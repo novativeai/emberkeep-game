@@ -1,0 +1,172 @@
+{
+  "default": [
+    0.5,
+    0.85
+  ],
+  "byKey": {
+    "tile_ash": [
+      0.5,
+      0.5
+    ],
+    "tile_ash_alt": [
+      0.5,
+      0.5
+    ],
+    "tile_moss": [
+      0.5,
+      0.5
+    ],
+    "tile_moss_alt": [
+      0.5,
+      0.5
+    ],
+    "cliff_sw": [
+      0.5,
+      0
+    ],
+    "cliff_se": [
+      0.5,
+      0
+    ],
+    "cliff_sw_b": [
+      0.5,
+      0
+    ],
+    "cliff_se_b": [
+      0.5,
+      0
+    ],
+    "cliff_corner_s": [
+      0.5,
+      0
+    ],
+    "cliff_corner_e": [
+      0.5,
+      0
+    ],
+    "cliff_corner_w": [
+      0.5,
+      0
+    ],
+    "cliff_rock": [
+      0.5,
+      0
+    ],
+    "fog_puff_1": [
+      0.5,
+      0.64
+    ],
+    "fog_puff_2": [
+      0.5,
+      0.64
+    ],
+    "decor_nest": [
+      0.5,
+      0.8
+    ],
+    "decor_brazier": [
+      0.5,
+      0.92
+    ],
+    "decor_far_isle": [
+      0.5,
+      0.5
+    ],
+    "fx_ember": [
+      0.5,
+      0.5
+    ],
+    "fx_spark": [
+      0.5,
+      0.5
+    ],
+    "fx_glow": [
+      0.5,
+      0.5
+    ],
+    "fx_shell": [
+      0.5,
+      0.5
+    ],
+    "ui_hand": [
+      0.3,
+      0.12
+    ],
+    "ui_arrow": [
+      0.5,
+      1
+    ],
+    "portrait_laurah": [
+      0.5,
+      0.5
+    ],
+    "portrait_pip": [
+      0.5,
+      0.5
+    ],
+    "portrait_cindra": [
+      0.5,
+      0.5
+    ],
+    "ui_tile_highlight": [
+      0.5,
+      0.5
+    ],
+    "ui_btn_play": [
+      0.5,
+      0.5
+    ],
+    "ui_btn_green": [
+      0.5,
+      0.5
+    ],
+    "ui_btn_round": [
+      0.5,
+      0.5
+    ],
+    "ui_panel": [
+      0.5,
+      0.5
+    ],
+    "ui_card": [
+      0.5,
+      0.5
+    ],
+    "ui_pill": [
+      0.5,
+      0.5
+    ],
+    "ui_slot": [
+      0.5,
+      0.5
+    ],
+    "ui_icon_bolt": [
+      0.5,
+      0.5
+    ],
+    "ui_icon_coin": [
+      0.5,
+      0.5
+    ],
+    "ui_icon_key": [
+      0.5,
+      0.5
+    ],
+    "ui_icon_gear": [
+      0.5,
+      0.5
+    ],
+    "ui_icon_scroll": [
+      0.5,
+      0.5
+    ],
+    "item_ember_dragon_2": [
+      0.5,
+      0.95
+    ],
+    "item_ember_dragon_3": [
+      0.5,
+      0.95
+    ]
+  }
+}

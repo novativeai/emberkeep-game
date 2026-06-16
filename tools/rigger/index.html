@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emberkeep Rigger — character rig station</title>
+<style>
+  :root {
+    --bg: #241B22; --panel: #322833; --panel2: #3A2B38; --line: #4A3845;
+    --cream: #FFF6E8; --gold: #F7A437; --gold2: #FFD84D; --lava: #E8503C;
+    --teal: #3FA8D9; --moss: #7ECB4F; --dim: #9b8d99;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg); color: var(--cream);
+    font: 13px/1.45 "Trebuchet MS", Verdana, sans-serif;
+    display: grid; grid-template-rows: 46px 1fr 30px; grid-template-columns: 1fr 295px;
+    grid-template-areas: "toolbar toolbar" "stage side" "status status";
+  }
+  /* ---------------- toolbar ---------------- */
+  #toolbar {
+    grid-area: toolbar; display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border-bottom: 1px solid var(--line); padding: 0 10px;
+  }
+  #toolbar .brand { color: var(--gold); font-weight: bold; margin-right: 6px; white-space: nowrap; }
+  button, select, input[type=text] {
+    background: var(--panel2); color: var(--cream); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--gold); }
+  button.tool.active { background: var(--gold); color: #3A2B38; font-weight: bold; }
+  button.primary { background: var(--moss); color: #1d3010; font-weight: bold; }
+  button.warn { background: var(--lava); color: var(--cream); }
+  #charName { width: 130px; }
+  .sep { width: 1px; height: 24px; background: var(--line); margin: 0 2px; }
+  .spacer { flex: 1; }
+  /* ---------------- stage ---------------- */
+  #stageWrap { grid-area: stage; position: relative; overflow: hidden; }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  #namePopup {
+    position: absolute; display: none; z-index: 10; background: var(--panel);
+    border: 2px solid var(--gold); border-radius: 8px; padding: 10px; width: 230px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.5);
+  }
+  #namePopup h4 { color: var(--gold2); margin-bottom: 6px; font-size: 12px; }
+  #namePopup select { width: 100%; margin-bottom: 8px; }
+  #namePopup .row { display: flex; gap: 6px; justify-content: flex-end; }
+  /* ---------------- sidebar ---------------- */
+  #side {
+    grid-area: side; background: var(--panel); border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #side h3 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--gold);
+    padding: 8px 10px 4px;
+  }
+  #side .hint { color: var(--dim); font-size: 11px; padding: 0 10px 6px; }
+  #layerList { overflow-y: auto; flex: 1.2; min-height: 120px; padding: 0 8px 8px; }
+  .layerRow {
+    display: flex; align-items: center; gap: 6px; padding: 4px 6px; margin-bottom: 4px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; cursor: grab;
+  }
+  .layerRow.selected { border-color: var(--gold); background: #4a3540; }
+  .layerRow.dragOver { border-top: 2px solid var(--gold2); }
+  .layerRow img.thumb { width: 34px; height: 34px; object-fit: contain; background:
+    repeating-conic-gradient(#555 0% 25%, #666 0% 50%) 0 0/12px 12px; border-radius: 4px; }
+  .layerRow select.partName { flex: 1; min-width: 0; padding: 3px 4px; font-size: 12px; }
+  .layerRow .mini { padding: 2px 6px; font-size: 11px; }
+  #jointList { overflow-y: auto; flex: 1; border-top: 1px solid var(--line); padding: 0 8px 8px; }
+  .jointRow {
+    display: flex; align-items: center; gap: 6px; padding: 3px 6px; margin-bottom: 3px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; font-size: 12px;
+  }
+  .jointRow.selected { border-color: var(--teal); }
+  .jointRow .tag { font-size: 10px; padding: 1px 5px; border-radius: 4px; font-weight: bold; }
+  .jointRow .tag.anchor { background: var(--gold); color: #3A2B38; }
+  .jointRow .tag.pin { background: var(--teal); color: #10242f; }
+  .jointRow .jname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .jointRow .mini { padding: 1px 6px; font-size: 11px; }
+  #status { grid-area: status; background: var(--panel); border-top: 1px solid var(--line);
+    padding: 5px 12px; color: var(--dim); white-space: nowrap; overflow: hidden; }
+  #status b { color: var(--gold2); }
+</style>
+</head>
+<body>
+  <div id="toolbar">
+    <span class="brand">🐉 Emberkeep Rigger</span>
+    <input id="charName" type="text" value="dragon-red" title="Character id (used in export filename + JSON)" />
+    <span class="sep"></span>
+    <button class="tool active" id="toolMove"  title="V — drag layers in the preview to align them">✥ Move</button>
+    <button class="tool" id="toolAnchor" title="A — select PARENT then CHILD layer, then drag in the preview to place the rotation anchor">◆ Anchor</button>
+    <button class="tool" id="toolPuppet" title="P — select ONE layer, then click inside it to place deform pins">● Puppet</button>
+    <span class="sep"></span>
+    <button id="zoomFit" title="F — fit content">Fit</button>
+    <button id="zoomIn">+</button>
+    <button id="zoomOut">−</button>
+    <span class="spacer"></span>
+    <button id="loadProject">Load project</button>
+    <button id="saveProject">Save project</button>
+    <button id="animateBtn" title="Preview animation presets driven by this rig">▶ Animate</button>
+    <button class="primary" id="exportRig" title="Self-contained rig JSON: layers, z-order, anchors (both-space + normalized origin), pin chains, root, embedded PNGs">⬇ Export rig.json</button>
+  </div>
+
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="namePopup">
+      <h4 id="popupTitle">Name this joint</h4>
+      <select id="popupSelect" size="9"></select>
+      <div class="row">
+        <button id="popupCancel">Cancel</button>
+        <button class="primary" id="popupOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="side">
+    <h3>Layers <small style="color:var(--dim)">(top of list = in front)</small></h3>
+    <div class="hint">Drag rows to reorder z. Click selects; in Anchor tool click PARENT then CHILD.</div>
+    <div style="padding:0 10px 6px"><button id="uploadBtn" style="width:100%">＋ Upload layer PNGs…</button>
+      <input id="fileInput" type="file" accept="image/png,image/webp" multiple hidden /></div>
+    <div id="layerList"></div>
+    <h3>Joints</h3>
+    <div class="hint">◆ anchors rotate a child around a point on its parent · ● pins deform within a layer. ▶ tests an anchor.<br>Click any marker to select & drag it (works in every tool); right-click it or press Delete to remove. Combined arm/leg layers: drop a 3-pin chain (shoulder→elbow→hand).</div>
+    <div id="jointList"></div>
+  </div>
+
+  <div id="status">Upload your layer PNGs to begin.</div>
+
+<script>
+'use strict';
+/* =====================================================================
+ * Emberkeep Rigger — outputs the EXACT contract the game's animation
+ * code consumes (see exportRig()): layer transforms + z-order, anchor
+ * joints in canvas/parent-local/child-local space with normalized child
+ * origins (Phaser setOrigin-ready), ordered puppet pin chains, the
+ * root_ground point, and the layer images embedded as data URLs.
+ * =================================================================== */
+
+/* ----- THE NAMING CONTRACT (do not free-type; the game code keys off these) ----- */
+const LAYER_PARTS = [
+  'body','body_tail','head','snout','jaw','neck','belly',
+  'eye_left','eye_right','eyelid_left','eyelid_right',
+  'horn_left','horn_right','ear_left','ear_right','crest',
+  'wing_left','wing_right','arm_left','arm_right','leg_left','leg_right',
+  'hand_left','hand_right','foot_left','foot_right',
+  'tail','shadow','accessory_a','accessory_b'
+];
+const ANCHOR_NAMES = [
+  'anchor_head','anchor_jaw','anchor_neck','anchor_snout',
+  'anchor_wing_left','anchor_wing_right',
+  'anchor_arm_left','anchor_arm_right','anchor_leg_left','anchor_leg_right',
+  'anchor_hand_left','anchor_hand_right','anchor_foot_left','anchor_foot_right',
+  'anchor_tail','anchor_crest',
+  'anchor_ear_left','anchor_ear_right','anchor_horn_left','anchor_horn_right',
+  'anchor_eyelid_left','anchor_eyelid_right',
+  'anchor_accessory_a','anchor_accessory_b'
+];
+const PIN_NAMES = [
+  'root_ground', // REQUIRED once, on the body layer: the character's ground contact point
+  'pin_tail_01','pin_tail_02','pin_tail_03','pin_tail_04',
+  'pin_wing_left_01','pin_wing_left_02','pin_wing_left_03',
+  'pin_wing_right_01','pin_wing_right_02','pin_wing_right_03',
+  // Combined shoulder+arm+hand limbs deform along a 3-pin chain (shoulder→elbow→hand):
+  'pin_arm_left_01','pin_arm_left_02','pin_arm_left_03',
+  'pin_arm_right_01','pin_arm_right_02','pin_arm_right_03',
+  // Combined hip+leg+foot limbs (hip→knee→foot):
+  'pin_leg_left_01','pin_leg_left_02','pin_leg_left_03',
+  'pin_leg_right_01','pin_leg_right_02','pin_leg_right_03',
+  'pin_hand_left_01','pin_hand_right_01','pin_foot_left_01','pin_foot_right_01',
+  'pin_neck_01','pin_neck_02',
+  'pin_body_01','pin_body_02','pin_body_03',
+  'pin_belly_01','pin_belly_02',
+  'pin_crest_01','pin_crest_02',
+  'pin_custom_01','pin_custom_02','pin_custom_03','pin_custom_04'
+];
+
+/* ----------------------------- state ----------------------------- */
+const S = {
+  layers: [],      // bottom -> top: {id,name,file,img,alpha,x,y,w,h,visible}
+  anchors: [],     // {id,name,parentId,childId,x,y}  (x,y in rig/canvas space)
+  pins: [],        // {id,name,layerId,x,y}
+  selection: [],   // layer ids, ordered (anchor tool: [parent, child])
+  selectedJoint: null,        // {kind:'anchor'|'pin', id}
+  tool: 'move',
+  zoom: 1, panX: 0, panY: 0,
+  drag: null,      // {kind:'layer'|'marker'|'pan'|'place', ...}
+  pending: null,   // marker awaiting a name {kind, ...coords}
+  wiggle: null,    // {anchorId, t0}
+  nextId: 1
+};
+const uid = () => S.nextId++;
+
+const stage = document.getElementById('stage');
+const ctx = stage.getContext('2d');
+const wrap = document.getElementById('stageWrap');
+const status = document.getElementById('status');
+const say = (html) => { status.innerHTML = html; };
+
+/* --------------------------- helpers --------------------------- */
+const layerById = (id) => S.layers.find((l) => l.id === id);
+const usedNames = (kind) => new Set((kind === 'anchor' ? S.anchors : S.pins).map((j) => j.name));
+const toWorld = (sx, sy) => ({ x: (sx - S.panX) / S.zoom, y: (sy - S.panY) / S.zoom });
+const toScreen = (wx, wy) => ({ x: wx * S.zoom + S.panX, y: wy * S.zoom + S.panY });
+
+function alphaAt(layer, wx, wy) {
+  const lx = Math.floor(wx - layer.x), ly = Math.floor(wy - layer.y);
+  if (lx < 0 || ly < 0 || lx >= layer.w || ly >= layer.h) return 0;
+  return layer.alpha[ly * layer.w + lx];
+}
+function topLayerAt(wx, wy) {
+  for (let i = S.layers.length - 1; i >= 0; i--) {
+    const l = S.layers[i];
+    if (l.visible && alphaAt(l, wx, wy) > 12) return l;
+  }
+  return null;
+}
+function markerAt(wx, wy) {
+  // Grabbable in ANY tool. Pins are smaller/on top, so test them first.
+  const r = 12 / S.zoom;
+  for (const p of S.pins) if (Math.hypot(p.x - wx, p.y - wy) < r) return { kind: 'pin', j: p };
+  for (const a of S.anchors) if (Math.hypot(a.x - wx, a.y - wy) < r) return { kind: 'anchor', j: a };
+  return null;
+}
+function deleteJoint(kind, id) {
+  if (kind === 'anchor') S.anchors = S.anchors.filter((a) => a.id !== id);
+  else S.pins = S.pins.filter((p) => p.id !== id);
+  if (S.selectedJoint && S.selectedJoint.id === id) S.selectedJoint = null;
+  renderJoints(); render();
+}
+
+/* --------------------------- rendering --------------------------- */
+function resize() {
+  stage.width = wrap.clientWidth * devicePixelRatio;
+  stage.height = wrap.clientHeight * devicePixelRatio;
+  render();
+}
+new ResizeObserver(resize).observe(wrap);
+
+function descendantsOf(childId) {
+  // The child layer of a wiggled anchor plus everything anchored below it.
+  const set = new Set([childId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const a of S.anchors) {
+      if (set.has(a.parentId) && !set.has(a.childId)) { set.add(a.childId); grew = true; }
+    }
+  }
+  return set;
+}
+
+function render() {
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  ctx.clearRect(0, 0, wrap.clientWidth, wrap.clientHeight);
+  // checkerboard
+  const cell = 14;
+  for (let y = 0; y < wrap.clientHeight; y += cell) {
+    for (let x = 0; x < wrap.clientWidth; x += cell) {
+      ctx.fillStyle = ((x + y) / cell) % 2 ? '#2c2430' : '#352b39';
+      ctx.fillRect(x, y, cell, cell);
+    }
+  }
+  ctx.save();
+  ctx.translate(S.panX, S.panY);
+  ctx.scale(S.zoom, S.zoom);
+
+  let wig = null;
+  if (S.wiggle) {
+    const a = S.anchors.find((x) => x.id === S.wiggle.anchorId);
+    const t = (performance.now() - S.wiggle.t0) / 1000;
+    if (!a || t > 1.8) { S.wiggle = null; }
+    else wig = { a, theta: Math.sin(t * Math.PI * 3) * 0.26 * Math.max(0, 1 - t / 1.8), set: descendantsOf(a.childId) };
+  }
+
+  for (const l of S.layers) {
+    if (!l.visible) continue;
+    ctx.save();
+    if (wig && wig.set.has(l.id)) {
+      ctx.translate(wig.a.x, wig.a.y);
+      ctx.rotate(wig.theta);
+      ctx.translate(-wig.a.x, -wig.a.y);
+    }
+    ctx.drawImage(l.img, l.x, l.y);
+    ctx.restore();
+    if (S.selection.includes(l.id)) {
+      ctx.strokeStyle = S.selection[0] === l.id ? '#F7A437' : '#FFD84D';
+      ctx.lineWidth = 2 / S.zoom;
+      ctx.setLineDash([6 / S.zoom, 4 / S.zoom]);
+      ctx.strokeRect(l.x, l.y, l.w, l.h);
+      ctx.setLineDash([]);
+    }
+  }
+
+  const label = (x, y, text, color) => {
+    ctx.font = `${11 / S.zoom}px Trebuchet MS`;
+    const w = ctx.measureText(text).width + 8 / S.zoom;
+    ctx.fillStyle = 'rgba(36,27,34,.85)';
+    ctx.fillRect(x + 8 / S.zoom, y - 16 / S.zoom, w, 14 / S.zoom);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x + 12 / S.zoom, y - 5 / S.zoom);
+  };
+  // anchors ◆
+  for (const a of S.anchors) {
+    const sel = S.selectedJoint && S.selectedJoint.kind === 'anchor' && S.selectedJoint.id === a.id;
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = sel ? '#FFD84D' : '#F7A437';
+    ctx.strokeStyle = '#241B22';
+    ctx.lineWidth = 1.5 / S.zoom;
+    const r = 6 / S.zoom;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.strokeRect(-r, -r, r * 2, r * 2);
+    ctx.restore();
+    label(a.x, a.y, a.name, '#FFD84D');
+  }
+  // pins ●
+  for (const p of S.pins) {
+    const sel = S.selectedJoint && S.selectedJoint.kind === 'pin' && S.selectedJoint.id === p.id;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5.5 / S.zoom, 0, Math.PI * 2);
+    ctx.fillStyle = p.name === 'root_ground' ? '#7ECB4F' : sel ? '#7fd4ff' : '#3FA8D9';
+    ctx.fill();
+    ctx.strokeStyle = '#241B22';
+    ctx.lineWidth = 1.5 / S.zoom;
+    ctx.stroke();
+    label(p.x, p.y, p.name, p.name === 'root_ground' ? '#7ECB4F' : '#7fd4ff');
+  }
+  // marker being placed
+  if (S.drag && S.drag.kind === 'place') {
+    ctx.beginPath();
+    ctx.arc(S.drag.x, S.drag.y, 7 / S.zoom, 0, Math.PI * 2);
+    ctx.strokeStyle = S.tool === 'anchor' ? '#F7A437' : '#3FA8D9';
+    ctx.lineWidth = 2 / S.zoom;
+    ctx.stroke();
+  }
+  ctx.restore();
+  if (S.wiggle) requestAnimationFrame(render);
+}
+
+/* --------------------------- layers UI --------------------------- */
+const layerList = document.getElementById('layerList');
+function renderLayers() {
+  layerList.innerHTML = '';
+  // top of list = topmost sprite => iterate reversed
+  [...S.layers].reverse().forEach((l) => {
+    const row = document.createElement('div');
+    row.className = 'layerRow' + (S.selection.includes(l.id) ? ' selected' : '');
+    row.draggable = true;
+    row.dataset.id = l.id;
+
+    const thumb = document.createElement('img');
+    thumb.className = 'thumb';
+    thumb.src = l.img.src;
+    row.appendChild(thumb);
+
+    const sel = document.createElement('select');
+    sel.className = 'partName';
+    sel.title = l.file;
+    for (const part of LAYER_PARTS) {
+      const o = document.createElement('option');
+      o.value = part; o.textContent = part;
+      if (part === l.name) o.selected = true;
+      sel.appendChild(o);
+    }
+    if (!LAYER_PARTS.includes(l.name)) {
+      const o = document.createElement('option');
+      o.value = l.name; o.textContent = `${l.name} (?)`; o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.onchange = () => { l.name = sel.value; renderJoints(); say(`Layer renamed to <b>${l.name}</b>.`); };
+    sel.onclick = (e) => e.stopPropagation();
+    row.appendChild(sel);
+
+    const eye = document.createElement('button');
+    eye.className = 'mini';
+    eye.textContent = l.visible ? '👁' : '–';
+    eye.onclick = (e) => { e.stopPropagation(); l.visible = !l.visible; renderLayers(); render(); };
+    row.appendChild(eye);
+
+    const del = document.createElement('button');
+    del.className = 'mini warn';
+    del.textContent = '✕';
+    del.onclick = (e) => {
+      e.stopPropagation();
+      S.layers = S.layers.filter((x) => x.id !== l.id);
+      S.anchors = S.anchors.filter((a) => a.parentId !== l.id && a.childId !== l.id);
+      S.pins = S.pins.filter((p) => p.layerId !== l.id);
+      S.selection = S.selection.filter((id) => id !== l.id);
+      renderLayers(); renderJoints(); render();
+    };
+    row.appendChild(del);
+
+    row.onclick = () => selectLayer(l.id);
+    row.ondragstart = (e) => e.dataTransfer.setData('text/plain', String(l.id));
+    row.ondragover = (e) => { e.preventDefault(); row.classList.add('dragOver'); };
+    row.ondragleave = () => row.classList.remove('dragOver');
+    row.ondrop = (e) => {
+      e.preventDefault();
+      row.classList.remove('dragOver');
+      const fromId = Number(e.dataTransfer.getData('text/plain'));
+      if (fromId === l.id) return;
+      const from = S.layers.findIndex((x) => x.id === fromId);
+      const moved = S.layers.splice(from, 1)[0];
+      const to = S.layers.findIndex((x) => x.id === l.id);
+      S.layers.splice(to + 1, 0, moved); // dropping ON a row places the moved layer just above it
+      renderLayers(); render();
+      say(`Z-order updated — <b>${moved.name}</b> now sits above <b>${l.name}</b>.`);
+    };
+    layerList.appendChild(row);
+  });
+}
+
+function selectLayer(id) {
+  if (S.tool === 'anchor') {
+    // ordered pair: first = PARENT, second = CHILD
+    if (S.selection.includes(id)) S.selection = S.selection.filter((x) => x !== id);
+    else S.selection = [...S.selection, id].slice(-2);
+    const names = S.selection.map((x) => layerById(x).name);
+    say(S.selection.length === 2
+      ? `Anchor pair: parent <b>${names[0]}</b> → child <b>${names[1]}</b>. Drag in the preview to place the pivot.`
+      : `Parent = <b>${names[0] ?? '…'}</b>. Now click the CHILD layer.`);
+  } else {
+    S.selection = [id];
+    say(`Selected <b>${layerById(id).name}</b>.`);
+  }
+  renderLayers(); render();
+}
+
+/* --------------------------- joints UI --------------------------- */
+const jointList = document.getElementById('jointList');
+function renderJoints() {
+  jointList.innerHTML = '';
+  const addRow = (kind, j, desc) => {
+    const row = document.createElement('div');
+    const isSel = S.selectedJoint && S.selectedJoint.kind === kind && S.selectedJoint.id === j.id;
+    row.className = 'jointRow' + (isSel ? ' selected' : '');
+    row.innerHTML = `<span class="tag ${kind}">${kind === 'anchor' ? '◆' : '●'}</span>
+      <span class="jname" title="${desc}">${j.name} <small style="color:var(--dim)">${desc}</small></span>`;
+    row.onclick = () => { S.selectedJoint = { kind, id: j.id }; renderJoints(); render(); };
+    if (kind === 'anchor') {
+      const test = document.createElement('button');
+      test.className = 'mini'; test.textContent = '▶'; test.title = 'Test: wiggle the child around this anchor';
+      test.onclick = (e) => { e.stopPropagation(); S.wiggle = { anchorId: j.id, t0: performance.now() }; render(); };
+      row.appendChild(test);
+    }
+    const del = document.createElement('button');
+    del.className = 'mini warn'; del.textContent = '✕';
+    del.onclick = (e) => {
+      e.stopPropagation();
+      if (kind === 'anchor') S.anchors = S.anchors.filter((a) => a.id !== j.id);
+      else S.pins = S.pins.filter((p) => p.id !== j.id);
+      S.selectedJoint = null; renderJoints(); render();
+    };
+    row.appendChild(del);
+    jointList.appendChild(row);
+  };
+  for (const a of S.anchors) {
+    const p = layerById(a.parentId), c = layerById(a.childId);
+    addRow('anchor', a, `${p ? p.name : '?'}→${c ? c.name : '?'}`);
+  }
+  for (const p of S.pins) addRow('pin', p, layerById(p.layerId)?.name ?? '?');
+}
+
+/* --------------------------- upload --------------------------- */
+document.getElementById('uploadBtn').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = async (e) => {
+  for (const file of e.target.files) await addLayerFromFile(file);
+  e.target.value = '';
+  fitView();
+};
+function guessPart(filename) {
+  // Token match so "red-dragon-leftWing.png" -> wing_left, "bodyTail" -> body_tail.
+  const stem = filename.toLowerCase().replace(/\.(png|webp)$/, '')
+    .replace(/([a-z])([A-Z])/g, '$1_$2').replace(/[\s-]+/g, '_');
+  const candidates = [...LAYER_PARTS].sort((a, b) => b.split('_').length - a.split('_').length);
+  for (const part of candidates) {
+    if (part.split('_').every((token) => stem.includes(token))) return part;
+  }
+  return stem;
+}
+function addLayerFromImage(img, file, x, y) {
+  const off = document.createElement('canvas');
+  off.width = img.naturalWidth; off.height = img.naturalHeight;
+  const octx = off.getContext('2d', { willReadFrequently: true });
+  octx.drawImage(img, 0, 0);
+  const data = octx.getImageData(0, 0, off.width, off.height).data;
+  const alpha = new Uint8Array(off.width * off.height);
+  for (let i = 0; i < alpha.length; i++) alpha[i] = data[i * 4 + 3];
+  // Pieces exported on a shared canvas stack perfectly: snap to a same-size sibling.
+  const sibling = S.layers.find((l) => l.w === off.width && l.h === off.height);
+  S.layers.push({
+    id: uid(), name: guessPart(file), file, img, alpha,
+    x: x ?? (sibling ? sibling.x : 60 + S.layers.length * 14),
+    y: y ?? (sibling ? sibling.y : 60 + S.layers.length * 14),
+    w: off.width, h: off.height, visible: true
+  });
+  renderLayers(); render();
+}
+function addLayerFromFile(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => { addLayerFromImage(img, file.name); resolve(); };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* --------------------------- tools & input --------------------------- */
+function setTool(tool) {
+  S.tool = tool;
+  S.selection = S.selection.slice(0, tool === 'anchor' ? 2 : 1);
+  for (const id of ['toolMove', 'toolAnchor', 'toolPuppet']) {
+    document.getElementById(id).classList.toggle('active', id === 'tool' + tool[0].toUpperCase() + tool.slice(1));
+  }
+  say({
+    move: 'Move tool — drag layers in the preview to align them.',
+    anchor: 'Anchor tool — click the PARENT layer, then the CHILD (sidebar or canvas), then drag in the preview to place the rotation pivot.',
+    puppet: 'Puppet tool — select ONE layer, then click inside it to drop deform pins (chains are ordered by their _01/_02 suffix).'
+  }[tool]);
+  renderLayers(); render();
+}
+document.getElementById('toolMove').onclick = () => setTool('move');
+document.getElementById('toolAnchor').onclick = () => setTool('anchor');
+document.getElementById('toolPuppet').onclick = () => setTool('puppet');
+
+stage.addEventListener('contextmenu', (e) => e.preventDefault());
+stage.addEventListener('mousedown', (e) => {
+  const rect = stage.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const w = toWorld(sx, sy);
+  // 1) A joint marker under the cursor — select / move / (right-click) delete, in ANY tool.
+  if (e.code !== 'Space' && !e.altKey) {
+    const m = markerAt(w.x, w.y);
+    if (m) {
+      S.selectedJoint = { kind: m.kind, id: m.j.id };
+      if (e.button === 2) { deleteJoint(m.kind, m.j.id); return; }
+      S.drag = { kind: 'marker', m };
+      renderJoints(); render();
+      return;
+    }
+  }
+  // 2) Pan (middle / right / alt / space).
+  if (e.button === 1 || e.button === 2 || e.altKey || e.code === 'Space') {
+    S.drag = { kind: 'pan', sx, sy, panX: S.panX, panY: S.panY };
+    return;
+  }
+
+  if (S.tool === 'move') {
+    const l = topLayerAt(w.x, w.y);
+    if (l) {
+      if (!S.selection.includes(l.id)) selectLayer(l.id);
+      S.drag = { kind: 'layer', id: l.id, dx: w.x - l.x, dy: w.y - l.y };
+    }
+  } else if (S.tool === 'anchor') {
+    if (S.selection.length !== 2) {
+      const l = topLayerAt(w.x, w.y);
+      if (l) selectLayer(l.id);
+      else say('Anchor tool: pick the PARENT layer first, then the CHILD.');
+      return;
+    }
+    S.drag = { kind: 'place', x: w.x, y: w.y };
+  } else if (S.tool === 'puppet') {
+    if (S.selection.length !== 1) { say('Puppet tool: select exactly ONE layer first.'); return; }
+    const layer = layerById(S.selection[0]);
+    if (alphaAt(layer, w.x, w.y) <= 12) { say(`Click INSIDE <b>${layer.name}</b> to place a pin.`); return; }
+    S.drag = { kind: 'place', x: w.x, y: w.y };
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  if (!S.drag) return;
+  const rect = stage.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const w = toWorld(sx, sy);
+  if (S.drag.kind === 'pan') {
+    S.panX = S.drag.panX + (sx - S.drag.sx);
+    S.panY = S.drag.panY + (sy - S.drag.sy);
+  } else if (S.drag.kind === 'layer') {
+    const l = layerById(S.drag.id);
+    l.x = Math.round(w.x - S.drag.dx);
+    l.y = Math.round(w.y - S.drag.dy);
+  } else if (S.drag.kind === 'marker') {
+    S.drag.m.j.x = Math.round(w.x);
+    S.drag.m.j.y = Math.round(w.y);
+  } else if (S.drag.kind === 'place') {
+    S.drag.x = w.x; S.drag.y = w.y;
+  }
+  render();
+});
+window.addEventListener('mouseup', (e) => {
+  if (!S.drag) return;
+  const drag = S.drag;
+  S.drag = null;
+  if (drag.kind === 'place') {
+    const rect = stage.getBoundingClientRect();
+    if (S.tool === 'anchor') {
+      S.pending = { kind: 'anchor', x: Math.round(drag.x), y: Math.round(drag.y) };
+      openNamePopup('anchor', e.clientX - rect.left, e.clientY - rect.top);
+    } else {
+      S.pending = { kind: 'pin', x: Math.round(drag.x), y: Math.round(drag.y), layerId: S.selection[0] };
+      openNamePopup('pin', e.clientX - rect.left, e.clientY - rect.top);
+    }
+  }
+  render();
+});
+stage.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = stage.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const before = toWorld(sx, sy);
+  S.zoom = Math.min(8, Math.max(0.1, S.zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  S.panX = sx - before.x * S.zoom;
+  S.panY = sy - before.y * S.zoom;
+  render();
+}, { passive: false });
+
+function fitView() {
+  if (S.layers.length === 0) return;
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (const l of S.layers) {
+    minX = Math.min(minX, l.x); minY = Math.min(minY, l.y);
+    maxX = Math.max(maxX, l.x + l.w); maxY = Math.max(maxY, l.y + l.h);
+  }
+  const pad = 60;
+  S.zoom = Math.min((wrap.clientWidth - pad) / (maxX - minX), (wrap.clientHeight - pad) / (maxY - minY), 4);
+  S.panX = (wrap.clientWidth - (maxX - minX) * S.zoom) / 2 - minX * S.zoom;
+  S.panY = (wrap.clientHeight - (maxY - minY) * S.zoom) / 2 - minY * S.zoom;
+  render();
+}
+document.getElementById('zoomFit').onclick = fitView;
+document.getElementById('zoomIn').onclick = () => { S.zoom = Math.min(8, S.zoom * 1.25); render(); };
+document.getElementById('zoomOut').onclick = () => { S.zoom = Math.max(0.1, S.zoom / 1.25); render(); };
+
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'v' || e.key === 'V') setTool('move');
+  if (e.key === 'a' || e.key === 'A') setTool('anchor');
+  if (e.key === 'p' || e.key === 'P') setTool('puppet');
+  if (e.key === 'f' || e.key === 'F') fitView();
+  if (e.key === 'Escape') { S.pending = null; document.getElementById('namePopup').style.display = 'none'; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && S.selectedJoint) {
+    if (S.selectedJoint.kind === 'anchor') S.anchors = S.anchors.filter((a) => a.id !== S.selectedJoint.id);
+    else S.pins = S.pins.filter((p) => p.id !== S.selectedJoint.id);
+    S.selectedJoint = null; renderJoints(); render();
+  }
+});
+
+/* --------------------------- name popup --------------------------- */
+const popup = document.getElementById('namePopup');
+const popupSelect = document.getElementById('popupSelect');
+function openNamePopup(kind, px, py) {
+  const names = kind === 'anchor' ? ANCHOR_NAMES : PIN_NAMES;
+  const used = usedNames(kind);
+  popupSelect.innerHTML = '';
+  let suggested = null;
+  // Suggest a name matching the child/pin layer part.
+  const targetLayer = kind === 'anchor' ? layerById(S.selection[1]) : layerById(S.pending.layerId);
+  for (const n of names) {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = used.has(n) ? `${n} (used)` : n;
+    o.disabled = used.has(n);
+    if (!o.disabled && !suggested && targetLayer && n.includes(targetLayer.name)) { o.selected = true; suggested = n; }
+    popupSelect.appendChild(o);
+  }
+  document.getElementById('popupTitle').textContent =
+    kind === 'anchor'
+      ? `Anchor: ${layerById(S.selection[0])?.name} → ${layerById(S.selection[1])?.name}`
+      : `Pin on ${targetLayer?.name}`;
+  popup.style.left = Math.min(px, wrap.clientWidth - 250) + 'px';
+  popup.style.top = Math.min(py, wrap.clientHeight - 280) + 'px';
+  popup.style.display = 'block';
+  popupSelect.focus();
+}
+document.getElementById('popupCancel').onclick = () => { S.pending = null; popup.style.display = 'none'; render(); };
+document.getElementById('popupOk').onclick = commitPending;
+popupSelect.addEventListener('dblclick', commitPending);
+function commitPending() {
+  if (!S.pending || !popupSelect.value) return;
+  const name = popupSelect.value;
+  if (S.pending.kind === 'anchor') {
+    S.anchors.push({ id: uid(), name, parentId: S.selection[0], childId: S.selection[1], x: S.pending.x, y: S.pending.y });
+    say(`Anchor <b>${name}</b> placed (${layerById(S.selection[0]).name} → ${layerById(S.selection[1]).name}). Press ▶ in the joint list to test it.`);
+  } else {
+    S.pins.push({ id: uid(), name, layerId: S.pending.layerId, x: S.pending.x, y: S.pending.y });
+    say(`Pin <b>${name}</b> placed on <b>${layerById(S.pending.layerId).name}</b>.`);
+  }
+  S.pending = null;
+  popup.style.display = 'none';
+  renderJoints(); render();
+}
+
+/* --------------------------- export / save / load --------------------------- */
+function download(filename, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function buildDocument(embedImages) {
+  const character = document.getElementById('charName').value.trim() || 'character';
+  const root = S.pins.find((p) => p.name === 'root_ground') ?? null;
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (const l of S.layers) {
+    minX = Math.min(minX, l.x); minY = Math.min(minY, l.y);
+    maxX = Math.max(maxX, l.x + l.w); maxY = Math.max(maxY, l.y + l.h);
+  }
+  if (S.layers.length === 0) { minX = minY = 0; maxX = maxY = 1; }
+  const doc = {
+    format: 'emberkeep-rig',
+    version: 1,
+    character,
+    /** Everything below is in "rig space" (the shared canvas the layers were aligned in). */
+    bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+    root: root ? { x: root.x, y: root.y } : null,
+    layers: S.layers.map((l, i) => ({
+      name: l.name,
+      file: l.file,
+      z: i, // 0 = back, higher = front
+      x: l.x, y: l.y, width: l.w, height: l.h,
+      visible: l.visible,
+      /** offset of the layer's top-left from root_ground, if set */
+      fromRoot: root ? { x: l.x - root.x, y: l.y - root.y } : null
+    })),
+    anchors: S.anchors.map((a) => {
+      const parent = layerById(a.parentId), child = layerById(a.childId);
+      return {
+        name: a.name,
+        parentLayer: parent.name,
+        childLayer: child.name,
+        rig: { x: a.x, y: a.y },
+        parentLocal: { x: a.x - parent.x, y: a.y - parent.y },
+        childLocal: { x: a.x - child.x, y: a.y - child.y },
+        /** Phaser-ready: child.setOrigin(childOriginNorm.x, childOriginNorm.y) rotates around this anchor */
+        childOriginNorm: { x: +((a.x - child.x) / child.w).toFixed(4), y: +((a.y - child.y) / child.h).toFixed(4) }
+      };
+    }),
+    pins: S.pins.map((p) => {
+      const layer = layerById(p.layerId);
+      return {
+        name: p.name,
+        layer: layer.name,
+        /** chain id + order parsed from the canonical name, e.g. pin_tail_02 -> tail #2 */
+        chain: (p.name.match(/^pin_(.+)_(\d+)$/) ?? [null, null, null])[1],
+        order: Number((p.name.match(/_(\d+)$/) ?? [0, 0])[1]),
+        rig: { x: p.x, y: p.y },
+        local: { x: p.x - layer.x, y: p.y - layer.y },
+        norm: { x: +((p.x - layer.x) / layer.w).toFixed(4), y: +((p.y - layer.y) / layer.h).toFixed(4) }
+      };
+    })
+  };
+  if (embedImages) {
+    doc.images = {};
+    for (const l of S.layers) doc.images[l.file] = l.img.src;
+  }
+  return doc;
+}
+document.getElementById('exportRig').onclick = () => {
+  const problems = [];
+  if (!S.pins.some((p) => p.name === 'root_ground')) problems.push('no root_ground pin (place one on the body layer — the ground contact point)');
+  const unknown = S.layers.filter((l) => !LAYER_PARTS.includes(l.name));
+  if (unknown.length) problems.push(`layers with non-canonical names: ${unknown.map((l) => l.name).join(', ')}`);
+  const doc = buildDocument(true);
+  download(`${doc.character}.rig.json`, JSON.stringify(doc, null, 2));
+  say(problems.length
+    ? `Exported with <b style="color:var(--lava)">warnings</b>: ${problems.join(' · ')}`
+    : `Exported <b>${doc.character}.rig.json</b> — layers, z-order, anchors, pin chains, root and images all embedded. ✔`);
+};
+document.getElementById('saveProject').onclick = () => {
+  const doc = buildDocument(true);
+  doc.format = 'emberkeep-rig-project';
+  download(`${doc.character}.rigproject.json`, JSON.stringify(doc));
+  say('Project saved (re-loadable with every layer + joint).');
+};
+document.getElementById('animateBtn').onclick = () => {
+  if (S.layers.length === 0) { say('Upload and rig some layers before animating.'); return; }
+  try { localStorage.setItem('emberkeep_rig_handoff', JSON.stringify(buildDocument(true))); } catch (e) {}
+  window.open('animator.html', '_blank');
+  say('Opened the Animator with the current rig — pick a preset to play it.');
+};
+document.getElementById('loadProject').onclick = () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json';
+  input.onchange = () => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const doc = JSON.parse(reader.result);
+      S.layers = []; S.anchors = []; S.pins = []; S.selection = []; S.nextId = 1;
+      document.getElementById('charName').value = doc.character ?? 'character';
+      const byName = {};
+      let remaining = doc.layers.length;
+      doc.layers.sort((a, b) => a.z - b.z).forEach((ld) => {
+        const img = new Image();
+        img.onload = () => {
+          addLayerFromImage(img, ld.file, ld.x, ld.y);
+          const layer = S.layers[S.layers.length - 1];
+          layer.name = ld.name;
+          layer.visible = ld.visible !== false;
+          byName[ld.name] = layer.id;
+          if (--remaining === 0) {
+            for (const a of doc.anchors ?? []) {
+              S.anchors.push({ id: uid(), name: a.name, parentId: byName[a.parentLayer], childId: byName[a.childLayer], x: a.rig.x, y: a.rig.y });
+            }
+            for (const p of doc.pins ?? []) {
+              S.pins.push({ id: uid(), name: p.name, layerId: byName[p.layer], x: p.rig.x, y: p.rig.y });
+            }
+            renderLayers(); renderJoints(); fitView();
+            say(`Loaded <b>${doc.character}</b>: ${doc.layers.length} layers, ${(doc.anchors ?? []).length} anchors, ${(doc.pins ?? []).length} pins.`);
+          }
+        };
+        img.src = (doc.images ?? {})[ld.file];
+      });
+    };
+    reader.readAsText(input.files[0]);
+  };
+  input.click();
+};
+
+resize();
+</script>
+</body>
+</html>

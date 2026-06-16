@@ -1,0 +1,100 @@
+{
+  "steps": [
+    {
+      "id": "pip_welcome",
+      "speaker": "laurah",
+      "text": "Welcome to Emberkeep, Keeper. I’m Laurah — last of the Dragon Masters. Once the Great Flame warmed every isle… then it went dark, and the dragons fell asleep under the ash. But you carry an ember. That’s all hope ever needs.",
+      "gate": { "type": "tap" },
+      "allow": {}
+    },
+    {
+      "id": "pip_merge_weeds",
+      "speaker": "laurah",
+      "text": "See those Spark Weeds glowing? Drag three together — where they merge, the ground remembers how to bloom. Go on, try it.",
+      "gate": { "type": "event", "event": "item:merged", "chain": "sparkweed" },
+      "highlight": [[2, 6], [2, 7], [4, 8]],
+      "hand": { "from": [4, 8], "to": [2, 8] },
+      "arrow": { "tile": [2, 8] },
+      "allow": { "drag": ["sparkweed"] }
+    },
+    {
+      "id": "pip_warmth",
+      "speaker": "laurah",
+      "text": "There — feel that warmth? The whole Hollow used to shine like this. Every merge you make pushes the cold back a little further.",
+      "gate": { "type": "tap" },
+      "allow": {}
+    },
+    {
+      "id": "pip_merge_eggs",
+      "speaker": "laurah",
+      "text": "Now the part I love most. These speckled eggs have slept a hundred years. Bring three together… and watch what wakes up.",
+      "gate": { "type": "event", "event": "item:hatched" },
+      "highlight": [[3, 6], [4, 6], [5, 8]],
+      "hand": { "from": [5, 8], "to": [3, 7] },
+      "arrow": { "tile": [3, 7] },
+      "allow": { "drag": ["ember_dragon"] }
+    },
+    {
+      "id": "cindra_hatch",
+      "speaker": "laurah",
+      "text": "A hatchling! Oh, she’s perfect. The Flame stirs again, Keeper — I’ve not seen a dragon born since I was a girl. You did that.",
+      "gate": { "type": "tap" },
+      "allow": {}
+    },
+    {
+      "id": "pip_harvest",
+      "speaker": "laurah",
+      "text": "She already adores you. Tap her and she’ll dig up a Gem Shard — it costs a spark of warmth, that little flame up top.",
+      "gate": { "type": "event", "event": "item:harvested" },
+      "highlight": ["last_hatched"],
+      "arrow": { "tile": "last_hatched" },
+      "allow": { "tapGenerators": true }
+    },
+    {
+      "id": "pip_merge_gems",
+      "speaker": "laurah",
+      "text": "Merge three Shards into a Flame Gem — and make TWO, would you? My old friend Cindra has been waiting on them for her brazier. Forever, to hear her tell it.",
+      "gate": { "type": "count", "chain": "flame_gem", "tier": 2, "count": 2 },
+      "allow": { "drag": ["flame_gem"], "tapGenerators": true }
+    },
+    {
+      "id": "pip_ledger",
+      "speaker": "laurah",
+      "text": "Open the Ledger — the scroll button. Cindra writes down every promise the Keep owes… and she does not like to be kept waiting.",
+      "gate": { "type": "event", "event": "ui:ledger_opened" },
+      "arrow": { "ui": "ledger" },
+      "allow": { "ledger": true }
+    },
+    {
+      "id": "pip_deliver",
+      "speaker": "laurah",
+      "text": "There’s her order — two Flame Gems. Press Deliver, and watch her pretend she isn’t pleased.",
+      "gate": { "type": "event", "event": "order:completed" },
+      "hand": { "ui": "deliver" },
+      "allow": { "ledger": true, "deliver": true }
+    },
+    {
+      "id": "cindra_key",
+      "speaker": "laurah",
+      "text": "Ha! ‘Adequate,’ she says — from Cindra, that’s a standing ovation. And look: a Gold Key. The terrace beyond the clouds has slept under ash long enough.",
+      "gate": { "type": "tap" },
+      "allow": {}
+    },
+    {
+      "id": "pip_fog",
+      "speaker": "laurah",
+      "text": "See the clouds crowding the edge of the clearing? Tap them — a Gold Key burns the fog away like morning mist. This is my favourite part. Watch… whoosh.",
+      "gate": { "type": "event", "event": "region:unlocked" },
+      "arrow": { "fogRegion": "level_2_gate" },
+      "hand": { "fogRegion": "level_2_gate" },
+      "allow": { "fog": true }
+    },
+    {
+      "id": "pip_free",
+      "speaker": "laurah",
+      "text": "Look at it GLOW — new eggs, an old nest, room to grow. Emberkeep is waking, Keeper, and it’s all your doing. Go on — make it warm again. I’ll be right here.",
+      "gate": { "type": "tap" },
+      "allow": {}
+    }
+  ]
+}

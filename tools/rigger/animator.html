@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emberkeep Animator — rig preview</title>
+<style>
+  :root {
+    --bg:#241B22; --panel:#322833; --panel2:#3A2B38; --line:#4A3845;
+    --cream:#FFF6E8; --gold:#F7A437; --gold2:#FFD84D; --lava:#E8503C;
+    --teal:#3FA8D9; --moss:#7ECB4F; --dim:#9b8d99;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; overflow:hidden; }
+  body { background:var(--bg); color:var(--cream); font:13px/1.45 "Trebuchet MS",Verdana,sans-serif;
+    display:grid; grid-template-rows:46px 1fr 28px; grid-template-columns:1fr 320px;
+    grid-template-areas:"toolbar toolbar" "stage side" "status status"; }
+  #toolbar { grid-area:toolbar; display:flex; align-items:center; gap:8px; background:var(--panel);
+    border-bottom:1px solid var(--line); padding:0 10px; }
+  #toolbar .brand { color:var(--gold); font-weight:bold; }
+  button,select { background:var(--panel2); color:var(--cream); border:1px solid var(--line);
+    border-radius:6px; padding:5px 10px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--gold); }
+  button.primary { background:var(--moss); color:#1d3010; font-weight:bold; }
+  button.playing { background:var(--gold); color:#3A2B38; font-weight:bold; }
+  .spacer { flex:1; } .sep { width:1px; height:24px; background:var(--line); }
+  #stageWrap { grid-area:stage; position:relative; overflow:hidden; }
+  #stage { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #side { grid-area:side; background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; }
+  #side h3 { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--gold); padding:9px 10px 3px; }
+  .hint { color:var(--dim); font-size:11px; padding:0 10px 6px; }
+  .preset { display:block; width:calc(100% - 16px); margin:4px 8px; text-align:left; padding:8px 10px; }
+  .preset .emoji { margin-right:6px; }
+  .preset small { color:var(--dim); display:block; font-weight:normal; }
+  .preset.playing small { color:#5a3a10; }
+  #transport { display:flex; gap:6px; padding:4px 8px 8px; align-items:center; }
+  #transport input[type=range] { flex:1; }
+  #caps, #channels { padding:0 10px 8px; font-size:12px; }
+  .cap { display:flex; gap:6px; align-items:center; margin-bottom:2px; }
+  .pill { font-size:10px; padding:1px 6px; border-radius:8px; font-weight:bold; }
+  .pill.anchor { background:var(--gold); color:#3A2B38; }
+  .pill.pin { background:var(--teal); color:#10242f; }
+  .pill.layer { background:var(--plumHighlight,#6A5468); color:var(--cream); }
+  .pill.none { background:#5a4a55; color:var(--dim); }
+  .chrow { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+  .chrow .via { font-size:11px; }
+  .via.anchor { color:var(--gold2); } .via.pin { color:var(--teal); }
+  .via.layer { color:#bda7c9; } .via.skip { color:var(--dim); }
+  #status { grid-area:status; background:var(--panel); border-top:1px solid var(--line);
+    padding:5px 12px; color:var(--dim); white-space:nowrap; overflow:hidden; }
+  #status b { color:var(--gold2); }
+</style>
+</head>
+<body>
+  <div id="toolbar">
+    <span class="brand">▶ Emberkeep Animator</span>
+    <button id="loadRig">Load rig.json</button>
+    <input id="fileInput" type="file" accept="application/json" hidden />
+    <span id="rigName" style="color:var(--gold2)"></span>
+    <span class="spacer"></span>
+    <button id="faceBtn" title="mirror the rig (left-facing art ↔ right-facing)">↔ Face: left</button>
+    <button id="bgToggle" title="cycle background">◳ BG</button>
+    <button id="boneToggle" title="show joints">⦿ Joints</button>
+    <button id="stopBtn">■ Stop</button>
+  </div>
+
+  <div id="stageWrap"><canvas id="stage"></canvas></div>
+
+  <div id="side">
+    <h3>Animations</h3>
+    <div class="hint">Each preset adapts to the rig — it drives whatever joints exist (anchor → pin-chain → bare-layer fallback) and skips the rest.</div>
+    <div id="presets"></div>
+    <div id="transport">
+      <span>Speed</span>
+      <input type="range" id="speed" min="0.2" max="2" step="0.05" value="1" />
+      <span id="speedVal">1.0×</span>
+      <label class="hint" style="padding:0"><input type="checkbox" id="loop" checked /> loop</label>
+    </div>
+    <h3>Rig capabilities</h3>
+    <div id="caps" class="hint">Load a rig to inspect its joints.</div>
+    <h3>Active channels <small style="color:var(--dim)">(this preset)</small></h3>
+    <div id="channels" class="hint">—</div>
+  </div>
+
+  <div id="status">Load a rig.json (or open from the Rigger via ▶ Animate).</div>
+
+<script>
+'use strict';
+/* =====================================================================
+ * Emberkeep Animator — plays presets against a rig, ADAPTING to whatever
+ * joints are present. Every motion resolves through a priority chain:
+ *   anchor (rotate child subtree) → pin chain (wave-deform) → bare layer
+ *   (rotate around its own base) → skip.
+ * The character is isometric, 3/4 facing LEFT: wings beat in-phase (both
+ * visible together), near-side limbs (higher z) get larger amplitude than
+ * far-side ones, and "forward" lean goes down-left along the iso axis.
+ * =================================================================== */
+
+const stage = document.getElementById('stage');
+const ctx = stage.getContext('2d');
+const wrap = document.getElementById('stageWrap');
+const statusEl = document.getElementById('status');
+const say = (h) => { statusEl.innerHTML = h; };
+
+const R = { rig: null, layers: [], anchorByChild: {}, pinsByLayer: {}, chains: {},
+  root: null, bounds: null, fit: { s: 1, x: 0, y: 0 } };
+const P = { presetKey: null, t0: 0, speed: 1, loop: true, raf: 0, lastChannels: [], showBones: false, bg: 0, facing: 'left' };
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const D2R = Math.PI / 180;
+
+/* ----------------------------- load ----------------------------- */
+function ingest(doc) {
+  R.rig = doc;
+  R.anchorByChild = {}; R.pinsByLayer = {}; R.chains = {};
+  R.layers = [];
+  let pending = doc.layers.length;
+  if (!pending) return;
+  doc.layers.slice().sort((a, b) => a.z - b.z).forEach((ld) => {
+    const img = new Image();
+    img.onload = () => {
+      R.layers.push({ ...ld, img });
+      if (--pending === 0) finishIngest(doc);
+    };
+    img.onerror = () => { if (--pending === 0) finishIngest(doc); };
+    img.src = (doc.images ?? {})[ld.file] ?? '';
+  });
+}
+function finishIngest(doc) {
+  R.layers.sort((a, b) => a.z - b.z);
+  for (const a of doc.anchors ?? []) R.anchorByChild[a.childLayer] = a;       // a.rig = pivot
+  for (const p of doc.pins ?? []) {
+    if (p.name === 'root_ground') continue;
+    (R.pinsByLayer[p.layer] ??= []).push(p);
+    if (p.chain) (R.chains[p.chain] ??= []).push(p);
+  }
+  for (const k in R.pinsByLayer) R.pinsByLayer[k].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  for (const k in R.chains) R.chains[k].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  // root: explicit root_ground, else bottom-centre of bounds.
+  const root = (doc.pins ?? []).find((p) => p.name === 'root_ground');
+  R.bounds = doc.bounds ?? unionBounds();
+  R.root = root ? { x: root.rig.x, y: root.rig.y }
+                : { x: R.bounds.x + R.bounds.width / 2, y: R.bounds.y + R.bounds.height * 0.84 };
+  document.getElementById('rigName').textContent = doc.character ?? '';
+  computeFit(); renderCaps(); resize();
+  say(`Loaded <b>${doc.character ?? 'rig'}</b>: ${R.layers.length} layers, ${(doc.anchors ?? []).length} anchors, ${Object.keys(R.chains).length} pin-chains. Pick an animation.`);
+  if (!P.presetKey) play('idle');
+}
+function unionBounds() {
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (const l of R.layers) { minX = Math.min(minX, l.x); minY = Math.min(minY, l.y); maxX = Math.max(maxX, l.x + l.width); maxY = Math.max(maxY, l.y + l.height); }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+function computeFit() {
+  if (!R.bounds) return;
+  const W = wrap.clientWidth, H = wrap.clientHeight, pad = 80;
+  const b = R.bounds;
+  const s = Math.min((W - pad) / b.width, (H - pad) / b.height);
+  R.fit = { s, x: (W - b.width * s) / 2 - b.x * s, y: (H - b.height * s) / 2 - b.y * s };
+}
+
+document.getElementById('loadRig').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = (e) => {
+  const r = new FileReader();
+  r.onload = () => { try { ingest(JSON.parse(r.result)); } catch (err) { say('Bad rig file: ' + err.message); } };
+  r.readAsText(e.target.files[0]); e.target.value = '';
+};
+
+/* --------------------- the adaptive driver --------------------- */
+/* A frame accumulates: global root xf, per-anchor extra angle, per-layer
+ * fallback rotation, and per-layer pin-wave params. Presets call drive*()
+ * which RESOLVE against the rig and record the channel actually used. */
+let F;
+function newFrame() {
+  F = { root: { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1 }, anchorAngle: {}, layerExtra: {}, wave: {}, channels: [] };
+}
+const hasLayer = (name) => R.layers.some((l) => l.name === name);
+const layerOf = (name) => R.layers.find((l) => l.name === name);
+const anchorForLayer = (name) => R.anchorByChild[name];     // anchor whose CHILD is this layer
+const pinsForLayer = (name) => R.pinsByLayer[name] ?? [];
+function layerBasePivot(l) { return { x: l.x + l.width * 0.5, y: l.y + l.height * 0.92 }; }
+const MIRROR = {
+  foot_left: 'foot_right', foot_right: 'foot_left', leg_left: 'leg_right', leg_right: 'leg_left',
+  hand_left: 'hand_right', hand_right: 'hand_left', arm_left: 'arm_right', arm_right: 'arm_left',
+  wing_left: 'wing_right', wing_right: 'wing_left', ear_left: 'ear_right', ear_right: 'ear_left',
+  horn_left: 'horn_right', horn_right: 'horn_left', eye_left: 'eye_right', eye_right: 'eye_left',
+  eyelid_left: 'eyelid_right', eyelid_right: 'eyelid_left'
+};
+
+/** Rotate a part by `deg`, using the best channel available. Records it. */
+function drive(part, deg, label) {
+  const l = layerOf(part);
+  if (!l && !R.chains[part]) { record(label ?? part, 'skip', '(absent)'); return; }
+  const a = anchorForLayer(part);
+  if (a) { F.anchorAngle[a.name] = (F.anchorAngle[a.name] ?? 0) + deg * D2R; record(label ?? part, 'anchor', a.name); return; }
+  const pins = pinsForLayer(part);
+  if (pins.length) { // rotate around the chain-root pin (acts like a bone)
+    F.layerExtra[part] = { pivot: { x: pins[0].rig.x, y: pins[0].rig.y }, angle: (F.layerExtra[part]?.angle ?? 0) + deg * D2R };
+    record(label ?? part, 'pin', pins[0].name); return;
+  }
+  // No own joint — mirror a counterpart anchor (proper hip/shoulder) if it exists.
+  const twinAnchor = MIRROR[part] ? anchorForLayer(MIRROR[part]) : null;
+  if (l && twinAnchor) {
+    F.layerExtra[part] = { pivot: { x: 2 * R.root.x - twinAnchor.rig.x, y: twinAnchor.rig.y }, angle: (F.layerExtra[part]?.angle ?? 0) + deg * D2R };
+    record(label ?? part, 'layer', `mirror of ${twinAnchor.name}`); return;
+  }
+  if (l) { F.layerExtra[part] = { pivot: layerBasePivot(l), angle: (F.layerExtra[part]?.angle ?? 0) + deg * D2R }; record(label ?? part, 'layer', `${part} base`); return; }
+  record(label ?? part, 'skip', '(absent)');
+}
+/** Wave-deform along a pin chain (tail flutter, wing flutter). Falls back to
+ *  a rotation of the owning layer if no chain, then to absent. */
+function driveWave(chainName, ownerLayer, amp, phase, label) {
+  const chain = R.chains[chainName];
+  if (chain && chain.length >= 2) {
+    const layer = ownerLayer ?? chain[0].layer;
+    F.wave[layer] = { chain, amp, phase };
+    record(label ?? chainName, 'pin', `${chainName} (${chain.length})`); return true;
+  }
+  // fallback: if there is a layer matching the chain concept, swing it
+  if (ownerLayer && hasLayer(ownerLayer)) { drive(ownerLayer, amp * 0.5 * Math.sin(phase), label); return true; }
+  record(label ?? chainName, 'skip', '(no chain)'); return false;
+}
+function record(name, via, detail) { F.channels.push({ name, via, detail }); }
+/** near-side parts (higher z = drawn in front) read larger in 3/4 iso. */
+function perspAmp(part, amp) {
+  const l = layerOf(part); if (!l) return amp;
+  const zmax = Math.max(...R.layers.map((x) => x.z), 1);
+  const near = l.z / zmax;            // 0 far .. 1 near
+  return amp * (0.78 + 0.22 * near);  // far side ~78%, near side 100%
+}
+
+/* ----------------------------- presets ----------------------------- */
+/* Times in seconds. Each returns by mutating F via drive*(). Iso, facing
+ * left → wings IN-PHASE, forward = down-left. */
+const TAU = Math.PI * 2;
+const PRESETS = {
+  idle: { emoji: '🌿', name: 'Idle', desc: 'breathing, head sway, tail drift, blink', fn: (t) => {
+    F.root.sy = 1 + 0.018 * Math.sin(t * TAU * 0.5);
+    F.root.dy = -3 * Math.sin(t * TAU * 0.5);
+    drive('head', 3.0 * Math.sin(t * TAU * 0.33), 'head sway');
+    driveWave('tail', 'body_tail', 9 + 3 * Math.sin(t), Math.sin(t * TAU * 0.4) * 1.4, 'tail drift');
+    drive('wing_left', perspAmp('wing_left', 2.4) * Math.sin(t * TAU * 0.5 + 0.3), 'wing settle L');
+    drive('wing_right', -perspAmp('wing_right', 2.4) * Math.sin(t * TAU * 0.5 + 0.3), 'wing settle R'); // mirror of L
+    blink(t, 3.1);
+  }},
+  hover: { emoji: '🪽', name: 'Low flight (hover in place)', desc: 'body lift + steady wing-beat + trailing tail', fn: (t) => {
+    const beat = t * TAU * 2.1;                 // wing-beat frequency
+    F.root.dy = -16 - 12 * Math.sin(beat);       // lifts and bobs with the beat
+    F.root.sx = 1 + 0.01 * Math.sin(beat);
+    // Wings: the Celebration-style flared-open beat (keeps wings spread and
+    // pulsing instead of sweeping down/closed), synced to the lift. Both beat
+    // in-phase (3/4 view); near wing larger.
+    const flap = Math.sin(beat);
+    drive('wing_left', perspAmp('wing_left', 28) + 14 * flap, 'flap L');
+    drive('wing_right', -(perspAmp('wing_right', 28) + 14 * flap), 'flap R'); // mirror of L
+    driveWave('tail', 'body_tail', 16, beat * 0.5, 'tail trail');
+    drive('foot_left', 10 * Math.sin(beat) - 6, 'leg tuck L');   // legs tuck/dangle with the beat
+    drive('foot_right', 10 * Math.sin(beat) - 6, 'leg tuck R');
+    drive('head', -3 + 2 * Math.sin(beat), 'head steady');
+  }},
+  celebrate: { emoji: '🎉', name: 'Celebration', desc: 'hops, arm pumps, wing flare, fast tail wag', fn: (t) => {
+    const hopF = 1.7;
+    const hop = Math.abs(Math.sin(t * Math.PI * hopF));         // bouncy
+    F.root.dy = -34 * hop;
+    F.root.sy = 1 + 0.05 * hop; F.root.sx = 1 - 0.03 * hop;
+    const pump = Math.sin(t * Math.PI * hopF * 2);
+    drive('hand_left', -38 - 18 * pump, 'arm pump L');           // arms up & pumping
+    drive('hand_right', -38 - 18 * pump, 'arm pump R');
+    drive('wing_left', perspAmp('wing_left', 28) + 6 * pump, 'wing flare L');
+    drive('wing_right', -(perspAmp('wing_right', 28) + 6 * pump), 'wing flare R'); // mirror of L
+    driveWave('tail', 'body_tail', 22, t * TAU * 3, 'tail wag');
+    drive('head', 6 * Math.sin(t * Math.PI * hopF) - 4, 'head bob');
+    blink(t, 1.4);
+  }},
+  roar: { emoji: '🔥', name: 'Roar / power-up', desc: 'rear back, head up, jaw/head tilt, wings spread', fn: (t) => {
+    // phase: 0..0.35 wind-up, 0.35..1 roar-hold with tremble
+    const k = clamp((t % 2.6) / 2.6, 0, 1);
+    const rear = k < 0.35 ? (k / 0.35) : 1;
+    const tremble = k > 0.4 ? 0.6 * Math.sin(t * TAU * 9) * (1 - (k - 0.4) / 0.6) : 0;
+    F.root.rot = (-6 * rear) * D2R;             // rear back
+    F.root.dy = -8 * rear; F.root.sx = 1 + 0.04 * rear; F.root.sy = 1 + 0.05 * rear;
+    drive('head', -16 * rear + tremble, 'head raise');
+    jawOpen(18 * rear);                          // opens jaw if present, else extra head tilt
+    drive('wing_left', perspAmp('wing_left', 46) * rear, 'wing spread L');
+    drive('wing_right', -perspAmp('wing_right', 46) * rear, 'wing spread R'); // mirror of L
+    drive('hand_left', -26 * rear + tremble, 'arm out L');
+    drive('hand_right', -26 * rear + tremble, 'arm out R');
+    driveWave('tail', 'body_tail', 8 * rear, Math.PI, 'tail stiffen');
+  }},
+  stretch: { emoji: '🥱', name: 'Wake / stretch', desc: 'rise from squash, yawn, one-wing stretch', fn: (t) => {
+    const k = clamp((t % 3.4) / 3.4, 0, 1);
+    const rise = k < 0.5 ? Math.sin(k * Math.PI) : Math.sin(0.5 * Math.PI) * (1 - (k - 0.5));
+    F.root.sy = 0.9 + 0.14 * rise; F.root.sx = 1.06 - 0.06 * rise;
+    F.root.dy = 6 - 14 * rise;
+    const yawn = Math.sin(clamp((k - 0.2) / 0.5, 0, 1) * Math.PI);
+    drive('head', -10 * yawn + 4, 'head yawn');
+    jawOpen(22 * yawn);
+    drive('wing_left', perspAmp('wing_left', 40) * rise, 'wing stretch L');   // one big wing stretch
+    drive('wing_right', -perspAmp('wing_right', 10) * rise, 'wing stretch R'); // mirror of L
+    driveWave('tail', 'body_tail', 12 * rise, k * TAU, 'tail curl');
+    drive('hand_left', -14 * rise, 'arm reach L');
+  }},
+  walk: { emoji: '🚶', name: 'Walk', desc: 'realistic 4-limb walk cycle (diagonal gait)', fn: (t) => {
+    const step = t * TAU * 1.5;          // ~1.5 strides/sec
+    const legAmp = 24, armAmp = 13;
+    // Diagonal gait: back-left leg + front-right arm swing together; the
+    // other diagonal is half a cycle out of phase (π).
+    drive('foot_left', legAmp * Math.sin(step), 'step leg L');
+    drive('hand_right', armAmp * Math.sin(step), 'swing arm R');
+    drive('foot_right', legAmp * Math.sin(step + Math.PI), 'step leg R');
+    drive('hand_left', armAmp * Math.sin(step + Math.PI), 'swing arm L');
+    // Body: two vertical bobs per stride + a small side-to-side lean once.
+    F.root.dy = -5 * Math.abs(Math.sin(step)) - 2;
+    F.root.rot = 0.03 * Math.sin(step);
+    drive('head', 3 * Math.sin(step + 0.4), 'head bob');
+    driveWave('tail', 'body_tail', 11, step + Math.PI, 'tail balance');
+    // Wings folded, held symmetrically.
+    drive('wing_left', 5, 'wing fold L');
+    drive('wing_right', -5, 'wing fold R');
+  }}
+};
+function blink(t, period) {
+  // eyelids close briefly; only if eyelid layers exist, else no-op (recorded).
+  const phase = (t % period) / period;
+  const closed = phase > 0.92 ? 1 - Math.abs((phase - 0.96) / 0.04) : 0;
+  let any = false;
+  for (const part of ['eyelid_left', 'eyelid_right']) if (hasLayer(part)) {
+    F.wave[part] = { blinkScaleY: clamp(1 - closed, 0.06, 1) }; any = true;
+  }
+  record('blink', any ? 'layer' : 'skip', any ? 'eyelids' : '(no eyelids)');
+}
+function jawOpen(deg) {
+  if (anchorForLayer('jaw') || hasLayer('jaw')) drive('jaw', deg, 'jaw open');
+  else { drive('head', -deg * 0.35, 'jaw→head tilt'); }  // no jaw: tilt the head back instead
+}
+
+/* ----------------------------- render ----------------------------- */
+function resize() { stage.width = wrap.clientWidth * devicePixelRatio; stage.height = wrap.clientHeight * devicePixelRatio; computeFit(); draw(); }
+new ResizeObserver(resize).observe(wrap);
+
+const BGS = ['#2c2733', '#3FA8D9', '#7ECB4F', '#241B22'];
+function applyAround(px, py, rot, sx = 1, sy = 1) { ctx.translate(px, py); ctx.rotate(rot); ctx.scale(sx, sy); ctx.translate(-px, -py); }
+
+function drawWaved(l, wave) {
+  const { img, x, y, width: w, height: h } = l;
+  if (wave.blinkScaleY !== undefined) { // eyelid squash around its own top
+    ctx.save(); applyAround(x + w / 2, y + h * 0.3, 0, 1, wave.blinkScaleY); ctx.drawImage(img, x, y, w, h); ctx.restore(); return;
+  }
+  const chain = wave.chain;
+  const first = chain[0].norm, last = chain[chain.length - 1].norm;
+  const horiz = Math.abs(last.x - first.x) >= Math.abs(last.y - first.y); // tail = horizontal axis
+  const N = 26, waves = 1.1, amp = wave.amp;
+  if (horiz) {
+    const sw = w / N, rootU = first.x, tipU = last.x, span = (tipU - rootU) || 1;
+    for (let i = 0; i < N; i++) {
+      const u = (i + 0.5) / N;
+      const ramp = clamp((u - rootU) / span, 0, 1);
+      const dy = amp * ramp * Math.sin(wave.phase - u * waves * TAU);
+      ctx.drawImage(img, i * sw, 0, sw, h, x + i * sw, y + dy, sw + 0.6, h);
+    }
+  } else {
+    const sh = h / N, rootV = first.y, tipV = last.y, span = (rootV - tipV) || 1;
+    for (let i = 0; i < N; i++) {
+      const v = (i + 0.5) / N;
+      const ramp = clamp((rootV - v) / span, 0, 1);
+      const dx = amp * ramp * Math.sin(wave.phase - v * waves * TAU);
+      ctx.drawImage(img, 0, i * sh, w, sh, x + dx, y + i * sh, w, sh + 0.6);
+    }
+  }
+}
+
+function draw() {
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  ctx.fillStyle = BGS[P.bg]; ctx.fillRect(0, 0, wrap.clientWidth, wrap.clientHeight);
+  if (!R.layers.length) return;
+  ctx.save();
+  ctx.translate(R.fit.x, R.fit.y); ctx.scale(R.fit.s, R.fit.s);
+  // Mirror for right-facing: a single horizontal flip about the root's vertical
+  // axis flips art, pivots and rotations uniformly — no name-swapping needed.
+  if (P.facing === 'right') applyAround(R.root.x, R.root.y, 0, -1, 1);
+  // ground shadow
+  ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.ellipse(R.root.x + (F?.root.dx ?? 0), R.root.y + 10, R.bounds.width * 0.30, R.bounds.height * 0.045, 0, 0, TAU); ctx.fill(); ctx.restore();
+
+  for (const l of R.layers) {
+    ctx.save();
+    // global root transform (breathe/bob/lean around the root point)
+    if (F) { ctx.translate(F.root.dx, F.root.dy); applyAround(R.root.x, R.root.y, F.root.rot, F.root.sx, F.root.sy); }
+    // anchor hierarchy: outermost ancestor first
+    const chain = [];
+    let cur = l.name;
+    const guard = new Set();
+    while (R.anchorByChild[cur] && !guard.has(cur)) { guard.add(cur); const a = R.anchorByChild[cur]; chain.push(a); cur = a.parentLayer; }
+    for (let i = chain.length - 1; i >= 0; i--) { const a = chain[i]; applyAround(a.rig.x, a.rig.y, (F?.anchorAngle[a.name]) ?? 0); }
+    // bare-layer fallback rotation
+    const ex = F?.layerExtra[l.name];
+    if (ex) applyAround(ex.pivot.x, ex.pivot.y, ex.angle);
+    // draw (waved or plain)
+    const wave = F?.wave[l.name];
+    if (wave) drawWaved(l, wave); else ctx.drawImage(l.img, l.x, l.y, l.width, l.height);
+    ctx.restore();
+  }
+
+  if (P.showBones) drawBones();
+  ctx.restore();
+}
+function drawBones() {
+  for (const c in R.chains) {
+    const pts = R.chains[c];
+    ctx.strokeStyle = '#3FA8D9'; ctx.lineWidth = 3 / R.fit.s; ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(p.rig.x, p.rig.y) : ctx.moveTo(p.rig.x, p.rig.y)); ctx.stroke();
+    for (const p of pts) { ctx.fillStyle = '#3FA8D9'; ctx.beginPath(); ctx.arc(p.rig.x, p.rig.y, 6 / R.fit.s, 0, TAU); ctx.fill(); }
+  }
+  for (const child in R.anchorByChild) {
+    const a = R.anchorByChild[child];
+    ctx.save(); ctx.translate(a.rig.x, a.rig.y); ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#F7A437'; const r = 7 / R.fit.s; ctx.fillRect(-r, -r, r * 2, r * 2); ctx.restore();
+  }
+}
+
+/* ----------------------------- transport ----------------------------- */
+let startMs = null;
+function loopFrame(ms) {
+  if (startMs === null) startMs = ms;
+  const t = ((ms - startMs) / 1000) * P.speed;
+  newFrame();
+  const preset = PRESETS[P.presetKey];
+  if (preset) preset.fn(t);
+  renderChannels(F.channels);
+  draw();
+  P.raf = requestAnimationFrame(loopFrame);
+}
+function play(key) {
+  P.presetKey = key; startMs = null;
+  cancelAnimationFrame(P.raf); P.raf = requestAnimationFrame(loopFrame);
+  for (const el of document.querySelectorAll('.preset')) el.classList.toggle('playing', el.dataset.key === key);
+  say(`Playing <b>${PRESETS[key].name}</b> — channels resolved against this rig (see Active channels).`);
+}
+function stop() { cancelAnimationFrame(P.raf); P.raf = 0; P.presetKey = null; newFrame(); draw();
+  for (const el of document.querySelectorAll('.preset')) el.classList.remove('playing');
+  renderChannels([]); say('Stopped.'); }
+document.getElementById('stopBtn').onclick = stop;
+document.getElementById('speed').oninput = (e) => { P.speed = +e.target.value; document.getElementById('speedVal').textContent = P.speed.toFixed(1) + '×'; };
+document.getElementById('loop').onchange = (e) => { P.loop = e.target.checked; };
+document.getElementById('bgToggle').onclick = () => { P.bg = (P.bg + 1) % BGS.length; draw(); };
+document.getElementById('boneToggle').onclick = () => { P.showBones = !P.showBones; draw(); };
+document.getElementById('faceBtn').onclick = (e) => {
+  P.facing = P.facing === 'left' ? 'right' : 'left';
+  e.target.textContent = `↔ Face: ${P.facing}`;
+  draw();
+  say(`Facing <b>${P.facing}</b> — mirror is a single horizontal flip; in-game it's <code>container.scaleX = ±1</code>.`);
+};
+
+/* ----------------------------- panels ----------------------------- */
+function renderPresets() {
+  const box = document.getElementById('presets'); box.innerHTML = '';
+  for (const [key, p] of Object.entries(PRESETS)) {
+    const b = document.createElement('button');
+    b.className = 'preset'; b.dataset.key = key;
+    b.innerHTML = `<span class="emoji">${p.emoji}</span><b>${p.name}</b><small>${p.desc}</small>`;
+    b.onclick = () => play(key);
+    box.appendChild(b);
+  }
+}
+function renderCaps() {
+  const box = document.getElementById('caps');
+  if (!R.layers.length) { box.innerHTML = 'No rig loaded.'; return; }
+  const anchors = Object.values(R.anchorByChild).map((a) => a.name);
+  const chains = Object.keys(R.chains);
+  const noJoint = R.layers.filter((l) => !R.anchorByChild[l.name] && !(R.pinsByLayer[l.name]?.length)).map((l) => l.name);
+  box.innerHTML =
+    `<div class="cap"><span class="pill anchor">anchor</span> ${anchors.join(', ') || '—'}</div>` +
+    `<div class="cap"><span class="pill pin">pin-chain</span> ${chains.join(', ') || '—'}</div>` +
+    `<div class="cap"><span class="pill none">no joint</span> ${noJoint.join(', ') || '—'} <small>(animated via base-rotation fallback)</small></div>` +
+    `<div class="cap"><span class="pill layer">root</span> ${R.rig && (R.rig.pins ?? []).some((p) => p.name === 'root_ground') ? 'root_ground pin' : 'fallback (bounds base)'}</div>`;
+}
+function renderChannels(channels) {
+  const box = document.getElementById('channels');
+  if (!channels.length) { box.innerHTML = '—'; return; }
+  // de-dupe by name, keep last
+  const seen = {}; for (const c of channels) seen[c.name] = c;
+  box.innerHTML = Object.values(seen).map((c) =>
+    `<div class="chrow"><span>${c.name}</span><span class="via ${c.via}">${c.via === 'skip' ? '— skip' : c.via} <small style="color:var(--dim)">${c.detail}</small></span></div>`).join('');
+}
+
+/* ----------------------------- boot ----------------------------- */
+renderPresets();
+resize();
+// 1) handoff from the Rigger (localStorage), 2) auto-load the bundled rig.
+let handed = false;
+try { const h = localStorage.getItem('emberkeep_rig_handoff'); if (h) { ingest(JSON.parse(h)); handed = true; } } catch (e) {}
+if (!handed) {
+  fetch('../../assets/sprites/characters/dragon/red-dragon/rig/dragon-red.rig.json')
+    .then((r) => r.ok ? r.json() : Promise.reject())
+    .then((doc) => ingest(doc))
+    .catch(() => say('Load a rig.json (or open from the Rigger via ▶ Animate).'));
+}
+</script>
+</body>
+</html>

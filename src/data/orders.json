@@ -1,0 +1,44 @@
+{
+  "orders": [
+    {
+      "id": "cindra_brazier",
+      "giver": "cindra",
+      "title": "Rekindle the Brazier",
+      "blurb": "Two Flame Gems, Keeper. The old brazier will not light itself, and I am far too dignified to dig.",
+      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 2 }],
+      "rewards": { "coins": 50, "keys": 1, "xp": 20 }
+    },
+    {
+      "id": "cindra_hearth",
+      "giver": "cindra",
+      "title": "Warm the Long Hearth",
+      "blurb": "Your little dragon keeps coughing up shards — splendid. Forge me FOUR Flame Gems and the hall will be warm by supper.",
+      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 4 }],
+      "rewards": { "coins": 75, "keys": 0, "xp": 35 }
+    },
+    {
+      "id": "cindra_centerpiece",
+      "giver": "cindra",
+      "title": "A Centerpiece Worth the Name",
+      "blurb": "One Radiant Gem. ONE. Merge three Flame Gems into something that would make the old court gasp.",
+      "requires": [{ "chain": "flame_gem", "tier": 3, "count": 1 }],
+      "rewards": { "coins": 110, "keys": 1, "xp": 50 }
+    },
+    {
+      "id": "laurah_terrace",
+      "giver": "laurah",
+      "title": "Bloom the South Terrace",
+      "blurb": "Let's make the old terrace beautiful again — two Ember Blooms, coaxed up from the Spark Weeds. The dragons love the colour.",
+      "requires": [{ "chain": "sparkweed", "tier": 2, "count": 2 }],
+      "rewards": { "coins": 80, "keys": 0, "xp": 40 }
+    },
+    {
+      "id": "cindra_hoard",
+      "giver": "cindra",
+      "title": "The Keeper's Hoard",
+      "blurb": "Three Radiant Gems, Keeper. A proper hoard for a proper Keep — and proof the Flame is truly back.",
+      "requires": [{ "chain": "flame_gem", "tier": 3, "count": 3 }],
+      "rewards": { "coins": 240, "keys": 1, "xp": 85 }
+    }
+  ]
+}

@@ -1,0 +1,238 @@
+{
+  "source": "assets/map/border-grass/border-grass.png",
+  "image_size": [
+    1536,
+    1024
+  ],
+  "mode": "grid",
+  "grid": {
+    "cols": 4,
+    "rows": 4
+  },
+  "col_lines": [
+    44,
+    388,
+    744,
+    1106,
+    1472
+  ],
+  "row_lines": [
+    16,
+    308,
+    592,
+    792,
+    1004
+  ],
+  "elements": 16,
+  "canvas": "per-element",
+  "items": [
+    {
+      "file": "border-grass-1.png",
+      "index": 0,
+      "row": 0,
+      "col": 0,
+      "bbox": [
+        94,
+        36,
+        335,
+        297
+      ],
+      "area": 44934
+    },
+    {
+      "file": "border-grass-2.png",
+      "index": 1,
+      "row": 0,
+      "col": 1,
+      "bbox": [
+        440,
+        36,
+        684,
+        298
+      ],
+      "area": 45624
+    },
+    {
+      "file": "border-grass-3.png",
+      "index": 2,
+      "row": 0,
+      "col": 2,
+      "bbox": [
+        808,
+        34,
+        1054,
+        299
+      ],
+      "area": 46338
+    },
+    {
+      "file": "border-grass-4.png",
+      "index": 3,
+      "row": 0,
+      "col": 3,
+      "bbox": [
+        1163,
+        34,
+        1407,
+        300
+      ],
+      "area": 46320
+    },
+    {
+      "file": "border-grass-5.png",
+      "index": 4,
+      "row": 1,
+      "col": 0,
+      "bbox": [
+        93,
+        317,
+        336,
+        577
+      ],
+      "area": 45248
+    },
+    {
+      "file": "border-grass-6.png",
+      "index": 5,
+      "row": 1,
+      "col": 1,
+      "bbox": [
+        442,
+        317,
+        687,
+        582
+      ],
+      "area": 45371
+    },
+    {
+      "file": "border-grass-7.png",
+      "index": 6,
+      "row": 1,
+      "col": 2,
+      "bbox": [
+        807,
+        317,
+        1052,
+        583
+      ],
+      "area": 44322
+    },
+    {
+      "file": "border-grass-8.png",
+      "index": 7,
+      "row": 1,
+      "col": 3,
+      "bbox": [
+        1169,
+        317,
+        1409,
+        584
+      ],
+      "area": 44730
+    },
+    {
+      "file": "border-grass-9.png",
+      "index": 8,
+      "row": 2,
+      "col": 0,
+      "bbox": [
+        88,
+        601,
+        329,
+        785
+      ],
+      "area": 29418
+    },
+    {
+      "file": "border-grass-10.png",
+      "index": 9,
+      "row": 2,
+      "col": 1,
+      "bbox": [
+        439,
+        601,
+        684,
+        787
+      ],
+      "area": 30229
+    },
+    {
+      "file": "border-grass-11.png",
+      "index": 10,
+      "row": 2,
+      "col": 2,
+      "bbox": [
+        803,
+        601,
+        1045,
+        788
+      ],
+      "area": 29803
+    },
+    {
+      "file": "border-grass-12.png",
+      "index": 11,
+      "row": 2,
+      "col": 3,
+      "bbox": [
+        1162,
+        601,
+        1406,
+        788
+      ],
+      "area": 29993
+    },
+    {
+      "file": "border-grass-13.png",
+      "index": 12,
+      "row": 3,
+      "col": 0,
+      "bbox": [
+        90,
+        799,
+        330,
+        986
+      ],
+      "area": 30892
+    },
+    {
+      "file": "border-grass-14.png",
+      "index": 13,
+      "row": 3,
+      "col": 1,
+      "bbox": [
+        440,
+        798,
+        685,
+        986
+      ],
+      "area": 31680
+    },
+    {
+      "file": "border-grass-15.png",
+      "index": 14,
+      "row": 3,
+      "col": 2,
+      "bbox": [
+        803,
+        799,
+        1046,
+        987
+      ],
+      "area": 31566
+    },
+    {
+      "file": "border-grass-16.png",
+      "index": 15,
+      "row": 3,
+      "col": 3,
+      "bbox": [
+        1160,
+        799,
+        1408,
+        987
+      ],
+      "area": 32260
+    }
+  ]
+}

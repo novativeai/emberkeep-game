@@ -1,0 +1,31 @@
+{
+  "name": "emberkeep",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Emberkeep: The Dragon Hatchery — Level 1 (Cinder Hollow). Isometric 2D merge game.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --port 4173 --strictPort",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run e2e",
+    "placeholders": "tsx scripts/gen-placeholders.ts",
+    "probe": "tsx scripts/probe-image.ts"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
+  },
+  "packageManager": "pnpm@10.25.0+sha512.5e82639027af37cf832061bcc6d639c219634488e0f2baebe785028a793de7b525ffcd3f7ff574f5e9860654e098fe852ba8ac5dd5cefe1767d23a020a92f501"
+}

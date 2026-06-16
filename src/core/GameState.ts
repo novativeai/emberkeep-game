@@ -1,0 +1,257 @@
+import { ENERGY_MAX, LEVEL_XP } from './Constants';
+import type {
+  BoardItemState,
+  ItemKind,
+  ItemSnapshot,
+  MapData,
+  RegionStatus,
+  SaveDataV1,
+  TilePos
+} from './types';
+
+const tileKey = (col: number, row: number): string => `${col},${row}`;
+
+/**
+ * The single source of truth for game state. Only systems mutate it; scenes
+ * and UI read it (and react to EventBus notifications).
+ */
+export class GameState {
+  readonly cols: number;
+  readonly rows: number;
+
+  items = new Map<number, BoardItemState>();
+  /** grid[row][col] -> itemId or null */
+  grid: (number | null)[][] = [];
+  regionStatus = new Map<string, RegionStatus>();
+  private tileRegion = new Map<string, string>();
+
+  nextItemId = 1;
+  energyCurrent = ENERGY_MAX;
+  energyLastRegenAt = 0;
+  coins = 0;
+  keys = 0;
+  xp = 0;
+  completedOrderIds: string[] = [];
+  tutorialIndex = 0;
+  tutorialDone = false;
+
+  constructor(private map: MapData) {
+    this.cols = map.cols;
+    this.rows = map.rows;
+    for (const region of map.regions) {
+      for (const [c, r] of region.tiles) {
+        this.tileRegion.set(tileKey(c, r), region.id);
+      }
+    }
+    this.reset(0);
+  }
+
+  /** Wipe to a brand-new game. `now` seeds the energy regen timestamp. */
+  reset(now: number): void {
+    this.items.clear();
+    this.grid = Array.from({ length: this.rows }, () =>
+      Array.from({ length: this.cols }, () => null)
+    );
+    this.regionStatus.clear();
+    for (const region of this.map.regions) {
+      this.regionStatus.set(region.id, region.status);
+    }
+    this.nextItemId = 1;
+    this.energyCurrent = ENERGY_MAX;
+    this.energyLastRegenAt = now;
+    this.coins = 0;
+    this.keys = 0;
+    this.xp = 0;
+    this.completedOrderIds = [];
+    this.tutorialIndex = 0;
+    this.tutorialDone = false;
+  }
+
+  hydrate(save: SaveDataV1): void {
+    this.reset(save.energy.lastRegenAt);
+    for (const item of save.items) {
+      this.items.set(item.id, { ...item });
+      this.grid[item.row]![item.col] = item.id;
+    }
+    this.nextItemId = save.nextItemId;
+    for (const [regionId, status] of Object.entries(save.regions)) {
+      this.regionStatus.set(regionId, status);
+    }
+    this.energyCurrent = save.energy.current;
+    this.energyLastRegenAt = save.energy.lastRegenAt;
+    this.coins = save.coins;
+    this.keys = save.keys;
+    this.xp = save.xp;
+    this.completedOrderIds = [...save.orderProgress.completedIds];
+    this.tutorialIndex = save.tutorial.index;
+    this.tutorialDone = save.tutorial.done;
+  }
+
+  toSave(savedAt: number, version: number): SaveDataV1 {
+    return {
+      version,
+      savedAt,
+      items: [...this.items.values()].map((i) => ({ ...i })),
+      nextItemId: this.nextItemId,
+      regions: Object.fromEntries(this.regionStatus),
+      energy: { current: this.energyCurrent, lastRegenAt: this.energyLastRegenAt },
+      coins: this.coins,
+      keys: this.keys,
+      xp: this.xp,
+      orderProgress: { completedIds: [...this.completedOrderIds] },
+      tutorial: { index: this.tutorialIndex, done: this.tutorialDone }
+    };
+  }
+
+  /* ------------- board mutation primitives (systems only) ------------- */
+
+  addItem(spec: {
+    chain: string;
+    tier: number;
+    col: number;
+    row: number;
+    kind: ItemKind;
+    readyAt?: number;
+  }): BoardItemState {
+    if (!this.inBounds(spec.col, spec.row)) {
+      throw new Error(`addItem out of bounds: ${spec.col},${spec.row}`);
+    }
+    if (this.grid[spec.row]![spec.col] !== null) {
+      throw new Error(`addItem on occupied tile: ${spec.col},${spec.row}`);
+    }
+    const item: BoardItemState = { id: this.nextItemId++, ...spec };
+    this.items.set(item.id, item);
+    this.grid[spec.row]![spec.col] = item.id;
+    return item;
+  }
+
+  moveItem(id: number, to: TilePos): void {
+    const item = this.items.get(id);
+    if (!item) throw new Error(`moveItem: unknown item ${id}`);
+    if (!this.inBounds(to.col, to.row)) throw new Error(`moveItem out of bounds`);
+    const occupant = this.grid[to.row]![to.col];
+    if (occupant !== null && occupant !== id) {
+      throw new Error(`moveItem onto occupied tile ${to.col},${to.row}`);
+    }
+    this.grid[item.row]![item.col] = null;
+    item.col = to.col;
+    item.row = to.row;
+    this.grid[to.row]![to.col] = id;
+  }
+
+  removeItem(id: number): BoardItemState {
+    const item = this.items.get(id);
+    if (!item) throw new Error(`removeItem: unknown item ${id}`);
+    this.grid[item.row]![item.col] = null;
+    this.items.delete(id);
+    return item;
+  }
+
+  /* ---------------- board helpers (reads only) ---------------- */
+
+  inBounds(col: number, row: number): boolean {
+    return col >= 0 && row >= 0 && col < this.cols && row < this.rows;
+  }
+
+  regionIdAt(col: number, row: number): string | undefined {
+    return this.tileRegion.get(tileKey(col, row));
+  }
+
+  regionStatusAt(col: number, row: number): RegionStatus | undefined {
+    const id = this.regionIdAt(col, row);
+    return id ? this.regionStatus.get(id) : undefined;
+  }
+
+  isTileActive(col: number, row: number): boolean {
+    return this.inBounds(col, row) && this.regionStatusAt(col, row) === 'active';
+  }
+
+  itemIdAt(col: number, row: number): number | null {
+    if (!this.inBounds(col, row)) return null;
+    return this.grid[row]![col] ?? null;
+  }
+
+  itemAt(col: number, row: number): BoardItemState | undefined {
+    const id = this.itemIdAt(col, row);
+    return id === null ? undefined : this.items.get(id);
+  }
+
+  neighbors(col: number, row: number): TilePos[] {
+    return [
+      { col: col + 1, row },
+      { col: col - 1, row },
+      { col, row: row + 1 },
+      { col, row: row - 1 }
+    ].filter((p) => this.inBounds(p.col, p.row));
+  }
+
+  /** Free, active tiles adjacent to (col,row), nearest-first by insertion. */
+  freeActiveNeighbors(col: number, row: number): TilePos[] {
+    return this.neighbors(col, row).filter(
+      (p) => this.isTileActive(p.col, p.row) && this.itemIdAt(p.col, p.row) === null
+    );
+  }
+
+  /** All free active tiles, ordered by Manhattan distance from (col,row). */
+  freeActiveTilesNear(col: number, row: number): TilePos[] {
+    const free: TilePos[] = [];
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        if (this.isTileActive(c, r) && this.grid[r]![c] === null) {
+          free.push({ col: c, row: r });
+        }
+      }
+    }
+    return free.sort(
+      (a, b) =>
+        Math.abs(a.col - col) + Math.abs(a.row - row) - (Math.abs(b.col - col) + Math.abs(b.row - row))
+    );
+  }
+
+  /** Count of board items matching chain+tier on active tiles (items only). */
+  countItems(chain: string, tier: number): number {
+    let n = 0;
+    for (const item of this.items.values()) {
+      if (item.kind === 'item' && item.chain === chain && item.tier === tier) n++;
+    }
+    return n;
+  }
+
+  itemsMatching(chain: string, tier: number): BoardItemState[] {
+    return [...this.items.values()].filter(
+      (i) => i.kind === 'item' && i.chain === chain && i.tier === tier
+    );
+  }
+
+  get level(): number {
+    let level = 1;
+    for (let i = 0; i < LEVEL_XP.length; i++) {
+      if (this.xp >= LEVEL_XP[i]!) level = i + 1;
+    }
+    return level;
+  }
+
+  /** XP progress within the current level: [gained, span]. */
+  get levelProgress(): [number, number] {
+    const lvl = this.level;
+    const base = LEVEL_XP[lvl - 1] ?? 0;
+    const next = LEVEL_XP[lvl] ?? base;
+    const span = Math.max(1, next - base);
+    return [Math.min(this.xp - base, span), span];
+  }
+
+  snapshot(item: BoardItemState, now?: number): ItemSnapshot {
+    const snap: ItemSnapshot = {
+      id: item.id,
+      chain: item.chain,
+      tier: item.tier,
+      col: item.col,
+      row: item.row,
+      kind: item.kind
+    };
+    if (item.readyAt !== undefined && now !== undefined) {
+      snap.ready = now >= item.readyAt;
+    }
+    return snap;
+  }
+}

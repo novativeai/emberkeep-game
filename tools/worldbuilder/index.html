@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emberkeep World Builder</title>
+<style>
+  :root {
+    --bg:#241B22; --panel:#322833; --panel2:#3A2B38; --line:#4A3845;
+    --cream:#FFF6E8; --gold:#F7A437; --gold2:#FFD84D; --lava:#E8503C;
+    --teal:#3FA8D9; --moss:#7ECB4F; --dim:#9b8d99;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; overflow:hidden; }
+  body {
+    background:var(--bg); color:var(--cream);
+    font:13px/1.45 "Trebuchet MS", Verdana, sans-serif;
+    display:grid; grid-template-rows:46px 1fr 28px; grid-template-columns:1fr 310px;
+    grid-template-areas:"toolbar toolbar" "stage side" "status status";
+  }
+  #toolbar { grid-area:toolbar; display:flex; align-items:center; gap:8px;
+    background:var(--panel); border-bottom:1px solid var(--line); padding:0 10px; }
+  #toolbar .brand { color:var(--gold); font-weight:bold; margin-right:6px; white-space:nowrap; }
+  button,select,input[type=text],input[type=number] {
+    background:var(--panel2); color:var(--cream); border:1px solid var(--line);
+    border-radius:6px; padding:5px 9px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--gold); }
+  button.tool.active { background:var(--gold); color:#3A2B38; font-weight:bold; }
+  button.primary { background:var(--moss); color:#1d3010; font-weight:bold; }
+  button.warn { background:var(--lava); color:var(--cream); }
+  input[type=number] { width:62px; }
+  .sep { width:1px; height:24px; background:var(--line); margin:0 2px; }
+  .spacer { flex:1; }
+  #stageWrap { grid-area:stage; position:relative; overflow:hidden; }
+  #stage { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
+  /* sidebar */
+  #side { grid-area:side; background:var(--panel); border-left:1px solid var(--line);
+    display:flex; flex-direction:column; overflow:hidden; }
+  .tabs { display:flex; border-bottom:1px solid var(--line); }
+  .tabs button { flex:1; border:none; border-radius:0; padding:9px; background:var(--panel);
+    border-bottom:3px solid transparent; }
+  .tabs button.active { color:var(--gold2); border-bottom-color:var(--gold); background:var(--panel2); }
+  .tabs button .count { color:var(--dim); font-size:11px; }
+  #side h3 { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--gold); padding:8px 10px 2px; }
+  .hint { color:var(--dim); font-size:11px; padding:0 10px 6px; }
+  #assetGrid { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:6px 8px; overflow-y:auto; flex:1; min-height:90px; align-content:start; }
+  .assetCard { background:var(--panel2); border:2px solid var(--line); border-radius:8px; padding:5px; cursor:pointer; text-align:center; position:relative; }
+  .assetCard.active { border-color:var(--gold); }
+  .assetCard img { width:100%; height:58px; object-fit:contain;
+    background:repeating-conic-gradient(#454 0% 25%, #565 0% 50%) 0 0/12px 12px; border-radius:4px; }
+  .assetCard .nm { font-size:11px; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .assetCard .calib { position:absolute; top:3px; left:4px; font-size:9px; color:var(--gold2); background:rgba(36,27,34,.7); padding:0 3px; border-radius:3px; }
+  .assetCard .del { position:absolute; top:2px; right:2px; background:var(--lava); border:none; color:#fff; border-radius:4px; padding:0 5px; font-size:11px; }
+  /* inspector */
+  #inspector { border-top:1px solid var(--line); padding:8px 10px 6px; }
+  #inspector .target { color:var(--gold2); font-weight:bold; margin-bottom:4px; min-height:17px; }
+  .slider { display:grid; grid-template-columns:54px 1fr 56px; gap:6px; align-items:center; margin-bottom:5px; }
+  .slider label { font-size:12px; color:var(--dim); }
+  .slider input[type=range] { width:100%; }
+  .slider .val { font-size:12px; text-align:right; }
+  #inspector .row { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  #inspector .row button { flex:1; font-size:12px; padding:5px 6px; }
+  #status { grid-area:status; background:var(--panel); border-top:1px solid var(--line);
+    padding:5px 12px; color:var(--dim); white-space:nowrap; overflow:hidden; }
+  #status b { color:var(--gold2); }
+  .anchorPick { display:flex; gap:4px; align-items:center; font-size:12px; color:var(--dim); margin-top:4px; }
+</style>
+</head>
+<body>
+  <div id="toolbar">
+    <span class="brand">🗺 World Builder</span>
+    <input id="worldName" type="text" value="cinder-hollow" title="World id (export filename + JSON)" style="width:120px" />
+    <button id="loadStarter" title="Re-load the bundled border-grass tiles + cloud blocker">⤓ Starter assets</button>
+    <button id="loadCurrent" title="Load the current shipped world (default on the deployed link)">🌍 Current world</button>
+    <span class="sep"></span>
+    <label class="hint" style="padding:0;color:var(--gold2)">☁ Level
+      <input id="activeLevel" type="number" value="1" min="1" max="30" style="width:50px"
+        title="Level tag stamped on each cloud blocker you place (a group per level)" /></label>
+    <span class="sep"></span>
+    <button class="tool active" id="toolPaint" title="B — click cells to place the selected asset">🖌 Paint</button>
+    <button class="tool" id="toolSelect" title="V — click a placed element to select & adjust it">✥ Select</button>
+    <button class="tool" id="toolErase" title="E — click to remove the topmost element on a cell">⌫ Erase</button>
+    <button class="tool" id="toolPan" title="H — drag to pan (also: hold Space, middle/right-drag, or arrow keys)">✋ Pan</button>
+    <span class="sep"></span>
+    <label class="hint" style="padding:0">Tile&nbsp;
+      <input id="tileW" type="number" value="240" title="Tile width (grid cell)" />×
+      <input id="tileH" type="number" value="120" title="Tile height (grid cell)" /></label>
+    <button id="zoomFit" title="F">Fit</button>
+    <button id="gridToggle" title="G — toggle grid">▦ Grid</button>
+    <button id="tagToggle" title="T — show/hide cloud level tags">☁# Tags</button>
+    <span class="spacer"></span>
+    <span id="saveDot" title="auto-saved to this browser" style="color:var(--moss); opacity:0.35; font-size:11px; transition:opacity .3s">● auto</span>
+    <button id="newWorld" title="Start a fresh world (clears the auto-saved session)">✦ New</button>
+    <button id="loadProject" title="Load a saved .worldproject.json file">Load</button>
+    <button id="saveProject" title="Download a .worldproject.json backup file">Save</button>
+    <button class="primary" id="exportWorld" title="World JSON: per-asset calibration (offset/scale/anchor), all placements, embedded PNGs">⬇ Export world.json</button>
+  </div>
+
+  <div id="stageWrap"><canvas id="stage"></canvas></div>
+
+  <div id="side">
+    <div class="tabs">
+      <button id="tabTiles" class="active">🟫 Tiles <span class="count" id="tileCount">(0)</span></button>
+      <button id="tabGround">🟤 Non-play <span class="count" id="groundCount">(0)</span></button>
+      <button id="tabDecor">🌿 Decor <span class="count" id="decorCount">(0)</span></button>
+      <button id="tabBlockers">☁ Blockers <span class="count" id="blockerCount">(0)</span></button>
+      <button id="tabMerge">🔮 Merge <span class="count" id="mergeCount">(0)</span></button>
+    </div>
+    <div class="hint" id="catHint">Tiles are the floor — one per cell. Click a card to select, then Paint.</div>
+    <div id="uploadRow" style="padding:0 8px 6px"><button id="uploadBtn" style="width:100%">＋ Upload <span id="uploadCat">tile</span> PNGs…</button>
+      <input id="fileInput" type="file" accept="image/png,image/webp" multiple hidden /></div>
+    <div id="mergeActions" style="padding:0 8px 6px; display:none; gap:6px">
+      <button id="resetMerge" style="width:100%" title="Revert every merge slot to its placeholder">↺ Reset all merge art to placeholders</button>
+    </div>
+    <div id="assetGrid"></div>
+
+    <div id="inspector">
+      <h3>Calibration <small style="color:var(--dim)">— edits the asset (all its instances)</small></h3>
+      <div class="target" id="inspTarget">Select an asset or a placed element.</div>
+      <div class="slider"><label>Offset X</label><input type="range" id="sOffX" min="-200" max="200" step="1" value="0" /><span class="val" id="vOffX">0</span></div>
+      <div class="slider"><label>Offset Y</label><input type="range" id="sOffY" min="-300" max="200" step="1" value="0" /><span class="val" id="vOffY">0</span></div>
+      <div class="slider"><label>Scale</label><input type="range" id="sScale" min="0.1" max="3" step="0.01" value="1" /><span class="val" id="vScale">1.00</span></div>
+      <div class="slider"><label>Anchor Y</label><input type="range" id="sAnchorY" min="0" max="1" step="0.01" value="0" /><span class="val" id="vAnchorY">0.00</span></div>
+      <div class="anchorPick">Anchor X
+        <input type="range" id="sAnchorX" min="0" max="1" step="0.01" value="0.5" style="flex:1" /><span class="val" id="vAnchorX">0.50</span></div>
+      <div class="slider" id="levelRow" style="display:none">
+        <label style="color:var(--gold2)">Level</label>
+        <input type="number" id="instLevel" min="1" max="30" value="1" style="grid-column:2/4; width:74px" title="Which level this cloud blocks" />
+      </div>
+      <div class="row">
+        <button id="resetCalib">Reset</button>
+        <button id="raiseEl" title="bring selected placed element forward">▲ Forward</button>
+        <button id="lowerEl" title="send selected placed element back">▼ Back</button>
+        <button class="warn" id="deleteEl">Delete element</button>
+      </div>
+    </div>
+
+    <div id="cameraPanel">
+      <h3>🎥 Camera per level <small style="color:var(--dim)">— framing on unlock</small></h3>
+      <div class="hint">Frame the view, then <b>Set</b> a keyframe for a level. On level-up the game flies to it (extra-smooth). <b>Go</b> previews one; ▶ tours them all.</div>
+      <div id="camRows"></div>
+      <div class="row" style="padding:0 10px 8px">
+        <button id="camTour" style="flex:1">▶ Preview tour</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="status">Upload tile PNGs, pick one, and paint the floor. Then switch to Decor for props.</div>
+
+<script>
+'use strict';
+/* =====================================================================
+ * Emberkeep World Builder — paints an infinite isometric world out of
+ * uploaded tile/decor PNGs and exports BOTH the scene AND a per-asset
+ * calibration table (offsetX/offsetY/scale/anchor). That table is the
+ * point: it tells you the exact nudge each PNG needs to sit right, which
+ * drops straight into the game's assets.json / anchors.json.
+ *
+ * Iso projection matches the game (Constants.ts): TILE_W x TILE_H, 2:1.
+ *   worldOf(col,row) = ((col-row)*TILE_W/2, (col+row)*TILE_H/2)
+ * =================================================================== */
+
+const S = {
+  tileW: 240, tileH: 120,
+  assets: {},          // id -> {id,name,category,file,img,w,h, offX,offY,scale,anchorX,anchorY}
+  placements: [],      // {id, assetId, col, row, z, level?}  blocker placements carry a level tag
+  category: 'tile',    // active sidebar tab: 'tile' | 'decor' | 'blocker'
+  selectedAssetId: null,   // asset chosen to paint
+  selectedPlacement: null, // placed-element id under inspection
+  activeLevel: 1,      // level stamped on newly-placed blockers
+  tool: 'paint',
+  spaceHeld: false,    // spacebar held → temporary pan override
+  cam: { x: 0, y: 0, zoom: 0.55 }, // screen offset of world-origin + zoom
+  showGrid: true,
+  showLevelTags: true,
+  cameraKeyframes: {}, // level -> { wx, wy, zoom } focal world point + zoom
+  flying: null,        // active smooth camera transition (raf id)
+  drag: null,
+  ready: false, // becomes true once the initial load/restore finishes (gates auto-save)
+  mergeSlots: {}, // key -> { key,label,chain,tier,color, src(dataURL), custom }
+  nextId: 1, nextZ: 1
+};
+const uid = () => S.nextId++;
+
+const CATEGORIES = ['tile', 'decotile', 'decor', 'blocker'];
+
+// The full merge-item library: every game element, pre-labelled. Drop your own
+// art onto any slot to replace its placeholder one-by-one (export carries the map).
+const MERGE_SLOTS = [
+  { key: 'sparkweed_1',    label: 'Spark Weed',      chain: 'sparkweed',    tier: 1, color: '#6FBE43' },
+  { key: 'sparkweed_2',    label: 'Ember Bloom',     chain: 'sparkweed',    tier: 2, color: '#9FE06A' },
+  { key: 'sparkweed_3',    label: 'Flame Lily',      chain: 'sparkweed',    tier: 3, color: '#CDEF7E' },
+  { key: 'ember_dragon_1', label: 'Speckled Egg',    chain: 'ember_dragon', tier: 1, color: '#E8A24C' },
+  { key: 'ember_dragon_2', label: 'Ember Hatchling', chain: 'ember_dragon', tier: 2, color: '#F2784B' },
+  { key: 'ember_dragon_3', label: 'Ember Whelp',     chain: 'ember_dragon', tier: 3, color: '#E8503C' },
+  { key: 'flame_gem_1',    label: 'Gem Shard',       chain: 'flame_gem',    tier: 1, color: '#54D6C0' },
+  { key: 'flame_gem_2',    label: 'Flame Gem',       chain: 'flame_gem',    tier: 2, color: '#3FA8D9' },
+  { key: 'flame_gem_3',    label: 'Radiant Gem',     chain: 'flame_gem',    tier: 3, color: '#B07CF0' },
+  { key: 'decor_nest',     label: 'Dragon Nest',     chain: 'nest',         tier: 1, color: '#A6794C' },
+  { key: 'decor_brazier',  label: 'Brazier',         chain: 'brazier',      tier: 1, color: '#F7A437' }
+];
+
+/** Draw a labelled placeholder swatch for a merge slot (data URL). */
+function mergePlaceholderSrc(slot) {
+  const c = document.createElement('canvas'); c.width = 220; c.height = 220;
+  const g = c.getContext('2d');
+  const cx = 110, cy = 100, r = 78;
+  // diamond-ish gem body in the chain colour
+  const grad = g.createLinearGradient(cx, cy - r, cx, cy + r);
+  grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.18, slot.color); grad.addColorStop(1, shade(slot.color, -0.35));
+  g.fillStyle = grad; g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 4;
+  g.beginPath();
+  g.moveTo(cx, cy - r); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r, cy); g.closePath();
+  g.fill(); g.stroke();
+  // tier pips
+  for (let i = 0; i < slot.tier; i++) {
+    g.fillStyle = '#ffffff'; g.beginPath();
+    g.arc(cx - (slot.tier - 1) * 9 + i * 18, cy, 5.5, 0, 7); g.fill();
+  }
+  // label
+  g.fillStyle = '#241B22'; g.font = 'bold 22px Segoe UI, sans-serif'; g.textAlign = 'center';
+  g.fillText(slot.label, cx, 196);
+  g.fillStyle = 'rgba(36,27,34,0.55)'; g.font = '13px Segoe UI, sans-serif';
+  g.fillText('drop art to replace', cx, 215);
+  return c.toDataURL();
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16); let r = n >> 16, gg = (n >> 8) & 255, b = n & 255;
+  const f = amt < 0 ? 1 + amt : 1; const t = amt < 0 ? 0 : 255 * amt;
+  r = Math.round(r * f + t); gg = Math.round(gg * f + t); b = Math.round(b * f + t);
+  return '#' + ((1 << 24) + (r << 16) + (gg << 8) + b).toString(16).slice(1);
+}
+
+/** Seed the merge library with placeholders (keeps any custom art already set). */
+function initMergeSlots() {
+  for (const def of MERGE_SLOTS) {
+    if (S.mergeSlots[def.key]) continue;
+    S.mergeSlots[def.key] = { ...def, src: mergePlaceholderSrc(def), custom: false };
+  }
+}
+// Both real game tiles AND non-playable ground tiles are "floor": one per cell,
+// centred, drawn at floor depth. Only the export category tells them apart.
+const isFloor = (a) => a && (a.category === 'tile' || a.category === 'decotile');
+// Distinct hue per level so cloud groups read at a glance.
+const LEVEL_HUES = ['#F7A437', '#3FA8D9', '#7ECB4F', '#E8503C', '#B07CF0', '#FFD84D', '#FF8AB0', '#54D6C0', '#F2784B', '#8FD14F'];
+const levelColor = (lvl) => LEVEL_HUES[((lvl - 1) % LEVEL_HUES.length + LEVEL_HUES.length) % LEVEL_HUES.length];
+
+const stage = document.getElementById('stage');
+const ctx = stage.getContext('2d');
+const wrap = document.getElementById('stageWrap');
+const statusEl = document.getElementById('status');
+const say = (h) => { statusEl.innerHTML = h; };
+
+/* ----------------------------- math ----------------------------- */
+const worldOf = (col, row) => ({ x: (col - row) * S.tileW / 2, y: (col + row) * S.tileH / 2 });
+const toScreen = (wx, wy) => ({ x: wx * S.cam.zoom + S.cam.x, y: wy * S.cam.zoom + S.cam.y });
+const toWorld = (sx, sy) => ({ x: (sx - S.cam.x) / S.cam.zoom, y: (sy - S.cam.y) / S.cam.zoom });
+function cellOf(sx, sy) {
+  const w = toWorld(sx, sy);
+  const a = w.x / (S.tileW / 2), b = w.y / (S.tileH / 2);
+  return { col: Math.round((b + a) / 2), row: Math.round((b - a) / 2) };
+}
+const assetById = (id) => S.assets[id];
+const placementById = (id) => S.placements.find((p) => p.id === id);
+
+/* ----------------------------- canvas ----------------------------- */
+function resize() {
+  stage.width = wrap.clientWidth * devicePixelRatio;
+  stage.height = wrap.clientHeight * devicePixelRatio;
+  render();
+}
+new ResizeObserver(resize).observe(wrap);
+
+function drawDiamond(cx, cy, stroke, fill) {
+  const hw = S.tileW / 2 * S.cam.zoom, hh = S.tileH / 2 * S.cam.zoom;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - hh);
+  ctx.lineTo(cx + hw, cy);
+  ctx.lineTo(cx, cy + hh);
+  ctx.lineTo(cx - hw, cy);
+  ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+}
+
+/** Draw one element's image with its asset calibration. Returns screen rect. */
+function drawElement(a, col, row) {
+  const wc = worldOf(col, row);
+  const s = toScreen(wc.x + a.offX, wc.y + a.offY);
+  const w = a.w * a.scale * S.cam.zoom, h = a.h * a.scale * S.cam.zoom;
+  const left = s.x - a.anchorX * w, top = s.y - a.anchorY * h;
+  ctx.drawImage(a.img, left, top, w, h);
+  return { left, top, w, h };
+}
+
+function render() {
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  ctx.fillStyle = '#2c2733';
+  ctx.fillRect(0, 0, W, H);
+
+  // visible cell range from the four screen corners.
+  const corners = [cellOf(0, 0), cellOf(W, 0), cellOf(0, H), cellOf(W, H)];
+  let minC = 1e9, maxC = -1e9, minR = 1e9, maxR = -1e9;
+  for (const c of corners) { minC = Math.min(minC, c.col); maxC = Math.max(maxC, c.col); minR = Math.min(minR, c.row); maxR = Math.max(maxR, c.row); }
+  minC -= 2; maxC += 2; minR -= 2; maxR += 2;
+
+  // grid
+  if (S.showGrid) {
+    for (let row = minR; row <= maxR; row++) {
+      for (let col = minC; col <= maxC; col++) {
+        const wc = worldOf(col, row);
+        const s = toScreen(wc.x, wc.y);
+        const even = ((col + row) % 2 + 2) % 2 === 0;
+        drawDiamond(s.x, s.y, 'rgba(255,246,232,0.10)', even ? 'rgba(255,246,232,0.03)' : 'transparent');
+      }
+    }
+    // origin cell highlight
+    const o = toScreen(0, 0);
+    drawDiamond(o.x, o.y, 'rgba(247,164,55,0.6)', 'rgba(247,164,55,0.08)');
+  }
+
+  // floor first, then everything above (decor + blockers), painter-sorted.
+  const tiles = S.placements.filter((p) => isFloor(assetById(p.assetId)));
+  const above = S.placements.filter((p) => { const a = assetById(p.assetId); return a && !isFloor(a); });
+  const sortKey = (p) => (p.col + p.row) * 1000 + p.z;
+  tiles.sort((a, b) => sortKey(a) - sortKey(b));
+  above.sort((a, b) => sortKey(a) - sortKey(b));
+
+  const hi = (p, rect) => {
+    if (S.selectedPlacement === p.id) {
+      ctx.strokeStyle = '#FFD84D'; ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]); ctx.strokeRect(rect.left, rect.top, rect.w, rect.h); ctx.setLineDash([]);
+    }
+  };
+  const levelBadge = (p, rect) => {
+    const lvl = p.level ?? 1;
+    const bx = rect.left + rect.w / 2, by = rect.top + Math.min(14, rect.h * 0.14);
+    ctx.beginPath(); ctx.arc(bx, by, 7.5, 0, Math.PI * 2);
+    ctx.fillStyle = levelColor(lvl); ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = '#241B22'; ctx.stroke();
+    ctx.fillStyle = '#241B22'; ctx.font = 'bold 9px Trebuchet MS';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(lvl), bx, by + 0.5);
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  };
+  for (const p of tiles) { const a = assetById(p.assetId); if (a) hi(p, drawElement(a, p.col, p.row)); }
+  for (const p of above) {
+    const a = assetById(p.assetId); if (!a) continue;
+    const rect = drawElement(a, p.col, p.row);
+    hi(p, rect);
+    if (a.category === 'blocker' && S.showLevelTags) levelBadge(p, rect);
+  }
+
+  // hovered cell marker
+  if (S.hover) {
+    const wc = worldOf(S.hover.col, S.hover.row);
+    const s = toScreen(wc.x, wc.y);
+    drawDiamond(s.x, s.y, S.tool === 'erase' ? '#E8503C' : '#7ECB4F', 'rgba(126,203,79,0.12)');
+  }
+  // camera keyframe reticles
+  for (const [lvl, kf] of Object.entries(S.cameraKeyframes)) {
+    const s = toScreen(kf.wx, kf.wy);
+    const col = levelColor(+lvl);
+    ctx.save();
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(s.x, s.y, 15, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s.x - 23, s.y); ctx.lineTo(s.x - 9, s.y); ctx.moveTo(s.x + 9, s.y); ctx.lineTo(s.x + 23, s.y);
+    ctx.moveTo(s.x, s.y - 23); ctx.lineTo(s.x, s.y - 9); ctx.moveTo(s.x, s.y + 9); ctx.lineTo(s.x, s.y + 23);
+    ctx.stroke();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill();
+    const label = `📷 L${lvl}`;
+    ctx.font = 'bold 12px Trebuchet MS';
+    const w = ctx.measureText(label).width + 10;
+    ctx.fillStyle = 'rgba(36,27,34,0.8)'; ctx.fillRect(s.x + 18, s.y - 26, w, 18);
+    ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, s.x + 23, s.y - 16);
+    ctx.restore();
+  }
+  scheduleSave(); // debounced auto-save on any state/view change (no-op until ready)
+}
+
+/* --------------------------- asset library --------------------------- */
+const grid = document.getElementById('assetGrid');
+function renderAssets() {
+  grid.innerHTML = '';
+  const countOf = (c) => Object.values(S.assets).filter((a) => a.category === c).length;
+  document.getElementById('tileCount').textContent = `(${countOf('tile')})`;
+  document.getElementById('groundCount').textContent = `(${countOf('decotile')})`;
+  document.getElementById('decorCount').textContent = `(${countOf('decor')})`;
+  document.getElementById('blockerCount').textContent = `(${countOf('blocker')})`;
+  const customMerge = Object.values(S.mergeSlots).filter((s) => s.custom).length;
+  document.getElementById('mergeCount').textContent = `(${customMerge}/${MERGE_SLOTS.length})`;
+  if (S.category === 'merge') { renderMergeLibrary(); return; }
+  const list = Object.values(S.assets).filter((a) => a.category === S.category);
+  for (const a of list) {
+    const card = document.createElement('div');
+    card.className = 'assetCard' + (a.id === S.selectedAssetId ? ' active' : '');
+    const calibrated = a.offX || a.offY || a.scale !== 1 || a.anchorY !== (a.category === 'tile' ? 0.5 : 0);
+    card.innerHTML =
+      (calibrated ? `<span class="calib" title="calibrated offset">✎ ${a.offX|0},${a.offY|0}</span>` : '') +
+      `<button class="del" title="delete asset + its placements">✕</button>` +
+      `<img src="${a.img.src}" /><div class="nm" title="${a.file}">${a.name}</div>`;
+    card.querySelector('img').onclick = () => selectAsset(a.id);
+    card.querySelector('.nm').onclick = () => selectAsset(a.id);
+    card.querySelector('.del').onclick = (e) => {
+      e.stopPropagation();
+      delete S.assets[a.id];
+      S.placements = S.placements.filter((p) => p.assetId !== a.id);
+      if (S.selectedAssetId === a.id) S.selectedAssetId = null;
+      renderAssets(); render(); refreshInspector();
+    };
+    grid.appendChild(card);
+  }
+}
+function selectAsset(id) {
+  S.selectedAssetId = id;
+  S.selectedPlacement = null;
+  const a = assetById(id);
+  say(`Painting <b>${a.name}</b> (${a.category}). Click cells to place${a.category === 'decor' ? ' — decor stacks' : ''}.`);
+  if (S.tool === 'select' || S.tool === 'erase') setTool('paint');
+  renderAssets(); refreshInspector(); render();
+}
+
+/* ----------------------- merge asset library ----------------------- */
+// The merge library is NOT painted on the canvas — it's the catalogue of every
+// game element, each replaceable by uploading your own art.
+function renderMergeLibrary() {
+  for (const slot of MERGE_SLOTS) {
+    const s = S.mergeSlots[slot.key];
+    if (!s) continue;
+    const card = document.createElement('div');
+    card.className = 'assetCard' + (s.custom ? ' active' : '');
+    card.title = `${s.label} — ${s.chain} · tier ${s.tier}`;
+    card.innerHTML =
+      `<span class="calib" style="left:5px;right:auto;background:${s.custom ? 'var(--moss)' : 'var(--line)'}">${s.custom ? '✓ custom' : 'placeholder'}</span>` +
+      (s.custom ? `<button class="del" title="revert to placeholder">↺</button>` : '') +
+      `<img src="${s.src}" style="background:repeating-conic-gradient(#0003 0 25%, transparent 0 50%) 0 0/16px 16px" />` +
+      `<div class="nm">${s.label}</div>` +
+      `<button class="replace" style="width:100%;margin-top:4px;font-size:11px;padding:4px">⤒ Replace</button>`;
+    card.querySelector('.replace').onclick = (e) => { e.stopPropagation(); replaceMergeSlot(slot.key); };
+    card.querySelector('img').onclick = () => replaceMergeSlot(slot.key);
+    const del = card.querySelector('.del');
+    if (del) del.onclick = (e) => { e.stopPropagation(); resetMergeSlot(slot.key); };
+    grid.appendChild(card);
+  }
+}
+function replaceMergeSlot(key) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/png,image/webp';
+  input.onchange = () => {
+    const f = input.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      const slot = S.mergeSlots[key];
+      slot.src = r.result; slot.custom = true; slot.fileName = f.name;
+      renderAssets(); scheduleSave();
+      say(`Replaced <b>${slot.label}</b> with <b>${f.name}</b>. (Export carries the mapping.)`);
+    };
+    r.readAsDataURL(f);
+  };
+  input.click();
+}
+function resetMergeSlot(key) {
+  const def = MERGE_SLOTS.find((d) => d.key === key);
+  S.mergeSlots[key] = { ...def, src: mergePlaceholderSrc(def), custom: false };
+  renderAssets(); scheduleSave();
+  say(`Reverted <b>${def.label}</b> to its placeholder.`);
+}
+document.getElementById('resetMerge').onclick = () => {
+  for (const def of MERGE_SLOTS) S.mergeSlots[def.key] = { ...def, src: mergePlaceholderSrc(def), custom: false };
+  renderAssets(); scheduleSave();
+  say('All merge slots reverted to placeholders.');
+};
+
+/* --------------------------- tabs / category --------------------------- */
+function setCategory(cat) {
+  S.category = cat;
+  document.getElementById('tabTiles').classList.toggle('active', cat === 'tile');
+  document.getElementById('tabGround').classList.toggle('active', cat === 'decotile');
+  document.getElementById('tabDecor').classList.toggle('active', cat === 'decor');
+  document.getElementById('tabBlockers').classList.toggle('active', cat === 'blocker');
+  document.getElementById('tabMerge').classList.toggle('active', cat === 'merge');
+  // The merge library is a catalogue, not a paintable palette: swap the upload
+  // row for the merge actions.
+  const isMerge = cat === 'merge';
+  document.getElementById('uploadRow').style.display = isMerge ? 'none' : '';
+  document.getElementById('mergeActions').style.display = isMerge ? 'flex' : 'none';
+  document.getElementById('uploadCat').textContent =
+    cat === 'blocker' ? 'cloud' : cat === 'decotile' ? 'ground' : cat;
+  document.getElementById('catHint').textContent = {
+    tile: 'Tiles are the playable floor — one per cell, centred on the diamond.',
+    decotile: 'Non-playable ground — same tiles, but decorative only (not part of the game board).',
+    decor: 'Decor sits above tiles — stack multiple, default top-centred.',
+    blocker: 'Cloud blockers cover cells and carry a Level tag (set it in the toolbar). Each level’s clouds clear when that level unlocks.',
+    merge: 'The merge-item catalogue — not painted on the map. Click ⤒ Replace (or the art) to swap any slot for your own PNG. Export carries the mapping.'
+  }[cat];
+  // keep selection if it belongs to this category
+  const sel = assetById(S.selectedAssetId);
+  if (!sel || sel.category !== cat) S.selectedAssetId = null;
+  renderAssets(); refreshInspector();
+}
+document.getElementById('tabTiles').onclick = () => setCategory('tile');
+document.getElementById('tabGround').onclick = () => setCategory('decotile');
+document.getElementById('tabDecor').onclick = () => setCategory('decor');
+document.getElementById('tabBlockers').onclick = () => setCategory('blocker');
+document.getElementById('tabMerge').onclick = () => setCategory('merge');
+document.getElementById('activeLevel').addEventListener('input', (e) => {
+  S.activeLevel = Math.max(1, +e.target.value || 1);
+  say(`New cloud blockers will be tagged <b style="color:${levelColor(S.activeLevel)}">Level ${S.activeLevel}</b>.`);
+});
+
+/* --------------------------- upload --------------------------- */
+document.getElementById('uploadBtn').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = async (e) => {
+  for (const f of e.target.files) await addAsset(f, S.category);
+  e.target.value = '';
+  renderAssets();
+};
+function makeAsset(img, file, category, calib) {
+  const id = uid();
+  S.assets[id] = {
+    id, name: file.replace(/\.(png|webp)$/i, ''), category, file, img,
+    w: img.naturalWidth, h: img.naturalHeight,
+    offX: calib?.offX ?? 0, offY: calib?.offY ?? 0, scale: calib?.scale ?? 1,
+    anchorX: calib?.anchorX ?? 0.5,
+    // tile/decotile = centred, blocker = sits slightly high over the cell, decor = top-centred
+    anchorY: calib?.anchorY ?? (category === 'tile' || category === 'decotile' ? 0.5 : category === 'blocker' ? 0.62 : 0)
+  };
+  if (!S.selectedAssetId && category === S.category) S.selectedAssetId = id;
+  return id;
+}
+function addAsset(file, category, calib) {
+  return new Promise((res) => {
+    const r = new FileReader();
+    r.onload = () => { const img = new Image(); img.onload = () => { makeAsset(img, file.name ?? file, category, calib); res(); }; img.src = r.result; };
+    r.readAsDataURL(file instanceof Blob ? file : dataURLToBlob(file));
+  });
+}
+
+/* --------------------------- tools & input --------------------------- */
+function setTool(tool) {
+  S.tool = tool;
+  for (const [id, t] of [['toolPaint', 'paint'], ['toolSelect', 'select'], ['toolErase', 'erase'], ['toolPan', 'pan']])
+    document.getElementById(id).classList.toggle('active', t === tool);
+  updateCursor();
+  render();
+}
+/** Cursor reflects the active pan affordance (hand) vs editing (crosshair). */
+function updateCursor() {
+  const panning = S.tool === 'pan' || S.spaceHeld;
+  stage.style.cursor = S.drag && S.drag.kind === 'pan' ? 'grabbing' : panning ? 'grab' : 'crosshair';
+}
+document.getElementById('toolPaint').onclick = () => setTool('paint');
+document.getElementById('toolSelect').onclick = () => setTool('select');
+document.getElementById('toolErase').onclick = () => setTool('erase');
+document.getElementById('toolPan').onclick = () => setTool('pan');
+
+function topElementAt(col, row) {
+  // topmost non-floor (decor/blocker) first, else the floor tile.
+  const here = S.placements.filter((p) => p.col === col && p.row === row);
+  const above = here.filter((p) => { const a = assetById(p.assetId); return a && !isFloor(a); }).sort((a, b) => b.z - a.z);
+  if (above.length) return above[0];
+  return here.find((p) => isFloor(assetById(p.assetId))) ?? null;
+}
+function paintAt(col, row) {
+  if (S.category === 'merge') { say('Merge items are a catalogue — use ⤒ Replace to swap art. They are not placed on the map.'); return; }
+  const a = assetById(S.selectedAssetId);
+  if (!a) { say('Pick an asset from the sidebar first.'); return; }
+  if (a.category === 'tile') {
+    // one floor tile per cell — replace.
+    S.placements = S.placements.filter((p) => !(p.col === col && p.row === row && isFloor(assetById(p.assetId))));
+    S.placements.push({ id: uid(), assetId: a.id, col, row, z: 0 });
+  } else {
+    const pl = { id: uid(), assetId: a.id, col, row, z: S.nextZ++ };
+    if (a.category === 'blocker') pl.level = S.activeLevel; // tag the level it blocks
+    S.placements.push(pl);
+  }
+}
+function eraseAt(col, row) {
+  const top = topElementAt(col, row);
+  if (top) {
+    S.placements = S.placements.filter((p) => p.id !== top.id);
+    if (S.selectedPlacement === top.id) S.selectedPlacement = null;
+  }
+}
+
+stage.addEventListener('mousedown', (e) => {
+  stopFly(); // any interaction cancels a camera glide
+  const rect = stage.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  if (e.button === 1 || e.button === 2 || e.altKey || S.spaceHeld || S.tool === 'pan') {
+    S.drag = { kind: 'pan', sx, sy, camX: S.cam.x, camY: S.cam.y }; updateCursor(); return;
+  }
+  const cell = cellOf(sx, sy);
+  if (S.tool === 'paint') { paintAt(cell.col, cell.row); S.drag = { kind: 'paint', last: `${cell.col},${cell.row}` }; }
+  else if (S.tool === 'erase') { eraseAt(cell.col, cell.row); S.drag = { kind: 'erase' }; }
+  else { // select
+    const top = topElementAt(cell.col, cell.row);
+    S.selectedPlacement = top ? top.id : null;
+    if (top) { S.selectedAssetId = top.assetId; const a = assetById(top.assetId); if (a.category !== S.category) setCategory(a.category); }
+    refreshInspector(); renderAssets();
+  }
+  render();
+});
+stage.addEventListener('contextmenu', (e) => e.preventDefault());
+window.addEventListener('mousemove', (e) => {
+  const rect = stage.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  S.hover = cellOf(sx, sy);
+  if (S.drag) {
+    if (S.drag.kind === 'pan') { S.cam.x = S.drag.camX + (sx - S.drag.sx); S.cam.y = S.drag.camY + (sy - S.drag.sy); }
+    else if (S.drag.kind === 'paint') { const k = `${S.hover.col},${S.hover.row}`; if (k !== S.drag.last) { paintAt(S.hover.col, S.hover.row); S.drag.last = k; } }
+    else if (S.drag.kind === 'erase') eraseAt(S.hover.col, S.hover.row);
+  }
+  render();
+});
+window.addEventListener('mouseup', () => { S.drag = null; updateCursor(); });
+stage.addEventListener('wheel', (e) => {
+  stopFly();
+  e.preventDefault();
+  const rect = stage.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const before = toWorld(sx, sy);
+  S.cam.zoom = Math.min(4, Math.max(0.08, S.cam.zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  S.cam.x = sx - before.x * S.cam.zoom; S.cam.y = sy - before.y * S.cam.zoom;
+  render();
+}, { passive: false });
+
+function fitView() {
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  if (!S.placements.length) { S.cam = { x: W / 2, y: H / 3, zoom: 0.55 }; render(); return; }
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (const p of S.placements) {
+    const wc = worldOf(p.col, p.row);
+    minX = Math.min(minX, wc.x - S.tileW); maxX = Math.max(maxX, wc.x + S.tileW);
+    minY = Math.min(minY, wc.y - S.tileH * 2); maxY = Math.max(maxY, wc.y + S.tileH);
+  }
+  S.cam.zoom = Math.min((W - 80) / (maxX - minX), (H - 80) / (maxY - minY), 2);
+  S.cam.x = (W - (maxX + minX) * S.cam.zoom) / 2;
+  S.cam.y = (H - (maxY + minY) * S.cam.zoom) / 2;
+  render();
+}
+document.getElementById('zoomFit').onclick = fitView;
+
+/* --------------------------- camera keyframes per level --------------------------- */
+/* A keyframe stores the FOCAL world point + zoom (window-size independent). On
+ * level-up the game flies to the matching level's keyframe; here we author and
+ * preview those moves with an extra-smooth (smootherstep + gentle dolly) glide. */
+const camCenterWorld = () => {
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  return { wx: (W / 2 - S.cam.x) / S.cam.zoom, wy: (H / 2 - S.cam.y) / S.cam.zoom, zoom: S.cam.zoom };
+};
+const camFromFocal = (kf) => {
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  return { x: W / 2 - kf.wx * kf.zoom, y: H / 2 - kf.wy * kf.zoom, zoom: kf.zoom };
+};
+const smootherstep = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+function maxLevelShown() {
+  let m = Math.max(3, S.activeLevel || 1);
+  for (const p of S.placements) { const a = assetById(p.assetId); if (a?.category === 'blocker') m = Math.max(m, p.level ?? 1); }
+  for (const k of Object.keys(S.cameraKeyframes)) m = Math.max(m, +k);
+  return Math.min(m, 30);
+}
+function stopFly() { if (S.flying) { cancelAnimationFrame(S.flying); S.flying = null; } }
+function flyCameraTo(kf, dur = 1300, onDone) {
+  stopFly();
+  const from = camCenterWorld();
+  const to = { wx: kf.wx, wy: kf.wy, zoom: kf.zoom };
+  let start = null;
+  const step = (now) => {
+    if (start === null) start = now;
+    const t = Math.min(1, (now - start) / dur);
+    const e = smootherstep(t);
+    const fx = from.wx + (to.wx - from.wx) * e;
+    const fy = from.wy + (to.wy - from.wy) * e;
+    // gentle dolly: pull back ~12% at the midpoint for a premium, extra-smooth feel.
+    const z = (from.zoom + (to.zoom - from.zoom) * e) * (1 - 0.12 * Math.sin(Math.PI * t));
+    S.cam = { x: wrap.clientWidth / 2 - fx * z, y: wrap.clientHeight / 2 - fy * z, zoom: z };
+    render();
+    if (t < 1) { S.flying = requestAnimationFrame(step); }
+    else { S.flying = null; if (onDone) onDone(); }
+  };
+  S.flying = requestAnimationFrame(step);
+}
+function setCamKeyframe(level) {
+  S.cameraKeyframes[level] = camCenterWorld();
+  renderCamRows(); render();
+  say(`Camera keyframe set for <b style="color:${levelColor(level)}">Level ${level}</b>.`);
+}
+function clearCamKeyframe(level) { delete S.cameraKeyframes[level]; renderCamRows(); render(); }
+function cameraTour() {
+  const levels = Object.keys(S.cameraKeyframes).map(Number).sort((a, b) => a - b);
+  if (!levels.length) { say('No camera keyframes yet — frame a view and Set one per level.'); return; }
+  let i = 0;
+  const next = () => {
+    if (i >= levels.length) { say('Tour complete.'); return; }
+    const lvl = levels[i++];
+    say(`Touring → <b style="color:${levelColor(lvl)}">Level ${lvl}</b>`);
+    flyCameraTo(S.cameraKeyframes[lvl], 1500, () => setTimeout(next, 650));
+  };
+  // start from the first keyframe instantly, then glide through the rest.
+  S.cam = camFromFocal(S.cameraKeyframes[levels[0]]); render();
+  i = 1; if (levels.length === 1) { say('Tour complete (one keyframe).'); } else setTimeout(next, 500);
+}
+function renderCamRows() {
+  const box = document.getElementById('camRows');
+  box.innerHTML = '';
+  for (let lvl = 1; lvl <= maxLevelShown(); lvl++) {
+    const has = !!S.cameraKeyframes[lvl];
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:center; gap:6px; padding:3px 10px;';
+    row.innerHTML =
+      `<span class="pill" style="background:${levelColor(lvl)}; color:#241B22">L${lvl}</span>` +
+      `<span style="flex:1; color:${has ? 'var(--cream)' : 'var(--dim)'}; font-size:12px">${has ? 'keyframe set' : '— not set'}</span>`;
+    const set = document.createElement('button'); set.textContent = has ? '↻ Set' : 'Set'; set.className = 'mini';
+    set.style.cssText = 'padding:3px 8px; font-size:11px'; set.onclick = () => setCamKeyframe(lvl);
+    const go = document.createElement('button'); go.textContent = 'Go'; go.style.cssText = 'padding:3px 8px; font-size:11px';
+    go.disabled = !has; go.onclick = () => flyCameraTo(S.cameraKeyframes[lvl]);
+    row.appendChild(set); row.appendChild(go);
+    if (has) {
+      const del = document.createElement('button'); del.textContent = '✕'; del.className = 'warn';
+      del.style.cssText = 'padding:3px 7px; font-size:11px'; del.onclick = () => clearCamKeyframe(lvl);
+      row.appendChild(del);
+    }
+    box.appendChild(row);
+  }
+}
+document.getElementById('camTour').onclick = cameraTour;
+
+document.getElementById('gridToggle').onclick = () => { S.showGrid = !S.showGrid; render(); };
+document.getElementById('tagToggle').onclick = (e) => {
+  S.showLevelTags = !S.showLevelTags;
+  e.target.classList.toggle('active', !S.showLevelTags);
+  render();
+  say(`Cloud level tags ${S.showLevelTags ? 'shown' : 'hidden'} on the preview (export keeps the level data).`);
+};
+document.getElementById('tileW').onchange = (e) => { S.tileW = +e.target.value || 256; render(); };
+document.getElementById('tileH').onchange = (e) => { S.tileH = +e.target.value || 128; render(); };
+
+window.addEventListener('keydown', (e) => {
+  if (/INPUT|SELECT/.test(e.target.tagName)) return;
+  if (e.key === 'b' || e.key === 'B') setTool('paint');
+  if (e.key === 'v' || e.key === 'V') setTool('select');
+  if (e.key === 'e' || e.key === 'E') setTool('erase');
+  if (e.key === 'h' || e.key === 'H') setTool('pan');
+  if (e.key === 'f' || e.key === 'F') fitView();
+  if (e.key === 'g' || e.key === 'G') { S.showGrid = !S.showGrid; render(); }
+  if (e.key === 't' || e.key === 'T') { document.getElementById('tagToggle').click(); }
+  if (e.code === 'Space' && !S.spaceHeld) { S.spaceHeld = true; e.preventDefault(); stopFly(); updateCursor(); }
+  // Arrow keys nudge-pan the view (Shift = coarse). A clear, no-mouse pan.
+  const ARROWS = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+  if (ARROWS[e.key]) {
+    e.preventDefault(); stopFly();
+    const step = (e.shiftKey ? 220 : 80);
+    S.cam.x += ARROWS[e.key][0] * step; S.cam.y += ARROWS[e.key][1] * step; render();
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && S.selectedPlacement) {
+    S.placements = S.placements.filter((p) => p.id !== S.selectedPlacement);
+    S.selectedPlacement = null; refreshInspector(); render();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') { S.spaceHeld = false; updateCursor(); }
+});
+
+/* --------------------------- inspector / sliders --------------------------- */
+const sliders = {
+  offX: ['sOffX', 'vOffX', (v) => v | 0],
+  offY: ['sOffY', 'vOffY', (v) => v | 0],
+  scale: ['sScale', 'vScale', (v) => (+v).toFixed(2)],
+  anchorY: ['sAnchorY', 'vAnchorY', (v) => (+v).toFixed(2)],
+  anchorX: ['sAnchorX', 'vAnchorX', (v) => (+v).toFixed(2)]
+};
+function inspectedAsset() {
+  if (S.selectedPlacement) { const p = placementById(S.selectedPlacement); if (p) return assetById(p.assetId); }
+  return assetById(S.selectedAssetId);
+}
+function refreshInspector() {
+  const a = inspectedAsset();
+  const target = document.getElementById('inspTarget');
+  if (!a) { target.textContent = 'Select an asset or a placed element.'; return; }
+  const p = S.selectedPlacement ? placementById(S.selectedPlacement) : null;
+  const inst = p ? ` · element @${p.col},${p.row}` : '';
+  target.innerHTML = `${a.name} <small style="color:var(--dim)">(${a.category}, ${a.w}×${a.h})${inst}</small>`;
+  for (const [prop, [sid, vid, fmt]] of Object.entries(sliders)) {
+    document.getElementById(sid).value = a[prop];
+    document.getElementById(vid).textContent = fmt(a[prop]);
+  }
+  // Level row: only for a selected blocker element.
+  const showLevel = p && a.category === 'blocker';
+  document.getElementById('levelRow').style.display = showLevel ? '' : 'none';
+  if (showLevel) document.getElementById('instLevel').value = p.level ?? 1;
+}
+document.getElementById('instLevel').addEventListener('input', (e) => {
+  const p = S.selectedPlacement ? placementById(S.selectedPlacement) : null;
+  if (!p) return;
+  p.level = Math.max(1, +e.target.value || 1);
+  render();
+  say(`This cloud now blocks <b style="color:${levelColor(p.level)}">Level ${p.level}</b>.`);
+});
+for (const [prop, [sid, vid, fmt]] of Object.entries(sliders)) {
+  document.getElementById(sid).addEventListener('input', (e) => {
+    const a = inspectedAsset();
+    if (!a) return;
+    a[prop] = prop === 'scale' || prop.startsWith('anchor') ? +e.target.value : Math.round(+e.target.value);
+    document.getElementById(vid).textContent = fmt(a[prop]);
+    renderAssets(); render();
+  });
+}
+document.getElementById('resetCalib').onclick = () => {
+  const a = inspectedAsset(); if (!a) return;
+  a.offX = 0; a.offY = 0; a.scale = 1; a.anchorX = 0.5; a.anchorY = a.category === 'tile' ? 0.5 : 0;
+  refreshInspector(); renderAssets(); render();
+  say(`Calibration reset for <b>${a.name}</b>.`);
+};
+document.getElementById('raiseEl').onclick = () => { const p = placementById(S.selectedPlacement); if (p) { p.z = S.nextZ++; render(); } };
+document.getElementById('lowerEl').onclick = () => { const p = placementById(S.selectedPlacement); if (p) { p.z = -(S.nextZ++); render(); } };
+document.getElementById('deleteEl').onclick = () => {
+  if (!S.selectedPlacement) return;
+  S.placements = S.placements.filter((p) => p.id !== S.selectedPlacement);
+  S.selectedPlacement = null; refreshInspector(); render();
+};
+
+/* --------------------------- export / save / load --------------------------- */
+function download(filename, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+}
+function dataURLToBlob(durl) {
+  const [head, b64] = durl.split(',');
+  const mime = head.match(/:(.*?);/)[1];
+  const bin = atob(b64); const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+function buildDoc(embed) {
+  const world = document.getElementById('worldName').value.trim() || 'world';
+  const assets = Object.values(S.assets).map((a) => ({
+    id: a.id, name: a.name, category: a.category, file: a.file,
+    width: a.w, height: a.h,
+    /** the calibration: drop offX/offY into the game placement, anchor into anchors.json */
+    calibration: {
+      offsetX: a.offX, offsetY: a.offY, scale: +a.scale.toFixed(4),
+      anchor: { x: +a.anchorX.toFixed(4), y: +a.anchorY.toFixed(4) }
+    }
+  }));
+  // normalise z to a compact 0..n per cell-decor stack for clean output.
+  const placements = S.placements
+    .slice()
+    .sort((p, q) => (p.col + p.row) - (q.col + q.row) || p.z - q.z)
+    .map((p) => {
+      const a = assetById(p.assetId);
+      const out = { asset: a.name, category: a.category, col: p.col, row: p.row, z: p.z };
+      if (a.category === 'blocker') out.level = p.level ?? 1;
+      return out;
+    });
+  // levels map: which cells each level's clouds cover (what the game unfogs per level).
+  const levels = {};
+  for (const p of S.placements) {
+    const a = assetById(p.assetId);
+    if (a?.category !== 'blocker') continue;
+    const L = p.level ?? 1;
+    (levels[L] ??= { count: 0, cells: [] });
+    levels[L].count++;
+    if (!levels[L].cells.some((c) => c.col === p.col && c.row === p.row)) levels[L].cells.push({ col: p.col, row: p.row });
+  }
+  let bounds = null;
+  if (S.placements.length) {
+    let minC = 1e9, maxC = -1e9, minR = 1e9, maxR = -1e9;
+    for (const p of S.placements) { minC = Math.min(minC, p.col); maxC = Math.max(maxC, p.col); minR = Math.min(minR, p.row); maxR = Math.max(maxR, p.row); }
+    bounds = { minCol: minC, maxCol: maxC, minRow: minR, maxRow: maxR };
+  }
+  // camera keyframes: focal world point + zoom, plus the focal cell (col,row)
+  // so the game can frame it regardless of its own tile size / viewport.
+  const cameraKeyframes = Object.entries(S.cameraKeyframes)
+    .map(([level, kf]) => {
+      const a = kf.wx / (S.tileW / 2), b = kf.wy / (S.tileH / 2);
+      return {
+        level: +level,
+        focus: { col: Math.round((b + a) / 2), row: Math.round((b - a) / 2) },
+        world: { x: Math.round(kf.wx), y: Math.round(kf.wy) },
+        zoom: +kf.zoom.toFixed(4)
+      };
+    })
+    .sort((a, b) => a.level - b.level);
+  // merge-item catalogue: every element, with custom art where the artist
+  // dropped it in. `image` is embedded only for replaced slots (keeps it lean).
+  const mergeAssets = MERGE_SLOTS.map((def) => {
+    const s = S.mergeSlots[def.key] ?? def;
+    return {
+      key: def.key, label: def.label, chain: def.chain, tier: def.tier,
+      custom: !!s.custom,
+      file: s.custom ? (s.fileName ?? `${def.key}.png`) : null,
+      image: s.custom ? s.src : null
+    };
+  });
+  const doc = {
+    format: 'emberkeep-world', version: 1, world,
+    tile: { width: S.tileW, height: S.tileH },
+    bounds, assets, placements, levels, cameraKeyframes, mergeAssets
+  };
+  if (embed) { doc.images = {}; for (const a of Object.values(S.assets)) doc.images[a.file] = a.img.src; }
+  return doc;
+}
+document.getElementById('exportWorld').onclick = () => {
+  const doc = buildDoc(true);
+  download(`${doc.world}.world.json`, JSON.stringify(doc, null, 2));
+  const levelKeys = Object.keys(doc.levels);
+  const levelSummary = levelKeys.length
+    ? ` Levels: ${levelKeys.sort((a, b) => a - b).map((L) => `L${L}×${doc.levels[L].count}`).join(', ')}.`
+    : '';
+  say(`Exported <b>${doc.world}.world.json</b> — ${doc.assets.length} assets, ${doc.placements.length} placements, images embedded.${levelSummary} ✔`);
+};
+document.getElementById('saveProject').onclick = () => {
+  const doc = buildDoc(true); doc.format = 'emberkeep-world-project';
+  download(`${doc.world}.worldproject.json`, JSON.stringify(doc));
+  say('Project saved.');
+};
+// Load a world doc (export or project format) into the builder. Shared by the
+// file-picker (Load) AND the deployed default-world auto-load.
+function loadWorldDoc(doc, label) {
+  S.ready = false; // pause auto-save while the file loads in
+  S.assets = {}; S.placements = []; S.selectedAssetId = null; S.selectedPlacement = null; S.nextId = 1; S.nextZ = 1;
+  document.getElementById('worldName').value = doc.world ?? 'world';
+  S.tileW = doc.tile?.width ?? 256; S.tileH = doc.tile?.height ?? 128;
+  document.getElementById('tileW').value = S.tileW; document.getElementById('tileH').value = S.tileH;
+  // merge library: placeholders + any custom art the file carried
+  S.mergeSlots = {}; initMergeSlots();
+  for (const m of doc.mergeAssets ?? []) {
+    const def = MERGE_SLOTS.find((d) => d.key === m.key);
+    if (def && m.custom && m.image) S.mergeSlots[m.key] = { ...def, src: m.image, custom: true, fileName: m.file };
+  }
+  const byName = {};
+  let remaining = (doc.assets ?? []).length;
+  if (!remaining) { markReady(); renderAssets(); render(); return; }
+  doc.assets.forEach((ad) => {
+    const img = new Image();
+    img.onload = () => {
+      const id = makeAsset(img, ad.file, ad.category, {
+        offX: ad.calibration.offsetX, offY: ad.calibration.offsetY,
+        scale: ad.calibration.scale, anchorX: ad.calibration.anchor.x, anchorY: ad.calibration.anchor.y
+      });
+      S.assets[id].name = ad.name; byName[`${ad.category}|${ad.name}`] = id;
+      if (--remaining === 0) {
+        for (const pl of doc.placements) {
+          const aid = byName[`${pl.category}|${pl.asset}`] ?? byName[`tile|${pl.asset}`] ?? byName[`decotile|${pl.asset}`];
+          if (!aid) continue;
+          const place = { id: uid(), assetId: aid, col: pl.col, row: pl.row, z: pl.z ?? 0 };
+          if (pl.level !== undefined) place.level = pl.level;
+          S.placements.push(place);
+        }
+        S.nextZ = Math.max(1, ...S.placements.map((p) => Math.abs(p.z))) + 1;
+        S.selectedAssetId = null;
+        renderAssets(); fitView(); refreshInspector();
+        markReady(); // resume auto-save and persist the loaded project
+        say(`Loaded <b>${label ?? doc.world}</b>: ${doc.assets.length} assets, ${doc.placements.length} placements.`);
+      }
+    };
+    img.src = (doc.images ?? {})[ad.file];
+  });
+}
+// Fetch the bundled current world (deployed alongside index.html). Returns true
+// if it loaded; false (and silent) if there is no default-world.json here.
+async function loadDefaultWorld(announce) {
+  try {
+    const res = await fetch('default-world.json', { cache: 'no-store' });
+    if (!res.ok) return false;
+    const doc = JSON.parse(await res.text());
+    loadWorldDoc(doc, 'current world');
+    if (announce) say('Loaded the <b>current world</b>. Edit freely — your changes auto-save in this browser.');
+    return true;
+  } catch (e) { return false; }
+}
+document.getElementById('loadProject').onclick = () => {
+  const input = document.createElement('input'); input.type = 'file'; input.accept = 'application/json';
+  input.onchange = () => {
+    const r = new FileReader();
+    r.onload = () => loadWorldDoc(JSON.parse(r.result));
+    r.readAsText(input.files[0]);
+  };
+  input.click();
+};
+
+/* --------------------------- bundled starter tiles --------------------------- */
+/* The real border-grass set with anchorY measured per tile (grass-diamond
+ * mid-axis / canvas height) so each block's tile-centre registration is exact.
+ * Loaded via relative <img> src, which works under file:// and http alike. */
+const STARTER_DIR = '../../assets/sprites/environment/map/border-grass/';
+const STARTER_TILES = [
+  ['border-grass-1.png', 0.2605], ['border-grass-2.png', 0.2634],
+  ['border-grass-3.png', 0.2566], ['border-grass-4.png', 0.2556],
+  ['border-grass-5.png', 0.2692], ['border-grass-6.png', 0.2566],
+  ['border-grass-7.png', 0.2444], ['border-grass-8.png', 0.2434],
+  ['border-grass-9.png', 0.3533], ['border-grass-10.png', 0.3333],
+  ['border-grass-11.png', 0.3422], ['border-grass-12.png', 0.3262],
+  ['border-grass-13.png', 0.3048], ['border-grass-14.png', 0.3138],
+  ['border-grass-15.png', 0.3191], ['border-grass-16.png', 0.3191]
+];
+// The normalised 1-tile cloud blocker (256x174); base-contact anchor sits high
+// so the puff overlaps neighbours like the in-game fog blanket.
+const STARTER_BLOCKERS = [
+  ['../../assets/sprites/environment/level-blocker/cloud/', 'cloud-tile.png', { anchorX: 0.5, anchorY: 0.62 }]
+];
+function loadStarterTiles() {
+  // de-dup by category+file so the SAME tile can live in both 'tile' (playable)
+  // and 'decotile' (non-playable ground).
+  const existing = new Set(Object.values(S.assets).map((a) => `${a.category}|${a.file}`));
+  const jobs = [
+    ...STARTER_TILES.map(([file, anchorY]) => [STARTER_DIR, file, 'tile', { anchorX: 0.5, anchorY }]),
+    ...STARTER_TILES.map(([file, anchorY]) => [STARTER_DIR, file, 'decotile', { anchorX: 0.5, anchorY }]),
+    ...STARTER_BLOCKERS.map(([dir, file, calib]) => [dir, file, 'blocker', calib])
+  ].filter(([, file, category]) => !existing.has(`${category}|${file}`));
+  let loaded = 0, failed = 0, pending = jobs.length;
+  if (pending === 0) { say('Starter assets already loaded.'); return; }
+  for (const [dir, file, category, calib] of jobs) {
+    const img = new Image();
+    img.onload = () => {
+      makeAsset(img, file, category, calib);
+      loaded++;
+      if (--pending === 0) done();
+    };
+    img.onerror = () => { failed++; if (--pending === 0) done(); };
+    img.src = dir + file;
+  }
+  function done() {
+    renderAssets(); refreshInspector(); render();
+    say(failed && !loaded
+      ? 'Starter assets not found from here — open this file inside the repo, or upload manually.'
+      : `Starter assets ready — <b>${loaded}</b> loaded (grass tiles + cloud blocker)${failed ? `, ${failed} missing` : ''}.`);
+    markReady();
+  }
+}
+document.getElementById('loadStarter').onclick = loadStarterTiles;
+document.getElementById('loadCurrent').onclick = async () => {
+  if (!(await loadDefaultWorld(true))) say('No <code>default-world.json</code> is bundled next to this page.');
+};
+
+/* --------------------------- auto-save (this browser) --------------------------- */
+/* Persists the whole session to localStorage and reopens it next time. Starter
+ * assets store only their URL (tiny); user-uploaded art embeds its data URL. */
+const WB_KEY = 'emberkeep_worldbuilder_session_v1';
+let saveTimer = null;
+function serializeSession() {
+  const list = Object.values(S.assets);
+  const idToIdx = new Map(list.map((a, i) => [a.id, i]));
+  return {
+    v: 1, world: document.getElementById('worldName').value,
+    tileW: S.tileW, tileH: S.tileH, cam: S.cam,
+    showGrid: S.showGrid, showLevelTags: S.showLevelTags, nextZ: S.nextZ,
+    cameraKeyframes: S.cameraKeyframes,
+    // only custom merge art needs saving — placeholders are regenerated on load.
+    mergeSlots: Object.values(S.mergeSlots)
+      .filter((s) => s.custom)
+      .map((s) => ({ key: s.key, src: s.src, fileName: s.fileName })),
+    assets: list.map((a) => ({
+      name: a.name, category: a.category, file: a.file, src: a.img.src,
+      offX: a.offX, offY: a.offY, scale: a.scale, anchorX: a.anchorX, anchorY: a.anchorY
+    })),
+    placements: S.placements.map((p) => {
+      const o = { a: idToIdx.get(p.assetId), col: p.col, row: p.row, z: p.z };
+      if (p.level !== undefined) o.level = p.level;
+      return o;
+    })
+  };
+}
+function saveNow() {
+  if (!S.ready) return;
+  try {
+    localStorage.setItem(WB_KEY, JSON.stringify(serializeSession()));
+    const dot = document.getElementById('saveDot');
+    dot.style.opacity = '1'; dot.textContent = '● saved';
+    setTimeout(() => { dot.style.opacity = '0.35'; dot.textContent = '● auto'; }, 900);
+  } catch (e) {
+    const dot = document.getElementById('saveDot');
+    dot.style.color = 'var(--lava)'; dot.textContent = '● full';
+    say('Auto-save hit the browser storage limit (too many embedded images). Use <b>Save</b> to a file instead.');
+  }
+}
+function scheduleSave() { if (!S.ready) return; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 600); }
+function markReady() { S.ready = true; renderCamRows(); saveNow(); }
+window.addEventListener('beforeunload', saveNow);
+window.addEventListener('pagehide', saveNow);
+
+function restoreSession() {
+  let raw = null;
+  try { raw = localStorage.getItem(WB_KEY); } catch (e) { return false; }
+  if (!raw) return false;
+  let doc; try { doc = JSON.parse(raw); } catch (e) { return false; }
+  if (!doc || !Array.isArray(doc.assets)) return false;
+  S.assets = {}; S.placements = []; S.selectedAssetId = null; S.selectedPlacement = null; S.nextId = 1;
+  S.tileW = doc.tileW ?? 240; S.tileH = doc.tileH ?? 120;
+  S.showGrid = doc.showGrid ?? true; S.showLevelTags = doc.showLevelTags ?? true;
+  S.cameraKeyframes = doc.cameraKeyframes ?? {};
+  S.nextZ = doc.nextZ ?? 1;
+  // restore the merge library (placeholders + any saved custom art)
+  S.mergeSlots = {}; initMergeSlots();
+  for (const m of doc.mergeSlots ?? []) {
+    const def = MERGE_SLOTS.find((d) => d.key === m.key);
+    if (def) S.mergeSlots[m.key] = { ...def, src: m.src, custom: true, fileName: m.fileName };
+  }
+  if (doc.cam) S.cam = doc.cam;
+  if (doc.world) document.getElementById('worldName').value = doc.world;
+  document.getElementById('tileW').value = S.tileW; document.getElementById('tileH').value = S.tileH;
+  if (doc.assets.length === 0) { markReady(); renderAssets(); render(); return true; }
+  const idxToId = [];
+  let remaining = doc.assets.length;
+  const finalize = () => {
+    if (--remaining > 0) return;
+    for (const pl of doc.placements ?? []) {
+      const aid = idxToId[pl.a];
+      if (aid == null) continue;
+      const place = { id: uid(), assetId: aid, col: pl.col, row: pl.row, z: pl.z ?? 0 };
+      if (pl.level !== undefined) place.level = pl.level;
+      S.placements.push(place);
+    }
+    S.selectedAssetId = null;
+    renderAssets(); refreshInspector(); render();
+    markReady();
+    const n = Object.keys(S.assets).length, m = S.placements.length;
+    say(`Reopened your last session — ${n} assets, ${m} placements. (Auto-saved in this browser.)`);
+  };
+  doc.assets.forEach((ad, i) => {
+    const img = new Image();
+    img.onload = () => {
+      const id = makeAsset(img, ad.file, ad.category, { offX: ad.offX, offY: ad.offY, scale: ad.scale, anchorX: ad.anchorX, anchorY: ad.anchorY });
+      S.assets[id].name = ad.name; idxToId[i] = id; finalize();
+    };
+    img.onerror = () => { finalize(); }; // skip a missing asset, keep the rest
+    img.src = ad.src;
+  });
+  return true;
+}
+
+document.getElementById('newWorld').onclick = () => {
+  if (!confirm('Start a fresh world? This clears the auto-saved session in this browser.')) return;
+  try { localStorage.removeItem(WB_KEY); } catch (e) {}
+  S.assets = {}; S.placements = []; S.selectedAssetId = null; S.selectedPlacement = null;
+  S.cameraKeyframes = {}; stopFly();
+  S.mergeSlots = {}; initMergeSlots();
+  S.nextId = 1; S.nextZ = 1; S.ready = false;
+  setCategory('tile'); fitView(); renderCamRows();
+  loadStarterTiles();
+};
+
+initMergeSlots(); // the merge library always exists
+setCategory('tile');
+// Reopen the last LOCAL session if one exists; otherwise load the bundled
+// current world (the deployed default) — so anyone arriving fresh sees it —
+// and only fall back to the bare starter tiles if no default-world.json ships.
+if (!restoreSession()) {
+  loadDefaultWorld(true).then((ok) => { if (!ok) { fitView(); loadStarterTiles(); } });
+}
+</script>
+</body>
+</html>

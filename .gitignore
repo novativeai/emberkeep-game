@@ -1,0 +1,15 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+.playwright-mcp/
+.vercel/
+.DS_Store
+*.local
+*.log
+
+# local debug screenshots (verification shots live in tests/e2e/shots/)
+/board-dragon-clouds.png
+/passive-gift-check.png
+/title-check.png
+/title-new.png

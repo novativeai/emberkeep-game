@@ -1,0 +1,79 @@
+import {
+  ENERGY_MAX,
+  ENERGY_REGEN_AMOUNT,
+  ENERGY_REGEN_MS
+} from '../core/Constants';
+import type { EventBus } from '../core/EventBus';
+import type { GameClock } from '../core/GameClock';
+import type { GameState } from '../core/GameState';
+
+export interface RegenResult {
+  current: number;
+  lastRegenAt: number;
+  recovered: number;
+}
+
+/**
+ * Pure regen math shared by the live tick and the offline catch-up on load.
+ * Regen is anchored to `lastRegenAt`; while at max the anchor follows `now`
+ * so no regen is banked.
+ */
+export function computeRegen(current: number, lastRegenAt: number, now: number): RegenResult {
+  let cur = Math.min(current, ENERGY_MAX);
+  let anchor = lastRegenAt;
+  let recovered = 0;
+  if (anchor > now) anchor = now; // clock went backwards; never regen negatively
+  while (cur < ENERGY_MAX && now - anchor >= ENERGY_REGEN_MS) {
+    cur = Math.min(ENERGY_MAX, cur + ENERGY_REGEN_AMOUNT);
+    anchor += ENERGY_REGEN_MS;
+    recovered += ENERGY_REGEN_AMOUNT;
+  }
+  if (cur >= ENERGY_MAX) anchor = now;
+  return { current: cur, lastRegenAt: anchor, recovered };
+}
+
+export class EnergySystem {
+  constructor(
+    private state: GameState,
+    private bus: EventBus,
+    private clock: GameClock
+  ) {
+    bus.on('energy:spend', ({ amount }) => this.spend(amount));
+    bus.on('energy:refill', () => this.refill());
+    bus.on('time:advanced', () => this.catchUp());
+    bus.on('state:loaded', () => this.catchUp());
+  }
+
+  /** Called every frame by BoardScene and after time jumps. */
+  catchUp(): void {
+    const result = computeRegen(this.state.energyCurrent, this.state.energyLastRegenAt, this.clock.now());
+    const changed = result.current !== this.state.energyCurrent;
+    this.state.energyCurrent = result.current;
+    this.state.energyLastRegenAt = result.lastRegenAt;
+    if (changed) {
+      this.bus.emit('energy:changed', { current: this.state.energyCurrent, max: ENERGY_MAX });
+    }
+  }
+
+  canAfford(amount: number): boolean {
+    this.catchUp();
+    return this.state.energyCurrent >= amount;
+  }
+
+  /** Top Warmth back to full (the level-up reward beat). */
+  private refill(): void {
+    if (this.state.energyCurrent >= ENERGY_MAX) return;
+    this.state.energyCurrent = ENERGY_MAX;
+    this.state.energyLastRegenAt = this.clock.now();
+    this.bus.emit('energy:changed', { current: this.state.energyCurrent, max: ENERGY_MAX });
+  }
+
+  private spend(amount: number): void {
+    this.catchUp();
+    if (this.state.energyCurrent < amount) return;
+    const wasFull = this.state.energyCurrent >= ENERGY_MAX;
+    this.state.energyCurrent -= amount;
+    if (wasFull) this.state.energyLastRegenAt = this.clock.now();
+    this.bus.emit('energy:changed', { current: this.state.energyCurrent, max: ENERGY_MAX });
+  }
+}

@@ -1,0 +1,394 @@
+{
+  "images": [
+    {
+      "key": "tile_ash",
+      "source": "file",
+      "generator": "tile",
+      "file": "raw/screamingbrain/tile_ash.png"
+    },
+    {
+      "key": "tile_ash_alt",
+      "source": "file",
+      "generator": "tile",
+      "file": "raw/screamingbrain/tile_ash_alt.png"
+    },
+    {
+      "key": "tile_moss",
+      "source": "placeholder",
+      "generator": "tile",
+      "file": "raw/ai/tile_moss.png"
+    },
+    {
+      "key": "tile_moss_alt",
+      "source": "placeholder",
+      "generator": "tile",
+      "file": "raw/ai/tile_moss_alt.png"
+    },
+    {
+      "key": "cliff_sw",
+      "source": "placeholder",
+      "generator": "cliff",
+      "file": "raw/ai/cliff_sw.png"
+    },
+    {
+      "key": "cliff_se",
+      "source": "placeholder",
+      "generator": "cliff",
+      "file": "raw/ai/cliff_se.png"
+    },
+    {
+      "key": "cliff_sw_b",
+      "source": "placeholder",
+      "generator": "cliff",
+      "file": "raw/ai/cliff_sw_b.png"
+    },
+    {
+      "key": "cliff_se_b",
+      "source": "placeholder",
+      "generator": "cliff",
+      "file": "raw/ai/cliff_se_b.png"
+    },
+    {
+      "key": "cliff_corner_s",
+      "source": "placeholder",
+      "generator": "cliff",
+      "file": "raw/ai/cliff_corner_s.png"
+    },
+    {
+      "key": "cliff_corner_e",
+      "source": "placeholder",
+      "generator": "cliff",
+      "file": "raw/ai/cliff_corner_e.png"
+    },
+    {
+      "key": "cliff_corner_w",
+      "source": "placeholder",
+      "generator": "cliff",
+      "file": "raw/ai/cliff_corner_w.png"
+    },
+    {
+      "key": "cliff_rock",
+      "source": "placeholder",
+      "generator": "cliff",
+      "file": "raw/ai/cliff_rock.png"
+    },
+    {
+      "key": "fog_puff_1",
+      "source": "placeholder",
+      "generator": "fog",
+      "file": "raw/ai/fog_puff_1.png"
+    },
+    {
+      "key": "fog_puff_2",
+      "source": "placeholder",
+      "generator": "fog",
+      "file": "raw/ai/fog_puff_2.png"
+    },
+    {
+      "key": "item_sparkweed_1",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "raw/ai/item_sparkweed_1.png"
+    },
+    {
+      "key": "item_sparkweed_2",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "raw/ai/item_sparkweed_2.png"
+    },
+    {
+      "key": "item_sparkweed_3",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "raw/ai/item_sparkweed_3.png"
+    },
+    {
+      "key": "item_ember_dragon_1",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "raw/ai/item_ember_dragon_1.png"
+    },
+    {
+      "key": "item_ember_dragon_2",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/_assembled-board.png"
+    },
+    {
+      "key": "item_ember_dragon_3",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/_assembled-board.png"
+    },
+    {
+      "key": "item_flame_gem_1",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "raw/ai/item_flame_gem_1.png"
+    },
+    {
+      "key": "item_flame_gem_2",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "raw/ai/item_flame_gem_2.png"
+    },
+    {
+      "key": "item_flame_gem_3",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "raw/ai/item_flame_gem_3.png"
+    },
+    {
+      "key": "decor_nest",
+      "source": "placeholder",
+      "generator": "decor",
+      "file": "raw/ai/decor_nest.png"
+    },
+    {
+      "key": "decor_brazier",
+      "source": "placeholder",
+      "generator": "decor",
+      "file": "raw/ai/decor_brazier.png"
+    },
+    {
+      "key": "decor_far_isle",
+      "source": "placeholder",
+      "generator": "decor",
+      "file": "raw/ai/decor_far_isle.png"
+    },
+    {
+      "key": "fx_ember",
+      "source": "placeholder",
+      "generator": "fx",
+      "file": "raw/ai/fx_ember.png"
+    },
+    {
+      "key": "fx_spark",
+      "source": "placeholder",
+      "generator": "fx",
+      "file": "raw/ai/fx_spark.png"
+    },
+    {
+      "key": "fx_glow",
+      "source": "placeholder",
+      "generator": "fx",
+      "file": "raw/ai/fx_glow.png"
+    },
+    {
+      "key": "fx_shell",
+      "source": "placeholder",
+      "generator": "fx",
+      "file": "raw/ai/fx_shell.png"
+    },
+    {
+      "key": "ui_hand",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_hand.png"
+    },
+    {
+      "key": "ui_arrow",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_arrow.png"
+    },
+    {
+      "key": "portrait_laurah",
+      "source": "file",
+      "generator": "portrait",
+      "file": "sprites/guide-characters/laurah-dragonMaster/guide-character-bubble-icon.png"
+    },
+    {
+      "key": "portrait_pip",
+      "source": "placeholder",
+      "generator": "portrait",
+      "file": "raw/ai/portrait_pip.png"
+    },
+    {
+      "key": "portrait_cindra",
+      "source": "placeholder",
+      "generator": "portrait",
+      "file": "raw/ai/portrait_cindra.png"
+    },
+    {
+      "key": "ui_tile_highlight",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_tile_highlight.png"
+    },
+    {
+      "key": "ui_btn_play",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_btn_play.png"
+    },
+    {
+      "key": "ui_btn_green",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_btn_green.png"
+    },
+    {
+      "key": "ui_btn_round",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_btn_round.png"
+    },
+    {
+      "key": "ui_panel",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_panel.png"
+    },
+    {
+      "key": "ui_card",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_card.png"
+    },
+    {
+      "key": "ui_pill",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_pill.png"
+    },
+    {
+      "key": "ui_slot",
+      "source": "placeholder",
+      "generator": "ui",
+      "file": "raw/ai/ui_slot.png"
+    },
+    {
+      "key": "ui_icon_bolt",
+      "source": "placeholder",
+      "generator": "icon",
+      "file": "raw/ai/ui_icon_bolt.png"
+    },
+    {
+      "key": "ui_icon_coin",
+      "source": "placeholder",
+      "generator": "icon",
+      "file": "raw/ai/ui_icon_coin.png"
+    },
+    {
+      "key": "ui_icon_key",
+      "source": "placeholder",
+      "generator": "icon",
+      "file": "raw/ai/ui_icon_key.png"
+    },
+    {
+      "key": "ui_icon_gear",
+      "source": "placeholder",
+      "generator": "icon",
+      "file": "raw/ai/ui_icon_gear.png"
+    },
+    {
+      "key": "ui_icon_scroll",
+      "source": "placeholder",
+      "generator": "icon",
+      "file": "raw/ai/ui_icon_scroll.png"
+    },
+    {
+      "key": "grass_1",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-1.png"
+    },
+    {
+      "key": "grass_2",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-2.png"
+    },
+    {
+      "key": "grass_3",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-3.png"
+    },
+    {
+      "key": "grass_4",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-4.png"
+    },
+    {
+      "key": "grass_5",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-5.png"
+    },
+    {
+      "key": "grass_6",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-6.png"
+    },
+    {
+      "key": "grass_7",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-7.png"
+    },
+    {
+      "key": "grass_8",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-8.png"
+    },
+    {
+      "key": "grass_9",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-9.png"
+    },
+    {
+      "key": "grass_10",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-10.png"
+    },
+    {
+      "key": "grass_11",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-11.png"
+    },
+    {
+      "key": "grass_12",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-12.png"
+    },
+    {
+      "key": "grass_13",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-13.png"
+    },
+    {
+      "key": "grass_14",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-14.png"
+    },
+    {
+      "key": "grass_15",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-15.png"
+    },
+    {
+      "key": "grass_16",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/border-grass/border-grass-16.png"
+    },
+    {
+      "key": "cloud_tile",
+      "source": "file",
+      "generator": "fog",
+      "file": "sprites/environment/blockers/cloud/cloud-tile.png"
+    }
+  ]
+}

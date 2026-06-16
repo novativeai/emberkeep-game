@@ -1,0 +1,47 @@
+{
+  "cols": 8,
+  "rows": 8,
+  "regions": [
+    {
+      "id": "start",
+      "status": "active",
+      "tiles": [
+        [1, 1], [2, 1], [3, 1], [4, 1], [5, 1],
+        [1, 2], [2, 2], [3, 2], [4, 2], [5, 2],
+        [1, 3], [2, 3], [3, 3], [4, 3], [5, 3],
+        [1, 4], [2, 4], [3, 4], [4, 4], [5, 4],
+        [1, 5], [2, 5], [3, 5], [4, 5], [5, 5]
+      ]
+    },
+    {
+      "id": "north_fog",
+      "status": "unlockable",
+      "unlock": { "keys": 1 },
+      "tiles": [
+        [0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0],
+        [0, 1], [0, 2], [0, 3], [0, 4], [0, 5]
+      ],
+      "contents": [
+        { "chain": "ember_dragon", "tier": 1, "at": [2, 0] },
+        { "chain": "ember_dragon", "tier": 1, "at": [4, 0] },
+        { "chain": "ember_dragon", "tier": 1, "at": [0, 3] }
+      ],
+      "decor": [{ "decor": "nest", "at": [0, 0] }]
+    }
+  ],
+  "startingItems": [
+    { "chain": "sparkweed", "tier": 1, "at": [1, 2] },
+    { "chain": "sparkweed", "tier": 1, "at": [1, 3] },
+    { "chain": "sparkweed", "tier": 1, "at": [3, 4] },
+    { "chain": "sparkweed", "tier": 1, "at": [5, 1] },
+    { "chain": "sparkweed", "tier": 1, "at": [5, 5] },
+    { "chain": "ember_dragon", "tier": 1, "at": [2, 2] },
+    { "chain": "ember_dragon", "tier": 1, "at": [3, 2] },
+    { "chain": "ember_dragon", "tier": 1, "at": [4, 4] },
+    { "chain": "flame_gem", "tier": 1, "at": [1, 5] },
+    { "chain": "flame_gem", "tier": 1, "at": [2, 5] },
+    { "chain": "flame_gem", "tier": 1, "at": [4, 2] },
+    { "chain": "flame_gem", "tier": 1, "at": [5, 3] },
+    { "chain": "flame_gem", "tier": 1, "at": [3, 1] }
+  ]
+}
