@@ -157,6 +157,12 @@
       "file": "raw/ai/decor_far_isle.png"
     },
     {
+      "key": "decor_dragon",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.png"
+    },
+    {
       "key": "fx_ember",
       "source": "placeholder",
       "generator": "fx",

@@ -1,5 +1,11 @@
 import { defineConfig } from '@playwright/test';
 
+// The 2560x1600 canvas is miserable under pure software rendering, so we hand
+// headless Chromium a real GPU path where one exists. The ANGLE backend is
+// platform-specific: metal on macOS, swiftshader (the portable fallback) on
+// Linux/CI where no metal/GL surface is available. Falls back gracefully.
+const angleBackend = process.platform === 'darwin' ? 'metal' : 'swiftshader';
+
 export default defineConfig({
   testDir: 'tests/e2e',
   // Generous: the 2560x1600 canvas renders under SwiftShader in headless CI.
@@ -15,9 +21,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
     launchOptions: {
-      // The 2560x1600 canvas is miserable under SwiftShader; let headless
-      // Chromium use the real GPU where one exists (falls back gracefully).
-      args: ['--enable-gpu', '--use-angle=metal', '--ignore-gpu-blocklist']
+      args: ['--enable-gpu', `--use-angle=${angleBackend}`, '--ignore-gpu-blocklist']
     }
   },
   webServer: {

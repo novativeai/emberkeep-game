@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
+  DECOR_SCALE,
   DEPTHS,
+  DRAG,
   DRAGON_ANIM,
   EMBER_MOTES,
   GAME_HEIGHT,
@@ -71,6 +73,10 @@ export class BoardScene extends Phaser.Scene {
   private allow: Required<TutorialAllow> = { ...NO_ALLOW };
   private tutorialDone = false;
   private dragFrom: TilePos | null = null;
+  /** Live drag: the lifted sprite eases toward this pointer-tracked target. */
+  private dragSprite: BoardItem | null = null;
+  private dragTarget = { x: 0, y: 0 };
+  private dragCell!: Phaser.GameObjects.Graphics;
   private burst!: Phaser.GameObjects.Particles.ParticleEmitter;
   private sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
   private shells!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -105,6 +111,7 @@ export class BoardScene extends Phaser.Scene {
     this.buildGround();
     this.buildFog();
     this.buildEmitters();
+    this.buildDragCell();
     this.wireInput();
     this.subscribe();
     this.setupCamera();
@@ -122,6 +129,7 @@ export class BoardScene extends Phaser.Scene {
 
   override update(time: number, delta: number): void {
     for (const sprite of this.itemSprites.values()) sprite.applyBob(time);
+    this.updateDrag(delta);
     this.updateLiveDragons(delta);
 
     this.coolAccum += delta;
@@ -558,6 +566,23 @@ export class BoardScene extends Phaser.Scene {
       .setDepth(DEPTHS.particles);
   }
 
+  /** The iso-diamond that lights up the cell a dragged item is hovering over. */
+  private buildDragCell(): void {
+    const g = this.add.graphics().setDepth(DEPTHS.tileHighlight).setVisible(false);
+    g.fillStyle(DRAG.cellHighlightColor, DRAG.cellHighlightAlpha);
+    g.lineStyle(3, DRAG.cellHighlightColor, Math.min(1, DRAG.cellHighlightAlpha + 0.3));
+    const pts = [0, -TILE_H / 2, TILE_W / 2, 0, 0, TILE_H / 2, -TILE_W / 2, 0];
+    g.fillPoints(this.diamond(pts), true);
+    g.strokePoints(this.diamond(pts), true);
+    this.dragCell = g;
+  }
+
+  private diamond(flat: number[]): Phaser.Geom.Point[] {
+    const pts: Phaser.Geom.Point[] = [];
+    for (let i = 0; i < flat.length; i += 2) pts.push(new Phaser.Geom.Point(flat[i], flat[i + 1]));
+    return pts;
+  }
+
   /* ----------------------------- input ------------------------------ */
 
   private isTap(pointer: Phaser.Input.Pointer): boolean {
@@ -577,6 +602,12 @@ export class BoardScene extends Phaser.Scene {
         this.dragFrom = { col: obj.col, row: obj.row };
         obj.setData('dragged', true);
         obj.liftForDrag();
+        // The sprite EASES toward this target in update() (Fairyland-style
+        // weighted follow); seed it at the current pos so it doesn't jump.
+        this.dragSprite = obj;
+        this.dragTarget.x = obj.x;
+        this.dragTarget.y = obj.y;
+        this.dragCell.setVisible(true);
       }
     );
     this.input.on(
@@ -588,13 +619,16 @@ export class BoardScene extends Phaser.Scene {
         dragY: number
       ) => {
         if (!(obj instanceof BoardItem)) return;
-        obj.setPosition(dragX, dragY - 24);
+        this.dragTarget.x = dragX;
+        this.dragTarget.y = dragY - 24;
       }
     );
     this.input.on(
       Phaser.Input.Events.DRAG_END,
       (pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
         if (!(obj instanceof BoardItem) || !this.dragFrom) return;
+        this.dragSprite = null;
+        this.dragCell.setVisible(false);
         const to = worldToGrid(pointer.worldX, pointer.worldY + 24);
         this.ctx.bus.emit('drag:dropped', {
           itemId: obj.itemId,
@@ -605,6 +639,18 @@ export class BoardScene extends Phaser.Scene {
         this.time.delayedCall(60, () => obj.setData('dragged', false));
       }
     );
+  }
+
+  /** Exponential-smoothing follow + target-cell highlight for the live drag. */
+  private updateDrag(delta: number): void {
+    const s = this.dragSprite;
+    if (!s) return;
+    const k = 1 - Math.exp(-delta / DRAG.followTau);
+    s.x += (this.dragTarget.x - s.x) * k;
+    s.y += (this.dragTarget.y - s.y) * k;
+    const cell = worldToGrid(this.dragTarget.x, this.dragTarget.y + 24);
+    const { x, y } = gridToWorld(cell.col, cell.row);
+    this.dragCell.setPosition(x, y);
   }
 
   /**
@@ -684,7 +730,8 @@ export class BoardScene extends Phaser.Scene {
         this.onItemTapped(sprite!);
       });
     }
-    sprite.acquire(snap, this.ctx.data.anchors, this.textureFor(snap));
+    const artScale = snap.kind === 'decor' ? (DECOR_SCALE[snap.chain] ?? 1) : 1;
+    sprite.acquire(snap, this.ctx.data.anchors, this.textureFor(snap), artScale);
     this.itemSprites.set(snap.id, sprite);
     this.refreshDraggable(sprite);
     if (pop) popIn(this, sprite, { duration: TIMINGS.spawnPop });
@@ -733,8 +780,8 @@ export class BoardScene extends Phaser.Scene {
           targets: sprite,
           x,
           y,
-          duration: 120,
-          ease: 'Sine.easeOut',
+          duration: TIMINGS.dragReturn,
+          ease: 'Back.easeOut',
           onComplete: () => sprite.settleDepth()
         });
         sprite.settleFromDrag();

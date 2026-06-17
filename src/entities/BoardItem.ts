@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEPTHS, TIMINGS, num, PALETTE } from '../core/Constants';
+import { DEPTHS, DRAG, TIMINGS, num, PALETTE } from '../core/Constants';
 import { gridToWorld } from '../core/iso';
 import type { AnchorsData, ItemSnapshot } from '../core/types';
 
@@ -21,22 +21,33 @@ export class BoardItem extends Phaser.GameObjects.Container {
 
   private sprite: Phaser.GameObjects.Image;
   private readyStar: Phaser.GameObjects.Image;
+  private shadow: Phaser.GameObjects.Ellipse;
   private bobPhase = 0;
   private bobPaused = false;
   private cooling = false;
 
   constructor(scene: Phaser.Scene) {
     super(scene, 0, 0);
+    // Ground shadow sits FIRST so it renders beneath the art; only shown while
+    // the item is lifted for a drag (Fairyland-style weighted pick-up).
+    this.shadow = scene.add
+      .ellipse(0, DRAG.shadowY, DRAG.shadowRX * 2, DRAG.shadowRY * 2, DRAG.shadowColor)
+      .setAlpha(0);
     this.sprite = scene.add.image(0, 0, '__DEFAULT');
     this.readyStar = scene.add.image(40, -104, 'fx_spark').setScale(0.7).setVisible(false);
-    this.add([this.sprite, this.readyStar]);
+    this.add([this.shadow, this.sprite, this.readyStar]);
     this.setSize(152, 152);
     scene.add.existing(this);
     this.setVisible(false);
     this.setActive(false);
   }
 
-  acquire(snapshot: ItemSnapshot, anchors: AnchorsData, textureKey: string): void {
+  acquire(
+    snapshot: ItemSnapshot,
+    anchors: AnchorsData,
+    textureKey: string,
+    artScale = 1
+  ): void {
     this.itemId = snapshot.id;
     this.chain = snapshot.chain;
     this.tier = snapshot.tier;
@@ -49,10 +60,12 @@ export class BoardItem extends Phaser.GameObjects.Container {
     const [ax, ay] = anchors.byKey[textureKey] ?? anchors.default;
     this.sprite.setOrigin(ax, ay);
     this.sprite.setPosition(0, 0);
-    this.sprite.setScale(1);
+    // File-based decor art can be far larger than a tile; artScale fits it.
+    this.sprite.setScale(artScale);
     this.sprite.setVisible(true); // a pooled item may have been a hidden rig host
     this.sprite.clearTint();
     this.readyStar.setVisible(false);
+    this.shadow.setAlpha(0);
     this.setScale(1);
     this.setAlpha(1);
     this.setVisible(true);
@@ -63,6 +76,8 @@ export class BoardItem extends Phaser.GameObjects.Container {
   release(): void {
     this.scene.tweens.killTweensOf(this);
     this.scene.tweens.killTweensOf(this.sprite);
+    this.scene.tweens.killTweensOf(this.shadow);
+    this.shadow.setAlpha(0);
     // Keep the input component: invisible objects are skipped by hit tests,
     // and disableInteractive() would leave reused pool sprites input-dead.
     this.setVisible(false);
@@ -97,24 +112,52 @@ export class BoardItem extends Phaser.GameObjects.Container {
   liftForDrag(): void {
     this.bobPaused = true;
     this.setDepth(DEPTHS.dragged);
+    this.scene.tweens.killTweensOf(this.shadow);
     this.scene.tweens.add({
       targets: this,
-      scale: 1.12,
-      duration: 110,
+      scale: DRAG.liftScale,
+      duration: DRAG.liftMs,
+      ease: 'Back.easeOut'
+    });
+    this.scene.tweens.add({
+      targets: this.sprite,
+      y: DRAG.liftY,
+      duration: DRAG.liftMs,
       ease: 'Sine.easeOut'
     });
-    this.sprite.setY(-12);
+    this.scene.tweens.add({
+      targets: this.shadow,
+      alpha: DRAG.shadowAlpha,
+      duration: DRAG.liftMs,
+      ease: 'Sine.easeOut'
+    });
   }
 
   settleFromDrag(): void {
-    this.bobPaused = false;
     this.scene.tweens.add({
       targets: this,
       scale: 1,
-      duration: 130,
-      ease: 'Sine.easeOut'
+      duration: DRAG.settleMs,
+      ease: 'Back.easeOut'
     });
-    this.sprite.setY(0);
+    // Keep the bob paused until the lift-offset has eased back to 0, otherwise
+    // applyBob would fight (and snap) the inner sprite mid-tween.
+    this.scene.tweens.add({
+      targets: this.sprite,
+      y: 0,
+      duration: DRAG.settleMs,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        this.bobPaused = false;
+      }
+    });
+    this.scene.tweens.killTweensOf(this.shadow);
+    this.scene.tweens.add({
+      targets: this.shadow,
+      alpha: 0,
+      duration: DRAG.shadowFadeMs,
+      ease: 'Sine.easeIn'
+    });
   }
 
   /** Idle bob, applied to the inner sprite only. Decor sits still. */

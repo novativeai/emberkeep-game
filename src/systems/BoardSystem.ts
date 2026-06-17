@@ -33,6 +33,9 @@ export class BoardSystem {
     for (const placement of this.map.startingItems) {
       this.spawn(placement.chain, placement.tier, placement.at[0], placement.at[1], 'init');
     }
+    for (const decor of this.map.startingDecor ?? []) {
+      this.spawnDecor(decor.decor, decor.at[0], decor.at[1], 'init');
+    }
     this.bus.emit('energy:changed', { current: this.state.energyCurrent, max: ENERGY_MAX });
     this.bus.emit('economy:changed', {
       coins: this.state.coins,

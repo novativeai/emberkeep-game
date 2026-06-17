@@ -42,6 +42,7 @@ declare global {
     __emberkeep: {
       gridToPage: (col: number, row: number) => { x: number; y: number };
       grantXp: (xp: number) => void;
+      reset: () => void;
       saveKey: string;
       game: Phaser.Game;
     };
@@ -156,6 +157,13 @@ window.__emberkeep = {
   // Test/diagnostic: award XP so a level-up (and its camera fly) can be driven
   // deterministically without grinding merges.
   grantXp: (xp: number) => ctx.bus.emit('economy:add', { xp, reason: 'debug:grantXp' }),
+  // Dev/diagnostic: wipe the save and hard-reload, so a fresh newGame() runs and
+  // any change to startingItems/startingDecor (e.g. the L1 dragon) shows again.
+  // A loaded save otherwise masks new-game seeding.
+  reset: () => {
+    window.localStorage.removeItem(SAVE_KEY);
+    window.location.reload();
+  },
   gridToPage: (col: number, row: number) => {
     const rect = game.canvas.getBoundingClientRect();
     const world = gridToWorld(col, row);

@@ -139,6 +139,8 @@ export interface MapData {
   rows: number;
   regions: MapRegionConfig[];
   startingItems: MapItemPlacement[];
+  /** Featured decor placed on the active board at new-game (e.g. the L1 dragon). */
+  startingDecor?: MapDecorPlacement[];
   /** Authored tile footprint (world-builder units). */
   tile?: { width: number; height: number };
   /** All playable cells as [col, row] (for void/cliff silhouette detection). */

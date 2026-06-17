@@ -14,7 +14,9 @@
     "e2e": "playwright test",
     "verify": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run e2e",
     "placeholders": "tsx scripts/gen-placeholders.ts",
-    "probe": "tsx scripts/probe-image.ts"
+    "probe": "tsx scripts/probe-image.ts",
+    "bake:dragon": "node scripts/bake-dragon.mjs",
+    "map:import": "node scripts/import-map.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0"

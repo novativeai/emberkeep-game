@@ -68,6 +68,16 @@ export const DEPTHS = {
 /** When a dragon's passive gift has nowhere to land, retry this soon (ms). */
 export const GENERATOR_PASSIVE_RETRY_MS = 8000;
 
+/**
+ * On-board render scale for file-based decor, keyed by decor chain. Placeholder
+ * decor (nest/brazier) is painted at tile size, but real-art files can be huge
+ * (the baked dragon is 1054px ≈ 4 tiles), so they need fitting. ~0.42 lands the
+ * guardian dragon at ~1.7 tiles wide. Anything absent renders at scale 1.
+ */
+export const DECOR_SCALE: Record<string, number> = {
+  dragon: 0.42
+};
+
 /** Energy. */
 export const ENERGY_MAX = 20;
 export const ENERGY_REGEN_MS = 30_000;
@@ -107,6 +117,31 @@ export const TIMINGS = {
   bobAmplitudePx: 5.2,
   fogPulsePeriodMs: 4200,
   readyPulse: 600
+} as const;
+
+/**
+ * Drag feel (Fairyland / Merge-Dragons style — see docs/research/drag-feel.md).
+ * The dragged item EASES toward the pointer (exponential smoothing) instead of
+ * locking 1:1, lifts with a ground shadow, and the target cell lights up.
+ */
+export const DRAG = {
+  /** Pick-up scale-up and how high the art floats above the finger (px). */
+  liftScale: 1.16,
+  liftY: -34,
+  liftMs: 120,
+  settleMs: 150,
+  /** Exponential-smoothing time constant (ms): lower = snappier follow. */
+  followTau: 70,
+  /** Ground shadow under a lifted item. */
+  shadowRX: 58,
+  shadowRY: 22,
+  shadowY: 30,
+  shadowAlpha: 0.28,
+  shadowColor: 0x1a0f14,
+  shadowFadeMs: 130,
+  /** Highlight diamond on the cell under the dragged item. */
+  cellHighlightAlpha: 0.5,
+  cellHighlightColor: 0xffd27a
 } as const;
 
 /**
