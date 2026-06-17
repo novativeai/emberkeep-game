@@ -12,9 +12,13 @@
       "speaker": "laurah",
       "text": "See those Spark Weeds glowing? Drag three together — where they merge, the ground remembers how to bloom. Go on, try it.",
       "gate": { "type": "event", "event": "item:merged", "chain": "sparkweed" },
-      "highlight": [[2, 6], [2, 7], [4, 8]],
-      "hand": { "from": [4, 8], "to": [2, 8] },
-      "arrow": { "tile": [2, 8] },
+      "highlight": [
+        { "chain": "sparkweed", "nth": 0 },
+        { "chain": "sparkweed", "nth": 1 },
+        { "chain": "sparkweed", "nth": 2 }
+      ],
+      "hand": { "from": { "chain": "sparkweed", "nth": 2 }, "to": { "chain": "sparkweed", "nth": 0 } },
+      "arrow": { "tile": { "chain": "sparkweed", "nth": 0 } },
       "allow": { "drag": ["sparkweed"] }
     },
     {
@@ -29,9 +33,13 @@
       "speaker": "laurah",
       "text": "Now the part I love most. These speckled eggs have slept a hundred years. Bring three together… and watch what wakes up.",
       "gate": { "type": "event", "event": "item:hatched" },
-      "highlight": [[3, 6], [4, 6], [5, 8]],
-      "hand": { "from": [5, 8], "to": [3, 7] },
-      "arrow": { "tile": [3, 7] },
+      "highlight": [
+        { "chain": "ember_dragon", "nth": 0 },
+        { "chain": "ember_dragon", "nth": 1 },
+        { "chain": "ember_dragon", "nth": 2 }
+      ],
+      "hand": { "from": { "chain": "ember_dragon", "nth": 2 }, "to": { "chain": "ember_dragon", "nth": 0 } },
+      "arrow": { "tile": { "chain": "ember_dragon", "nth": 0 } },
       "allow": { "drag": ["ember_dragon"] }
     },
     {

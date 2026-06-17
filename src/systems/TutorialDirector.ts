@@ -182,6 +182,7 @@ export class TutorialDirector {
   }
 
   private resolveTileRef(ref: TileRef): TilePos | null {
+    if (Array.isArray(ref)) return { col: ref[0], row: ref[1] };
     if (ref === 'last_hatched') {
       if (this.lastHatched) return this.lastHatched;
       // Resume fallback: point at any generator on the board.
@@ -192,6 +193,12 @@ export class TutorialDirector {
       }
       return null;
     }
-    return { col: ref[0], row: ref[1] };
+    // `{ chain, nth }`: the nth board item of that chain, in a stable order, so
+    // hints track wherever the map placed the starting cluster.
+    const cells = [...this.state.items.values()]
+      .filter((i) => i.kind === 'item' && i.chain === ref.chain)
+      .sort((a, b) => a.col + a.row - (b.col + b.row) || a.col - b.col)
+      .map((i) => ({ col: i.col, row: i.row }));
+    return cells[ref.nth] ?? cells[cells.length - 1] ?? null;
   }
 }

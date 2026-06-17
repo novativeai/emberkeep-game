@@ -168,8 +168,13 @@ export interface TutorialAllow {
   sell?: boolean;
 }
 
-/** A tile reference in tutorial data: literal [col,row] or a dynamic marker. */
-export type TileRef = [number, number] | 'last_hatched';
+/**
+ * A tile reference in tutorial data: a literal [col,row], the dynamic
+ * `last_hatched` marker, or a `{ chain, nth }` token that resolves at runtime to
+ * the nth board item of that chain. Tokens keep tutorial hints glued to the
+ * ACTUAL item placement, so they stay correct for any imported map.
+ */
+export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: number };
 
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
