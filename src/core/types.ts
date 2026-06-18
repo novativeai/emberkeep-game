@@ -290,9 +290,16 @@ export interface EventMap {
   /* -- input intents (scenes/UI emit, systems handle) -- */
   'drag:dropped': { itemId: number; from: TilePos; to: TilePos };
   'item:tapped': { itemId: number };
-  'generator:skip': { itemId: number };
+  'generator:skip': { itemId: number; currency: 'gold' | 'warmth' };
+  /* -- dragon jobs -- */
+  'dragon:work': { dragonId: number; houseId: number };
+  'dragon:working': { dragonId: number; houseId: number };
+  'dragon:rest': { dragonId: number };
+  'dragon:rested': { dragonId: number };
   'ui:ledger_toggled': { open: boolean };
   'ui:deliver_requested': { orderId: string };
+  /** A gauge "+" button opened the shop for that currency. */
+  'ui:shop_requested': { currency: 'energy' | 'coins' | 'keys' };
   'ui:sell_requested': { itemId: number };
   'fog:tapped': { regionId: string };
   'tutorial:advance_requested': { stepId: string };
@@ -331,6 +338,8 @@ export interface EventMap {
   'item:produced': { generatorId: number; output: ItemSnapshot };
   /** A reward generator (the house) paid out currency/energy on its timer. */
   'generator:reward': { generatorId: number; coins: number; xp: number; energy: number };
+  /** A Gold coin was tapped to bank it — UI flies a coin to the Gold gauge. */
+  'gold:collected': { at: TilePos };
   'item:removed': { itemId: number; at: TilePos; reason: 'sold' | 'delivered' };
   'item:sold': { itemId: number; coins: number };
   'energy:changed': { current: number; max: number };

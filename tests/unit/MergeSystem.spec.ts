@@ -188,6 +188,25 @@ describe('MergeSystem', () => {
     expect(ctx.state.items.size).toBe(4);
   });
 
+  it('emerald chain: 3 emeralds → an Emerald Egg, and 3 eggs hatch the Emerald Dragon', () => {
+    const ctx = createTestContext();
+    // 3 emerald gems → 1 emerald egg (tier 2)
+    ctx.state.addItem({ chain: 'emerald', tier: 1, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'emerald', tier: 1, col: 1, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'emerald', tier: 1, col: 3, row: 3, kind: 'item' });
+    drag(ctx, [3, 3], [1, 3]);
+    expect(ctx.state.itemAt(1, 3)).toMatchObject({ chain: 'emerald', tier: 2 });
+
+    // 3 emerald eggs → the Emerald Dragon (tier 3 = hatch tier)
+    ctx.state.addItem({ chain: 'emerald', tier: 2, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'emerald', tier: 2, col: 1, row: 2, kind: 'item' });
+    const hatches = capture(ctx.bus, 'item:hatched');
+    drag(ctx, [1, 3], [1, 1]); // bring the third egg onto the pair
+    expect(hatches).toHaveLength(1);
+    expect(hatches[0]!.item).toMatchObject({ chain: 'emerald', tier: 3 });
+    expect(ctx.state.itemAt(1, 1)?.readyAt).toBeDefined(); // a ready generator
+  });
+
   it('merging 3 eggs hatches: emits item:hatched and the result is a ready generator', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 2, row: 2, kind: 'item' });

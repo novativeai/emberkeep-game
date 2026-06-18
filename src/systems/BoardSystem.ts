@@ -1,4 +1,3 @@
-import { ENERGY_MAX } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -38,7 +37,10 @@ export class BoardSystem {
   }): void {
     const items = [...this.state.items.values()].filter((i) => i.kind === 'item');
     const anchor = (nearChain && items.find((i) => i.chain === nearChain)) || items[0] || null;
-    const cells = this.freeBlobNear(anchor?.col ?? 0, anchor?.row ?? 0, count);
+    // Spawn IN FRONT of the anchor (+1,+1 = south, toward the viewer) so produce
+    // isn't hidden behind a tall generator — e.g. the dragon occluding its gems.
+    const offset = nearChain && anchor ? 1 : 0;
+    const cells = this.freeBlobNear((anchor?.col ?? 0) + offset, (anchor?.row ?? 0) + offset, count);
     for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, 'unlock');
   }
 
@@ -103,7 +105,7 @@ export class BoardSystem {
     for (const decor of this.map.startingDecor ?? []) {
       this.spawnDecor(decor.decor, decor.at[0], decor.at[1], 'init');
     }
-    this.bus.emit('energy:changed', { current: this.state.energyCurrent, max: ENERGY_MAX });
+    this.bus.emit('energy:changed', { current: this.state.energyCurrent, max: this.state.energyMax });
     this.bus.emit('economy:changed', {
       coins: this.state.coins,
       keys: this.state.keys,

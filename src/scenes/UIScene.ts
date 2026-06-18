@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SCENES } from '../core/Constants';
+import { ENERGY_REGEN_MS, GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SCENES } from '../core/Constants';
 import { gridToWorld } from '../core/iso';
 import type { ResolvedArrow, ResolvedHand, TilePos, TutorialStepEvent } from '../core/types';
 import { CharacterBubble } from '../entities/CharacterBubble';
 import { Hud } from '../ui/Hud';
 import { LedgerPanel } from '../ui/LedgerPanel';
+import { ShopPanel } from '../ui/ShopPanel';
 import { Tooltip } from '../ui/Tooltip';
 import { hoverBob } from '../ui/tweens';
 
@@ -22,9 +23,11 @@ const DEPTH_DIALOG = 200;
  */
 export class UIScene extends Phaser.Scene {
   private ctx!: GameContext;
+  private regenAccum = 0;
   private hud!: Hud;
   private tooltip!: Tooltip;
   private ledger!: LedgerPanel;
+  private shop!: ShopPanel;
   private bubble!: CharacterBubble;
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
@@ -51,6 +54,9 @@ export class UIScene extends Phaser.Scene {
 
     this.ledger = new LedgerPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.orders);
     this.ledger.setDepth(DEPTH_PANEL);
+
+    this.shop = new ShopPanel(this, this.ctx.bus);
+    this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     this.bubble.setPosition(GAME_WIDTH / 2 - 80, GAME_HEIGHT - 232);
@@ -85,6 +91,21 @@ export class UIScene extends Phaser.Scene {
     this.ctx.beginRun();
   }
 
+  override update(_time: number, delta: number): void {
+    // ~Twice a second, refresh the "next +1 Warmth" countdown on the energy gauge.
+    this.regenAccum += delta;
+    if (this.regenAccum < 500) return;
+    this.regenAccum = 0;
+    const state = this.ctx.state;
+    if (state.energyCurrent >= state.energyMax) {
+      this.hud.setRegenText('');
+      return;
+    }
+    const left = Math.max(0, state.energyLastRegenAt + ENERGY_REGEN_MS - this.ctx.clock.now());
+    const s = Math.ceil(left / 1000);
+    this.hud.setRegenText(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+  }
+
   /* --------------------------- subscriptions ------------------------ */
 
   private subscribe(): void {
@@ -107,6 +128,8 @@ export class UIScene extends Phaser.Scene {
           this.flyGemToLedger(payload.at, payload.resultTier);
         }
       }),
+      bus.on('gold:collected', ({ at }) => this.flyCoinToGold(at)),
+      bus.on('ui:shop_requested', ({ currency }) => this.shop.open(currency)),
       bus.on('order:completed', () => {
         this.time.delayedCall(650, () => {
           if (this.ledger.isOpen && this.lastStep?.gateType === 'tap') this.ledger.requestClose();
@@ -153,6 +176,38 @@ export class UIScene extends Phaser.Scene {
           yoyo: true,
           ease: 'Sine.easeOut'
         });
+      }
+    });
+  }
+
+  /** A tapped Gold coin arcs from its board cell up to the Gold gauge, then the
+   *  gauge bumps — smooth appearance + collection juice. */
+  private flyCoinToGold(at: TilePos): void {
+    const start = this.cellToScreen(at.col, at.row);
+    const end = this.hud.getCoinPos();
+    const coin = this.add
+      .image(start.x, start.y - 30, 'item_coin_1')
+      .setScale(0.16)
+      .setDepth(DEPTH_PANEL + 5);
+    coin.setScale(0.05);
+    this.tweens.add({ targets: coin, scale: 0.16, duration: 160, ease: 'Back.easeOut' });
+    const proxy = { t: 0 };
+    this.tweens.add({
+      targets: proxy,
+      t: 1,
+      duration: 560,
+      delay: 150,
+      ease: 'Sine.easeIn',
+      onUpdate: () => {
+        const t = proxy.t;
+        coin.x = Phaser.Math.Linear(start.x, end.x, t);
+        coin.y = Phaser.Math.Linear(start.y - 30, end.y, t) - Math.sin(Math.PI * t) * 120;
+        coin.rotation = t * Math.PI * 1.5;
+        coin.setScale(0.16 * (1 - 0.45 * t));
+      },
+      onComplete: () => {
+        coin.destroy();
+        this.hud.bumpCoin();
       }
     });
   }

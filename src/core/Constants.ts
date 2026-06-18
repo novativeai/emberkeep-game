@@ -71,19 +71,26 @@ export const GENERATOR_PASSIVE_RETRY_MS = 8000;
 /** Warmth spent to instantly clear a generator's cooldown (the "skip" button). */
 export const GENERATOR_SKIP_ENERGY = 3;
 
-/** Most Warmth a skip can cost — paid when the timer has just started. */
-export const GENERATOR_SKIP_MAX_ENERGY = 8;
+/** Most GOLD a skip can cost — paid when the timer has just started. */
+export const GENERATOR_SKIP_MAX_ENERGY = 9;
 
 /**
- * Energy to skip a generator's remaining wait. EXPENSIVE near the start and it
- * CHEAPENS as the timer runs down (cost ∝ fraction remaining), so finishing the
- * last stretch is nearly free. Always ≥ 1 while anything remains.
+ * Skip a generator's remaining wait. Two ways: GOLD (the default) or ENERGY
+ * (cheaper). Both are EXPENSIVE near the start and CHEAPEN as the timer runs
+ * down (cost ∝ fraction remaining). Always ≥ 1 while anything remains.
+ *   skipEnergyCost = the GOLD price; skipWarmthCost ≈ 0.55× (the cheaper Warmth).
  */
 export function skipEnergyCost(remainingMs: number, totalMs: number): number {
   if (remainingMs <= 0) return 0;
   if (totalMs <= 0) return 1;
   const frac = Math.min(1, Math.max(0, remainingMs / totalMs));
   return Math.min(GENERATOR_SKIP_MAX_ENERGY, Math.max(1, Math.ceil(GENERATOR_SKIP_MAX_ENERGY * frac)));
+}
+/** Warmth (energy) price of a skip — cheaper than the Gold price (e.g. 10 min
+ *  ≈ 5 Warmth vs 9 Gold). 0 when nothing remains. */
+export function skipWarmthCost(remainingMs: number, totalMs: number): number {
+  const gold = skipEnergyCost(remainingMs, totalMs);
+  return gold <= 0 ? 0 : Math.max(1, Math.round(gold * 0.55));
 }
 
 /**
@@ -118,14 +125,29 @@ export const ITEM_SCALE: Record<string, number> = {
   ember_dragon_1: 0.18,
   flame_gem_1: 0.15,
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
-  lumber_1: 0.5, // a small log
+  lumber_1: 0.4, // a small log (reduced 20%)
   lumber_2: 1.0, // a house reads ~1.4 tiles
-  bigtree_1: 0.62 // a tall landmark tree
+  bigtree_1: 0.62, // a tall landmark tree
+  // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
+  crystal_1: 0.4, // ~1.3 tiles
+  emerald_1: 0.25, // a small gem (crystal output)
+  emerald_2: 0.18, // emerald egg — EXACT same scale as the red egg (ember_dragon_1)
+  emerald_3: 1.0, // dragon host (the rig overlays it)
+  coin_1: 0.12 // SMALLER than an egg, per spec
 };
+
+/** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
+export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
+  coin: { coins: 1 }
+};
+
+/** Gold (coins) spent to skip a generator timer — dynamic like the energy cost
+ *  was, but paid in Gold now. Expensive at the start, ~1 near the end. */
+export const SKIP_GOLD_MAX = 8;
 
 /** Energy. */
 export const ENERGY_MAX = 20;
-export const ENERGY_REGEN_MS = 30_000;
+export const ENERGY_REGEN_MS = 180_000; // 1 Warmth every 3 minutes
 export const ENERGY_REGEN_AMOUNT = 1;
 
 /**
@@ -137,6 +159,17 @@ export const ENERGY_REGEN_AMOUNT = 1;
  * payoff moment, while the curve never walls. See `docs/research/xp-pacing.md`.
  */
 export const LEVEL_XP = [0, 60, 140, 250, 400, 590, 820] as const;
+
+/** Max Warmth grows by this much per Keeper level (level 1 = ENERGY_MAX). */
+export const ENERGY_PER_LEVEL = 3;
+export function levelForXp(xp: number): number {
+  let level = 1;
+  for (let i = 0; i < LEVEL_XP.length; i++) if (xp >= LEVEL_XP[i]!) level = i + 1;
+  return level;
+}
+export function energyMaxForLevel(level: number): number {
+  return ENERGY_MAX + Math.max(0, level - 1) * ENERGY_PER_LEVEL;
+}
 
 /** Level-up reward: full Warmth refill (handled by EnergySystem) + this Gold. */
 export const LEVELUP_REWARD = {
@@ -209,6 +242,21 @@ export const DRAGON_ANIM = {
   workMs: 700, // breathing magic onto the plant before the loot drops
   flyBackMs: 480 // glide home
 } as const;
+
+/** Per-dragon-chain rig scale factor so different art reads at the SAME on-board
+ *  size. The emerald rig renders larger, so it's taken down 40% to match red. */
+export const DRAGON_RIG_SCALE: Record<string, number> = {
+  emerald: 0.6,
+  ember_dragon: 0.88 // −12% so the red dragon matches the emerald's on-board size
+};
+
+/**
+ * Dragon Job system. A working dragon stands by a House and speeds its timer:
+ * each worker adds +1× (1 dragon = 2× speed, 2 = 3×, …). It tires after
+ * WORK_MS, returns home and rests REST_MS before it can work again.
+ */
+export const DRAGON_WORK_MS = 180_000; // 3 minutes of work
+export const DRAGON_REST_MS = 300_000; // then 5 minutes of rest (fatigue)
 
 /** Input (game-resolution pixels; CSS pixels are half of these under FIT). */
 export const TAP_MAX_DISTANCE_PX = 16;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ENERGY_MAX, LEVELUP_REWARD, LEVEL_XP } from '../../src/core/Constants';
+import { energyMaxForLevel, ENERGY_MAX, LEVELUP_REWARD, LEVEL_XP } from '../../src/core/Constants';
 import { capture, createTestContext } from './helpers';
 
 describe('level-up rewards (the addictive beat)', () => {
@@ -16,7 +16,8 @@ describe('level-up rewards (the addictive beat)', () => {
     expect(levels).toHaveLength(1);
     expect(levels[0]).toEqual({ level: 2, from: 1 });
     expect(ctx.state.level).toBe(2);
-    expect(ctx.state.energyCurrent).toBe(ENERGY_MAX); // refilled
+    expect(ctx.state.energyCurrent).toBe(energyMaxForLevel(2)); // refilled to the new, higher max (+3)
+    expect(energyMaxForLevel(2)).toBe(ENERGY_MAX + 3);
     expect(ctx.state.coins).toBe(LEVELUP_REWARD.coinsBase + 2 * LEVELUP_REWARD.coinsPerLevel);
   });
 

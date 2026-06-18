@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SCENES } from '../core/Constants';
+import { GAME_HEIGHT, GAME_WIDTH, PALETTE, SCENES } from '../core/Constants';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
@@ -17,32 +17,22 @@ export class TitleScene extends Phaser.Scene {
   create(): void {
     const ctx = this.registry.get('ctx') as GameContext;
 
-    // Opaque gradient backdrop (warm teal sky) so the logo's transparent gaps
-    // read as a designed splash, never raw canvas. (Graphics.fillRect paints
-    // reliably over the transparent game canvas; a Shape rectangle did not.)
-    const sky = this.add.graphics();
-    sky.fillGradientStyle(
-      num(PALETTE.teal),
-      num(PALETTE.teal),
-      num(PALETTE.tealDeep),
-      num(PALETTE.tealDeep),
-      1
-    );
-    sky.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-    // Full-screen logo: scale to COVER the canvas (fill both axes, crop overflow).
-    if (this.textures.exists('title_logo')) {
-      const src = this.textures.get('title_logo').getSourceImage();
-      const cover = Math.max(GAME_WIDTH / src.width, GAME_HEIGHT / src.height);
-      // Fill the screen: COVER the canvas (image edges hit the screen edges).
-      // Sit it a touch above centre so the banner clears the Play button below.
-      const logo = this.add
-        .image(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, 'title_logo')
-        .setOrigin(0.5)
-        .setScale(cover * 1.05)
-        .setAlpha(0);
-      this.tweens.add({ targets: logo, scale: cover, alpha: 1, duration: 600, ease: 'Sine.easeOut' });
+    // FULL-SCREEN logo: a real DOM <img> (object-fit:cover) that fills the WHOLE
+    // window — including the FIT letterbox the canvas can't reach. We hide the
+    // water photo and paint the page dark (for the logo's transparent gaps),
+    // show the logo image, and the Play button below renders on the transparent
+    // canvas ON TOP. Everything is restored for gameplay on scene shutdown.
+    const waterBg = document.querySelector<HTMLElement>('.water-bg');
+    const titleLogo = document.getElementById('title-logo');
+    const prevBodyBg = document.body.style.background;
+    if (waterBg) waterBg.style.display = 'none';
+    document.body.style.background = '#180f15';
+    if (titleLogo) {
+      titleLogo.style.display = 'block';
+      // next frame so the opacity transition runs
+      requestAnimationFrame(() => (titleLogo.style.opacity = '1'));
     } else {
+      // Fallback wordmark on the (transparent) canvas if the DOM logo is absent.
       this.add
         .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, 'EMBERKEEP', {
           fontFamily: FONT,
@@ -53,6 +43,14 @@ export class TitleScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setStroke(PALETTE.textBrown, 20);
     }
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (waterBg) waterBg.style.display = '';
+      if (titleLogo) {
+        titleLogo.style.opacity = '0';
+        titleLogo.style.display = 'none';
+      }
+      document.body.style.background = prevBodyBg;
+    });
 
     // Play button — VISIBLE and interactive from the first frame (never gated on
     // a tween: a GPU stutter can stall a delayed tween, and an alpha-0 object is

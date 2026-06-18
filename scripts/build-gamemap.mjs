@@ -87,8 +87,8 @@ for (const zone of world.playZones) {
         { chain: 'ember_dragon', tier: 1, at: eg[0] },
         { chain: 'ember_dragon', tier: 1, at: eg[1] },
         { chain: 'ember_dragon', tier: 1, at: eg[2] }
-      ],
-      decor: [{ decor: 'nest', at: eg[3] }]
+      ]
+      // (no nest decor — removed on request)
     });
     // Seed the zone, plus the Ancient Tree (produces 1 wood / 10 min → 5 = House).
     const restSeed = nearestTo(restCells, focus, SEED.length + 1);
@@ -147,13 +147,21 @@ const woodStart =
   focusCell;
 const woodBlob = growBlob(woodStart, WOOD_COUNT, eggSet);
 
+// The Theme Crystal stands in the L1 clearing by default (produces a Diamond
+// every 10 min). Place it on a clearing cell clear of the eggs + wood.
+const usedSet = new Set([...eggBlob, ...woodBlob].map(([c, r]) => key(c, r)));
+const crystalCell =
+  nearestTo(clearing.filter(([c, r]) => !usedSet.has(key(c, r))), { col: L1_FOCUS.col - 2, row: L1_FOCUS.row + 1 }, 1)[0] ??
+  focusCell;
+
 const startingItems = [
   ...TUT_START_ITEMS.map((x, i) => ({ chain: x.chain, tier: x.tier, at: eggBlob[i] ?? focusCell })),
   ...Array.from({ length: WOOD_COUNT }, (_, i) => ({
     chain: 'lumber',
     tier: 1,
     at: woodBlob[i] ?? woodStart
-  }))
+  })),
+  { chain: 'crystal', tier: 1, at: crystalCell }
 ];
 
 // No pre-placed dragon: the dragon is EARNED by merging 3 eggs (the hatch
@@ -199,7 +207,9 @@ for (const [k, v] of Object.entries(world.calibration)) {
 // pre-placed. Other scenery (e.g. crystals) still flows through.
 const mapDecor = (world.decor ?? [])
   .map((d) => ({ name: slug(d.name), col: d.col, row: d.row, z: d.z ?? 0 }))
-  .filter((d) => !/hut|house|maison/.test(d.name));
+  // Houses (earned via wood) and the crystal (now an L1 generator) are gameplay,
+  // not scenery — drop them from the static decor layer.
+  .filter((d) => !/hut|house|maison|crist/.test(d.name));
 
 const map = {
   cols: world.cols,

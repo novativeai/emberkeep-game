@@ -211,6 +211,54 @@
     "item_bigtree_1": [
       0.5,
       0.92
+    ],
+    "decor_tree_2": [
+      0.18,
+      0
+    ],
+    "decor_plant_1": [
+      0.5,
+      0
+    ],
+    "decor_flower_1": [
+      0.5,
+      0
+    ],
+    "decor_rose_2": [
+      0.5,
+      0
+    ],
+    "decor_warning": [
+      0.5,
+      0
+    ],
+    "decor_space_rose": [
+      0.5,
+      0
+    ],
+    "item_crystal_1": [
+      0.5,
+      0.92
+    ],
+    "item_coin_1": [
+      0.5,
+      0.62
+    ],
+    "item_diamond_1": [
+      0.5,
+      0.66
+    ],
+    "item_emerald_1": [
+      0.5,
+      0.66
+    ],
+    "item_emerald_2": [
+      0.5,
+      0.9
+    ],
+    "item_emerald_3": [
+      0.5,
+      0.9
     ]
   }
 }

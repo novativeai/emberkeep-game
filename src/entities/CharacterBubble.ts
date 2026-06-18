@@ -72,9 +72,9 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     const speakerName = { pip: 'Pip', cindra: 'Cindra', laurah: 'Laurah' }[step.speaker];
     const tagColor = { pip: PALETTE.tealDeep, cindra: PALETTE.lavaShade, laurah: PALETTE.goldShade }[step.speaker];
     this.portrait.setTexture(`portrait_${step.speaker}`);
-    // Normalise the disc size: real-art portraits (Laurah, 412px) and the
-    // generated discs (192px) both display at ~the same height.
-    this.portrait.setScale(206 / Math.max(1, this.portrait.height));
+    // Normalise the disc to fit INSIDE the bubble (it must be shorter than the
+    // min bubble height, 192, or Laurah's 412px art overflows the frame).
+    this.portrait.setScale(150 / Math.max(1, this.portrait.height));
     this.nameTag.setText(speakerName);
     this.label.setText(step.text);
 
@@ -95,15 +95,18 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
 
     this.label.setPosition(left + PAD + 12, 0);
     this.hitZone.setSize(BUBBLE_WIDTH + 120, height + 60);
-    this.portrait.setPosition(BUBBLE_WIDTH / 2 - 56, -height / 2 + 36);
-    const tagY = -height / 2 + 132;
-    this.nameTag.setPosition(BUBBLE_WIDTH / 2 - 56, tagY);
+    // Portrait seated INSIDE the right of the bubble (centred vertically), with
+    // its name tag just under it — nothing spills past the frame.
+    const portraitX = BUBBLE_WIDTH / 2 - 104;
+    this.portrait.setPosition(portraitX, 0);
+    const tagY = 60;
+    this.nameTag.setPosition(portraitX, tagY);
     this.nameTagBg.clear();
     this.nameTagBg.fillStyle(num(tagColor), 0.95);
     const tagWidth = this.nameTag.width + 36;
-    this.nameTagBg.fillRoundedRect(BUBBLE_WIDTH / 2 - 56 - tagWidth / 2, tagY - 22, tagWidth, 44, 22);
+    this.nameTagBg.fillRoundedRect(portraitX - tagWidth / 2, tagY - 22, tagWidth, 44, 22);
     this.nameTagBg.lineStyle(4, num(PALETTE.cream), 0.9);
-    this.nameTagBg.strokeRoundedRect(BUBBLE_WIDTH / 2 - 56 - tagWidth / 2, tagY - 22, tagWidth, 44, 22);
+    this.nameTagBg.strokeRoundedRect(portraitX - tagWidth / 2, tagY - 22, tagWidth, 44, 22);
 
     this.chevron.setPosition(BUBBLE_WIDTH / 2 - 192, height / 2 - 36);
     this.chevron.setVisible(this.tapGated);

@@ -2,11 +2,13 @@ import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
   ANIMATED_TILE_NAMES,
+  COLLECTIBLE_REWARD,
   DECOR_BOUNCE,
   DECOR_SCALE,
   DEPTHS,
   DRAG,
   DRAGON_ANIM,
+  DRAGON_RIG_SCALE,
   ITEM_SCALE,
   EMBER_MOTES,
   GAME_HEIGHT,
@@ -15,6 +17,7 @@ import {
   PALETTE,
   SCENES,
   skipEnergyCost,
+  skipWarmthCost,
   TAP_MAX_DISTANCE_PX,
   TAP_MAX_MS,
   TILE_H,
@@ -33,6 +36,7 @@ import { hopTo, hoverBob, popIn, scalePulse } from '../ui/tweens';
 interface LiveDragon {
   player: RigPlayer;
   host: BoardItem;
+  shadow: Phaser.GameObjects.Image; // ground shadow scaled to the rig
   mode: 'celebrate' | 'idle';
   remainMs: number; // countdown until the next mode roll
   busy: boolean; // flying out to work a plant — pause idle rolls + further taps
@@ -49,7 +53,11 @@ interface CameraFrame {
 const smootherstep = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 
 const DRAGON_CHAIN = 'ember_dragon';
-const DRAGON_RIG_URL = 'sprites/characters/dragon/red-dragon/rig/dragon-red.rig.json';
+/** Chains whose generator tiers wear a live rig, and where to fetch each rig. */
+const DRAGON_RIGS: Record<string, string> = {
+  ember_dragon: 'sprites/characters/dragon/red-dragon/rig/dragon-red.rig.json',
+  emerald: 'sprites/characters/dragon/emerald-dragon/rig/dragon-emerald.rig.json'
+};
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
@@ -76,8 +84,17 @@ export class BoardScene extends Phaser.Scene {
   private fog = new Map<string, Phaser.GameObjects.Image>();
   /** Floating "skip cooldown" button + the generator it belongs to. */
   private skipButton?: Phaser.GameObjects.Container;
-  private skipLabel?: Phaser.GameObjects.Text;
+  private skipGoldLabel?: Phaser.GameObjects.Text;
+  private skipWarmthLabel?: Phaser.GameObjects.Text;
   private skipForId = 0;
+  /** Dragon job menu (Work / Harvest) + the dragon it belongs to. */
+  private dragonMenu?: Phaser.GameObjects.Container;
+  private dragonMenuLabel?: Phaser.GameObjects.Text;
+  private dragonMenuForId = 0;
+  /** Home position a working dragon flies back to when it tires. */
+  private dragonHomes = new Map<number, { x: number; y: number }>();
+  /** "💤 m:ss" fatigue badge over a resting dragon (until the fatigue lifts). */
+  private restBadges = new Map<number, Phaser.GameObjects.Text>();
   /** One floating key badge per key-locked region, so it reads as "needs a key". */
   private keyBadges = new Map<string, Phaser.GameObjects.Image>();
   private highlights: Phaser.GameObjects.Image[] = [];
@@ -95,7 +112,7 @@ export class BoardScene extends Phaser.Scene {
   private regenAccum = 0;
   private coolAccum = 0;
   /** The ember-dragon rig, loaded once and reused for every hatchling/whelp. */
-  private dragonRig: RigDoc | null = null;
+  private dragonRigs = new Map<string, RigDoc>();
   private liveDragons = new Map<number, LiveDragon>();
   /** Dragon item ids currently flying a cosmetic worker flourish. */
   private busyDragons = new Set<number>();
@@ -117,13 +134,18 @@ export class BoardScene extends Phaser.Scene {
     this.keyBadges.clear();
     this.skipButton = undefined; // a fresh scene; old container died with the last
     this.skipForId = 0;
+    this.dragonMenu = undefined;
+    this.dragonMenuForId = 0;
+    this.dragonHomes.clear();
+    this.restBadges.clear();
     this.highlights = [];
     this.allow = { ...NO_ALLOW };
     this.tutorialDone = this.ctx.state.tutorialDone;
     this.liveDragons.clear();
     this.busyDragons.clear();
-    void this.loadDragonRig(); // lazy + fault-tolerant; ready well before the hatch
+    void this.loadDragonRigs(); // lazy + fault-tolerant; ready well before the hatch
 
+    this.ensureShadowTexture(); // soft radial shadow used by every object
     this.buildSky();
     this.buildGround();
     this.buildMapDecor();
@@ -154,8 +176,21 @@ export class BoardScene extends Phaser.Scene {
     this.coolAccum += delta;
     if (this.coolAccum >= 240) {
       this.coolAccum = 0;
+      if (this.dragonMenu) this.refreshDragonMenu(); // live rest/ruby countdown
+      for (const [id, badge] of this.restBadges) {
+        const sp = this.itemSprites.get(id);
+        const rest = this.ctx.systems.jobs.restRemaining(id);
+        if (!sp || rest <= 0) {
+          badge.destroy();
+          this.restBadges.delete(id);
+          continue;
+        }
+        const s = Math.ceil(rest / 1000);
+        badge.setPosition(sp.x, sp.y - 132).setText(`💤 ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+      }
       for (const sprite of this.itemSprites.values()) {
         if (!sprite.isGenerator) continue;
+        if (DRAGON_RIGS[sprite.chain]) continue; // dragons never show the timer pill
         const item = this.ctx.state.items.get(sprite.itemId);
         if (!item) continue;
         const timer = this.genTimer(item);
@@ -171,34 +206,50 @@ export class BoardScene extends Phaser.Scene {
 
     this.regenAccum += delta;
     if (this.regenAccum >= 500) {
+      // Pass the REAL elapsed ms (not 0): regen/passive read the clock, but the
+      // dragon-job speed-up advances House timers by this delta per worker.
+      const elapsed = Math.round(this.regenAccum);
       this.regenAccum = 0;
-      this.ctx.bus.emit('time:advanced', { ms: 0 }); // real-time regen tick
+      this.ctx.bus.emit('time:advanced', { ms: elapsed });
     }
   }
 
   /* ------------------------- live rigged dragons ------------------------- */
 
-  /** Fetch + load the ember-dragon rig once. Any failure leaves dragons as the
+  /** True if this item is a dragon generator that should wear a live rig
+   *  (ember hatchling/whelp, emerald dragon). */
+  private wearsRig(chain: string, isGenerator: boolean): boolean {
+    return DRAGON_RIGS[chain] !== undefined && isGenerator;
+  }
+
+  /** Same test from a chain+tier (a snapshot before its sprite is acquired). */
+  private wearsRigTier(chain: string, tier: number): boolean {
+    return DRAGON_RIGS[chain] !== undefined && this.generatorConfigFor(chain, tier) !== undefined;
+  }
+
+  /** Fetch + load every dragon rig once. Any failure leaves that dragon as the
    *  pooled placeholder sprite (graceful: the board still works). */
-  private async loadDragonRig(): Promise<void> {
-    if (this.dragonRig) return;
-    try {
-      const base = (import.meta.env.BASE_URL ?? './').replace(/\/?$/, '/');
-      const res = await fetch(base + DRAGON_RIG_URL);
-      if (!res.ok || !this.scene.isActive()) return;
-      const rig = (await res.json()) as RigDoc;
-      if (rig.format !== 'emberkeep-rig' || !rig.images || !this.scene.isActive()) return;
-      await RigPlayer.loadTextures(this, rig, (layer) => `rig:${rig.character}:${layer}`);
-      if (!this.scene.isActive()) return;
-      this.dragonRig = rig;
-      // Re-skin any dragons that hatched before the rig finished loading.
-      for (const sprite of this.itemSprites.values()) {
-        if (sprite.chain === DRAGON_CHAIN && sprite.isGenerator && !this.liveDragons.has(sprite.itemId)) {
-          this.attachDragon(sprite, false);
+  private async loadDragonRigs(): Promise<void> {
+    const base = (import.meta.env.BASE_URL ?? './').replace(/\/?$/, '/');
+    for (const [chain, url] of Object.entries(DRAGON_RIGS)) {
+      if (this.dragonRigs.has(chain)) continue;
+      try {
+        const res = await fetch(base + url);
+        if (!res.ok || !this.scene.isActive()) continue;
+        const rig = (await res.json()) as RigDoc;
+        if (rig.format !== 'emberkeep-rig' || !rig.images || !this.scene.isActive()) continue;
+        await RigPlayer.loadTextures(this, rig, (layer) => `rig:${rig.character}:${layer}`);
+        if (!this.scene.isActive()) continue;
+        this.dragonRigs.set(chain, rig);
+        // Re-skin any dragons of this chain that spawned before the rig loaded.
+        for (const sprite of this.itemSprites.values()) {
+          if (sprite.chain === chain && this.wearsRig(sprite.chain, sprite.isGenerator) && !this.liveDragons.has(sprite.itemId)) {
+            this.attachDragon(sprite, false);
+          }
         }
+      } catch {
+        /* no rig available — pooled sprite stays */
       }
-    } catch {
-      /* no rig available — pooled sprite stays */
     }
   }
 
@@ -206,16 +257,21 @@ export class BoardScene extends Phaser.Scene {
    *  which goes invisible but stays interactive/draggable. Returns false if the
    *  rig isn't ready yet (caller falls back to the sprite). */
   private attachDragon(host: BoardItem, intro: boolean): boolean {
-    const rig = this.dragonRig;
-    if (!rig || host.chain !== DRAGON_CHAIN) return false;
+    const rig = this.dragonRigs.get(host.chain);
+    if (!rig) return false;
     this.removeDragonRig(host.itemId);
-    const scale = host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale;
+    const scale =
+      (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
+      (DRAGON_RIG_SCALE[host.chain] ?? 1);
     const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, { scale });
     player.setFacing('right').play(intro ? 'celebrate' : 'idle');
     host.setArtVisible(false); // host is now just the invisible hit-target + bob anchor
+    // Ground shadow proportional to the rig (666px pieces × scale).
+    const shadow = this.addGroundShadow(host.x, host.y, 666 * scale, host.depth - 0.5);
     const ld: LiveDragon = {
       player,
       host,
+      shadow,
       mode: intro ? 'celebrate' : 'idle',
       remainMs: intro ? DRAGON_ANIM.introCelebrateMs : this.idleSpanMs(),
       busy: false
@@ -242,6 +298,7 @@ export class BoardScene extends Phaser.Scene {
   private syncDragon(ld: LiveDragon): void {
     ld.player.container.setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift);
     ld.player.container.setDepth(ld.host.depth + 0.5);
+    ld.shadow.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth - 0.5);
   }
 
   private updateLiveDragons(delta: number): void {
@@ -268,6 +325,7 @@ export class BoardScene extends Phaser.Scene {
     const ld = this.liveDragons.get(itemId);
     if (!ld) return;
     ld.player.destroy();
+    ld.shadow.destroy();
     this.liveDragons.delete(itemId);
   }
 
@@ -335,14 +393,21 @@ export class BoardScene extends Phaser.Scene {
     }
     dxs.sort((a, b) => a - b);
     dys.sort((a, b) => a - b);
-    const pct = (arr: number[]): number => arr[Math.floor(0.95 * (arr.length - 1))] ?? 0;
+    // CLOSER framing: the board sat too far back. Frame the DENSE CORE around the
+    // focal cell (lower percentile = ignore the sparse outer cells) and pull in,
+    // so the start cluster fills the view. The focal cell stays centred; pan/
+    // wheel still reach the rest of the zone.
+    const pct = (arr: number[]): number => arr[Math.floor(0.7 * (arr.length - 1))] ?? 0;
     const halfW = Math.max(TILE_W, pct(dxs) + TILE_W / 2);
     const halfH = Math.max(TILE_H, pct(dys) + TILE_H);
-    const pad = 140;
+    const pad = 110;
+    // The ceiling was 2.0 and the dense-core frame kept hitting it, so earlier
+    // multiplier tweaks did nothing. Lower ceiling = a real zoom-out: the start
+    // area fills the view comfortably without being right on top of it.
     const zoom = Phaser.Math.Clamp(
-      Math.min((GAME_WIDTH / 2 - pad) / halfW, (GAME_HEIGHT / 2 - pad) / halfH),
-      0.28,
-      1.0
+      Math.min((GAME_WIDTH / 2 - pad) / halfW, (GAME_HEIGHT / 2 - pad) / halfH) * 1.15,
+      0.45,
+      1.05
     );
     return { x: center.x, y: center.y, zoom };
   }
@@ -500,6 +565,8 @@ export class BoardScene extends Phaser.Scene {
         .setOrigin(cal.anchor.x, cal.anchor.y)
         .setScale(cal.scale * ratio * (DECOR_SCALE[d.name] ?? 1))
         .setDepth(DEPTHS.itemBase + y);
+      // Ground shadow sized to the art, on the cell so the spring lifts off it.
+      this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
       // Slow spring-bounce (not a smooth float): lazy spring, staggered, calm.
       this.springBounce(sprite, baseY, i, false);
     });
@@ -742,8 +809,13 @@ export class BoardScene extends Phaser.Scene {
     const cam = this.cameras.main;
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       const hits = this.input.hitTestPointer(pointer);
-      // Dismiss the skip button on any tap that isn't on the button itself.
-      if (this.skipButton && !hits.includes(this.skipButton)) this.hideSkipButton();
+      // Dismiss the skip button / dragon menu on any tap not on the popup itself.
+      if (this.skipButton && !hits.some((o) => o === this.skipButton || o.parentContainer === this.skipButton)) {
+        this.hideSkipButton();
+      }
+      if (this.dragonMenu && !hits.some((o) => o === this.dragonMenu || o.parentContainer === this.dragonMenu)) {
+        this.hideDragonMenu();
+      }
       const onObject = hits.some(
         (o) => o instanceof BoardItem || o.getData?.('regionId') !== undefined
       );
@@ -812,6 +884,68 @@ export class BoardScene extends Phaser.Scene {
     return null;
   }
 
+  /** Build the soft radial-gradient shadow texture once (a dark core fading to
+   *  transparent → reads as a blurred, realistic ground shadow when squashed). */
+  private ensureShadowTexture(): void {
+    if (!this.textures.exists('fx_shadow')) {
+      const S = 128;
+      const tex = this.textures.createCanvas('fx_shadow', S, S);
+      if (tex) {
+        const ctx = tex.getContext();
+        const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+        g.addColorStop(0, 'rgba(16,10,15,0.55)');
+        g.addColorStop(0.5, 'rgba(16,10,15,0.3)');
+        g.addColorStop(1, 'rgba(16,10,15,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, S, S);
+        tex.refresh();
+      }
+    }
+    // Blue glossy pill behind the generator countdown (payement-energie style).
+    if (!this.textures.exists('fx_timepill')) {
+      const W = 168;
+      const H = 60;
+      const R = 30;
+      const tex = this.textures.createCanvas('fx_timepill', W, H);
+      if (tex) {
+        const ctx = tex.getContext();
+        const rr = (x: number, y: number, w: number, h: number, r: number): void => {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + w, y, x + w, y + h, r);
+          ctx.arcTo(x + w, y + h, x, y + h, r);
+          ctx.arcTo(x, y + h, x, y, r);
+          ctx.arcTo(x, y, x + w, y, r);
+          ctx.closePath();
+        };
+        ctx.fillStyle = '#1f4f8c';
+        rr(0, 0, W, H, R);
+        ctx.fill(); // dark rim
+        const g = ctx.createLinearGradient(0, 4, 0, H - 4);
+        g.addColorStop(0, '#5aa9ec');
+        g.addColorStop(1, '#2f6cc0');
+        ctx.fillStyle = g;
+        rr(5, 4, W - 10, H - 8, R - 4);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.22)'; // top gloss
+        rr(12, 8, W - 24, H * 0.4, R * 0.6);
+        ctx.fill();
+        tex.refresh();
+      }
+    }
+  }
+
+  /** A soft ground shadow whose size tracks the art's width (decor, trees,
+   *  dragon). Squashed into an ellipse; sits on the cell ground so a bouncing
+   *  sprite lifts off it. */
+  private addGroundShadow(x: number, y: number, displayWidth: number, depth: number): Phaser.GameObjects.Image {
+    const w = Math.max(70, displayWidth * 0.95);
+    return this.add
+      .image(x, y, 'fx_shadow')
+      .setDisplaySize(w, w * 0.42)
+      .setDepth(depth);
+  }
+
   /** Slow spring-bounce shared by world-builder decor and animated tree tiles.
    *  Trees run faster (TREE_BOUNCE_SPEEDUP). `baseY` is the resting y. */
   private springBounce(target: Phaser.GameObjects.Image, baseY: number, index: number, fast: boolean): void {
@@ -870,12 +1004,31 @@ export class BoardScene extends Phaser.Scene {
   private onItemTapped(sprite: BoardItem): void {
     const item = this.ctx.state.items.get(sprite.itemId);
     if (!item) return;
+    // Collectible (a Gold coin): tap banks it — +Gold, a coin flies to the gauge
+    // (UIScene), and the board coin is consumed.
+    const collect = COLLECTIBLE_REWARD[item.chain];
+    if (collect) {
+      // Always collectable (even mid-tutorial) — banking a coin never interferes.
+      this.ctx.bus.emit('economy:add', { coins: collect.coins, reason: 'collect' });
+      this.ctx.bus.emit('gold:collected', { at: { col: item.col, row: item.row } });
+      this.sparks.explode(8, sprite.x, sprite.y - 40);
+      this.ctx.bus.emit('board:consume_items', { itemIds: [item.id], reason: 'sold' });
+      return;
+    }
+    // Emerald gems & eggs are merge-only: a tap does nothing (no menu, no sell) —
+    // you just drag them together. (The Emerald Dragon, tier 3, still has its menu.)
+    if (item.chain === 'emerald' && item.tier < 3) return;
     const cfg = this.generatorConfigFor(item.chain, item.tier);
     const isGenerator = cfg !== undefined;
     if (isGenerator && !this.tutorialDone && !this.allow.tapGenerators) return;
     if (!isGenerator && !this.tutorialDone && !this.allow.sell) return;
-    // Tapping a COOLING/WAITING generator offers a skip-for-Warmth button (cost
-    // scales with the time left); a ready tap-generator harvests as usual.
+    // A DRAGON opens its Job menu (Work / Harvest, with rest & ruby timers).
+    if (DRAGON_RIGS[item.chain] && this.tutorialDone) {
+      this.showDragonMenu(sprite);
+      return;
+    }
+    // Tapping a COOLING/WAITING generator offers the skip buttons (cost scales
+    // with the time left); a ready tap-generator harvests as usual.
     const timer = isGenerator ? this.genTimer(item) : null;
     if (timer) {
       this.showSkipButton(sprite, timer.remaining, timer.total);
@@ -888,7 +1041,7 @@ export class BoardScene extends Phaser.Scene {
     // then, for a plant, a nearby dragon flies over as a cosmetic "worker"
     // flourish. The harvest already happened, so a dropped frame can't stall it.
     this.ctx.bus.emit('item:tapped', { itemId: sprite.itemId });
-    if (isGenerator && item.chain !== DRAGON_CHAIN) this.sendDragonFlourish(sprite);
+    if (isGenerator && !DRAGON_RIGS[item.chain]) this.sendDragonFlourish(sprite);
   }
 
   /** Cosmetic only: the nearest idle dragon swoops to a just-harvested plant,
@@ -956,45 +1109,259 @@ export class BoardScene extends Phaser.Scene {
     });
   }
 
-  /** Floating "skip for Warmth" button under a waiting generator. The cost is
-   *  dynamic (expensive at the start, cheap near the end) and refreshes live. */
+  /** Two floating skip buttons under a waiting generator: GOLD (🪙) and the
+   *  cheaper WARMTH (⚡). Hovering a button shows WHICH currency it spends ("Par
+   *  or" / "Par énergie"). Both prices are dynamic and refresh live. */
   private showSkipButton(sprite: BoardItem, remaining: number, total: number): void {
     this.hideSkipButton();
-    const bg = this.add.image(0, 0, 'ui_btn_green').setScale(0.62, 0.56);
-    this.skipLabel = this.add
-      .text(0, -2, `⚡ Skip  ${skipEnergyCost(remaining, total)}`, {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: '34px',
+    const btn = this.add.container(sprite.x, sprite.y + 100).setDepth(DEPTHS.dragged - 1);
+    // Caption shown on hover, telling the player which payment a button uses.
+    const caption = this.add
+      .text(0, -58, '', {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '28px',
         fontStyle: 'bold',
         color: '#fff6e0',
-        stroke: '#1f3a14',
-        strokeThickness: 5
+        stroke: '#241b22',
+        strokeThickness: 5,
+        backgroundColor: 'rgba(28,20,26,0.78)',
+        padding: { x: 12, y: 5 }
       })
-      .setOrigin(0.5);
-    const btn = this.add
-      .container(sprite.x, sprite.y + 92, [bg, this.skipLabel])
-      .setDepth(DEPTHS.dragged - 1);
-    btn.setSize(bg.displayWidth, bg.displayHeight);
-    btn.setInteractive({ useHandCursor: true });
-    btn.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
-      ev.stopPropagation();
-      this.ctx.bus.emit('generator:skip', { itemId: sprite.itemId });
-      this.hideSkipButton();
-    });
+      .setOrigin(0.5)
+      .setVisible(false);
+    const make = (
+      dx: number,
+      tint: number,
+      currency: 'gold' | 'warmth',
+      method: string,
+      text: string
+    ): Phaser.GameObjects.Text => {
+      const bg = this.add.image(dx, 0, 'ui_btn_green').setScale(0.46, 0.52).setTint(tint);
+      const label = this.add
+        .text(dx, -2, text, {
+          fontFamily: 'Segoe UI, sans-serif',
+          fontSize: '30px',
+          fontStyle: 'bold',
+          color: '#fff6e0',
+          stroke: '#1f3a14',
+          strokeThickness: 5
+        })
+        .setOrigin(0.5);
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerover', () => caption.setText(method).setX(dx).setVisible(true));
+      bg.on('pointerout', () => caption.setVisible(false));
+      bg.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
+        ev.stopPropagation();
+        this.ctx.bus.emit('generator:skip', { itemId: sprite.itemId, currency });
+        this.hideSkipButton();
+      });
+      btn.add([bg, label]);
+      return label;
+    };
+    this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Par or', `🪙 ${skipEnergyCost(remaining, total)}`);
+    this.skipWarmthLabel = make(150, 0xa9d6ff, 'warmth', 'Par énergie', `⚡ ${skipWarmthCost(remaining, total)}`);
+    btn.add(caption); // on top of the buttons
     this.skipButton = btn;
     this.skipForId = sprite.itemId;
   }
 
-  /** Keep the skip button's price in step as the timer drains. */
+  /** Keep both skip prices in step as the timer drains. */
   private updateSkipCost(remaining: number, total: number): void {
-    this.skipLabel?.setText(`⚡ Skip  ${skipEnergyCost(remaining, total)}`);
+    this.skipGoldLabel?.setText(`🪙 ${skipEnergyCost(remaining, total)}`);
+    this.skipWarmthLabel?.setText(`⚡ ${skipWarmthCost(remaining, total)}`);
   }
 
   private hideSkipButton(): void {
     this.skipButton?.destroy();
     this.skipButton = undefined;
-    this.skipLabel = undefined;
+    this.skipGoldLabel = undefined;
+    this.skipWarmthLabel = undefined;
     this.skipForId = 0;
+  }
+
+  /** The dragon Job menu: WORK (fly to a House, speed its timer) and HARVEST
+   *  (collect a Ruby), with the rest (fatigue) and ruby timers shown above. */
+  private showDragonMenu(sprite: BoardItem): void {
+    this.hideDragonMenu();
+    const menu = this.add.container(sprite.x, sprite.y + 104).setDepth(DEPTHS.dragged - 1);
+    this.dragonMenuLabel = this.add
+      .text(0, -64, '', {
+        fontFamily: 'Segoe UI, sans-serif',
+        fontSize: '28px',
+        fontStyle: 'bold',
+        color: '#fff6e0',
+        align: 'center',
+        stroke: '#241b22',
+        strokeThickness: 5,
+        backgroundColor: 'rgba(28,20,26,0.74)',
+        padding: { x: 12, y: 5 }
+      })
+      .setOrigin(0.5);
+    const mkBtn = (dx: number, text: string, onTap: () => void): void => {
+      const bg = this.add.image(dx, 0, 'ui_btn_green').setScale(0.5, 0.54);
+      const label = this.add
+        .text(dx, -2, text, {
+          fontFamily: 'Segoe UI, sans-serif',
+          fontSize: '30px',
+          fontStyle: 'bold',
+          color: '#fff6e0',
+          stroke: '#1f3a14',
+          strokeThickness: 5
+        })
+        .setOrigin(0.5);
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
+        ev.stopPropagation();
+        onTap();
+        this.hideDragonMenu();
+      });
+      menu.add([bg, label]);
+    };
+    mkBtn(-150, '⛏ Work', () => this.startDragonWork(sprite));
+    mkBtn(150, '✋ Harvest', () => this.ctx.bus.emit('item:tapped', { itemId: sprite.itemId }));
+    menu.add(this.dragonMenuLabel);
+    this.dragonMenu = menu;
+    this.dragonMenuForId = sprite.itemId;
+    this.refreshDragonMenu();
+  }
+
+  /** Update the menu's rest/ruby countdown each tick while it's open. */
+  private refreshDragonMenu(): void {
+    if (!this.dragonMenuLabel || this.dragonMenuForId === 0) return;
+    const item = this.ctx.state.items.get(this.dragonMenuForId);
+    const now = this.ctx.clock.now();
+    const rest = this.ctx.systems.jobs.restRemaining(this.dragonMenuForId);
+    const cfg = item && this.generatorConfigFor(item.chain, item.tier);
+    const rubyMs = item?.readyAt !== undefined ? Math.max(0, item.readyAt - now) : 0;
+    const fmt = (ms: number): string => {
+      const s = Math.ceil(ms / 1000);
+      return s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    };
+    const parts = [`Ruby ${cfg && rubyMs > 0 ? fmt(rubyMs) : 'ready'}`];
+    parts.push(rest > 0 ? `Rest ${fmt(rest)}` : this.ctx.systems.jobs.isWorking(this.dragonMenuForId) ? 'Working' : 'Idle');
+    this.dragonMenuLabel.setText(parts.join('   '));
+  }
+
+  private hideDragonMenu(): void {
+    this.dragonMenu?.destroy();
+    this.dragonMenu = undefined;
+    this.dragonMenuLabel = undefined;
+    this.dragonMenuForId = 0;
+  }
+
+  /** Send a dragon to WORK the nearest House: it flies over and stands by it,
+   *  speeding its timer (+1× per worker) until it tires. */
+  private startDragonWork(sprite: BoardItem): void {
+    if (this.ctx.systems.jobs.restRemaining(sprite.itemId) > 0) {
+      this.floatText(sprite.x, sprite.y - 150, 'Resting…', PALETTE.cream);
+      return;
+    }
+    // Work the NEAREST timed production building (House, Crystal, Ancient Tree —
+    // any passive generator, not another dragon), so a 10-min object finishes in
+    // 5 with one worker.
+    const house = [...this.itemSprites.values()]
+      .filter((s) => {
+        const cfg = this.generatorConfigFor(s.chain, s.tier);
+        return cfg?.tappable === false && !DRAGON_RIGS[s.chain] && s.itemId !== sprite.itemId;
+      })
+      .sort(
+        (a, b) =>
+          Phaser.Math.Distance.Between(a.x, a.y, sprite.x, sprite.y) -
+          Phaser.Math.Distance.Between(b.x, b.y, sprite.x, sprite.y)
+      )[0];
+    if (!house) {
+      this.floatText(sprite.x, sprite.y - 150, 'Nothing to work yet', PALETTE.cream);
+      return;
+    }
+    this.busyDragons.add(sprite.itemId);
+    this.dragonHomes.set(sprite.itemId, { x: sprite.x, y: sprite.y });
+    const ld = this.liveDragons.get(sprite.itemId);
+    if (ld) ld.busy = true;
+    sprite.setDepth(DEPTHS.dragged);
+    // Stand at a DISTINCT spot around the building (offset by how many dragons
+    // already work it) so two dragons never overlap on the same place.
+    const slots = [
+      { dx: -110, dy: 24 },
+      { dx: 110, dy: 24 },
+      { dx: -120, dy: -48 },
+      { dx: 120, dy: -48 },
+      { dx: 0, dy: 70 },
+      { dx: 0, dy: -78 }
+    ];
+    const slot = slots[this.ctx.systems.jobs.workersFor(house.itemId) % slots.length]!;
+    const target = { x: house.x + slot.dx, y: house.y + slot.dy };
+    this.tweens.add({
+      targets: sprite,
+      x: target.x,
+      y: target.y,
+      duration: DRAGON_ANIM.flyToMs,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        sprite.settleDepth();
+        if (ld) ld.player.play('idle'); // "floats" by the house, working
+      }
+    });
+    this.ctx.bus.emit('dragon:work', { dragonId: sprite.itemId, houseId: house.itemId });
+  }
+
+  /** Float a "💤 m:ss" fatigue badge over a resting dragon (cool loop updates it). */
+  private showRestBadge(dragonId: number): void {
+    this.restBadges.get(dragonId)?.destroy();
+    const sprite = this.itemSprites.get(dragonId);
+    if (!sprite) return;
+    const badge = this.add
+      .text(sprite.x, sprite.y - 132, '💤', {
+        fontFamily: 'Segoe UI, sans-serif',
+        fontSize: '32px',
+        fontStyle: 'bold',
+        color: '#cfe8ff',
+        stroke: '#1a3a66',
+        strokeThickness: 5,
+        backgroundColor: 'rgba(28,20,40,0.7)',
+        padding: { x: 12, y: 5 }
+      })
+      .setOrigin(0.5)
+      .setDepth(DEPTHS.flash);
+    this.restBadges.set(dragonId, badge);
+  }
+
+  /** The fatigue lifted — pop the badge, sparkle, and a "Refreshed!" cue so the
+   *  player SEES the dragon become available again. */
+  private wakeDragon(dragonId: number): void {
+    this.restBadges.get(dragonId)?.destroy();
+    this.restBadges.delete(dragonId);
+    const sprite = this.itemSprites.get(dragonId);
+    if (!sprite) return;
+    this.sparks.explode(14, sprite.x, sprite.y - 60);
+    this.glowFlash(sprite.x, sprite.y - 50, PALETTE.goldAccent, 0.5, 1.0);
+    this.floatText(sprite.x, sprite.y - 150, 'Refreshed!', PALETTE.goldAccent);
+    const ld = this.liveDragons.get(dragonId);
+    if (ld) {
+      ld.player.play('celebrate');
+      ld.mode = 'celebrate';
+      ld.remainMs = DRAGON_ANIM.celebrateMs;
+    }
+  }
+
+  /** A tired dragon flies back to its home tile to rest. */
+  private returnDragonHome(dragonId: number): void {
+    const sprite = this.itemSprites.get(dragonId);
+    const home = this.dragonHomes.get(dragonId);
+    if (!sprite || !home) return;
+    sprite.setDepth(DEPTHS.dragged);
+    this.tweens.add({
+      targets: sprite,
+      x: home.x,
+      y: home.y,
+      duration: DRAGON_ANIM.flyBackMs,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        sprite.settleDepth();
+        this.busyDragons.delete(dragonId);
+        const ld = this.liveDragons.get(dragonId);
+        if (ld) ld.busy = false;
+      }
+    });
   }
 
   private onFogTapped(regionId: string, col: number, row: number): void {
@@ -1017,8 +1384,8 @@ export class BoardScene extends Phaser.Scene {
     this.offBus.push(
       bus.on('item:spawned', ({ item }) => {
         const sprite = this.acquireSprite(item, false);
-        // Any ember-dragon generator wears the live rig, however it arrived.
-        if (item.chain === DRAGON_CHAIN && sprite.isGenerator) this.attachDragon(sprite, false);
+        // Any dragon generator (ember or emerald) wears its live rig.
+        if (this.wearsRig(item.chain, sprite.isGenerator)) this.attachDragon(sprite, false);
       }),
       bus.on('item:moved', ({ itemId, to }) => {
         const sprite = this.itemSprites.get(itemId);
@@ -1057,6 +1424,11 @@ export class BoardScene extends Phaser.Scene {
       bus.on('generator:reward', ({ generatorId, coins, xp, energy }) =>
         this.onGeneratorReward(generatorId, coins, xp, energy)
       ),
+      bus.on('dragon:rest', ({ dragonId }) => {
+        this.returnDragonHome(dragonId);
+        this.showRestBadge(dragonId);
+      }),
+      bus.on('dragon:rested', ({ dragonId }) => this.wakeDragon(dragonId)),
       bus.on('item:harvest_failed', ({ generatorId, reason }) => {
         const sprite = this.itemSprites.get(generatorId);
         if (sprite) sprite.flashDenied();
@@ -1097,6 +1469,11 @@ export class BoardScene extends Phaser.Scene {
         this.tutorialDone = step.done;
         this.refreshAllDraggable();
         this.setHighlights(step.highlight);
+        // The closer camera can leave a fog-gate lesson off-screen — glide to it.
+        const fog =
+          (step.arrow && 'fogRegion' in step.arrow && step.arrow.fogRegion) ||
+          (step.hand && 'fogRegion' in step.hand && step.hand.fogRegion);
+        if (fog) this.panToRegion(fog);
       }),
       bus.on('state:loaded', () => this.fullResync())
     );
@@ -1138,7 +1515,8 @@ export class BoardScene extends Phaser.Scene {
         this.time.delayedCall(60 + i * 90, () => {
           // popIn's Back.easeOut overshoot IS the pop — never stack a second
           // scale tween on a spawning sprite, the longer one wins the final write.
-          const isDragon = output.chain === DRAGON_CHAIN;          const sprite = this.acquireSprite(output, !isDragon);
+          const isDragon = this.wearsRigTier(output.chain, output.tier);
+          const sprite = this.acquireSprite(output, !isDragon);
           // A merged-up dragon (e.g. the Whelp) also wears the live rig and
           // celebrates its arrival; pop the sprite if the rig isn't ready.
           if (isDragon && !this.attachDragon(sprite, true)) {
@@ -1399,7 +1777,7 @@ export class BoardScene extends Phaser.Scene {
       const sprite = this.acquireSprite(snap, false);
       // Restore the live rig for dragons already on the board (resting, not
       // celebrating — they didn't just hatch).
-      if (snap.chain === DRAGON_CHAIN && sprite.isGenerator) this.attachDragon(sprite, false);
+      if (this.wearsRig(snap.chain, sprite.isGenerator)) this.attachDragon(sprite, false);
     }
     // Re-frame the camera on the loaded Keeper level (no glide).
     const frame = this.frameForLevel(this.ctx.state.level);
@@ -1409,6 +1787,16 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /* ----------------------------- helpers ---------------------------- */
+
+  /** Glide the camera to centre a region (e.g. the key-fog gate the tutorial
+   *  points at), keeping the current zoom. */
+  private panToRegion(regionId: string): void {
+    const region = this.ctx.data.map.regions.find((r) => r.id === regionId);
+    if (!region || region.tiles.length === 0) return;
+    const c = this.regionCentroid(region.tiles.map(([col, row]) => ({ col, row })));
+    this.flyTween?.stop();
+    this.cameras.main.centerOn(c.x, c.y); // reliable jump to the gate
+  }
 
   private regionCentroid(tiles: TilePos[]): { x: number; y: number } {
     let sx = 0;

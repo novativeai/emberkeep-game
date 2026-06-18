@@ -1,4 +1,4 @@
-import { SAVE_KEY, SAVE_VERSION } from '../core/Constants';
+import { energyMaxForLevel, levelForXp, SAVE_KEY, SAVE_VERSION } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -89,7 +89,8 @@ export class SaveSystem {
     if (!data) return false;
     const now = this.clock.now();
     const offlineMs = Math.max(0, now - data.savedAt);
-    const regen = computeRegen(data.energy.current, data.energy.lastRegenAt, now);
+    const max = energyMaxForLevel(levelForXp(data.xp ?? 0));
+    const regen = computeRegen(data.energy.current, data.energy.lastRegenAt, now, max);
     this.suspend(() => {
       this.state.hydrate(data);
     });

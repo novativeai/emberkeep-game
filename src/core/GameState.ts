@@ -1,4 +1,4 @@
-import { ENERGY_MAX, LEVEL_XP } from './Constants';
+import { ENERGY_MAX, energyMaxForLevel, LEVEL_XP } from './Constants';
 import type {
   BoardItemState,
   ItemKind,
@@ -229,6 +229,11 @@ export class GameState {
       if (this.xp >= LEVEL_XP[i]!) level = i + 1;
     }
     return level;
+  }
+
+  /** Max Warmth at the current level (+3 per level). */
+  get energyMax(): number {
+    return energyMaxForLevel(this.level);
   }
 
   /** XP progress within the current level: [gained, span]. */

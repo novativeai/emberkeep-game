@@ -1,0 +1,89 @@
+import { DRAGON_REST_MS, DRAGON_WORK_MS } from '../core/Constants';
+import type { EventBus } from '../core/EventBus';
+import type { GameClock } from '../core/GameClock';
+import type { GameState } from '../core/GameState';
+
+interface Job {
+  houseId: number;
+  state: 'working' | 'resting';
+  sinceMs: number; // clock time the current state started
+}
+
+/**
+ * Dragon jobs. A dragon can WORK a House: every worker standing by it speeds the
+ * House's timer by +1× (1 dragon = 2×, 2 = 3×, …) — implemented by advancing the
+ * House's `passiveAt` an extra `ms` per worker on each tick (the clock already
+ * gives the base 1×). A dragon tires after DRAGON_WORK_MS, flies home and rests
+ * DRAGON_REST_MS before it can work again. All timing reads the virtual clock.
+ */
+export class DragonJobSystem {
+  private jobs = new Map<number, Job>(); // dragonId → job
+
+  constructor(
+    private state: GameState,
+    private bus: EventBus,
+    private clock: GameClock
+  ) {
+    bus.on('dragon:work', ({ dragonId, houseId }) => this.startWork(dragonId, houseId));
+    bus.on('time:advanced', ({ ms }) => this.tick(ms));
+    bus.on('item:removed', ({ itemId }) => this.jobs.delete(itemId));
+    bus.on('game:reset', () => this.jobs.clear());
+  }
+
+  private startWork(dragonId: number, houseId: number): void {
+    if (!this.state.items.get(dragonId) || !this.state.items.get(houseId)) return;
+    if (this.jobs.get(dragonId)?.state === 'resting') return; // still tired
+    this.jobs.set(dragonId, { houseId, state: 'working', sinceMs: this.clock.now() });
+    this.bus.emit('dragon:working', { dragonId, houseId });
+  }
+
+  /** Dragons currently working a given building (for spacing them out). */
+  workersFor(houseId: number): number {
+    let n = 0;
+    for (const job of this.jobs.values()) if (job.state === 'working' && job.houseId === houseId) n++;
+    return n;
+  }
+
+  /** Total dragons working anywhere — they speed up EVERY timed object. */
+  workingCount(): number {
+    let n = 0;
+    for (const job of this.jobs.values()) if (job.state === 'working') n++;
+    return n;
+  }
+
+  isWorking(dragonId: number): boolean {
+    return this.jobs.get(dragonId)?.state === 'working';
+  }
+
+  /** Rest (fatigue) time left in ms, or 0 if the dragon isn't resting. */
+  restRemaining(dragonId: number): number {
+    const job = this.jobs.get(dragonId);
+    if (!job || job.state !== 'resting') return 0;
+    return Math.max(0, job.sinceMs + DRAGON_REST_MS - this.clock.now());
+  }
+
+  private tick(ms: number): void {
+    const now = this.clock.now();
+    // GLOBAL speed-up: every working dragon advances EVERY timed object an extra
+    // `ms` (1 worker → +1× on all of them; clock gives the base 1×).
+    const workers = this.workingCount();
+    if (workers > 0 && ms > 0) {
+      for (const item of this.state.items.values()) {
+        if (item.passiveAt !== undefined) item.passiveAt -= workers * ms;
+      }
+    }
+    // Per-dragon fatigue: work DRAGON_WORK_MS → rest DRAGON_REST_MS.
+    for (const [dragonId, job] of this.jobs) {
+      if (job.state === 'working') {
+        if (now - job.sinceMs >= DRAGON_WORK_MS) {
+          job.state = 'resting';
+          job.sinceMs = now;
+          this.bus.emit('dragon:rest', { dragonId }); // tired → fly home
+        }
+      } else if (now - job.sinceMs >= DRAGON_REST_MS) {
+        this.jobs.delete(dragonId);
+        this.bus.emit('dragon:rested', { dragonId });
+      }
+    }
+  }
+}

@@ -22,3 +22,6 @@ playwright-report/
 # external standalone tools that carry their own .git (not part of this repo)
 /rigger/
 /world/
+
+# personal Claude Code permissions (local)
+.claude/settings.local.json

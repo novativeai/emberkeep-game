@@ -17,7 +17,6 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private titleText: Phaser.GameObjects.Text;
   private orderTitle: Phaser.GameObjects.Text;
   private blurb: Phaser.GameObjects.Text;
-  private rewardCoins: Phaser.GameObjects.Text;
   private rewardKeys: Phaser.GameObjects.Text;
   private rewardRow: Phaser.GameObjects.Container;
   private slotIcon: Phaser.GameObjects.Image;
@@ -98,15 +97,13 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       fontStyle: 'bold',
       color: PALETTE.textBrown
     });
-    const coinIcon = scene.add.image(32, 8, 'ui_icon_coin').setScale(0.85);
-    this.rewardCoins = scene.add
-      .text(72, 8, '+50', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: PALETTE.goldShade })
-      .setOrigin(0, 0.5);
-    const keyIcon = scene.add.image(224, 8, 'ui_icon_key').setScale(0.85);
+    // Coin reward hidden for now (the coin pill is off); the Gold Key is the
+    // reward shown. Keys take the coin's old slot so the row stays tidy.
+    const keyIcon = scene.add.image(32, 8, 'ui_icon_key').setScale(0.85);
     this.rewardKeys = scene.add
-      .text(264, 8, '×1', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: PALETTE.goldShade })
+      .text(72, 8, '×1', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: PALETTE.goldShade })
       .setOrigin(0, 0.5);
-    this.rewardRow.add([rewardLabel, coinIcon, this.rewardCoins, keyIcon, this.rewardKeys]);
+    this.rewardRow.add([rewardLabel, keyIcon, this.rewardKeys]);
 
     // Right column: Cindra card with the requirement slot + deliver.
     this.card = scene.add.container(300, 16);
@@ -258,7 +255,6 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       Math.min(this.gameState.countItems(requirement.chain, requirement.tier), requirement.count);
     this.orderTitle.setText(this.currentOrder.title);
     this.blurb.setText(`“${this.currentOrder.blurb}”`);
-    this.rewardCoins.setText(`+${this.currentOrder.rewards.coins}`);
     this.rewardKeys.setText(`×${this.currentOrder.rewards.keys}`);
     this.slotIcon.setTexture(`item_${requirement.chain}_${requirement.tier}`);
     this.slotCount.setText(`${have}/${requirement.count}`);

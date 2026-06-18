@@ -62,15 +62,15 @@ describe('skip cooldown for Warmth', () => {
     });
     ctx.bus.emit('item:tapped', { itemId: gen.id }); // harvest → cooldown
     expect(gen.readyAt!).toBeGreaterThan(ctx.clock.now());
-    const energyAfterHarvest = ctx.state.energyCurrent;
+    ctx.state.coins = 20; // skip is paid in GOLD now
     // Freshly cooled = full time left → the skip costs the MAX (most expensive).
     const fullCost = skipEnergyCost(gen.readyAt! - ctx.clock.now(), 10_000);
     expect(fullCost).toBe(GENERATOR_SKIP_MAX_ENERGY);
 
-    ctx.bus.emit('generator:skip', { itemId: gen.id });
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
 
     expect(gen.readyAt!).toBeLessThanOrEqual(ctx.clock.now()); // ready now
-    expect(ctx.state.energyCurrent).toBe(energyAfterHarvest - fullCost);
+    expect(ctx.state.coins).toBe(20 - fullCost);
   });
 
   it('cheapens the skip as the timer nears completion (dynamic price)', () => {
@@ -92,42 +92,53 @@ describe('skip cooldown for Warmth', () => {
     });
     ctx.bus.emit('item:tapped', { itemId: gen.id }); // cooling
     const cooldownEnds = gen.readyAt!;
-    ctx.state.energyCurrent = GENERATOR_SKIP_MAX_ENERGY - 1; // not enough for a fresh skip
+    ctx.state.coins = GENERATOR_SKIP_MAX_ENERGY - 1; // not enough GOLD for a fresh skip
     const fails = capture(ctx.bus, 'item:harvest_failed');
 
-    ctx.bus.emit('generator:skip', { itemId: gen.id });
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
 
     expect(gen.readyAt!).toBe(cooldownEnds); // unchanged
     expect(fails.some((f) => f.reason === 'energy')).toBe(true);
   });
 });
 
-describe('the House (reward generator)', () => {
-  it('pays coins + xp + energy on its passive timer (no tap)', () => {
+describe('the House (Gold generator)', () => {
+  it('produces one Gold coin every 5 minutes (passive, no tap)', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'lumber', tier: 2, col: 2, row: 2, kind: 'item' });
-    const rewards = capture(ctx.bus, 'generator:reward');
-    const coinsBefore = ctx.state.coins;
-    const xpBefore = ctx.state.xp;
+    const produced = capture(ctx.bus, 'item:produced');
 
     ctx.bus.emit('time:advanced', { ms: 0 }); // arm
-    expect(rewards).toHaveLength(0);
+    expect(produced).toHaveLength(0);
 
-    ctx.clock.advance(600_001); // one 10-minute interval
-    ctx.bus.emit('time:advanced', { ms: 600_001 });
+    ctx.clock.advance(300_001); // one 5-minute interval
+    ctx.bus.emit('time:advanced', { ms: 300_001 });
 
-    expect(rewards).toHaveLength(1);
-    expect(rewards[0]).toMatchObject({ coins: 5, xp: 10, energy: 1 });
-    expect(ctx.state.coins).toBe(coinsBefore + 5);
-    expect(ctx.state.xp).toBe(xpBefore + 10);
+    expect(produced).toHaveLength(1);
+    expect(produced[0]!.output).toMatchObject({ chain: 'coin', tier: 1 });
   });
 
   it('a tap never harvests a passive-only House', () => {
     const ctx = createTestContext();
     const house = ctx.state.addItem({ chain: 'lumber', tier: 2, col: 2, row: 2, kind: 'item' });
-    const rewards = capture(ctx.bus, 'generator:reward');
+    const produced = capture(ctx.bus, 'item:produced');
     ctx.bus.emit('item:tapped', { itemId: house.id });
-    expect(rewards).toHaveLength(0); // tapping pays nothing; it only offers a skip
+    expect(produced).toHaveLength(0); // tapping pays nothing; it only offers a skip
+  });
+});
+
+describe('the Theme Crystal (Emerald generator)', () => {
+  it('produces one Emerald every 10 minutes', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'crystal', tier: 1, col: 2, row: 2, kind: 'item' });
+    const produced = capture(ctx.bus, 'item:produced');
+
+    ctx.bus.emit('time:advanced', { ms: 0 }); // arm
+    ctx.clock.advance(600_001);
+    ctx.bus.emit('time:advanced', { ms: 600_001 });
+
+    expect(produced).toHaveLength(1);
+    expect(produced[0]!.output).toMatchObject({ chain: 'emerald', tier: 1 });
   });
 });
 

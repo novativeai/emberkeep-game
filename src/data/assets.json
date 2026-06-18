@@ -175,6 +175,24 @@
       "file": "sprites/items/bigtree.png"
     },
     {
+      "key": "item_crystal_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/crystal.png"
+    },
+    {
+      "key": "item_coin_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/coin.png"
+    },
+    {
+      "key": "item_diamond_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/diamond.png"
+    },
+    {
       "key": "decor_nest",
       "source": "placeholder",
       "generator": "decor",
@@ -593,6 +611,102 @@
       "source": "file",
       "generator": "decor",
       "file": "sprites/environment/map/decor/hut_houses_transparent_001.png"
+    },
+    {
+      "key": "tile_Tiles-out_016",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_016.png"
+    },
+    {
+      "key": "tile_Tiles-out_017",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_017.png"
+    },
+    {
+      "key": "tile_Tiles-out_018",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_018.png"
+    },
+    {
+      "key": "tile_Tiles-out_019",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_019.png"
+    },
+    {
+      "key": "tile_Tiles-out_020",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_020.png"
+    },
+    {
+      "key": "tile_Tiles-out_021",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_021.png"
+    },
+    {
+      "key": "tile_water-tile",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/water-tile.png"
+    },
+    {
+      "key": "decor_tree_2",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/tree_2.png"
+    },
+    {
+      "key": "decor_plant_1",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/plant_1.png"
+    },
+    {
+      "key": "decor_flower_1",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/flower_1.png"
+    },
+    {
+      "key": "decor_rose_2",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/rose_2.png"
+    },
+    {
+      "key": "decor_warning",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/warning.png"
+    },
+    {
+      "key": "decor_space_rose",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/space_rose.png"
+    },
+    {
+      "key": "item_emerald_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/emerald.png"
+    },
+    {
+      "key": "item_emerald_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/emerald-egg.png"
+    },
+    {
+      "key": "item_emerald_3",
+      "source": "placeholder",
+      "generator": "item",
+      "file": "sprites/items/emerald-egg.png"
     }
   ]
 }

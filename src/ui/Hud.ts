@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ENERGY_MAX, GAME_HEIGHT, GAME_WIDTH, num, PALETTE } from '../core/Constants';
+import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 
@@ -21,6 +21,7 @@ export class Hud {
   private energyPill: Pill;
   private coinPill?: Pill; // hidden for now (per request)
   private keyPill: Pill;
+  private regenLabel: Phaser.GameObjects.Text; // "next +1 in m:ss" under energy
   private xpFill: Phaser.GameObjects.Graphics;
   private levelText: Phaser.GameObjects.Text;
   private xpLabel: Phaser.GameObjects.Text;
@@ -33,10 +34,20 @@ export class Hud {
     private state: GameState,
     callbacks: { onLedger: () => void; onGear: () => void }
   ) {
-    this.energyPill = this.pill(224, 88, 'ui_icon_bolt', `${state.energyCurrent}/${ENERGY_MAX}`);
-    // Coin pill removed for now (per request); keys take its slot. Coins still
-    // accrue in state — re-add `this.coinPill = this.pill(572, …)` to show them.
-    this.keyPill = this.pill(572, 88, 'ui_icon_key', `${state.keys}`);
+    this.energyPill = this.pill(224, 88, 'ui_icon_bolt', `${state.energyCurrent}/${this.state.energyMax}`);
+    // coin.png is a big detailed coin — shrink the icon ~85% so the Gold gauge
+    // reads like the others (icon + value), not an oversized coin.
+    this.coinPill = this.pill(572, 88, 'ui_icon_coin', `${state.coins}`, 0.14);
+    this.keyPill = this.pill(920, 88, 'ui_icon_key', `${state.keys}`);
+    // A green "+" on each gauge opens its shop.
+    this.addPlus(this.energyPill, 'energy', bus);
+    this.addPlus(this.coinPill, 'coins', bus);
+    this.addPlus(this.keyPill, 'keys', bus);
+    // Small countdown to the next +1 Warmth, just under the energy gauge.
+    this.regenLabel = scene.add
+      .text(224, 138, '', { fontFamily: FONT, fontSize: '27px', fontStyle: 'bold', color: PALETTE.cream })
+      .setOrigin(0.5)
+      .setAlpha(0.9);
 
     // Settings gear.
     this.gearButton = this.roundIconButton(GAME_WIDTH - 112, 104, 'ui_icon_gear', 1, callbacks.onGear);
@@ -122,10 +133,45 @@ export class Hud {
     return { x: this.ledgerButton.x, y: this.ledgerButton.y };
   }
 
-  private pill(x: number, y: number, icon: string, value: string): Pill {
+  /** Screen position of the Gold gauge (for the coin-collect fly). */
+  getCoinPos(): { x: number; y: number } {
+    return { x: this.coinPill?.container.x ?? 572, y: this.coinPill?.container.y ?? 88 };
+  }
+
+  /** A little bump when Gold lands. */
+  bumpCoin(): void {
+    if (!this.coinPill) return;
+    this.scene.tweens.add({
+      targets: this.coinPill.container,
+      scale: { from: 1.16, to: 1 },
+      duration: 160,
+      ease: 'Sine.easeOut'
+    });
+  }
+
+  /** A green "+" button hanging off a gauge's right edge → opens its shop. */
+  private addPlus(pill: Pill, currency: 'energy' | 'coins' | 'keys', bus: EventBus): void {
+    const btn = this.scene.add.container(150, 0);
+    const ring = this.scene.add.circle(0, 0, 31, 0x5fb43a).setStrokeStyle(6, num(PALETTE.cream));
+    const plus = this.scene.add
+      .text(0, -4, '+', { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: '#ffffff' })
+      .setOrigin(0.5);
+    btn.add([ring, plus]);
+    btn.setSize(70, 70);
+    btn.setInteractive({ useHandCursor: true });
+    btn.on('pointerover', () => btn.setScale(1.1));
+    btn.on('pointerout', () => btn.setScale(1));
+    btn.on('pointerup', () => {
+      btn.setScale(1);
+      bus.emit('ui:shop_requested', { currency });
+    });
+    pill.container.add(btn);
+  }
+
+  private pill(x: number, y: number, icon: string, value: string, iconScale = 0.92): Pill {
     const container = this.scene.add.container(x, y);
     const bg = this.scene.add.image(0, 0, 'ui_pill').setScale(0.95, 0.9);
-    const iconImg = this.scene.add.image(-116, 0, icon).setScale(0.92);
+    const iconImg = this.scene.add.image(-116, 0, icon).setScale(iconScale);
     const text = this.scene.add
       .text(20, 0, value, {
         fontFamily: FONT,
@@ -161,8 +207,13 @@ export class Hud {
     return container;
   }
 
+  /** Show the time to the next +1 Warmth (m:ss), or hide it when full. */
+  setRegenText(text: string): void {
+    this.regenLabel.setText(text ? `⏱ ${text}` : '').setVisible(text !== '');
+  }
+
   private refreshEnergy(current: number): void {
-    this.energyPill.value.setText(`${current}/${ENERGY_MAX}`);
+    this.energyPill.value.setText(`${current}/${this.state.energyMax}`);
     this.scene.tweens.add({
       targets: this.energyPill.container,
       scale: { from: 1.08, to: 1 },

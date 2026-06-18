@@ -22,7 +22,10 @@ export class BoardItem extends Phaser.GameObjects.Container {
   private sprite: Phaser.GameObjects.Image;
   private readyStar: Phaser.GameObjects.Image;
   private shadow: Phaser.GameObjects.Ellipse;
+  private groundShadow: Phaser.GameObjects.Image; // persistent soft shadow, sized to the art
   private cooldownLabel: Phaser.GameObjects.Text;
+  private timePill: Phaser.GameObjects.Image;
+  private timeIcon: Phaser.GameObjects.Arc;
   private bobPhase = 0;
   private bobPaused = false;
   private cooling = false;
@@ -31,27 +34,47 @@ export class BoardItem extends Phaser.GameObjects.Container {
     super(scene, 0, 0);
     // Ground shadow sits FIRST so it renders beneath the art; only shown while
     // the item is lifted for a drag (Fairyland-style weighted pick-up).
+    // Persistent soft (radial-gradient) ground shadow, sized to the art in
+    // acquire() so EVERY object casts one. Sits first (under the art); the idle
+    // bob lifts the sprite off it. Falls back to a flat tint if the texture
+    // (built by BoardScene.ensureShadowTexture) isn't ready.
+    this.groundShadow = scene.add
+      .image(0, 8, scene.textures.exists('fx_shadow') ? 'fx_shadow' : '__WHITE')
+      .setVisible(false);
+    if (!scene.textures.exists('fx_shadow')) this.groundShadow.setTint(num(PALETTE.night)).setAlpha(0.24);
     this.shadow = scene.add
       .ellipse(0, DRAG.shadowY, DRAG.shadowRX * 2, DRAG.shadowRY * 2, DRAG.shadowColor)
       .setAlpha(0);
     this.sprite = scene.add.image(0, 0, '__DEFAULT');
     this.readyStar = scene.add.image(40, -104, 'fx_spark').setScale(0.7).setVisible(false);
-    // Countdown shown over a waiting generator, in a small dark frame
-    // ("8s" for short cooldowns, "9:58" mm:ss for the long house/tree timers).
+    // Countdown shown over a waiting generator as a glossy BLUE PILL (the
+    // payement-energie look): a stretched pill texture + a pink time-icon dot +
+    // white mm:ss text. "8s" for short cooldowns, "9:58" for the long timers.
+    this.timePill = scene.add
+      .image(0, -122, scene.textures.exists('fx_timepill') ? 'fx_timepill' : '__WHITE')
+      .setVisible(false);
+    if (!scene.textures.exists('fx_timepill')) this.timePill.setTint(0x2f6cc0);
+    this.timeIcon = scene.add.circle(-58, -122, 18, 0xff7ab0).setStrokeStyle(5, 0xffffff).setVisible(false);
     this.cooldownLabel = scene.add
-      .text(0, -122, '', {
+      .text(8, -122, '', {
         fontFamily: 'Segoe UI, sans-serif',
-        fontSize: '38px',
+        fontSize: '34px',
         fontStyle: 'bold',
-        color: '#fff6e0',
-        stroke: '#241b22',
-        strokeThickness: 6,
-        backgroundColor: 'rgba(28,20,26,0.74)',
-        padding: { x: 14, y: 6 }
+        color: '#ffffff',
+        stroke: '#1a3a66',
+        strokeThickness: 5
       })
       .setOrigin(0.5)
       .setVisible(false);
-    this.add([this.shadow, this.sprite, this.readyStar, this.cooldownLabel]);
+    this.add([
+      this.groundShadow,
+      this.shadow,
+      this.sprite,
+      this.readyStar,
+      this.timePill,
+      this.timeIcon,
+      this.cooldownLabel
+    ]);
     this.setSize(152, 152);
     scene.add.existing(this);
     this.setVisible(false);
@@ -79,9 +102,15 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // File-based decor art can be far larger than a tile; artScale fits it.
     this.sprite.setScale(artScale);
     this.sprite.setVisible(true); // a pooled item may have been a hidden rig host
+    // Soft shadow scaled to the art's footprint (proportional to its size).
+    const w = Math.max(64, this.sprite.displayWidth * 0.92);
+    this.groundShadow.setDisplaySize(w, w * 0.42);
+    this.groundShadow.setVisible(true);
     this.sprite.clearTint();
     this.readyStar.setVisible(false);
     this.cooldownLabel.setVisible(false);
+    this.timePill.setVisible(false);
+    this.timeIcon.setVisible(false);
     this.shadow.setAlpha(0);
     this.setScale(1);
     this.setAlpha(1);
@@ -123,6 +152,8 @@ export class BoardItem extends Phaser.GameObjects.Container {
    */
   setArtVisible(visible: boolean): void {
     this.sprite.setVisible(visible);
+    // A live rig stands in for the art and brings its own shadow — hide ours.
+    this.groundShadow.setVisible(visible);
     if (!visible) this.readyStar.setVisible(false);
   }
 
@@ -193,9 +224,13 @@ export class BoardItem extends Phaser.GameObjects.Container {
       this.sprite.setTint(COOLING_TINT);
       this.readyStar.setVisible(false);
       this.cooldownLabel.setVisible(true);
+      this.timePill.setVisible(true);
+      this.timeIcon.setVisible(true);
     } else {
       this.sprite.clearTint();
       this.cooldownLabel.setVisible(false);
+      this.timePill.setVisible(false);
+      this.timeIcon.setVisible(false);
       this.readyStar.setVisible(true);
       this.readyStar.setAlpha(0);
       this.readyStar.setScale(0.2);
@@ -216,13 +251,18 @@ export class BoardItem extends Phaser.GameObjects.Container {
     }
   }
 
-  /** Update the countdown text: "8s" under a minute, "9:58" mm:ss above. */
+  /** Update the countdown text + resize the blue pill around it: "8s" under a
+   *  minute, "9:58" mm:ss above. */
   setCooldownRemaining(ms: number): void {
     if (!this.cooling) return;
     const secs = Math.max(0, Math.ceil(ms / 1000));
     this.cooldownLabel.setText(
       secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
     );
+    const pillW = Math.max(120, this.cooldownLabel.width + 96);
+    this.timePill.setDisplaySize(pillW, 56);
+    this.timeIcon.setX(-pillW / 2 + 30);
+    this.cooldownLabel.setX(18);
   }
 
   flashDenied(): void {

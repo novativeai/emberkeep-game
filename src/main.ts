@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
-import { ENERGY_MAX, GAME_HEIGHT, GAME_WIDTH, SAVE_KEY, SCENES } from './core/Constants';
+import { GAME_HEIGHT, GAME_WIDTH, SAVE_KEY, SCENES } from './core/Constants';
 import { createGameConfig } from './core/GameConfig';
 import { gridToWorld } from './core/iso';
 
@@ -41,6 +41,7 @@ declare global {
     advanceTime: (ms: number) => { now: number; offset: number };
     __emberkeep: {
       gridToPage: (col: number, row: number) => { x: number; y: number };
+      centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
       reset: () => void;
       saveKey: string;
@@ -129,7 +130,7 @@ window.render_game_to_text = (): RenderedGame => {
       total: ctx.data.tutorial.steps.length,
       done: state.tutorialDone
     },
-    energy: { current: state.energyCurrent, max: ENERGY_MAX },
+    energy: { current: state.energyCurrent, max: state.energyMax },
     coins: state.coins,
     keys: state.keys,
     xp: state.xp,
@@ -181,5 +182,13 @@ window.__emberkeep = {
       x: rect.left + (world.x / GAME_WIDTH) * rect.width,
       y: rect.top + (world.y / GAME_HEIGHT) * rect.height
     };
+  },
+  /** Centre the board camera on a cell (test hook; the closer camera can leave
+   *  off-zone targets like the fog gate out of view). */
+  centerCell: (col: number, row: number) => {
+    const board = game.scene.getScene(SCENES.board) as Phaser.Scene | undefined;
+    if (!board) return;
+    const { x, y } = gridToWorld(col, row);
+    board.cameras.main.centerOn(x, y);
   }
 };

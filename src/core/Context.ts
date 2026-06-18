@@ -1,4 +1,5 @@
 import { BoardSystem } from '../systems/BoardSystem';
+import { DragonJobSystem } from '../systems/DragonJobSystem';
 import { EconomySystem } from '../systems/EconomySystem';
 import { EnergySystem } from '../systems/EnergySystem';
 import { GeneratorSystem } from '../systems/GeneratorSystem';
@@ -40,6 +41,7 @@ export interface GameSystems {
   merge: MergeSystem;
   energy: EnergySystem;
   generator: GeneratorSystem;
+  jobs: DragonJobSystem;
   order: OrderSystem;
   economy: EconomySystem;
   reward: RewardSystem;
@@ -78,6 +80,7 @@ export class GameContext {
       merge: new MergeSystem(this.state, this.bus, this.clock, this.data.chains),
       energy: new EnergySystem(this.state, this.bus, this.clock),
       generator: new GeneratorSystem(this.state, this.bus, this.clock, this.data.chains),
+      jobs: new DragonJobSystem(this.state, this.bus, this.clock),
       order: new OrderSystem(this.state, this.bus, this.data.orders),
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       reward: new RewardSystem(this.bus),

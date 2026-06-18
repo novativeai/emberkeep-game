@@ -178,7 +178,17 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await waitStep(page, 'open_fog');
     const gate = await findCells(page, (c) => c.fog === 'level_2_gate');
     expect(gate.length).toBeGreaterThan(0);
-    await tapTile(page, gate[0]![0], gate[0]![1]);
+    // Centre the camera on the gate, then tap its cells (re-centring each) until
+    // the key clears the fog — one cloud tap unlocks the whole region. Robust to
+    // headless tap-precision on a single cloud.
+    const order = [gate[Math.floor(gate.length / 2)]!, ...gate];
+    for (const cell of order) {
+      if ((await gameText(page)).tutorial.step !== 'open_fog') break;
+      await page.evaluate(([c, r]) => window.__emberkeep.centerCell(c as number, r as number), [cell[0], cell[1]]);
+      await page.waitForTimeout(280);
+      await tapTile(page, cell[0], cell[1]);
+      await page.waitForTimeout(360);
+    }
     await waitStep(page, 'free');
     state = await gameText(page);
     expect(state.keys).toBe(0);
@@ -214,9 +224,10 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       savedAt: number;
       energy: { current: number; lastRegenAt: number };
     };
+    // Warmth regenerates 1 per 3 minutes — 3 intervals ≈ +3 (capped at max).
     const expectedEnergy = Math.min(20, saved.energy.current + 3);
-    saved.energy.lastRegenAt -= 90_500;
-    saved.savedAt -= 90_500;
+    saved.energy.lastRegenAt -= 540_500;
+    saved.savedAt -= 540_500;
     await page.evaluate(
       ([key, value]) => localStorage.setItem(key as string, value as string),
       [await page.evaluate(() => window.__emberkeep.saveKey), JSON.stringify(saved)]

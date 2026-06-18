@@ -1,4 +1,4 @@
-import { GENERATOR_PASSIVE_RETRY_MS, skipEnergyCost } from '../core/Constants';
+import { GENERATOR_PASSIVE_RETRY_MS, skipEnergyCost, skipWarmthCost } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -22,7 +22,7 @@ export class GeneratorSystem {
     private chains: ChainsData
   ) {
     bus.on('item:tapped', ({ itemId }) => this.onTapped(itemId));
-    bus.on('generator:skip', ({ itemId }) => this.onSkip(itemId));
+    bus.on('generator:skip', ({ itemId, currency }) => this.onSkip(itemId, currency));
     bus.on('time:advanced', () => this.tickPassive());
   }
 
@@ -50,7 +50,7 @@ export class GeneratorSystem {
 
   /** Spend Warmth to clear a generator's remaining wait. The cost scales with the
    *  fraction of time still left (see skipEnergyCost). */
-  private onSkip(itemId: number): void {
+  private onSkip(itemId: number, currency: 'gold' | 'warmth'): void {
     const item = this.state.items.get(itemId);
     if (!item || item.kind !== 'item') return;
     const cfg = this.generatorConfig(item.chain, item.tier);
@@ -59,12 +59,23 @@ export class GeneratorSystem {
     const timer = this.activeTimer(item, cfg, now);
     if (!timer) return; // already ready
 
-    const cost = skipEnergyCost(timer.at - now, timer.total);
-    if (this.state.energyCurrent < cost) {
-      this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
-      return;
+    // Two ways to skip: GOLD (default) or WARMTH (cheaper). Both expensive at the
+    // start, ~1 near the end.
+    if (currency === 'warmth') {
+      const cost = skipWarmthCost(timer.at - now, timer.total);
+      if (this.state.energyCurrent < cost) {
+        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
+        return;
+      }
+      this.bus.emit('energy:spend', { amount: cost, reason: 'skip_cooldown' });
+    } else {
+      const cost = skipEnergyCost(timer.at - now, timer.total);
+      if (this.state.coins < cost) {
+        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
+        return;
+      }
+      this.bus.emit('economy:add', { coins: -cost, reason: 'skip_cooldown' });
     }
-    this.bus.emit('energy:spend', { amount: cost, reason: 'skip_cooldown' });
     if (timer.kind === 'ready') item.readyAt = now;
     else item.passiveAt = now; // next passive tick fires immediately
   }
