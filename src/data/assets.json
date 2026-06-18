@@ -103,16 +103,34 @@
       "file": "raw/ai/item_sparkweed_3.png"
     },
     {
-      "key": "item_ember_dragon_1",
-      "source": "placeholder",
+      "key": "item_strawberry_1",
+      "source": "file",
       "generator": "item",
-      "file": "raw/ai/item_ember_dragon_1.png"
+      "file": "sprites/level1/item_strawberry_1.png"
+    },
+    {
+      "key": "item_strawberry_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/level1/item_strawberry_2.png"
+    },
+    {
+      "key": "item_strawberry_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/level1/item_strawberry_3.png"
+    },
+    {
+      "key": "item_ember_dragon_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/rewards/egg.png"
     },
     {
       "key": "item_ember_dragon_2",
-      "source": "placeholder",
+      "source": "file",
       "generator": "item",
-      "file": "sprites/characters/dragon/red-dragon/_assembled-board.png"
+      "file": "sprites/level1/item_ember_dragon_2.png"
     },
     {
       "key": "item_ember_dragon_3",
@@ -122,9 +140,9 @@
     },
     {
       "key": "item_flame_gem_1",
-      "source": "placeholder",
+      "source": "file",
       "generator": "item",
-      "file": "raw/ai/item_flame_gem_1.png"
+      "file": "sprites/rewards/ruby.png"
     },
     {
       "key": "item_flame_gem_2",
@@ -137,6 +155,24 @@
       "source": "placeholder",
       "generator": "item",
       "file": "raw/ai/item_flame_gem_3.png"
+    },
+    {
+      "key": "item_lumber_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/wood.png"
+    },
+    {
+      "key": "item_lumber_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/house.png"
+    },
+    {
+      "key": "item_bigtree_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/bigtree.png"
     },
     {
       "key": "decor_nest",
@@ -161,6 +197,12 @@
       "source": "file",
       "generator": "decor",
       "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.png"
+    },
+    {
+      "key": "icon_key_bronze",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/level1/icon_key_bronze.png"
     },
     {
       "key": "fx_ember",
@@ -229,6 +271,12 @@
       "file": "raw/ai/ui_btn_play.png"
     },
     {
+      "key": "title_logo",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/title-logo.png"
+    },
+    {
       "key": "ui_btn_green",
       "source": "placeholder",
       "generator": "ui",
@@ -272,9 +320,9 @@
     },
     {
       "key": "ui_icon_coin",
-      "source": "placeholder",
+      "source": "file",
       "generator": "icon",
-      "file": "raw/ai/ui_icon_coin.png"
+      "file": "sprites/items/coin.png"
     },
     {
       "key": "ui_icon_key",
@@ -395,6 +443,156 @@
       "source": "file",
       "generator": "fog",
       "file": "sprites/environment/blockers/cloud/cloud-tile.png"
+    },
+    {
+      "key": "tile_border-fgreen",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fgreen.png"
+    },
+    {
+      "key": "tile_border-fgreenyellow",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fgreenyellow.png"
+    },
+    {
+      "key": "tile_border-fpink",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fpink.png"
+    },
+    {
+      "key": "tile_border-fpink2",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fpink2.png"
+    },
+    {
+      "key": "tile_border-fpinkwhite",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fpinkwhite.png"
+    },
+    {
+      "key": "tile_border-fpinkwhite2",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fpinkwhite2.png"
+    },
+    {
+      "key": "tile_border-fpurple",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fpurple.png"
+    },
+    {
+      "key": "tile_border-fwhite",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fwhite.png"
+    },
+    {
+      "key": "tile_border-fwhite2",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fwhite2.png"
+    },
+    {
+      "key": "tile_border-fwhitegreen",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fwhitegreen.png"
+    },
+    {
+      "key": "tile_border-fwhitegreen2",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fwhitegreen2.png"
+    },
+    {
+      "key": "tile_border-fwhiteyellow",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fwhiteyellow.png"
+    },
+    {
+      "key": "tile_border-fwhiteyellow2",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fwhiteyellow2.png"
+    },
+    {
+      "key": "tile_border-fyellow",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fyellow.png"
+    },
+    {
+      "key": "tile_border-fyellowgreen",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/border-fyellowgreen.png"
+    },
+    {
+      "key": "tile_architectures-to-delete-bg_002",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/architectures-to-delete-bg_002.png"
+    },
+    {
+      "key": "tile_hut-houses- transparent_002",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/hut-houses- transparent_002.png"
+    },
+    {
+      "key": "tile_tree-1",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/tree-1.png"
+    },
+    {
+      "key": "tile_tree-3",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/tree-3.png"
+    },
+    {
+      "key": "tile_tree-2",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/tree-2.png"
+    },
+    {
+      "key": "tile_tree-4",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/tree-4.png"
+    },
+    {
+      "key": "tile_hole",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/hole.png"
+    },
+    {
+      "key": "tile_sapin",
+      "source": "file",
+      "generator": "tile",
+      "file": "sprites/environment/map/flower-tiles/sapin.png"
+    },
+    {
+      "key": "decor_themcristall",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/themcristall.png"
+    },
+    {
+      "key": "decor_hut_houses_transparent_001",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/hut_houses_transparent_001.png"
     }
   ]
 }

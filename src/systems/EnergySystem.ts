@@ -39,6 +39,7 @@ export class EnergySystem {
     private clock: GameClock
   ) {
     bus.on('energy:spend', ({ amount }) => this.spend(amount));
+    bus.on('energy:add', ({ amount }) => this.gain(amount));
     bus.on('energy:refill', () => this.refill());
     bus.on('time:advanced', () => this.catchUp());
     bus.on('state:loaded', () => this.catchUp());
@@ -58,6 +59,14 @@ export class EnergySystem {
   canAfford(amount: number): boolean {
     this.catchUp();
     return this.state.energyCurrent >= amount;
+  }
+
+  /** Add Warmth (a reward gift, e.g. the house), capped at the max. */
+  private gain(amount: number): void {
+    this.catchUp();
+    if (amount <= 0 || this.state.energyCurrent >= ENERGY_MAX) return;
+    this.state.energyCurrent = Math.min(ENERGY_MAX, this.state.energyCurrent + amount);
+    this.bus.emit('energy:changed', { current: this.state.energyCurrent, max: ENERGY_MAX });
   }
 
   /** Top Warmth back to full (the level-up reward beat). */

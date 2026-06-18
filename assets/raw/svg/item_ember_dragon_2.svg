@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <!-- OBJ_DRAGON_LVL1 — Baby Dragon (first worker): cute, front-facing -->
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff7a4d"/>
+      <stop offset="100%" stop-color="#e24327"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="120" cy="214" rx="50" ry="12" fill="#1d0f0c" opacity="0.22"/>
+  <!-- tail -->
+  <path d="M150 176 C182 178 192 156 178 138 C172 152 160 158 150 160 Z" fill="#e24327"/>
+  <!-- wings -->
+  <path d="M84 120 C52 96 40 110 48 140 C60 134 74 132 88 138 Z" fill="#c8381f"/>
+  <path d="M156 120 C188 96 200 110 192 140 C180 134 166 132 152 138 Z" fill="#c8381f"/>
+  <!-- body -->
+  <ellipse cx="120" cy="152" rx="46" ry="44" fill="url(#body)"/>
+  <ellipse cx="120" cy="166" rx="28" ry="26" fill="#ffd9a0"/>
+  <!-- feet -->
+  <ellipse cx="100" cy="198" rx="13" ry="9" fill="#e24327"/>
+  <ellipse cx="140" cy="198" rx="13" ry="9" fill="#e24327"/>
+  <!-- head -->
+  <ellipse cx="120" cy="96" rx="40" ry="36" fill="url(#body)"/>
+  <!-- horns -->
+  <path d="M98 66 L92 44 L108 60 Z" fill="#ffe1b0"/>
+  <path d="M142 66 L148 44 L132 60 Z" fill="#ffe1b0"/>
+  <!-- snout/muzzle -->
+  <ellipse cx="120" cy="110" rx="20" ry="13" fill="#ffd9a0"/>
+  <circle cx="113" cy="110" r="2.4" fill="#7a2417"/>
+  <circle cx="127" cy="110" r="2.4" fill="#7a2417"/>
+  <!-- eyes -->
+  <circle cx="106" cy="92" r="10" fill="#fff"/>
+  <circle cx="134" cy="92" r="10" fill="#fff"/>
+  <circle cx="108" cy="94" r="5.5" fill="#23211f"/>
+  <circle cx="136" cy="94" r="5.5" fill="#23211f"/>
+  <circle cx="110" cy="92" r="1.8" fill="#fff"/>
+  <circle cx="138" cy="92" r="1.8" fill="#fff"/>
+</svg>

@@ -19,7 +19,7 @@ export class Hud {
   ledgerButton: Phaser.GameObjects.Container;
   gearButton: Phaser.GameObjects.Container;
   private energyPill: Pill;
-  private coinPill: Pill;
+  private coinPill?: Pill; // hidden for now (per request)
   private keyPill: Pill;
   private xpFill: Phaser.GameObjects.Graphics;
   private levelText: Phaser.GameObjects.Text;
@@ -34,8 +34,9 @@ export class Hud {
     callbacks: { onLedger: () => void; onGear: () => void }
   ) {
     this.energyPill = this.pill(224, 88, 'ui_icon_bolt', `${state.energyCurrent}/${ENERGY_MAX}`);
-    this.coinPill = this.pill(572, 88, 'ui_icon_coin', `${state.coins}`);
-    this.keyPill = this.pill(920, 88, 'ui_icon_key', `${state.keys}`);
+    // Coin pill removed for now (per request); keys take its slot. Coins still
+    // accrue in state — re-add `this.coinPill = this.pill(572, …)` to show them.
+    this.keyPill = this.pill(572, 88, 'ui_icon_key', `${state.keys}`);
 
     // Settings gear.
     this.gearButton = this.roundIconButton(GAME_WIDTH - 112, 104, 'ui_icon_gear', 1, callbacks.onGear);
@@ -171,7 +172,7 @@ export class Hud {
   }
 
   private refreshEconomy(): void {
-    this.coinPill.value.setText(`${this.state.coins}`);
+    this.coinPill?.value.setText(`${this.state.coins}`);
     this.keyPill.value.setText(`${this.state.keys}`);
     this.levelText.setText(`${this.state.level}`);
     const [gained, span] = this.state.levelProgress;

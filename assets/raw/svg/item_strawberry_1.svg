@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <!-- OBJ_STRAWBERRY_01 — Strawberry Sprout: small green stem, two tiny leaves -->
+  <ellipse cx="120" cy="214" rx="42" ry="11" fill="#1d2a17" opacity="0.20"/>
+  <path d="M120 214 C117 185 118 168 120 146" fill="none" stroke="#3f8f3a" stroke-width="7" stroke-linecap="round"/>
+  <!-- left leaf -->
+  <path d="M119 172 C96 168 80 178 74 196 C96 200 113 192 119 172 Z" fill="#62c452"/>
+  <path d="M119 172 C103 174 90 182 80 194" fill="none" stroke="#3f8f3a" stroke-width="3" stroke-linecap="round"/>
+  <!-- right leaf -->
+  <path d="M121 162 C144 154 162 162 170 180 C148 188 129 182 121 162 Z" fill="#74d562"/>
+  <path d="M121 162 C138 160 152 166 164 178" fill="none" stroke="#3f8f3a" stroke-width="3" stroke-linecap="round"/>
+  <!-- top bud -->
+  <circle cx="120" cy="142" r="9" fill="#8ce06f"/>
+  <circle cx="116" cy="139" r="3" fill="#c8f5b0" opacity="0.8"/>
+</svg>

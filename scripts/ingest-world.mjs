@@ -36,6 +36,7 @@ const norm = (p) => ({ col: p.col - minC, row: p.row - minR });
 
 const tileAt = new Map(); // "c,r" -> { asset, kind }
 const decoAt = new Map();
+const decorStack = []; // category 'decor' — stackable authored scenery (huts, crystals)
 const fogLevelAt = new Map(); // "c,r" -> lowest level that covers it
 
 for (const p of doc.placements) {
@@ -43,11 +44,14 @@ for (const p of doc.placements) {
   const key = `${col},${row}`;
   if (p.category === 'tile') tileAt.set(key, p.asset);
   else if (p.category === 'decotile') decoAt.set(key, p.asset);
+  else if (p.category === 'decor') decorStack.push({ name: p.asset, col, row, z: p.z ?? 0 });
   else if (p.category === 'blocker') {
     const lvl = p.level ?? 1;
     fogLevelAt.set(key, Math.min(fogLevelAt.get(key) ?? Infinity, lvl));
   }
 }
+// Stable back-to-front paint order: lower z first, then north-to-south.
+decorStack.sort((a, b) => (a.z ?? 0) - (b.z ?? 0) || a.row + a.col - (b.row + b.col));
 
 const cell = (key) => key.split(',').map(Number);
 const tiles = [...tileAt.keys()].map(cell);
@@ -107,6 +111,7 @@ const out = {
   calibration: calibByKey,
   playable: tiles,        // [col,row] cells that are part of the board
   decorative: deco,       // [col,row] non-playable ground
+  decor: decorStack,      // { name, col, row, z } — stackable authored scenery
   startClearing: startCells,
   playZones,              // { level, cells } — the merge zone unlocked at each level
   fogRegions: regions,    // { id, level, status, cells }
@@ -119,7 +124,8 @@ writeFileSync(outPath, JSON.stringify(out, null, 2));
 
 console.log(`Ingested ${inPath} → ${outPath}`);
 console.log(`  grid: ${out.cols} × ${out.rows} (normalised from cols ${minC}..${maxC}, rows ${minR}..${maxR})`);
-console.log(`  playable tiles: ${tiles.length}  ·  decorative: ${deco.length}`);
+console.log(`  playable tiles: ${tiles.length}  ·  decorative: ${deco.length}  ·  decor scenery: ${decorStack.length}`);
+for (const d of decorStack) console.log(`    decor ${d.name} @ (${d.col},${d.row}) z${d.z}`);
 for (const z of playZones) console.log(`  play zone L${z.level}: ${z.cells.length} playable tiles unlock`);
 for (const r of regions) console.log(`  fog ${r.id}: ${r.cells.length} cells (unlock at level ${r.level})`);
 console.log(`  camera keyframes: ${cameraKeyframes.map((k) => `L${k.level}@(${k.focus?.col},${k.focus?.row})z${k.zoom}`).join(', ')}`);

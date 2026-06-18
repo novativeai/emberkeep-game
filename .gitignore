@@ -13,3 +13,12 @@ playwright-report/
 /passive-gift-check.png
 /title-check.png
 /title-new.png
+
+# loose junk / root duplicates (canonical copies live under assets/)
+/log.txt
+/full-water-bg.jpg
+/dragon-land.world.json
+
+# external standalone tools that carry their own .git (not part of this repo)
+/rigger/
+/world/

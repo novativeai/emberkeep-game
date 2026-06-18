@@ -4,6 +4,30 @@
     0.85
   ],
   "byKey": {
+    "item_strawberry_1": [
+      0.5,
+      0.88
+    ],
+    "item_strawberry_2": [
+      0.5,
+      0.88
+    ],
+    "item_strawberry_3": [
+      0.5,
+      0.88
+    ],
+    "item_ember_dragon_1": [
+      0.5,
+      0.9
+    ],
+    "item_ember_dragon_2": [
+      0.5,
+      0.95
+    ],
+    "icon_key_bronze": [
+      0.5,
+      0.6
+    ],
     "decor_dragon": [
       0.5,
       0.84
@@ -164,13 +188,29 @@
       0.5,
       0.5
     ],
-    "item_ember_dragon_2": [
-      0.5,
-      0.95
-    ],
     "item_ember_dragon_3": [
       0.5,
       0.95
+    ],
+    "decor_themcristall": [
+      0.99,
+      0
+    ],
+    "decor_hut_houses_transparent_001": [
+      0.84,
+      1
+    ],
+    "item_lumber_1": [
+      0.5,
+      0.84
+    ],
+    "item_lumber_2": [
+      0.5,
+      0.9
+    ],
+    "item_bigtree_1": [
+      0.5,
+      0.92
     ]
   }
 }

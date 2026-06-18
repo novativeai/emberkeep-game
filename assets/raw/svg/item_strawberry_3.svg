@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <!-- OBJ_STRAWBERRY_03 — Ripe Strawberry Plant (generator): glowing, ripe berries -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="46%" r="55%">
+      <stop offset="0%" stop-color="#fff3b0" stop-opacity="0.85"/>
+      <stop offset="55%" stop-color="#ffd24a" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#ffd24a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="berry" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff6b5e"/>
+      <stop offset="100%" stop-color="#d92f33"/>
+    </linearGradient>
+  </defs>
+  <circle cx="120" cy="120" r="104" fill="url(#glow)"/>
+  <ellipse cx="120" cy="216" rx="60" ry="14" fill="#1d2a17" opacity="0.22"/>
+  <!-- bush -->
+  <ellipse cx="86"  cy="176" rx="34" ry="24" fill="#4faf44" transform="rotate(-18 86 176)"/>
+  <ellipse cx="156" cy="172" rx="36" ry="25" fill="#56bd49" transform="rotate(16 156 172)"/>
+  <ellipse cx="120" cy="150" rx="42" ry="31" fill="#63c953"/>
+  <!-- ripe strawberries (heart-ish body, seeds, green calyx) -->
+  <g>
+    <g transform="translate(92 168) rotate(-10)">
+      <path d="M0 -16 C16 -22 24 -8 18 6 C13 18 4 26 0 30 C-4 26 -13 18 -18 6 C-24 -8 -16 -22 0 -16 Z" fill="url(#berry)"/>
+      <g fill="#ffe6a0"><circle cx="-7" cy="-2" r="1.6"/><circle cx="6" cy="-3" r="1.6"/><circle cx="0" cy="6" r="1.6"/><circle cx="-9" cy="10" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="0" cy="18" r="1.6"/></g>
+      <path d="M-10 -16 L0 -22 L10 -16 L4 -12 L0 -16 L-4 -12 Z" fill="#3f9a36"/>
+    </g>
+    <g transform="translate(150 176) rotate(12) scale(0.92)">
+      <path d="M0 -16 C16 -22 24 -8 18 6 C13 18 4 26 0 30 C-4 26 -13 18 -18 6 C-24 -8 -16 -22 0 -16 Z" fill="url(#berry)"/>
+      <g fill="#ffe6a0"><circle cx="-7" cy="-2" r="1.6"/><circle cx="6" cy="-3" r="1.6"/><circle cx="0" cy="6" r="1.6"/><circle cx="-9" cy="10" r="1.6"/><circle cx="9" cy="9" r="1.6"/></g>
+      <path d="M-10 -16 L0 -22 L10 -16 L4 -12 L0 -16 L-4 -12 Z" fill="#3f9a36"/>
+    </g>
+    <g transform="translate(122 142) rotate(2) scale(0.8)">
+      <path d="M0 -16 C16 -22 24 -8 18 6 C13 18 4 26 0 30 C-4 26 -13 18 -18 6 C-24 -8 -16 -22 0 -16 Z" fill="url(#berry)"/>
+      <g fill="#ffe6a0"><circle cx="-6" cy="0" r="1.6"/><circle cx="6" cy="-2" r="1.6"/><circle cx="0" cy="8" r="1.6"/></g>
+      <path d="M-10 -16 L0 -22 L10 -16 L4 -12 L0 -16 L-4 -12 Z" fill="#3f9a36"/>
+    </g>
+  </g>
+</svg>

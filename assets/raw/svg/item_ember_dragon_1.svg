@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <!-- OBJ_DRAGON_EGG — fiery red & orange spotted egg -->
+  <defs>
+    <linearGradient id="shell" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0%" stop-color="#ffd36b"/>
+      <stop offset="38%" stop-color="#ff8a3c"/>
+      <stop offset="100%" stop-color="#d83a2c"/>
+    </linearGradient>
+    <clipPath id="eggclip"><path d="M120 44 C162 44 186 104 186 146 C186 188 156 212 120 212 C84 212 54 188 54 146 C54 104 78 44 120 44 Z"/></clipPath>
+  </defs>
+  <ellipse cx="120" cy="216" rx="48" ry="12" fill="#1d0f0c" opacity="0.22"/>
+  <path d="M120 44 C162 44 186 104 186 146 C186 188 156 212 120 212 C84 212 54 188 54 146 C54 104 78 44 120 44 Z" fill="url(#shell)" stroke="#a82a1f" stroke-width="3"/>
+  <g clip-path="url(#eggclip)">
+    <ellipse cx="92"  cy="108" rx="16" ry="13" fill="#b8331f" opacity="0.85"/>
+    <ellipse cx="142" cy="92"  rx="12" ry="10" fill="#b8331f" opacity="0.85"/>
+    <ellipse cx="150" cy="150" rx="18" ry="14" fill="#b8331f" opacity="0.85"/>
+    <ellipse cx="98"  cy="166" rx="13" ry="11" fill="#b8331f" opacity="0.85"/>
+    <ellipse cx="120" cy="128" rx="9"  ry="8"  fill="#ffd36b" opacity="0.65"/>
+  </g>
+  <!-- shine -->
+  <path d="M96 78 C84 96 80 116 84 134" fill="none" stroke="#fff2cf" stroke-width="9" stroke-linecap="round" opacity="0.55"/>
+</svg>

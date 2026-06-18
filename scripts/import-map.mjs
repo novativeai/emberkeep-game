@@ -42,6 +42,8 @@ if (src) {
 const run = (file, args = []) => execFileSync('node', [file, ...args], { stdio: 'inherit' });
 run('scripts/ingest-world.mjs', [CANON]);   // → src/data/world-map.json
 run('scripts/build-gamemap.mjs');           // → src/data/map.json
+run('scripts/extract-tiles.mjs');           // floor-tile PNGs → assets/ + assets.json
+run('scripts/extract-decor.mjs');           // decor PNGs → assets/ + assets.json + anchors.json
 
-console.log('\n✓ src/data/map.json régénéré.');
+console.log('\n✓ src/data/map.json régénéré (tiles + décor extraits).');
 console.log('  Dans la console du jeu (localhost:5173) : __emberkeep.reset()  pour voir le résultat.');

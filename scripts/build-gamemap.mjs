@@ -15,22 +15,17 @@ const world = JSON.parse(readFileSync('src/data/world-map.json', 'utf8'));
 
 const key = (c, r) => `${c},${r}`;
 
-/* ---- the hand-authored tutorial start items (from the original 8×8), offset ---- */
+/* ---- Level 1 start: three red Dragon Eggs in the clearing. Merging them
+ *      hatches the first dragon; everything after (gem shards, flame gems, the
+ *      key) is earned through the scripted tutorial (see tutorial.json). ---- */
 const TUT_START_ITEMS = [
-  { chain: 'sparkweed', tier: 1, at: [1, 2] },
-  { chain: 'sparkweed', tier: 1, at: [1, 3] },
-  { chain: 'sparkweed', tier: 1, at: [3, 4] },
-  { chain: 'sparkweed', tier: 1, at: [5, 1] },
-  { chain: 'sparkweed', tier: 1, at: [5, 5] },
-  { chain: 'ember_dragon', tier: 1, at: [2, 2] },
-  { chain: 'ember_dragon', tier: 1, at: [3, 2] },
-  { chain: 'ember_dragon', tier: 1, at: [4, 4] },
-  { chain: 'flame_gem', tier: 1, at: [1, 5] },
-  { chain: 'flame_gem', tier: 1, at: [2, 5] },
-  { chain: 'flame_gem', tier: 1, at: [4, 2] },
-  { chain: 'flame_gem', tier: 1, at: [5, 3] },
-  { chain: 'flame_gem', tier: 1, at: [3, 1] }
+  { chain: 'ember_dragon', tier: 1, at: [3, 3] },
+  { chain: 'ember_dragon', tier: 1, at: [4, 3] },
+  { chain: 'ember_dragon', tier: 1, at: [3, 4] }
 ];
+// Five logs sit in the L1 clearing at new game (NO house pre-placed): merging
+// the 5 (lumber chain, 5→1) builds the first House, a coins/xp/energy generator.
+const WOOD_COUNT = 5;
 
 const dist2 = ([c, r], f) => (c - f.col) ** 2 + (r - f.row) ** 2;
 const nearestTo = (cells, f, n) => [...cells].sort((a, b) => dist2(a, f) - dist2(b, f)).slice(0, n);
@@ -95,13 +90,17 @@ for (const zone of world.playZones) {
       ],
       decor: [{ decor: 'nest', at: eg[3] }]
     });
-    const restSeed = nearestTo(restCells, focus, SEED.length);
+    // Seed the zone, plus the Ancient Tree (produces 1 wood / 10 min → 5 = House).
+    const restSeed = nearestTo(restCells, focus, SEED.length + 1);
+    const l2Contents = SEED.map(([chain, tier], i) => ({ chain, tier, at: restSeed[i] }));
+    const treeCell = restSeed[SEED.length];
+    if (treeCell) l2Contents.push({ chain: 'bigtree', tier: 1, at: treeCell });
     regions.push({
       id: 'level_2',
       status: 'unlockable',
       unlock: { level: 2 },
       tiles: restCells,
-      contents: SEED.map(([chain, tier], i) => ({ chain, tier, at: restSeed[i] }))
+      contents: l2Contents
     });
   } else {
     const seedCells = nearestTo(cells, focus, SEED.length);
@@ -115,33 +114,47 @@ for (const zone of world.playZones) {
   }
 }
 
-/* ----------------------- tutorial cluster + decor placement -----------------------
- * Place the hand-authored start items by SNAPPING the cluster onto free clearing
- * cells around L1_FOCUS — never a fixed +1,+4 offset (that only matched the old
- * map and floated the items off any re-imported isle). Each item keeps its
- * relative position to the cluster centre, then snaps to the nearest unused
- * clearing cell, so all items + the dragon always land on the active L1 isle. */
-const usedCells = new Set();
-const snapToFreeClearing = (target) => {
-  const t = { col: target[0], row: target[1] };
-  const sorted = [...clearing].sort((a, b) => dist2(a, t) - dist2(b, t));
-  for (const cell of sorted) {
-    const k = key(cell[0], cell[1]);
-    if (!usedCells.has(k)) { usedCells.add(k); return cell; }
+/* ----------------------- tutorial start placement -----------------------
+ * Lay the start items into a CONNECTED blob of clearing cells, BFS-grown from
+ * L1_FOCUS. Adjacency matters: drop-onto-merge needs the cluster's pieces to be
+ * orthogonal neighbours, and BFS guarantees that for any imported map (a plain
+ * "nearest N" scatters them into un-mergeable singletons). */
+const clearingSet = new Set(clearing.map(([c, r]) => key(c, r)));
+const focusCell = nearestTo(clearing, L1_FOCUS, 1)[0] ?? [L1_FOCUS.col, L1_FOCUS.row];
+
+/** BFS a contiguous blob of `count` clearing cells from `start`, skipping any in
+ *  `excludeSet`. Adjacency matters: drop-onto-merge needs orthogonal neighbours. */
+function growBlob(start, count, excludeSet) {
+  const out = [];
+  const seen = new Set([key(...start)]);
+  const queue = [start];
+  while (queue.length > 0 && out.length < count) {
+    const [c, r] = queue.shift();
+    if (clearingSet.has(key(c, r)) && !excludeSet.has(key(c, r))) out.push([c, r]);
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nb = [c + dc, r + dr];
+      if (!seen.has(key(...nb))) { seen.add(key(...nb)); queue.push(nb); }
+    }
   }
-  return target; // clearing smaller than the cluster (shouldn't happen)
-};
-const clusterCentre = (() => {
-  const c = TUT_START_ITEMS.reduce((s, x) => s + x.at[0], 0) / TUT_START_ITEMS.length;
-  const r = TUT_START_ITEMS.reduce((s, x) => s + x.at[1], 0) / TUT_START_ITEMS.length;
-  return { col: c, row: r };
-})();
-const placeOnClearing = ([c, r]) =>
-  snapToFreeClearing([
-    Math.round(L1_FOCUS.col + (c - clusterCentre.col)),
-    Math.round(L1_FOCUS.row + (r - clusterCentre.row))
-  ]);
-const startingItems = TUT_START_ITEMS.map((x) => ({ chain: x.chain, tier: x.tier, at: placeOnClearing(x.at) }));
+  return out;
+}
+
+const eggBlob = growBlob(focusCell, TUT_START_ITEMS.length, new Set());
+const eggSet = new Set(eggBlob.map(([c, r]) => key(c, r)));
+// A separate wood cluster a couple of cells south-east of the eggs.
+const woodStart =
+  nearestTo(clearing.filter(([c, r]) => !eggSet.has(key(c, r))), { col: L1_FOCUS.col + 2, row: L1_FOCUS.row + 2 }, 1)[0] ??
+  focusCell;
+const woodBlob = growBlob(woodStart, WOOD_COUNT, eggSet);
+
+const startingItems = [
+  ...TUT_START_ITEMS.map((x, i) => ({ chain: x.chain, tier: x.tier, at: eggBlob[i] ?? focusCell })),
+  ...Array.from({ length: WOOD_COUNT }, (_, i) => ({
+    chain: 'lumber',
+    tier: 1,
+    at: woodBlob[i] ?? woodStart
+  }))
+];
 
 // No pre-placed dragon: the dragon is EARNED by merging 3 eggs (the hatch
 // mechanic), so seeding a guardian decor at new-game was confusing. The decor
@@ -173,6 +186,21 @@ for (const [k, v] of Object.entries(world.calibration)) {
   if (k.startsWith('tile|')) calibration[k.slice(5)] = v;
 }
 
+/* Static authored scenery (world-builder `decor`): huts, crystals, landmarks.
+ * Slug names to safe texture keys (`decor_<slug>`, matching extract-decor.mjs)
+ * and carry per-asset calibration so the renderer places each PNG exactly. */
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+const decorCalibration = {};
+for (const [k, v] of Object.entries(world.calibration)) {
+  if (k.startsWith('decor|')) decorCalibration[slug(k.slice(6))] = v;
+}
+// Houses/huts are now EARNED gameplay (merge 5 wood → House), so any hut/house
+// authored as world-builder scenery is dropped — nothing house-shaped is
+// pre-placed. Other scenery (e.g. crystals) still flows through.
+const mapDecor = (world.decor ?? [])
+  .map((d) => ({ name: slug(d.name), col: d.col, row: d.row, z: d.z ?? 0 }))
+  .filter((d) => !/hut|house|maison/.test(d.name));
+
 const map = {
   cols: world.cols,
   rows: world.rows,
@@ -184,6 +212,8 @@ const map = {
   playable: world.playable,
   tilesByCell: world.tilesByCell,
   calibration,
+  mapDecor,
+  decorCalibration,
   cameraKeyframes
 };
 
@@ -197,5 +227,6 @@ for (const r of regions) {
 }
 console.log(`  startingItems: ${map.startingItems.length} (snapped onto L1 clearing @ focus ${L1_FOCUS.col},${L1_FOCUS.row})`);
 console.log(`  startingDecor: ${startingDecor.length} (dragon now earned via the 3-egg hatch, not pre-placed)`);
+console.log(`  mapDecor: ${mapDecor.length} static scenery (${mapDecor.map((d) => `${d.name}@${d.col},${d.row}`).join(' ') || 'none'}) — run extract-decor.mjs for the art`);
 console.log(`  cameraKeyframes: ${cameraKeyframes.length} (${cameraKeyframes.map((k) => `L${k.level}@${k.focus.col},${k.focus.row}`).join(' ')})`);
 console.log(`  >> tutorial key-gate: tap cell [${gateTapCell}] · nest at [${gateNestCell}] (use these in tutorial.json + e2e)`);

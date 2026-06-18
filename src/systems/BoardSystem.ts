@@ -19,6 +19,73 @@ export class BoardSystem {
     private map: MapData
   ) {
     bus.on('board:consume_items', ({ itemIds, reason }) => this.consume(itemIds, reason));
+    bus.on('board:spawn', (p) => this.spawnReward(p));
+    bus.on('board:retier', (p) => this.retier(p));
+  }
+
+  /** Scripted reward spawn (tutorial): drop `count` items into free tiles near
+   *  an existing item of `nearChain` (else near any item, else the origin). */
+  private spawnReward({
+    chain,
+    tier,
+    count,
+    nearChain
+  }: {
+    chain: string;
+    tier: number;
+    count: number;
+    nearChain?: string;
+  }): void {
+    const items = [...this.state.items.values()].filter((i) => i.kind === 'item');
+    const anchor = (nearChain && items.find((i) => i.chain === nearChain)) || items[0] || null;
+    const cells = this.freeBlobNear(anchor?.col ?? 0, anchor?.row ?? 0, count);
+    for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, 'unlock');
+  }
+
+  /** A CONNECTED blob of free active tiles grown from the nearest free tile to
+   *  (col,row). Spawned items land orthogonally adjacent, so a single drag can
+   *  merge them (drop-onto needs neighbours) — unlike "nearest N" which scatters. */
+  private freeBlobNear(col: number, row: number, n: number): { col: number; row: number }[] {
+    const seed = this.state.freeActiveTilesNear(col, row)[0];
+    if (!seed) return [];
+    const seen = new Set([`${seed.col},${seed.row}`]);
+    const out: { col: number; row: number }[] = [];
+    const queue = [seed];
+    while (queue.length > 0 && out.length < n) {
+      const cur = queue.shift()!;
+      if (!this.state.isTileActive(cur.col, cur.row)) continue;
+      if (this.state.itemIdAt(cur.col, cur.row) !== null) continue;
+      out.push(cur);
+      for (const nb of this.state.neighbors(cur.col, cur.row)) {
+        const k = `${nb.col},${nb.row}`;
+        if (!seen.has(k)) {
+          seen.add(k);
+          queue.push(nb);
+        }
+      }
+    }
+    return out;
+  }
+
+  /** Scripted in-place upgrade (tutorial): one `chain`+`fromTier` item becomes
+   *  `toTier` on its tile (e.g. the strawberry bush ripening into a generator). */
+  private retier({
+    chain,
+    fromTier,
+    toTier
+  }: {
+    chain: string;
+    fromTier: number;
+    toTier: number;
+  }): void {
+    const target = [...this.state.items.values()].find(
+      (i) => i.kind === 'item' && i.chain === chain && i.tier === fromTier
+    );
+    if (!target) return;
+    const at = { col: target.col, row: target.row };
+    this.state.removeItem(target.id);
+    this.bus.emit('item:removed', { itemId: target.id, at, reason: 'delivered' });
+    this.spawn(chain, toTier, at.col, at.row, 'unlock');
   }
 
   generatorConfig(chain: string, tier: number): GeneratorConfig | undefined {

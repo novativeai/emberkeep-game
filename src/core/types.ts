@@ -39,12 +39,18 @@ export interface ItemSnapshot {
 /* ------------------------------------------------------------------ */
 
 export interface GeneratorConfig {
-  produces: { chain: string; tier: number };
+  /** Spawns this item per cycle (item generators: dragons, the big tree). */
+  produces?: { chain: string; tier: number };
+  /** Grants currency/energy per cycle instead of an item (the house). */
+  reward?: { coins?: number; xp?: number; energy?: number };
   cooldownMs: number;
   energyCost: number;
   /** If set, the generator also PASSIVELY gifts one produce every this-many ms
    *  — free, no tap, no energy. The standing advantage of owning a dragon. */
   passiveMs?: number;
+  /** Tap-to-harvest? Passive-only generators (house, big tree) set false: they
+   *  auto-produce on their passive timer; a tap only offers the energy skip. */
+  tappable?: boolean;
 }
 
 export interface ChainTierConfig {
@@ -57,11 +63,21 @@ export interface ChainTierConfig {
   generator?: GeneratorConfig;
 }
 
+/** Per-chain merge recipe override (e.g. 5 wood → 1 house). */
+export interface ChainMergeOverride {
+  /** Number consumed to make one next-tier item (default mergeRule.minGroup). */
+  group: number;
+  /** Next-tier items produced per merge (default 1). */
+  outputs: number;
+}
+
 export interface ChainConfig {
   id: string;
   name: string;
   /** Tier whose creation counts as a hatch (dragon chains). */
   hatchAtTier?: number;
+  /** Overrides the global mergeRule for this chain (e.g. lumber: 5 → 1). */
+  merge?: ChainMergeOverride;
   tiers: ChainTierConfig[];
 }
 
@@ -107,6 +123,19 @@ export interface MapDecorPlacement {
   at: [number, number];
 }
 
+/**
+ * Static authored scenery from the world builder's `decor` category (huts,
+ * crystals, landmarks). Painted like tiles — part of the MAP, not save state —
+ * so a re-imported world refreshes the scene for everyone. `name` is the slug;
+ * the texture loads as `decor_<name>`.
+ */
+export interface MapDecorRender {
+  name: string;
+  col: number;
+  row: number;
+  z?: number;
+}
+
 export interface MapRegionConfig {
   id: string;
   status: RegionStatus;
@@ -149,6 +178,10 @@ export interface MapData {
   tilesByCell?: Record<string, string>;
   /** Placement calibration keyed by bare tile-art name. */
   calibration?: Record<string, TileCalibration>;
+  /** Static authored scenery (world-builder `decor`), painted like tiles. */
+  mapDecor?: MapDecorRender[];
+  /** Placement calibration for map decor, keyed by decor slug. */
+  decorCalibration?: Record<string, TileCalibration>;
   /** Per-level camera framing. */
   cameraKeyframes?: CameraKeyframe[];
 }
@@ -186,6 +219,16 @@ export type TutorialArrowConfig =
   | { ui: 'ledger' | 'deliver' }
   | { fogRegion: string };
 
+/**
+ * Scripted side-effects a tutorial step runs the moment it becomes active —
+ * the spec's "reward" beats: spawn the dragon eggs after the plant merge, ripen
+ * the bush after the hatch, hand over the key before the fog lesson.
+ */
+export type TutorialEffect =
+  | { spawn: { chain: string; tier: number; count: number; nearChain?: string } }
+  | { retier: { chain: string; fromTier: number; toTier: number } }
+  | { grantKeys: number };
+
 export interface TutorialStepConfig {
   id: string;
   speaker: 'pip' | 'cindra' | 'laurah';
@@ -195,6 +238,8 @@ export interface TutorialStepConfig {
   hand?: TutorialHandConfig;
   arrow?: TutorialArrowConfig;
   allow?: TutorialAllow;
+  /** Side-effects fired once, when this step becomes the active step. */
+  effects?: TutorialEffect[];
 }
 
 export interface TutorialData {
@@ -245,6 +290,7 @@ export interface EventMap {
   /* -- input intents (scenes/UI emit, systems handle) -- */
   'drag:dropped': { itemId: number; from: TilePos; to: TilePos };
   'item:tapped': { itemId: number };
+  'generator:skip': { itemId: number };
   'ui:ledger_toggled': { open: boolean };
   'ui:deliver_requested': { orderId: string };
   'ui:sell_requested': { itemId: number };
@@ -255,9 +301,14 @@ export interface EventMap {
 
   /* -- cross-system commands (systems handle, synchronously) -- */
   'energy:spend': { amount: number; reason: string };
+  'energy:add': { amount: number; reason: string };
   'economy:add': { coins?: number; keys?: number; xp?: number; reason: string };
   'economy:spend_keys': { keys: number; reason: string };
   'board:consume_items': { itemIds: number[]; reason: string };
+  /** Scripted spawn of `count` items, into free tiles near an item of `nearChain`. */
+  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string };
+  /** Transform one on-board item of `chain`+`fromTier` into `toTier` in place. */
+  'board:retier': { chain: string; fromTier: number; toTier: number };
 
   /* -- state-change notifications (systems emit; UI + audio subscribe) -- */
   'item:spawned': { item: ItemSnapshot; cause: SpawnCause };
@@ -278,6 +329,8 @@ export interface EventMap {
   'item:harvest_failed': { generatorId: number; reason: 'cooldown' | 'energy' | 'no_space' };
   /** A generator passively gifted an item (no tap, no energy). */
   'item:produced': { generatorId: number; output: ItemSnapshot };
+  /** A reward generator (the house) paid out currency/energy on its timer. */
+  'generator:reward': { generatorId: number; coins: number; xp: number; energy: number };
   'item:removed': { itemId: number; at: TilePos; reason: 'sold' | 'delivered' };
   'item:sold': { itemId: number; coins: number };
   'energy:changed': { current: number; max: number };

@@ -144,21 +144,14 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5)
       .setShadow(0, 4, 'rgba(36,27,34,0.5)', 6);
     this.deliverButton.add([deliverBg, this.deliverText]);
+    // The button art is centred on the container origin. setSize + an explicit
+    // origin-centred hit rect makes the WHOLE button clickable (a plain setSize
+    // default hit rect (0,0,w,h) only covers the bottom-right quadrant of a
+    // centred container — clicks on the rest miss). The bg image carries the
+    // interaction so the nested-container transform doesn't muddle the hit test.
+    deliverBg.setInteractive({ useHandCursor: true });
+    deliverBg.on('pointerup', () => this.onDeliverPressed());
     this.deliverButton.setSize(400, 140);
-    this.deliverButton.setInteractive({ useHandCursor: true });
-    this.deliverButton.on('pointerup', () => {
-      if (this.deliverable && this.deliverAllowed && this.currentOrder) {
-        this.bus.emit('ui:deliver_requested', { orderId: this.currentOrder.id });
-      } else if (!this.deliverable) {
-        this.scene.tweens.add({
-          targets: this.deliverButton,
-          x: this.deliverButton.x + 10,
-          duration: 45,
-          yoyo: true,
-          repeat: 3
-        });
-      }
-    });
 
     this.emptyText = scene.add
       .text(0, 20, 'The brazier roars again!\nCindra will have new work for you soon.', {
@@ -202,6 +195,21 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
 
   setDeliverAllowed(allowed: boolean): void {
     this.deliverAllowed = allowed;
+  }
+
+  /** Deliver the active order, or shake the button if it isn't ready. */
+  private onDeliverPressed(): void {
+    if (this.deliverable && this.deliverAllowed && this.currentOrder) {
+      this.bus.emit('ui:deliver_requested', { orderId: this.currentOrder.id });
+    } else if (!this.deliverable) {
+      this.scene.tweens.add({
+        targets: this.deliverButton,
+        x: this.deliverButton.x + 10,
+        duration: 45,
+        yoyo: true,
+        repeat: 3
+      });
+    }
   }
 
   open(): void {

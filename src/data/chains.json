@@ -16,6 +16,27 @@
       ]
     },
     {
+      "id": "strawberry",
+      "name": "Strawberry Plants",
+      "tiers": [
+        { "tier": 1, "id": "strawberry_1", "name": "Strawberry Sprout", "sell": 1, "xp": 0 },
+        { "tier": 2, "id": "strawberry_2", "name": "Strawberry Bush", "sell": 3, "xp": 6 },
+        {
+          "tier": 3,
+          "id": "strawberry_3",
+          "name": "Ripe Strawberry Plant",
+          "sell": 8,
+          "xp": 14,
+          "generator": {
+            "produces": { "chain": "strawberry", "tier": 1 },
+            "cooldownMs": 10000,
+            "energyCost": 1,
+            "passiveMs": 120000
+          }
+        }
+      ]
+    },
+    {
       "id": "ember_dragon",
       "name": "Ember Dragons",
       "hatchAtTier": 2,
@@ -56,6 +77,48 @@
         { "tier": 1, "id": "flame_gem_1", "name": "Gem Shard", "sell": 1, "xp": 0 },
         { "tier": 2, "id": "flame_gem_2", "name": "Flame Gem", "sell": 5, "xp": 8 },
         { "tier": 3, "id": "flame_gem_3", "name": "Radiant Gem", "sell": 15, "xp": 18 }
+      ]
+    },
+    {
+      "id": "lumber",
+      "name": "Timber",
+      "merge": { "group": 5, "outputs": 1 },
+      "tiers": [
+        { "tier": 1, "id": "lumber_1", "name": "Wood", "sell": 1, "xp": 0 },
+        {
+          "tier": 2,
+          "id": "lumber_2",
+          "name": "House",
+          "sell": 0,
+          "xp": 0,
+          "generator": {
+            "reward": { "coins": 5, "xp": 10, "energy": 1 },
+            "cooldownMs": 600000,
+            "energyCost": 0,
+            "passiveMs": 600000,
+            "tappable": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "bigtree",
+      "name": "Ancient Tree",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "bigtree_1",
+          "name": "Ancient Tree",
+          "sell": 0,
+          "xp": 0,
+          "generator": {
+            "produces": { "chain": "lumber", "tier": 1 },
+            "cooldownMs": 600000,
+            "energyCost": 0,
+            "passiveMs": 600000,
+            "tappable": false
+          }
+        }
       ]
     }
   ]

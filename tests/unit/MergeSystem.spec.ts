@@ -125,6 +125,69 @@ describe('MergeSystem', () => {
     expect(ctx.state.itemAt(1, 1)?.chain).toBe('sparkweed');
   });
 
+  it('merges when the third piece is dropped directly ONTO a matching pair', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 3, row: 3, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    drag(ctx, [3, 3], [1, 1]); // drop ON the occupied matching tile
+
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.consumedIds).toHaveLength(3);
+    expect(ctx.state.items.size).toBe(1);
+    const result = ctx.state.itemAt(1, 1); // output lands on the drop tile
+    expect(result?.tier).toBe(2);
+  });
+
+  it('bounces a drop onto a single matching item (only 2 — below the threshold)', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 1, kind: 'item' });
+    const weed = ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 3, row: 3, kind: 'item' });
+    const bounces = capture(ctx.bus, 'item:move_bounced');
+
+    drag(ctx, [3, 3], [1, 1]); // only 2 total → cannot merge, cannot stack
+
+    expect(bounces).toHaveLength(1);
+    expect(ctx.state.items.size).toBe(2);
+    expect(ctx.state.itemAt(3, 3)?.id).toBe(weed.id); // bounced home
+  });
+
+  it('builds one House from five Wood (per-chain 5 → 1 override)', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 3, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 2, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 3, row: 3, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    drag(ctx, [3, 3], [2, 3]); // connects all five orthogonally
+
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.consumedIds).toHaveLength(5);
+    expect(merges[0]!.outputs).toHaveLength(1); // the override yields 1, not the 5→2 bonus
+    const house = ctx.state.itemAt(2, 3);
+    expect(house?.chain).toBe('lumber');
+    expect(house?.tier).toBe(2);
+    expect(ctx.state.items.size).toBe(1);
+  });
+
+  it('does NOT build a House from only four Wood (below the 5 threshold)', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 2, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 3, row: 3, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    drag(ctx, [3, 3], [2, 3]); // only four connect
+
+    expect(merges).toHaveLength(0);
+    expect(ctx.state.items.size).toBe(4);
+  });
+
   it('merging 3 eggs hatches: emits item:hatched and the result is a ready generator', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 2, row: 2, kind: 'item' });

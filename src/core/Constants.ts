@@ -68,6 +68,34 @@ export const DEPTHS = {
 /** When a dragon's passive gift has nowhere to land, retry this soon (ms). */
 export const GENERATOR_PASSIVE_RETRY_MS = 8000;
 
+/** Warmth spent to instantly clear a generator's cooldown (the "skip" button). */
+export const GENERATOR_SKIP_ENERGY = 3;
+
+/** Most Warmth a skip can cost — paid when the timer has just started. */
+export const GENERATOR_SKIP_MAX_ENERGY = 8;
+
+/**
+ * Energy to skip a generator's remaining wait. EXPENSIVE near the start and it
+ * CHEAPENS as the timer runs down (cost ∝ fraction remaining), so finishing the
+ * last stretch is nearly free. Always ≥ 1 while anything remains.
+ */
+export function skipEnergyCost(remainingMs: number, totalMs: number): number {
+  if (remainingMs <= 0) return 0;
+  if (totalMs <= 0) return 1;
+  const frac = Math.min(1, Math.max(0, remainingMs / totalMs));
+  return Math.min(GENERATOR_SKIP_MAX_ENERGY, Math.max(1, Math.ceil(GENERATOR_SKIP_MAX_ENERGY * frac)));
+}
+
+/**
+ * Spring-bounce timing for scenery (world-builder decor + tree tiles). The Back
+ * ease overshoots like a lazy spring; a long rest between hops keeps it calm.
+ * Trees animate 15% FASTER (durations ÷ 1.15) on request.
+ */
+export const DECOR_BOUNCE = { riseMs: 820, hold: 90, restMs: 1700, rise: 18 } as const;
+export const TREE_BOUNCE_SPEEDUP = 1.15;
+/** Tile-art names (in tilesByCell) that should spring-bounce like decor. */
+export const ANIMATED_TILE_NAMES = ['tree-1', 'tree-2', 'tree-3', 'tree-4', 'sapin'];
+
 /**
  * On-board render scale for file-based decor, keyed by decor chain. Placeholder
  * decor (nest/brazier) is painted at tile size, but real-art files can be huge
@@ -76,6 +104,23 @@ export const GENERATOR_PASSIVE_RETRY_MS = 8000;
  */
 export const DECOR_SCALE: Record<string, number> = {
   dragon: 0.42
+};
+
+/**
+ * On-board render scale for file-based ITEM art, keyed by `<chain>_<tier>`
+ * (preferred) or bare `<chain>`. Absent → 1. Lets a single PNG read bigger
+ * without re-exporting art (e.g. the red dragon egg looks small at native size).
+ */
+export const ITEM_SCALE: Record<string, number> = {
+  // reward/egg.png (396×501) and reward/ruby.png (474×382) are ~2× the old
+  // placeholder art — scale down so a gem reads ~1 tile wide (SVG-sized).
+  // Egg + ruby reduced 70% on request (small speckled egg / small ruby shard).
+  ember_dragon_1: 0.18,
+  flame_gem_1: 0.15,
+  // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
+  lumber_1: 0.5, // a small log
+  lumber_2: 1.0, // a house reads ~1.4 tiles
+  bigtree_1: 0.62 // a tall landmark tree
 };
 
 /** Energy. */
@@ -158,7 +203,11 @@ export const DRAGON_ANIM = {
   fadeInMs: 220,
   hatchlingScale: 0.34,
   whelpScale: 0.46,
-  groundLift: 10 // px the rig sits above the tile centre so feet meet the floor
+  groundLift: 10, // px the rig sits above the tile centre so feet meet the floor
+  /** Worker harvest (Phase 3): the dragon flies to a tapped plant, works, returns. */
+  flyToMs: 520, // glide out to the plant
+  workMs: 700, // breathing magic onto the plant before the loot drops
+  flyBackMs: 480 // glide home
 } as const;
 
 /** Input (game-resolution pixels; CSS pixels are half of these under FIT). */

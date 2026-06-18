@@ -113,7 +113,23 @@ export class TutorialDirector {
       this.state.tutorialDone = true;
       this.emitDone();
     } else {
+      // Effects fire on the advance INTO a step (once), never on resume — their
+      // results live in saved state, so emitStep() on reload must not re-run them.
+      this.applyEffects(this.currentStep);
       this.emitStep();
+    }
+  }
+
+  /** Run a step's scripted reward beats via bus commands (spawn / ripen / key). */
+  private applyEffects(step: TutorialStepConfig | undefined): void {
+    for (const effect of step?.effects ?? []) {
+      if ('spawn' in effect) {
+        this.bus.emit('board:spawn', effect.spawn);
+      } else if ('retier' in effect) {
+        this.bus.emit('board:retier', effect.retier);
+      } else if ('grantKeys' in effect) {
+        this.bus.emit('economy:add', { keys: effect.grantKeys, reason: 'tutorial' });
+      }
     }
   }
 

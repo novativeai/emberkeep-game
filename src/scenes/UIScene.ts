@@ -99,7 +99,14 @@ export class UIScene extends Phaser.Scene {
       bus.on('item:removed', ({ itemId }) => {
         if (this.tooltip.openItemId === itemId) this.tooltip.close();
       }),
-      bus.on('item:merged', () => this.tooltip.close()),
+      bus.on('item:merged', (payload) => {
+        this.tooltip.close();
+        // A fresh Flame Gem flies toward the Ledger (where the magic happens) —
+        // pure juice, no game state depends on it.
+        if (payload.chain === 'flame_gem' && payload.resultTier === 2) {
+          this.flyGemToLedger(payload.at, payload.resultTier);
+        }
+      }),
       bus.on('order:completed', () => {
         this.time.delayedCall(650, () => {
           if (this.ledger.isOpen && this.lastStep?.gateType === 'tap') this.ledger.requestClose();
@@ -111,6 +118,43 @@ export class UIScene extends Phaser.Scene {
         this.scene.start(SCENES.title);
       })
     );
+  }
+
+  /** Cosmetic: a Flame Gem arcs from the merge cell into the Ledger button and
+   *  pulses it — the "gems gathered toward the magic" beat. UIScene's camera is
+   *  fixed, so the Ledger target and the board-cell start share one space. */
+  private flyGemToLedger(at: TilePos, tier: number): void {
+    const start = this.cellToScreen(at.col, at.row);
+    const end = this.hud.getLedgerPos();
+    const gem = this.add
+      .image(start.x, start.y - 40, `item_flame_gem_${tier}`)
+      .setScale(0.45)
+      .setDepth(DEPTH_PANEL + 5);
+    const proxy = { t: 0 };
+    this.tweens.add({
+      targets: proxy,
+      t: 1,
+      duration: 600,
+      delay: 140,
+      ease: 'Sine.easeIn',
+      onUpdate: () => {
+        const t = proxy.t;
+        gem.x = Phaser.Math.Linear(start.x, end.x, t);
+        gem.y = Phaser.Math.Linear(start.y - 40, end.y, t) - Math.sin(Math.PI * t) * 130;
+        gem.rotation = t * Math.PI;
+        gem.setScale(0.45 * (1 - 0.4 * t));
+      },
+      onComplete: () => {
+        gem.destroy();
+        this.tweens.add({
+          targets: this.hud.ledgerButton,
+          scale: { from: 1, to: 1.18 },
+          duration: 120,
+          yoyo: true,
+          ease: 'Sine.easeOut'
+        });
+      }
+    });
   }
 
   /** The level-up reward beat: a warm banner — Warmth refilled + Gold. */
@@ -157,6 +201,9 @@ export class UIScene extends Phaser.Scene {
     this.lastStep = step;
     this.hud.setLedgerEnabled(step.done || step.allow.ledger);
     this.ledger.setDeliverAllowed(step.done || step.allow.deliver);
+    // A step that no longer involves the Ledger closes it, so its dim never
+    // sits over the board and swallows the next tap (e.g. the post-deliver fog).
+    if (!step.done && !step.allow.ledger && this.ledger.isOpen) this.ledger.requestClose();
     if (step.done) {
       this.bubble.hide();
       this.clearMarkers();

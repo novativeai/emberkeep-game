@@ -22,6 +22,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
   private sprite: Phaser.GameObjects.Image;
   private readyStar: Phaser.GameObjects.Image;
   private shadow: Phaser.GameObjects.Ellipse;
+  private cooldownLabel: Phaser.GameObjects.Text;
   private bobPhase = 0;
   private bobPaused = false;
   private cooling = false;
@@ -35,7 +36,22 @@ export class BoardItem extends Phaser.GameObjects.Container {
       .setAlpha(0);
     this.sprite = scene.add.image(0, 0, '__DEFAULT');
     this.readyStar = scene.add.image(40, -104, 'fx_spark').setScale(0.7).setVisible(false);
-    this.add([this.shadow, this.sprite, this.readyStar]);
+    // Countdown shown over a waiting generator, in a small dark frame
+    // ("8s" for short cooldowns, "9:58" mm:ss for the long house/tree timers).
+    this.cooldownLabel = scene.add
+      .text(0, -122, '', {
+        fontFamily: 'Segoe UI, sans-serif',
+        fontSize: '38px',
+        fontStyle: 'bold',
+        color: '#fff6e0',
+        stroke: '#241b22',
+        strokeThickness: 6,
+        backgroundColor: 'rgba(28,20,26,0.74)',
+        padding: { x: 14, y: 6 }
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    this.add([this.shadow, this.sprite, this.readyStar, this.cooldownLabel]);
     this.setSize(152, 152);
     scene.add.existing(this);
     this.setVisible(false);
@@ -65,6 +81,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.sprite.setVisible(true); // a pooled item may have been a hidden rig host
     this.sprite.clearTint();
     this.readyStar.setVisible(false);
+    this.cooldownLabel.setVisible(false);
     this.shadow.setAlpha(0);
     this.setScale(1);
     this.setAlpha(1);
@@ -175,8 +192,10 @@ export class BoardItem extends Phaser.GameObjects.Container {
     if (cooling) {
       this.sprite.setTint(COOLING_TINT);
       this.readyStar.setVisible(false);
+      this.cooldownLabel.setVisible(true);
     } else {
       this.sprite.clearTint();
+      this.cooldownLabel.setVisible(false);
       this.readyStar.setVisible(true);
       this.readyStar.setAlpha(0);
       this.readyStar.setScale(0.2);
@@ -195,6 +214,15 @@ export class BoardItem extends Phaser.GameObjects.Container {
         ease: 'Sine.easeOut'
       });
     }
+  }
+
+  /** Update the countdown text: "8s" under a minute, "9:58" mm:ss above. */
+  setCooldownRemaining(ms: number): void {
+    if (!this.cooling) return;
+    const secs = Math.max(0, Math.ceil(ms / 1000));
+    this.cooldownLabel.setText(
+      secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+    );
   }
 
   flashDenied(): void {

@@ -45,41 +45,74 @@ export class MergeSystem {
     }
 
     const sameTile = to.col === from.col && to.row === from.row;
-    const targetFree =
-      this.state.isTileActive(to.col, to.row) && this.state.itemIdAt(to.col, to.row) === null;
-
-    if (sameTile || !targetFree) {
+    if (sameTile || !this.state.isTileActive(to.col, to.row)) {
       this.bus.emit('item:move_bounced', { itemId, at: from });
       return;
     }
 
-    this.state.moveItem(itemId, to);
+    const targetItem = this.state.itemAt(to.col, to.row);
 
-    const merged = this.tryMergeAt(item);
-    if (!merged) {
+    // Fairyland-style: dropping the piece directly ON a matching item makes it
+    // join that cluster — merge if together they reach the threshold, else
+    // bounce home (you can't stack on an occupied tile otherwise).
+    if (targetItem && targetItem.id !== itemId) {
+      const matches =
+        targetItem.kind === 'item' &&
+        targetItem.chain === item.chain &&
+        targetItem.tier === item.tier;
+      if (matches && this.tryMergeOnto(item, targetItem, to)) return;
+      this.bus.emit('item:move_bounced', { itemId, at: from });
+      return;
+    }
+
+    // Dropping on a FREE tile: move there, then merge the connected group.
+    this.state.moveItem(itemId, to);
+    if (!this.tryMergeAt(item)) {
       this.bus.emit('item:moved', { itemId, from, to });
     }
   }
 
-  /** Flood-fill the same-chain/tier group containing `seed` and merge if big enough. */
+  /** Merge the flood-filled group around `seed`, output at the seed's tile. */
   private tryMergeAt(seed: BoardItemState): boolean {
+    return this.performMerge(this.collectGroup(seed), { col: seed.col, row: seed.row });
+  }
+
+  /**
+   * Drop-onto-merge: the dragged piece (still at its source tile) plus the
+   * cluster it was dropped on. Output lands on the drop tile `to`.
+   */
+  private tryMergeOnto(dragged: BoardItemState, targetItem: BoardItemState, to: TilePos): boolean {
+    const cluster = this.collectGroup(targetItem).filter((i) => i.id !== dragged.id);
+    return this.performMerge([dragged, ...cluster], to);
+  }
+
+  /**
+   * Consume the first `minGroup`/`fiveGroup` of `members` (seed/dragged first)
+   * into the next tier at `dropPos`. Returns false if the group is too small or
+   * the chain is at max tier (caller then treats it as a plain move/bounce).
+   */
+  private performMerge(members: BoardItemState[], dropPos: TilePos): boolean {
+    const seed = members[0];
+    if (!seed) return false;
     const config = this.chainConfig(seed.chain);
     if (!config) return false;
     const nextTier = config.tiers.find((t) => t.tier === seed.tier + 1);
-    if (!nextTier) return false; // max tier: plain move only
+    if (!nextTier) return false; // max tier: no merge
 
-    const group = this.collectGroup(seed);
     const rule = this.chains.mergeRule;
-    if (group.length < rule.minGroup) return false;
+    // A chain may override the recipe (e.g. lumber: 5 wood → 1 house); otherwise
+    // the global rule applies, with its 5-for-2 bonus.
+    const override = config.merge;
+    const minGroup = override?.group ?? rule.minGroup;
+    if (members.length < minGroup) return false;
 
-    const isFive = rule.fiveBonus && group.length >= rule.fiveGroup;
-    const consumeCount = isFive ? rule.fiveGroup : rule.minGroup;
-    const outputCount = isFive ? rule.fiveOutputs : 1;
+    const isFive = !override && rule.fiveBonus && members.length >= rule.fiveGroup;
+    const consumeCount = override ? override.group : isFive ? rule.fiveGroup : rule.minGroup;
+    const outputCount = override ? override.outputs : isFive ? rule.fiveOutputs : 1;
 
-    const consumed = group.slice(0, consumeCount);
+    const consumed = members.slice(0, consumeCount);
     const consumedIds = consumed.map((i) => i.id);
     const consumedAt = consumed.map((i) => ({ col: i.col, row: i.row }));
-    const dropPos = { col: seed.col, row: seed.row };
 
     for (const member of consumed) {
       this.state.removeItem(member.id);

@@ -1,17 +1,18 @@
-import { GENERATOR_PASSIVE_RETRY_MS } from '../core/Constants';
+import { GENERATOR_PASSIVE_RETRY_MS, skipEnergyCost } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
 import type { BoardItemState, ChainsData, GeneratorConfig, TilePos } from '../core/types';
 
 /**
- * Hatchlings and whelps are generators in two ways:
- *   • TAP a ready one — spends energy, drops produce on a free neighbour, starts
- *     a short cooldown (the active, fast path).
- *   • PASSIVE — every `passiveMs` the dragon gifts one produce for free, no tap,
- *     no energy (the standing advantage of owning a dragon). Driven by the
- *     `time:advanced` tick, so it honours `window.advanceTime` deterministically.
- * All timing reads the virtual GameClock.
+ * Generators come in two flavours:
+ *   • TAP generators (dragons): tap a ready one → spend energy, drop produce on a
+ *     free neighbour, start a cooldown. Also gift one produce passively.
+ *   • PASSIVE generators (big tree, house — `tappable:false`): never tap-harvest;
+ *     they auto-produce every `passiveMs` (item, or a coins/xp/energy reward), and
+ *     a tap only offers the energy SKIP.
+ * The skip costs energy proportional to the time still remaining (expensive at
+ * the start, nearly free at the end). All timing reads the virtual GameClock.
  */
 export class GeneratorSystem {
   constructor(
@@ -21,6 +22,7 @@ export class GeneratorSystem {
     private chains: ChainsData
   ) {
     bus.on('item:tapped', ({ itemId }) => this.onTapped(itemId));
+    bus.on('generator:skip', ({ itemId }) => this.onSkip(itemId));
     bus.on('time:advanced', () => this.tickPassive());
   }
 
@@ -30,11 +32,49 @@ export class GeneratorSystem {
       ?.tiers.find((t) => t.tier === tier)?.generator;
   }
 
+  /** The timer a tap should offer to skip: a live tap-cooldown, else a live
+   *  passive wait. Returns null when nothing is pending. */
+  private activeTimer(
+    item: BoardItemState,
+    cfg: GeneratorConfig,
+    now: number
+  ): { at: number; total: number; kind: 'ready' | 'passive' } | null {
+    if (item.readyAt !== undefined && now < item.readyAt) {
+      return { at: item.readyAt, total: cfg.cooldownMs, kind: 'ready' };
+    }
+    if (cfg.passiveMs && item.passiveAt !== undefined && now < item.passiveAt) {
+      return { at: item.passiveAt, total: cfg.passiveMs, kind: 'passive' };
+    }
+    return null;
+  }
+
+  /** Spend Warmth to clear a generator's remaining wait. The cost scales with the
+   *  fraction of time still left (see skipEnergyCost). */
+  private onSkip(itemId: number): void {
+    const item = this.state.items.get(itemId);
+    if (!item || item.kind !== 'item') return;
+    const cfg = this.generatorConfig(item.chain, item.tier);
+    if (!cfg) return;
+    const now = this.clock.now();
+    const timer = this.activeTimer(item, cfg, now);
+    if (!timer) return; // already ready
+
+    const cost = skipEnergyCost(timer.at - now, timer.total);
+    if (this.state.energyCurrent < cost) {
+      this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
+      return;
+    }
+    this.bus.emit('energy:spend', { amount: cost, reason: 'skip_cooldown' });
+    if (timer.kind === 'ready') item.readyAt = now;
+    else item.passiveAt = now; // next passive tick fires immediately
+  }
+
   private onTapped(itemId: number): void {
     const item = this.state.items.get(itemId);
     if (!item || item.kind !== 'item') return;
     const generator = this.generatorConfig(item.chain, item.tier);
     if (!generator) return; // not a generator; tooltip handling lives in UI
+    if (generator.tappable === false) return; // passive-only: tap only skips (board-side)
 
     const now = this.clock.now();
     if (item.readyAt !== undefined && now < item.readyAt) {
@@ -53,11 +93,12 @@ export class GeneratorSystem {
 
     this.bus.emit('energy:spend', { amount: generator.energyCost, reason: 'harvest' });
     item.readyAt = now + generator.cooldownMs;
-    const output = this.produce(generator, target, now);
+    const output = this.produceItem(generator, target, now);
     this.bus.emit('item:harvested', { generatorId: itemId, output: this.state.snapshot(output, now) });
   }
 
-  /** Every generator with a `passiveMs` gifts one produce when its timer is due. */
+  /** Every generator with a `passiveMs` pays out when its timer is due — an item
+   *  (dragons, big tree) or a currency reward (the house). */
   private tickPassive(): void {
     const now = this.clock.now();
     // Snapshot first — producing mutates the items map mid-loop.
@@ -71,7 +112,13 @@ export class GeneratorSystem {
       }
       if (now < item.passiveAt) continue;
 
-      // Prefer a neighbour; otherwise the nearest free active tile anywhere.
+      if (generator.reward) {
+        item.passiveAt = now + generator.passiveMs;
+        this.payReward(item, generator);
+        continue;
+      }
+
+      // Item producer: prefer a neighbour; otherwise the nearest free active tile.
       const target: TilePos | undefined =
         this.state.freeActiveNeighbors(item.col, item.row)[0] ??
         this.state.freeActiveTilesNear(item.col, item.row)[0];
@@ -79,19 +126,30 @@ export class GeneratorSystem {
         item.passiveAt = now + GENERATOR_PASSIVE_RETRY_MS; // board full — try again soon
         continue;
       }
-      // One gift per tick even if long overdue (no flood after advanceTime).
-      item.passiveAt = now + generator.passiveMs;
-      const output = this.produce(generator, target, now);
+      item.passiveAt = now + generator.passiveMs; // one gift per tick even if overdue
+      const output = this.produceItem(generator, target, now);
       this.bus.emit('item:produced', { generatorId: item.id, output: this.state.snapshot(output, now) });
     }
   }
 
+  /** Pay a reward generator's coins/xp/energy (the house). */
+  private payReward(item: BoardItemState, generator: GeneratorConfig): void {
+    const r = generator.reward!;
+    const coins = r.coins ?? 0;
+    const xp = r.xp ?? 0;
+    const energy = r.energy ?? 0;
+    if (coins || xp) this.bus.emit('economy:add', { coins, xp, reason: 'generator' });
+    if (energy) this.bus.emit('energy:add', { amount: energy, reason: 'generator' });
+    this.bus.emit('generator:reward', { generatorId: item.id, coins, xp, energy });
+  }
+
   /** Spawn the configured produce on `target`, arming it if it's itself a generator. */
-  private produce(generator: GeneratorConfig, target: TilePos, now: number): BoardItemState {
-    const producedGenerator = this.generatorConfig(generator.produces.chain, generator.produces.tier);
+  private produceItem(generator: GeneratorConfig, target: TilePos, now: number): BoardItemState {
+    const produces = generator.produces!;
+    const producedGenerator = this.generatorConfig(produces.chain, produces.tier);
     return this.state.addItem({
-      chain: generator.produces.chain,
-      tier: generator.produces.tier,
+      chain: produces.chain,
+      tier: produces.tier,
       col: target.col,
       row: target.row,
       kind: 'item',
