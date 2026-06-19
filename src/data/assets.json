@@ -124,7 +124,7 @@
       "key": "item_ember_dragon_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/rewards/egg.png"
+      "file": "sprites/merge/rubis-transparent_001.png"
     },
     {
       "key": "item_ember_dragon_2",

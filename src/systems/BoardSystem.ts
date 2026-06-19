@@ -40,7 +40,17 @@ export class BoardSystem {
     // Spawn IN FRONT of the anchor (+1,+1 = south, toward the viewer) so produce
     // isn't hidden behind a tall generator — e.g. the dragon occluding its gems.
     const offset = nearChain && anchor ? 1 : 0;
-    const cells = this.freeBlobNear((anchor?.col ?? 0) + offset, (anchor?.row ?? 0) + offset, count);
+    let anchorCol = (anchor?.col ?? 0) + offset;
+    let anchorRow = (anchor?.row ?? 0) + offset;
+    // When the board is empty the default [0,0] may resolve to an isolated active
+    // tile with no active neighbours (unable to grow a connected blob). Prefer the
+    // nearest active tile that has at least one active free neighbour instead.
+    if (!anchor) {
+      const connected = this.state.freeActiveTilesNear(0, 0)
+        .find((p) => this.state.freeActiveNeighbors(p.col, p.row).length > 0);
+      if (connected) { anchorCol = connected.col; anchorRow = connected.row; }
+    }
+    const cells = this.freeBlobNear(anchorCol, anchorRow, count);
     for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, 'unlock');
   }
 
@@ -104,12 +114,6 @@ export class BoardSystem {
     }
     for (const decor of this.map.startingDecor ?? []) {
       this.spawnDecor(decor.decor, decor.at[0], decor.at[1], 'init');
-    }
-    // A starting Treasure Chest — code-injected (NOT in the authored map): tap it
-    // for a random gift (Gold, Warmth, or a fan of Wood). (9,6) is a free L1 tile
-    // on the shipped map; guarded so the 8×8 test fixture (no such cell) skips it.
-    if (this.state.isTileActive(9, 6) && this.state.itemIdAt(9, 6) === null) {
-      this.spawn('chest', 1, 9, 6, 'init');
     }
     this.bus.emit('energy:changed', { current: this.state.energyCurrent, max: this.state.energyMax });
     this.bus.emit('economy:changed', {

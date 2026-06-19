@@ -1207,9 +1207,9 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.bus.emit('chest:open', { itemId: item.id });
       return;
     }
-    // Emerald gems & eggs are merge-only: a tap does nothing (no menu, no sell) —
-    // you just drag them together. (The Emerald Dragon, tier 3, still has its menu.)
-    if (item.chain === 'emerald' && item.tier < 3) return;
+    // Raw Emerald gems (tier 1) are merge-only: a tap does nothing (no menu, no sell).
+    // Tier 2+ are dragons with generators and get the normal tap path.
+    if (item.chain === 'emerald' && item.tier === 1) return;
     const cfg = this.generatorConfigFor(item.chain, item.tier);
     const isGenerator = cfg !== undefined;
     if (isGenerator && !this.tutorialDone && !this.allow.tapGenerators) return;

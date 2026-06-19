@@ -4,6 +4,7 @@ import { ENERGY_REGEN_MS, GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SCENES } from '
 import { gridToWorld } from '../core/iso';
 import type { ResolvedArrow, ResolvedHand, TilePos, TutorialStepEvent } from '../core/types';
 import { CharacterBubble } from '../entities/CharacterBubble';
+import { EndScreen } from '../ui/EndScreen';
 import { Hud } from '../ui/Hud';
 import { LedgerPanel } from '../ui/LedgerPanel';
 import { ShopPanel } from '../ui/ShopPanel';
@@ -33,6 +34,7 @@ export class UIScene extends Phaser.Scene {
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
   private dialog: Phaser.GameObjects.Container | null = null;
+  private endScreen: EndScreen | null = null;
   private lastStep: TutorialStepEvent | null = null;
   private offBus: (() => void)[] = [];
   // Tutorial markers are anchored to BOARD CELLS, not the screen: the board
@@ -170,6 +172,8 @@ export class UIScene extends Phaser.Scene {
       }),
       bus.on('keeper:leveled', ({ level }) => this.celebrateLevelUp(level)),
       bus.on('game:reset', () => {
+        this.endScreen?.destroy();
+        this.endScreen = null;
         this.scene.stop(SCENES.board);
         this.scene.start(SCENES.title);
       })
@@ -295,6 +299,11 @@ export class UIScene extends Phaser.Scene {
     if (step.done) {
       this.bubble.hide();
       this.clearMarkers();
+      if (!this.endScreen) {
+        this.endScreen = new EndScreen(this, this.ctx.bus);
+        this.add.existing(this.endScreen);
+        this.endScreen.setDepth(DEPTH_DIALOG + 50);
+      }
       return;
     }
     this.bubble.show(step);

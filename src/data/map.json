@@ -102,80 +102,30 @@
         "level": 2
       },
       "tiles": [
-        [
-          6,
-          5
-        ],
-        [
-          6,
-          4
-        ],
-        [
-          6,
-          6
-        ],
-        [
-          6,
-          3
-        ],
-        [
-          5,
-          5
-        ],
-        [
-          5,
-          4
-        ],
-        [
-          5,
-          6
-        ],
-        [
-          6,
-          2
-        ],
-        [
-          5,
-          3
-        ],
-        [
-          4,
-          5
-        ],
-        [
-          4,
-          4
-        ],
-        [
-          4,
-          6
-        ]
+        [6, 5],
+        [5, 5],
+        [6, 6],
+        [5, 6]
       ],
       "contents": [
-        {
-          "chain": "ember_dragon",
-          "tier": 1,
-          "at": [
-            6,
-            5
-          ]
-        },
-        {
-          "chain": "ember_dragon",
-          "tier": 1,
-          "at": [
-            6,
-            4
-          ]
-        },
-        {
-          "chain": "ember_dragon",
-          "tier": 1,
-          "at": [
-            6,
-            6
-          ]
-        }
+        { "chain": "lumber", "tier": 1, "at": [6, 5] },
+        { "chain": "lumber", "tier": 1, "at": [5, 5] },
+        { "chain": "lumber", "tier": 1, "at": [6, 6] }
+      ]
+    },
+    {
+      "id": "level_5",
+      "status": "locked",
+      "unlock": { "level": 99 },
+      "tiles": [
+        [6, 4],
+        [6, 3],
+        [5, 4],
+        [5, 3],
+        [6, 2],
+        [4, 4],
+        [4, 5],
+        [4, 6]
       ]
     },
     {
@@ -240,78 +190,6 @@
       ],
       "contents": [
         {
-          "chain": "sparkweed",
-          "tier": 1,
-          "at": [
-            3,
-            3
-          ]
-        },
-        {
-          "chain": "sparkweed",
-          "tier": 1,
-          "at": [
-            3,
-            2
-          ]
-        },
-        {
-          "chain": "sparkweed",
-          "tier": 1,
-          "at": [
-            2,
-            3
-          ]
-        },
-        {
-          "chain": "ember_dragon",
-          "tier": 1,
-          "at": [
-            4,
-            3
-          ]
-        },
-        {
-          "chain": "ember_dragon",
-          "tier": 1,
-          "at": [
-            3,
-            4
-          ]
-        },
-        {
-          "chain": "ember_dragon",
-          "tier": 1,
-          "at": [
-            2,
-            2
-          ]
-        },
-        {
-          "chain": "flame_gem",
-          "tier": 1,
-          "at": [
-            4,
-            2
-          ]
-        },
-        {
-          "chain": "flame_gem",
-          "tier": 1,
-          "at": [
-            2,
-            4
-          ]
-        },
-        {
-          "chain": "flame_gem",
-          "tier": 1,
-          "at": [
-            1,
-            3
-          ]
-        },
-        {
           "chain": "bigtree",
           "tier": 1,
           "at": [
@@ -322,80 +200,7 @@
       ]
     }
   ],
-  "startingItems": [
-    {
-      "chain": "ember_dragon",
-      "tier": 1,
-      "at": [
-        8,
-        5
-      ]
-    },
-    {
-      "chain": "ember_dragon",
-      "tier": 1,
-      "at": [
-        9,
-        5
-      ]
-    },
-    {
-      "chain": "ember_dragon",
-      "tier": 1,
-      "at": [
-        7,
-        5
-      ]
-    },
-    {
-      "chain": "lumber",
-      "tier": 1,
-      "at": [
-        11,
-        7
-      ]
-    },
-    {
-      "chain": "lumber",
-      "tier": 1,
-      "at": [
-        12,
-        7
-      ]
-    },
-    {
-      "chain": "lumber",
-      "tier": 1,
-      "at": [
-        11,
-        8
-      ]
-    },
-    {
-      "chain": "lumber",
-      "tier": 1,
-      "at": [
-        12,
-        8
-      ]
-    },
-    {
-      "chain": "lumber",
-      "tier": 1,
-      "at": [
-        8,
-        7
-      ]
-    },
-    {
-      "chain": "crystal",
-      "tier": 1,
-      "at": [
-        8,
-        11
-      ]
-    }
-  ],
+  "startingItems": [],
   "startingDecor": [],
   "playable": [
     [

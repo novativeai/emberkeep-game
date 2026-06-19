@@ -211,7 +211,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened'; chain?: string }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'chest:open'; chain?: string }
   | { type: 'count'; chain: string; tier: number; count: number };
 
 export interface TutorialAllow {
@@ -250,7 +250,8 @@ export type TutorialArrowConfig =
 export type TutorialEffect =
   | { spawn: { chain: string; tier: number; count: number; nearChain?: string } }
   | { retier: { chain: string; fromTier: number; toTier: number } }
-  | { grantKeys: number };
+  | { grantKeys: number }
+  | { grantXp: number };
 
 export interface TutorialStepConfig {
   id: string;

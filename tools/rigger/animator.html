@@ -234,9 +234,9 @@ function perspAmp(part, amp) {
 const TAU = Math.PI * 2;
 const PRESETS = {
   idle: { emoji: '🌿', name: 'Idle', desc: 'breathing, head sway, tail drift, blink', fn: (t) => {
-    F.root.sy = 1 + 0.018 * Math.sin(t * TAU * 0.5);
-    F.root.dy = -3 * Math.sin(t * TAU * 0.5);
-    drive('head', 3.0 * Math.sin(t * TAU * 0.33), 'head sway');
+    F.root.sy = 1 + 0.004 * Math.sin(t * TAU * 0.5);
+    F.root.dy = -0.7 * Math.sin(t * TAU * 0.5);
+    drive('head', 0.7 * Math.sin(t * TAU * 0.33), 'head sway');
     driveWave('tail', 'body_tail', 9 + 3 * Math.sin(t), Math.sin(t * TAU * 0.4) * 1.4, 'tail drift');
     drive('wing_left', perspAmp('wing_left', 2.4) * Math.sin(t * TAU * 0.5 + 0.3), 'wing settle L');
     drive('wing_right', -perspAmp('wing_right', 2.4) * Math.sin(t * TAU * 0.5 + 0.3), 'wing settle R'); // mirror of L
@@ -260,15 +260,15 @@ const PRESETS = {
   celebrate: { emoji: '🎉', name: 'Celebration', desc: 'hops, arm pumps, wing flare, fast tail wag', fn: (t) => {
     const hopF = 1.7;
     const hop = Math.abs(Math.sin(t * Math.PI * hopF));         // bouncy
-    F.root.dy = -34 * hop;
-    F.root.sy = 1 + 0.05 * hop; F.root.sx = 1 - 0.03 * hop;
+    F.root.dy = -8 * hop;
+    F.root.sy = 1 + 0.012 * hop; F.root.sx = 1 - 0.007 * hop;
     const pump = Math.sin(t * Math.PI * hopF * 2);
     drive('hand_left', -38 - 18 * pump, 'arm pump L');           // arms up & pumping
     drive('hand_right', -38 - 18 * pump, 'arm pump R');
     drive('wing_left', perspAmp('wing_left', 28) + 6 * pump, 'wing flare L');
     drive('wing_right', -(perspAmp('wing_right', 28) + 6 * pump), 'wing flare R'); // mirror of L
-    driveWave('tail', 'body_tail', 22, t * TAU * 3, 'tail wag');
-    drive('head', 6 * Math.sin(t * Math.PI * hopF) - 4, 'head bob');
+    driveWave('tail', 'body_tail', 14, t * TAU * 3, 'tail wag');
+    drive('head', 1.5 * Math.sin(t * Math.PI * hopF) - 1, 'head bob');
     blink(t, 1.4);
   }},
   roar: { emoji: '🔥', name: 'Roar / power-up', desc: 'rear back, head up, jaw/head tilt, wings spread', fn: (t) => {

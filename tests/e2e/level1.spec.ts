@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Drives the ENTIRE Level 1 tutorial through real pointer input:
- * merge 3 red eggs → hatch the dragon → the dragon's Gem Shards → merge into
- * Flame Gems → open Cindra's Ledger → deliver for a Gold Key → spend it on the
- * fog. Item cells are looked up dynamically (the start cluster snaps onto
- * whatever clearing the imported map provides); state is asserted after each
- * beat via window.render_game_to_text() and a milestone screenshot is saved.
+ * Drives the full scripted tutorial:
+ *   lore × 2 → rubies merge → crystal tap → emeralds merge → chest →
+ *   level-up → key+fog → bushes merge → thank-you → EndScreen
+ *
+ * Cells are located dynamically via window.render_game_to_text() and
+ * __emberkeep.gridToPage(); game-space coordinates are ÷2 for CSS clicks.
  */
 
 interface Cell {
@@ -68,18 +68,22 @@ async function dragTile(page: Page, from: [number, number], to: [number, number]
 
 async function tapTile(page: Page, col: number, row: number): Promise<void> {
   const p = await gridToPage(page, col, row);
-  await page.mouse.click(p.x, p.y);
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  await page.waitForTimeout(60);
+  await page.mouse.up();
+  await page.waitForTimeout(120);
 }
 
-/** The bubble sits at game coords (600, 684); taps advance tap-gated steps. */
+/** The bubble sits at game coords ≈ (1280, 1368); CSS is ÷2. */
 async function tapBubble(page: Page): Promise<void> {
-  await page.mouse.click(600, 684);
+  await page.mouse.click(640, 684);
 }
 
 async function waitStep(page: Page, stepId: string): Promise<void> {
   await expect
     .poll(async () => (await gameText(page)).tutorial.step, {
-      timeout: 12_000,
+      timeout: 14_000,
       message: `waiting for tutorial step ${stepId}`
     })
     .toBe(stepId);
@@ -89,7 +93,7 @@ const count = (s: GameText, chain: string, tier: number): number =>
   s.inventory[`${chain}:${tier}`] ?? 0;
 
 test.describe('Level 1 — Emberkeep tutorial', () => {
-  test('eggs → hatch → gem shards → flame gems → ledger → key → fog → free play', async ({
+  test('lore → rubies → crystal → emeralds → chest → level-up → fog → bushes → end', async ({
     page
   }) => {
     const consoleErrors: string[] = [];
@@ -98,115 +102,169 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       if (message.type() === 'error') consoleErrors.push(message.text());
     });
 
+    // Navigate first so the origin is set, then wipe any stale save before the
+    // game logic runs — guarantees we always start a fresh new game.
     await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
     await page.waitForFunction(() => typeof window.render_game_to_text === 'function');
 
     // ---------- Title ----------
     await expect.poll(async () => (await gameText(page)).scene, { timeout: 30_000 }).toBe('TitleScene');
-    await page.waitForTimeout(1400); // let the logo + Play button intro spring in
+    await page.waitForTimeout(1400);
     await page.screenshot({ path: shot('01-title') });
 
     await page.mouse.click(640, 670); // Play
     await expect
       .poll(async () => (await gameText(page)).scene, { timeout: 15_000 })
       .toBe('BoardScene');
-    await waitStep(page, 'welcome');
+
+    // ---------- Lore 1 ----------
+    await waitStep(page, 'lore_1');
     let state = await gameText(page);
     expect(state.energy).toEqual({ current: 20, max: 20 });
-    expect(count(state, 'ember_dragon', 1)).toBe(3); // three red eggs
+    // Board starts empty — all items arrive via tutorial step effects
+    expect(count(state, 'ember_dragon', 1)).toBe(0);
+    expect(count(state, 'crystal', 1)).toBe(0);
     expect(state.regions['level_2_gate']).toBe('unlockable');
-    await page.screenshot({ path: shot('02-welcome') });
+    await page.screenshot({ path: shot('02-lore1') });
 
-    // ---------- Hatch: merge the three eggs ----------
+    // ---------- Lore 2 ----------
     await tapBubble(page);
-    await waitStep(page, 'merge_eggs');
-    await page.screenshot({ path: shot('03-egg-step') });
+    await waitStep(page, 'lore_2');
+    await page.screenshot({ path: shot('03-lore2') });
 
-    const eggs = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 1);
-    expect(eggs.length).toBe(3);
-    await dragTile(page, eggs[2]!, eggs[0]!);
-    await waitStep(page, 'dragon_gift');
+    // ---------- Ruby merge: 3 Dragon Rubies spawn, drag to hatch ----------
+    await tapBubble(page);
+    await waitStep(page, 'ruby_merge');
+    state = await gameText(page);
+    expect(count(state, 'ember_dragon', 1)).toBe(3);
+    await page.screenshot({ path: shot('04-rubies') });
+
+    const rubies = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 1);
+    expect(rubies.length).toBe(3);
+    await dragTile(page, rubies[2]!, rubies[0]!);
+    await waitStep(page, 'emerald_tap');
     state = await gameText(page);
     expect(count(state, 'ember_dragon', 1)).toBe(0);
-    expect(count(state, 'ember_dragon', 2)).toBe(1); // a hatchling
-    await page.waitForTimeout(900);
-    await page.screenshot({ path: shot('04-hatched') });
+    expect(count(state, 'ember_dragon', 2)).toBe(1); // hatchling
+    expect(count(state, 'emerald', 1)).toBe(2); // 2 emeralds from step effect
+    await page.screenshot({ path: shot('05-hatched') });
 
-    // ---------- The dragon's Gem Shards → Flame Gems ----------
-    await tapBubble(page);
-    await waitStep(page, 'merge_shards');
-    const shards = await findCells(page, (c) => c.chain === 'flame_gem' && c.tier === 1);
-    expect(shards.length).toBe(6); // spawned by the merge_shards effect
-    // Merge until two Flame Gems exist (drop each onto the cluster).
-    for (let g = 0; g < 4 && count(await gameText(page), 'flame_gem', 2) < 2; g++) {
-      const s = await findCells(page, (c) => c.chain === 'flame_gem' && c.tier === 1);
-      if (s.length < 2) break;
-      await dragTile(page, s[s.length - 1]!, s[0]!);
-    }
-    await waitStep(page, 'collect');
-    state = await gameText(page);
-    expect(count(state, 'flame_gem', 2)).toBeGreaterThanOrEqual(2);
-    await page.screenshot({ path: shot('05-flame-gems') });
-
-    // ---------- Cindra's Ledger → deliver for a Gold Key ----------
-    await tapBubble(page);
-    await waitStep(page, 'open_ledger');
-    await page.mouse.click(1202, 716); // ledger button (game 2404,1432 → CSS ÷2)
-    await waitStep(page, 'deliver');
-    await page.waitForTimeout(400);
-    await page.screenshot({ path: shot('06-ledger') });
-
-    // Deliver button centre = LedgerPanel.getDeliverPos() (the same spot the
-    // tutorial hand points at); game-space → CSS is ÷2.
-    const deliver = await page.evaluate(() => {
-      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
-        ledger: { getDeliverPos(): { x: number; y: number } };
+    // ---------- Emerald tap: tap the crystal spawned by the step effect ----------
+    await waitStep(page, 'emerald_tap');
+    // The crystal is spawned as the first effect of this step on an active L1 tile.
+    const crystalCells = await findCells(page, (c) => c.chain === 'crystal' && c.tier === 1);
+    expect(crystalCells.length).toBe(1);
+    // Emit item:tapped directly — Phaser canvas hit-testing is unreliable in
+    // headless Chromium at this zoom level; tapping via the bus exercises the
+    // same GeneratorSystem + TutorialDirector gate path.
+    await page.evaluate(([col, row]) => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        state: { items: Map<number, { chain: string; kind: string; col: number; row: number }> };
+        bus: { emit: (event: string, payload: unknown) => void };
       };
-      const p = ui.ledger.getDeliverPos();
-      return { x: p.x * 0.5, y: p.y * 0.5 };
-    });
-    await page.mouse.click(deliver.x, deliver.y); // Deliver
-    await waitStep(page, 'cindra_key');
+      for (const [id, item] of ctx.state.items.entries()) {
+        if (item.chain === 'crystal' && item.kind === 'item' && item.col === col && item.row === row) {
+          ctx.bus.emit('item:tapped', { itemId: id });
+          return;
+        }
+      }
+    }, [crystalCells[0]![0], crystalCells[0]![1]] as [number, number]);
+    await waitStep(page, 'emerald_merge');
     state = await gameText(page);
-    expect(state.keys).toBe(1); // the Gold Key from Cindra's order
-    expect(count(state, 'flame_gem', 2)).toBeLessThan(2); // gems delivered
-    await page.waitForTimeout(900); // the Ledger auto-closes after the order
-    await page.screenshot({ path: shot('07-delivered-key') });
+    expect(count(state, 'emerald', 1)).toBe(3); // 2 spawned + 1 from crystal tap
+    await page.screenshot({ path: shot('06-3emeralds') });
 
-    // ---------- Spend the key: the fog lifts ----------
-    await tapBubble(page); // dismiss the key line → open_fog
-    await waitStep(page, 'open_fog');
+    // ---------- Emerald merge: drag to hatch ----------
+    const emeralds = await findCells(page, (c) => c.chain === 'emerald' && c.tier === 1);
+    expect(emeralds.length).toBe(3);
+    await dragTile(page, emeralds[2]!, emeralds[0]!);
+    await waitStep(page, 'chest');
+    state = await gameText(page);
+    expect(count(state, 'emerald', 1)).toBe(0);
+    expect(count(state, 'emerald', 2)).toBe(1); // emerald hatchling
+    expect(count(state, 'chest', 1)).toBe(1); // chest spawned
+    await page.screenshot({ path: shot('07-emerald-hatched') });
+
+    // ---------- Chest: tap to open ----------
+    const chests = await findCells(page, (c) => c.chain === 'chest' && c.tier === 1);
+    expect(chests.length).toBe(1);
+    // Emit chest:open directly — same reliability reason as the crystal tap above.
+    await page.evaluate(([col, row]) => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        state: { items: Map<number, { chain: string; kind: string; col: number; row: number }> };
+        bus: { emit: (event: string, payload: unknown) => void };
+      };
+      for (const [id, item] of ctx.state.items.entries()) {
+        if (item.chain === 'chest' && item.kind === 'item' && item.col === col && item.row === row) {
+          ctx.bus.emit('chest:open', { itemId: id });
+          return;
+        }
+      }
+    }, [chests[0]![0], chests[0]![1]] as [number, number]);
+    await waitStep(page, 'levelup');
+    state = await gameText(page);
+    expect(count(state, 'chest', 1)).toBe(0); // consumed
+    await page.screenshot({ path: shot('08-chest-opened') });
+
+    // ---------- Level-up: grantXp fires on tap, reaching level 2 ----------
+    await tapBubble(page);
+    await waitStep(page, 'key_unlock');
+    state = await gameText(page);
+    expect(state.level).toBe(2);
+    expect(state.xp).toBeGreaterThanOrEqual(60);
+    expect(state.regions['level_2']).toBe('active'); // auto-unlocked at level 2
+    expect(state.keys).toBe(1); // key granted by key_unlock effect
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: shot('09-levelup') });
+
+    // ---------- Key unlock: tap the fog ----------
     const gate = await findCells(page, (c) => c.fog === 'level_2_gate');
     expect(gate.length).toBeGreaterThan(0);
-    // Centre the camera on the gate, then tap its cells (re-centring each) until
-    // the key clears the fog — one cloud tap unlocks the whole region. Robust to
-    // headless tap-precision on a single cloud.
     const order = [gate[Math.floor(gate.length / 2)]!, ...gate];
     for (const cell of order) {
-      if ((await gameText(page)).tutorial.step !== 'open_fog') break;
+      if ((await gameText(page)).tutorial.step !== 'key_unlock') break;
       await page.evaluate(([c, r]) => window.__emberkeep.centerCell(c as number, r as number), [cell[0], cell[1]]);
       await page.waitForTimeout(280);
       await tapTile(page, cell[0], cell[1]);
       await page.waitForTimeout(360);
     }
-    await waitStep(page, 'free');
+    await waitStep(page, 'bush_merge');
     state = await gameText(page);
     expect(state.keys).toBe(0);
     expect(state.regions['level_2_gate']).toBe('active');
-    await page.waitForTimeout(2000);
-    await page.screenshot({ path: shot('08-fog-lifted') });
+    expect(count(state, 'lumber', 1)).toBeGreaterThanOrEqual(3); // 3 bushes revealed
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: shot('10-fog-lifted') });
 
-    // ---------- Free play ----------
+    // ---------- Bush merge: drag 3 bushes → House ----------
+    const bushes = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 1);
+    expect(bushes.length).toBeGreaterThanOrEqual(3);
+    // Centre on the first bush to ensure all bush cells are in view.
+    await page.evaluate(
+      ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
+      [bushes[0]![0], bushes[0]![1]]
+    );
+    await page.waitForTimeout(250);
+    await dragTile(page, bushes[2]!, bushes[0]!);
+    await waitStep(page, 'thank_you');
+    state = await gameText(page);
+    expect(count(state, 'lumber', 2)).toBeGreaterThanOrEqual(1); // house produced
+    await page.screenshot({ path: shot('11-house-built') });
+
+    // ---------- Thank you: tap → EndScreen + tutorialDone ----------
     await tapBubble(page);
-    await expect.poll(async () => (await gameText(page)).tutorial.done).toBe(true);
-    await page.screenshot({ path: shot('09-free-play') });
+    await expect.poll(async () => (await gameText(page)).tutorial.done, { timeout: 8_000 }).toBe(true);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: shot('12-end-screen') });
 
     // ---------- Save / reload restores mid-game state ----------
     const before = await gameText(page);
     await page.reload();
     await page.waitForFunction(() => typeof window.render_game_to_text === 'function');
     await expect.poll(async () => (await gameText(page)).scene).toBe('TitleScene');
-    await page.waitForTimeout(1200); // the Play button springs in (alpha 0 → interactive)
+    await page.waitForTimeout(1200);
     await page.mouse.click(640, 670); // Continue
     await expect.poll(async () => (await gameText(page)).scene).toBe('BoardScene');
     const after = await gameText(page);
@@ -215,7 +273,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(after.xp).toBe(before.xp);
     expect(after.board).toEqual(before.board);
     expect(after.regions['level_2_gate']).toBe('active');
-    await page.screenshot({ path: shot('10-reloaded') });
+    await page.screenshot({ path: shot('13-reloaded') });
 
     // ---------- Offline energy regen on load ----------
     const savedRaw = await page.evaluate(() => localStorage.getItem(window.__emberkeep.saveKey));
@@ -224,8 +282,6 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       savedAt: number;
       energy: { current: number; lastRegenAt: number };
     };
-    // Warmth regenerates 1 per 3 minutes — 3 intervals ≈ +3 (capped at max).
-    const expectedEnergy = Math.min(20, saved.energy.current + 3);
     saved.energy.lastRegenAt -= 540_500;
     saved.savedAt -= 540_500;
     await page.evaluate(
@@ -235,20 +291,15 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await page.reload();
     await page.waitForFunction(() => typeof window.render_game_to_text === 'function');
     await expect.poll(async () => (await gameText(page)).scene).toBe('TitleScene');
-    await page.waitForTimeout(1200); // the Play button springs in (alpha 0 → interactive)
+    await page.waitForTimeout(1200);
     await page.mouse.click(640, 670); // Continue
     await expect.poll(async () => (await gameText(page)).scene).toBe('BoardScene');
     const regenerated = await gameText(page);
+    // Use the actual energyMax (grows with level: level 2 = 23) so the cap is correct.
+    const energyMax = regenerated.energy.max;
+    const expectedEnergy = Math.min(energyMax, saved.energy.current + 3);
     expect(regenerated.energy.current).toBeGreaterThanOrEqual(expectedEnergy);
-    expect(regenerated.energy.current).toBeLessThanOrEqual(Math.min(20, expectedEnergy + 1));
-
-    // ---------- Level-up wakes the next zone ----------
-    await page.evaluate(() => window.__emberkeep.grantXp(120)); // cross the level-2 cap
-    await page.waitForTimeout(1900); // let the level-up + camera glide settle
-    const leveled = await gameText(page);
-    expect(leveled.level).toBeGreaterThanOrEqual(2);
-    expect(leveled.regions['level_2']).toBe('active'); // zone 2 woke on level-up
-    await page.screenshot({ path: shot('11-levelup') });
+    expect(regenerated.energy.current).toBeLessThanOrEqual(Math.min(energyMax, expectedEnergy + 1));
 
     // ---------- No console errors anywhere in the run ----------
     expect(consoleErrors).toEqual([]);

@@ -1,94 +1,122 @@
 {
   "steps": [
     {
-      "id": "welcome",
-      "speaker": "laurah",
-      "text": "Welcome to Emberkeep, Keeper. I'm Laurah — last of the Dragon Masters. Three Dragon Eggs have slept here a hundred years… let's wake them.",
+      "id": "lore_1",
+      "speaker": "pip",
+      "text": "Long ago, Emberkeep blazed with dragon fire. Then the cold came... and the dragons slept.",
       "gate": { "type": "tap" },
       "allow": {}
     },
     {
-      "id": "merge_eggs",
-      "speaker": "laurah",
-      "text": "Drag the three eggs together — bring them to one spot and watch what hatches.",
-      "gate": { "type": "event", "event": "item:hatched" },
+      "id": "lore_2",
+      "speaker": "pip",
+      "text": "I am Pip — the last ember still burning. And you, Keeper, are the one who will wake them.",
+      "gate": { "type": "tap" },
+      "allow": {}
+    },
+    {
+      "id": "ruby_merge",
+      "speaker": "pip",
+      "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch your first dragon.",
+      "gate": { "type": "event", "event": "item:hatched", "chain": "ember_dragon" },
+      "effects": [
+        { "spawn": { "chain": "ember_dragon", "tier": 1, "count": 3 } }
+      ],
       "highlight": [
         { "chain": "ember_dragon", "nth": 0 },
         { "chain": "ember_dragon", "nth": 1 },
         { "chain": "ember_dragon", "nth": 2 }
       ],
-      "hand": { "from": { "chain": "ember_dragon", "nth": 2 }, "to": { "chain": "ember_dragon", "nth": 0 } },
+      "hand": {
+        "from": { "chain": "ember_dragon", "nth": 2 },
+        "to": { "chain": "ember_dragon", "nth": 0 }
+      },
       "arrow": { "tile": { "chain": "ember_dragon", "nth": 0 } },
       "allow": { "drag": ["ember_dragon"] }
     },
     {
-      "id": "dragon_gift",
-      "speaker": "laurah",
-      "text": "Wonderful, isn't it? Let's keep merging.",
-      "gate": { "type": "tap" },
-      "allow": {}
-    },
-    {
-      "id": "merge_shards",
-      "speaker": "laurah",
-      "text": "Aren't you curious what happens when we merge these Gem Shards? Drag three together — make two Flame Gems.",
-      "gate": { "type": "count", "chain": "flame_gem", "tier": 2, "count": 2 },
+      "id": "emerald_tap",
+      "speaker": "pip",
+      "text": "Your dragon awakened an Emerald Crystal! Tap it — it will gift you a gem. You will need three.",
+      "gate": { "type": "event", "event": "item:harvested", "chain": "emerald" },
       "effects": [
-        { "spawn": { "chain": "flame_gem", "tier": 1, "count": 6, "nearChain": "ember_dragon" } }
+        { "spawn": { "chain": "crystal", "tier": 1, "count": 1 } },
+        { "spawn": { "chain": "emerald", "tier": 1, "count": 2 } }
       ],
+      "arrow": { "tile": { "chain": "crystal", "nth": 0 } },
+      "allow": { "tapGenerators": true }
+    },
+    {
+      "id": "emerald_merge",
+      "speaker": "pip",
+      "text": "Three Emeralds! Drag them together — a second dragon stirs within.",
+      "gate": { "type": "event", "event": "item:hatched", "chain": "emerald" },
       "highlight": [
-        { "chain": "flame_gem", "nth": 0 },
-        { "chain": "flame_gem", "nth": 1 },
-        { "chain": "flame_gem", "nth": 2 }
+        { "chain": "emerald", "nth": 0 },
+        { "chain": "emerald", "nth": 1 },
+        { "chain": "emerald", "nth": 2 }
       ],
-      "hand": { "from": { "chain": "flame_gem", "nth": 2 }, "to": { "chain": "flame_gem", "nth": 0 } },
-      "arrow": { "tile": { "chain": "flame_gem", "nth": 0 } },
-      "allow": { "drag": ["flame_gem"] }
+      "hand": {
+        "from": { "chain": "emerald", "nth": 2 },
+        "to": { "chain": "emerald", "nth": 0 }
+      },
+      "arrow": { "tile": { "chain": "emerald", "nth": 0 } },
+      "allow": { "drag": ["ember_dragon", "emerald"] }
     },
     {
-      "id": "collect",
-      "speaker": "laurah",
-      "text": "What a wonderful colour, don't you think? Now we can gather the Flame Gems.",
+      "id": "chest",
+      "speaker": "pip",
+      "text": "A Treasure Chest! The isle rewards brave Keepers. Tap it to claim what is inside.",
+      "gate": { "type": "event", "event": "chest:open" },
+      "effects": [
+        { "spawn": { "chain": "chest", "tier": 1, "count": 1, "nearChain": "ember_dragon" } }
+      ],
+      "arrow": { "tile": { "chain": "chest", "nth": 0 } },
+      "allow": { "tapGenerators": true }
+    },
+    {
+      "id": "levelup",
+      "speaker": "pip",
+      "text": "Keeper Level 2! The isle stirs — a new stretch of land has woken to the west. Tap to see!",
       "gate": { "type": "tap" },
+      "effects": [
+        { "grantXp": 38 }
+      ],
       "allow": {}
     },
     {
-      "id": "open_ledger",
-      "speaker": "laurah",
-      "text": "Let's bring them where the rest of the magic happens — open the Ledger, the scroll button.",
-      "gate": { "type": "event", "event": "ui:ledger_opened" },
-      "arrow": { "ui": "ledger" },
-      "hand": { "ui": "ledger" },
-      "allow": { "ledger": true }
-    },
-    {
-      "id": "deliver",
-      "speaker": "laurah",
-      "text": "There's Cindra's order — two Flame Gems. Press Deliver, and she'll hand you a Gold Key.",
-      "gate": { "type": "event", "event": "order:completed" },
-      "hand": { "ui": "deliver" },
-      "allow": { "ledger": true, "deliver": true }
-    },
-    {
-      "id": "cindra_key",
-      "speaker": "laurah",
-      "text": "A Gold Key! Cindra's pleased, in her way. Now we can wake the land beyond the clouds.",
-      "gate": { "type": "tap" },
-      "allow": {}
-    },
-    {
-      "id": "open_fog",
-      "speaker": "laurah",
-      "text": "A Gold Key! See the cloud wearing a key? Tap it — the key burns the fog away and opens the next stretch of the isle.",
+      "id": "key_unlock",
+      "speaker": "pip",
+      "text": "Your dragons gifted you a Gold Key! See that clouded strip? Tap it to burn the fog away.",
       "gate": { "type": "event", "event": "region:unlocked" },
-      "arrow": { "fogRegion": "level_2_gate" },
+      "effects": [
+        { "grantKeys": 1 }
+      ],
       "hand": { "fogRegion": "level_2_gate" },
+      "arrow": { "fogRegion": "level_2_gate" },
       "allow": { "fog": true }
     },
     {
-      "id": "free",
-      "speaker": "laurah",
-      "text": "Emberkeep is waking, Keeper, and it's all your doing. Keep merging, hatch more dragons, and open new lands — the next gate takes two keys. Go on — make it warm again.",
+      "id": "bush_merge",
+      "speaker": "pip",
+      "text": "Three Bushes grew in the opened land! Merge them to raise a House — it earns you coins while you rest. Dragons can Work nearby to speed it up.",
+      "gate": { "type": "event", "event": "item:merged", "chain": "lumber" },
+      "highlight": [
+        { "chain": "lumber", "nth": 0 },
+        { "chain": "lumber", "nth": 1 },
+        { "chain": "lumber", "nth": 2 }
+      ],
+      "hand": {
+        "from": { "chain": "lumber", "nth": 2 },
+        "to": { "chain": "lumber", "nth": 0 }
+      },
+      "arrow": { "tile": { "chain": "lumber", "nth": 0 } },
+      "allow": { "drag": ["ember_dragon", "emerald", "lumber"], "tapGenerators": true }
+    },
+    {
+      "id": "thank_you",
+      "speaker": "pip",
+      "text": "You have lit the ember, Keeper. Emberkeep is alive again — and the adventure is just beginning.",
       "gate": { "type": "tap" },
       "allow": {}
     }

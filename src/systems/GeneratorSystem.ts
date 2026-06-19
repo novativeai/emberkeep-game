@@ -96,7 +96,12 @@ export class GeneratorSystem {
       this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
       return;
     }
-    const target = this.state.freeActiveNeighbors(item.col, item.row)[0];
+    // Prefer an immediate neighbour; fall back to the nearest free active tile so
+    // out-of-zone fixtures (e.g. the crystal fixture at a non-playable position)
+    // can still drop produce somewhere reachable on the active board.
+    const target =
+      this.state.freeActiveNeighbors(item.col, item.row)[0] ??
+      this.state.freeActiveTilesNear(item.col, item.row)[0];
     if (!target) {
       this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'no_space' });
       return;

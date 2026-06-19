@@ -41,7 +41,7 @@
       "name": "Ember Dragons",
       "hatchAtTier": 2,
       "tiers": [
-        { "tier": 1, "id": "ember_dragon_1", "name": "Speckled Ember Egg", "sell": 2, "xp": 0 },
+        { "tier": 1, "id": "ember_dragon_1", "name": "Dragon Ruby", "sell": 2, "xp": 0 },
         {
           "tier": 2,
           "id": "ember_dragon_2",
@@ -82,9 +82,8 @@
     {
       "id": "lumber",
       "name": "Timber",
-      "merge": { "group": 5, "outputs": 1 },
       "tiers": [
-        { "tier": 1, "id": "lumber_1", "name": "Wood", "sell": 1, "xp": 0 },
+        { "tier": 1, "id": "lumber_1", "name": "Bush", "sell": 1, "xp": 0 },
         {
           "tier": 2,
           "id": "lumber_2",
@@ -133,10 +132,10 @@
           "xp": 0,
           "generator": {
             "produces": { "chain": "emerald", "tier": 1 },
-            "cooldownMs": 600000,
+            "cooldownMs": 30000,
             "energyCost": 0,
             "passiveMs": 600000,
-            "tappable": false
+            "tappable": true
           }
         }
       ]
@@ -149,21 +148,33 @@
     {
       "id": "emerald",
       "name": "Emerald Dragons",
-      "hatchAtTier": 3,
+      "hatchAtTier": 2,
       "tiers": [
         { "tier": 1, "id": "emerald_1", "name": "Emerald", "sell": 2, "xp": 0 },
-        { "tier": 2, "id": "emerald_2", "name": "Emerald Egg", "sell": 8, "xp": 10 },
+        {
+          "tier": 2,
+          "id": "emerald_2",
+          "name": "Emerald Hatchling",
+          "sell": 10,
+          "xp": 10,
+          "generator": {
+            "produces": { "chain": "flame_gem", "tier": 1 },
+            "cooldownMs": 10000,
+            "energyCost": 1,
+            "passiveMs": 120000
+          }
+        },
         {
           "tier": 3,
           "id": "emerald_3",
-          "name": "Emerald Dragon",
+          "name": "Emerald Whelp",
           "sell": 20,
           "xp": 24,
           "generator": {
             "produces": { "chain": "flame_gem", "tier": 1 },
             "cooldownMs": 10000,
             "energyCost": 1,
-            "passiveMs": 120000
+            "passiveMs": 90000
           }
         }
       ]

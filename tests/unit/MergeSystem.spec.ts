@@ -154,7 +154,25 @@ describe('MergeSystem', () => {
     expect(ctx.state.itemAt(3, 3)?.id).toBe(weed.id); // bounced home
   });
 
-  it('builds one House from five Wood (per-chain 5 → 1 override)', () => {
+  it('builds one House from three Bushes (standard 3→1 merge)', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 2, row: 2, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    drag(ctx, [2, 2], [1, 3]); // connects all three orthogonally
+
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.consumedIds).toHaveLength(3);
+    expect(merges[0]!.outputs).toHaveLength(1);
+    expect(ctx.state.items.size).toBe(1);
+    const house = [...ctx.state.items.values()][0];
+    expect(house?.chain).toBe('lumber');
+    expect(house?.tier).toBe(2);
+  });
+
+  it('five Bushes merge into two Houses (standard 5-bonus rule)', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 1, kind: 'item' });
     ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 2, kind: 'item' });
@@ -167,44 +185,41 @@ describe('MergeSystem', () => {
 
     expect(merges).toHaveLength(1);
     expect(merges[0]!.consumedIds).toHaveLength(5);
-    expect(merges[0]!.outputs).toHaveLength(1); // the override yields 1, not the 5→2 bonus
-    const house = ctx.state.itemAt(2, 3);
-    expect(house?.chain).toBe('lumber');
-    expect(house?.tier).toBe(2);
-    expect(ctx.state.items.size).toBe(1);
+    expect(merges[0]!.outputs).toHaveLength(2); // 5-bonus yields 2
+    expect(ctx.state.items.size).toBe(2);
+    for (const item of ctx.state.items.values()) {
+      expect(item.chain).toBe('lumber');
+      expect(item.tier).toBe(2);
+    }
   });
 
-  it('does NOT build a House from only four Wood (below the 5 threshold)', () => {
+  it('emerald chain: 3 emeralds → Emerald Hatchling (hatchAtTier=2)', () => {
     const ctx = createTestContext();
-    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 1, kind: 'item' });
-    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 2, kind: 'item' });
-    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 2, row: 2, kind: 'item' });
-    ctx.state.addItem({ chain: 'lumber', tier: 1, col: 3, row: 3, kind: 'item' });
-    const merges = capture(ctx.bus, 'item:merged');
-
-    drag(ctx, [3, 3], [2, 3]); // only four connect
-
-    expect(merges).toHaveLength(0);
-    expect(ctx.state.items.size).toBe(4);
-  });
-
-  it('emerald chain: 3 emeralds → an Emerald Egg, and 3 eggs hatch the Emerald Dragon', () => {
-    const ctx = createTestContext();
-    // 3 emerald gems → 1 emerald egg (tier 2)
     ctx.state.addItem({ chain: 'emerald', tier: 1, col: 1, row: 1, kind: 'item' });
     ctx.state.addItem({ chain: 'emerald', tier: 1, col: 1, row: 2, kind: 'item' });
     ctx.state.addItem({ chain: 'emerald', tier: 1, col: 3, row: 3, kind: 'item' });
-    drag(ctx, [3, 3], [1, 3]);
-    expect(ctx.state.itemAt(1, 3)).toMatchObject({ chain: 'emerald', tier: 2 });
+    const hatches = capture(ctx.bus, 'item:hatched');
 
-    // 3 emerald eggs → the Emerald Dragon (tier 3 = hatch tier)
+    drag(ctx, [3, 3], [1, 3]); // merge 3 → emerald_2 = hatch tier
+
+    expect(hatches).toHaveLength(1);
+    expect(hatches[0]!.item).toMatchObject({ chain: 'emerald', tier: 2 });
+    expect(ctx.state.itemAt(1, 3)?.readyAt).toBeDefined(); // ready generator
+  });
+
+  it('emerald chain: 3 hatchlings → Emerald Whelp (no second hatch)', () => {
+    const ctx = createTestContext();
     ctx.state.addItem({ chain: 'emerald', tier: 2, col: 1, row: 1, kind: 'item' });
     ctx.state.addItem({ chain: 'emerald', tier: 2, col: 1, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'emerald', tier: 2, col: 1, row: 3, kind: 'item' });
     const hatches = capture(ctx.bus, 'item:hatched');
-    drag(ctx, [1, 3], [1, 1]); // bring the third egg onto the pair
-    expect(hatches).toHaveLength(1);
-    expect(hatches[0]!.item).toMatchObject({ chain: 'emerald', tier: 3 });
-    expect(ctx.state.itemAt(1, 1)?.readyAt).toBeDefined(); // a ready generator
+
+    drag(ctx, [1, 3], [1, 1]); // merge 3 → emerald_3
+
+    expect(hatches).toHaveLength(0); // tier 3 is NOT the hatchAtTier
+    const whelp = ctx.state.itemAt(1, 1);
+    expect(whelp).toMatchObject({ chain: 'emerald', tier: 3 });
+    expect(whelp?.readyAt).toBeDefined(); // still a ready generator
   });
 
   it('merging 3 eggs hatches: emits item:hatched and the result is a ready generator', () => {

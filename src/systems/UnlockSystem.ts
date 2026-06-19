@@ -35,6 +35,10 @@ export class UnlockSystem {
       this.bus.emit('region:unlock_failed', { regionId, reason: 'level' });
       return;
     }
+    if (region.unlock.level !== undefined && this.state.level < region.unlock.level) {
+      this.bus.emit('region:unlock_failed', { regionId, reason: 'level' });
+      return;
+    }
     if (this.state.keys < region.unlock.keys) {
       this.bus.emit('region:unlock_failed', { regionId, reason: 'keys' });
       return;
@@ -48,6 +52,7 @@ export class UnlockSystem {
     for (const region of this.map.regions) {
       if (
         region.unlock?.level !== undefined &&
+        region.unlock.keys === undefined && // key-gated regions unlock via fog:tapped, not level
         region.unlock.level <= level &&
         this.state.regionStatus.get(region.id) === 'unlockable'
       ) {

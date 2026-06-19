@@ -46,13 +46,14 @@ export class TutorialDirector {
   ) {
     bus.on('item:hatched', ({ item }) => {
       this.lastHatched = { col: item.col, row: item.row };
-      this.onGateEvent('item:hatched');
+      this.onGateEvent('item:hatched', item.chain);
     });
     bus.on('item:merged', ({ chain }) => {
       this.onGateEvent('item:merged', chain);
       this.checkCountGate();
     });
-    bus.on('item:harvested', () => this.onGateEvent('item:harvested'));
+    bus.on('item:harvested', ({ output }) => this.onGateEvent('item:harvested', output.chain));
+    bus.on('chest:open', () => this.onGateEvent('chest:open'));
     bus.on('order:completed', () => this.onGateEvent('order:completed'));
     bus.on('region:unlocked', () => this.onGateEvent('region:unlocked'));
     bus.on('ui:ledger_toggled', ({ open }) => {
@@ -120,7 +121,7 @@ export class TutorialDirector {
     }
   }
 
-  /** Run a step's scripted reward beats via bus commands (spawn / ripen / key). */
+  /** Run a step's scripted reward beats via bus commands (spawn / ripen / key / xp). */
   private applyEffects(step: TutorialStepConfig | undefined): void {
     for (const effect of step?.effects ?? []) {
       if ('spawn' in effect) {
@@ -129,6 +130,8 @@ export class TutorialDirector {
         this.bus.emit('board:retier', effect.retier);
       } else if ('grantKeys' in effect) {
         this.bus.emit('economy:add', { keys: effect.grantKeys, reason: 'tutorial' });
+      } else if ('grantXp' in effect) {
+        this.bus.emit('economy:add', { xp: effect.grantXp, reason: 'tutorial' });
       }
     }
   }
