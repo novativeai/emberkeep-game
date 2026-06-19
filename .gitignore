@@ -19,6 +19,12 @@ playwright-report/
 /full-water-bg.jpg
 /dragon-land.world.json
 
+# World-builder project files — large authoring artifacts (28 MB each).
+# The game runs from src/data/map.json (generated); keep these locally but
+# never commit them so clone stays fast.
+assets/map/*.json
+assets/map/*.worldproject.json
+
 # external standalone tools that carry their own .git (not part of this repo)
 /rigger/
 /world/
