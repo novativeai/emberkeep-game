@@ -23,10 +23,16 @@ export class TitleScene extends Phaser.Scene {
     // show the logo image, and the Play button below renders on the transparent
     // canvas ON TOP. Everything is restored for gameplay on scene shutdown.
     const waterBg = document.querySelector<HTMLElement>('.water-bg');
+    const titleBg = document.getElementById('title-bg');
     const titleLogo = document.getElementById('title-logo');
     const prevBodyBg = document.body.style.background;
     if (waterBg) waterBg.style.display = 'none';
     document.body.style.background = '#180f15';
+    // Title-only cloud background behind the logo + button.
+    if (titleBg) {
+      titleBg.style.display = 'block';
+      requestAnimationFrame(() => (titleBg.style.opacity = '1'));
+    }
     if (titleLogo) {
       titleLogo.style.display = 'block';
       // next frame so the opacity transition runs
@@ -45,6 +51,10 @@ export class TitleScene extends Phaser.Scene {
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (waterBg) waterBg.style.display = '';
+      if (titleBg) {
+        titleBg.style.opacity = '0';
+        titleBg.style.display = 'none';
+      }
       if (titleLogo) {
         titleLogo.style.opacity = '0';
         titleLogo.style.display = 'none';
