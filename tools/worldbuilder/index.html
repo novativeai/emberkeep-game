@@ -14,7 +14,7 @@
   body {
     background:var(--bg); color:var(--cream);
     font:13px/1.45 "Trebuchet MS", Verdana, sans-serif;
-    display:grid; grid-template-rows:46px 1fr 28px; grid-template-columns:1fr 310px;
+    display:grid; grid-template-rows:46px 1fr 28px; grid-template-columns:1fr var(--side-w, 312px);
     grid-template-areas:"toolbar toolbar" "stage side" "status status";
   }
   #toolbar { grid-area:toolbar; display:flex; align-items:center; gap:8px;
@@ -27,14 +27,30 @@
   button.tool.active { background:var(--gold); color:#3A2B38; font-weight:bold; }
   button.primary { background:var(--moss); color:#1d3010; font-weight:bold; }
   button.warn { background:var(--lava); color:var(--cream); }
+  /* animation tool (top bar) — appears only when a decor is selected */
+  #animTool { align-items:center; gap:4px; }
+  #animTool .lbl { color:var(--gold2); white-space:nowrap; font-size:12px; }
+  button.anim { padding:4px 9px; font-size:12px; }
+  button.anim.active { background:var(--gold2); color:#3A2B38; font-weight:bold; border-color:var(--gold2); }
   input[type=number] { width:62px; }
   .sep { width:1px; height:24px; background:var(--line); margin:0 2px; }
   .spacer { flex:1; }
+  /* toolbar: brand pinned left, file actions + Export pinned right, crowded middle scrolls */
+  #tbScroll { flex:1; min-width:0; display:flex; align-items:center; gap:8px; overflow-x:auto; overflow-y:hidden; padding-bottom:3px; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+  #tbScroll::-webkit-scrollbar { height:6px; }
+  #tbScroll::-webkit-scrollbar-thumb { background:var(--line); border-radius:3px; }
+  #tbScroll::-webkit-scrollbar-track { background:transparent; }
+  #tbScroll > * { flex:none; }
+  #tbRight { display:flex; align-items:center; gap:8px; flex:none; }
+  /* draggable handle on the sidebar's left edge — widen the asset panel */
+  #sideResize { position:absolute; left:-4px; top:0; bottom:0; width:8px; cursor:ew-resize; z-index:40; }
+  #sideResize::after { content:''; position:absolute; left:3px; top:0; bottom:0; width:2px; background:transparent; transition:background .15s; }
+  #sideResize:hover::after, #sideResize.drag::after { background:var(--gold); }
   #stageWrap { grid-area:stage; position:relative; overflow:hidden; }
   #stage { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
   /* sidebar */
   #side { grid-area:side; background:var(--panel); border-left:1px solid var(--line);
-    display:flex; flex-direction:column; overflow:hidden; }
+    display:flex; flex-direction:column; overflow:hidden; position:relative; }
   .tabs { display:flex; border-bottom:1px solid var(--line); }
   .tabs button { flex:1; border:none; border-radius:0; padding:9px; background:var(--panel);
     border-bottom:3px solid transparent; }
@@ -49,6 +65,7 @@
     background:repeating-conic-gradient(#454 0% 25%, #565 0% 50%) 0 0/12px 12px; border-radius:4px; }
   .assetCard .nm { font-size:11px; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .assetCard .calib { position:absolute; top:3px; left:4px; font-size:9px; color:var(--gold2); background:rgba(36,27,34,.7); padding:0 3px; border-radius:3px; }
+  .assetCard .animb { position:absolute; bottom:23px; left:4px; font-size:12px; background:rgba(36,27,34,.72); padding:0 3px; border-radius:3px; }
   .assetCard .del { position:absolute; top:2px; right:2px; background:var(--lava); border:none; color:#fff; border-radius:4px; padding:0 5px; font-size:11px; }
   /* inspector */
   #inspector { border-top:1px solid var(--line); padding:8px 10px 6px; }
@@ -68,6 +85,7 @@
 <body>
   <div id="toolbar">
     <span class="brand">🗺 World Builder</span>
+    <div id="tbScroll">
     <input id="worldName" type="text" value="cinder-hollow" title="World id (export filename + JSON)" style="width:120px" />
     <button id="loadStarter" title="Re-load the bundled border-grass tiles + cloud blocker">⤓ Starter assets</button>
     <button id="loadCurrent" title="Load the current shipped world (default on the deployed link)">🌍 Current world</button>
@@ -77,39 +95,60 @@
         title="Level tag stamped on each cloud blocker you place (a group per level)" /></label>
     <span class="sep"></span>
     <button class="tool active" id="toolPaint" title="B — click cells to place the selected asset">🖌 Paint</button>
-    <button class="tool" id="toolSelect" title="V — click a placed element to select & adjust it">✥ Select</button>
+    <button class="tool" id="toolSelect" title="V — click a placed element to select & adjust it">❖ Select</button>
+    <button class="tool" id="toolMove" title="M — drag a decor / background / 3D element to move it freely, off the grid">✥ Move</button>
     <button class="tool" id="toolErase" title="E — click to remove the topmost element on a cell">⌫ Erase</button>
     <button class="tool" id="toolPan" title="H — drag to pan (also: hold Space, middle/right-drag, or arrow keys)">✋ Pan</button>
     <span class="sep"></span>
     <label class="hint" style="padding:0">Tile&nbsp;
-      <input id="tileW" type="number" value="240" title="Tile width (grid cell)" />×
-      <input id="tileH" type="number" value="120" title="Tile height (grid cell)" /></label>
+      <input id="tileW" type="number" value="240" title="Tile width — grid cell horizontal span (px)" style="width:52px" />×
+      <input id="tileH" type="number" value="120" title="Tile height — grid cell vertical span (px); also sets the iso pitch" style="width:52px" /></label>
+    <label class="hint" style="padding:0" title="Iso angle — the tile edge's tilt from horizontal (°). Linked to width/height: edit it to set the grid pitch directly.">∠
+      <input id="gridAngle" type="number" value="26.6" step="0.5" min="1" max="80" style="width:52px" />°</label>
+    <label class="hint" style="padding:0" title="Skew — leans the grid into a parallelogram for a custom perspective (0° = symmetric iso).">⤡
+      <input id="gridSkew" type="number" value="0" step="1" min="-60" max="60" style="width:50px" />°</label>
     <button id="zoomFit" title="F">Fit</button>
     <button id="gridToggle" title="G — toggle grid">▦ Grid</button>
     <button id="tagToggle" title="T — show/hide cloud level tags">☁# Tags</button>
-    <span class="spacer"></span>
+    <span class="sep" id="animSep" style="display:none"></span>
+    <span id="animTool" style="display:none">
+      <span class="lbl">🎬 Animate</span>
+      <button class="anim" id="animNone" title="No animation">None</button>
+      <button class="anim" id="animPuppet" title="Breathing squash & stretch, planted at the base (trees, houses)">🤸 Puppet</button>
+      <button class="anim" id="animFloat" title="Smooth up-and-down hover (merge-game float)">🎈 Floating</button>
+    </span>
+    </div>
+    <div id="tbRight">
     <span id="saveDot" title="auto-saved to this browser" style="color:var(--moss); opacity:0.35; font-size:11px; transition:opacity .3s">● auto</span>
     <button id="newWorld" title="Start a fresh world (clears the auto-saved session)">✦ New</button>
     <button id="loadProject" title="Load a saved .worldproject.json file">Load</button>
     <button id="saveProject" title="Download a .worldproject.json backup file">Save</button>
     <button class="primary" id="exportWorld" title="World JSON: per-asset calibration (offset/scale/anchor), all placements, embedded PNGs">⬇ Export world.json</button>
+    </div>
   </div>
 
   <div id="stageWrap"><canvas id="stage"></canvas></div>
 
   <div id="side">
+    <div id="sideResize" title="Drag to widen the asset panel"></div>
     <div class="tabs">
       <button id="tabTiles" class="active">🟫 Tiles <span class="count" id="tileCount">(0)</span></button>
       <button id="tabGround">🟤 Non-play <span class="count" id="groundCount">(0)</span></button>
       <button id="tabDecor">🌿 Decor <span class="count" id="decorCount">(0)</span></button>
       <button id="tabBlockers">☁ Blockers <span class="count" id="blockerCount">(0)</span></button>
+      <button id="tabBackground">🖼 Background <span class="count" id="backgroundCount">(0)</span></button>
+      <button id="tab3d">🧊 3D <span class="count" id="count3d">(0)</span></button>
       <button id="tabMerge">🔮 Merge <span class="count" id="mergeCount">(0)</span></button>
     </div>
     <div class="hint" id="catHint">Tiles are the floor — one per cell. Click a card to select, then Paint.</div>
     <div id="uploadRow" style="padding:0 8px 6px"><button id="uploadBtn" style="width:100%">＋ Upload <span id="uploadCat">tile</span> PNGs…</button>
-      <input id="fileInput" type="file" accept="image/png,image/webp" multiple hidden /></div>
+      <input id="fileInput" type="file" accept="image/png,image/webp,image/jpeg" multiple hidden /></div>
     <div id="mergeActions" style="padding:0 8px 6px; display:none; gap:6px">
       <button id="resetMerge" style="width:100%" title="Revert every merge slot to its placeholder">↺ Reset all merge art to placeholders</button>
+    </div>
+    <div id="backgroundActions" style="padding:0 8px 6px; display:none; flex-direction:column; gap:6px">
+      <button id="fillBackground" style="width:100%" title="Fill the world's bounding box + a 10-tile border with the selected background">⛶ Fill world + 10-tile border</button>
+      <button id="clearBackground" style="width:100%" title="Remove every background placement">⌫ Clear all backgrounds</button>
     </div>
     <div id="assetGrid"></div>
 
@@ -126,6 +165,11 @@
         <label style="color:var(--gold2)">Level</label>
         <input type="number" id="instLevel" min="1" max="30" value="1" style="grid-column:2/4; width:74px" title="Which level this cloud blocks" />
       </div>
+      <div id="animRow" style="display:none; border-top:1px dashed var(--line); margin-top:7px; padding-top:7px">
+        <div class="hint" id="animHint" style="padding:0 0 5px">🎈 Floating — smooth up/down hover.</div>
+        <div class="slider"><label>Amplitude</label><input type="range" id="sAmp" min="0" max="100" step="1" value="45" /><span class="val" id="vAmp">45</span></div>
+        <div class="slider"><label>Speed</label><input type="range" id="sSpeed" min="0" max="100" step="1" value="45" /><span class="val" id="vSpeed">45</span></div>
+      </div>
       <div class="row">
         <button id="resetCalib">Reset</button>
         <button id="raiseEl" title="bring selected placed element forward">▲ Forward</button>
@@ -138,6 +182,12 @@
       <h3>🎥 Camera per level <small style="color:var(--dim)">— framing on unlock</small></h3>
       <div class="hint">Frame the view, then <b>Set</b> a keyframe for a level. On level-up the game flies to it (extra-smooth). <b>Go</b> previews one; ▶ tours them all.</div>
       <div id="camRows"></div>
+      <h3 style="border-top:1px solid var(--line); margin-top:4px">🔍 Zoom lock <small style="color:var(--dim)">— in-game limits</small></h3>
+      <div class="hint">How far the player may zoom OUT / IN on the board — the game clamps wheel zoom to this range.</div>
+      <div class="row" style="padding:0 10px 8px; align-items:center; gap:12px; color:var(--dim)">
+        <label>min <input id="zoomMin" type="number" value="0.2" step="0.05" min="0.05" max="3" style="width:58px" title="Most zoomed-OUT (smaller = more board visible)" /></label>
+        <label>max <input id="zoomMax" type="number" value="1.4" step="0.05" min="0.1" max="5" style="width:58px" title="Most zoomed-IN (larger = closer)" /></label>
+      </div>
       <div class="row" style="padding:0 10px 8px">
         <button id="camTour" style="flex:1">▶ Preview tour</button>
       </div>
@@ -146,6 +196,15 @@
 
   <div id="status">Upload tile PNGs, pick one, and paint the floor. Then switch to Decor for props.</div>
 
+<script type="module">
+// Three.js for the 3D animated decor section (loaded from CDN; the rest of the
+// builder stays zero-dep). Bridges to the main script via window.THREE.
+try {
+  const THREE = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js');
+  window.THREE = THREE;
+  window.dispatchEvent(new CustomEvent('three-ready'));
+} catch (e) { window.dispatchEvent(new CustomEvent('three-failed')); }
+</script>
 <script>
 'use strict';
 /* =====================================================================
@@ -161,6 +220,7 @@
 
 const S = {
   tileW: 240, tileH: 120,
+  gridSkew: 0,         // horizontal shear of the grid (°): 0 = symmetric iso diamond
   assets: {},          // id -> {id,name,category,file,img,w,h, offX,offY,scale,anchorX,anchorY}
   placements: [],      // {id, assetId, col, row, z, level?}  blocker placements carry a level tag
   category: 'tile',    // active sidebar tab: 'tile' | 'decor' | 'blocker'
@@ -173,6 +233,7 @@ const S = {
   showGrid: true,
   showLevelTags: true,
   cameraKeyframes: {}, // level -> { wx, wy, zoom } focal world point + zoom
+  gameZoom: { min: 0.2, max: 1.4 }, // in-game wheel-zoom clamp the game enforces
   flying: null,        // active smooth camera transition (raf id)
   drag: null,
   ready: false, // becomes true once the initial load/restore finishes (gates auto-save)
@@ -181,7 +242,11 @@ const S = {
 };
 const uid = () => S.nextId++;
 
-const CATEGORIES = ['tile', 'decotile', 'decor', 'blocker'];
+const CATEGORIES = ['tile', 'decotile', 'decor', 'blocker', 'background', '3d'];
+// Backgrounds sit BELOW the world tiles (one per cell) so the floor superposes
+// over them. A "fill" stamps them across the whole map plus a 10-tile border.
+const isBackground = (a) => a && a.category === 'background';
+const BG_FILL_MARGIN = 10;
 
 // The full merge-item library: every game element, pre-labelled. Drop your own
 // art onto any slot to replace its placeholder one-by-one (export carries the map).
@@ -251,13 +316,28 @@ const statusEl = document.getElementById('status');
 const say = (h) => { statusEl.innerHTML = h; };
 
 /* ----------------------------- math ----------------------------- */
-const worldOf = (col, row) => ({ x: (col - row) * S.tileW / 2, y: (col + row) * S.tileH / 2 });
+// The grid is a parametric axonometric projection: two screen-space axis vectors
+// (one world step in +col / +row) derived from tile size + skew. Skew 0 gives the
+// classic symmetric 2:1 iso diamond; non-zero skew shears the vertical, leaning the
+// diamond into a parallelogram (a custom perspective). det is constant (2·hw·hh ≠ 0),
+// so the projection is always invertible — cellOf works at any angle/skew.
+function gridAxes() {
+  const hw = S.tileW / 2, hh = S.tileH / 2;
+  const k = Math.tan((S.gridSkew || 0) * Math.PI / 180);
+  return { cx: hw + k * hh, cy: hh, rx: -hw + k * hh, ry: hh, det: 2 * hw * hh };
+}
+const worldOf = (col, row) => { const A = gridAxes(); return { x: col * A.cx + row * A.rx, y: col * A.cy + row * A.ry }; };
 const toScreen = (wx, wy) => ({ x: wx * S.cam.zoom + S.cam.x, y: wy * S.cam.zoom + S.cam.y });
 const toWorld = (sx, sy) => ({ x: (sx - S.cam.x) / S.cam.zoom, y: (sy - S.cam.y) / S.cam.zoom });
+// Invert the axis matrix: world point → fractional (col,row).
+function worldToCell(wx, wy) {
+  const A = gridAxes();
+  return { col: (wx * A.ry - A.rx * wy) / A.det, row: (A.cx * wy - wx * A.cy) / A.det };
+}
 function cellOf(sx, sy) {
   const w = toWorld(sx, sy);
-  const a = w.x / (S.tileW / 2), b = w.y / (S.tileH / 2);
-  return { col: Math.round((b + a) / 2), row: Math.round((b - a) / 2) };
+  const c = worldToCell(w.x, w.y);
+  return { col: Math.round(c.col), row: Math.round(c.row) };
 }
 const assetById = (id) => S.assets[id];
 const placementById = (id) => S.placements.find((p) => p.id === id);
@@ -270,29 +350,129 @@ function resize() {
 }
 new ResizeObserver(resize).observe(wrap);
 
+/* --------------------- resizable asset sidebar --------------------- */
+// Drag the handle on the panel's left edge to widen it (it overflows when the
+// asset cards + inspector get crowded). Width persists per browser.
+(function () {
+  const handle = document.getElementById('sideResize');
+  const MIN = 264, MAX = 760;
+  const apply = (w) => document.body.style.setProperty('--side-w', Math.max(MIN, Math.min(MAX, w)) + 'px');
+  try { const saved = +localStorage.getItem('wb-side-w'); if (saved) apply(saved); } catch (e) {}
+  let dragging = false;
+  handle.addEventListener('mousedown', (e) => { dragging = true; handle.classList.add('drag'); e.preventDefault(); });
+  window.addEventListener('mousemove', (e) => { if (dragging) apply(window.innerWidth - e.clientX); });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return; dragging = false; handle.classList.remove('drag');
+    try { localStorage.setItem('wb-side-w', parseInt(getComputedStyle(document.body).getPropertyValue('--side-w')) || 312); } catch (e) {}
+  });
+})();
+
 function drawDiamond(cx, cy, stroke, fill) {
   const hw = S.tileW / 2 * S.cam.zoom, hh = S.tileH / 2 * S.cam.zoom;
+  // skew shifts the top/bottom vertices horizontally by ±tan(skew)·hh.
+  const sk = Math.tan((S.gridSkew || 0) * Math.PI / 180) * hh;
   ctx.beginPath();
-  ctx.moveTo(cx, cy - hh);
+  ctx.moveTo(cx - sk, cy - hh);
   ctx.lineTo(cx + hw, cy);
-  ctx.lineTo(cx, cy + hh);
+  ctx.lineTo(cx + sk, cy + hh);
   ctx.lineTo(cx - hw, cy);
   ctx.closePath();
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
 }
 
+/* ----------------------------- animation ----------------------------- */
+// Live preview clock + the per-asset motion the world builder visualises.
+// Two kinds, decor only: PUPPET breathes (vertical squash/stretch planted at
+// the base — middle-bottom to middle-top) and FLOATING hovers (smooth up/down).
+const ANIM = { t: 0, raf: null };
+// SINGLE SOURCE OF TRUTH for the motion: the live preview AND the exported spec
+// both derive from these — so the JSON the game ingests reproduces the builder
+// pixel-for-pixel without knowing any of these constants.
+const ANIM_MODEL = {
+  freqBase: 0.18, freqSpan: 1.5,    // frequencyHz = freqBase + speed/100 * freqSpan
+  puppetMax: 0.26,                  // puppet: peak |scaleY − 1| at amplitude 100
+  floatMax: 0.25,                   // floating: peak offset ÷ sprite height at amplitude 100
+  phasePerCol: 1.7, phasePerRow: 0.9 // per-instance desync (radians) by grid cell
+};
+const clamp01 = (v) => Math.max(0, Math.min(100, v)) / 100;
+const animFreq = (anim) => ANIM_MODEL.freqBase + clamp01(anim.speed) * ANIM_MODEL.freqSpan;
+const animActive = (a) => a && a.category === 'decor' && a.anim && a.anim.type !== 'none';
+function anyAnimating() { return S.placements.some((p) => animActive(assetById(p.assetId))); }
+function animWave(anim, col, row) {
+  // sin(phase) in [-1,1]; the per-instance phase keeps a field of props from
+  // pulsing in lockstep — EXACTLY the phase the export documents.
+  const phase = ANIM.t * 2 * Math.PI * animFreq(anim) + col * ANIM_MODEL.phasePerCol + row * ANIM_MODEL.phasePerRow;
+  return Math.sin(phase);
+}
+// Fully-resolved, engine-ready playback spec for the export. No builder-internal
+// constants are needed downstream: the game multiplies `amount` by its own
+// sprite (heightFraction) or applies it as a scale delta (scaleDelta).
+function resolveAnim(anim) {
+  const isPuppet = anim.type === 'puppet';
+  const freq = animFreq(anim);
+  const amount = (isPuppet ? ANIM_MODEL.puppetMax : ANIM_MODEL.floatMax) * clamp01(anim.amplitude);
+  return {
+    transform: isPuppet ? 'scaleY' : 'translateY',
+    axis: 'y', wave: 'sine', rest: 'symmetric',
+    frequencyHz: +freq.toFixed(5), periodMs: Math.round(1000 / freq),
+    amount: +amount.toFixed(5),
+    amountUnit: isPuppet ? 'scaleDelta' : 'heightFraction',
+    pivot: isPuppet ? 'bottom-center' : 'center',
+    phasePerCol: ANIM_MODEL.phasePerCol, phasePerRow: ANIM_MODEL.phasePerRow,
+    timeUnit: 'seconds',
+    formula: isPuppet
+      ? 'scaleY = 1 + amount*sin(2*PI*frequencyHz*tSec + col*phasePerCol + row*phasePerRow); scaled about pivot bottom-center'
+      : 'spriteY -= amount*spriteHeightPx*sin(2*PI*frequencyHz*tSec + col*phasePerCol + row*phasePerRow)'
+  };
+}
+function animLoop(now) {
+  ANIM.t = now / 1000;
+  if (anyAnimating()) { render(true); ANIM.raf = requestAnimationFrame(animLoop); }
+  else ANIM.raf = null;
+}
+function ensureAnimLoop() { if (ANIM.raf == null && anyAnimating()) ANIM.raf = requestAnimationFrame(animLoop); }
+
 /** Draw one element's image with its asset calibration. Returns screen rect. */
-function drawElement(a, col, row) {
+function drawElement(a, col, row, dx = 0, dy = 0) {
   const wc = worldOf(col, row);
+  wc.x += dx; wc.y += dy; // per-placement free offset (decor/background/3D moved off-grid)
+  if (a.invisible) {
+    // No sprite — the background shows straight through. We paint a faint
+    // editor-only diamond so the author can see & select the playable cell;
+    // nothing is exported as art (the cell is just flagged playable).
+    const s = toScreen(wc.x, wc.y);
+    const hw = S.tileW / 2 * S.cam.zoom, hh = S.tileH / 2 * S.cam.zoom;
+    const sk = Math.tan((S.gridSkew || 0) * Math.PI / 180) * hh;
+    ctx.save();
+    ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(126,203,79,0.6)';
+    ctx.fillStyle = 'rgba(126,203,79,0.06)';
+    ctx.beginPath();
+    ctx.moveTo(s.x - sk, s.y - hh); ctx.lineTo(s.x + hw, s.y);
+    ctx.lineTo(s.x + sk, s.y + hh); ctx.lineTo(s.x - hw, s.y); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+    return { left: s.x - hw, top: s.y - hh, w: hw * 2, h: hh * 2 };
+  }
   const s = toScreen(wc.x + a.offX, wc.y + a.offY);
   const w = a.w * a.scale * S.cam.zoom, h = a.h * a.scale * S.cam.zoom;
-  const left = s.x - a.anchorX * w, top = s.y - a.anchorY * h;
-  ctx.drawImage(a.img, left, top, w, h);
-  return { left, top, w, h };
+  let left = s.x - a.anchorX * w, top = s.y - a.anchorY * h, dh = h;
+  if (animActive(a)) {
+    const amp = clamp01(a.anim.amplitude);
+    const wave = animWave(a.anim, col, row);
+    if (a.anim.type === 'floating') {
+      top -= wave * ANIM_MODEL.floatMax * amp * h;    // bob up/down around rest
+    } else {                                          // puppet: scaleY about the base
+      const sy = 1 + wave * ANIM_MODEL.puppetMax * amp;
+      dh = h * sy;
+      top = (top + h) - dh;                           // keep the bottom edge planted
+    }
+  }
+  ctx.drawImage(a.img, left, top, w, dh);
+  return { left, top, w, h: dh };
 }
 
-function render() {
+function render(transient) {
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   const W = wrap.clientWidth, H = wrap.clientHeight;
   ctx.fillStyle = '#2c2733';
@@ -304,25 +484,14 @@ function render() {
   for (const c of corners) { minC = Math.min(minC, c.col); maxC = Math.max(maxC, c.col); minR = Math.min(minR, c.row); maxR = Math.max(maxR, c.row); }
   minC -= 2; maxC += 2; minR -= 2; maxR += 2;
 
-  // grid
-  if (S.showGrid) {
-    for (let row = minR; row <= maxR; row++) {
-      for (let col = minC; col <= maxC; col++) {
-        const wc = worldOf(col, row);
-        const s = toScreen(wc.x, wc.y);
-        const even = ((col + row) % 2 + 2) % 2 === 0;
-        drawDiamond(s.x, s.y, 'rgba(255,246,232,0.10)', even ? 'rgba(255,246,232,0.03)' : 'transparent');
-      }
-    }
-    // origin cell highlight
-    const o = toScreen(0, 0);
-    drawDiamond(o.x, o.y, 'rgba(247,164,55,0.6)', 'rgba(247,164,55,0.08)');
-  }
-
-  // floor first, then everything above (decor + blockers), painter-sorted.
+  // backgrounds (below the floor), then floor, then everything above (decor +
+  // blockers), each painter-sorted.
+  const inView = (p) => p.col >= minC && p.col <= maxC && p.row >= minR && p.row <= maxR;
+  const backgrounds = S.placements.filter((p) => isBackground(assetById(p.assetId)) && inView(p));
   const tiles = S.placements.filter((p) => isFloor(assetById(p.assetId)));
-  const above = S.placements.filter((p) => { const a = assetById(p.assetId); return a && !isFloor(a); });
+  const above = S.placements.filter((p) => { const a = assetById(p.assetId); return a && !isFloor(a) && !isBackground(a); });
   const sortKey = (p) => (p.col + p.row) * 1000 + p.z;
+  backgrounds.sort((a, b) => sortKey(a) - sortKey(b));
   tiles.sort((a, b) => sortKey(a) - sortKey(b));
   above.sort((a, b) => sortKey(a) - sortKey(b));
 
@@ -343,12 +512,36 @@ function render() {
     ctx.fillText(String(lvl), bx, by + 0.5);
     ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
   };
-  for (const p of tiles) { const a = assetById(p.assetId); if (a) hi(p, drawElement(a, p.col, p.row)); }
+  // draw each placement at its cell + per-placement free offset, and record the
+  // screen rect so picking works even when an element is moved off its cell.
+  S.hitRects = [];
+  const drawP = (p) => {
+    const a = assetById(p.assetId); if (!a) return null;
+    const rect = drawElement(a, p.col, p.row, p.dx || 0, p.dy || 0);
+    hi(p, rect); S.hitRects.push({ p, rect });
+    return rect;
+  };
+  for (const p of backgrounds) drawP(p);
+  for (const p of tiles) drawP(p);
   for (const p of above) {
-    const a = assetById(p.assetId); if (!a) continue;
-    const rect = drawElement(a, p.col, p.row);
-    hi(p, rect);
-    if (a.category === 'blocker' && S.showLevelTags) levelBadge(p, rect);
+    const rect = drawP(p); const a = assetById(p.assetId);
+    if (rect && a && a.category === 'blocker' && S.showLevelTags) levelBadge(p, rect);
+  }
+
+  // grid ON TOP — always in front of tiles/backgrounds/decor so the cells stay
+  // visible as an editing guide (it used to be hidden behind the background).
+  if (S.showGrid) {
+    for (let row = minR; row <= maxR; row++) {
+      for (let col = minC; col <= maxC; col++) {
+        const wc = worldOf(col, row);
+        const s = toScreen(wc.x, wc.y);
+        const even = ((col + row) % 2 + 2) % 2 === 0;
+        drawDiamond(s.x, s.y, 'rgba(255,246,232,0.10)', even ? 'rgba(255,246,232,0.03)' : 'transparent');
+      }
+    }
+    // origin cell highlight
+    const o = toScreen(0, 0);
+    drawDiamond(o.x, o.y, 'rgba(247,164,55,0.6)', 'rgba(247,164,55,0.08)');
   }
 
   // hovered cell marker
@@ -377,7 +570,7 @@ function render() {
     ctx.fillText(label, s.x + 23, s.y - 16);
     ctx.restore();
   }
-  scheduleSave(); // debounced auto-save on any state/view change (no-op until ready)
+  if (!transient) scheduleSave(); // debounced auto-save (skipped on animation frames)
 }
 
 /* --------------------------- asset library --------------------------- */
@@ -389,6 +582,8 @@ function renderAssets() {
   document.getElementById('groundCount').textContent = `(${countOf('decotile')})`;
   document.getElementById('decorCount').textContent = `(${countOf('decor')})`;
   document.getElementById('blockerCount').textContent = `(${countOf('blocker')})`;
+  document.getElementById('backgroundCount').textContent = `(${countOf('background')})`;
+  document.getElementById('count3d').textContent = `(${countOf('3d')})`;
   const customMerge = Object.values(S.mergeSlots).filter((s) => s.custom).length;
   document.getElementById('mergeCount').textContent = `(${customMerge}/${MERGE_SLOTS.length})`;
   if (S.category === 'merge') { renderMergeLibrary(); return; }
@@ -397,11 +592,16 @@ function renderAssets() {
     const card = document.createElement('div');
     card.className = 'assetCard' + (a.id === S.selectedAssetId ? ' active' : '');
     const calibrated = a.offX || a.offY || a.scale !== 1 || a.anchorY !== (a.category === 'tile' ? 0.5 : 0);
+    const animated = a.category === 'decor' && a.anim && a.anim.type !== 'none';
+    // 3D decor = a live WebGL canvas (no .src); the spin loop blits into it.
+    const thumb = a.is3d ? `<canvas class="card3d" width="152" height="152"></canvas>` : `<img src="${a.img.src}" />`;
     card.innerHTML =
       (calibrated ? `<span class="calib" title="calibrated offset">✎ ${a.offX|0},${a.offY|0}</span>` : '') +
+      (animated ? `<span class="animb" title="${a.anim.type} animation">${a.anim.type === 'puppet' ? '🤸' : '🎈'}</span>` : '') +
+      (a.is3d ? `<span class="animb" title="3D animated decor">🧊</span>` : '') +
       `<button class="del" title="delete asset + its placements">✕</button>` +
-      `<img src="${a.img.src}" /><div class="nm" title="${a.file}">${a.name}</div>`;
-    card.querySelector('img').onclick = () => selectAsset(a.id);
+      thumb + `<div class="nm" title="${a.file}">${a.name}</div>`;
+    card.querySelector('img, canvas.card3d').onclick = () => selectAsset(a.id);
     card.querySelector('.nm').onclick = () => selectAsset(a.id);
     card.querySelector('.del').onclick = (e) => {
       e.stopPropagation();
@@ -410,6 +610,9 @@ function renderAssets() {
       if (S.selectedAssetId === a.id) S.selectedAssetId = null;
       renderAssets(); render(); refreshInspector();
     };
+    // drag the card straight onto the canvas to drop the asset anywhere
+    card.draggable = true;
+    card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', String(a.id)); e.dataTransfer.effectAllowed = 'copy'; });
     grid.appendChild(card);
   }
 }
@@ -480,31 +683,73 @@ function setCategory(cat) {
   document.getElementById('tabGround').classList.toggle('active', cat === 'decotile');
   document.getElementById('tabDecor').classList.toggle('active', cat === 'decor');
   document.getElementById('tabBlockers').classList.toggle('active', cat === 'blocker');
+  document.getElementById('tabBackground').classList.toggle('active', cat === 'background');
+  document.getElementById('tab3d').classList.toggle('active', cat === '3d');
   document.getElementById('tabMerge').classList.toggle('active', cat === 'merge');
-  // The merge library is a catalogue, not a paintable palette: swap the upload
-  // row for the merge actions.
+  // The merge library + 3D section are catalogues, not upload palettes.
   const isMerge = cat === 'merge';
-  document.getElementById('uploadRow').style.display = isMerge ? 'none' : '';
+  const isBg = cat === 'background';
+  document.getElementById('uploadRow').style.display = (isMerge || cat === '3d') ? 'none' : '';
   document.getElementById('mergeActions').style.display = isMerge ? 'flex' : 'none';
+  document.getElementById('backgroundActions').style.display = isBg ? 'flex' : 'none';
   document.getElementById('uploadCat').textContent =
     cat === 'blocker' ? 'cloud' : cat === 'decotile' ? 'ground' : cat;
   document.getElementById('catHint').textContent = {
-    tile: 'Tiles are the playable floor — one per cell, centred on the diamond.',
+    tile: 'Tiles are the playable floor — one per cell, centred on the diamond. The <b>Invisible</b> tile makes a cell playable with no sprite (the background shows through).',
     decotile: 'Non-playable ground — same tiles, but decorative only (not part of the game board).',
     decor: 'Decor sits above tiles — stack multiple, default top-centred.',
     blocker: 'Cloud blockers cover cells and carry a Level tag (set it in the toolbar). Each level’s clouds clear when that level unlocks.',
-    merge: 'The merge-item catalogue — not painted on the map. Click ⤒ Replace (or the art) to swap any slot for your own PNG. Export carries the mapping.'
+    background: 'Upload your own tile (sized to a grid cell). Backgrounds sit BELOW the world tiles, one per cell, so the floor superposes over them. Paint cells, or hit ⛶ Fill to flood the whole map + a 10-tile border.',
+    merge: 'The merge-item catalogue — not painted on the map. Click ⤒ Replace (or the art) to swap any slot for your own PNG. Export carries the mapping.',
+    '3d': 'Animated 3D decor (Three.js) — a cell-shaded emerald crystal spinning on itself in the grid’s top-down view. Pick it and paint; every placement spins live. Calibrate scale/anchor like any decor. (Procedural — the export carries a model3d spec.)'
   }[cat];
   // keep selection if it belongs to this category
   const sel = assetById(S.selectedAssetId);
   if (!sel || sel.category !== cat) S.selectedAssetId = null;
+  if (cat === '3d') { const c = ensureCrystalAsset(); if (c) S.selectedAssetId = c.id; } // build + select the crystal
   renderAssets(); refreshInspector();
 }
 document.getElementById('tabTiles').onclick = () => setCategory('tile');
 document.getElementById('tabGround').onclick = () => setCategory('decotile');
 document.getElementById('tabDecor').onclick = () => setCategory('decor');
 document.getElementById('tabBlockers').onclick = () => setCategory('blocker');
+document.getElementById('tabBackground').onclick = () => setCategory('background');
+document.getElementById('tab3d').onclick = () => setCategory('3d');
 document.getElementById('tabMerge').onclick = () => setCategory('merge');
+
+/* --------------------------- background fill --------------------------- */
+// Bounding box of the actual world content (everything that isn't a background).
+function worldBounds() {
+  let minC = 1e9, maxC = -1e9, minR = 1e9, maxR = -1e9, any = false;
+  for (const p of S.placements) {
+    if (isBackground(assetById(p.assetId))) continue;
+    any = true;
+    minC = Math.min(minC, p.col); maxC = Math.max(maxC, p.col);
+    minR = Math.min(minR, p.row); maxR = Math.max(maxR, p.row);
+  }
+  return any ? { minC, maxC, minR, maxR } : { minC: 0, maxC: 0, minR: 0, maxR: 0 };
+}
+document.getElementById('fillBackground').onclick = () => {
+  const a = assetById(S.selectedAssetId);
+  if (!a || a.category !== 'background') { say('Upload + select a <b>background</b> first, then Fill.'); return; }
+  const b = worldBounds();
+  const c0 = b.minC - BG_FILL_MARGIN, c1 = b.maxC + BG_FILL_MARGIN;
+  const r0 = b.minR - BG_FILL_MARGIN, r1 = b.maxR + BG_FILL_MARGIN;
+  // clear existing backgrounds, then stamp the selected one across the whole box.
+  S.placements = S.placements.filter((p) => !isBackground(assetById(p.assetId)));
+  for (let row = r0; row <= r1; row++)
+    for (let col = c0; col <= c1; col++)
+      S.placements.push({ id: uid(), assetId: a.id, col, row, z: 0 });
+  const n = (c1 - c0 + 1) * (r1 - r0 + 1);
+  renderAssets(); render(); scheduleSave();
+  say(`Filled <b>${n}</b> cells with <b>${a.name}</b> — the world${b.minC === 0 && b.maxC === 0 ? ' origin' : ''} plus a ${BG_FILL_MARGIN}-tile border.`);
+};
+document.getElementById('clearBackground').onclick = () => {
+  const before = S.placements.length;
+  S.placements = S.placements.filter((p) => !isBackground(assetById(p.assetId)));
+  render(); scheduleSave();
+  say(`Removed <b>${before - S.placements.length}</b> background tiles.`);
+};
 document.getElementById('activeLevel').addEventListener('input', (e) => {
   S.activeLevel = Math.max(1, +e.target.value || 1);
   say(`New cloud blockers will be tagged <b style="color:${levelColor(S.activeLevel)}">Level ${S.activeLevel}</b>.`);
@@ -520,12 +765,18 @@ document.getElementById('fileInput').onchange = async (e) => {
 function makeAsset(img, file, category, calib) {
   const id = uid();
   S.assets[id] = {
-    id, name: file.replace(/\.(png|webp)$/i, ''), category, file, img,
+    id, name: file.replace(/\.(png|webp|jpe?g)$/i, ''), category, file, img,
     w: img.naturalWidth, h: img.naturalHeight,
     offX: calib?.offX ?? 0, offY: calib?.offY ?? 0, scale: calib?.scale ?? 1,
     anchorX: calib?.anchorX ?? 0.5,
-    // tile/decotile = centred, blocker = sits slightly high over the cell, decor = top-centred
-    anchorY: calib?.anchorY ?? (category === 'tile' || category === 'decotile' ? 0.5 : category === 'blocker' ? 0.62 : 0)
+    // tile/decotile/background = centred, blocker = sits slightly high over the cell, decor = top-centred
+    anchorY: calib?.anchorY ?? (category === 'tile' || category === 'decotile' || category === 'background' ? 0.5 : category === 'blocker' ? 0.62 : 0),
+    // live-preview animation (decor only): puppet = breathe from the base, floating = hover
+    anim: {
+      type: calib?.anim?.type ?? 'none',
+      amplitude: calib?.anim?.amplitude ?? 45,
+      speed: calib?.anim?.speed ?? 45
+    }
   };
   if (!S.selectedAssetId && category === S.category) S.selectedAssetId = id;
   return id;
@@ -538,10 +789,55 @@ function addAsset(file, category, calib) {
   });
 }
 
+/* --------------------------- invisible tile --------------------------- */
+// A preloaded "no-sprite" floor tile. Painted like any tile (one per cell, makes
+// the cell playable) but renders nothing in-game — the background shows straight
+// through. The library card / preview use a labelled checker-diamond icon; the
+// export flags it `invisible:true` and embeds a transparent pixel, so downstream
+// treats the cell as playable with no tile art.
+const INVISIBLE_NAME = 'invisible';
+const TRANSPARENT_PX = (() => { const c = document.createElement('canvas'); c.width = c.height = 2; return c.toDataURL(); })();
+function invisibleTileIcon() {
+  const c = document.createElement('canvas'); c.width = 220; c.height = 170;
+  const g = c.getContext('2d');
+  const cx = 110, cy = 74, hw = 96, hh = 48;
+  const diamond = () => { g.beginPath(); g.moveTo(cx, cy - hh); g.lineTo(cx + hw, cy); g.lineTo(cx, cy + hh); g.lineTo(cx - hw, cy); g.closePath(); };
+  g.save(); diamond(); g.clip();
+  const sq = 13;
+  for (let y = cy - hh; y < cy + hh; y += sq)
+    for (let x = cx - hw; x < cx + hw; x += sq) {
+      g.fillStyle = ((((x - (cx - hw)) / sq | 0) + ((y - (cy - hh)) / sq | 0)) % 2) ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.22)';
+      g.fillRect(x, y, sq, sq);
+    }
+  g.restore();
+  g.setLineDash([7, 5]); g.lineWidth = 2; g.strokeStyle = '#7ECB4F'; diamond(); g.stroke(); g.setLineDash([]);
+  g.fillStyle = '#EDE3D6'; g.font = 'bold 19px Segoe UI, sans-serif'; g.textAlign = 'center';
+  g.fillText('Invisible', cx, cy + 6);
+  g.font = '12px Segoe UI, sans-serif'; g.fillStyle = 'rgba(237,227,214,0.6)';
+  g.fillText('playable · shows background', cx, cy + 26);
+  return c.toDataURL();
+}
+const isInvisibleAsset = (a) => a && a.category === 'tile' && a.invisible;
+/** Ensure the single invisible tile exists in the Tiles palette (deduped). */
+function ensureInvisibleTile() {
+  if (Object.values(S.assets).some(isInvisibleAsset)) return;
+  const img = new Image();
+  img.onload = () => {
+    if (Object.values(S.assets).some(isInvisibleAsset)) return; // race guard
+    const id = makeAsset(img, INVISIBLE_NAME + '.png', 'tile', { anchorY: 0.5 });
+    const a = S.assets[id];
+    a.name = INVISIBLE_NAME; a.invisible = true;
+    renderAssets();
+    if (S.category === 'tile') refreshInspector();
+    scheduleSave();
+  };
+  img.src = invisibleTileIcon();
+}
+
 /* --------------------------- tools & input --------------------------- */
 function setTool(tool) {
   S.tool = tool;
-  for (const [id, t] of [['toolPaint', 'paint'], ['toolSelect', 'select'], ['toolErase', 'erase'], ['toolPan', 'pan']])
+  for (const [id, t] of [['toolPaint', 'paint'], ['toolSelect', 'select'], ['toolMove', 'move'], ['toolErase', 'erase'], ['toolPan', 'pan']])
     document.getElementById(id).classList.toggle('active', t === tool);
   updateCursor();
   render();
@@ -549,19 +845,34 @@ function setTool(tool) {
 /** Cursor reflects the active pan affordance (hand) vs editing (crosshair). */
 function updateCursor() {
   const panning = S.tool === 'pan' || S.spaceHeld;
-  stage.style.cursor = S.drag && S.drag.kind === 'pan' ? 'grabbing' : panning ? 'grab' : 'crosshair';
+  stage.style.cursor = S.drag && (S.drag.kind === 'pan' || S.drag.kind === 'movefree') ? 'grabbing'
+    : panning ? 'grab' : S.tool === 'move' ? 'move' : 'crosshair';
 }
 document.getElementById('toolPaint').onclick = () => setTool('paint');
 document.getElementById('toolSelect').onclick = () => setTool('select');
+document.getElementById('toolMove').onclick = () => setTool('move');
 document.getElementById('toolErase').onclick = () => setTool('erase');
 document.getElementById('toolPan').onclick = () => setTool('pan');
 
+/** Topmost placement whose drawn rect contains the screen point (handles free
+ *  off-grid elements that aren't at their cell). `filter` narrows by asset. */
+function pickAt(sx, sy, filter) {
+  for (let i = S.hitRects.length - 1; i >= 0; i--) {
+    const { p, rect } = S.hitRects[i];
+    if (filter && !filter(assetById(p.assetId))) continue;
+    if (sx >= rect.left && sx <= rect.left + rect.w && sy >= rect.top && sy <= rect.top + rect.h) return p;
+  }
+  return null;
+}
+
 function topElementAt(col, row) {
-  // topmost non-floor (decor/blocker) first, else the floor tile.
+  // topmost non-floor (decor/blocker) first, then the floor tile, then the background.
   const here = S.placements.filter((p) => p.col === col && p.row === row);
-  const above = here.filter((p) => { const a = assetById(p.assetId); return a && !isFloor(a); }).sort((a, b) => b.z - a.z);
+  const above = here.filter((p) => { const a = assetById(p.assetId); return a && !isFloor(a) && !isBackground(a); }).sort((a, b) => b.z - a.z);
   if (above.length) return above[0];
-  return here.find((p) => isFloor(assetById(p.assetId))) ?? null;
+  return here.find((p) => isFloor(assetById(p.assetId)))
+    ?? here.find((p) => isBackground(assetById(p.assetId)))
+    ?? null;
 }
 function paintAt(col, row) {
   if (S.category === 'merge') { say('Merge items are a catalogue — use ⤒ Replace to swap art. They are not placed on the map.'); return; }
@@ -571,18 +882,23 @@ function paintAt(col, row) {
     // one floor tile per cell — replace.
     S.placements = S.placements.filter((p) => !(p.col === col && p.row === row && isFloor(assetById(p.assetId))));
     S.placements.push({ id: uid(), assetId: a.id, col, row, z: 0 });
+  } else if (a.category === 'background') {
+    // one background per cell — replace (sits below the floor tiles).
+    S.placements = S.placements.filter((p) => !(p.col === col && p.row === row && isBackground(assetById(p.assetId))));
+    S.placements.push({ id: uid(), assetId: a.id, col, row, z: 0 });
   } else {
     const pl = { id: uid(), assetId: a.id, col, row, z: S.nextZ++ };
     if (a.category === 'blocker') pl.level = S.activeLevel; // tag the level it blocks
     S.placements.push(pl);
+    if (animActive(a)) ensureAnimLoop(); // a just-placed animated decor starts moving
+    if (a.is3d) startCrystalLoop();      // keep the placed crystal spinning
   }
 }
-function eraseAt(col, row) {
-  const top = topElementAt(col, row);
-  if (top) {
-    S.placements = S.placements.filter((p) => p.id !== top.id);
-    if (S.selectedPlacement === top.id) S.selectedPlacement = null;
-  }
+function eraseAt(col, row) { removePlacement(topElementAt(col, row)); }
+function removePlacement(p) {
+  if (!p) return;
+  S.placements = S.placements.filter((x) => x.id !== p.id);
+  if (S.selectedPlacement === p.id) S.selectedPlacement = null;
 }
 
 stage.addEventListener('mousedown', (e) => {
@@ -594,11 +910,20 @@ stage.addEventListener('mousedown', (e) => {
   }
   const cell = cellOf(sx, sy);
   if (S.tool === 'paint') { paintAt(cell.col, cell.row); S.drag = { kind: 'paint', last: `${cell.col},${cell.row}` }; }
-  else if (S.tool === 'erase') { eraseAt(cell.col, cell.row); S.drag = { kind: 'erase' }; }
-  else { // select
-    const top = topElementAt(cell.col, cell.row);
-    S.selectedPlacement = top ? top.id : null;
-    if (top) { S.selectedAssetId = top.assetId; const a = assetById(top.assetId); if (a.category !== S.category) setCategory(a.category); }
+  else if (S.tool === 'erase') { removePlacement(pickAt(sx, sy)); S.drag = { kind: 'erase' }; }
+  else if (S.tool === 'move') { // grab a decor/background/3D element + drag it off-grid
+    const p = pickAt(sx, sy, (a) => a && !isFloor(a));
+    if (p) {
+      S.selectedPlacement = p.id; S.selectedAssetId = p.assetId;
+      const a = assetById(p.assetId); if (a.category !== S.category) setCategory(a.category);
+      S.drag = { kind: 'movefree', id: p.id, sx, sy, dx0: p.dx || 0, dy0: p.dy || 0 };
+      refreshInspector(); renderAssets(); say(`Moving <b>${a.name}</b> freely — drag to position it off the grid.`);
+    } else { S.selectedPlacement = null; say('Move tool: grab a decor, background or 3D element to drag it freely.'); }
+  }
+  else { // select (rect-based so off-grid elements are pickable)
+    const p = pickAt(sx, sy);
+    S.selectedPlacement = p ? p.id : null;
+    if (p) { S.selectedAssetId = p.assetId; const a = assetById(p.assetId); if (a.category !== S.category) setCategory(a.category); }
     refreshInspector(); renderAssets();
   }
   render();
@@ -611,11 +936,35 @@ window.addEventListener('mousemove', (e) => {
   if (S.drag) {
     if (S.drag.kind === 'pan') { S.cam.x = S.drag.camX + (sx - S.drag.sx); S.cam.y = S.drag.camY + (sy - S.drag.sy); }
     else if (S.drag.kind === 'paint') { const k = `${S.hover.col},${S.hover.row}`; if (k !== S.drag.last) { paintAt(S.hover.col, S.hover.row); S.drag.last = k; } }
-    else if (S.drag.kind === 'erase') eraseAt(S.hover.col, S.hover.row);
+    else if (S.drag.kind === 'erase') removePlacement(pickAt(sx, sy));
+    else if (S.drag.kind === 'movefree') { const p = placementById(S.drag.id); if (p) { p.dx = S.drag.dx0 + (sx - S.drag.sx) / S.cam.zoom; p.dy = S.drag.dy0 + (sy - S.drag.sy) / S.cam.zoom; } }
   }
   render();
 });
 window.addEventListener('mouseup', () => { S.drag = null; updateCursor(); });
+
+/* ----------------- drag an asset from the sidebar onto the canvas ------ */
+stage.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+stage.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const a = assetById(+e.dataTransfer.getData('text/plain'));
+  if (!a) return;
+  const r = stage.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const cell = cellOf(sx, sy);
+  if (isFloor(a)) { S.selectedAssetId = a.id; paintAt(cell.col, cell.row); } // floor snaps to the cell
+  else { // decor / background / blocker / 3D drop free, right where you let go
+    const w = toWorld(sx, sy), base = worldOf(cell.col, cell.row);
+    const pl = { id: uid(), assetId: a.id, col: cell.col, row: cell.row, z: S.nextZ++, dx: w.x - base.x - a.offX, dy: w.y - base.y - a.offY };
+    if (a.category === 'blocker') pl.level = S.activeLevel;
+    S.placements.push(pl);
+    if (animActive(a)) ensureAnimLoop();
+    if (a.is3d) startCrystalLoop();
+    S.selectedPlacement = pl.id; S.selectedAssetId = a.id;
+    say(`Dropped <b>${a.name}</b> freely on the canvas.`);
+  }
+  render(); renderAssets(); refreshInspector();
+});
 stage.addEventListener('wheel', (e) => {
   stopFly();
   e.preventDefault();
@@ -728,6 +1077,22 @@ function renderCamRows() {
 }
 document.getElementById('camTour').onclick = cameraTour;
 
+/* --------------------- in-game zoom lock --------------------- */
+function syncZoomInputs() {
+  document.getElementById('zoomMin').value = S.gameZoom.min;
+  document.getElementById('zoomMax').value = S.gameZoom.max;
+}
+document.getElementById('zoomMin').addEventListener('input', (e) => {
+  S.gameZoom.min = Math.max(0.05, +e.target.value || 0.2);
+  if (S.gameZoom.min > S.gameZoom.max) S.gameZoom.max = S.gameZoom.min;
+  scheduleSave(); say(`In-game zoom locked to <b>${S.gameZoom.min}–${S.gameZoom.max}×</b>.`);
+});
+document.getElementById('zoomMax').addEventListener('input', (e) => {
+  S.gameZoom.max = Math.max(0.1, +e.target.value || 1.4);
+  if (S.gameZoom.max < S.gameZoom.min) S.gameZoom.min = S.gameZoom.max;
+  scheduleSave(); say(`In-game zoom locked to <b>${S.gameZoom.min}–${S.gameZoom.max}×</b>.`);
+});
+
 document.getElementById('gridToggle').onclick = () => { S.showGrid = !S.showGrid; render(); };
 document.getElementById('tagToggle').onclick = (e) => {
   S.showLevelTags = !S.showLevelTags;
@@ -735,13 +1100,57 @@ document.getElementById('tagToggle').onclick = (e) => {
   render();
   say(`Cloud level tags ${S.showLevelTags ? 'shown' : 'hidden'} on the preview (export keeps the level data).`);
 };
-document.getElementById('tileW').onchange = (e) => { S.tileW = +e.target.value || 256; render(); };
-document.getElementById('tileH').onchange = (e) => { S.tileH = +e.target.value || 128; render(); };
+/* --------------------------- grid projection controls --------------------------- */
+// Tile size (W×H), iso Angle (edge pitch, linked to W/H) and Skew (perspective lean)
+// all drive the same parametric projection. Angle ⇄ height are kept in sync so the
+// grid angle is directly editable — type 30 to set a 30° pitch, etc.
+const gridAngleDeg = () => Math.atan2(S.tileH, S.tileW) * 180 / Math.PI;
+function syncGridFields() {
+  document.getElementById('tileW').value = S.tileW;
+  document.getElementById('tileH').value = S.tileH;
+  document.getElementById('gridAngle').value = gridAngleDeg().toFixed(1);
+  document.getElementById('gridSkew').value = +(+S.gridSkew || 0).toFixed(1);
+}
+const clampNum = (v, lo, hi, d) => { v = +v; if (!isFinite(v)) v = d; return Math.max(lo, Math.min(hi, v)); };
+// Which cell to keep PINNED while the projection changes, so tiles don't jump:
+// the selected element if there is one (you're tuning the grid to fit it),
+// otherwise the cell at the centre of the view.
+function gridPivotCell() {
+  const sel = placementById(S.selectedPlacement);
+  if (sel) return { col: sel.col, row: sel.row };
+  return cellOf(wrap.clientWidth / 2, wrap.clientHeight / 2);
+}
+// Run a projection change (size/angle/skew) keeping the pivot cell fixed on
+// screen: capture its current pixel, mutate, then re-solve the camera so the
+// SAME cell lands back on that pixel. Zoom is untouched.
+function withStableGrid(mutate) {
+  const pivot = gridPivotCell();
+  const w0 = worldOf(pivot.col, pivot.row);
+  const before = toScreen(w0.x, w0.y);   // pixel the pivot cell sits on now
+  mutate();                              // change size / angle / skew
+  const after = worldOf(pivot.col, pivot.row);
+  S.cam.x = before.x - after.x * S.cam.zoom;   // put the SAME cell back on that pixel
+  S.cam.y = before.y - after.y * S.cam.zoom;
+}
+document.getElementById('tileW').onchange = (e) => { const v = clampNum(e.target.value, 8, 4096, 240); withStableGrid(() => { S.tileW = v; }); syncGridFields(); render(); };
+document.getElementById('tileH').onchange = (e) => { const v = clampNum(e.target.value, 8, 4096, 120); withStableGrid(() => { S.tileH = v; }); syncGridFields(); render(); };
+document.getElementById('gridAngle').onchange = (e) => {
+  const ang = clampNum(e.target.value, 1, 80, 26.6);
+  withStableGrid(() => { S.tileH = Math.max(8, Math.round(S.tileW * Math.tan(ang * Math.PI / 180))); });
+  syncGridFields(); render();
+  say(`Grid pitch set to <b>${ang.toFixed(1)}°</b> (tile ${S.tileW}×${S.tileH}).`);
+};
+document.getElementById('gridSkew').onchange = (e) => {
+  const v = clampNum(e.target.value, -60, 60, 0);
+  withStableGrid(() => { S.gridSkew = v; }); syncGridFields(); render();
+  say(S.gridSkew ? `Grid skewed <b>${S.gridSkew}°</b> — parallelogram perspective.` : 'Grid skew reset — symmetric iso.');
+};
 
 window.addEventListener('keydown', (e) => {
   if (/INPUT|SELECT/.test(e.target.tagName)) return;
   if (e.key === 'b' || e.key === 'B') setTool('paint');
   if (e.key === 'v' || e.key === 'V') setTool('select');
+  if (e.key === 'm' || e.key === 'M') setTool('move');
   if (e.key === 'e' || e.key === 'E') setTool('erase');
   if (e.key === 'h' || e.key === 'H') setTool('pan');
   if (e.key === 'f' || e.key === 'F') fitView();
@@ -778,6 +1187,7 @@ function inspectedAsset() {
 }
 function refreshInspector() {
   const a = inspectedAsset();
+  updateAnimUI(); // toggles the top-bar tool + sidebar sliders (hides them when not a decor)
   const target = document.getElementById('inspTarget');
   if (!a) { target.textContent = 'Select an asset or a placed element.'; return; }
   const p = S.selectedPlacement ? placementById(S.selectedPlacement) : null;
@@ -808,6 +1218,54 @@ for (const [prop, [sid, vid, fmt]] of Object.entries(sliders)) {
     renderAssets(); render();
   });
 }
+
+/* --------------------------- decor animation --------------------------- */
+// Sync the top-bar tool (visible only for a selected decor) + the sidebar
+// amplitude/speed sliders to the inspected asset.
+function updateAnimUI() {
+  const a = inspectedAsset();
+  const isDecor = !!a && a.category === 'decor';
+  document.getElementById('animTool').style.display = isDecor ? 'inline-flex' : 'none';
+  document.getElementById('animSep').style.display = isDecor ? '' : 'none';
+  const t = isDecor ? (a.anim?.type ?? 'none') : 'none';
+  document.getElementById('animNone').classList.toggle('active', isDecor && t === 'none');
+  document.getElementById('animPuppet').classList.toggle('active', isDecor && t === 'puppet');
+  document.getElementById('animFloat').classList.toggle('active', isDecor && t === 'floating');
+  const showSettings = isDecor && t !== 'none';
+  document.getElementById('animRow').style.display = showSettings ? '' : 'none';
+  if (showSettings) {
+    document.getElementById('sAmp').value = a.anim.amplitude;
+    document.getElementById('vAmp').textContent = a.anim.amplitude;
+    document.getElementById('sSpeed').value = a.anim.speed;
+    document.getElementById('vSpeed').textContent = a.anim.speed;
+    document.getElementById('animHint').innerHTML = t === 'puppet'
+      ? '🤸 Puppet — breathing squash/stretch, planted at the base.'
+      : '🎈 Floating — smooth up/down hover.';
+  }
+}
+function setAnim(type) {
+  const a = inspectedAsset();
+  if (!a || a.category !== 'decor') { say('Select a decor asset first (only decor animates).'); return; }
+  a.anim = a.anim || { type: 'none', amplitude: 45, speed: 45 };
+  a.anim.type = type;
+  updateAnimUI(); ensureAnimLoop(); renderAssets(); render();
+  say(type === 'none'
+    ? `Animation off for <b>${a.name}</b>.`
+    : `<b>${a.name}</b> now ${type === 'puppet' ? 'breathes (🤸 puppet)' : 'floats (🎈)'} — tune amplitude & speed on the right.`);
+}
+document.getElementById('animNone').onclick = () => setAnim('none');
+document.getElementById('animPuppet').onclick = () => setAnim('puppet');
+document.getElementById('animFloat').onclick = () => setAnim('floating');
+for (const [sid, vid, key] of [['sAmp', 'vAmp', 'amplitude'], ['sSpeed', 'vSpeed', 'speed']]) {
+  document.getElementById(sid).addEventListener('input', (e) => {
+    const a = inspectedAsset();
+    if (!a || !a.anim) return;
+    a.anim[key] = Math.round(+e.target.value);
+    document.getElementById(vid).textContent = a.anim[key];
+    ensureAnimLoop(); render();
+  });
+}
+
 document.getElementById('resetCalib').onclick = () => {
   const a = inspectedAsset(); if (!a) return;
   a.offX = 0; a.offY = 0; a.scale = 1; a.anchorX = 0.5; a.anchorY = a.category === 'tile' ? 0.5 : 0;
@@ -837,15 +1295,31 @@ function dataURLToBlob(durl) {
 }
 function buildDoc(embed) {
   const world = document.getElementById('worldName').value.trim() || 'world';
-  const assets = Object.values(S.assets).map((a) => ({
-    id: a.id, name: a.name, category: a.category, file: a.file,
-    width: a.w, height: a.h,
-    /** the calibration: drop offX/offY into the game placement, anchor into anchors.json */
-    calibration: {
-      offsetX: a.offX, offsetY: a.offY, scale: +a.scale.toFixed(4),
-      anchor: { x: +a.anchorX.toFixed(4), y: +a.anchorY.toFixed(4) }
+  const assets = Object.values(S.assets).map((a) => {
+    const out = {
+      id: a.id, name: a.name, category: a.category, file: a.file,
+      width: a.w, height: a.h,
+      /** the calibration: drop offX/offY into the game placement, anchor into anchors.json */
+      calibration: {
+        offsetX: a.offX, offsetY: a.offY, scale: +a.scale.toFixed(4),
+        anchor: { x: +a.anchorX.toFixed(4), y: +a.anchorY.toFixed(4) }
+      }
+    };
+    // no-sprite playable floor: the game leaves the cell empty (background shows through).
+    if (a.invisible) out.invisible = true;
+    // decor motion the game can replay (puppet breathe / floating hover). Carries
+    // BOTH the raw controls (re-editable) AND a fully-resolved `model` so the game
+    // can reproduce it from JSON alone — no builder constants needed downstream.
+    if (a.anim && a.anim.type !== 'none') {
+      out.animation = {
+        type: a.anim.type, amplitude: a.anim.amplitude, speed: a.anim.speed,
+        model: resolveAnim(a.anim)
+      };
     }
-  }));
+    // procedural animated 3D decor — the game rebuilds it from this spec (no PNG embedded)
+    if (a.is3d) { out.is3d = true; out.model3d = a.model3d; }
+    return out;
+  });
   // normalise z to a compact 0..n per cell-decor stack for clean output.
   const placements = S.placements
     .slice()
@@ -854,6 +1328,7 @@ function buildDoc(embed) {
       const a = assetById(p.assetId);
       const out = { asset: a.name, category: a.category, col: p.col, row: p.row, z: p.z };
       if (a.category === 'blocker') out.level = p.level ?? 1;
+      if (p.dx || p.dy) { out.dx = Math.round(p.dx); out.dy = Math.round(p.dy); } // free off-grid offset
       return out;
     });
   // levels map: which cells each level's clouds cover (what the game unfogs per level).
@@ -872,14 +1347,22 @@ function buildDoc(embed) {
     for (const p of S.placements) { minC = Math.min(minC, p.col); maxC = Math.max(maxC, p.col); minR = Math.min(minR, p.row); maxR = Math.max(maxR, p.row); }
     bounds = { minCol: minC, maxCol: maxC, minRow: minR, maxRow: maxR };
   }
+  // the background's cell extent — the game clamps its camera to this (the frontier).
+  let backgroundBounds = null;
+  const bgCells = S.placements.filter((p) => isBackground(assetById(p.assetId)));
+  if (bgCells.length) {
+    let minC = 1e9, maxC = -1e9, minR = 1e9, maxR = -1e9;
+    for (const p of bgCells) { minC = Math.min(minC, p.col); maxC = Math.max(maxC, p.col); minR = Math.min(minR, p.row); maxR = Math.max(maxR, p.row); }
+    backgroundBounds = { minCol: minC, maxCol: maxC, minRow: minR, maxRow: maxR };
+  }
   // camera keyframes: focal world point + zoom, plus the focal cell (col,row)
   // so the game can frame it regardless of its own tile size / viewport.
   const cameraKeyframes = Object.entries(S.cameraKeyframes)
     .map(([level, kf]) => {
-      const a = kf.wx / (S.tileW / 2), b = kf.wy / (S.tileH / 2);
+      const c = worldToCell(kf.wx, kf.wy);
       return {
         level: +level,
-        focus: { col: Math.round((b + a) / 2), row: Math.round((b - a) / 2) },
+        focus: { col: Math.round(c.col), row: Math.round(c.row) },
         world: { x: Math.round(kf.wx), y: Math.round(kf.wy) },
         zoom: +kf.zoom.toFixed(4)
       };
@@ -898,10 +1381,14 @@ function buildDoc(embed) {
   });
   const doc = {
     format: 'emberkeep-world', version: 1, world,
-    tile: { width: S.tileW, height: S.tileH },
-    bounds, assets, placements, levels, cameraKeyframes, mergeAssets
+    // width/height stay first for the existing ingest; skew/angle describe the
+    // full parametric projection (angle = edge pitch in degrees, skew = shear).
+    tile: { width: S.tileW, height: S.tileH, skew: +(+S.gridSkew || 0).toFixed(2), angle: +gridAngleDeg().toFixed(2) },
+    bounds, backgroundBounds, assets, placements, levels, cameraKeyframes, mergeAssets,
+    cameraZoom: { min: +S.gameZoom.min, max: +S.gameZoom.max } // in-game wheel-zoom clamp
   };
-  if (embed) { doc.images = {}; for (const a of Object.values(S.assets)) doc.images[a.file] = a.img.src; }
+  // Invisible tiles export a transparent pixel (the card icon is editor-only).
+  if (embed) { doc.images = {}; for (const a of Object.values(S.assets)) { if (a.is3d) continue; doc.images[a.file] = a.invisible ? TRANSPARENT_PX : a.img.src; } }
   return doc;
 }
 document.getElementById('exportWorld').onclick = () => {
@@ -925,7 +1412,9 @@ function loadWorldDoc(doc, label) {
   S.assets = {}; S.placements = []; S.selectedAssetId = null; S.selectedPlacement = null; S.nextId = 1; S.nextZ = 1;
   document.getElementById('worldName').value = doc.world ?? 'world';
   S.tileW = doc.tile?.width ?? 256; S.tileH = doc.tile?.height ?? 128;
-  document.getElementById('tileW').value = S.tileW; document.getElementById('tileH').value = S.tileH;
+  S.gridSkew = doc.tile?.skew ?? 0;
+  if (doc.cameraZoom) S.gameZoom = { min: doc.cameraZoom.min ?? 0.2, max: doc.cameraZoom.max ?? 1.4 };
+  syncGridFields();
   // merge library: placeholders + any custom art the file carried
   S.mergeSlots = {}; initMergeSlots();
   for (const m of doc.mergeAssets ?? []) {
@@ -940,15 +1429,18 @@ function loadWorldDoc(doc, label) {
     img.onload = () => {
       const id = makeAsset(img, ad.file, ad.category, {
         offX: ad.calibration.offsetX, offY: ad.calibration.offsetY,
-        scale: ad.calibration.scale, anchorX: ad.calibration.anchor.x, anchorY: ad.calibration.anchor.y
+        scale: ad.calibration.scale, anchorX: ad.calibration.anchor.x, anchorY: ad.calibration.anchor.y,
+        anim: ad.animation
       });
-      S.assets[id].name = ad.name; byName[`${ad.category}|${ad.name}`] = id;
+      S.assets[id].name = ad.name; if (ad.invisible) S.assets[id].invisible = true;
+      byName[`${ad.category}|${ad.name}`] = id;
       if (--remaining === 0) {
         for (const pl of doc.placements) {
           const aid = byName[`${pl.category}|${pl.asset}`] ?? byName[`tile|${pl.asset}`] ?? byName[`decotile|${pl.asset}`];
           if (!aid) continue;
           const place = { id: uid(), assetId: aid, col: pl.col, row: pl.row, z: pl.z ?? 0 };
           if (pl.level !== undefined) place.level = pl.level;
+          if (pl.dx || pl.dy) { place.dx = pl.dx; place.dy = pl.dy; }
           S.placements.push(place);
         }
         S.nextZ = Math.max(1, ...S.placements.map((p) => Math.abs(p.z))) + 1;
@@ -958,7 +1450,7 @@ function loadWorldDoc(doc, label) {
         say(`Loaded <b>${label ?? doc.world}</b>: ${doc.assets.length} assets, ${doc.placements.length} placements.`);
       }
     };
-    img.src = (doc.images ?? {})[ad.file];
+    img.src = ad.invisible ? invisibleTileIcon() : (doc.images ?? {})[ad.file];
   });
 }
 // Fetch the bundled current world (deployed alongside index.html). Returns true
@@ -987,42 +1479,62 @@ document.getElementById('loadProject').onclick = () => {
 /* The real border-grass set with anchorY measured per tile (grass-diamond
  * mid-axis / canvas height) so each block's tile-centre registration is exact.
  * Loaded via relative <img> src, which works under file:// and http alike. */
-const STARTER_DIR = '../../assets/sprites/environment/map/border-grass/';
+const STARTER_DIR = '../../assets/sprites/environment/map/grass-tiles/';
+// New grass tileset — iso cubes. Each tile STEALS an authored border-grass name
+// (border-grass-N) so the map, which references those names, renders with the
+// new art. Two source crops ship: the first 15 are normalised to 281px wide
+// (240 grid → scale 0.854); the next 6 are a larger ~440px-wide crop of the same
+// art family (240 grid → scale 0.545). Both share the diamond anchorY 0.34.
 const STARTER_TILES = [
-  ['border-grass-1.png', 0.2605], ['border-grass-2.png', 0.2634],
-  ['border-grass-3.png', 0.2566], ['border-grass-4.png', 0.2556],
-  ['border-grass-5.png', 0.2692], ['border-grass-6.png', 0.2566],
-  ['border-grass-7.png', 0.2444], ['border-grass-8.png', 0.2434],
-  ['border-grass-9.png', 0.3533], ['border-grass-10.png', 0.3333],
-  ['border-grass-11.png', 0.3422], ['border-grass-12.png', 0.3262],
-  ['border-grass-13.png', 0.3048], ['border-grass-14.png', 0.3138],
-  ['border-grass-15.png', 0.3191], ['border-grass-16.png', 0.3191]
+  'Tiles-out_001.png', 'Tiles-out_002.png', 'Tiles-out_003.png', 'Tiles-out_004.png',
+  'Tiles-out_005.png', 'Tiles-out_006.png', 'Tiles-out_007.png', 'Tiles-out_008.png',
+  'Tiles-out_009.png', 'Tiles-out_010.png', 'Tiles-out_011.png', 'Tiles-out_012.png',
+  'Tiles-out_013.png', 'Tiles-out_014.png', 'Tiles-out_015.png'
 ];
+const STARTER_TILES_2 = [
+  'Tiles-out_016.png', 'Tiles-out_017.png', 'Tiles-out_018.png',
+  'Tiles-out_019.png', 'Tiles-out_020.png', 'Tiles-out_021.png'
+];
+const TILE_CALIB = { anchorX: 0.5, anchorY: 0.34, scale: 0.854 };
+const TILE_CALIB_2 = { anchorX: 0.5, anchorY: 0.34, scale: 0.545 };
 // The normalised 1-tile cloud blocker (256x174); base-contact anchor sits high
 // so the puff overlaps neighbours like the in-game fog blanket.
 const STARTER_BLOCKERS = [
   ['../../assets/sprites/environment/level-blocker/cloud/', 'cloud-tile.png', { anchorX: 0.5, anchorY: 0.62 }]
 ];
+// Preloaded BACKGROUND tiles (sit below the world floor). The normalised water
+// tile (240px diamond) ships ready in the Background tab; anchor puts its top
+// surface at the cell. Users can still upload their own.
+const STARTER_BACKGROUNDS = [
+  ['../../assets/sprites/bg-tile/', 'water-tile.png', { anchorX: 0.5, anchorY: 0.26 }]
+];
 function loadStarterTiles() {
-  // de-dup by category+file so the SAME tile can live in both 'tile' (playable)
-  // and 'decotile' (non-playable ground).
-  const existing = new Set(Object.values(S.assets).map((a) => `${a.category}|${a.file}`));
+  // de-dup by category+NAME (not file): the new grass tiles steal the authored
+  // border-grass names, so a name can live in both 'tile' (playable) and
+  // 'decotile' (non-playable ground), and we never double-load over a world.
+  const existing = new Set(Object.values(S.assets).map((a) => `${a.category}|${a.name}`));
+  const grass = [
+    ...STARTER_TILES.map((src, i) => ({ src, name: `border-grass-${i + 1}`, calib: TILE_CALIB })),
+    ...STARTER_TILES_2.map((src, i) => ({ src, name: `border-grass-${STARTER_TILES.length + i + 1}`, calib: TILE_CALIB_2 }))
+  ];
   const jobs = [
-    ...STARTER_TILES.map(([file, anchorY]) => [STARTER_DIR, file, 'tile', { anchorX: 0.5, anchorY }]),
-    ...STARTER_TILES.map(([file, anchorY]) => [STARTER_DIR, file, 'decotile', { anchorX: 0.5, anchorY }]),
-    ...STARTER_BLOCKERS.map(([dir, file, calib]) => [dir, file, 'blocker', calib])
-  ].filter(([, file, category]) => !existing.has(`${category}|${file}`));
+    ...grass.map((g) => [STARTER_DIR, g.src, g.name, 'tile', g.calib]),
+    ...grass.map((g) => [STARTER_DIR, g.src, g.name, 'decotile', g.calib]),
+    ...STARTER_BLOCKERS.map(([dir, file, calib]) => [dir, file, file.replace(/\.(png|webp)$/i, ''), 'blocker', calib])
+  ].filter(([, , name, category]) => !existing.has(`${category}|${name}`));
   let loaded = 0, failed = 0, pending = jobs.length;
   if (pending === 0) { say('Starter assets already loaded.'); return; }
-  for (const [dir, file, category, calib] of jobs) {
+  for (const [dir, src, name, category, calib] of jobs) {
     const img = new Image();
     img.onload = () => {
-      makeAsset(img, file, category, calib);
+      const id = makeAsset(img, src, category, calib);
+      S.assets[id].name = name;          // steal the authored border-grass name…
+      S.assets[id].file = name + '.png'; // …and export/embed under it
       loaded++;
       if (--pending === 0) done();
     };
     img.onerror = () => { failed++; if (--pending === 0) done(); };
-    img.src = dir + file;
+    img.src = dir + src;
   }
   function done() {
     renderAssets(); refreshInspector(); render();
@@ -1043,24 +1555,28 @@ document.getElementById('loadCurrent').onclick = async () => {
 const WB_KEY = 'emberkeep_worldbuilder_session_v1';
 let saveTimer = null;
 function serializeSession() {
-  const list = Object.values(S.assets);
+  const list = Object.values(S.assets).filter((a) => !a.is3d); // 3D decor is procedural — saved as placements below
   const idToIdx = new Map(list.map((a, i) => [a.id, i]));
   return {
     v: 1, world: document.getElementById('worldName').value,
-    tileW: S.tileW, tileH: S.tileH, cam: S.cam,
+    tileW: S.tileW, tileH: S.tileH, gridSkew: S.gridSkew, cam: S.cam,
     showGrid: S.showGrid, showLevelTags: S.showLevelTags, nextZ: S.nextZ,
-    cameraKeyframes: S.cameraKeyframes,
+    cameraKeyframes: S.cameraKeyframes, gameZoom: S.gameZoom,
+    // 3D crystal placements (the crystal itself rebuilds from code when Three loads)
+    crystalPlacements: S.placements.filter((p) => assetById(p.assetId)?.is3d).map((p) => ({ col: p.col, row: p.row, z: p.z, dx: p.dx, dy: p.dy })),
     // only custom merge art needs saving — placeholders are regenerated on load.
     mergeSlots: Object.values(S.mergeSlots)
       .filter((s) => s.custom)
       .map((s) => ({ key: s.key, src: s.src, fileName: s.fileName })),
     assets: list.map((a) => ({
       name: a.name, category: a.category, file: a.file, src: a.img.src,
-      offX: a.offX, offY: a.offY, scale: a.scale, anchorX: a.anchorX, anchorY: a.anchorY
+      offX: a.offX, offY: a.offY, scale: a.scale, anchorX: a.anchorX, anchorY: a.anchorY,
+      anim: a.anim, invisible: a.invisible || undefined
     })),
-    placements: S.placements.map((p) => {
+    placements: S.placements.filter((p) => !assetById(p.assetId)?.is3d).map((p) => {
       const o = { a: idToIdx.get(p.assetId), col: p.col, row: p.row, z: p.z };
       if (p.level !== undefined) o.level = p.level;
+      if (p.dx || p.dy) { o.dx = p.dx; o.dy = p.dy; }
       return o;
     })
   };
@@ -1079,7 +1595,25 @@ function saveNow() {
   }
 }
 function scheduleSave() { if (!S.ready) return; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 600); }
-function markReady() { S.ready = true; renderCamRows(); saveNow(); }
+function markReady() { S.ready = true; renderCamRows(); saveNow(); loadStarterBackgrounds(); ensureInvisibleTile(); ensureAnimLoop(); syncZoomInputs(); }
+
+/** Ensure the preloaded background tiles are present after any world loads
+ *  (session restore, default world, or starter set) — deduped by file. */
+function loadStarterBackgrounds() {
+  const have = new Set(Object.values(S.assets).filter((a) => a.category === 'background').map((a) => a.file));
+  for (const [dir, file, calib] of STARTER_BACKGROUNDS) {
+    if (have.has(file)) continue;
+    const img = new Image();
+    img.onload = () => {
+      makeAsset(img, file, 'background', calib);
+      renderAssets();
+      if (S.category === 'background') refreshInspector();
+      scheduleSave();
+    };
+    img.onerror = () => {};
+    img.src = dir + file;
+  }
+}
 window.addEventListener('beforeunload', saveNow);
 window.addEventListener('pagehide', saveNow);
 
@@ -1090,9 +1624,11 @@ function restoreSession() {
   let doc; try { doc = JSON.parse(raw); } catch (e) { return false; }
   if (!doc || !Array.isArray(doc.assets)) return false;
   S.assets = {}; S.placements = []; S.selectedAssetId = null; S.selectedPlacement = null; S.nextId = 1;
-  S.tileW = doc.tileW ?? 240; S.tileH = doc.tileH ?? 120;
+  S.tileW = doc.tileW ?? 240; S.tileH = doc.tileH ?? 120; S.gridSkew = doc.gridSkew ?? 0;
   S.showGrid = doc.showGrid ?? true; S.showLevelTags = doc.showLevelTags ?? true;
   S.cameraKeyframes = doc.cameraKeyframes ?? {};
+  if (doc.gameZoom) S.gameZoom = { min: doc.gameZoom.min ?? 0.2, max: doc.gameZoom.max ?? 1.4 };
+  pendingCrystal = doc.crystalPlacements ?? []; // re-attached when Three builds the crystal
   S.nextZ = doc.nextZ ?? 1;
   // restore the merge library (placeholders + any saved custom art)
   S.mergeSlots = {}; initMergeSlots();
@@ -1102,7 +1638,7 @@ function restoreSession() {
   }
   if (doc.cam) S.cam = doc.cam;
   if (doc.world) document.getElementById('worldName').value = doc.world;
-  document.getElementById('tileW').value = S.tileW; document.getElementById('tileH').value = S.tileH;
+  syncGridFields();
   if (doc.assets.length === 0) { markReady(); renderAssets(); render(); return true; }
   const idxToId = [];
   let remaining = doc.assets.length;
@@ -1113,6 +1649,7 @@ function restoreSession() {
       if (aid == null) continue;
       const place = { id: uid(), assetId: aid, col: pl.col, row: pl.row, z: pl.z ?? 0 };
       if (pl.level !== undefined) place.level = pl.level;
+      if (pl.dx || pl.dy) { place.dx = pl.dx; place.dy = pl.dy; }
       S.placements.push(place);
     }
     S.selectedAssetId = null;
@@ -1124,8 +1661,9 @@ function restoreSession() {
   doc.assets.forEach((ad, i) => {
     const img = new Image();
     img.onload = () => {
-      const id = makeAsset(img, ad.file, ad.category, { offX: ad.offX, offY: ad.offY, scale: ad.scale, anchorX: ad.anchorX, anchorY: ad.anchorY });
-      S.assets[id].name = ad.name; idxToId[i] = id; finalize();
+      const id = makeAsset(img, ad.file, ad.category, { offX: ad.offX, offY: ad.offY, scale: ad.scale, anchorX: ad.anchorX, anchorY: ad.anchorY, anim: ad.anim });
+      S.assets[id].name = ad.name; if (ad.invisible) S.assets[id].invisible = true;
+      idxToId[i] = id; finalize();
     };
     img.onerror = () => { finalize(); }; // skip a missing asset, keep the rest
     img.src = ad.src;
@@ -1143,6 +1681,72 @@ document.getElementById('newWorld').onclick = () => {
   setCategory('tile'); fitView(); renderCamRows();
   loadStarterTiles();
 };
+
+/* ===================== 3D animated decor (Three.js) ===================== */
+// A live-rendered, cell-shaded emerald crystal spinning on itself, viewed from
+// the grid's top-down iso angle. The WebGL canvas IS the asset image — drawn on
+// every placement and spun by a rAF loop. Procedural: no embedded PNG; the
+// export carries a `model3d` spec the game can rebuild.
+const CRYSTAL_DEF = { shape: 'emerald', color: '#2ad673', material: 'toon-cel', outline: '#07331b', spinDegPerSec: 50, camera: 'iso-top', steps: 4 };
+let CRYSTAL = null, crystalRAF = null, pendingCrystal = [];
+
+function buildCrystalScene() {
+  const T = window.THREE, SIZE = 280;
+  const renderer = new T.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(2); renderer.setSize(SIZE, SIZE, false);
+  const scene = new T.Scene();
+  // toon ramp — a few hard cell-shading bands
+  const ramp = new T.DataTexture(new Uint8Array([45, 110, 185, 255]), 4, 1, T.RedFormat);
+  ramp.minFilter = ramp.magFilter = T.NearestFilter; ramp.needsUpdate = true;
+  // faceted gem (stretched octahedron reads as a crystal)
+  const geo = new T.OctahedronGeometry(1, 0); geo.scale(0.66, 1.2, 0.66);
+  const gem = new T.Mesh(geo, new T.MeshToonMaterial({ color: new T.Color(CRYSTAL_DEF.color), gradientMap: ramp }));
+  // classic cel outline = inverted black back-face hull
+  const outline = new T.Mesh(geo, new T.MeshBasicMaterial({ color: new T.Color(CRYSTAL_DEF.outline), side: T.BackSide }));
+  outline.scale.multiplyScalar(1.07);
+  const group = new T.Group(); group.add(outline); group.add(gem); scene.add(group);
+  // key + cool rim, low ambient so the toon bands read
+  const key = new T.DirectionalLight(0xffffff, 2.4); key.position.set(2.5, 4, 3); scene.add(key);
+  const rim = new T.DirectionalLight(0x9bffd2, 1.0); rim.position.set(-3, 1.6, -2.6); scene.add(rim);
+  scene.add(new T.AmbientLight(0x2c4d3d, 1.5));
+  // orthographic camera at the grid's iso tilt (top-down, ~2:1)
+  const f = 1.45, cam = new T.OrthographicCamera(-f, f, f, -f, 0.1, 100);
+  cam.position.set(0, 2.5, 3.2); cam.lookAt(0, 0, 0);
+  return { renderer, scene, cam, group };
+}
+function ensureCrystalAsset() {
+  if (!window.THREE) return null;
+  let asset = Object.values(S.assets).find((a) => a.is3d && a.model3d?.shape === 'emerald');
+  if (!asset) {
+    CRYSTAL = buildCrystalScene(); CRYSTAL.renderer.render(CRYSTAL.scene, CRYSTAL.cam);
+    const cv = CRYSTAL.renderer.domElement, id = uid();
+    asset = S.assets[id] = {
+      id, name: 'Emerald Crystal', category: '3d', file: 'emerald-crystal',
+      img: cv, w: cv.width, h: cv.height, offX: 0, offY: 0, scale: 0.5, anchorX: 0.5, anchorY: 0.72,
+      anim: { type: 'none', amplitude: 45, speed: 45 }, is3d: true, model3d: { ...CRYSTAL_DEF }
+    };
+    if (!S.selectedAssetId && S.category === '3d') S.selectedAssetId = id;
+  }
+  // re-attach any placements restored before the (async) crystal existed
+  for (const pl of pendingCrystal) S.placements.push({ id: uid(), assetId: asset.id, col: pl.col, row: pl.row, z: pl.z ?? S.nextZ++, dx: pl.dx, dy: pl.dy });
+  pendingCrystal = [];
+  renderAssets(); render(); startCrystalLoop();
+  return asset;
+}
+function crystalActive() { return !!CRYSTAL && (S.category === '3d' || S.placements.some((p) => assetById(p.assetId)?.is3d)); }
+function crystalLoop(ts) {
+  if (CRYSTAL) {
+    CRYSTAL.group.rotation.y = (ts / 1000) * (CRYSTAL_DEF.spinDegPerSec * Math.PI / 180);
+    CRYSTAL.renderer.render(CRYSTAL.scene, CRYSTAL.cam);
+    for (const c of document.querySelectorAll('canvas.card3d')) { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.drawImage(CRYSTAL.renderer.domElement, 0, 0, c.width, c.height); }
+  }
+  if (crystalActive()) { render(true); crystalRAF = requestAnimationFrame(crystalLoop); }
+  else crystalRAF = null;
+}
+function startCrystalLoop() { if (crystalRAF == null && window.THREE) crystalRAF = requestAnimationFrame(crystalLoop); }
+function initThree3d() { ensureCrystalAsset(); if (S.category === '3d') { renderAssets(); refreshInspector(); } }
+if (window.THREE) initThree3d();
+else { window.addEventListener('three-ready', initThree3d); window.addEventListener('three-failed', () => say('The 3D section needs an internet connection (Three.js CDN) — the other tabs work offline.')); }
 
 initMergeSlots(); // the merge library always exists
 setCategory('tile');

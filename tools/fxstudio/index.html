@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emberkeep FX Studio — Merge Element FX & Animation</title>
+<style>
+  :root {
+    --bg:#1d1622; --panel:#2a2030; --panel2:#352838; --line:#473548;
+    --cream:#FFF6E8; --gold:#F7A437; --gold2:#FFD84D; --lava:#E8503C;
+    --teal:#3FA8D9; --moss:#7ECB4F; --dim:#9b8d99; --purple:#B07CF0;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; overflow:hidden; }
+  body {
+    background:var(--bg); color:var(--cream);
+    font:13px/1.45 "Trebuchet MS", Verdana, sans-serif;
+    display:grid; grid-template-rows:46px 1fr 26px; grid-template-columns:222px 1fr 332px;
+    grid-template-areas:"toolbar toolbar toolbar" "cat stage panel" "status status status";
+  }
+  #toolbar { grid-area:toolbar; display:flex; align-items:center; gap:8px;
+    background:var(--panel); border-bottom:1px solid var(--line); padding:0 12px; }
+  #toolbar .brand { color:var(--gold); font-weight:bold; white-space:nowrap; }
+  #toolbar .selname { color:var(--gold2); font-weight:bold; }
+  button { background:var(--panel2); color:var(--cream); border:1px solid var(--line);
+    border-radius:7px; padding:6px 10px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--gold); }
+  button.primary { background:var(--moss); color:#16280c; font-weight:bold; border-color:var(--moss); }
+  button.on { background:var(--gold2); color:#2a2030; font-weight:bold; border-color:var(--gold2); }
+  .sep { width:1px; height:24px; background:var(--line); }
+  .spacer { flex:1; }
+
+  /* catalogue */
+  #cat { grid-area:cat; background:var(--panel); border-right:1px solid var(--line);
+    overflow-y:auto; padding:8px; }
+  #cat h4 { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--gold);
+    margin:10px 2px 5px; }
+  #cat h4:first-child { margin-top:2px; }
+  .ecard { display:flex; align-items:center; gap:8px; background:var(--panel2);
+    border:2px solid var(--line); border-radius:9px; padding:5px 7px; margin-bottom:5px; cursor:pointer; }
+  .ecard:hover { border-color:var(--gold); }
+  .ecard.active { border-color:var(--gold2); background:#3d2c40; }
+  .ecard canvas { width:38px; height:38px; flex:none;
+    background:repeating-conic-gradient(#3a2f3f 0% 25%, #463a4c 0% 50%) 0 0/10px 10px; border-radius:6px; }
+  .ecard .meta { overflow:hidden; }
+  .ecard .nm { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ecard .sub { font-size:10px; color:var(--dim); }
+  .ecard .fxn { font-size:9px; color:var(--gold2); }
+
+  /* stage */
+  #stageWrap { grid-area:stage; position:relative; overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 38%, #2a2438 0%, #181219 78%); }
+  #stage { position:absolute; inset:0; width:100%; height:100%; }
+  #stageBar { position:absolute; top:12px; left:0; right:0; display:flex; justify-content:center;
+    gap:8px; pointer-events:none; }
+  #stageBar .ev { pointer-events:auto; padding:6px 16px; border-radius:20px; font-weight:bold;
+    background:rgba(42,32,48,.82); border:1px solid var(--line); }
+  #stageBar .ev.active { background:var(--gold2); color:#2a2030; border-color:var(--gold2); }
+  #stageHint { position:absolute; bottom:10px; left:0; right:0; text-align:center; color:var(--dim);
+    font-size:11px; pointer-events:none; }
+  #replay { position:absolute; bottom:30px; left:50%; transform:translateX(-50%);
+    background:rgba(42,32,48,.85); }
+
+  /* panel */
+  #panel { grid-area:panel; background:var(--panel); border-left:1px solid var(--line);
+    display:flex; flex-direction:column; overflow-y:auto; }
+  #panel h3 { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--gold);
+    padding:9px 12px 3px; }
+  .hint { color:var(--dim); font-size:11px; padding:0 12px 7px; }
+  #spriteRow { display:flex; gap:10px; align-items:center; padding:4px 12px 8px; }
+  #spriteRow canvas { width:64px; height:64px; flex:none; border-radius:8px;
+    background:repeating-conic-gradient(#3a2f3f 0% 25%, #463a4c 0% 50%) 0 0/12px 12px; }
+  #spriteRow .col { display:flex; flex-direction:column; gap:5px; flex:1; }
+  #spriteRow button { font-size:12px; padding:5px 8px; }
+  .evtabs { display:flex; gap:6px; padding:2px 12px 6px; }
+  .evtabs button { flex:1; }
+  #countRow { display:flex; align-items:center; gap:6px; padding:0 12px 8px; color:var(--dim); font-size:12px; }
+  #countRow button { padding:3px 11px; }
+  #fxgrid { display:grid; grid-template-columns:1fr 1fr; gap:7px; padding:4px 12px 12px; }
+  .fxchip { background:var(--panel2); border:2px solid var(--line); border-radius:9px; padding:5px;
+    cursor:pointer; text-align:center; position:relative; }
+  .fxchip:hover { border-color:var(--gold); }
+  .fxchip.on { border-color:var(--gold2); background:#3d2c40; }
+  .fxchip canvas { width:100%; height:46px; border-radius:6px; background:#15101a; display:block; }
+  .fxchip .nm { font-size:10px; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fxchip .tick { position:absolute; top:3px; right:5px; color:var(--gold2); font-size:12px; display:none; }
+  .fxchip.on .tick { display:block; }
+
+  #status { grid-area:status; background:var(--panel); border-top:1px solid var(--line);
+    padding:5px 14px; color:var(--dim); white-space:nowrap; overflow:hidden; }
+  #status b { color:var(--gold2); }
+  input[type=file] { display:none; }
+</style>
+</head>
+<body>
+  <div id="toolbar">
+    <span class="brand">✨ FX Studio</span>
+    <span class="sep"></span>
+    <span>Editing: <span class="selname" id="selName">—</span></span>
+    <span class="spacer"></span>
+    <button id="replayTop" title="Replay the current event">▶ Replay</button>
+    <button id="loopBtn" class="on" title="Auto-loop the preview">⟲ Loop</button>
+    <span class="sep"></span>
+    <button id="saveBtn" title="Download a .fxproject backup">Save</button>
+    <button id="loadBtn" title="Load a .fxproject backup">Load</button>
+    <button class="primary" id="exportBtn" title="Export merge-fx.json for the game">⬇ Export JSON</button>
+  </div>
+
+  <div id="cat"></div>
+
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="stageBar">
+      <button class="ev" id="evAppear" data-ev="appear">✨ Appear</button>
+      <button class="ev" id="evMerge" data-ev="merge">💥 Merge</button>
+    </div>
+    <button id="replay" title="Replay">▶ Replay</button>
+    <div id="stageHint"></div>
+  </div>
+
+  <div id="panel">
+    <h3>Sprite <small style="color:var(--dim)">— replace the placeholder</small></h3>
+    <div id="spriteRow">
+      <canvas id="spritePrev" width="128" height="128"></canvas>
+      <div class="col">
+        <button id="replaceSprite">⤒ Replace sprite…</button>
+        <button id="loadRig" title="Upload a rigged character folder (e.g. red-dragon/) — its idle plays in the preview">🐉 Character folder…</button>
+        <button id="removeRig" style="display:none">✖ Remove character</button>
+        <button id="revertSprite">↺ Revert to placeholder</button>
+      </div>
+    </div>
+    <h3>Event</h3>
+    <div class="hint">Pick the event to preview &amp; configure. Both replay live on the stage.</div>
+    <div class="evtabs">
+      <button id="tabAppear" data-ev="appear">✨ Appear</button>
+      <button id="tabMerge" data-ev="merge">💥 Merge</button>
+    </div>
+    <div id="countRow">Merging:
+      <button data-n="3">3</button><button data-n="4">4</button><button data-n="5">5</button>
+    </div>
+    <h3>FX presets <small style="color:var(--dim)">— toggle any for this event</small></h3>
+    <div id="fxgrid"></div>
+  </div>
+
+  <div id="status">Pick an element, choose Appear or Merge, then toggle FX presets. Everything previews live.</div>
+
+  <input type="file" id="fileSprite" accept="image/png,image/webp" />
+  <input type="file" id="fileProject" accept="application/json" />
+  <input type="file" id="fileRig" webkitdirectory directory />
+
+<script>
+'use strict';
+/* =====================================================================
+ * Emberkeep FX Studio — authors the spawn ("appear") and merge FX +
+ * animation for every merge element, previews both live, and exports a
+ * single self-describing JSON the game can replay directly.
+ *
+ * One data-driven engine (FX_PRESETS + EVENTS) powers BOTH the on-screen
+ * preview and the export, so what you see is exactly what ships.
+ * =================================================================== */
+
+/* ----------------------------- catalogue ----------------------------- */
+// Mirrors src/data/chains.json (3 chains × 3 tiers) + the two merge-library
+// specials. `next` is the tier a 3+ merge yields (null = top tier / special).
+const ELEMENTS = [
+  { key:'sparkweed_1',    label:'Spark Weed',        chain:'sparkweed',    tier:1, color:'#6FBE43', next:'sparkweed_2' },
+  { key:'sparkweed_2',    label:'Ember Bloom',       chain:'sparkweed',    tier:2, color:'#9FE06A', next:'sparkweed_3' },
+  { key:'sparkweed_3',    label:'Flame Lily',        chain:'sparkweed',    tier:3, color:'#CDEF7E', next:null },
+  { key:'ember_dragon_1', label:'Speckled Ember Egg',chain:'ember_dragon', tier:1, color:'#E8A24C', next:'ember_dragon_2' },
+  { key:'ember_dragon_2', label:'Ember Hatchling',   chain:'ember_dragon', tier:2, color:'#F2784B', next:'ember_dragon_3' },
+  { key:'ember_dragon_3', label:'Ember Whelp',       chain:'ember_dragon', tier:3, color:'#E8503C', next:null },
+  { key:'flame_gem_1',    label:'Gem Shard',         chain:'flame_gem',    tier:1, color:'#54D6C0', next:'flame_gem_2' },
+  { key:'flame_gem_2',    label:'Flame Gem',         chain:'flame_gem',    tier:2, color:'#3FA8D9', next:'flame_gem_3' },
+  { key:'flame_gem_3',    label:'Radiant Gem',       chain:'flame_gem',    tier:3, color:'#B07CF0', next:null },
+  { key:'decor_nest',     label:'Dragon Nest',       chain:'special',      tier:1, color:'#A6794C', next:null },
+  { key:'decor_brazier',  label:'Brazier',           chain:'special',      tier:1, color:'#F7A437', next:null }
+];
+const CHAIN_LABEL = { sparkweed:'Sparkweed', ember_dragon:'Ember Dragons', flame_gem:'Flame Gems', special:'Specials' };
+const elById = (k) => ELEMENTS.find((e) => e.key === k);
+
+/* ----------------------------- FX presets ---------------------------- */
+// 10 authored effects. Each is FULLY RESOLVED (real units) so the game can
+// reproduce it with no studio-internal constants. See FX_PARAM_SPEC.
+// angle deg: 0=right, 90=down, 180=left, 270=up.  drag = velocity fraction
+// kept per second.  gravity px/s² (+down).  scaleOut = size fraction lost/s.
+const FX_PRESETS = [
+  { key:'sparkle_burst', label:'Sparkle Burst', kind:'particles', shape:'spark', motion:'linear',
+    colorMode:'element', colors:['#FFFFFF','#FFE9A8'], count:24, speed:[150,360], angle:[0,360], size:[3,7.5],
+    gravity:0, drag:0.05, life:[0.4,0.8], spin:[-180,180], scaleOut:0.5, fadeIn:0.08, fadeOut:0.55, blend:'add', spawnR:6, alpha:1 },
+  { key:'ember_rise', label:'Ember Rise', kind:'particles', shape:'circle', motion:'linear',
+    colorMode:'warm', colors:['#FFF3B0','#FFC24D','#FF7A3C','#E8503C'], count:20, speed:[30,90], angle:[250,290], size:[2,5.5],
+    gravity:-40, drag:0.6, life:[0.7,1.4], spin:[0,0], scaleOut:0.7, fadeIn:0.12, fadeOut:0.5, blend:'add', spawnR:18, alpha:1 },
+  { key:'smoke_puff', label:'Smoke Puff', kind:'particles', shape:'circle', motion:'linear',
+    colorMode:'fixed', colors:['#cdbfb8','#a99e98','#8a8079'], count:14, speed:[20,70], angle:[240,300], size:[16,36],
+    gravity:-12, drag:0.5, life:[0.8,1.6], spin:[-30,30], scaleOut:-0.7, fadeIn:0.15, fadeOut:0.6, blend:'normal', spawnR:10, alpha:0.5 },
+  { key:'shock_ring', label:'Shock Ring', kind:'ring', shape:'ring', motion:'expand',
+    colorMode:'element', colors:['#FFFFFF'], count:1, speed:[0,0], angle:[0,0], size:[0,0],
+    gravity:0, drag:1, life:[0.5,0.5], spin:[0,0], scaleOut:0, fadeIn:0, fadeOut:0.7, blend:'add', spawnR:0, alpha:1, expandTo:130, ringWidth:7 },
+  { key:'confetti_pop', label:'Confetti Pop', kind:'particles', shape:'square', motion:'linear',
+    colorMode:'rainbow', colors:[], count:28, speed:[140,320], angle:[200,340], size:[4,9],
+    gravity:360, drag:0.5, life:[0.9,1.7], spin:[-540,540], scaleOut:0, fadeIn:0.04, fadeOut:0.3, blend:'normal', spawnR:4, alpha:1 },
+  { key:'star_pop', label:'Star Pop', kind:'particles', shape:'star', motion:'linear',
+    colorMode:'element', colors:['#FFFFFF','#FFD84D'], count:9, speed:[90,210], angle:[0,360], size:[9,18],
+    gravity:70, drag:0.12, life:[0.5,0.95], spin:[-160,160], scaleOut:0.55, fadeIn:0.06, fadeOut:0.5, blend:'add', spawnR:6, alpha:1 },
+  { key:'glow_flash', label:'Glow Flash', kind:'glow', shape:'glow', motion:'pulse',
+    colorMode:'element', colors:['#FFFFFF'], count:1, speed:[0,0], angle:[0,0], size:[0,0],
+    gravity:0, drag:1, life:[0.38,0.38], spin:[0,0], scaleOut:0, fadeIn:0.25, fadeOut:0.6, blend:'add', spawnR:0, alpha:1, peakR:80 },
+  { key:'dust_motes', label:'Dust Motes', kind:'particles', shape:'circle', motion:'linear',
+    colorMode:'fixed', colors:['#e8d8b8','#cdb892','#b89c72'], count:16, speed:[10,46], angle:[0,360], size:[1.5,4],
+    gravity:16, drag:0.5, life:[1.0,2.0], spin:[0,0], scaleOut:0.3, fadeIn:0.2, fadeOut:0.5, blend:'normal', spawnR:14, alpha:0.7 },
+  { key:'fireflies', label:'Fireflies', kind:'particles', shape:'circle', motion:'wander',
+    colorMode:'element', colors:['#FFFFAA'], count:13, speed:[18,52], angle:[0,360], size:[2.5,5],
+    gravity:0, drag:0.4, life:[1.2,2.2], spin:[0,0], scaleOut:0, fadeIn:0.2, fadeOut:0.4, blend:'add', spawnR:20, alpha:1, wander:60, blink:true },
+  { key:'magic_swirl', label:'Magic Swirl', kind:'particles', shape:'spark', motion:'swirl',
+    colorMode:'element', colors:['#FFFFFF'], count:26, speed:[60,150], angle:[0,360], size:[3,6],
+    gravity:0, drag:0.5, life:[0.7,1.4], spin:[0,0], scaleOut:0.4, fadeIn:0.1, fadeOut:0.5, blend:'add', spawnR:8, alpha:1, swirl:6 }
+];
+const presetByKey = (k) => FX_PRESETS.find((p) => p.key === k);
+const FX_PARAM_SPEC = {
+  kind:'particles | ring | glow', shape:'circle|square|spark|star|triangle|ring|glow',
+  motion:'linear | swirl (tangential) | wander (sine drift) | expand (ring) | pulse (glow)',
+  count:'particles emitted at the burst', colorMode:'element (tint to element) | warm | fixed | rainbow',
+  speed:'px/s [min,max]', angle:'deg [min,max] (0=right,90=down,270=up)', size:'px radius/half-extent [min,max]',
+  gravity:'px/s^2 (+down)', drag:'fraction of velocity kept per second (1=none)', life:'seconds [min,max]',
+  spin:'deg/s [min,max]', scaleOut:'size fraction lost per second (negative = grow)',
+  fadeIn:'fraction of life ramping alpha 0→1', fadeOut:'fraction of life ramping alpha 1→0',
+  blend:'add | normal', spawnR:'px random spawn radius from origin', alpha:'master opacity',
+  expandTo:'ring final radius px', ringWidth:'ring stroke px at birth', peakR:'glow peak radius px',
+  wander:'sine drift px/s amplitude', swirl:'rad/s tangential rotation', blink:'flicker alpha'
+};
+
+// The structural element motion for each event (fixed; the FX layer on top).
+const EVENTS = {
+  appear: {
+    trigger:'spawn', loopMs:1500, fxAtMs:0, durationMs:430,
+    sprite:{ scaleFrom:0, scaleTo:1, ease:'backOut', overshoot:1.8, alphaMs:230, riseFromPx:-20 },
+    note:'Sprite pops in with a back-overshoot while the appear FX bursts at its centre.'
+  },
+  merge: {
+    trigger:'group>=minGroup', minGroup:3, loopMs:2050, convergeMs:430, fxAtMs:430, resultMs:380, flashMs:430,
+    inputs:{ startRadiusPx:120, ease:'quadIn', shrinkTo:0.5 },
+    result:{ scaleFrom:0, scaleTo:1, ease:'backOut', overshoot:2.0 },
+    note:'N inputs converge to centre (quad-in), a flash + merge FX fire, then the next-tier result pops in.'
+  }
+};
+
+/* ----------------------------- state ----------------------------- */
+const FX_KEY = 'emberkeep-fxstudio-v1';
+const S = {
+  config: {},          // key -> { sprite:dataURL|null, appear:[fxKeys], merge:[fxKeys] }
+  selKey: ELEMENTS[0].key,
+  selEvent: 'appear',
+  mergeCount: 3,
+  loop: true
+};
+function defaultConfig() {
+  const c = {};
+  for (const e of ELEMENTS) c[e.key] = { sprite: null, appear: ['sparkle_burst'], merge: ['shock_ring', 'star_pop'] };
+  return c;
+}
+
+/* ----------------------------- helpers ----------------------------- */
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp01 = (t) => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOutBack = (t, s = 1.8) => { const c = s + 1; return 1 + c * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2); };
+const easeInQuad = (t) => t * t;
+const easeOutQuad = (t) => 1 - (1 - t) * (1 - t);
+function ease(name, t, k) {
+  if (name === 'backOut') return easeOutBack(t, k ?? 1.8);
+  if (name === 'quadIn') return easeInQuad(t);
+  if (name === 'quadOut') return easeOutQuad(t);
+  return t;
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  const f = amt < 0 ? 1 + amt : 1, t = amt < 0 ? 0 : 255 * amt;
+  r = Math.round(r * f + t); g = Math.round(g * f + t); b = Math.round(b * f + t);
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+function pickColor(p, elColor) {
+  if (p.colorMode === 'element') return Math.random() < 0.4 ? '#FFFFFF' : elColor;
+  if (p.colorMode === 'rainbow') return `hsl(${Math.floor(Math.random() * 360)},85%,62%)`;
+  if ((p.colorMode === 'warm' || p.colorMode === 'fixed') && p.colors.length) return p.colors[Math.floor(Math.random() * p.colors.length)];
+  return elColor;
+}
+
+/* ------------------ placeholder sprite (matches the world builder) ----- */
+function placeholderSprite(el) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  const cx = 128, cy = 118, r = 92;
+  const grad = g.createLinearGradient(cx, cy - r, cx, cy + r);
+  grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.18, el.color); grad.addColorStop(1, shade(el.color, -0.4));
+  g.fillStyle = grad; g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = 5;
+  g.beginPath(); g.moveTo(cx, cy - r); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r, cy); g.closePath();
+  g.fill(); g.stroke();
+  for (let i = 0; i < el.tier; i++) { g.fillStyle = '#fff'; g.beginPath(); g.arc(cx - (el.tier - 1) * 12 + i * 24, cy, 7, 0, 7); g.fill(); }
+  g.fillStyle = '#241B22'; g.font = 'bold 26px "Trebuchet MS"'; g.textAlign = 'center';
+  g.fillText(el.label, cx, 236);
+  return c.toDataURL();
+}
+const IMG = {}; // key -> HTMLImageElement (placeholder or custom)
+function loadSprite(key, src, cb) {
+  const img = new Image(); img.onload = () => { IMG[key] = img; cb && cb(); }; img.onerror = () => cb && cb(); img.src = src;
+}
+
+/* ----------------------------- FX engine ----------------------------- */
+// One Effect = one fired preset at (ox,oy) tinted by the element colour.
+class Effect {
+  constructor(preset, ox, oy, color) {
+    this.p = preset; this.ox = ox; this.oy = oy; this.color = color; this.t = 0; this.parts = [];
+    if (preset.kind === 'particles') for (let i = 0; i < preset.count; i++) this.parts.push(this.spawn());
+  }
+  spawn() {
+    const p = this.p, ang = rand(p.angle[0], p.angle[1]) * Math.PI / 180, spd = rand(p.speed[0], p.speed[1]);
+    const sr = (p.spawnR || 0) * Math.random(), sa = Math.random() * Math.PI * 2;
+    return { x: this.ox + Math.cos(sa) * sr, y: this.oy + Math.sin(sa) * sr,
+      vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, size: rand(p.size[0], p.size[1]),
+      rot: Math.random() * Math.PI * 2, vrot: rand(p.spin[0], p.spin[1]) * Math.PI / 180,
+      life: 0, maxLife: rand(p.life[0], p.life[1]), color: pickColor(p, this.color), wob: Math.random() * 6.28 };
+  }
+  update(dt) {
+    this.t += dt; const p = this.p;
+    if (p.kind !== 'particles') return;
+    for (const q of this.parts) {
+      q.life += dt;
+      if (p.motion === 'swirl') { const a = Math.atan2(q.vy, q.vx) + p.swirl * dt, s = Math.hypot(q.vx, q.vy); q.vx = Math.cos(a) * s; q.vy = Math.sin(a) * s; }
+      if (p.motion === 'wander') { q.x += Math.sin(this.t * 4 + q.wob) * (p.wander || 0) * dt; q.y += Math.cos(this.t * 3.3 + q.wob) * (p.wander || 0) * 0.6 * dt; }
+      const k = Math.pow(p.drag, dt); q.vx *= k; q.vy *= k; q.vy += p.gravity * dt;
+      q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vrot * dt;
+      q.size *= Math.max(0, 1 - (p.scaleOut || 0) * dt);
+    }
+    this.parts = this.parts.filter((q) => q.life < q.maxLife && q.size > 0.25);
+  }
+  done() { return this.p.kind === 'particles' ? (this.parts.length === 0 && this.t > 0.05) : this.t >= this.p.life[1]; }
+  alphaOf(f) {
+    let a = 1; const p = this.p;
+    if (p.fadeIn && f < p.fadeIn) a = f / p.fadeIn;
+    if (p.fadeOut && f > 1 - p.fadeOut) a = Math.min(a, (1 - f) / p.fadeOut);
+    return clamp01(a) * (p.alpha ?? 1);
+  }
+  draw(g) {
+    const p = this.p; g.save();
+    if (p.blend === 'add') g.globalCompositeOperation = 'lighter';
+    if (p.kind === 'ring') this.drawRing(g);
+    else if (p.kind === 'glow') this.drawGlow(g);
+    else for (const q of this.parts) {
+      const a = this.alphaOf(q.life / q.maxLife) * (p.blink ? 0.55 + 0.45 * Math.sin(q.life * 22 + q.wob) : 1);
+      if (a <= 0.01) continue;
+      g.globalAlpha = a; g.fillStyle = q.color;
+      g.save(); g.translate(q.x, q.y); g.rotate(q.rot); drawShape(g, p.shape, q.size); g.restore();
+    }
+    g.restore();
+  }
+  drawRing(g) {
+    const f = clamp01(this.t / this.p.life[1]); const rad = ease('quadOut', f) * this.p.expandTo;
+    g.globalAlpha = this.alphaOf(f); g.strokeStyle = this.p.colorMode === 'element' ? this.color : '#fff';
+    g.lineWidth = this.p.ringWidth * (1 - f); g.beginPath(); g.arc(this.ox, this.oy, rad, 0, 6.2832); g.stroke();
+  }
+  drawGlow(g) {
+    const f = clamp01(this.t / this.p.life[1]); const rad = Math.sin(f * Math.PI) * this.p.peakR + 6;
+    const col = this.p.colorMode === 'element' ? this.color : '#fff';
+    const grd = g.createRadialGradient(this.ox, this.oy, 0, this.ox, this.oy, rad);
+    grd.addColorStop(0, '#ffffff'); grd.addColorStop(0.35, col); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.globalAlpha = this.alphaOf(f); g.fillStyle = grd; g.beginPath(); g.arc(this.ox, this.oy, rad, 0, 6.2832); g.fill();
+  }
+}
+function drawShape(g, shape, s) {
+  g.beginPath();
+  if (shape === 'circle') { g.arc(0, 0, s, 0, 6.2832); g.fill(); return; }
+  if (shape === 'square') { g.fillRect(-s, -s, s * 2, s * 2); return; }
+  if (shape === 'spark') { // 4-point sparkle
+    const n = s * 0.32; g.moveTo(0, -s); g.lineTo(n, -n); g.lineTo(s, 0); g.lineTo(n, n);
+    g.lineTo(0, s); g.lineTo(-n, n); g.lineTo(-s, 0); g.lineTo(-n, -n); g.closePath(); g.fill(); return;
+  }
+  if (shape === 'triangle') { g.moveTo(0, -s); g.lineTo(s, s); g.lineTo(-s, s); g.closePath(); g.fill(); return; }
+  // 5-point star
+  for (let i = 0; i < 10; i++) { const r = i % 2 ? s * 0.45 : s, a = -Math.PI / 2 + i * Math.PI / 5; const fn = i ? 'lineTo' : 'moveTo'; g[fn](Math.cos(a) * r, Math.sin(a) * r); }
+  g.closePath(); g.fill();
+}
+
+/* ----------------------------- ground shadow -------------------------- */
+// Realistic soft shadow used under every element (radial-gradient opacity +
+// blur). The same spec ships in the export so the GAME draws identical shadows
+// for all merge elements.
+const SHADOW = { color: '#000000', opacity: 0.42, radiusXFactor: 0.46, aspect: 0.30, blurPx: 6, yOffsetFactor: 0.42 };
+function drawShadow(g, cx, baseY, size, alpha) {
+  const rx = SHADOW.radiusXFactor * size; if (rx < 1.5 || alpha <= 0.01) return;
+  const o = SHADOW.opacity * clamp01(alpha);
+  g.save();
+  g.filter = `blur(${SHADOW.blurPx}px)`;
+  g.translate(cx, baseY); g.scale(1, SHADOW.aspect);
+  const grad = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+  grad.addColorStop(0, `rgba(0,0,0,${o})`);
+  grad.addColorStop(0.5, `rgba(0,0,0,${o * 0.62})`);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad; g.beginPath(); g.arc(0, 0, rx, 0, 6.2832); g.fill();
+  g.restore();
+}
+
+/* ----------------------------- rigged character ----------------------- */
+// A compact port of the rigger's animator engine (tools/rigger/animator.html):
+// loads a self-contained rig.json (embedded images) and plays its IDLE so the
+// FX can be tested against the real animated character. Adaptive driver:
+// anchor (rotate child subtree) → pin-chain (wave deform) → bare-layer.
+const TAU = Math.PI * 2, D2R = Math.PI / 180;
+const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+const RIG = {};        // element key -> RigChar
+let rigClock = 0;      // seconds, advances every frame so idle plays continuously
+const RMIRROR = { wing_left: 'wing_right', wing_right: 'wing_left', hand_left: 'hand_right', hand_right: 'hand_left',
+  foot_left: 'foot_right', foot_right: 'foot_left', eyelid_left: 'eyelid_right', eyelid_right: 'eyelid_left' };
+class RigChar {
+  constructor(doc, onReady) {
+    this.layers = []; this.anchorByChild = {}; this.pinsByLayer = {}; this.chains = {};
+    this.root = null; this.bounds = null; this.ready = false; this.character = doc.character || 'character';
+    let pending = (doc.layers || []).length; if (!pending) return;
+    doc.layers.slice().sort((a, b) => a.z - b.z).forEach((ld) => {
+      const img = new Image();
+      img.onload = () => { this.layers.push({ ...ld, img }); if (--pending === 0) this.finish(doc, onReady); };
+      img.onerror = () => { if (--pending === 0) this.finish(doc, onReady); };
+      img.src = (doc.images || {})[ld.file] || '';
+    });
+  }
+  finish(doc, onReady) {
+    this.layers.sort((a, b) => a.z - b.z);
+    for (const a of doc.anchors || []) this.anchorByChild[a.childLayer] = a;
+    for (const p of doc.pins || []) { if (p.name === 'root_ground') continue; (this.pinsByLayer[p.layer] ??= []).push(p); if (p.chain) (this.chains[p.chain] ??= []).push(p); }
+    for (const k in this.pinsByLayer) this.pinsByLayer[k].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    for (const k in this.chains) this.chains[k].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const rootPin = (doc.pins || []).find((p) => p.name === 'root_ground');
+    this.bounds = doc.bounds || this.unionBounds();
+    this.root = rootPin ? { x: rootPin.rig.x, y: rootPin.rig.y } : { x: this.bounds.x + this.bounds.width / 2, y: this.bounds.y + this.bounds.height * 0.84 };
+    this.ready = true; if (onReady) onReady();
+  }
+  unionBounds() { let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const l of this.layers) { a = Math.min(a, l.x); b = Math.min(b, l.y); c = Math.max(c, l.x + l.width); d = Math.max(d, l.y + l.height); } return { x: a, y: b, width: c - a, height: d - b }; }
+  layerOf(n) { return this.layers.find((l) => l.name === n); }
+  hasLayer(n) { return this.layers.some((l) => l.name === n); }
+  perspAmp(part, amp) { const l = this.layerOf(part); if (!l) return amp; const zmax = Math.max(...this.layers.map((x) => x.z), 1); return amp * (0.78 + 0.22 * (l.z / zmax)); }
+  drive(F, part, deg) {
+    const l = this.layerOf(part), a = this.anchorByChild[part];
+    if (a) { F.anchorAngle[a.name] = (F.anchorAngle[a.name] ?? 0) + deg * D2R; return; }
+    const pins = this.pinsByLayer[part]; if (pins && pins.length) { F.layerExtra[part] = { pivot: { x: pins[0].rig.x, y: pins[0].rig.y }, angle: (F.layerExtra[part]?.angle ?? 0) + deg * D2R }; return; }
+    const twin = RMIRROR[part] ? this.anchorByChild[RMIRROR[part]] : null;
+    if (l && twin) { F.layerExtra[part] = { pivot: { x: 2 * this.root.x - twin.rig.x, y: twin.rig.y }, angle: (F.layerExtra[part]?.angle ?? 0) + deg * D2R }; return; }
+    if (l) F.layerExtra[part] = { pivot: { x: l.x + l.width * 0.5, y: l.y + l.height * 0.92 }, angle: (F.layerExtra[part]?.angle ?? 0) + deg * D2R };
+  }
+  driveWave(F, chainName, owner, amp, phase) { const chain = this.chains[chainName]; if (chain && chain.length >= 2) { F.wave[owner ?? chain[0].layer] = { chain, amp, phase }; return; } if (owner && this.hasLayer(owner)) this.drive(F, owner, amp * 0.5 * Math.sin(phase)); }
+  idleFrame(t) {
+    const F = { root: { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1 }, anchorAngle: {}, layerExtra: {}, wave: {} };
+    F.root.sy = 1 + 0.007 * Math.sin(t * TAU * 0.5);   // gentle breathe (game-tuned amplitude)
+    F.root.dy = -1.4 * Math.sin(t * TAU * 0.5);
+    this.drive(F, 'head', 2.2 * Math.sin(t * TAU * 0.33));
+    this.driveWave(F, 'tail', 'body_tail', 9 + 3 * Math.sin(t), Math.sin(t * TAU * 0.4) * 1.4);
+    this.drive(F, 'wing_left', this.perspAmp('wing_left', 2.2) * Math.sin(t * TAU * 0.5 + 0.3));
+    this.drive(F, 'wing_right', -this.perspAmp('wing_right', 2.2) * Math.sin(t * TAU * 0.5 + 0.3));
+    const ph = (t % 3.1) / 3.1, closed = ph > 0.92 ? 1 - Math.abs((ph - 0.96) / 0.04) : 0;
+    for (const part of ['eyelid_left', 'eyelid_right']) if (this.hasLayer(part)) F.wave[part] = { blinkScaleY: clampN(1 - closed, 0.06, 1) };
+    return F;
+  }
+  around(g, px, py, rot, sx = 1, sy = 1) { g.translate(px, py); g.rotate(rot); g.scale(sx, sy); g.translate(-px, -py); }
+  drawWaved(g, l, wave) {
+    const { img, x, y, width: w, height: h } = l;
+    if (wave.blinkScaleY !== undefined) { g.save(); this.around(g, x + w / 2, y + h * 0.3, 0, 1, wave.blinkScaleY); g.drawImage(img, x, y, w, h); g.restore(); return; }
+    const chain = wave.chain, first = chain[0].norm, last = chain[chain.length - 1].norm;
+    const horiz = Math.abs(last.x - first.x) >= Math.abs(last.y - first.y), N = 26, waves = 1.1, amp = wave.amp;
+    if (horiz) { const sw = w / N, rootU = first.x, span = (last.x - rootU) || 1; for (let i = 0; i < N; i++) { const u = (i + 0.5) / N, ramp = clampN((u - rootU) / span, 0, 1), dy = amp * ramp * Math.sin(wave.phase - u * waves * TAU); g.drawImage(img, i * sw, 0, sw, h, x + i * sw, y + dy, sw + 0.6, h); } }
+    else { const sh = h / N, rootV = first.y, span = (rootV - last.y) || 1; for (let i = 0; i < N; i++) { const v = (i + 0.5) / N, ramp = clampN((rootV - v) / span, 0, 1), dx = amp * ramp * Math.sin(wave.phase - v * waves * TAU); g.drawImage(img, 0, i * sh, w, sh, x + dx, y + i * sh, w, sh + 0.6); } }
+  }
+  draw(g, x, y, size, alpha, t) {
+    if (!this.ready) return; const b = this.bounds, s = size / Math.max(b.width, b.height) * 1.35, F = this.idleFrame(t);
+    g.save(); g.globalAlpha = clamp01(alpha);
+    g.translate(x, y); g.scale(s, s); g.translate(-(b.x + b.width / 2), -(b.y + b.height / 2));
+    for (const l of this.layers) {
+      g.save();
+      g.translate(F.root.dx, F.root.dy); this.around(g, this.root.x, this.root.y, F.root.rot, F.root.sx, F.root.sy);
+      const chain = []; let cur = l.name; const guard = new Set();
+      while (this.anchorByChild[cur] && !guard.has(cur)) { guard.add(cur); const a = this.anchorByChild[cur]; chain.push(a); cur = a.parentLayer; }
+      for (let i = chain.length - 1; i >= 0; i--) { const a = chain[i]; this.around(g, a.rig.x, a.rig.y, F.anchorAngle[a.name] ?? 0); }
+      const ex = F.layerExtra[l.name]; if (ex) this.around(g, ex.pivot.x, ex.pivot.y, ex.angle);
+      const wave = F.wave[l.name]; if (wave) this.drawWaved(g, l, wave); else g.drawImage(l.img, l.x, l.y, l.width, l.height);
+      g.restore();
+    }
+    g.restore();
+  }
+}
+
+/* ----------------------------- main stage ----------------------------- */
+const stageCanvas = document.getElementById('stage');
+const sg = stageCanvas.getContext('2d');
+const stage = { w: 0, h: 0, dpr: 1, t0: 0, last: 0, effects: [], flash: 0, fxFired: false, frozen: false };
+function resizeStage() {
+  const r = stageCanvas.getBoundingClientRect(); stage.dpr = devicePixelRatio || 1;
+  stageCanvas.width = r.width * stage.dpr; stageCanvas.height = r.height * stage.dpr;
+  stage.w = r.width; stage.h = r.height;
+}
+new ResizeObserver(resizeStage).observe(stageCanvas);
+
+function restartStage() { stage.t0 = performance.now(); stage.effects = []; stage.flash = 0; stage.fxFired = false; stage.frozen = false; }
+function fireFX(list, ox, oy, color) { for (const k of list) { const p = presetByKey(k); if (p) stage.effects.push(new Effect(p, ox, oy, color)); } }
+
+function tick(now) {
+  const dt = Math.min(0.05, (now - stage.last) / 1000); stage.last = now;
+  rigClock = now / 1000; // continuous clock so any uploaded character keeps idling
+  const el = elById(S.selKey); const ev = EVENTS[S.selEvent];
+  const t = now - stage.t0; // ms into the cycle
+  const cx = stage.w / 2, cy = stage.h / 2 + 14;
+
+  for (const e of stage.effects) e.update(dt);
+  stage.effects = stage.effects.filter((e) => !e.done());
+  if (stage.flash > 0) stage.flash = Math.max(0, stage.flash - dt * 3.2);
+
+  // draw
+  sg.setTransform(stage.dpr, 0, 0, stage.dpr, 0, 0);
+  sg.clearRect(0, 0, stage.w, stage.h);
+
+  if (el && IMG[el.key]) {
+    if (S.selEvent === 'appear') drawAppear(el, t, ev, cx, cy);
+    else drawMerge(el, t, ev, cx, cy);
+  }
+  // flash on merge convergence
+  if (stage.flash > 0) {
+    const grd = sg.createRadialGradient(cx, cy, 0, cx, cy, 230 * stage.flash + 30);
+    grd.addColorStop(0, `rgba(255,255,255,${0.85 * stage.flash})`); grd.addColorStop(1, 'rgba(255,255,255,0)');
+    sg.fillStyle = grd; sg.fillRect(0, 0, stage.w, stage.h);
+  }
+  for (const e of stage.effects) e.draw(sg);
+
+  // loop / freeze
+  if (t > ev.loopMs) { if (S.loop) restartStage(); else stage.frozen = true; }
+  updateMinis(dt);
+  requestAnimationFrame(tick);
+}
+
+function drawSprite(el, x, y, size, alpha) {
+  drawShadow(sg, x, y + size * SHADOW.yOffsetFactor, size, alpha); // realistic ground shadow
+  const rig = RIG[el.key];
+  if (rig && rig.ready) { rig.draw(sg, x, y, size, alpha, rigClock); return; } // animated idle stand-in
+  const img = IMG[el.key]; if (!img) return;
+  sg.globalAlpha = clamp01(alpha); sg.drawImage(img, x - size / 2, y - size / 2, size, size); sg.globalAlpha = 1;
+}
+function drawAppear(el, t, ev, cx, cy) {
+  if (!stage.fxFired && t >= ev.fxAtMs) { fireFX(S.config[el.key].appear, cx, cy, el.color); stage.fxFired = true; }
+  const p = clamp01(t / ev.durationMs);
+  const sc = ev.sprite.scaleFrom + (ev.sprite.scaleTo - ev.sprite.scaleFrom) * ease(ev.sprite.ease, p, ev.sprite.overshoot);
+  const a = clamp01(t / ev.sprite.alphaMs);
+  const dy = (1 - easeOutQuad(p)) * ev.sprite.riseFromPx;
+  drawSprite(el, cx, cy + dy, 150 * Math.max(0, sc), a);
+}
+function drawMerge(el, t, ev, cx, cy) {
+  const n = S.mergeCount, R = ev.inputs.startRadiusPx;
+  if (t < ev.convergeMs) {
+    const p = clamp01(t / ev.convergeMs), k = ease(ev.inputs.ease, p);
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + i / n * Math.PI * 2;
+      const sx = cx + Math.cos(a) * R, sy = cy + Math.sin(a) * R;
+      drawSprite(el, lerp(sx, cx, k), lerp(sy, cy, k), 116 * lerp(1, ev.inputs.shrinkTo, k), 1);
+    }
+  } else {
+    if (!stage.fxFired) { fireFX(S.config[el.key].merge, cx, cy, el.color); stage.flash = 1; stage.fxFired = true; }
+    const nxt = el.next ? elById(el.next) : null;
+    const rp = clamp01((t - ev.convergeMs) / ev.resultMs);
+    const sc = ev.result.scaleFrom + (ev.result.scaleTo - ev.result.scaleFrom) * ease(ev.result.ease, rp, ev.result.overshoot);
+    if (nxt && IMG[nxt.key]) drawSprite(nxt, cx, cy, 152 * Math.max(0, sc), clamp01(rp * 2));
+    else { sg.save(); sg.font = '13px "Trebuchet MS"'; sg.fillStyle = '#9b8d99'; sg.textAlign = 'center'; sg.globalAlpha = clamp01(rp * 1.5); sg.fillText(el.next ? '' : '★ top tier — no merge result', cx, cy + 4); sg.restore(); }
+  }
+}
+
+/* ----------------------------- mini previews -------------------------- */
+const minis = []; // { canvas, g, preset, eff, timer }
+function buildMinis() {
+  minis.length = 0;
+  for (const chip of document.querySelectorAll('.fxchip')) {
+    const canvas = chip.querySelector('canvas'); const g = canvas.getContext('2d');
+    minis.push({ canvas, g, key: chip.dataset.fx, eff: null, timer: Math.random() * 0.8 });
+  }
+}
+function updateMinis(dt) {
+  const el = elById(S.selKey);
+  for (const m of minis) {
+    const r = m.canvas.getBoundingClientRect(); if (!r.width) continue;
+    const dpr = devicePixelRatio || 1;
+    if (m.canvas.width !== Math.round(r.width * dpr)) { m.canvas.width = r.width * dpr; m.canvas.height = r.height * dpr; }
+    const w = r.width, h = r.height, cx = w / 2, cy = h / 2 + (presetByKey(m.key).gravity > 100 ? -h * 0.18 : 0);
+    m.timer -= dt;
+    if (!m.eff || m.eff.done()) { if (m.timer <= 0) { m.eff = new Effect(presetByKey(m.key), cx, cy, el ? el.color : '#FFD84D'); m.timer = 1.4; } }
+    if (m.eff) m.eff.update(dt);
+    const g = m.g; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+    g.fillStyle = '#15101a'; g.fillRect(0, 0, w, h);
+    if (m.eff) m.eff.draw(g);
+  }
+}
+
+/* ----------------------------- UI: catalogue -------------------------- */
+const catEl = document.getElementById('cat');
+function renderCatalogue() {
+  catEl.innerHTML = '';
+  let chain = null;
+  for (const e of ELEMENTS) {
+    if (e.chain !== chain) { chain = e.chain; const h = document.createElement('h4'); h.textContent = CHAIN_LABEL[chain]; catEl.appendChild(h); }
+    const card = document.createElement('div');
+    card.className = 'ecard' + (e.key === S.selKey ? ' active' : '');
+    const cfg = S.config[e.key]; const nfx = cfg.appear.length + cfg.merge.length;
+    const rigged = RIG[e.key] && RIG[e.key].ready;
+    card.innerHTML = `<canvas width="76" height="76"></canvas><div class="meta"><div class="nm">${e.label}</div>`
+      + `<div class="sub">${e.chain === 'special' ? 'special' : 'tier ' + e.tier}${cfg.sprite ? ' · custom' : ''}${rigged ? ' · 🐉' : ''}</div>`
+      + `<div class="fxn">✨${cfg.appear.length} · 💥${cfg.merge.length}</div></div>`;
+    const mc = card.querySelector('canvas'); const mg = mc.getContext('2d');
+    if (rigged) RIG[e.key].draw(mg, 38, 42, 70, 1, 0);
+    else if (IMG[e.key]) mg.drawImage(IMG[e.key], 0, 0, 76, 76);
+    card.onclick = () => selectElement(e.key);
+    catEl.appendChild(card);
+  }
+}
+
+/* ----------------------------- UI: panel ------------------------------ */
+const fxgrid = document.getElementById('fxgrid');
+function renderFXGrid() {
+  fxgrid.innerHTML = '';
+  const sel = S.config[S.selKey][S.selEvent];
+  for (const p of FX_PRESETS) {
+    const chip = document.createElement('div');
+    chip.className = 'fxchip' + (sel.includes(p.key) ? ' on' : ''); chip.dataset.fx = p.key;
+    chip.innerHTML = `<span class="tick">✔</span><canvas></canvas><div class="nm" title="${p.label}">${p.label}</div>`;
+    chip.onclick = () => toggleFX(p.key);
+    fxgrid.appendChild(chip);
+  }
+  buildMinis();
+}
+function refreshPanel() {
+  const el = elById(S.selKey);
+  document.getElementById('selName').textContent = el.label;
+  // sprite preview (shows the rigged character's rest pose when one is loaded)
+  const pc = document.getElementById('spritePrev'); const pg = pc.getContext('2d');
+  pg.clearRect(0, 0, 128, 128);
+  if (RIG[el.key] && RIG[el.key].ready) RIG[el.key].draw(pg, 64, 70, 116, 1, 0);
+  else if (IMG[el.key]) pg.drawImage(IMG[el.key], 0, 0, 128, 128);
+  document.getElementById('removeRig').style.display = RIG[el.key] && RIG[el.key].ready ? '' : 'none';
+  // event tabs + stage bar
+  for (const id of ['tabAppear', 'tabMerge']) document.getElementById(id).classList.toggle('on', document.getElementById(id).dataset.ev === S.selEvent);
+  document.getElementById('evAppear').classList.toggle('active', S.selEvent === 'appear');
+  document.getElementById('evMerge').classList.toggle('active', S.selEvent === 'merge');
+  document.getElementById('countRow').style.display = S.selEvent === 'merge' ? 'flex' : 'none';
+  for (const b of document.querySelectorAll('#countRow button')) b.classList.toggle('on', +b.dataset.n === S.mergeCount);
+  document.getElementById('stageHint').textContent = S.selEvent === 'appear'
+    ? '✨ Appear — the element pops into the world'
+    : `💥 Merge — ${S.mergeCount} ${el.label} combine` + (el.next ? ` → ${elById(el.next).label}` : ' (top tier)');
+  renderFXGrid();
+}
+
+function selectElement(key) { S.selKey = key; renderCatalogue(); refreshPanel(); restartStage(); }
+function selectEvent(ev) { S.selEvent = ev; refreshPanel(); restartStage(); save(); }
+function toggleFX(key) {
+  const arr = S.config[S.selKey][S.selEvent]; const i = arr.indexOf(key);
+  if (i >= 0) arr.splice(i, 1); else arr.push(key);
+  renderFXGrid(); renderCatalogue(); restartStage(); save();
+  say(`<b>${elById(S.selKey).label}</b> ${S.selEvent} FX: ${arr.length ? arr.join(', ') : 'none'}.`);
+}
+const say = (h) => { document.getElementById('status').innerHTML = h; };
+
+/* ----------------------------- toolbar wiring ------------------------- */
+document.getElementById('replay').onclick = () => restartStage();
+document.getElementById('replayTop').onclick = () => restartStage();
+document.getElementById('loopBtn').onclick = (e) => { S.loop = !S.loop; e.target.classList.toggle('on', S.loop); if (S.loop) restartStage(); };
+for (const b of document.querySelectorAll('#stageBar .ev')) b.onclick = () => selectEvent(b.dataset.ev);
+for (const id of ['tabAppear', 'tabMerge']) document.getElementById(id).onclick = (e) => selectEvent(e.target.dataset.ev);
+for (const b of document.querySelectorAll('#countRow button')) b.onclick = () => { S.mergeCount = +b.dataset.n; refreshPanel(); restartStage(); save(); };
+
+// sprite replace
+document.getElementById('replaceSprite').onclick = () => document.getElementById('fileSprite').click();
+document.getElementById('fileSprite').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+  r.onload = () => { S.config[S.selKey].sprite = r.result; loadSprite(S.selKey, r.result, () => { refreshPanel(); renderCatalogue(); save(); }); say(`Replaced <b>${elById(S.selKey).label}</b> sprite.`); };
+  r.readAsDataURL(f); e.target.value = '';
+};
+document.getElementById('revertSprite').onclick = () => {
+  S.config[S.selKey].sprite = null; loadSprite(S.selKey, placeholderSprite(elById(S.selKey)), () => { refreshPanel(); renderCatalogue(); save(); });
+  say(`Reverted <b>${elById(S.selKey).label}</b> to its placeholder.`);
+};
+// upload a rigged character FOLDER (e.g. red-dragon/) → play its idle in the preview
+document.getElementById('loadRig').onclick = () => document.getElementById('fileRig').click();
+document.getElementById('fileRig').onchange = (e) => {
+  const files = [...e.target.files];
+  const rigFile = files.find((f) => f.name.endsWith('.rig.json')) || files.find((f) => f.name.endsWith('.json') && !/project/i.test(f.name));
+  e.target.value = '';
+  if (!rigFile) { say('No <b>.rig.json</b> in that folder — pick a rigged character folder (e.g. red-dragon/).'); return; }
+  const r = new FileReader();
+  r.onload = () => {
+    let doc; try { doc = JSON.parse(r.result); } catch (err) { say('That rig file could not be parsed.'); return; }
+    const key = S.selKey; say(`Loading character <b>${doc.character || rigFile.name}</b>…`);
+    RIG[key] = new RigChar(doc, () => { refreshPanel(); renderCatalogue(); restartStage(); say(`<b>${elById(key).label}</b> now previews the <b>${RIG[key].character}</b> idle — FX play on the live character.`); });
+  };
+  r.readAsText(rigFile);
+};
+document.getElementById('removeRig').onclick = () => {
+  delete RIG[S.selKey]; refreshPanel(); renderCatalogue(); restartStage();
+  say(`Removed the character from <b>${elById(S.selKey).label}</b> — back to its sprite.`);
+};
+
+/* ----------------------------- persistence ---------------------------- */
+function save() { try { localStorage.setItem(FX_KEY, JSON.stringify({ v: 1, config: S.config, selKey: S.selKey, selEvent: S.selEvent, mergeCount: S.mergeCount })); } catch (e) {} }
+function restore() {
+  let raw; try { raw = localStorage.getItem(FX_KEY); } catch (e) { return false; }
+  if (!raw) return false; let d; try { d = JSON.parse(raw); } catch (e) { return false; }
+  if (!d || !d.config) return false;
+  S.config = defaultConfig();
+  for (const e of ELEMENTS) if (d.config[e.key]) S.config[e.key] = { sprite: d.config[e.key].sprite ?? null,
+    appear: Array.isArray(d.config[e.key].appear) ? d.config[e.key].appear : ['sparkle_burst'],
+    merge: Array.isArray(d.config[e.key].merge) ? d.config[e.key].merge : ['shock_ring', 'star_pop'] };
+  S.selKey = d.selKey ?? S.selKey; S.selEvent = d.selEvent ?? 'appear'; S.mergeCount = d.mergeCount ?? 3;
+  return true;
+}
+
+/* ----------------------------- export --------------------------------- */
+function buildDoc() {
+  const images = {};
+  const elements = ELEMENTS.map((e) => {
+    const cfg = S.config[e.key]; const file = e.key + '.png';
+    if (cfg.sprite) images[file] = cfg.sprite;
+    const rigged = RIG[e.key] && RIG[e.key].ready;
+    return { key: e.key, label: e.label, chain: e.chain, tier: e.tier, color: e.color, next: e.next,
+      sprite: { custom: !!cfg.sprite, file },
+      rig: rigged ? { character: RIG[e.key].character } : null,  // resolve the rig from game assets; plays idle
+      fx: { appear: cfg.appear.slice(), merge: cfg.merge.slice() } };
+  });
+  return {
+    format: 'emberkeep-merge-fx', version: 1,
+    note: 'FX + spawn/merge animation for every merge element. Under each element draw `shadow`. Replay events[ev].sprite (the structural motion) and fire each element.fx[ev] preset (from fxPresets) at the element centre. If element.rig is set, render that character (idle) instead of the sprite. All values resolved — see fxParamSpec.',
+    mergeRule: { minGroup: EVENTS.merge.minGroup },
+    // soft ground shadow drawn under EVERY merge element (radial-gradient opacity + blur).
+    shadow: { type: 'radialGradient', color: SHADOW.color, opacity: SHADOW.opacity,
+      radiusXFactor: SHADOW.radiusXFactor, aspect: SHADOW.aspect, blurPx: SHADOW.blurPx, yOffsetFactor: SHADOW.yOffsetFactor,
+      note: 'Ellipse under the element: radiusX = radiusXFactor*spriteSize, radiusY = radiusX*aspect, centred at spriteCentre + (0, yOffsetFactor*spriteSize). Fill a radial gradient rgba(0,0,0,opacity) at centre → transparent at the edge, with a gaussian blur of blurPx. Scales with the element and multiplies opacity by the element alpha.' },
+    events: EVENTS,
+    fxParamSpec: FX_PARAM_SPEC,
+    fxPresets: FX_PRESETS,
+    elements, images
+  };
+}
+function download(name, text) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+document.getElementById('exportBtn').onclick = () => {
+  const doc = buildDoc(); download('merge-fx.json', JSON.stringify(doc, null, 2));
+  const custom = doc.elements.filter((e) => e.sprite.custom).length;
+  say(`Exported <b>merge-fx.json</b> — ${doc.elements.length} elements, ${doc.fxPresets.length} FX presets, ${custom} custom sprite(s). ✔`);
+};
+document.getElementById('saveBtn').onclick = () => { const doc = buildDoc(); doc.format = 'emberkeep-merge-fx-project'; download('merge-fx.fxproject.json', JSON.stringify(doc)); say('Project saved.'); };
+document.getElementById('loadBtn').onclick = () => document.getElementById('fileProject').click();
+document.getElementById('fileProject').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+  r.onload = () => { try { applyDoc(JSON.parse(r.result)); } catch (err) { say('Could not read that project file.'); } };
+  r.readAsText(f); e.target.value = '';
+};
+function applyDoc(doc) {
+  S.config = defaultConfig();
+  for (const el of doc.elements ?? []) if (S.config[el.key]) {
+    S.config[el.key].appear = el.fx?.appear?.slice() ?? [];
+    S.config[el.key].merge = el.fx?.merge?.slice() ?? [];
+    S.config[el.key].sprite = el.sprite?.custom ? (doc.images?.[el.sprite.file] ?? null) : null;
+  }
+  bootSprites(() => { renderCatalogue(); refreshPanel(); restartStage(); save(); say(`Loaded project — ${(doc.elements ?? []).length} elements.`); });
+}
+
+/* ----------------------------- boot ----------------------------------- */
+function bootSprites(done) {
+  let pending = ELEMENTS.length;
+  for (const e of ELEMENTS) {
+    const src = S.config[e.key].sprite || placeholderSprite(e);
+    loadSprite(e.key, src, () => { if (--pending === 0) done(); });
+  }
+}
+function init() {
+  if (!restore()) S.config = defaultConfig();
+  resizeStage();
+  bootSprites(() => { renderCatalogue(); refreshPanel(); restartStage(); });
+  stage.last = performance.now(); requestAnimationFrame(tick);
+}
+init();
+</script>
+</body>
+</html>
