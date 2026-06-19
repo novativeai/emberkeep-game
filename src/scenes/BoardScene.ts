@@ -1168,6 +1168,14 @@ export class BoardScene extends Phaser.Scene {
         ? (DECOR_SCALE[snap.chain] ?? 1)
         : (ITEM_SCALE[`${snap.chain}_${snap.tier}`] ?? ITEM_SCALE[snap.chain] ?? 1);
     sprite.acquire(snap, this.ctx.data.anchors, this.textureFor(snap), artScale);
+    // Crystal towers are taller than one iso row — override with a full-body hit
+    // rect covering the visible 3D column so the whole crystal is tappable.
+    // Calling setInteractive again updates only the hit area; pointer listeners
+    // registered in the new-sprite block above are unaffected.
+    if (snap.chain === 'crystal') {
+      const tallHit = new Phaser.Geom.Rectangle(4, -324, 144, 428);
+      sprite.setInteractive({ hitArea: tallHit, hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
+    }
     // Passive-only generators (house, big tree) have no readyAt, so the snapshot
     // doesn't flag them — recognise them by their chain config for the timer UI.
     if (snap.kind === 'item' && this.generatorConfigFor(snap.chain, snap.tier)) {

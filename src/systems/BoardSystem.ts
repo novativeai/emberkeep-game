@@ -37,19 +37,25 @@ export class BoardSystem {
   }): void {
     const items = [...this.state.items.values()].filter((i) => i.kind === 'item');
     const anchor = (nearChain && items.find((i) => i.chain === nearChain)) || items[0] || null;
-    // Spawn IN FRONT of the anchor (+1,+1 = south, toward the viewer) so produce
-    // isn't hidden behind a tall generator — e.g. the dragon occluding its gems.
-    const offset = nearChain && anchor ? 1 : 0;
-    let anchorCol = (anchor?.col ?? 0) + offset;
-    let anchorRow = (anchor?.row ?? 0) + offset;
-    // When the board is empty the default [0,0] may resolve to an isolated active
-    // tile with no active neighbours (unable to grow a connected blob). Prefer the
-    // nearest active tile that has at least one active free neighbour instead.
+    let anchorCol = anchor?.col ?? 0;
+    let anchorRow = anchor?.row ?? 0;
     if (!anchor) {
+      // When the board is empty the default [0,0] may resolve to an isolated active
+      // tile with no active neighbours (unable to grow a connected blob). Prefer the
+      // nearest active tile that has at least one active free neighbour instead.
       const connected = this.state.freeActiveTilesNear(0, 0)
         .find((p) => this.state.freeActiveNeighbors(p.col, p.row).length > 0);
       if (connected) { anchorCol = connected.col; anchorRow = connected.row; }
+    } else if (nearChain) {
+      // Use the nearest free active neighbour of the anchor so items always land
+      // adjacent to it on a valid tile. A fixed +1,+1 offset can leave the active
+      // zone and cause freeBlobNear to scatter items to a distant cluster.
+      const near = this.state.freeActiveNeighbors(anchor.col, anchor.row)[0]
+        ?? this.state.freeActiveTilesNear(anchor.col, anchor.row)[0];
+      if (near) { anchorCol = near.col; anchorRow = near.row; }
     }
+    // No else: for non-nearChain spawns with an anchor the start col/row is the
+    // anchor's own tile (offset=0) — freeBlobNear resolves adjacency from there.
     const cells = this.freeBlobNear(anchorCol, anchorRow, count);
     for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, 'unlock');
   }
