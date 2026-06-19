@@ -18,7 +18,7 @@
       "id": "ruby_merge",
       "speaker": "laurah",
       "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch a Red Egg.",
-      "gate": { "type": "event", "event": "item:hatched", "chain": "ember_dragon" },
+      "gate": { "type": "event", "event": "item:merged", "chain": "ember_dragon" },
       "effects": [
         { "spawn": { "chain": "ember_dragon", "tier": 1, "count": 3 } }
       ],
@@ -38,7 +38,7 @@
       "id": "dragon_hatch",
       "speaker": "laurah",
       "text": "A Red Egg! Two more have appeared. Drag all three together — the Red Dragon stirs inside!",
-      "gate": { "type": "event", "event": "item:merged", "chain": "ember_dragon" },
+      "gate": { "type": "event", "event": "item:hatched", "chain": "ember_dragon" },
       "effects": [
         { "spawn": { "chain": "ember_dragon", "tier": 2, "count": 2 } }
       ],

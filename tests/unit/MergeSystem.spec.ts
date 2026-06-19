@@ -222,22 +222,40 @@ describe('MergeSystem', () => {
     expect(whelp?.readyAt).toBeDefined(); // still a ready generator
   });
 
-  it('merging 3 rubies hatches: emits item:hatched and the result is a Red Egg (pure merge piece)', () => {
+  it('merging 3 rubies produces a Red Egg — no item:hatched, no generator', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 2, row: 2, kind: 'item' });
     ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 3, row: 2, kind: 'item' });
     ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 4, row: 4, kind: 'item' });
+    const hatches = capture(ctx.bus, 'item:hatched');
+    const merges = capture(ctx.bus, 'item:merged');
+
+    drag(ctx, [4, 4], [2, 3]);
+
+    // hatchAtTier:3 — tier 2 (Red Egg) is a pure merge piece, not a hatch event
+    expect(hatches).toHaveLength(0);
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.resultTier).toBe(2);
+    const redEgg = ctx.state.itemAt(2, 3);
+    expect(redEgg).toMatchObject({ chain: 'ember_dragon', tier: 2 });
+    expect(redEgg?.readyAt).toBeUndefined();
+  });
+
+  it('merging 3 Red Eggs hatches the Red Dragon: emits item:hatched and result is a generator', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'ember_dragon', tier: 2, col: 2, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'ember_dragon', tier: 2, col: 3, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'ember_dragon', tier: 2, col: 4, row: 4, kind: 'item' });
     const hatches = capture(ctx.bus, 'item:hatched');
 
     drag(ctx, [4, 4], [2, 3]);
 
     expect(hatches).toHaveLength(1);
     expect(hatches[0]!.item.chain).toBe('ember_dragon');
-    expect(hatches[0]!.item.tier).toBe(2);
-    // Red Egg has no generator — ready/readyAt are not set
-    expect(hatches[0]!.item.ready).toBeUndefined();
-    const redEgg = ctx.state.itemAt(2, 3);
-    expect(redEgg?.readyAt).toBeUndefined();
+    expect(hatches[0]!.item.tier).toBe(3);
+    expect(hatches[0]!.item.ready).toBe(true); // Red Dragon is a generator, immediately ready
+    const dragon = ctx.state.itemAt(2, 3);
+    expect(dragon?.readyAt).toBeDefined();
   });
 
   it('snaps a piece dropped NEAR (not on) a mergeable pair onto the completing tile', () => {

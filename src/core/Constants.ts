@@ -125,6 +125,7 @@ export const ITEM_SCALE: Record<string, number> = {
   // placeholder art — scale down so a gem reads ~1 tile wide (SVG-sized).
   // Egg + ruby reduced 70% on request (small speckled egg / small ruby shard).
   ember_dragon_1: 0.18,
+  ember_dragon_2: 0.10, // Red Egg (red-egg.png 1162×1437) — scaled to ~emerald visual size
   flame_gem_1: 0.15,
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
   lumber_1: 0.48, // a log — bumped up so it reads clearly, planted on the ground
@@ -133,8 +134,8 @@ export const ITEM_SCALE: Record<string, number> = {
   chest_1: 0.48, // a treasure chest — SAME size as the wood, per spec
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
-  emerald_1: 0.25, // a small gem (crystal output)
-  emerald_2: 0.18, // emerald egg — EXACT same scale as the red egg (ember_dragon_1)
+  emerald_1: 0.10, // Green Egg (green-egg.png 1147×1438) — scaled to ~emerald visual size
+  emerald_2: 0.18, // green dragon egg sprite (emerald-egg.png 396×501)
   emerald_3: 1.0, // dragon host (the rig overlays it)
   coin_1: 0.12 // SMALLER than an egg, per spec
 };

@@ -39,7 +39,7 @@
     {
       "id": "ember_dragon",
       "name": "Ember Dragons",
-      "hatchAtTier": 2,
+      "hatchAtTier": 3,
       "tiers": [
         { "tier": 1, "id": "ember_dragon_1", "name": "Dragon Ruby", "sell": 2, "xp": 0 },
         {
