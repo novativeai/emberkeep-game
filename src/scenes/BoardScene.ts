@@ -1172,7 +1172,7 @@ export class BoardScene extends Phaser.Scene {
     // rect covering the visible 3D column so the whole crystal is tappable.
     // Calling setInteractive again updates only the hit area; pointer listeners
     // registered in the new-sprite block above are unaffected.
-    if (snap.chain === 'crystal') {
+    if (snap.chain === 'crystal' || snap.chain === 'chest') {
       const tallHit = new Phaser.Geom.Rectangle(4, -324, 144, 428);
       sprite.setInteractive({ hitArea: tallHit, hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
     }
