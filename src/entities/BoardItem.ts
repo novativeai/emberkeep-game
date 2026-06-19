@@ -46,22 +46,24 @@ export class BoardItem extends Phaser.GameObjects.Container {
       .setAlpha(0);
     this.sprite = scene.add.image(0, 0, '__DEFAULT');
     this.readyStar = scene.add.image(40, -104, 'fx_spark').setScale(0.7).setVisible(false);
-    // Countdown shown over a waiting generator as a glossy BLUE PILL (the
-    // payement-energie look): a stretched pill texture + a pink time-icon dot +
-    // white mm:ss text. "8s" for short cooldowns, "9:58" for the long timers.
+    // Countdown shown over a waiting generator: warm plum pill (Emberkeep
+    // palette) + gold dot icon + cream mm:ss text.
     this.timePill = scene.add
       .image(0, -122, scene.textures.exists('fx_timepill') ? 'fx_timepill' : '__WHITE')
       .setVisible(false);
-    if (!scene.textures.exists('fx_timepill')) this.timePill.setTint(0x2f6cc0);
-    this.timeIcon = scene.add.circle(-58, -122, 18, 0xff7ab0).setStrokeStyle(5, 0xffffff).setVisible(false);
+    if (!scene.textures.exists('fx_timepill')) this.timePill.setTint(num(PALETTE.plum));
+    this.timeIcon = scene.add
+      .circle(-58, -122, 18, num(PALETTE.gold))
+      .setStrokeStyle(4, num(PALETTE.plumShade))
+      .setVisible(false);
     this.cooldownLabel = scene.add
       .text(8, -122, '', {
-        fontFamily: 'Segoe UI, sans-serif',
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
         fontSize: '34px',
         fontStyle: 'bold',
-        color: '#ffffff',
-        stroke: '#1a3a66',
-        strokeThickness: 5
+        color: PALETTE.cream,
+        stroke: PALETTE.night,
+        strokeThickness: 4
       })
       .setOrigin(0.5)
       .setVisible(false);
@@ -265,7 +267,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     }
   }
 
-  /** Update the countdown text + resize the blue pill around it: "8s" under a
+  /** Update the countdown text + resize the pill around it: "8s" under a
    *  minute, "9:58" mm:ss above. */
   setCooldownRemaining(ms: number): void {
     if (!this.cooling) return;

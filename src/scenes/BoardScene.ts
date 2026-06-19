@@ -1074,7 +1074,7 @@ export class BoardScene extends Phaser.Scene {
         tex.refresh();
       }
     }
-    // Blue glossy pill behind the generator countdown (payement-energie style).
+    // Warm plum pill behind the generator countdown (Emberkeep palette).
     if (!this.textures.exists('fx_timepill')) {
       const W = 168;
       const H = 60;
@@ -1091,16 +1091,20 @@ export class BoardScene extends Phaser.Scene {
           ctx.arcTo(x, y, x + w, y, r);
           ctx.closePath();
         };
-        ctx.fillStyle = '#1f4f8c';
+        ctx.fillStyle = '#3A2B38'; // plumShade rim
         rr(0, 0, W, H, R);
-        ctx.fill(); // dark rim
+        ctx.fill();
+        ctx.strokeStyle = '#D9821F'; // goldShade border accent
+        ctx.lineWidth = 3;
+        rr(2, 2, W - 4, H - 4, R - 2);
+        ctx.stroke();
         const g = ctx.createLinearGradient(0, 4, 0, H - 4);
-        g.addColorStop(0, '#5aa9ec');
-        g.addColorStop(1, '#2f6cc0');
+        g.addColorStop(0, '#6A5468'); // plumHighlight
+        g.addColorStop(1, '#4A3845'); // plum
         ctx.fillStyle = g;
         rr(5, 4, W - 10, H - 8, R - 4);
         ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.22)'; // top gloss
+        ctx.fillStyle = 'rgba(255,255,255,0.08)'; // subtle top gloss
         rr(12, 8, W - 24, H * 0.4, R * 0.6);
         ctx.fill();
         tex.refresh();

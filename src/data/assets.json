@@ -350,9 +350,9 @@
     },
     {
       "key": "ui_icon_key",
-      "source": "placeholder",
+      "source": "file",
       "generator": "icon",
-      "file": "raw/ai/ui_icon_key.png"
+      "file": "sprites/items/key-icon.png"
     },
     {
       "key": "ui_icon_gear",
