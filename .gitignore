@@ -25,6 +25,18 @@ playwright-report/
 assets/map/*.json
 assets/map/*.worldproject.json
 
+# Root-level source / duplicate art folders — canonical copies live under assets/sprites/.
+# e2e shots are generated output, not baselines — re-run `pnpm e2e` to regenerate.
+asset-reference/
+Islands/
+Decors/
+egs/
+reward/
+payment/
+logo/
+tests/e2e/shots/
+before-bubble-camera.png
+
 # external standalone tools that carry their own .git (not part of this repo)
 /rigger/
 /world/
