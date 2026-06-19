@@ -26,7 +26,6 @@ export class BoardItem extends Phaser.GameObjects.Container {
   private cooldownLabel: Phaser.GameObjects.Text;
   private timePill: Phaser.GameObjects.Image;
   private timeIcon: Phaser.GameObjects.Arc;
-  private bobPhase = 0;
   private bobPaused = false;
   private cooling = false;
 
@@ -92,7 +91,6 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.tier = snapshot.tier;
     this.kind = snapshot.kind;
     this.isGenerator = snapshot.ready !== undefined;
-    this.bobPhase = Math.random() * Math.PI * 2;
     this.bobPaused = false;
     this.cooling = false;
     this.sprite.setTexture(textureKey);
@@ -197,6 +195,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
       ease: 'Sine.easeOut',
       onComplete: () => {
         this.bobPaused = false;
+        this.landSquash();
       }
     });
     this.scene.tweens.killTweensOf(this.shadow);
@@ -208,12 +207,27 @@ export class BoardItem extends Phaser.GameObjects.Container {
     });
   }
 
-  /** Idle bob, applied to the inner sprite only. Decor sits still. */
-  applyBob(timeMs: number): void {
-    if (this.kind === 'decor') return;
+  /** Items no longer float — they sit flat on the ground (a one-time landing
+   *  squash on spawn sells the "placed" feel). Kept as a no-op so the per-frame
+   *  caller and the drag pause/resume logic stay intact. */
+  applyBob(_timeMs: number): void {
     if (this.bobPaused) return;
-    const wave = Math.sin((timeMs / TIMINGS.bobPeriodMs) * Math.PI * 2 + this.bobPhase);
-    this.sprite.setY(wave * TIMINGS.bobAmplitudePx);
+    if (this.sprite.y !== 0) this.sprite.setY(0);
+  }
+
+  /** A quick squash-and-settle so a newly placed item reads as landing on the
+   *  ground (replaces the old idle float). */
+  landSquash(): void {
+    const baseX = this.sprite.scaleX;
+    const baseY = this.sprite.scaleY;
+    this.sprite.setScale(baseX * 1.14, baseY * 0.8);
+    this.scene.tweens.add({
+      targets: this.sprite,
+      scaleX: baseX,
+      scaleY: baseY,
+      duration: 240,
+      ease: 'Back.easeOut'
+    });
   }
 
   /** Generator cooldown visual: muted tint while cooling, sparkle when ready. */

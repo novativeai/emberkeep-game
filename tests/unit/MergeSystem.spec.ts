@@ -223,4 +223,36 @@ describe('MergeSystem', () => {
     const hatchling = ctx.state.itemAt(2, 3);
     expect(hatchling?.readyAt).toBeDefined();
   });
+
+  it('snaps a piece dropped NEAR (not on) a mergeable pair onto the completing tile', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 5, row: 5, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    // (3,2) touches NEITHER pair tile (two columns away) — the exact-tile merge
+    // fails. The smart snap finds (2,1), which sits beside both, and fuses there.
+    drag(ctx, [5, 5], [3, 2]);
+
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.consumedIds).toHaveLength(3);
+    expect(ctx.state.items.size).toBe(1);
+    expect(ctx.state.itemAt(2, 1)).toMatchObject({ chain: 'sparkweed', tier: 2 });
+  });
+
+  it('does NOT snap-merge when only ONE matching piece sits nearby', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 5, row: 5, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+    const moves = capture(ctx.bus, 'item:moved');
+
+    drag(ctx, [5, 5], [3, 2]); // only one matching piece total — nothing to complete
+
+    expect(merges).toHaveLength(0);
+    expect(moves).toHaveLength(1);
+    expect(ctx.state.items.size).toBe(2);
+    expect(ctx.state.itemAt(3, 2)?.chain).toBe('sparkweed'); // just moved, no snap
+  });
 });

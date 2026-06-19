@@ -67,9 +67,50 @@ export class MergeSystem {
 
     // Dropping on a FREE tile: move there, then merge the connected group.
     this.state.moveItem(itemId, to);
-    if (!this.tryMergeAt(item)) {
-      this.bus.emit('item:moved', { itemId, from, to });
+    if (this.tryMergeAt(item)) return;
+    // Smart "near enough" merge: dropping NEXT TO a mergeable cluster (not dead
+    // on it) snaps the piece onto the completing tile and fuses.
+    if (this.trySnapMerge(item, to)) return;
+    this.bus.emit('item:moved', { itemId, from, to });
+  }
+
+  /**
+   * If the exact drop tile didn't form a group, scan the 8 tiles around it for a
+   * FREE active tile that sits beside enough matching pieces to merge; snap the
+   * dropped piece there and fuse. This makes dropping a piece NEAR a mergeable
+   * pair merge directly, the way a forgiving merge game should feel.
+   */
+  private trySnapMerge(item: BoardItemState, to: TilePos): boolean {
+    const config = this.chainConfig(item.chain);
+    if (!config || !config.tiers.some((t) => t.tier === item.tier + 1)) return false; // max tier
+    const minGroup = config.merge?.group ?? this.chains.mergeRule.minGroup;
+    let best: { col: number; row: number; matches: number } | null = null;
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        if (dc === 0 && dr === 0) continue; // the drop tile itself was already tried
+        const col = to.col + dc;
+        const row = to.row + dr;
+        if (!this.state.isTileActive(col, row)) continue;
+        const occ = this.state.itemIdAt(col, row);
+        if (occ && occ !== item.id) continue; // candidate must be free
+        let matches = 0;
+        for (let ec = -1; ec <= 1; ec++) {
+          for (let er = -1; er <= 1; er++) {
+            if (ec === 0 && er === 0) continue;
+            const n = this.state.itemAt(col + ec, row + er);
+            if (n && n.id !== item.id && n.kind === 'item' && n.chain === item.chain && n.tier === item.tier) {
+              matches++;
+            }
+          }
+        }
+        if (matches >= minGroup - 1 && (!best || matches > best.matches)) {
+          best = { col, row, matches };
+        }
+      }
     }
+    if (!best) return false;
+    this.state.moveItem(item.id, { col: best.col, row: best.row });
+    return this.performMerge(this.collectGroup(item), { col: best.col, row: best.row });
   }
 
   /** Merge the flood-filled group around `seed`, output at the seed's tile. */

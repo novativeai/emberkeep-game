@@ -10,7 +10,6 @@ import { ShopPanel } from '../ui/ShopPanel';
 import { renderScale } from '../core/render-scale';
 import { getMusicMuted, setMusicMuted } from '../audio/musicPref';
 import { Tooltip } from '../ui/Tooltip';
-import { hoverBob } from '../ui/tweens';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 const DEPTH_HUD = 10;
@@ -36,6 +35,16 @@ export class UIScene extends Phaser.Scene {
   private dialog: Phaser.GameObjects.Container | null = null;
   private lastStep: TutorialStepEvent | null = null;
   private offBus: (() => void)[] = [];
+  // Tutorial markers are anchored to BOARD CELLS, not the screen: the board
+  // camera pans/zooms over the big map, so each frame we re-project the cell to
+  // its current on-screen spot (update()). Otherwise a marker would appear glued
+  // to the screen and slide off its target the moment the camera moves.
+  private handDrag: { from: TilePos; to: TilePos } | null = null;
+  private handProg = { t: 0 }; // 0..1 along from→to, driven by a looping tween
+  private handPoint: (() => { x: number; y: number } | null) | null = null;
+  private arrowAnchor: (() => { x: number; y: number } | null) | null = null;
+  private arrowLift = 128;
+  private arrowBob = { v: 0 };
 
   constructor() {
     super(SCENES.ui);
@@ -95,6 +104,27 @@ export class UIScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    // Re-project board-anchored tutorial markers EVERY frame so they stay glued
+    // to their cell as the board camera pans/zooms (they live on the UI scene's
+    // own fixed camera, so without this they'd appear stuck to the screen).
+    if (this.hand.visible) {
+      if (this.handDrag) {
+        const f = this.cellToScreen(this.handDrag.from.col, this.handDrag.from.row);
+        const t = this.cellToScreen(this.handDrag.to.col, this.handDrag.to.row);
+        this.hand.setPosition(
+          Phaser.Math.Linear(f.x, t.x, this.handProg.t) + 16,
+          Phaser.Math.Linear(f.y, t.y, this.handProg.t) - 12
+        );
+      } else if (this.handPoint) {
+        const p = this.handPoint();
+        if (p) this.hand.setPosition(p.x, p.y);
+      }
+    }
+    if (this.arrow.visible && this.arrowAnchor) {
+      const a = this.arrowAnchor();
+      if (a) this.arrow.setPosition(a.x, a.y - this.arrowLift + this.arrowBob.v);
+    }
+
     // ~Twice a second, refresh the "next +1 Warmth" countdown on the energy gauge.
     this.regenAccum += delta;
     if (this.regenAccum < 500) return;
@@ -307,8 +337,13 @@ export class UIScene extends Phaser.Scene {
   private clearMarkers(): void {
     this.tweens.killTweensOf(this.hand);
     this.tweens.killTweensOf(this.arrow);
+    this.tweens.killTweensOf(this.handProg);
+    this.tweens.killTweensOf(this.arrowBob);
     this.hand.setVisible(false);
     this.arrow.setVisible(false);
+    this.handDrag = null;
+    this.handPoint = null;
+    this.arrowAnchor = null;
   }
 
   private applyMarkers(step: TutorialStepEvent): void {
@@ -337,12 +372,14 @@ export class UIScene extends Phaser.Scene {
 
   private placeHand(hand: ResolvedHand): void {
     if ('from' in hand) {
-      const from = this.cellToScreen(hand.from.col, hand.from.row);
-      const to = this.cellToScreen(hand.to.col, hand.to.row);
+      // Drag gesture: store the from/to CELLS and drive a 0→1 progress proxy;
+      // update() lerps the live re-projected cell positions so the hand follows
+      // the camera. (Alpha still fades on the hand itself; that's screen-space.)
+      this.handDrag = { from: hand.from, to: hand.to };
       this.hand.setVisible(true);
       const run = (): void => {
         if (!this.hand.visible) return;
-        this.hand.setPosition(from.x + 16, from.y - 12);
+        this.handProg.t = 0;
         this.hand.setAlpha(0);
         this.tweens.add({
           targets: this.hand,
@@ -350,9 +387,8 @@ export class UIScene extends Phaser.Scene {
           duration: 200,
           onComplete: () => {
             this.tweens.add({
-              targets: this.hand,
-              x: to.x + 16,
-              y: to.y - 12,
+              targets: this.handProg,
+              t: 1,
               duration: 950,
               ease: 'Sine.easeInOut',
               onComplete: () => {
@@ -371,14 +407,20 @@ export class UIScene extends Phaser.Scene {
       run();
       return;
     }
-    const target = this.uiTarget(hand);
+    // Point gesture at a UI/fog target: re-evaluate the anchor each frame.
+    this.handPoint = () => {
+      const t = this.uiTarget(hand);
+      return t ? { x: t.x + 28, y: t.y + 32 } : null;
+    };
+    const target = this.handPoint();
     if (!target) {
       this.hand.setVisible(false);
+      this.handPoint = null;
       return;
     }
     this.hand.setVisible(true);
     this.hand.setAlpha(1);
-    this.hand.setPosition(target.x + 28, target.y + 32);
+    this.hand.setPosition(target.x, target.y);
     this.tweens.add({
       targets: this.hand,
       scale: { from: 1, to: 0.88 },
@@ -390,20 +432,32 @@ export class UIScene extends Phaser.Scene {
   }
 
   private placeArrow(arrow: ResolvedArrow): void {
-    let target: { x: number; y: number } | null = null;
-    let lift = 128;
     if ('tile' in arrow) {
-      target = this.cellToScreen(arrow.tile.col, arrow.tile.row);
-      lift = 156;
+      this.arrowAnchor = () => this.cellToScreen(arrow.tile.col, arrow.tile.row);
+      this.arrowLift = 156;
     } else {
-      target = this.uiTarget(arrow);
-      lift = 'ui' in arrow ? 116 : 192;
+      this.arrowAnchor = () => this.uiTarget(arrow);
+      this.arrowLift = 'ui' in arrow ? 116 : 192;
     }
-    if (!target) return;
+    const target = this.arrowAnchor();
+    if (!target) {
+      this.arrowAnchor = null;
+      return;
+    }
     this.arrow.setVisible(true);
     this.arrow.setAlpha(1);
-    this.arrow.setPosition(target.x, target.y - lift);
-    hoverBob(this, this.arrow, 20, 430);
+    this.arrow.setPosition(target.x, target.y - this.arrowLift);
+    // Bob via a proxy so update() can re-anchor the arrow to its cell each frame
+    // while it bobs (a tween writing arrow.y directly would fight re-projection).
+    this.arrowBob.v = 0;
+    this.tweens.add({
+      targets: this.arrowBob,
+      v: -20,
+      duration: 430,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
   }
 
   /* ----------------------------- dialogs ---------------------------- */

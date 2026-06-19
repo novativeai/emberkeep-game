@@ -3,7 +3,6 @@ import type { GameContext } from '../core/Context';
 import {
   ANIMATED_TILE_NAMES,
   COLLECTIBLE_REWARD,
-  DECOR_BOUNCE,
   DECOR_SCALE,
   DEPTHS,
   DRAG,
@@ -22,8 +21,7 @@ import {
   TAP_MAX_MS,
   TILE_H,
   TILE_W,
-  TIMINGS,
-  TREE_BOUNCE_SPEEDUP
+  TIMINGS
 } from '../core/Constants';
 import { gridToWorld, setProjection, worldToGrid } from '../core/iso';
 import { renderScale } from '../core/render-scale';
@@ -582,7 +580,7 @@ export class BoardScene extends Phaser.Scene {
       this.tiles.set(`${col},${row}`, tile);
       // Trees authored as floor tiles spring-bounce like decor (15% faster).
       if (artName && ANIMATED_TILE_NAMES.includes(artName)) {
-        this.springBounce(tile, tileY, col + row, true);
+        this.settleSprite(tile, ((col + row) % 8) * 35);
       }
     }
   }
@@ -676,7 +674,7 @@ export class BoardScene extends Phaser.Scene {
       // Ground shadow sized to the art, on the cell so the spring lifts off it.
       this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
       // Slow spring-bounce (not a smooth float): lazy spring, staggered, calm.
-      this.springBounce(sprite, baseY, i, false);
+      this.settleSprite(sprite, (i % 8) * 35); // one-time landing settle
     });
   }
 
@@ -739,7 +737,7 @@ export class BoardScene extends Phaser.Scene {
         .setScale((cal.scale ?? 1) * ratio)
         .setDepth(DEPTHS.itemBase + y);
       this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
-      this.springBounce(sprite, baseY, i, false);
+      this.settleSprite(sprite, (i % 8) * 35); // one-time landing settle
     });
   }
 
@@ -1121,20 +1119,20 @@ export class BoardScene extends Phaser.Scene {
       .setDepth(depth);
   }
 
-  /** Slow spring-bounce shared by world-builder decor and animated tree tiles.
-   *  Trees run faster (TREE_BOUNCE_SPEEDUP). `baseY` is the resting y. */
-  private springBounce(target: Phaser.GameObjects.Image, baseY: number, index: number, fast: boolean): void {
-    const k = fast ? TREE_BOUNCE_SPEEDUP : 1;
+  /** One-time landing settle for scenery (world-builder decor + animated tree
+   *  tiles): a quick squash that springs back, so a piece reads as PLACED on the
+   *  ground instead of endlessly floating. `delay` staggers neighbours. */
+  private settleSprite(target: Phaser.GameObjects.Image, delay: number): void {
+    const sx = target.scaleX;
+    const sy = target.scaleY;
+    target.setScale(sx * 1.08, sy * 0.84);
     this.tweens.add({
       targets: target,
-      y: baseY - DECOR_BOUNCE.rise,
-      duration: DECOR_BOUNCE.riseMs / k,
-      delay: 300 + (index % 6) * 400,
-      ease: 'Back.easeOut',
-      yoyo: true,
-      hold: DECOR_BOUNCE.hold / k,
-      repeat: -1,
-      repeatDelay: DECOR_BOUNCE.restMs / k
+      scaleX: sx,
+      scaleY: sy,
+      duration: 280,
+      delay,
+      ease: 'Back.easeOut'
     });
   }
 
@@ -1172,7 +1170,19 @@ export class BoardScene extends Phaser.Scene {
     }
     this.itemSprites.set(snap.id, sprite);
     this.refreshDraggable(sprite);
-    if (pop) popIn(this, sprite, { duration: TIMINGS.spawnPop });
+    // Every object gets the "placed on the ground" settle. With an entrance pop
+    // the squash plays once the container has finished growing; without one
+    // (initial board load) it plays immediately so starting items — e.g. the
+    // default wood — plant onto the ground instead of appearing to float.
+    const settleId = snap.id;
+    if (pop) {
+      popIn(this, sprite, { duration: TIMINGS.spawnPop });
+      this.time.delayedCall(TIMINGS.spawnPop, () => {
+        if (sprite.active && sprite.itemId === settleId) sprite.landSquash();
+      });
+    } else {
+      sprite.landSquash();
+    }
     return sprite;
   }
 

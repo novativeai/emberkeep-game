@@ -110,7 +110,9 @@ export const ANIMATED_TILE_NAMES = ['tree-1', 'tree-2', 'tree-3', 'tree-4', 'sap
  * guardian dragon at ~1.7 tiles wide. Anything absent renders at scale 1.
  */
 export const DECOR_SCALE: Record<string, number> = {
-  dragon: 0.42
+  dragon: 0.42,
+  // Landmark trees read too tall in the higher zones — halve them (−50%).
+  tree_2: 0.5
 };
 
 /**
@@ -125,9 +127,9 @@ export const ITEM_SCALE: Record<string, number> = {
   ember_dragon_1: 0.18,
   flame_gem_1: 0.15,
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
-  lumber_1: 0.4, // a small log (reduced 20%)
-  lumber_2: 1.0, // a house reads ~1.4 tiles
-  bigtree_1: 0.62, // a tall landmark tree
+  lumber_1: 0.38, // a small log (−20%, then −5% more on request)
+  lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
+  bigtree_1: 0.31, // the level-2 wood tree — reduced 50% on request
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
   emerald_1: 0.25, // a small gem (crystal output)
@@ -248,7 +250,7 @@ export const DRAGON_ANIM = {
  *  size. The emerald rig renders larger, so it's taken down 40% to match red. */
 export const DRAGON_RIG_SCALE: Record<string, number> = {
   emerald: 0.6,
-  ember_dragon: 0.88 // −12% so the red dragon matches the emerald's on-board size
+  ember_dragon: 0.7 // red dragon taken down a further 20% on request
 };
 
 /**
