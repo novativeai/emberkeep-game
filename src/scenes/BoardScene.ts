@@ -37,7 +37,7 @@ interface LiveDragon {
   player: RigPlayer;
   host: BoardItem;
   shadow: Phaser.GameObjects.Image; // ground shadow scaled to the rig
-  mode: 'celebrate' | 'idle';
+  mode: 'hover' | 'idle';
   remainMs: number; // countdown until the next mode roll
   busy: boolean; // flying out to work a plant — pause idle rolls + further taps
 }
@@ -282,7 +282,7 @@ export class BoardScene extends Phaser.Scene {
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
       (DRAGON_RIG_SCALE[host.chain] ?? 1);
     const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, { scale });
-    player.setFacing('left').play(intro ? 'celebrate' : 'idle'); // rig's original (un-mirrored) orientation
+    player.setFacing('left').play(intro ? 'hover' : 'idle'); // rig's original (un-mirrored) orientation
     host.setArtVisible(false); // host is now just the invisible hit-target + bob anchor
     // Ground shadow proportional to the rig (666px pieces × scale).
     const shadow = this.addGroundShadow(host.x, host.y, 666 * scale, host.depth - 0.5);
@@ -290,7 +290,7 @@ export class BoardScene extends Phaser.Scene {
       player,
       host,
       shadow,
-      mode: intro ? 'celebrate' : 'idle',
+      mode: intro ? 'hover' : 'idle',
       remainMs: intro ? DRAGON_ANIM.introCelebrateMs : this.idleSpanMs(),
       busy: false
     };
@@ -328,9 +328,9 @@ export class BoardScene extends Phaser.Scene {
       if (ld.remainMs > 0) continue;
       // Roll the next segment: mostly idle (~90% of the time), the rest a burst.
       if (ld.mode === 'idle' && Math.random() < DRAGON_ANIM.celebrateChance) {
-        ld.mode = 'celebrate';
+        ld.mode = 'hover';
         ld.remainMs = DRAGON_ANIM.celebrateMs;
-        ld.player.play('celebrate');
+        ld.player.play('hover');
       } else {
         ld.mode = 'idle';
         ld.remainMs = this.idleSpanMs();
@@ -1263,7 +1263,7 @@ export class BoardScene extends Phaser.Scene {
     if (ld) {
       ld.busy = true;
       ld.player.setFacing(landX <= plant.x ? 'right' : 'left');
-      ld.player.play('celebrate');
+      ld.player.play('hover');
     }
     dragon.setDepth(DEPTHS.dragged);
     const land = (): void => {
@@ -1529,8 +1529,8 @@ export class BoardScene extends Phaser.Scene {
     this.floatText(sprite.x, sprite.y - 150, 'Refreshed!', PALETTE.goldAccent);
     const ld = this.liveDragons.get(dragonId);
     if (ld) {
-      ld.player.play('celebrate');
-      ld.mode = 'celebrate';
+      ld.player.play('hover');
+      ld.mode = 'hover';
       ld.remainMs = DRAGON_ANIM.celebrateMs;
     }
   }
@@ -1812,9 +1812,9 @@ export class BoardScene extends Phaser.Scene {
   private celebrateDragon(itemId: number): void {
     const ld = this.liveDragons.get(itemId);
     if (!ld) return;
-    ld.mode = 'celebrate';
+    ld.mode = 'hover';
     ld.remainMs = DRAGON_ANIM.celebrateMs;
-    ld.player.play('celebrate');
+    ld.player.play('hover');
   }
 
   private onRegionUnlocked(tiles: TilePos[], revealed: ItemSnapshot[], regionId?: string): void {
