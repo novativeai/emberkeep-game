@@ -1,0 +1,80 @@
+{
+  "_note": "Numeric knobs for rigAnimations.ts presets. Edit here first, then mirror into rigAnimations.ts and tools/rigger/animator.html.",
+  "idle": {
+    "breatheScale": 0.004,
+    "breatheLift": 0.7,
+    "headSway": 0.7,
+    "tailSwing": 6,
+    "wingSettle": 2.4,
+    "blinkPeriod": 3.1
+  },
+  "hover": {
+    "liftBase": 16,
+    "liftBob": 12,
+    "beatFreq": 2.1,
+    "wingSpread": 28,
+    "wingPulse": 14,
+    "tailAmp": 10,
+    "footDangle": 6,
+    "footPulse": 10,
+    "headTilt": -3,
+    "headPulse": 2
+  },
+  "celebrate": {
+    "hopFreq": 1.7,
+    "hopHeight": 8,
+    "bodySquashY": 0.012,
+    "bodySquashX": 0.007,
+    "armRaise": 38,
+    "armPump": 18,
+    "wingSpread": 28,
+    "wingPulse": 6,
+    "tailFreqMult": 3,
+    "tailAmp": 14,
+    "headBob": 1.5,
+    "headOffset": -1,
+    "blinkPeriod": 1.4
+  },
+  "roar": {
+    "period": 2.6,
+    "windUpFraction": 0.35,
+    "rearRotDeg": -6,
+    "rearLift": 8,
+    "rearScaleX": 0.04,
+    "rearScaleY": 0.05,
+    "headTilt": -16,
+    "jawDeg": 18,
+    "wingSpread": 46,
+    "armRaise": 26,
+    "tailPush": 6,
+    "trembleFreq": 9,
+    "trembleAmp": 0.6
+  },
+  "stretch": {
+    "period": 3.4,
+    "squashSy": 0.9,
+    "stretchSy": 0.14,
+    "squashSx": 1.06,
+    "stretchSxReduce": 0.06,
+    "liftBase": 6,
+    "liftPeak": 14,
+    "headTilt": 4,
+    "headYawnDip": -10,
+    "jawDeg": 22,
+    "wingNearSpread": 40,
+    "wingFarSpread": 10,
+    "armRaise": 14
+  },
+  "walk": {
+    "strideFreq": 1.5,
+    "legAmp": 24,
+    "armAmp": 13,
+    "bobAmp": 5,
+    "bobBase": 2,
+    "leanAmp": 1.7,
+    "headNod": 3,
+    "headPhase": 0.4,
+    "tailAmp": 8,
+    "wingRest": 5
+  }
+}
