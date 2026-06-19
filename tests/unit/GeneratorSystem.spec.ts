@@ -13,9 +13,9 @@ describe('dragon passive generation (the standing advantage)', () => {
     ctx.bus.emit('time:advanced', { ms: 0 });
     expect(produced).toHaveLength(0);
 
-    // Cross the 90s passive interval (tier 3 passiveMs).
-    ctx.clock.advance(90_001);
-    ctx.bus.emit('time:advanced', { ms: 90_001 });
+    // Cross the 180s passive interval (tier 3 passiveMs).
+    ctx.clock.advance(180_001);
+    ctx.bus.emit('time:advanced', { ms: 180_001 });
 
     expect(produced).toHaveLength(1);
     expect(produced[0]!.output).toMatchObject({ chain: 'flame_gem', tier: 1 });

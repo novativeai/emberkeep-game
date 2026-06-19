@@ -102,30 +102,48 @@
         "level": 2
       },
       "tiles": [
-        [6, 5],
-        [5, 5],
-        [6, 6],
-        [5, 6]
+        [
+          6,
+          5
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          5,
+          6
+        ]
       ],
       "contents": [
-        { "chain": "lumber", "tier": 1, "at": [6, 5] },
-        { "chain": "lumber", "tier": 1, "at": [5, 5] },
-        { "chain": "lumber", "tier": 1, "at": [6, 6] }
-      ]
-    },
-    {
-      "id": "level_5",
-      "status": "locked",
-      "unlock": { "level": 99 },
-      "tiles": [
-        [6, 4],
-        [6, 3],
-        [5, 4],
-        [5, 3],
-        [6, 2],
-        [4, 4],
-        [4, 5],
-        [4, 6]
+        {
+          "chain": "lumber",
+          "tier": 1,
+          "at": [
+            6,
+            5
+          ]
+        },
+        {
+          "chain": "lumber",
+          "tier": 1,
+          "at": [
+            5,
+            5
+          ]
+        },
+        {
+          "chain": "lumber",
+          "tier": 1,
+          "at": [
+            6,
+            6
+          ]
+        }
       ]
     },
     {
@@ -133,6 +151,57 @@
       "status": "unlockable",
       "unlock": {
         "level": 2
+      },
+      "tiles": [
+        [
+          6,
+          4
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "contents": [
+        {
+          "chain": "bigtree",
+          "tier": 1,
+          "at": [
+            4,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "level_5",
+      "status": "locked",
+      "unlock": {
+        "level": 99
       },
       "tiles": [
         [
@@ -187,20 +256,19 @@
           3,
           4
         ]
-      ],
-      "contents": [
-        {
-          "chain": "bigtree",
-          "tier": 1,
-          "at": [
-            1,
-            2
-          ]
-        }
       ]
     }
   ],
-  "startingItems": [{ "chain": "crystal", "tier": 1, "at": [8, 11] }],
+  "startingItems": [
+    {
+      "chain": "crystal",
+      "tier": 1,
+      "at": [
+        8,
+        11
+      ]
+    }
+  ],
   "startingDecor": [],
   "playable": [
     [
