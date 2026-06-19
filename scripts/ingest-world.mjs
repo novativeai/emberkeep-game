@@ -38,13 +38,24 @@ const tileAt = new Map(); // "c,r" -> { asset, kind }
 const decoAt = new Map();
 const decorStack = []; // category 'decor' — stackable authored scenery (huts, crystals)
 const fogLevelAt = new Map(); // "c,r" -> lowest level that covers it
+const invisibleCells = new Set(); // playable cells with no tile art (background shows through)
+const backgrounds = [];           // category 'background' — a layer painted BELOW the floor
+const decor3d = [];               // category '3d' — procedural Three.js decor (the emerald crystal)
+
+// which asset names are the editor's "invisible" tile (playable, no exported art)
+const invisibleAssets = new Set((doc.assets ?? []).filter((a) => a.invisible).map((a) => a.name));
+// per-asset 3D model spec + free-offset carry from the export
+const model3dByAsset = {}; for (const a of doc.assets ?? []) if (a.is3d) model3dByAsset[a.name] = a.model3d;
 
 for (const p of doc.placements) {
   const { col, row } = norm(p);
   const key = `${col},${row}`;
-  if (p.category === 'tile') tileAt.set(key, p.asset);
+  const off = (p.dx || p.dy) ? { dx: p.dx | 0, dy: p.dy | 0 } : {};
+  if (p.category === 'tile') { tileAt.set(key, p.asset); if (invisibleAssets.has(p.asset)) invisibleCells.add(key); }
   else if (p.category === 'decotile') decoAt.set(key, p.asset);
-  else if (p.category === 'decor') decorStack.push({ name: p.asset, col, row, z: p.z ?? 0 });
+  else if (p.category === 'decor') decorStack.push({ name: p.asset, col, row, z: p.z ?? 0, ...off });
+  else if (p.category === 'background') backgrounds.push({ name: p.asset, col, row, z: p.z ?? 0, ...off });
+  else if (p.category === '3d') decor3d.push({ name: p.asset, col, row, z: p.z ?? 0, model3d: model3dByAsset[p.asset] ?? null, ...off });
   else if (p.category === 'blocker') {
     const lvl = p.level ?? 1;
     fogLevelAt.set(key, Math.min(fogLevelAt.get(key) ?? Infinity, lvl));
@@ -81,7 +92,10 @@ const startCells = tiles.filter(([c, r]) => !fogLevelAt.has(`${c},${r}`));
 
 // Per-LEVEL playable merge zone = the playable tiles unlocked AT that level
 // (level 1 = the start clearing; level N = playable tiles under a level-N cloud).
-const playZoneByLevel = new Map([[1, startCells]]);
+// NB: copy — the loop below pushes level-N tiles into this map's arrays; sharing
+// `startCells` here would mutate the start clearing (degenerate level-1 clouds,
+// like dragon-land.world-3, would balloon the clearing to every playable cell).
+const playZoneByLevel = new Map([[1, startCells.slice()]]);
 for (const [c, r] of tiles) {
   const lvl = fogLevelAt.get(`${c},${r}`);
   if (lvl === undefined) continue; // already counted in the level-1 start clearing
@@ -111,7 +125,16 @@ const out = {
   calibration: calibByKey,
   playable: tiles,        // [col,row] cells that are part of the board
   decorative: deco,       // [col,row] non-playable ground
-  decor: decorStack,      // { name, col, row, z } — stackable authored scenery
+  decor: decorStack,      // { name, col, row, z, dx?, dy? } — stackable authored scenery
+  invisible: [...invisibleCells].map(cell), // [col,row] cells with no tile art (bg shows through)
+  backgrounds,            // { name, col, row, z, dx?, dy? } — layer painted BELOW the floor
+  decor3d,                // { name, col, row, z, model3d, dx?, dy? } — procedural 3D decor
+  // the background's cell extent (normalised) — the game clamps its camera here.
+  backgroundBounds: doc.backgroundBounds ? {
+    minCol: doc.backgroundBounds.minCol - minC, maxCol: doc.backgroundBounds.maxCol - minC,
+    minRow: doc.backgroundBounds.minRow - minR, maxRow: doc.backgroundBounds.maxRow - minR
+  } : null,
+  cameraZoom: doc.cameraZoom ?? { min: 0.2, max: 1.4 }, // in-game wheel-zoom clamp
   startClearing: startCells,
   playZones,              // { level, cells } — the merge zone unlocked at each level
   fogRegions: regions,    // { id, level, status, cells }

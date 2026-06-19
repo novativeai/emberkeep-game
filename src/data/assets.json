@@ -707,6 +707,12 @@
       "source": "placeholder",
       "generator": "item",
       "file": "sprites/items/emerald-egg.png"
+    },
+    {
+      "key": "background_emberkeep",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/background/emberkeep.jpg"
     }
   ]
 }

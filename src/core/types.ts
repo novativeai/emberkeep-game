@@ -134,6 +134,17 @@ export interface MapDecorRender {
   col: number;
   row: number;
   z?: number;
+  /** Free-move offset in world px from the cell centre (world-builder Move tool). */
+  dx?: number;
+  dy?: number;
+}
+
+/** Procedural animated 3D decor (world-builder 🧊 tab — the emerald crystal). */
+export interface MapDecor3dRender extends MapDecorRender {
+  model3d?: {
+    shape: string; color: string; material: string; outline: string;
+    spinDegPerSec: number; camera: string; steps: number;
+  } | null;
 }
 
 export interface MapRegionConfig {
@@ -182,6 +193,18 @@ export interface MapData {
   mapDecor?: MapDecorRender[];
   /** Placement calibration for map decor, keyed by decor slug. */
   decorCalibration?: Record<string, TileCalibration>;
+  /** Playable cells with NO tile art — the background/void shows through, keyed "col,row" elsewhere as [col,row]. */
+  invisible?: [number, number][];
+  /** A layer painted BELOW the floor (world-builder Background), + its calibration. */
+  backgrounds?: MapDecorRender[];
+  backgroundCalibration?: Record<string, TileCalibration>;
+  /** The background's cell extent — the camera frontier (pan/zoom can't go past it). */
+  backgroundBounds?: { minCol: number; maxCol: number; minRow: number; maxRow: number } | null;
+  /** Procedural Three.js decor (the emerald crystal) + its calibration. */
+  decor3d?: MapDecor3dRender[];
+  decor3dCalibration?: Record<string, TileCalibration>;
+  /** In-game wheel-zoom clamp authored in the world builder. */
+  cameraZoom?: { min: number; max: number };
   /** Per-level camera framing. */
   cameraKeyframes?: CameraKeyframe[];
 }
@@ -301,6 +324,8 @@ export interface EventMap {
   /** A gauge "+" button opened the shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' | 'keys' };
   'ui:sell_requested': { itemId: number };
+  /** Settings toggled the background music on/off (AudioManager applies it). */
+  'audio:set_music_muted': { muted: boolean };
   'fog:tapped': { regionId: string };
   'tutorial:advance_requested': { stepId: string };
   'game:reset_requested': Record<string, never>;

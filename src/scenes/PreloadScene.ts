@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
 import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SCENES } from '../core/Constants';
+import { renderScale } from '../core/render-scale';
 
 /**
  * Loads real-art files for any assets.json entry flipped to source:"file"
@@ -14,6 +15,7 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   preload(): void {
+    this.cameras.main.setOrigin(0).setZoom(renderScale.value); // hi-DPI backing for the loading bar
     const ctx = this.registry.get('ctx') as GameContext;
     const factory = this.registry.get('textureFactory') as TextureFactory;
 

@@ -25,9 +25,11 @@ import {
   TIMINGS,
   TREE_BOUNCE_SPEEDUP
 } from '../core/Constants';
-import { gridToWorld, worldToGrid } from '../core/iso';
+import { gridToWorld, setProjection, worldToGrid } from '../core/iso';
+import { renderScale } from '../core/render-scale';
 import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAllow } from '../core/types';
 import { BoardItem } from '../entities/BoardItem';
+import { Crystal3D } from '../render/Crystal3D';
 import { RigPlayer } from '../render/RigPlayer';
 import type { RigDoc } from '../render/rigTypes';
 import { hopTo, hoverBob, popIn, scalePulse } from '../ui/tweens';
@@ -120,6 +122,13 @@ export class BoardScene extends Phaser.Scene {
   private levelFrames = new Map<number, CameraFrame>();
   private flyTween?: Phaser.Tweens.Tween;
   private panFrom: { px: number; py: number; sx: number; sy: number } | null = null;
+  /** Live Three.js emerald crystal driving the `item_crystal_1` texture (the
+   *  Theme-Crystal generator's look) + any authored 3D-decor placement. */
+  private crystal3d?: Crystal3D;
+  private crystalTex?: Phaser.Textures.CanvasTexture;
+  /** Lowest zoom the wheel/flights allow — raised so the camera can never show
+   *  past the authored background image (the world border). */
+  private minZoom = 0.2;
 
   constructor() {
     super(SCENES.board);
@@ -127,6 +136,7 @@ export class BoardScene extends Phaser.Scene {
 
   create(): void {
     this.ctx = this.registry.get('ctx') as GameContext;
+    setProjection(this.ctx.data.map.tile); // adopt the world's authored grid perspective
     this.itemSprites.clear();
     this.pool = [];
     this.tiles.clear();
@@ -146,9 +156,12 @@ export class BoardScene extends Phaser.Scene {
     void this.loadDragonRigs(); // lazy + fault-tolerant; ready well before the hatch
 
     this.ensureShadowTexture(); // soft radial shadow used by every object
+    this.ensureCrystal3D(); // live 3D emerald → item_crystal_1 (before items build)
     this.buildSky();
+    this.buildBackground(); // authored backdrop, below the floor (shows through invisible tiles)
     this.buildGround();
     this.buildMapDecor();
+    this.buildMapDecor3d(); // authored Three.js 3D-decor placements
     this.buildFog();
     this.buildKeyBadges();
     this.buildEmitters();
@@ -165,11 +178,18 @@ export class BoardScene extends Phaser.Scene {
       this.offBus = [];
       for (const ld of this.liveDragons.values()) ld.player.destroy();
       this.liveDragons.clear();
+      this.crystal3d?.dispose();
+      this.crystal3d = undefined;
+      this.crystalTex = undefined;
     });
   }
 
   override update(time: number, delta: number): void {
     for (const sprite of this.itemSprites.values()) sprite.applyBob(time);
+    if (this.crystal3d && this.crystalTex) {
+      this.crystal3d.update(time); // spin + render the live emerald
+      this.crystalTex.refresh(); // re-upload to the GPU for this frame
+    }
     this.updateDrag(delta);
     this.updateLiveDragons(delta);
 
@@ -264,7 +284,7 @@ export class BoardScene extends Phaser.Scene {
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
       (DRAGON_RIG_SCALE[host.chain] ?? 1);
     const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, { scale });
-    player.setFacing('right').play(intro ? 'celebrate' : 'idle');
+    player.setFacing('left').play(intro ? 'celebrate' : 'idle'); // rig's original (un-mirrored) orientation
     host.setArtVisible(false); // host is now just the invisible hit-target + bob anchor
     // Ground shadow proportional to the rig (666px pieces × scale).
     const shadow = this.addGroundShadow(host.x, host.y, 666 * scale, host.depth - 0.5);
@@ -357,8 +377,33 @@ export class BoardScene extends Phaser.Scene {
     }
 
     const cam = this.cameras.main;
+    // Camera frontier — the authored BACKGROUND IMAGE is the world's border: the
+    // camera roams ONLY inside it (pan + zoom), so no void is ever visible. Bound
+    // to the image's exact world rect, and raise the minimum zoom to the image-fit
+    // so the viewport can never grow past it (zoom-out stops at the full image).
+    const bgRect = this.backgroundWorldRect();
+    const zoomCfg = this.ctx.data.map.cameraZoom ?? { min: 0.2, max: 1.4 };
+    if (bgRect) {
+      cam.setBounds(bgRect.x, bgRect.y, bgRect.w, bgRect.h);
+      const fitZoom = Math.max(GAME_WIDTH / bgRect.w, GAME_HEIGHT / bgRect.h);
+      this.minZoom = Math.max(zoomCfg.min, fitZoom);
+    } else {
+      // Fallback (no backdrop): hold to the playable extent, the old behaviour.
+      this.minZoom = zoomCfg.min;
+      const cells = map.playable ?? [];
+      if (cells.length) {
+        let minC = Infinity, maxC = -Infinity, minR = Infinity, maxR = -Infinity;
+        for (const [c, r] of cells) { minC = Math.min(minC, c); maxC = Math.max(maxC, c); minR = Math.min(minR, r); maxR = Math.max(maxR, r); }
+        const pts = [[minC, minR], [maxC, minR], [minC, maxR], [maxC, maxR]].map(([c, r]) => gridToWorld(c, r));
+        const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+        const x0 = Math.min(...xs) - TILE_W, y0 = Math.min(...ys) - TILE_H * 2;
+        cam.setBounds(x0, y0, Math.max(...xs) - Math.min(...xs) + TILE_W * 2, Math.max(...ys) - Math.min(...ys) + TILE_H * 3);
+      }
+    }
     const frame = this.frameForLevel(this.ctx.state.level);
-    cam.setZoom(frame.zoom);
+    // World framing stays logical (R cancels in world space); only the actual zoom
+    // is ×renderScale so the same view renders into the larger hi-DPI backing.
+    cam.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);
     cam.centerOn(frame.x, frame.y);
 
     this.offBus.push(
@@ -425,6 +470,8 @@ export class BoardScene extends Phaser.Scene {
     // all live in the L1 zone. Zones still unlock; the view just stays put.
     if (!this.tutorialDone) return;
     const target = this.frameForLevel(level);
+    // actual (×renderScale) zoom space — cam.zoom below is already scaled.
+    const targetZoom = Math.max(target.zoom, this.minZoom) * renderScale.value; // stay inside the image
     const cam = this.cameras.main;
     const from = { x: cam.midPoint.x, y: cam.midPoint.y, zoom: cam.zoom };
     this.flyTween?.stop();
@@ -438,9 +485,10 @@ export class BoardScene extends Phaser.Scene {
         const s = smootherstep(proxy.t);
         const x = Phaser.Math.Linear(from.x, target.x, s);
         const y = Phaser.Math.Linear(from.y, target.y, s);
-        // Gentle mid-flight dolly-out for a premium, cinematic glide.
-        const z = Phaser.Math.Linear(from.zoom, target.zoom, s) * (1 - 0.08 * Math.sin(Math.PI * proxy.t));
-        cam.setZoom(z);
+        // Gentle mid-flight dolly-out for a premium, cinematic glide — but never
+        // below the image-fit zoom, or the dip would flash the void.
+        const z = Phaser.Math.Linear(from.zoom, targetZoom, s) * (1 - 0.08 * Math.sin(Math.PI * proxy.t));
+        cam.setZoom(Math.max(z, this.minZoom * renderScale.value));
         cam.centerOn(x, y);
       }
     });
@@ -513,7 +561,9 @@ export class BoardScene extends Phaser.Scene {
   private buildGround(): void {
     const map = this.ctx.data.map;
     const ratio = TILE_W / (map.tile?.width ?? TILE_W); // authored 240 → game 256
+    const invisible = new Set((map.invisible ?? []).map(([c, r]) => `${c},${r}`));
     for (const [col, row] of map.playable ?? []) {
+      if (invisible.has(`${col},${row}`)) continue; // playable cell, no art — background shows through
       const { x, y } = gridToWorld(col, row);
       const artName = map.tilesByCell?.[`${col},${row}`];
       const cal = (artName && map.calibration?.[artName]) || {
@@ -538,6 +588,64 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /**
+   * Authored backdrop (`map.backgrounds`, the world-builder's `background` tab):
+   * a painted scene that sits BELOW the floor so invisible tiles reveal it. Laid
+   * EXACTLY per the world JSON — cell + free-move dx/dy + calibration scale/anchor
+   * (only the grid-unit ratio is applied, as for all decor) — and scrolls with the
+   * camera as part of the world. Skipped cleanly if the art isn't present.
+   */
+  private buildBackground(): void {
+    const map = this.ctx.data.map;
+    if (!map.backgrounds?.length) return;
+    const ratio = TILE_W / (map.tile?.width ?? TILE_W);
+    for (const b of map.backgrounds) {
+      const key = `background_${b.name}`;
+      if (!this.textures.exists(key)) continue;
+      const { x, y } = gridToWorld(b.col, b.row);
+      const cal = map.backgroundCalibration?.[b.name] ?? {
+        offsetX: 0,
+        offsetY: 0,
+        scale: 1,
+        anchor: { x: 0.5, y: 0.5 }
+      };
+      this.add
+        .image(x + (cal.offsetX + (b.dx ?? 0)) * ratio, y + (cal.offsetY + (b.dy ?? 0)) * ratio, key)
+        .setOrigin(cal.anchor?.x ?? 0.5, cal.anchor?.y ?? 0.5)
+        .setScale((cal.scale ?? 1) * ratio)
+        .setDepth(DEPTHS.tiles - 1); // below the floor tiles, above the sky FX
+    }
+  }
+
+  /**
+   * World-space rect of the FIRST authored backdrop image — placed exactly as
+   * buildBackground draws it (cell + free-move + calibration) — or null if there's
+   * no background art. The camera frontier is held to this so the image is the
+   * world's border and nothing beyond it is ever shown.
+   */
+  private backgroundWorldRect(): { x: number; y: number; w: number; h: number } | null {
+    const map = this.ctx.data.map;
+    const b = map.backgrounds?.[0];
+    if (!b) return null;
+    const key = `background_${b.name}`;
+    if (!this.textures.exists(key)) return null;
+    const src = this.textures.get(key).getSourceImage() as HTMLImageElement;
+    const ratio = TILE_W / (map.tile?.width ?? TILE_W);
+    const cal = map.backgroundCalibration?.[b.name] ?? {
+      offsetX: 0,
+      offsetY: 0,
+      scale: 1,
+      anchor: { x: 0.5, y: 0.5 }
+    };
+    const { x, y } = gridToWorld(b.col, b.row);
+    const cx = x + (cal.offsetX + (b.dx ?? 0)) * ratio;
+    const cy = y + (cal.offsetY + (b.dy ?? 0)) * ratio;
+    const scale = (cal.scale ?? 1) * ratio;
+    const w = src.width * scale;
+    const h = src.height * scale;
+    return { x: cx - w * (cal.anchor?.x ?? 0.5), y: cy - h * (cal.anchor?.y ?? 0.5), w, h };
+  }
+
+  /**
    * Static authored scenery (world-builder `decor` placements): huts, crystals,
    * landmarks. Painted like tiles — part of the MAP, not save state — so a
    * re-imported world refreshes the scene for everyone. Each uses its per-asset
@@ -559,15 +667,78 @@ export class BoardScene extends Phaser.Scene {
         scale: 1,
         anchor: { x: 0.5, y: 0 }
       };
-      const baseY = y + cal.offsetY * ratio;
+      const baseY = y + (cal.offsetY + (d.dy ?? 0)) * ratio; // + free-move offset (Move tool)
       const sprite = this.add
-        .image(x + cal.offsetX * ratio, baseY, key)
+        .image(x + (cal.offsetX + (d.dx ?? 0)) * ratio, baseY, key)
         .setOrigin(cal.anchor.x, cal.anchor.y)
         .setScale(cal.scale * ratio * (DECOR_SCALE[d.name] ?? 1))
         .setDepth(DEPTHS.itemBase + y);
       // Ground shadow sized to the art, on the cell so the spring lifts off it.
       this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
       // Slow spring-bounce (not a smooth float): lazy spring, staggered, calm.
+      this.springBounce(sprite, baseY, i, false);
+    });
+  }
+
+  /**
+   * Build the live Three.js emerald crystal ONCE and graft it over the
+   * `item_crystal_1` texture, so the Theme-Crystal generator (and every authored
+   * 3D-decor placement) shows the spinning cel-shaded gem instead of the flat
+   * PNG — same key, so the generator's anchor/scale/gameplay are untouched. The
+   * spec comes from the world's `decor3d` (the world-builder's `model3d`), or a
+   * default emerald. WebGL-less contexts keep the PNG (the try/catch falls back).
+   */
+  private ensureCrystal3D(): void {
+    const map = this.ctx.data.map;
+    const spec = map.decor3d?.find((d) => d.model3d)?.model3d ?? undefined;
+    try {
+      const crystal = new Crystal3D(spec ?? {});
+      if (this.textures.exists('item_crystal_1')) this.textures.remove('item_crystal_1');
+      this.crystalTex = this.textures.addCanvas('item_crystal_1', crystal.canvas) ?? undefined;
+      if (!this.crystalTex) {
+        crystal.dispose();
+        return;
+      }
+      this.crystal3d = crystal;
+    } catch (err) {
+      console.warn('[Crystal3D] WebGL unavailable — keeping the 2D crystal art.', err);
+    }
+  }
+
+  /**
+   * Authored Three.js 3D-decor (`map.decor3d`, the world-builder's `3d` tab):
+   * static scenery that wears the SAME live crystal texture as the generator.
+   * Mirrors buildMapDecor — per-asset calibration + free-move dx/dy, y-sorted in
+   * the item band, with a ground shadow. Skipped if the live texture never came
+   * up (WebGL-less); the gem only shows where the world placed it.
+   */
+  private buildMapDecor3d(): void {
+    const map = this.ctx.data.map;
+    if (!map.decor3d?.length || !this.crystal3d || !this.textures.exists('item_crystal_1')) return;
+    // The crystal GENERATOR already stands on the authored 3D-crystal spot (see
+    // build-gamemap), so skip the scenery copy there — exactly ONE crystal renders.
+    const genCells = new Set(
+      (map.startingItems ?? [])
+        .filter((i) => i.chain === 'crystal')
+        .map((i) => `${i.at[0]},${i.at[1]}`)
+    );
+    const ratio = TILE_W / (map.tile?.width ?? TILE_W);
+    map.decor3d.forEach((d, i) => {
+      if (genCells.has(`${d.col},${d.row}`)) return; // generator covers this placement
+      const { x, y } = gridToWorld(d.col, d.row);
+      const cal = map.decor3dCalibration?.[d.name] ?? {
+        offsetX: 0,
+        offsetY: 0,
+        scale: 1,
+        anchor: { x: 0.5, y: 0.72 }
+      };
+      const baseY = y + (cal.offsetY + (d.dy ?? 0)) * ratio;
+      const sprite = this.add
+        .image(x + (cal.offsetX + (d.dx ?? 0)) * ratio, baseY, 'item_crystal_1')
+        .setOrigin(cal.anchor?.x ?? 0.5, cal.anchor?.y ?? 0.72)
+        .setScale((cal.scale ?? 1) * ratio)
+        .setDepth(DEPTHS.itemBase + y);
+      this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
       this.springBounce(sprite, baseY, i, false);
     });
   }
@@ -837,7 +1008,11 @@ export class BoardScene extends Phaser.Scene {
       Phaser.Input.Events.POINTER_WHEEL,
       (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
         this.flyTween?.stop();
-        cam.setZoom(Phaser.Math.Clamp(cam.zoom * (dy < 0 ? 1.1 : 1 / 1.1), 0.2, 1.4));
+        const z = this.ctx.data.map.cameraZoom ?? { min: 0.2, max: 1.4 }; // world-builder zoom lock
+        // minZoom is raised to the background-image fit so you can't zoom out past it;
+        // ×renderScale converts the logical bounds into the actual (scaled) zoom space.
+        const r = renderScale.value;
+        cam.setZoom(Phaser.Math.Clamp(cam.zoom * (dy < 0 ? 1.1 : 1 / 1.1), this.minZoom * r, z.max * r));
       }
     );
   }
@@ -1067,7 +1242,7 @@ export class BoardScene extends Phaser.Scene {
     this.busyDragons.add(dragon.itemId);
     const ld = this.liveDragons.get(dragon.itemId); // rig overlay, if attached
     const home = { x: dragon.x, y: dragon.y };
-    const landX = plant.x - 70;
+    const landX = plant.x + 70; // land to the plant's right so the un-mirrored rig still faces it (left)
     if (ld) {
       ld.busy = true;
       ld.player.setFacing(landX <= plant.x ? 'right' : 'left');
@@ -1548,7 +1723,7 @@ export class BoardScene extends Phaser.Scene {
       this.shells.explode(7, x, y - 52);
       this.sparks.explode(24, x, y - 48);
       this.burst.explode(12, x, y - 44);
-      const sprite = this.acquireSprite(snap, false);      // A live rigged dragon bursts in facing RIGHT, mid-celebration; the host
+      const sprite = this.acquireSprite(snap, false);      // A live rigged dragon bursts in facing LEFT (un-mirrored), mid-celebration; the host
       // sprite becomes its invisible interactive anchor. Falls back to the
       // pooled sprite pop-in if the rig hasn't loaded.
       if (this.attachDragon(sprite, true)) return;
@@ -1781,7 +1956,7 @@ export class BoardScene extends Phaser.Scene {
     }
     // Re-frame the camera on the loaded Keeper level (no glide).
     const frame = this.frameForLevel(this.ctx.state.level);
-    this.cameras.main.setZoom(frame.zoom);
+    this.cameras.main.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);
     this.cameras.main.centerOn(frame.x, frame.y);
     this.tutorialDone = this.ctx.state.tutorialDone;
   }

@@ -12,20 +12,11 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: radial-gradient(120% 90% at 50% 18%, #3fa8d9 0%, #2e7fa6 52%, #1d5878 100%);
-      }
-      /* Water photo backdrop: a real full-screen <img> layer BEHIND the
-         transparent game canvas (the isle floats over it). Cheap — composited
-         by the browser, no GPU texture, no per-frame work. */
-      .water-bg {
-        position: fixed;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        z-index: 0;
-        pointer-events: none;
-        user-select: none;
+        /* The authored emberkeep backdrop is the ONLY background. In-canvas it is
+           painted per the world JSON and the camera is held inside it; this fills
+           the FIT letterbox with the same image so no other background is ever
+           seen (dark warm fallback only if the file fails to load). */
+        background: #160d0b url('/sprites/background/emberkeep.jpg') center / cover no-repeat;
       }
       /* Title logo: a real full-WINDOW <img> (covers the whole screen, including
          the FIT letterbox) behind the transparent canvas. Shown only on the
@@ -68,7 +59,6 @@
     </style>
   </head>
   <body>
-    <img class="water-bg" src="/sprites/environment/full-water-bg.png" alt="" />
     <img class="title-logo" id="title-logo" src="/sprites/ui/title-logo.png" alt="" />
     <div id="game"></div>
     <div class="boot-note" id="boot-note">stoking the ember&hellip;</div>

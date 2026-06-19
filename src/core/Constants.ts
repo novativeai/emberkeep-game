@@ -223,9 +223,10 @@ export const DRAG = {
 } as const;
 
 /**
- * Live rigged dragon on the board (hatchling/whelp). Enters mirrored
- * (facing RIGHT) celebrating, then alternates idle/celebrate weighted so it is
- * idle ~90% of the time. Durations in ms; scales are RigPlayer display scales.
+ * Live rigged dragon on the board (hatchling/whelp). Enters in the rig's original
+ * (un-mirrored, facing LEFT) orientation celebrating, then alternates idle/celebrate
+ * weighted so it is idle ~90% of the time. Durations in ms; scales are RigPlayer
+ * display scales.
  */
 export const DRAGON_ANIM = {
   introCelebrateMs: 2400, // the grand entrance after hatching
@@ -282,7 +283,8 @@ export const SAVE_VERSION = 1;
 export const AUDIO = {
   master: 0.8,
   sfx: 0.9,
-  ambient: 0.16
+  ambient: 0.16,
+  music: 0.45 // looping background track (Dragonsland.mp3)
 } as const;
 
 export const SCENES = {

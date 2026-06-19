@@ -1,5 +1,9 @@
 import { AUDIO } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import { getMusicMuted, setMusicMuted } from './musicPref';
+
+/** Looping background track (served from the Vite public dir, `assets/`). */
+const MUSIC_URL = `${import.meta.env.BASE_URL}background-music/Dragonsland.mp3`;
 
 interface ToneOptions {
   type?: OscillatorType;
@@ -18,9 +22,13 @@ export class AudioManager {
   private actx: AudioContext | null = null;
   private master: GainNode | null = null;
   private sfx: GainNode | null = null;
-  private ambient: GainNode | null = null;
+  private music: GainNode | null = null;
+  private musicSource: AudioBufferSourceNode | null = null;
+  private musicLoading = false;
+  private musicMuted = getMusicMuted();
 
   constructor(bus: EventBus) {
+    bus.on('audio:set_music_muted', ({ muted }) => this.applyMusicMuted(muted));
     bus.on('item:merged', ({ resultTier }) => this.popMerge(resultTier));
     bus.on('item:hatched', () => this.hatchChime());
     bus.on('item:harvested', () => this.harvestTick());
@@ -51,14 +59,49 @@ export class AudioManager {
       this.sfx = this.actx.createGain();
       this.sfx.gain.value = AUDIO.sfx;
       this.sfx.connect(this.master);
-      this.ambient = this.actx.createGain();
-      this.ambient.gain.value = AUDIO.ambient;
-      this.ambient.connect(this.master);
-      this.startAmbient();
+      this.music = this.actx.createGain();
+      this.music.gain.value = this.musicMuted ? 0 : AUDIO.music;
+      this.music.connect(this.master);
+      void this.loadMusic();
     }
     if (this.actx.state === 'suspended') {
       void this.actx.resume();
     }
+  }
+
+  /* --------------------- looping background music --------------------- */
+
+  /** Fetch + decode the track once (after the context exists) and loop it. */
+  private async loadMusic(): Promise<void> {
+    if (this.musicSource || this.musicLoading || !this.actx || !this.music) return;
+    this.musicLoading = true;
+    try {
+      const res = await fetch(MUSIC_URL);
+      const data = await res.arrayBuffer();
+      const buffer = await this.actx.decodeAudioData(data);
+      if (!this.actx || !this.music) return; // torn down mid-load
+      const source = this.actx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.connect(this.music);
+      source.start();
+      this.musicSource = source;
+    } catch (err) {
+      console.warn('[audio] background music failed to load:', err);
+    } finally {
+      this.musicLoading = false;
+    }
+  }
+
+  /** Mute/unmute the looping background music (SFX stay). Persists too. */
+  private applyMusicMuted(muted: boolean): void {
+    this.musicMuted = muted;
+    setMusicMuted(muted);
+    if (!this.actx || !this.music) return;
+    const t = this.actx.currentTime;
+    this.music.gain.cancelScheduledValues(t);
+    this.music.gain.setValueAtTime(this.music.gain.value, t);
+    this.music.gain.linearRampToValueAtTime(muted ? 0 : AUDIO.music, t + 0.25);
   }
 
   /* ------------------------- tiny synth kit ------------------------- */
@@ -178,61 +221,4 @@ export class AudioManager {
     this.tone(700, 0.03, { type: 'triangle', gain: 0.07, slideTo: 520 });
   }
 
-  /** Soft airy pad + occasional ember crackles, very quiet. */
-  private startAmbient(): void {
-    if (!this.actx || !this.ambient) return;
-    const t0 = this.actx.currentTime;
-    for (const [freq, detune] of [
-      [108, 0],
-      [162.2, 4]
-    ] as const) {
-      const osc = this.actx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      osc.detune.value = detune;
-      const gain = this.actx.createGain();
-      gain.gain.value = 0.5;
-      // Slow breathing LFO.
-      const lfo = this.actx.createOscillator();
-      lfo.frequency.value = 0.06 + freq / 5000;
-      const lfoGain = this.actx.createGain();
-      lfoGain.gain.value = 0.22;
-      lfo.connect(lfoGain).connect(gain.gain);
-      osc.connect(gain).connect(this.ambient);
-      osc.start(t0);
-      lfo.start(t0);
-    }
-    const scheduleCrackle = (): void => {
-      setTimeout(() => {
-        if (this.actx && this.actx.state === 'running') {
-          const dur = 0.05 + Math.random() * 0.07;
-          const freq = 900 + Math.random() * 2200;
-          this.crackle(dur, freq);
-        }
-        scheduleCrackle();
-      }, 2800 + Math.random() * 5200);
-    };
-    scheduleCrackle();
-  }
-
-  private crackle(duration: number, freq: number): void {
-    if (!this.actx || !this.ambient) return;
-    const t0 = this.actx.currentTime;
-    const length = Math.ceil(this.actx.sampleRate * duration);
-    const buffer = this.actx.createBuffer(1, length, this.actx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < length; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / length);
-    }
-    const source = this.actx.createBufferSource();
-    source.buffer = buffer;
-    const filter = this.actx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = freq;
-    filter.Q.value = 3;
-    const gain = this.actx.createGain();
-    gain.gain.value = 0.5;
-    source.connect(filter).connect(gain).connect(this.ambient);
-    source.start(t0);
-  }
 }

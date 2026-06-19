@@ -7,6 +7,8 @@ import { CharacterBubble } from '../entities/CharacterBubble';
 import { Hud } from '../ui/Hud';
 import { LedgerPanel } from '../ui/LedgerPanel';
 import { ShopPanel } from '../ui/ShopPanel';
+import { renderScale } from '../core/render-scale';
+import { getMusicMuted, setMusicMuted } from '../audio/musicPref';
 import { Tooltip } from '../ui/Tooltip';
 import { hoverBob } from '../ui/tweens';
 
@@ -41,6 +43,7 @@ export class UIScene extends Phaser.Scene {
 
   create(): void {
     this.ctx = this.registry.get('ctx') as GameContext;
+    this.cameras.main.setOrigin(0).setZoom(renderScale.value); // paint the 2560-space UI into the hi-DPI backing
 
     this.hud = new Hud(this, this.ctx.bus, this.ctx.state, {
       onLedger: () => (this.ledger.isOpen ? this.ledger.requestClose() : this.ledger.open()),
@@ -413,26 +416,61 @@ export class UIScene extends Phaser.Scene {
       .setInteractive();
     const panel = this.add.graphics();
     panel.fillStyle(num(PALETTE.night), 0.25);
-    panel.fillRoundedRect(-450, -270 + 16, 900, 540, 52);
+    panel.fillRoundedRect(-450, -310 + 16, 900, 620, 52);
     panel.fillStyle(num(PALETTE.cream), 1);
-    panel.fillRoundedRect(-450, -270, 900, 540, 52);
+    panel.fillRoundedRect(-450, -310, 900, 620, 52);
     panel.lineStyle(8, num(PALETTE.lava), 1);
-    panel.strokeRoundedRect(-450, -270, 900, 540, 52);
+    panel.strokeRoundedRect(-450, -310, 900, 620, 52);
     const title = this.add
-      .text(0, -172, 'Reset Cinder Hollow?', {
+      .text(0, -244, 'Settings', {
         fontFamily: FONT,
         fontSize: '54px',
         fontStyle: 'bold',
         color: PALETTE.textBrown
       })
       .setOrigin(0.5);
-    const body = this.add
-      .text(0, -52, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
+
+    // Background-music toggle (persists; the AudioManager applies it via the bus).
+    const musicLabel = (): string => (getMusicMuted() ? 'Music: Off' : 'Music: On');
+    const musicBtn = this.add.container(0, -148);
+    const musicBg = this.add
+      .image(0, 0, getMusicMuted() ? 'ui_btn_play' : 'ui_btn_green')
+      .setScale(1.05, 0.8);
+    const musicText = this.add
+      .text(0, -10, musicLabel(), {
         fontFamily: FONT,
-        fontSize: '34px',
+        fontSize: '42px',
+        fontStyle: 'bold',
+        color: '#FFFFFF'
+      })
+      .setOrigin(0.5)
+      .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
+    musicBtn.add([musicBg, musicText]);
+    musicBtn.setSize(380 * 1.05, 118).setInteractive({ useHandCursor: true });
+    musicBtn.on('pointerup', () => {
+      const muted = !getMusicMuted();
+      setMusicMuted(muted);
+      this.ctx.bus.emit('audio:set_music_muted', { muted });
+      musicText.setText(musicLabel());
+      musicBg.setTexture(muted ? 'ui_btn_play' : 'ui_btn_green');
+    });
+
+    const divider = this.add.rectangle(0, -76, 760, 3, num(PALETTE.lava), 0.22);
+    const resetTitle = this.add
+      .text(0, -22, 'Reset Cinder Hollow?', {
+        fontFamily: FONT,
+        fontSize: '40px',
+        fontStyle: 'bold',
+        color: PALETTE.textBrown
+      })
+      .setOrigin(0.5);
+    const body = this.add
+      .text(0, 48, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
+        fontFamily: FONT,
+        fontSize: '30px',
         color: '#8A6248',
         align: 'center',
-        lineSpacing: 12
+        lineSpacing: 10
       })
       .setOrigin(0.5);
 
@@ -443,7 +481,7 @@ export class UIScene extends Phaser.Scene {
       scaleX: number,
       onTap: () => void
     ): Phaser.GameObjects.Container => {
-      const button = this.add.container(x, 144);
+      const button = this.add.container(x, 190);
       const bg = this.add.image(0, 0, texture).setScale(scaleX, 0.78);
       const text = this.add
         .text(0, -10, label, {
@@ -469,7 +507,7 @@ export class UIScene extends Phaser.Scene {
       this.closeResetDialog()
     );
 
-    container.add([dim, panel, title, body, resetButton, keepButton]);
+    container.add([dim, panel, title, musicBtn, divider, resetTitle, body, resetButton, keepButton]);
     container.setAlpha(0);
     container.setScale(0.94);
     this.tweens.add({ targets: container, alpha: 1, scale: 1, duration: 170, ease: 'Back.easeOut' });

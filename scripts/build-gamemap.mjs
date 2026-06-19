@@ -114,6 +114,33 @@ for (const zone of world.playZones) {
   }
 }
 
+/* ROBUST FALLBACK — a world whose clouds collapse to a single level (or has no
+ * authored level-2 zone) still needs a key-gate, or the fog/key tutorial lesson
+ * has nothing to gate. If none was carved, impose a level-2 zone + key-gate from
+ * the playable tiles that fell outside the active clearing. */
+if (!gateTapCell) {
+  const inRegion = new Set(regions.flatMap((r) => r.tiles).map(([c, r]) => key(c, r)));
+  const fogged = world.playable.filter(([c, r]) => !inRegion.has(key(c, r)));
+  if (fogged.length >= 3) {
+    const gateCells = nearestTo(fogged, L1_FOCUS, Math.min(GATE_SIZE, fogged.length));
+    const gateSet = new Set(gateCells.map(([c, r]) => key(c, r)));
+    const restCells = fogged.filter(([c, r]) => !gateSet.has(key(c, r)));
+    gateTapCell = gateCells[0];
+    gateNestCell = gateCells[3] ?? gateCells[gateCells.length - 1];
+    regions.push({
+      id: 'level_2_gate', status: 'unlockable', unlock: { keys: 1, level: 2 }, tiles: gateCells,
+      contents: [0, 1, 2].map((i) => ({ chain: 'ember_dragon', tier: 1, at: gateCells[i] ?? gateCells[0] }))
+    });
+    if (restCells.length) {
+      const fc = centroidCell(restCells);
+      const restSeed = nearestTo(restCells, { col: fc[0], row: fc[1] }, SEED.length + 1);
+      const l2 = SEED.map(([chain, tier], i) => restSeed[i] && { chain, tier, at: restSeed[i] }).filter(Boolean);
+      if (restSeed[SEED.length]) l2.push({ chain: 'bigtree', tier: 1, at: restSeed[SEED.length] });
+      regions.push({ id: 'level_2', status: 'unlockable', unlock: { level: 2 }, tiles: restCells, contents: l2 });
+    }
+  }
+}
+
 /* ----------------------- tutorial start placement -----------------------
  * Lay the start items into a CONNECTED blob of clearing cells, BFS-grown from
  * L1_FOCUS. Adjacency matters: drop-onto-merge needs the cluster's pieces to be
@@ -147,12 +174,18 @@ const woodStart =
   focusCell;
 const woodBlob = growBlob(woodStart, WOOD_COUNT, eggSet);
 
-// The Theme Crystal stands in the L1 clearing by default (produces a Diamond
-// every 10 min). Place it on a clearing cell clear of the eggs + wood.
+// The Theme Crystal (produces a Diamond every 10 min). When the world authors a
+// 3D-crystal landmark (`decor3d`), the GENERATOR stands on that exact spot so we
+// render ONE crystal — the functional generator AT the world-builder's place —
+// instead of a generator + a duplicate scenery gem. (Its passive gift still lands
+// on the nearest free active tile, so an off-board landmark works fine.) Otherwise
+// it sits on a clearing cell clear of the eggs + wood.
 const usedSet = new Set([...eggBlob, ...woodBlob].map(([c, r]) => key(c, r)));
-const crystalCell =
-  nearestTo(clearing.filter(([c, r]) => !usedSet.has(key(c, r))), { col: L1_FOCUS.col - 2, row: L1_FOCUS.row + 1 }, 1)[0] ??
-  focusCell;
+const decor3dCell = world.decor3d?.[0];
+const crystalCell = decor3dCell
+  ? [decor3dCell.col, decor3dCell.row]
+  : nearestTo(clearing.filter(([c, r]) => !usedSet.has(key(c, r))), { col: L1_FOCUS.col - 2, row: L1_FOCUS.row + 1 }, 1)[0] ??
+    focusCell;
 
 const startingItems = [
   ...TUT_START_ITEMS.map((x, i) => ({ chain: x.chain, tier: x.tier, at: eggBlob[i] ?? focusCell })),
@@ -211,6 +244,12 @@ const mapDecor = (world.decor ?? [])
   // not scenery — drop them from the static decor layer.
   .filter((d) => !/hut|house|maison|crist/.test(d.name));
 
+// background + 3D-decor calibration, keyed like the others (bare asset name).
+const bgCalibration = {};
+for (const [k, v] of Object.entries(world.calibration)) if (k.startsWith('background|')) bgCalibration[k.slice(11)] = v;
+const d3Calibration = {};
+for (const [k, v] of Object.entries(world.calibration)) if (k.startsWith('3d|')) d3Calibration[slug(k.slice(3))] = v;
+
 const map = {
   cols: world.cols,
   rows: world.rows,
@@ -221,9 +260,18 @@ const map = {
   // rendering: which tile art sits on each playable cell + how to place it.
   playable: world.playable,
   tilesByCell: world.tilesByCell,
+  invisible: world.invisible ?? [],            // playable cells with no tile art
   calibration,
   mapDecor,
   decorCalibration,
+  // layer painted BELOW the floor + its calibration; the camera is held to it.
+  backgrounds: (world.backgrounds ?? []).map((b) => ({ name: slug(b.name), col: b.col, row: b.row, z: b.z ?? 0, dx: b.dx, dy: b.dy })),
+  backgroundCalibration: Object.fromEntries(Object.entries(bgCalibration).map(([k, v]) => [slug(k), v])),
+  backgroundBounds: world.backgroundBounds ?? null, // camera frontier (normalised cell bbox)
+  // procedural 3D decor (the Three.js emerald crystal — also the emerald generator's look)
+  decor3d: (world.decor3d ?? []).map((d) => ({ name: slug(d.name), col: d.col, row: d.row, z: d.z ?? 0, model3d: d.model3d, dx: d.dx, dy: d.dy })),
+  decor3dCalibration: d3Calibration,
+  cameraZoom: world.cameraZoom ?? { min: 0.2, max: 1.4 }, // in-game wheel-zoom clamp
   cameraKeyframes
 };
 

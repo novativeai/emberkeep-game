@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import { GAME_HEIGHT, GAME_WIDTH, PALETTE, SCENES } from '../core/Constants';
+import { renderScale } from '../core/render-scale';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
@@ -16,6 +17,7 @@ export class TitleScene extends Phaser.Scene {
 
   create(): void {
     const ctx = this.registry.get('ctx') as GameContext;
+    this.cameras.main.setOrigin(0).setZoom(renderScale.value); // hi-DPI backing
 
     // FULL-SCREEN logo: a real DOM <img> (object-fit:cover) that fills the WHOLE
     // window — including the FIT letterbox the canvas can't reach. We hide the
