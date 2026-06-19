@@ -64,7 +64,7 @@ describe('skip cooldown for Warmth', () => {
     expect(gen.readyAt!).toBeGreaterThan(ctx.clock.now());
     ctx.state.coins = 20; // skip is paid in GOLD now
     // Freshly cooled = full time left → the skip costs the MAX (most expensive).
-    const fullCost = skipEnergyCost(gen.readyAt! - ctx.clock.now(), 10_000);
+    const fullCost = skipEnergyCost(gen.readyAt! - ctx.clock.now(), 90_000);
     expect(fullCost).toBe(GENERATOR_SKIP_MAX_ENERGY);
 
     ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });

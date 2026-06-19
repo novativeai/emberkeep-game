@@ -57,7 +57,7 @@
           "xp": 26,
           "generator": {
             "produces": { "chain": "flame_gem", "tier": 1 },
-            "cooldownMs": 10000,
+            "cooldownMs": 90000,
             "energyCost": 1,
             "passiveMs": 180000
           }
