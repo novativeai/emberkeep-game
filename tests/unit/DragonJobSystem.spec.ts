@@ -30,18 +30,18 @@ describe('DragonJobSystem (dragon jobs)', () => {
   it('the speed-up is GLOBAL — it advances every timed object, not just the assigned one', () => {
     const ctx = createTestContext();
     const house = ctx.state.addItem({ chain: 'lumber', tier: 2, col: 2, row: 2, kind: 'item' });
-    const crystal = ctx.state.addItem({ chain: 'crystal', tier: 1, col: 6, row: 6, kind: 'item' });
+    const tree = ctx.state.addItem({ chain: 'bigtree', tier: 1, col: 6, row: 6, kind: 'item' });
     const dragon = ctx.state.addItem({ chain: 'emerald', tier: 3, col: 4, row: 4, kind: 'item' });
     ctx.bus.emit('time:advanced', { ms: 0 }); // arm both buildings
     const houseBefore = house.passiveAt!;
-    const crystalBefore = crystal.passiveAt!;
+    const treeBefore = tree.passiveAt!;
 
     ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id }); // assigned to the house
     ctx.clock.advance(10_000);
     ctx.bus.emit('time:advanced', { ms: 10_000 });
 
     expect(house.passiveAt!).toBe(houseBefore - 10_000); // the assigned one
-    expect(crystal.passiveAt!).toBe(crystalBefore - 10_000); // AND the crystal it never touched
+    expect(tree.passiveAt!).toBe(treeBefore - 10_000); // AND the tree it never touched
   });
 
   it('a tired (resting) dragon cannot be put back to work until it has rested', () => {

@@ -134,8 +134,8 @@ export const ITEM_SCALE: Record<string, number> = {
   chest_1: 0.48, // a treasure chest — SAME size as the wood, per spec
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
-  emerald_1: 0.10, // Green Egg (green-egg.png 1147×1438) — scaled to ~emerald visual size
-  emerald_2: 0.18, // green dragon egg sprite (emerald-egg.png 396×501)
+  emerald_1: 0.25, // Emerald gem (emerald.png 467×392)
+  emerald_2: 0.10, // Green Egg (green-egg.png 1147×1438) — scaled to ~red egg visual size
   emerald_3: 1.0, // dragon host (the rig overlays it)
   coin_1: 0.12 // SMALLER than an egg, per spec
 };

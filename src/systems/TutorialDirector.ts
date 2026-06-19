@@ -212,10 +212,15 @@ export class TutorialDirector {
       }
       return null;
     }
-    // `{ chain, nth }`: the nth board item of that chain, in a stable order, so
-    // hints track wherever the map placed the starting cluster.
+    // `{ chain, nth }`: the nth board item of that chain (optionally filtered to a
+    // specific tier), in a stable order, so hints track wherever items actually land.
     const cells = [...this.state.items.values()]
-      .filter((i) => i.kind === 'item' && i.chain === ref.chain)
+      .filter(
+        (i) =>
+          i.kind === 'item' &&
+          i.chain === ref.chain &&
+          (ref.tier === undefined || i.tier === ref.tier)
+      )
       .sort((a, b) => a.col + a.row - (b.col + b.row) || a.col - b.col)
       .map((i) => ({ col: i.col, row: i.row }));
     return cells[ref.nth] ?? cells[cells.length - 1] ?? null;

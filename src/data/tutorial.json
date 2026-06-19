@@ -57,7 +57,7 @@
     {
       "id": "emerald_tap",
       "speaker": "laurah",
-      "text": "The Red Dragon! And look — the Emerald Crystal glows with life. Tap it to claim one Green Egg. You already have two — merge all three for a Green Dragon!",
+      "text": "The Red Dragon! And look — the Crystal glows! Tap it to claim an Emerald. You already have two — merge all three to forge a Green Egg!",
       "gate": { "type": "event", "event": "item:harvested", "chain": "emerald" },
       "effects": [
         { "spawn": { "chain": "emerald", "tier": 1, "count": 2 } }
@@ -66,20 +66,40 @@
       "allow": { "tapGenerators": true }
     },
     {
-      "id": "emerald_merge",
+      "id": "emerald_egg_merge",
       "speaker": "laurah",
-      "text": "Three Green Eggs! Drag them all together to hatch the Green Dragon!",
-      "gate": { "type": "event", "event": "item:hatched", "chain": "emerald" },
+      "text": "Three Emeralds! Drag them all together — they will forge a Green Egg.",
+      "gate": { "type": "event", "event": "item:merged", "chain": "emerald" },
       "highlight": [
-        { "chain": "emerald", "nth": 0 },
-        { "chain": "emerald", "nth": 1 },
-        { "chain": "emerald", "nth": 2 }
+        { "chain": "emerald", "nth": 0, "tier": 1 },
+        { "chain": "emerald", "nth": 1, "tier": 1 },
+        { "chain": "emerald", "nth": 2, "tier": 1 }
       ],
       "hand": {
-        "from": { "chain": "emerald", "nth": 2 },
-        "to": { "chain": "emerald", "nth": 0 }
+        "from": { "chain": "emerald", "nth": 2, "tier": 1 },
+        "to": { "chain": "emerald", "nth": 0, "tier": 1 }
       },
-      "arrow": { "tile": { "chain": "emerald", "nth": 0 } },
+      "arrow": { "tile": { "chain": "emerald", "nth": 0, "tier": 1 } },
+      "allow": { "drag": ["ember_dragon", "emerald"] }
+    },
+    {
+      "id": "green_dragon_hatch",
+      "speaker": "laurah",
+      "text": "A Green Egg! Two more have appeared. Drag all three together — the Green Dragon stirs inside!",
+      "gate": { "type": "event", "event": "item:hatched", "chain": "emerald" },
+      "effects": [
+        { "spawn": { "chain": "emerald", "tier": 2, "count": 2, "nearChain": "emerald" } }
+      ],
+      "highlight": [
+        { "chain": "emerald", "nth": 0, "tier": 2 },
+        { "chain": "emerald", "nth": 1, "tier": 2 },
+        { "chain": "emerald", "nth": 2, "tier": 2 }
+      ],
+      "hand": {
+        "from": { "chain": "emerald", "nth": 2, "tier": 2 },
+        "to": { "chain": "emerald", "nth": 0, "tier": 2 }
+      },
+      "arrow": { "tile": { "chain": "emerald", "nth": 0, "tier": 2 } },
       "allow": { "drag": ["ember_dragon", "emerald"] }
     },
     {
@@ -99,7 +119,7 @@
       "text": "Keeper Level 2! The isle stirs — a new stretch of land has woken to the west. Tap to see!",
       "gate": { "type": "tap" },
       "effects": [
-        { "grantXp": 12 }
+        { "grantXp": 10 }
       ],
       "allow": {}
     },

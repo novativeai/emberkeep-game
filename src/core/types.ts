@@ -230,7 +230,7 @@ export interface TutorialAllow {
  * the nth board item of that chain. Tokens keep tutorial hints glued to the
  * ACTUAL item placement, so they stay correct for any imported map.
  */
-export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: number };
+export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: number; tier?: number };
 
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }

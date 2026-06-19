@@ -1213,8 +1213,8 @@ export class BoardScene extends Phaser.Scene {
       return;
     }
     // Merge-only items (no generator) are not interactable via tap beyond the sell path.
-    // Green Eggs (emerald t1), Red Eggs (ember_dragon t2), and Rubies (ember_dragon t1) are pure merge pieces.
-    if (item.chain === 'emerald' && item.tier === 1) return;
+    // Emeralds (emerald t1), Green Eggs (emerald t2), Red Eggs (ember_dragon t2), and Rubies (ember_dragon t1) are pure merge pieces.
+    if (item.chain === 'emerald' && item.tier < 3) return;
     if (item.chain === 'ember_dragon' && item.tier < 3) return;
     const cfg = this.generatorConfigFor(item.chain, item.tier);
     const isGenerator = cfg !== undefined;

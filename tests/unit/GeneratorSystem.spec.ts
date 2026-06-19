@@ -128,17 +128,28 @@ describe('the House (Gold generator)', () => {
 });
 
 describe('the Theme Crystal (Emerald generator)', () => {
-  it('produces one Emerald every 10 minutes', () => {
+  it('does NOT passively produce — tap is required; no auto-generation after any interval', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'crystal', tier: 1, col: 2, row: 2, kind: 'item' });
     const produced = capture(ctx.bus, 'item:produced');
 
     ctx.bus.emit('time:advanced', { ms: 0 }); // arm
-    ctx.clock.advance(600_001);
+    ctx.clock.advance(600_001); // well past any passive interval
     ctx.bus.emit('time:advanced', { ms: 600_001 });
 
-    expect(produced).toHaveLength(1);
-    expect(produced[0]!.output).toMatchObject({ chain: 'emerald', tier: 1 });
+    expect(produced).toHaveLength(0); // tap-only — no passive output ever
+  });
+
+  it('produces one Emerald on tap and starts a cooldown', () => {
+    const ctx = createTestContext();
+    const crystal = ctx.state.addItem({ chain: 'crystal', tier: 1, col: 2, row: 2, kind: 'item' });
+    const harvested = capture(ctx.bus, 'item:harvested');
+
+    ctx.bus.emit('item:tapped', { itemId: crystal.id });
+
+    expect(harvested).toHaveLength(1);
+    expect(harvested[0]!.output).toMatchObject({ chain: 'emerald', tier: 1 });
+    expect(crystal.readyAt).toBeDefined(); // cooldown armed
   });
 });
 

@@ -193,33 +193,39 @@ describe('MergeSystem', () => {
     }
   });
 
-  it('emerald chain: 3 emeralds → Emerald Hatchling (hatchAtTier=2)', () => {
+  it('emerald chain: 3 Emeralds → Green Egg — no item:hatched, no generator', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'emerald', tier: 1, col: 1, row: 1, kind: 'item' });
     ctx.state.addItem({ chain: 'emerald', tier: 1, col: 1, row: 2, kind: 'item' });
     ctx.state.addItem({ chain: 'emerald', tier: 1, col: 3, row: 3, kind: 'item' });
     const hatches = capture(ctx.bus, 'item:hatched');
+    const merges = capture(ctx.bus, 'item:merged');
 
-    drag(ctx, [3, 3], [1, 3]); // merge 3 → emerald_2 = hatch tier
+    drag(ctx, [3, 3], [1, 3]); // merge 3 → emerald_2 (Green Egg) — hatchAtTier:3
 
-    expect(hatches).toHaveLength(1);
-    expect(hatches[0]!.item).toMatchObject({ chain: 'emerald', tier: 2 });
-    expect(ctx.state.itemAt(1, 3)?.readyAt).toBeDefined(); // ready generator
+    expect(hatches).toHaveLength(0); // tier 2 is not the hatch tier
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.resultTier).toBe(2);
+    const greenEgg = ctx.state.itemAt(1, 3);
+    expect(greenEgg).toMatchObject({ chain: 'emerald', tier: 2 });
+    expect(greenEgg?.readyAt).toBeUndefined(); // no generator on tier 2
   });
 
-  it('emerald chain: 3 hatchlings → Emerald Whelp (no second hatch)', () => {
+  it('emerald chain: 3 Green Eggs → Green Dragon — item:hatched fires, generator ready', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'emerald', tier: 2, col: 1, row: 1, kind: 'item' });
     ctx.state.addItem({ chain: 'emerald', tier: 2, col: 1, row: 2, kind: 'item' });
     ctx.state.addItem({ chain: 'emerald', tier: 2, col: 1, row: 3, kind: 'item' });
     const hatches = capture(ctx.bus, 'item:hatched');
 
-    drag(ctx, [1, 3], [1, 1]); // merge 3 → emerald_3
+    drag(ctx, [1, 3], [1, 1]); // merge 3 → emerald_3 (Green Dragon) — hatchAtTier:3
 
-    expect(hatches).toHaveLength(0); // tier 3 is NOT the hatchAtTier
-    const whelp = ctx.state.itemAt(1, 1);
-    expect(whelp).toMatchObject({ chain: 'emerald', tier: 3 });
-    expect(whelp?.readyAt).toBeDefined(); // still a ready generator
+    expect(hatches).toHaveLength(1);
+    expect(hatches[0]!.item.chain).toBe('emerald');
+    expect(hatches[0]!.item.tier).toBe(3);
+    expect(hatches[0]!.item.ready).toBe(true);
+    const dragon = ctx.state.itemAt(1, 1);
+    expect(dragon?.readyAt).toBeDefined(); // Green Dragon is a generator
   });
 
   it('merging 3 rubies produces a Red Egg — no item:hatched, no generator', () => {

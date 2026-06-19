@@ -694,13 +694,13 @@
       "key": "item_emerald_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/green-egg.png"
+      "file": "sprites/items/emerald.png"
     },
     {
       "key": "item_emerald_2",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/emerald-egg.png"
+      "file": "sprites/items/green-egg.png"
     },
     {
       "key": "item_emerald_3",

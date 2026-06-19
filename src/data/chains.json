@@ -47,7 +47,7 @@
           "id": "ember_dragon_2",
           "name": "Red Egg",
           "sell": 10,
-          "xp": 12
+          "xp": 0
         },
         {
           "tier": 3,
@@ -128,7 +128,6 @@
             "produces": { "chain": "emerald", "tier": 1 },
             "cooldownMs": 30000,
             "energyCost": 0,
-            "passiveMs": 600000,
             "tappable": true
           }
         }
@@ -142,26 +141,14 @@
     {
       "id": "emerald",
       "name": "Emerald Dragons",
-      "hatchAtTier": 2,
+      "hatchAtTier": 3,
       "tiers": [
-        { "tier": 1, "id": "emerald_1", "name": "Green Egg", "sell": 2, "xp": 0 },
-        {
-          "tier": 2,
-          "id": "emerald_2",
-          "name": "Green Dragon",
-          "sell": 10,
-          "xp": 10,
-          "generator": {
-            "produces": { "chain": "flame_gem", "tier": 1 },
-            "cooldownMs": 10000,
-            "energyCost": 1,
-            "passiveMs": 120000
-          }
-        },
+        { "tier": 1, "id": "emerald_1", "name": "Emerald", "sell": 2, "xp": 0 },
+        { "tier": 2, "id": "emerald_2", "name": "Green Egg", "sell": 10, "xp": 0 },
         {
           "tier": 3,
           "id": "emerald_3",
-          "name": "Emerald Whelp",
+          "name": "Green Dragon",
           "sell": 20,
           "xp": 24,
           "generator": {
