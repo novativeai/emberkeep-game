@@ -3,9 +3,9 @@ import { GENERATOR_SKIP_MAX_ENERGY, skipEnergyCost } from '../../src/core/Consta
 import { capture, createTestContext } from './helpers';
 
 describe('dragon passive generation (the standing advantage)', () => {
-  it('a hatchling gifts a Gem Shard once its passiveMs elapses — free, no tap', () => {
+  it('a dragon gifts a Gem Shard once its passiveMs elapses — free, no tap', () => {
     const ctx = createTestContext();
-    ctx.systems.board.spawn('ember_dragon', 2, 2, 2, 'init'); // a generator on an active tile
+    ctx.systems.board.spawn('ember_dragon', 3, 2, 2, 'init'); // Red Dragon: passive generator
     const produced = capture(ctx.bus, 'item:produced');
     const energyBefore = ctx.state.energyCurrent;
 
@@ -13,9 +13,9 @@ describe('dragon passive generation (the standing advantage)', () => {
     ctx.bus.emit('time:advanced', { ms: 0 });
     expect(produced).toHaveLength(0);
 
-    // Cross the 120s passive interval.
-    ctx.clock.advance(120_001);
-    ctx.bus.emit('time:advanced', { ms: 120_001 });
+    // Cross the 90s passive interval (tier 3 passiveMs).
+    ctx.clock.advance(90_001);
+    ctx.bus.emit('time:advanced', { ms: 90_001 });
 
     expect(produced).toHaveLength(1);
     expect(produced[0]!.output).toMatchObject({ chain: 'flame_gem', tier: 1 });
@@ -25,13 +25,13 @@ describe('dragon passive generation (the standing advantage)', () => {
 
   it('does not flood after a long jump: at most one gift per tick', () => {
     const ctx = createTestContext();
-    ctx.systems.board.spawn('ember_dragon', 2, 2, 2, 'init');
+    ctx.systems.board.spawn('ember_dragon', 3, 2, 2, 'init');
     const produced = capture(ctx.bus, 'item:produced');
     ctx.bus.emit('time:advanced', { ms: 0 }); // arm
 
-    ctx.clock.advance(600_000); // five intervals at once
+    ctx.clock.advance(600_000); // many intervals at once
     ctx.bus.emit('time:advanced', { ms: 600_000 });
-    expect(produced).toHaveLength(1); // not five
+    expect(produced).toHaveLength(1); // not many
 
     // A tick immediately after (timer just reset) produces nothing.
     ctx.bus.emit('time:advanced', { ms: 0 });
@@ -54,7 +54,7 @@ describe('skip cooldown for Warmth', () => {
     const ctx = createTestContext();
     const gen = ctx.state.addItem({
       chain: 'ember_dragon',
-      tier: 2,
+      tier: 3,
       col: 2,
       row: 2,
       kind: 'item',
@@ -84,7 +84,7 @@ describe('skip cooldown for Warmth', () => {
     const ctx = createTestContext();
     const gen = ctx.state.addItem({
       chain: 'ember_dragon',
-      tier: 2,
+      tier: 3,
       col: 2,
       row: 2,
       kind: 'item',

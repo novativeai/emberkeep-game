@@ -10,14 +10,14 @@
     {
       "id": "lore_2",
       "speaker": "laurah",
-      "text": "I am Pip — the last ember still burning. And you, Keeper, are the one who will wake them.",
+      "text": "I am Laurah, Dragon Master of the ancient flame. And you, Keeper, are the one who will wake them.",
       "gate": { "type": "tap" },
       "allow": {}
     },
     {
       "id": "ruby_merge",
       "speaker": "laurah",
-      "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch your first dragon.",
+      "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch a Red Egg.",
       "gate": { "type": "event", "event": "item:hatched", "chain": "ember_dragon" },
       "effects": [
         { "spawn": { "chain": "ember_dragon", "tier": 1, "count": 3 } }
@@ -35,9 +35,29 @@
       "allow": { "drag": ["ember_dragon"] }
     },
     {
+      "id": "dragon_hatch",
+      "speaker": "laurah",
+      "text": "A Red Egg! Two more have appeared. Drag all three together — the Red Dragon stirs inside!",
+      "gate": { "type": "event", "event": "item:merged", "chain": "ember_dragon" },
+      "effects": [
+        { "spawn": { "chain": "ember_dragon", "tier": 2, "count": 2 } }
+      ],
+      "highlight": [
+        { "chain": "ember_dragon", "nth": 0 },
+        { "chain": "ember_dragon", "nth": 1 },
+        { "chain": "ember_dragon", "nth": 2 }
+      ],
+      "hand": {
+        "from": { "chain": "ember_dragon", "nth": 2 },
+        "to": { "chain": "ember_dragon", "nth": 0 }
+      },
+      "arrow": { "tile": { "chain": "ember_dragon", "nth": 0 } },
+      "allow": { "drag": ["ember_dragon"] }
+    },
+    {
       "id": "emerald_tap",
       "speaker": "laurah",
-      "text": "Your dragon awakened an Emerald Crystal! Tap it — it will gift you a gem. You will need three.",
+      "text": "The Red Dragon! And look — the Emerald Crystal glows with life. Tap it to claim one Green Egg. You already have two — merge all three for a Green Dragon!",
       "gate": { "type": "event", "event": "item:harvested", "chain": "emerald" },
       "effects": [
         { "spawn": { "chain": "emerald", "tier": 1, "count": 2 } }
@@ -48,7 +68,7 @@
     {
       "id": "emerald_merge",
       "speaker": "laurah",
-      "text": "Three Emeralds! Drag them together — a second dragon stirs within.",
+      "text": "Three Green Eggs! Drag them all together to hatch the Green Dragon!",
       "gate": { "type": "event", "event": "item:hatched", "chain": "emerald" },
       "highlight": [
         { "chain": "emerald", "nth": 0 },
@@ -79,7 +99,7 @@
       "text": "Keeper Level 2! The isle stirs — a new stretch of land has woken to the west. Tap to see!",
       "gate": { "type": "tap" },
       "effects": [
-        { "grantXp": 38 }
+        { "grantXp": 12 }
       ],
       "allow": {}
     },

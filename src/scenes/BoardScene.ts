@@ -1212,15 +1212,16 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.bus.emit('chest:open', { itemId: item.id });
       return;
     }
-    // Raw Emerald gems (tier 1) are merge-only: a tap does nothing (no menu, no sell).
-    // Tier 2+ are dragons with generators and get the normal tap path.
+    // Merge-only items (no generator) are not interactable via tap beyond the sell path.
+    // Green Eggs (emerald t1), Red Eggs (ember_dragon t2), and Rubies (ember_dragon t1) are pure merge pieces.
     if (item.chain === 'emerald' && item.tier === 1) return;
+    if (item.chain === 'ember_dragon' && item.tier < 3) return;
     const cfg = this.generatorConfigFor(item.chain, item.tier);
     const isGenerator = cfg !== undefined;
     if (isGenerator && !this.tutorialDone && !this.allow.tapGenerators) return;
     if (!isGenerator && !this.tutorialDone && !this.allow.sell) return;
-    // A DRAGON opens its Job menu (Work / Harvest, with rest & ruby timers).
-    if (DRAGON_RIGS[item.chain] && this.tutorialDone) {
+    // A DRAGON (with a generator) opens its Job menu (Work / Harvest, with rest & ruby timers).
+    if (DRAGON_RIGS[item.chain] && isGenerator && this.tutorialDone) {
       this.showDragonMenu(sprite);
       return;
     }

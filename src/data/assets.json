@@ -130,7 +130,7 @@
       "key": "item_ember_dragon_2",
       "source": "file",
       "generator": "item",
-      "file": "sprites/level1/item_ember_dragon_2.png"
+      "file": "sprites/items/red-egg.png"
     },
     {
       "key": "item_ember_dragon_3",
@@ -694,7 +694,7 @@
       "key": "item_emerald_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/emerald.png"
+      "file": "sprites/items/green-egg.png"
     },
     {
       "key": "item_emerald_2",

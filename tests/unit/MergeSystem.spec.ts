@@ -222,7 +222,7 @@ describe('MergeSystem', () => {
     expect(whelp?.readyAt).toBeDefined(); // still a ready generator
   });
 
-  it('merging 3 eggs hatches: emits item:hatched and the result is a ready generator', () => {
+  it('merging 3 rubies hatches: emits item:hatched and the result is a Red Egg (pure merge piece)', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 2, row: 2, kind: 'item' });
     ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 3, row: 2, kind: 'item' });
@@ -234,9 +234,10 @@ describe('MergeSystem', () => {
     expect(hatches).toHaveLength(1);
     expect(hatches[0]!.item.chain).toBe('ember_dragon');
     expect(hatches[0]!.item.tier).toBe(2);
-    expect(hatches[0]!.item.ready).toBe(true);
-    const hatchling = ctx.state.itemAt(2, 3);
-    expect(hatchling?.readyAt).toBeDefined();
+    // Red Egg has no generator — ready/readyAt are not set
+    expect(hatches[0]!.item.ready).toBeUndefined();
+    const redEgg = ctx.state.itemAt(2, 3);
+    expect(redEgg?.readyAt).toBeUndefined();
   });
 
   it('snaps a piece dropped NEAR (not on) a mergeable pair onto the completing tile', () => {
