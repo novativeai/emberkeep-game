@@ -56,16 +56,23 @@
   label.row{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:11px}
   label.row input[type=range]{flex:1;accent-color:var(--gold);cursor:pointer}
   label.row span{min-width:28px;text-align:right;color:var(--cream)}
+  /* ── shape toggle ── */
+  .btn-shape{background:var(--panel2);color:var(--dim);border:1px solid var(--line);
+    border-radius:6px;padding:5px 11px;font:inherit;cursor:pointer;font-size:12px}
+  .btn-shape.active{background:var(--gold);color:#1a0f14;font-weight:bold;border-color:var(--gold)}
 </style>
 </head>
 <body>
 
 <div id="toolbar">
   <span class="brand">🎲 Iso3D</span>
-  <span class="sub">2D isometric sprite → 3D textured cube</span>
+  <span class="sub">2D sprite → 3D textured shape</span>
+  <div class="sep"></div>
+  <button class="btn-shape active" id="btnCube">⬜ Cube</button>
+  <button class="btn-shape" id="btnSphere">⬤ Sphere / Egg</button>
   <div class="spacer"></div>
   <button id="btnAuto">⟳ Auto-detect</button>
-  <button id="btnReset">↺ Reset handles</button>
+  <button id="btnReset" style="display:none">↺ Reset handles</button>
   <div class="sep"></div>
   <button id="btnUpload" class="primary">Upload sprite…</button>
   <input type="file" id="fileInput" accept="image/*" style="display:none"/>
@@ -100,7 +107,7 @@
           <input type="range" id="cubeH" min="0.3" max="3" step="0.05" value="1" style="width:70px">
           <span id="cubeHVal">1.0</span>
         </label>
-        <label class="row" style="gap:6px">
+        <label class="row" id="bevelRow" style="gap:6px">
           Bevel
           <input type="range" id="bevelSlider" min="0" max="0.44" step="0.01" value="0" style="width:70px">
           <span id="bevelVal">0.00</span>
@@ -117,21 +124,33 @@
 </div>
 
 <div id="footer">
-  <div style="color:var(--dim);font-size:11px;flex-shrink:0">Extracted faces:</div>
-  <div class="face-group">
-    <canvas id="faceTop" width="128" height="128" title="Top (+Y)"></canvas>
-    <div class="label">Top<br>+Y</div>
+  <!-- cube footer -->
+  <div id="cubeFooter" style="display:flex;align-items:center;gap:14px;flex:1">
+    <div style="color:var(--dim);font-size:11px;flex-shrink:0">Extracted faces:</div>
+    <div class="face-group">
+      <canvas id="faceTop" width="128" height="128" title="Top (+Y)"></canvas>
+      <div class="label">Top<br>+Y</div>
+    </div>
+    <div class="face-group">
+      <canvas id="faceLeft" width="128" height="128" title="Left (+Z front)"></canvas>
+      <div class="label">Left<br>+Z</div>
+    </div>
+    <div class="face-group">
+      <canvas id="faceRight" width="128" height="128" title="Right (+X)"></canvas>
+      <div class="label">Right<br>+X</div>
+    </div>
+    <div class="sep"></div>
+    <button id="btnExport">⤓ Export face PNGs</button>
   </div>
-  <div class="face-group">
-    <canvas id="faceLeft" width="128" height="128" title="Left (+Z front)"></canvas>
-    <div class="label">Left<br>+Z</div>
+  <!-- sphere footer -->
+  <div id="sphereFooter" style="display:none;align-items:center;gap:14px;flex:1">
+    <div style="color:var(--dim);font-size:11px;flex-shrink:0">Equirectangular map:</div>
+    <canvas id="equiPreview" width="256" height="128"
+      style="border:1px solid var(--line);border-radius:3px;width:256px;height:128px" title="Equirectangular texture"></canvas>
+    <div style="font-size:10px;color:var(--dim);max-width:180px;line-height:1.5">
+      Front hemisphere sampled from sprite.<br>Back hemisphere: darkened mirror.
+    </div>
   </div>
-  <div class="face-group">
-    <canvas id="faceRight" width="128" height="128" title="Right (+X)"></canvas>
-    <div class="label">Right<br>+X</div>
-  </div>
-  <div class="sep"></div>
-  <button id="btnExport">⤓ Export face PNGs</button>
   <button id="btnExportGLB">⤓ Export GLB</button>
   <span id="status">Upload a sprite to begin</span>
 </div>
@@ -224,6 +243,16 @@ function extractFace(srcCanvas, quad, size) {
 const FACE_SIZE = { value: 256 };
 let srcCanvas = null;   // original sprite, full resolution
 let imgW = 1, imgH = 1;
+let shapeMode = 'cube'; // 'cube' | 'sphere'
+
+/* Sphere / egg mode: 3 handles defining the bounding ellipse (normalised 0..1).
+   C = centre, R = right-edge (defines rx), T = top-edge (defines ry). */
+let sC = {x:.50, y:.50};
+let sR = {x:.85, y:.50};
+let sT = {x:.50, y:.05};
+let equiCanvas = null;   // equirectangular texture canvas
+let sphereMesh = null;   // Three.js Mesh
+let sphGeo = null, sphMat = null;
 
 /* 7 handle positions (normalised 0..1 relative to image).
    T=top apex, TL=top-left diamond, TR=top-right diamond,
@@ -252,28 +281,41 @@ const COLORS = { top:'#7ECB4F', left:'#3FA8D9', right:'#F7A437' };
 
 /* ═══════════════════════ AUTO DETECT ═══════════════════════ */
 
-function autoDetect() {
-  if (!srcCanvas) return;
+function bboxAlpha() {
+  if (!srcCanvas) return null;
   const {width:w, height:h} = srcCanvas;
   const data = srcCanvas.getContext('2d').getImageData(0,0,w,h).data;
-  let x0=w, y0=h, x1=0, y1=0;
+  let x0=w,y0=h,x1=0,y1=0;
   for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
-    const a = data[(y*w+x)*4+3];
-    if (a > 12) { x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); }
+    if (data[(y*w+x)*4+3] > 12) {
+      x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y);
+    }
   }
-  if (x1 <= x0 || y1 <= y0) return; // no non-transparent region → use full bounds
-  // Convert bounding box to normalised positions
-  const norm = (px, py) => ({x: px/w, y: py/h});
-  const bW = x1-x0, bH = y1-y0;
-  const cx = (x0+x1)/2;
-  // Apply 2:1 iso formula within the bounding box
-  H.T  = norm(cx,       y0);
-  H.TL = norm(x0,       y0 + bH*0.25);
-  H.TR = norm(x1,       y0 + bH*0.25);
-  H.C  = norm(cx,       y0 + bH*0.5);
-  H.BL = norm(x0,       y0 + bH*0.75);
-  H.BR = norm(x1,       y0 + bH*0.75);
-  H.B  = norm(cx,       y1);
+  return x1>x0 && y1>y0 ? {x0,y0,x1,y1,w,h} : null;
+}
+
+function autoDetect() {
+  if (shapeMode === 'sphere') { autoDetectSphere(); return; }
+  const bb = bboxAlpha(); if (!bb) return;
+  const {x0,y0,x1,y1,w,h} = bb;
+  const norm = (px,py) => ({x:px/w, y:py/h});
+  const bH = y1-y0, cx = (x0+x1)/2;
+  H.T  = norm(cx,  y0);
+  H.TL = norm(x0,  y0+bH*0.25);
+  H.TR = norm(x1,  y0+bH*0.25);
+  H.C  = norm(cx,  y0+bH*0.5);
+  H.BL = norm(x0,  y0+bH*0.75);
+  H.BR = norm(x1,  y0+bH*0.75);
+  H.B  = norm(cx,  y1);
+  rebuildAll();
+}
+
+function autoDetectSphere() {
+  const bb = bboxAlpha(); if (!bb) return;
+  const {x0,y0,x1,y1,w,h} = bb;
+  const cx=(x0+x1)/(2*w), cy=(y0+y1)/(2*h);
+  const rx=(x1-x0)/(2*w), ry=(y1-y0)/(2*h);
+  sC={x:cx,y:cy}; sR={x:cx+rx,y:cy}; sT={x:cx,y:cy-ry};
   rebuildAll();
 }
 
@@ -308,6 +350,37 @@ function drawOverlay() {
   ctx.clearRect(0,0,W,SH);
   if (!srcCanvas) return;
 
+  if (shapeMode === 'sphere') {
+    // Draw bounding ellipse
+    const cx = displayOX + sC.x*imgW*displayScale;
+    const cy = displayOY + sC.y*imgH*displayScale;
+    const rx = Math.abs(sR.x-sC.x)*imgW*displayScale;
+    const ry = Math.abs(sT.y-sC.y)*imgH*displayScale;
+    ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+    ctx.fillStyle='#7ECB4F22'; ctx.fill();
+    ctx.strokeStyle='#7ECB4Faa'; ctx.lineWidth=1.5; ctx.stroke();
+    // Equator guide (dotted)
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry*0.2,0,0,Math.PI*2);
+    ctx.strokeStyle='#7ECB4F55'; ctx.stroke();
+    ctx.setLineDash([]);
+    // Handles
+    const sHandles = {C:sC, R:sR, T:sT};
+    const sColors  = {C:'#ccc', R:'#F7A437', T:'#7ECB4F'};
+    for (const [k,h] of Object.entries(sHandles)) {
+      const x = displayOX+h.x*imgW*displayScale;
+      const y = displayOY+h.y*imgH*displayScale;
+      ctx.beginPath(); ctx.arc(x,y,hoveredHandle===k?8:6,0,Math.PI*2);
+      ctx.fillStyle=sColors[k]; ctx.fill();
+      ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle='#000'; ctx.font='bold 8px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(k,x,y);
+    }
+    return;
+  }
+
+  // ── cube mode ──
   const drawFace = (keys, color) => {
     const pts = keys.map(k => pt(k));
     ctx.beginPath();
@@ -352,10 +425,14 @@ function screenToNorm(ex, ey) {
 
 function nearestHandle(ex, ey) {
   let best = null, bestD = 20;
-  for (const [k] of Object.entries(H)) {
-    const [hx,hy] = pt(k);
-    const wrap = document.getElementById('spriteWrap');
-    const rect = wrap.getBoundingClientRect();
+  const wrap = document.getElementById('spriteWrap');
+  const rect = wrap.getBoundingClientRect();
+  const candidates = shapeMode === 'sphere'
+    ? [['C',sC],['R',sR],['T',sT]]
+    : Object.entries(H).map(([k]) => [k, H[k]]);
+  for (const [k, h] of candidates) {
+    const hx = displayOX + h.x*imgW*displayScale;
+    const hy = displayOY + h.y*imgH*displayScale;
     const d = Math.hypot(ex-rect.left-hx, ey-rect.top-hy);
     if (d < bestD) { bestD = d; best = k; }
   }
@@ -369,7 +446,14 @@ overlayCanvas.addEventListener('mousedown', e => {
 });
 window.addEventListener('mousemove', e => {
   if (draggingHandle) {
-    H[draggingHandle] = screenToNorm(e.clientX, e.clientY);
+    const norm = screenToNorm(e.clientX, e.clientY);
+    if (shapeMode === 'sphere') {
+      if (draggingHandle === 'C') sC = norm;
+      else if (draggingHandle === 'R') sR = norm;
+      else if (draggingHandle === 'T') sT = norm;
+    } else {
+      H[draggingHandle] = norm;
+    }
     rebuildAll();
   } else {
     const h = nearestHandle(e.clientX, e.clientY);
@@ -548,6 +632,116 @@ function avgColorHex(canvas) {
   return (R<<16)|(G<<8)|B;
 }
 
+/* ═══════════════════════ SPHERE / EGG ═══════════════════════ */
+
+/* Build a full equirectangular (2:1) texture by orthographic back-projection.
+   Uses Three.js SphereGeometry's own parameterisation so UV aligns perfectly:
+     x = -cos(phi)*sin(theta),  y = cos(theta),  z = -sin(phi)*sin(theta)
+   The FRONT of the sphere (z>0) is at phi = 3π/2 → u = 0.75 in Three.js UV.
+   Front hemisphere samples the sprite directly; back hemisphere gets a
+   darkened mirror of the opposite point (plausible back-lighting approximation).
+*/
+function buildEquirectangular(SW, SH, srcData, cx, cy, rx, ry, texW) {
+  const texH = texW >> 1; // 2:1 ratio
+  const out = document.createElement('canvas');
+  out.width = texW; out.height = texH;
+  const ctx = out.getContext('2d');
+  const dst = ctx.createImageData(texW, texH);
+  const dd = dst.data;
+
+  const sample = (px, py) => {
+    px = Math.max(0, Math.min(SW-1.001, px));
+    py = Math.max(0, Math.min(SH-1.001, py));
+    const x0=px|0, y0=py|0, fx=px-x0, fy=py-y0;
+    const S = (x,y) => { const i=(y*SW+x)*4; return [srcData[i],srcData[i+1],srcData[i+2],srcData[i+3]]; };
+    const c00=S(x0,y0),c10=S(x0+1,y0),c01=S(x0,y0+1),c11=S(x0+1,y0+1);
+    return [0,1,2,3].map(c=>(c00[c]*(1-fx)*(1-fy)+c10[c]*fx*(1-fy)+c01[c]*(1-fx)*fy+c11[c]*fx*fy)|0);
+  };
+
+  for (let vp = 0; vp < texH; vp++) {
+    const theta = (vp / texH) * Math.PI;               // 0 (north) → π (south)
+    const sinT = Math.sin(theta), cosT = Math.cos(theta);
+    for (let up = 0; up < texW; up++) {
+      const phi = (up / texW) * 2 * Math.PI;           // 0 → 2π
+      // Three.js SphereGeometry convention:
+      const x3 = -Math.cos(phi) * sinT;                // maps to sprite horizontal
+      const y3 =  cosT;                                 // maps to sprite vertical
+      const z3 = -Math.sin(phi) * sinT;                // depth: z3>0 = front (faces +Z camera)
+      const di = (vp * texW + up) * 4;
+
+      if (z3 >= 0) {
+        // Front hemisphere — sample sprite directly
+        const p = sample(cx + x3*rx,  cy - y3*ry);
+        dd[di]=p[0]; dd[di+1]=p[1]; dd[di+2]=p[2]; dd[di+3]=p[3];
+      } else {
+        // Back hemisphere — mirror through centre + darken
+        // t ranges from 0.78 at silhouette (z3≈0) down to 0.25 at back pole (z3=-1)
+        const t = 0.25 + 0.53 * (1 + z3);
+        const p = sample(cx - x3*rx,  cy + y3*ry);
+        dd[di]=(p[0]*t)|0; dd[di+1]=(p[1]*t)|0; dd[di+2]=(p[2]*t)|0; dd[di+3]=p[3];
+      }
+    }
+  }
+  ctx.putImageData(dst, 0, 0);
+  return out;
+}
+
+function rebuildSphere() {
+  if (!srcCanvas) return;
+
+  // Dispose old sphere
+  if (sphereMesh) {
+    scene.remove(sphereMesh);
+    sphGeo.dispose();
+    if (sphMat.map) sphMat.map.dispose();
+    sphMat.dispose();
+    sphereMesh = null;
+  }
+
+  const CX = sC.x*imgW, CY = sC.y*imgH;
+  const RX = Math.abs(sR.x-sC.x)*imgW;
+  const RY = Math.abs(sT.y-sC.y)*imgH;
+
+  const srcData = srcCanvas.getContext('2d',{willReadFrequently:true})
+    .getImageData(0,0,imgW,imgH).data;
+
+  equiCanvas = buildEquirectangular(imgW,imgH,srcData, CX,CY, RX,RY, 512);
+
+  // Update equi preview in footer
+  const prev = document.getElementById('equiPreview');
+  if (prev) { prev.width=256; prev.height=128; prev.getContext('2d').drawImage(equiCanvas,0,0,256,128); }
+
+  // Three.js sphere — scale.y = RY/RX for egg elongation
+  sphGeo = new THREE.SphereGeometry(1, 64, 64);
+  sphMat = new THREE.MeshStandardMaterial({map:makeCanvasTex(equiCanvas), roughness:0.7, metalness:0.05});
+  sphereMesh = new THREE.Mesh(sphGeo, sphMat);
+  sphereMesh.scale.set(1, RY/RX, 1);
+  sphereMesh.castShadow = true; sphereMesh.receiveShadow = true;
+  scene.add(sphereMesh);
+
+  document.getElementById('status').textContent =
+    `Sphere ${(RX*2)|0}×${(RY*2)|0}px · equi 512×256`;
+}
+
+/* Switch between cube and sphere modes. */
+function switchMode(mode) {
+  shapeMode = mode;
+  cube.visible         = (mode === 'cube');
+  if (sphereMesh) sphereMesh.visible = (mode === 'sphere');
+
+  document.getElementById('cubeFooter').style.display  = mode==='cube'   ? 'flex'  : 'none';
+  document.getElementById('sphereFooter').style.display = mode==='sphere' ? 'flex'  : 'none';
+  document.getElementById('bevelRow').style.display     = mode==='cube'   ? 'flex'  : 'none';
+  document.getElementById('btnReset').style.display     = mode==='cube'   ? ''      : 'none';
+  document.getElementById('btnCube').classList.toggle('active', mode==='cube');
+  document.getElementById('btnSphere').classList.toggle('active', mode==='sphere');
+
+  if (srcCanvas) {
+    if (mode === 'sphere') autoDetectSphere();
+    else rebuildAll();
+  }
+}
+
 function makeCanvasTex(canvas) {
   const t = new THREE.CanvasTexture(canvas);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -588,8 +782,12 @@ function rebuildCube() {
 
 function rebuildAll() {
   updateSpriteDisplay();
-  rebuildFaces();
-  updateCubeTextures();
+  if (shapeMode === 'sphere') {
+    rebuildSphere();
+  } else {
+    rebuildFaces();
+    updateCubeTextures();
+  }
   drawOverlay();
 }
 
@@ -661,6 +859,8 @@ spriteWrap.addEventListener('drop', e => {
 /* ── toolbar buttons ── */
 document.getElementById('btnAuto').onclick = autoDetect;
 document.getElementById('btnReset').onclick = resetHandles;
+document.getElementById('btnCube').onclick   = () => switchMode('cube');
+document.getElementById('btnSphere').onclick = () => switchMode('sphere');
 
 /* ── cube height slider ── */
 document.getElementById('cubeH').oninput = function() {
@@ -699,13 +899,14 @@ document.getElementById('btnExport').onclick = () => {
 };
 
 document.getElementById('btnExportGLB').onclick = () => {
-  if (!faceCanvases.top) { alert('Load a sprite first.'); return; }
+  const mesh = shapeMode === 'sphere' ? sphereMesh : cube;
+  if (!mesh) { alert('Load a sprite first.'); return; }
   const exporter = new GLTFExporter();
-  exporter.parse(cube, glb => {
+  exporter.parse(mesh, glb => {
     const blob = new Blob([glb], {type:'application/octet-stream'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'iso3d-cube.glb'; a.click();
+    a.download = `iso3d-${shapeMode}.glb`; a.click();
   }, err => console.error(err), {binary:true});
 };
 
