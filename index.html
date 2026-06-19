@@ -23,11 +23,12 @@
          title; the Play button (on the canvas) sits on top. */
       .title-logo {
         position: fixed;
-        inset: 0;
+        top: 0;
+        left: 0;
         width: 100%;
-        height: 100%;
+        height: 78%; /* reduced ~20% and anchored to the top, freeing the bottom strip for the round Play button */
         object-fit: cover;
-        object-position: center 20%; /* sit the banner higher */
+        object-position: center 12%; /* sit the banner higher still */
         z-index: 1;
         display: none;
         pointer-events: none;

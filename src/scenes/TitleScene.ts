@@ -58,21 +58,28 @@ export class TitleScene extends Phaser.Scene {
     // in *scale* for flavour, so it stays tappable throughout.
     // Play sits low, in the clear sky below the banner (e2e taps it here).
     const play = this.add.container(GAME_WIDTH / 2, 1340);
-    const playBg = this.add.image(0, 0, 'ui_btn_play');
-    // NO text — just the PLAY glyph: a right-pointing triangle (the "play logo"),
-    // drawn with Graphics so it centres cleanly on the button.
+    // A ROUND button (drawn — the round-button PNG is only a placeholder): a gold
+    // disc with a darker rim + inner ring, with the PLAY triangle on top. No text.
+    const R = 116;
+    const playBg = this.add.graphics();
+    playBg.fillStyle(num(PALETTE.gold), 1);
+    playBg.fillCircle(0, 0, R);
+    playBg.lineStyle(12, num(PALETTE.goldShade), 1);
+    playBg.strokeCircle(0, 0, R);
+    playBg.lineStyle(6, num(PALETTE.goldAccent), 0.85);
+    playBg.strokeCircle(0, 0, R - 18);
     const playIcon = this.add.graphics();
     playIcon.fillStyle(num(PALETTE.cream), 1);
     playIcon.lineStyle(7, num(PALETTE.textBrown), 1);
     playIcon.beginPath();
-    playIcon.moveTo(-22, -46);
-    playIcon.lineTo(-22, 46);
-    playIcon.lineTo(44, 0);
+    playIcon.moveTo(-30, -52);
+    playIcon.lineTo(-30, 52);
+    playIcon.lineTo(52, 0);
     playIcon.closePath();
     playIcon.fillPath();
     playIcon.strokePath();
     play.add([playBg, playIcon]);
-    play.setSize(528, 192);
+    play.setSize(R * 2, R * 2);
     play.setInteractive({ useHandCursor: true });
     play.on('pointerover', () => this.tweens.add({ targets: play, scale: 1.05, duration: 110 }));
     play.on('pointerout', () => this.tweens.add({ targets: play, scale: 1, duration: 110 }));
