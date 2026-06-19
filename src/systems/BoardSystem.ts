@@ -126,13 +126,15 @@ export class BoardSystem {
 
   spawn(chain: string, tier: number, col: number, row: number, cause: SpawnCause): void {
     const generator = this.generatorConfig(chain, tier);
+    // 'init' items (startingItems) are permanent fixtures — no cooldown ever at
+    // placement; the cooldown only arms after the first real tap.
     const item = this.state.addItem({
       chain,
       tier,
       col,
       row,
       kind: 'item',
-      ...(generator ? { readyAt: this.clock.now() } : {})
+      ...(generator && cause !== 'init' ? { readyAt: this.clock.now() } : {})
     });
     this.bus.emit('item:spawned', { item: this.state.snapshot(item, this.clock.now()), cause });
   }

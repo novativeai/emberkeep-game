@@ -1670,6 +1670,14 @@ export class BoardScene extends Phaser.Scene {
         // visible after tutorial is done.
         const showBadges = step.done || step.id === 'key_unlock';
         this.keyBadges.forEach((b) => b.setAlpha(showBadges ? 1 : 0));
+        // Glide the camera to show the crystal when the player must tap it.
+        if (step.id === 'emerald_tap') {
+          const crystal = [...this.ctx.state.items.values()].find((i) => i.chain === 'crystal');
+          if (crystal) {
+            const w = gridToWorld(crystal.col, crystal.row);
+            this.glideToWorld(w.x, w.y, 900);
+          }
+        }
         // The closer camera can leave a fog-gate lesson off-screen — glide to it.
         const fog =
           (step.arrow && 'fogRegion' in step.arrow && step.arrow.fogRegion) ||
@@ -1989,6 +1997,24 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /* ----------------------------- helpers ---------------------------- */
+
+  /** Smooth tween to any world position (keeps current zoom). */
+  private glideToWorld(worldX: number, worldY: number, duration = 900): void {
+    const cam = this.cameras.main;
+    const from = { x: cam.midPoint.x, y: cam.midPoint.y };
+    this.flyTween?.stop();
+    const proxy = { t: 0 };
+    this.flyTween = this.tweens.add({
+      targets: proxy,
+      t: 1,
+      duration,
+      ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        const s = smootherstep(proxy.t);
+        cam.centerOn(Phaser.Math.Linear(from.x, worldX, s), Phaser.Math.Linear(from.y, worldY, s));
+      }
+    });
+  }
 
   /** Glide the camera to centre a region (e.g. the key-fog gate the tutorial
    *  points at), keeping the current zoom. */
