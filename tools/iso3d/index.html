@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Iso3D · 2D→3D Cube Mapper</title>
+<style>
+  :root {
+    --bg:#1a1218; --panel:#241a20; --panel2:#2e2028; --line:#3d2e38;
+    --cream:#FFF6E8; --gold:#F7A437; --gold2:#FFD84D; --lava:#E8503C;
+    --teal:#3FA8D9; --moss:#7ECB4F; --dim:#8a7a70;
+    --ht:#7ECB4F; --hl:#3FA8D9; --hr:#F7A437;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--cream);
+    font:13px/1.4 "Trebuchet MS",Verdana,sans-serif;
+    display:grid;grid-template-rows:44px 1fr 72px;height:100vh}
+  /* ── toolbar ── */
+  #toolbar{display:flex;align-items:center;gap:8px;padding:0 12px;
+    background:var(--panel);border-bottom:1px solid var(--line)}
+  #toolbar .brand{color:var(--gold);font-weight:bold;font-size:15px;white-space:nowrap}
+  #toolbar .sub{color:var(--dim);font-size:11px}
+  button{background:var(--panel2);color:var(--cream);border:1px solid var(--line);
+    border-radius:6px;padding:5px 11px;font:inherit;cursor:pointer;font-size:12px}
+  button:hover{border-color:var(--gold)}
+  button.primary{background:var(--moss);color:#16280c;font-weight:bold;border-color:var(--moss)}
+  button.primary:hover{filter:brightness(1.15)}
+  .sep{width:1px;height:24px;background:var(--line);flex-shrink:0}
+  .spacer{flex:1}
+  /* ── workspace ── */
+  #workspace{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);overflow:hidden}
+  .pane{background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
+  .pane-title{padding:6px 12px;font-size:10px;font-weight:bold;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--dim);border-bottom:1px solid var(--line);
+    flex-shrink:0;display:flex;align-items:center;gap:8px}
+  .pane-title .legend{display:flex;gap:8px;margin-left:auto;font-size:10px}
+  .pane-title .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:3px}
+  .canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;position:relative;background:
+    repeating-conic-gradient(#2a2030 0% 25%,#1d1622 0% 50%) 0 0/20px 20px}
+  #spriteCanvas{cursor:crosshair;display:none;max-width:100%;max-height:100%}
+  #threeCanvas{display:block}
+  #dropzone{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:10px;color:var(--dim);
+    font-size:13px;pointer-events:none}
+  #dropzone.drag-over{color:var(--gold)}
+  #dropzone .icon{font-size:40px}
+  /* ── footer ── */
+  #footer{background:var(--panel);border-top:1px solid var(--line);
+    display:flex;align-items:center;gap:14px;padding:6px 14px;overflow:hidden}
+  .face-group{display:flex;align-items:center;gap:6px;flex-shrink:0}
+  .face-group .label{font-size:10px;color:var(--dim)}
+  .face-group canvas{border:1px solid var(--line);border-radius:3px;width:52px;height:52px}
+  #status{color:var(--dim);font-size:11px;margin-left:auto}
+  /* ── slider/number inputs ── */
+  label.row{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:11px}
+  label.row input[type=range]{flex:1;accent-color:var(--gold);cursor:pointer}
+  label.row span{min-width:28px;text-align:right;color:var(--cream)}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span class="brand">🎲 Iso3D</span>
+  <span class="sub">2D isometric sprite → 3D textured cube</span>
+  <div class="spacer"></div>
+  <button id="btnAuto">⟳ Auto-detect</button>
+  <button id="btnReset">↺ Reset handles</button>
+  <div class="sep"></div>
+  <button id="btnUpload" class="primary">Upload sprite…</button>
+  <input type="file" id="fileInput" accept="image/*" style="display:none"/>
+</div>
+
+<div id="workspace">
+  <!-- left: 2D sprite + handles -->
+  <div class="pane">
+    <div class="pane-title">2D SPRITE · drag corners to adjust face regions
+      <div class="legend">
+        <span><span class="dot" style="background:var(--ht)"></span>Top</span>
+        <span><span class="dot" style="background:var(--hl)"></span>Left</span>
+        <span><span class="dot" style="background:var(--hr)"></span>Right</span>
+      </div>
+    </div>
+    <div class="canvas-wrap" id="spriteWrap">
+      <div id="dropzone">
+        <div class="icon">🧱</div>
+        <div>Drop an isometric sprite here</div>
+        <div style="font-size:11px;margin-top:4px">or click <b>Upload sprite…</b> · PNG with transparency works best</div>
+      </div>
+      <canvas id="spriteCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- right: Three.js 3D preview -->
+  <div class="pane">
+    <div class="pane-title">3D PREVIEW · drag to orbit · scroll to zoom
+      <div class="legend" style="gap:12px">
+        <label class="row" style="gap:6px">
+          Cube H
+          <input type="range" id="cubeH" min="0.3" max="3" step="0.05" value="1" style="width:70px">
+          <span id="cubeHVal">1.0</span>
+        </label>
+        <label class="row" style="gap:6px">
+          Face size
+          <input type="range" id="faceSize" min="64" max="512" step="64" value="256" style="width:70px">
+          <span id="faceSizeVal">256</span>
+        </label>
+      </div>
+    </div>
+    <div class="canvas-wrap" id="threeWrap"></div>
+  </div>
+</div>
+
+<div id="footer">
+  <div style="color:var(--dim);font-size:11px;flex-shrink:0">Extracted faces:</div>
+  <div class="face-group">
+    <canvas id="faceTop" width="128" height="128" title="Top (+Y)"></canvas>
+    <div class="label">Top<br>+Y</div>
+  </div>
+  <div class="face-group">
+    <canvas id="faceLeft" width="128" height="128" title="Left (+Z front)"></canvas>
+    <div class="label">Left<br>+Z</div>
+  </div>
+  <div class="face-group">
+    <canvas id="faceRight" width="128" height="128" title="Right (+X)"></canvas>
+    <div class="label">Right<br>+X</div>
+  </div>
+  <div class="sep"></div>
+  <button id="btnExport">⤓ Export face PNGs</button>
+  <button id="btnExportGLB">⤓ Export GLB</button>
+  <span id="status">Upload a sprite to begin</span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+/* ═══════════════════════ MATHS ═══════════════════════ */
+
+function gaussElim(A, b) {
+  const n = b.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let mr = c;
+    for (let r = c+1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[mr][c])) mr = r;
+    [M[c], M[mr]] = [M[mr], M[c]];
+    const piv = M[c][c];
+    if (Math.abs(piv) < 1e-12) continue;
+    for (let r = c+1; r < n; r++) {
+      const f = M[r][c] / piv;
+      for (let j = c; j <= n; j++) M[r][j] -= f * M[c][j];
+    }
+  }
+  const x = new Array(n).fill(0);
+  for (let i = n-1; i >= 0; i--) {
+    x[i] = M[i][n];
+    for (let j = i+1; j < n; j++) x[i] -= M[i][j] * x[j];
+    x[i] /= M[i][i];
+  }
+  return x;
+}
+
+/* Build H (3×3 flat, row-major) that maps output coords → source sprite coords.
+   quad = [TL, TR, BR, BL]  each {x,y} in source sprite pixel space.
+   size = side length of the square output canvas. */
+function buildH(quad, size) {
+  const dst = [{x:0,y:0},{x:size,y:0},{x:size,y:size},{x:0,y:size}];
+  const A = [], b = [];
+  for (let i = 0; i < 4; i++) {
+    const {x:u, y:v} = dst[i], {x:sx, y:sy} = quad[i];
+    A.push([u,v,1,0,0,0,-u*sx,-v*sx]); b.push(sx);
+    A.push([0,0,0,u,v,1,-u*sy,-v*sy]); b.push(sy);
+  }
+  const h = gaussElim(A, b);
+  return [h[0],h[1],h[2],h[3],h[4],h[5],h[6],h[7],1];
+}
+
+/* Extract a square texture from `srcCanvas` using a perspective warp.
+   quad = {TL,TR,BR,BL} each {x,y} in source pixels.
+   Returns a new canvas of `size`×`size`. */
+function extractFace(srcCanvas, quad, size) {
+  const H = buildH([quad.TL, quad.TR, quad.BR, quad.BL], size);
+  const out = document.createElement('canvas');
+  out.width = out.height = size;
+  const ctx = out.getContext('2d');
+  const {width:sw, height:sh} = srcCanvas;
+  const src = srcCanvas.getContext('2d', {willReadFrequently:true}).getImageData(0,0,sw,sh).data;
+  const dst = ctx.createImageData(size, size);
+  const dd = dst.data;
+
+  for (let v = 0; v < size; v++) {
+    for (let u = 0; u < size; u++) {
+      const w = H[6]*u + H[7]*v + H[8];
+      const sx = (H[0]*u + H[1]*v + H[2]) / w;
+      const sy = (H[3]*u + H[4]*v + H[5]) / w;
+      if (sx < 0 || sy < 0 || sx >= sw-1 || sy >= sh-1) continue;
+      const x0 = sx|0, y0 = sy|0, fx = sx-x0, fy = sy-y0;
+      const S = (x,y) => { const i=(y*sw+x)*4; return [src[i],src[i+1],src[i+2],src[i+3]]; };
+      const c00=S(x0,y0),c10=S(x0+1,y0),c01=S(x0,y0+1),c11=S(x0+1,y0+1);
+      const di = (v*size+u)*4;
+      for (let c=0;c<4;c++) dd[di+c] = (c00[c]*(1-fx)*(1-fy)+c10[c]*fx*(1-fy)+c01[c]*(1-fx)*fy+c11[c]*fx*fy)|0;
+    }
+  }
+  ctx.putImageData(dst, 0, 0);
+  return out;
+}
+
+/* ═══════════════════════ STATE ═══════════════════════ */
+
+const FACE_SIZE = { value: 256 };
+let srcCanvas = null;   // original sprite, full resolution
+let imgW = 1, imgH = 1;
+
+/* 7 handle positions (normalised 0..1 relative to image).
+   T=top apex, TL=top-left diamond, TR=top-right diamond,
+   C=center junction, BL=bottom-left, BR=bottom-right, B=bottom apex. */
+let H = {
+  T:  {x:.50, y:.00},
+  TL: {x:.00, y:.25},
+  TR: {x:1.0, y:.25},
+  C:  {x:.50, y:.50},
+  BL: {x:.00, y:.75},
+  BR: {x:1.0, y:.75},
+  B:  {x:.50, y:1.0},
+};
+
+// Which handle belongs to which face (for colouring)
+const FACE_HANDLES = {
+  top:   ['T','TL','TR','C'],
+  left:  ['TL','C','B','BL'],
+  right: ['C','TR','BR','B'],
+};
+const HANDLE_COLOR = {
+  T:'#7ECB4F', TL:'mix', TR:'mix2', C:'#ccc',
+  BL:'#3FA8D9', BR:'#F7A437', B:'#ccc'
+};
+const COLORS = { top:'#7ECB4F', left:'#3FA8D9', right:'#F7A437' };
+
+/* ═══════════════════════ AUTO DETECT ═══════════════════════ */
+
+function autoDetect() {
+  if (!srcCanvas) return;
+  const {width:w, height:h} = srcCanvas;
+  const data = srcCanvas.getContext('2d').getImageData(0,0,w,h).data;
+  let x0=w, y0=h, x1=0, y1=0;
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+    const a = data[(y*w+x)*4+3];
+    if (a > 12) { x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); }
+  }
+  if (x1 <= x0 || y1 <= y0) return; // no non-transparent region → use full bounds
+  // Convert bounding box to normalised positions
+  const norm = (px, py) => ({x: px/w, y: py/h});
+  const bW = x1-x0, bH = y1-y0;
+  const cx = (x0+x1)/2;
+  // Apply 2:1 iso formula within the bounding box
+  H.T  = norm(cx,       y0);
+  H.TL = norm(x0,       y0 + bH*0.25);
+  H.TR = norm(x1,       y0 + bH*0.25);
+  H.C  = norm(cx,       y0 + bH*0.5);
+  H.BL = norm(x0,       y0 + bH*0.75);
+  H.BR = norm(x1,       y0 + bH*0.75);
+  H.B  = norm(cx,       y1);
+  rebuildAll();
+}
+
+function resetHandles() {
+  H = {T:{x:.50,y:.00},TL:{x:.00,y:.25},TR:{x:1.0,y:.25},C:{x:.50,y:.50},
+       BL:{x:.00,y:.75},BR:{x:1.0,y:.75},B:{x:.50,y:1.0}};
+  rebuildAll();
+}
+
+/* ═══════════════════════ 2D OVERLAY CANVAS ═══════════════════════ */
+
+const spriteCanvas = document.getElementById('spriteCanvas');
+const overlayCanvas = document.createElement('canvas');
+overlayCanvas.style.cssText = 'position:absolute;pointer-events:none;';
+document.getElementById('spriteWrap').appendChild(overlayCanvas);
+
+let displayScale = 1; // sprite → screen scale factor
+let displayOX = 0, displayOY = 0; // screen offset
+
+function pt(k) {
+  // Convert normalised handle to screen coords
+  const p = H[k];
+  return [displayOX + p.x * imgW * displayScale,
+          displayOY + p.y * imgH * displayScale];
+}
+
+function drawOverlay() {
+  const wrap = document.getElementById('spriteWrap');
+  const W = wrap.clientWidth, SH = wrap.clientHeight;
+  overlayCanvas.width = W; overlayCanvas.height = SH;
+  const ctx = overlayCanvas.getContext('2d');
+  ctx.clearRect(0,0,W,SH);
+  if (!srcCanvas) return;
+
+  const drawFace = (keys, color) => {
+    const pts = keys.map(k => pt(k));
+    ctx.beginPath();
+    ctx.moveTo(...pts[0]);
+    for (let i=1;i<pts.length;i++) ctx.lineTo(...pts[i]);
+    ctx.closePath();
+    ctx.fillStyle = color + '33';
+    ctx.fill();
+    ctx.strokeStyle = color + 'aa';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  };
+
+  drawFace(FACE_HANDLES.top,   COLORS.top);
+  drawFace(FACE_HANDLES.left,  COLORS.left);
+  drawFace(FACE_HANDLES.right, COLORS.right);
+
+  const hColors = { T:COLORS.top, TL:COLORS.left, TR:COLORS.right,
+                    C:'#cccccc', BL:COLORS.left, BR:COLORS.right, B:'#aaaaaa' };
+  for (const [k] of Object.entries(H)) {
+    const [x,y] = pt(k);
+    ctx.beginPath(); ctx.arc(x,y,hoveredHandle===k?8:6,0,Math.PI*2);
+    ctx.fillStyle = hColors[k]||'#fff';
+    ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#000'; ctx.font = 'bold 8px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(k, x, y);
+  }
+}
+
+/* drag interaction */
+let draggingHandle = null, hoveredHandle = null;
+
+function screenToNorm(ex, ey) {
+  const wrap = document.getElementById('spriteWrap');
+  const rect = wrap.getBoundingClientRect();
+  const x = (ex - rect.left - displayOX) / (imgW * displayScale);
+  const y = (ey - rect.top  - displayOY) / (imgH * displayScale);
+  return {x: Math.max(0,Math.min(1,x)), y: Math.max(0,Math.min(1,y))};
+}
+
+function nearestHandle(ex, ey) {
+  let best = null, bestD = 20;
+  for (const [k] of Object.entries(H)) {
+    const [hx,hy] = pt(k);
+    const wrap = document.getElementById('spriteWrap');
+    const rect = wrap.getBoundingClientRect();
+    const d = Math.hypot(ex-rect.left-hx, ey-rect.top-hy);
+    if (d < bestD) { bestD = d; best = k; }
+  }
+  return best;
+}
+
+overlayCanvas.style.pointerEvents = 'auto';
+overlayCanvas.addEventListener('mousedown', e => {
+  const h = nearestHandle(e.clientX, e.clientY);
+  if (h) { draggingHandle = h; e.preventDefault(); }
+});
+window.addEventListener('mousemove', e => {
+  if (draggingHandle) {
+    H[draggingHandle] = screenToNorm(e.clientX, e.clientY);
+    rebuildAll();
+  } else {
+    const h = nearestHandle(e.clientX, e.clientY);
+    if (h !== hoveredHandle) { hoveredHandle = h; drawOverlay(); }
+  }
+});
+window.addEventListener('mouseup', () => {
+  if (draggingHandle) { draggingHandle = null; rebuildAll(); }
+});
+
+/* ═══════════════════════ FACE EXTRACTION ═══════════════════════ */
+
+let faceCanvases = { top: null, left: null, right: null };
+
+function getQuad(face) {
+  const p = k => ({x: H[k].x * imgW, y: H[k].y * imgH});
+  if (face === 'top')   return {TL:p('TL'), TR:p('T'),  BR:p('TR'), BL:p('C')};
+  if (face === 'left')  return {TL:p('TL'), TR:p('C'),  BR:p('B'),  BL:p('BL')};
+  if (face === 'right') return {TL:p('C'),  TR:p('TR'), BR:p('BR'), BL:p('B')};
+}
+
+function rebuildFaces() {
+  if (!srcCanvas) return;
+  const sz = FACE_SIZE.value;
+  faceCanvases.top   = extractFace(srcCanvas, getQuad('top'),   sz);
+  faceCanvases.left  = extractFace(srcCanvas, getQuad('left'),  sz);
+  faceCanvases.right = extractFace(srcCanvas, getQuad('right'), sz);
+  // Update footer preview canvases
+  ['top','left','right'].forEach(f => {
+    const c = document.getElementById('face'+f[0].toUpperCase()+f.slice(1));
+    c.width = 128; c.height = 128;
+    c.getContext('2d').drawImage(faceCanvases[f], 0, 0, 128, 128);
+  });
+}
+
+/* ═══════════════════════ THREE.JS ═══════════════════════ */
+
+const threeWrap = document.getElementById('threeWrap');
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+threeWrap.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = null;
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+camera.position.set(1.9, 1.5, 1.9);
+camera.lookAt(0, 0, 0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 1; controls.maxDistance = 8;
+
+// Lights
+scene.add(new THREE.AmbientLight(0xfff6e8, 0.55));
+const sun = new THREE.DirectionalLight(0xfff6e8, 1.1);
+sun.position.set(4, 8, 4); sun.castShadow = true;
+sun.shadow.mapSize.set(1024,1024);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x3fa8d9, 0.25);
+fill.position.set(-4,-2,-4); scene.add(fill);
+
+// Grid helper floor
+const grid = new THREE.GridHelper(6, 12, 0x3d2e38, 0x3d2e38);
+grid.position.y = -0.5; scene.add(grid);
+
+// Cube geometry: 6 materials, one per face
+// BoxGeometry face order: +X, -X, +Y, -Y, +Z, -Z
+// Iso mapping:
+//   top face (iso diamond)  → +Y (idx 2)
+//   left face (lower-left)  → +Z (idx 4, front)
+//   right face (lower-right) → +X (idx 0, right)
+//   hidden faces reuse nearest visible texture
+const geo = new THREE.BoxGeometry(1, 1, 1);
+let mats = Array.from({length:6}, () =>
+  new THREE.MeshStandardMaterial({color:0x888888, roughness:0.7, metalness:0.05})
+);
+let cube = new THREE.Mesh(geo, mats);
+cube.castShadow = true; cube.receiveShadow = true;
+scene.add(cube);
+
+// Shadow catcher
+const catcher = new THREE.Mesh(
+  new THREE.PlaneGeometry(6,6),
+  new THREE.ShadowMaterial({opacity:0.18})
+);
+catcher.rotation.x = -Math.PI/2;
+catcher.position.y = -0.5;
+catcher.receiveShadow = true;
+scene.add(catcher);
+
+let cubeHeight = 1;
+
+function makeCanvasTex(canvas) {
+  const t = new THREE.CanvasTexture(canvas);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.needsUpdate = true;
+  return t;
+}
+
+function updateCubeTextures() {
+  if (!faceCanvases.top) return;
+  // Dispose old textures
+  mats.forEach(m => { if (m.map) m.map.dispose(); });
+  // Map iso faces to Three.js material slots
+  const topT   = makeCanvasTex(faceCanvases.top);
+  const leftT  = makeCanvasTex(faceCanvases.left);
+  const rightT = makeCanvasTex(faceCanvases.right);
+  // +X right, -X, +Y top, -Y bottom, +Z front, -Z back
+  mats[0].map = rightT; // +X → iso right
+  mats[1].map = leftT;  // -X → iso left (other side, reuse)
+  mats[2].map = topT;   // +Y → iso top
+  mats[3].map = topT;   // -Y → darkened top
+  mats[3].color.set(0x666666);
+  mats[4].map = leftT;  // +Z → iso left face (front in 3D)
+  mats[5].map = rightT; // -Z → iso right face (back in 3D)
+  mats.forEach((m,i) => { if(i!==3) m.color.set(0xffffff); m.needsUpdate = true; });
+}
+
+function rebuildCube() {
+  scene.remove(cube);
+  cube.geometry.dispose();
+  cube.geometry = new THREE.BoxGeometry(1, cubeHeight, 1);
+  // scale UV Y on side faces to match cube height (prevent vertical stretch)
+  const pos = cube.geometry.getAttribute('position');
+  const uv  = cube.geometry.getAttribute('uv');
+  // BoxGeometry face order in attribute: +X(0..5), -X(6..11), +Y(12..17), -Y(18..23), +Z(24..29), -Z(30..35)
+  // No need to hand-edit UV — the default UV is fine for now.
+  scene.add(cube);
+  updateCubeTextures();
+}
+
+function rebuildAll() {
+  updateSpriteDisplay();
+  rebuildFaces();
+  updateCubeTextures();
+  drawOverlay();
+}
+
+/* ═══════════════════════ SPRITE DISPLAY ═══════════════════════ */
+
+function updateSpriteDisplay() {
+  if (!srcCanvas) return;
+  const wrap = document.getElementById('spriteWrap');
+  const W = wrap.clientWidth, H2 = wrap.clientHeight;
+  const sc = Math.min((W-24)/imgW, (H2-24)/imgH);
+  displayScale = sc;
+  displayOX = (W - imgW*sc)/2;
+  displayOY = (H2 - imgH*sc)/2;
+  spriteCanvas.width  = imgW;
+  spriteCanvas.height = imgH;
+  spriteCanvas.style.width  = imgW*sc+'px';
+  spriteCanvas.style.height = imgH*sc+'px';
+  spriteCanvas.style.position = 'relative';
+  spriteCanvas.style.left = displayOX+'px';
+  spriteCanvas.style.top  = displayOY+'px';
+  spriteCanvas.style.imageRendering = 'pixelated';
+  const ctx = spriteCanvas.getContext('2d');
+  ctx.clearRect(0,0,imgW,imgH);
+  ctx.drawImage(srcCanvas,0,0);
+  spriteCanvas.style.display = 'block';
+}
+
+/* ═══════════════════════ IMAGE LOAD ═══════════════════════ */
+
+function loadImage(src) {
+  const img = new Image();
+  img.onload = () => {
+    imgW = img.naturalWidth; imgH = img.naturalHeight;
+    srcCanvas = document.createElement('canvas');
+    srcCanvas.width = imgW; srcCanvas.height = imgH;
+    srcCanvas.getContext('2d').drawImage(img,0,0);
+    document.getElementById('dropzone').style.display = 'none';
+    document.getElementById('status').textContent =
+      `${imgW}×${imgH}px · drag handles to adjust face regions`;
+    autoDetect();
+  };
+  img.onerror = () => { document.getElementById('status').textContent = 'Failed to load image.'; };
+  img.src = src;
+}
+
+/* ── upload button ── */
+document.getElementById('btnUpload').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const url = URL.createObjectURL(f);
+  loadImage(url);
+};
+
+/* ── drag & drop ── */
+const spriteWrap = document.getElementById('spriteWrap');
+spriteWrap.addEventListener('dragover', e => {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.add('drag-over');
+});
+spriteWrap.addEventListener('dragleave', () =>
+  document.getElementById('dropzone').classList.remove('drag-over'));
+spriteWrap.addEventListener('drop', e => {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag-over');
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  loadImage(URL.createObjectURL(f));
+});
+
+/* ── toolbar buttons ── */
+document.getElementById('btnAuto').onclick = autoDetect;
+document.getElementById('btnReset').onclick = resetHandles;
+
+/* ── cube height slider ── */
+document.getElementById('cubeH').oninput = function() {
+  cubeHeight = +this.value;
+  document.getElementById('cubeHVal').textContent = cubeHeight.toFixed(2);
+  rebuildCube();
+};
+
+/* ── face size slider ── */
+document.getElementById('faceSize').oninput = function() {
+  FACE_SIZE.value = +this.value;
+  document.getElementById('faceSizeVal').textContent = this.value;
+  rebuildAll();
+};
+
+/* ═══════════════════════ EXPORT ═══════════════════════ */
+
+function dlCanvas(canvas, name) {
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = name; a.click();
+}
+
+document.getElementById('btnExport').onclick = () => {
+  if (!faceCanvases.top) { alert('Load a sprite first.'); return; }
+  dlCanvas(faceCanvases.top,   'face-top.png');
+  dlCanvas(faceCanvases.left,  'face-left.png');
+  dlCanvas(faceCanvases.right, 'face-right.png');
+};
+
+document.getElementById('btnExportGLB').onclick = () => {
+  if (!faceCanvases.top) { alert('Load a sprite first.'); return; }
+  const exporter = new GLTFExporter();
+  exporter.parse(cube, glb => {
+    const blob = new Blob([glb], {type:'application/octet-stream'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'iso3d-cube.glb'; a.click();
+  }, err => console.error(err), {binary:true});
+};
+
+/* ═══════════════════════ RENDER LOOP ═══════════════════════ */
+
+let rafId;
+function onResize() {
+  const W = threeWrap.clientWidth, H2 = threeWrap.clientHeight;
+  if (!W || !H2) return;
+  camera.aspect = W/H2; camera.updateProjectionMatrix();
+  renderer.setSize(W, H2, true);
+  if (srcCanvas) updateSpriteDisplay();
+  drawOverlay();
+}
+
+new ResizeObserver(onResize).observe(threeWrap);
+new ResizeObserver(() => { if(srcCanvas){updateSpriteDisplay();drawOverlay();} })
+  .observe(spriteWrap);
+
+onResize();
+
+(function loop() {
+  rafId = requestAnimationFrame(loop);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+
+/* ═══════════════════════ LOAD DEFAULT ═══════════════════════ */
+
+// Auto-load stone.png from the game's assets if we're inside the repo
+(async () => {
+  const candidates = [
+    '../../assets/sprites/items/stone.png',
+    '../../../assets/sprites/items/stone.png',
+  ];
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) { loadImage(url); break; }
+    } catch {}
+  }
+})();
+</script>
+</body>
+</html>
