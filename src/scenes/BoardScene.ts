@@ -762,8 +762,9 @@ export class BoardScene extends Phaser.Scene {
       const { x, y } = this.regionCentroid(region.tiles.map(([col, row]) => ({ col, row })));
       const badge = this.add
         .image(x, y - 64, 'icon_key_bronze')
-        .setScale(0.66)
-        .setDepth(DEPTHS.itemBase + y + 1000); // above this region's cloud band
+        .setScale(1.2)
+        .setDepth(DEPTHS.itemBase + y + 1000) // above this region's cloud band
+        .setAlpha(this.tutorialDone ? 1 : 0); // hidden until key_unlock step
       hoverBob(this, badge, 10, 520);
       this.keyBadges.set(region.id, badge);
     }
@@ -1665,6 +1666,10 @@ export class BoardScene extends Phaser.Scene {
         this.tutorialDone = step.done;
         this.refreshAllDraggable();
         this.setHighlights(step.highlight);
+        // Key badges appear only on the key_unlock step (during tutorial); always
+        // visible after tutorial is done.
+        const showBadges = step.done || step.id === 'key_unlock';
+        this.keyBadges.forEach((b) => b.setAlpha(showBadges ? 1 : 0));
         // The closer camera can leave a fog-gate lesson off-screen — glide to it.
         const fog =
           (step.arrow && 'fogRegion' in step.arrow && step.arrow.fogRegion) ||
@@ -1980,6 +1985,7 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);
     this.cameras.main.centerOn(frame.x, frame.y);
     this.tutorialDone = this.ctx.state.tutorialDone;
+    this.keyBadges.forEach((b) => b.setAlpha(this.tutorialDone ? 1 : 0));
   }
 
   /* ----------------------------- helpers ---------------------------- */

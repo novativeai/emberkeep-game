@@ -148,7 +148,7 @@ export class TutorialDirector {
       index: this.data.steps.length,
       total: this.data.steps.length,
       done: true,
-      speaker: 'pip',
+      speaker: 'laurah',
       text: '',
       gateType: 'tap',
       highlight: [],

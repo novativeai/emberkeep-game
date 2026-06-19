@@ -226,7 +226,7 @@
       "key": "icon_key_bronze",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/level1/icon_key_bronze.png"
+      "file": "sprites/items/key-icon.png"
     },
     {
       "key": "fx_ember",
@@ -269,12 +269,6 @@
       "source": "file",
       "generator": "portrait",
       "file": "sprites/guide-characters/laurah-dragonMaster/guide-character-bubble-icon.png"
-    },
-    {
-      "key": "portrait_pip",
-      "source": "placeholder",
-      "generator": "portrait",
-      "file": "raw/ai/portrait_pip.png"
     },
     {
       "key": "portrait_cindra",

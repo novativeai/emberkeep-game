@@ -106,9 +106,8 @@ The `allow` block restricts/enables everything else while the step is live.
 - Width: 1200px, font 38px bold, text wrap at 940px
 - Speaker portrait: 150px tall, left side
 - Name badge: colored per speaker
-  - pip → `tealDeep` (`#2E7FA6`)
+  - laurah → `goldShade` (`#D9821F`) — the sole tutorial narrator; portrait from `guide-character-bubble-icon.png`
   - cindra → `lavaShade` (`#C73A2E`)
-  - laurah → `goldShade` (`#D9821F`)
 - Tap chevron (▼, gold): only visible for `gate.type === 'tap'`; pulses alpha 1→0.25 every 520ms
 - Emits `'tutorial:advance_requested'` when player taps the bubble (and gate is tap)
 
@@ -180,7 +179,7 @@ Zone 2 focal is stored in `cameraKeyframes` in `map.json`.
 | `emerald` | 1 Emerald → 2 Emerald Hatchling → 3 Emerald Whelp | Green dragon family; T2/T3 produce flame_gem | 2 |
 | `flame_gem` | 1 Gem Shard → 2 Flame Gem → 3 Radiant Gem | Merge-chain currency; feeds order board | — |
 | `lumber` | 1 Bush → 2 House | Bush merges 3→1 House; House passively earns coins | — |
-| `crystal` | 1 Theme Crystal | Permanent fixture at [8,11]; tappable (30 s cooldown) → produces emerald_1 | — |
+| `crystal` | 1 Theme Crystal | startingItem at [8,11] (decor3d position); tappable (30 s cooldown) → produces emerald_1 on nearest free active tile | — |
 | `chest` | 1 Treasure Chest | Tap to open → coins / energy / wood fan, then consumed | — |
 | `bigtree` | 1 Ancient Tree | Passive lumber_1 producer (10 min); lives in level_2 at [1,2] | — |
 | `sparkweed` | 1-3 | Merge filler; no longer in starting content | — |
@@ -247,7 +246,7 @@ All startingItems have been removed. Each tutorial step spawns exactly what it n
 | 0 | lore_1 | tap | — |
 | 1 | lore_2 | tap | — |
 | 2 | ruby_merge | item:hatched (chain:ember_dragon) | spawn 3× ember_dragon_1 |
-| 3 | emerald_tap | item:harvested (chain:emerald) | spawn 1× crystal_1 (on active L1 tile) + 2× emerald_1 |
+| 3 | emerald_tap | item:harvested (chain:emerald) | spawn 2× emerald_1 (crystal is permanent startingItem at [8,11]) |
 | 4 | emerald_merge | item:hatched (chain:emerald) | — |
 | 5 | chest | chest:open | spawn 1× chest (near ember_dragon) |
 | 6 | levelup | tap | grantXp 38 → triggers level 2 → level_2 + camera fly |

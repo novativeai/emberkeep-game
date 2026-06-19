@@ -151,26 +151,23 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(count(state, 'emerald', 1)).toBe(2); // 2 emeralds from step effect
     await page.screenshot({ path: shot('05-hatched') });
 
-    // ---------- Emerald tap: tap the crystal spawned by the step effect ----------
+    // ---------- Emerald tap: tap the permanent crystal fixture at [8,11] ----------
     await waitStep(page, 'emerald_tap');
-    // The crystal is spawned as the first effect of this step on an active L1 tile.
-    const crystalCells = await findCells(page, (c) => c.chain === 'crystal' && c.tier === 1);
-    expect(crystalCells.length).toBe(1);
-    // Emit item:tapped directly — Phaser canvas hit-testing is unreliable in
-    // headless Chromium at this zoom level; tapping via the bus exercises the
-    // same GeneratorSystem + TutorialDirector gate path.
-    await page.evaluate(([col, row]) => {
+    // The crystal is a permanent startingItem at [8,11] (non-active tile —
+    // invisible in the board grid but present in state.items). Emit item:tapped
+    // directly; same GeneratorSystem + TutorialDirector gate path as a real tap.
+    await page.evaluate(() => {
       const ctx = window.__emberkeep.game.registry.get('ctx') as {
-        state: { items: Map<number, { chain: string; kind: string; col: number; row: number }> };
+        state: { items: Map<number, { chain: string; kind: string }> };
         bus: { emit: (event: string, payload: unknown) => void };
       };
       for (const [id, item] of ctx.state.items.entries()) {
-        if (item.chain === 'crystal' && item.kind === 'item' && item.col === col && item.row === row) {
+        if (item.chain === 'crystal' && item.kind === 'item') {
           ctx.bus.emit('item:tapped', { itemId: id });
           return;
         }
       }
-    }, [crystalCells[0]![0], crystalCells[0]![1]] as [number, number]);
+    });
     await waitStep(page, 'emerald_merge');
     state = await gameText(page);
     expect(count(state, 'emerald', 1)).toBe(3); // 2 spawned + 1 from crystal tap

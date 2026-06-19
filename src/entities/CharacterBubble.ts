@@ -38,10 +38,10 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
         lineSpacing: 8
       })
       .setOrigin(0, 0.5);
-    this.portrait = scene.add.image(BUBBLE_WIDTH / 2 - 56, 0, 'portrait_pip').setScale(1.06);
+    this.portrait = scene.add.image(BUBBLE_WIDTH / 2 - 56, 0, 'portrait_laurah').setScale(1.06);
     this.nameTagBg = scene.add.graphics();
     this.nameTag = scene.add
-      .text(BUBBLE_WIDTH / 2 - 56, 108, 'Pip', {
+      .text(BUBBLE_WIDTH / 2 - 56, 108, 'Laurah', {
         fontFamily: 'Trebuchet MS, Verdana, sans-serif',
         fontSize: '30px',
         fontStyle: 'bold',
@@ -69,8 +69,8 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   show(step: TutorialStepEvent): void {
     this.currentStepId = step.id;
     this.tapGated = step.gateType === 'tap';
-    const speakerName = { pip: 'Pip', cindra: 'Cindra', laurah: 'Laurah' }[step.speaker];
-    const tagColor = { pip: PALETTE.tealDeep, cindra: PALETTE.lavaShade, laurah: PALETTE.goldShade }[step.speaker];
+    const speakerName = { cindra: 'Cindra', laurah: 'Laurah' }[step.speaker] ?? step.speaker;
+    const tagColor = { cindra: PALETTE.lavaShade, laurah: PALETTE.goldShade }[step.speaker] ?? PALETTE.goldShade;
     this.portrait.setTexture(`portrait_${step.speaker}`);
     // Normalise the disc to fit INSIDE the bubble (it must be shorter than the
     // min bubble height, 192, or Laurah's 412px art overflows the frame).

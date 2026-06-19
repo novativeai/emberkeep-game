@@ -2,21 +2,21 @@
   "steps": [
     {
       "id": "lore_1",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "Long ago, Emberkeep blazed with dragon fire. Then the cold came... and the dragons slept.",
       "gate": { "type": "tap" },
       "allow": {}
     },
     {
       "id": "lore_2",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "I am Pip — the last ember still burning. And you, Keeper, are the one who will wake them.",
       "gate": { "type": "tap" },
       "allow": {}
     },
     {
       "id": "ruby_merge",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch your first dragon.",
       "gate": { "type": "event", "event": "item:hatched", "chain": "ember_dragon" },
       "effects": [
@@ -36,11 +36,10 @@
     },
     {
       "id": "emerald_tap",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "Your dragon awakened an Emerald Crystal! Tap it — it will gift you a gem. You will need three.",
       "gate": { "type": "event", "event": "item:harvested", "chain": "emerald" },
       "effects": [
-        { "spawn": { "chain": "crystal", "tier": 1, "count": 1 } },
         { "spawn": { "chain": "emerald", "tier": 1, "count": 2 } }
       ],
       "arrow": { "tile": { "chain": "crystal", "nth": 0 } },
@@ -48,7 +47,7 @@
     },
     {
       "id": "emerald_merge",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "Three Emeralds! Drag them together — a second dragon stirs within.",
       "gate": { "type": "event", "event": "item:hatched", "chain": "emerald" },
       "highlight": [
@@ -65,7 +64,7 @@
     },
     {
       "id": "chest",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "A Treasure Chest! The isle rewards brave Keepers. Tap it to claim what is inside.",
       "gate": { "type": "event", "event": "chest:open" },
       "effects": [
@@ -76,7 +75,7 @@
     },
     {
       "id": "levelup",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "Keeper Level 2! The isle stirs — a new stretch of land has woken to the west. Tap to see!",
       "gate": { "type": "tap" },
       "effects": [
@@ -86,7 +85,7 @@
     },
     {
       "id": "key_unlock",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "Your dragons gifted you a Gold Key! See that clouded strip? Tap it to burn the fog away.",
       "gate": { "type": "event", "event": "region:unlocked" },
       "effects": [
@@ -98,7 +97,7 @@
     },
     {
       "id": "bush_merge",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "Three Bushes grew in the opened land! Merge them to raise a House — it earns you coins while you rest. Dragons can Work nearby to speed it up.",
       "gate": { "type": "event", "event": "item:merged", "chain": "lumber" },
       "highlight": [
@@ -115,7 +114,7 @@
     },
     {
       "id": "thank_you",
-      "speaker": "pip",
+      "speaker": "laurah",
       "text": "You have lit the ember, Keeper. Emberkeep is alive again — and the adventure is just beginning.",
       "gate": { "type": "tap" },
       "allow": {}

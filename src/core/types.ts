@@ -255,7 +255,7 @@ export type TutorialEffect =
 
 export interface TutorialStepConfig {
   id: string;
-  speaker: 'pip' | 'cindra' | 'laurah';
+  speaker: 'cindra' | 'laurah';
   text: string;
   gate: TutorialGate;
   highlight?: TileRef[];
@@ -401,7 +401,7 @@ export interface TutorialStepEvent {
   index: number;
   total: number;
   done: boolean;
-  speaker: 'pip' | 'cindra' | 'laurah';
+  speaker: 'cindra' | 'laurah';
   text: string;
   gateType: TutorialGate['type'];
   highlight: TilePos[];

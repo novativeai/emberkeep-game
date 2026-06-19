@@ -200,7 +200,7 @@
       ]
     }
   ],
-  "startingItems": [],
+  "startingItems": [{ "chain": "crystal", "tier": 1, "at": [8, 11] }],
   "startingDecor": [],
   "playable": [
     [
