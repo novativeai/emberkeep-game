@@ -105,6 +105,12 @@ export class BoardSystem {
     for (const decor of this.map.startingDecor ?? []) {
       this.spawnDecor(decor.decor, decor.at[0], decor.at[1], 'init');
     }
+    // A starting Treasure Chest — code-injected (NOT in the authored map): tap it
+    // for a random gift (Gold, Warmth, or a fan of Wood). (9,6) is a free L1 tile
+    // on the shipped map; guarded so the 8×8 test fixture (no such cell) skips it.
+    if (this.state.isTileActive(9, 6) && this.state.itemIdAt(9, 6) === null) {
+      this.spawn('chest', 1, 9, 6, 'init');
+    }
     this.bus.emit('energy:changed', { current: this.state.energyCurrent, max: this.state.energyMax });
     this.bus.emit('economy:changed', {
       coins: this.state.coins,

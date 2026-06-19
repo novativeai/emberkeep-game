@@ -127,9 +127,10 @@ export const ITEM_SCALE: Record<string, number> = {
   ember_dragon_1: 0.18,
   flame_gem_1: 0.15,
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
-  lumber_1: 0.38, // a small log (−20%, then −5% more on request)
+  lumber_1: 0.48, // a log — bumped up so it reads clearly, planted on the ground
   lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
   bigtree_1: 0.31, // the level-2 wood tree — reduced 50% on request
+  chest_1: 0.48, // a treasure chest — SAME size as the wood, per spec
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
   emerald_1: 0.25, // a small gem (crystal output)
@@ -142,6 +143,27 @@ export const ITEM_SCALE: Record<string, number> = {
 export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
   coin: { coins: 1 }
 };
+
+/**
+ * Chains that exist in chains.json (the unit tests use `sparkweed` as their
+ * generic merge chain) but must NEVER spawn in the live game. The map can still
+ * reference them; `BoardSystem`/`UnlockSystem` skip them at spawn, so we erase
+ * the flower (Spark Weed → Ember Bloom) WITHOUT editing the authored map.
+ */
+export const HIDDEN_CHAINS = new Set<string>(['sparkweed']);
+
+/**
+ * Treasure-chest loot table. Tapping a chest grants ONE of these at random.
+ * `wood` spawns that many lumber logs next to the chest; the others are
+ * currency. Kept tiny and readable — designers tune it here, not in code.
+ */
+export const CHEST_REWARDS: ReadonlyArray<
+  { kind: 'coins'; amount: number } | { kind: 'energy'; amount: number } | { kind: 'wood'; amount: number }
+> = [
+  { kind: 'coins', amount: 2 },
+  { kind: 'energy', amount: 3 },
+  { kind: 'wood', amount: 5 }
+];
 
 /** Gold (coins) spent to skip a generator timer — dynamic like the energy cost
  *  was, but paid in Gold now. Expensive at the start, ~1 near the end. */

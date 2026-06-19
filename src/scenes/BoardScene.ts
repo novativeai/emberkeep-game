@@ -1200,6 +1200,13 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.bus.emit('board:consume_items', { itemIds: [item.id], reason: 'sold' });
       return;
     }
+    // A treasure chest: tap to open — ChestSystem grants a random gift (Gold,
+    // Warmth, or a fan of Wood) and consumes the chest. Always tappable.
+    if (item.chain === 'chest') {
+      this.sparks.explode(10, sprite.x, sprite.y - 40);
+      this.ctx.bus.emit('chest:open', { itemId: item.id });
+      return;
+    }
     // Emerald gems & eggs are merge-only: a tap does nothing (no menu, no sell) —
     // you just drag them together. (The Emerald Dragon, tier 3, still has its menu.)
     if (item.chain === 'emerald' && item.tier < 3) return;

@@ -1,4 +1,5 @@
 import { BoardSystem } from '../systems/BoardSystem';
+import { ChestSystem } from '../systems/ChestSystem';
 import { DragonJobSystem } from '../systems/DragonJobSystem';
 import { EconomySystem } from '../systems/EconomySystem';
 import { EnergySystem } from '../systems/EnergySystem';
@@ -45,6 +46,7 @@ export interface GameSystems {
   order: OrderSystem;
   economy: EconomySystem;
   reward: RewardSystem;
+  chest: ChestSystem;
   unlock: UnlockSystem;
   save: SaveSystem;
   tutorial: TutorialDirector;
@@ -84,6 +86,7 @@ export class GameContext {
       order: new OrderSystem(this.state, this.bus, this.data.orders),
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       reward: new RewardSystem(this.bus),
+      chest: new ChestSystem(this.state, this.bus, this.clock),
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains, this.data.map),
       save,
       tutorial: new TutorialDirector(this.state, this.bus, this.data.tutorial)

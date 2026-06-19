@@ -25,14 +25,6 @@
       "rewards": { "coins": 110, "keys": 1, "xp": 50 }
     },
     {
-      "id": "laurah_terrace",
-      "giver": "laurah",
-      "title": "Bloom the South Terrace",
-      "blurb": "Let's make the old terrace beautiful again — two Ember Blooms, coaxed up from the Spark Weeds. The dragons love the colour.",
-      "requires": [{ "chain": "sparkweed", "tier": 2, "count": 2 }],
-      "rewards": { "coins": 80, "keys": 0, "xp": 40 }
-    },
-    {
       "id": "cindra_hoard",
       "giver": "cindra",
       "title": "The Keeper's Hoard",

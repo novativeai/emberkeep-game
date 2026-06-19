@@ -1,3 +1,4 @@
+import { HIDDEN_CHAINS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -61,6 +62,7 @@ export class UnlockSystem {
     const now = this.clock.now();
     const revealed: ItemSnapshot[] = [];
     for (const placement of region.contents ?? []) {
+      if (HIDDEN_CHAINS.has(placement.chain)) continue; // never reveal the flower chain
       const generator = this.chains.chains
         .find((c) => c.id === placement.chain)
         ?.tiers.find((t) => t.tier === placement.tier)?.generator;

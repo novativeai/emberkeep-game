@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
-import type { GameContext } from '../core/Context';
-import { GAME_HEIGHT, GAME_WIDTH, PALETTE, SCENES } from '../core/Constants';
+import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
@@ -16,7 +15,6 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
-    const ctx = this.registry.get('ctx') as GameContext;
     this.cameras.main.setOrigin(0).setZoom(renderScale.value); // hi-DPI backing
 
     // FULL-SCREEN logo: a real DOM <img> (object-fit:cover) that fills the WHOLE
@@ -59,19 +57,21 @@ export class TitleScene extends Phaser.Scene {
     // skipped in hit-tests, which would leave Play unclickable). It only springs
     // in *scale* for flavour, so it stays tappable throughout.
     // Play sits low, in the clear sky below the banner (e2e taps it here).
-    const hasSave = ctx.hasSave();
     const play = this.add.container(GAME_WIDTH / 2, 1340);
     const playBg = this.add.image(0, 0, 'ui_btn_play');
-    const playLabel = this.add
-      .text(0, -16, hasSave ? 'Continue' : 'Play', {
-        fontFamily: FONT,
-        fontSize: '76px',
-        fontStyle: 'bold',
-        color: '#FFFFFF'
-      })
-      .setOrigin(0.5)
-      .setShadow(0, 6, 'rgba(181,96,47,0.85)', 6);
-    play.add([playBg, playLabel]);
+    // NO text — just the PLAY glyph: a right-pointing triangle (the "play logo"),
+    // drawn with Graphics so it centres cleanly on the button.
+    const playIcon = this.add.graphics();
+    playIcon.fillStyle(num(PALETTE.cream), 1);
+    playIcon.lineStyle(7, num(PALETTE.textBrown), 1);
+    playIcon.beginPath();
+    playIcon.moveTo(-22, -46);
+    playIcon.lineTo(-22, 46);
+    playIcon.lineTo(44, 0);
+    playIcon.closePath();
+    playIcon.fillPath();
+    playIcon.strokePath();
+    play.add([playBg, playIcon]);
     play.setSize(528, 192);
     play.setInteractive({ useHandCursor: true });
     play.on('pointerover', () => this.tweens.add({ targets: play, scale: 1.05, duration: 110 }));

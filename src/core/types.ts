@@ -342,6 +342,9 @@ export interface EventMap {
   /** Transform one on-board item of `chain`+`fromTier` into `toTier` in place. */
   'board:retier': { chain: string; fromTier: number; toTier: number };
 
+  /** A treasure chest was tapped — ChestSystem grants a random reward + removes it. */
+  'chest:open': { itemId: number };
+
   /* -- state-change notifications (systems emit; UI + audio subscribe) -- */
   'item:spawned': { item: ItemSnapshot; cause: SpawnCause };
   'item:moved': { itemId: number; from: TilePos; to: TilePos };

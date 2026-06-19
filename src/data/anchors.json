@@ -202,11 +202,15 @@
     ],
     "item_lumber_1": [
       0.5,
-      0.84
+      0.92
     ],
     "item_lumber_2": [
       0.5,
       0.9
+    ],
+    "item_chest_1": [
+      0.5,
+      0.92
     ],
     "item_bigtree_1": [
       0.5,

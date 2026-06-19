@@ -163,6 +163,12 @@
       "file": "sprites/items/wood.png"
     },
     {
+      "key": "item_chest_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chest.png"
+    },
+    {
       "key": "item_lumber_2",
       "source": "file",
       "generator": "item",

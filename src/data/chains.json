@@ -167,6 +167,13 @@
           }
         }
       ]
+    },
+    {
+      "id": "chest",
+      "name": "Treasure Chest",
+      "tiers": [
+        { "tier": 1, "id": "chest_1", "name": "Treasure Chest", "sell": 0, "xp": 0 }
+      ]
     }
   ]
 }
