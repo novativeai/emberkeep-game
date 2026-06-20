@@ -71,8 +71,9 @@
         opacity: 0.55;
         pointer-events: none;
       }
-      /* Portrait-mode hint for touch devices (iOS ignores orientation.lock) */
-      @media (pointer: coarse) and (orientation: portrait) {
+      /* Landscape-mode hint for touch devices (iOS ignores orientation.lock):
+         the game is PORTRAIT, so nudge the player back to portrait. */
+      @media (pointer: coarse) and (orientation: landscape) {
         #rotate-hint { display: flex !important; }
       }
       #rotate-hint {
@@ -101,8 +102,8 @@
         animation: spin90 1.6s ease-in-out infinite;
       }
       @keyframes spin90 {
-        0%,30% { transform: rotate(0deg); }
-        60%,100% { transform: rotate(90deg); }
+        0%,30% { transform: rotate(90deg); }
+        60%,100% { transform: rotate(0deg); }
       }
     </style>
   </head>
@@ -117,7 +118,7 @@
         <path d="M48 20 L56 28 L48 36"/>
         <line x1="56" y1="28" x2="40" y2="28"/>
       </svg>
-      Rotate to landscape to play
+      Rotate to portrait to play
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

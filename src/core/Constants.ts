@@ -48,16 +48,17 @@ export const IS_MOBILE: boolean =
 
 /**
  * Viewport height in game-space units.
- * On desktop stays at GAME_HEIGHT (1600) — no change.
- * On phones wider than 1.6:1 in landscape, shrinks so FIT mode fills the
- * full screen width with zero black bars. Clamped to ≤ GAME_HEIGHT so
- * squarish tablets (iPad etc.) get normal letterboxing, not extra blank space.
+ * On desktop stays at GAME_HEIGHT (1600) — no change (e2e/landscape untouched).
+ * On mobile the game is PORTRAIT: GAME_WIDTH (2560) spans the phone's SHORT side
+ * (full width) and the coordinate space grows TALLER to match the portrait aspect,
+ * so FIT fills the screen with zero bars and the board pans vertically. The 2.4×
+ * cap keeps a near-square tablet (or an extreme aspect) from a runaway backing.
  */
 export const LIVE_GAME_HEIGHT: number = (() => {
   if (typeof window === 'undefined' || !IS_MOBILE) return GAME_HEIGHT;
-  const lw = Math.max(window.innerWidth, window.innerHeight); // landscape width
-  const lh = Math.min(window.innerWidth, window.innerHeight); // landscape height
-  return Math.min(GAME_HEIGHT, Math.round(GAME_WIDTH * lh / lw));
+  const shortSide = Math.min(window.innerWidth, window.innerHeight); // portrait width
+  const longSide = Math.max(window.innerWidth, window.innerHeight); // portrait height
+  return Math.round(GAME_WIDTH * Math.min(2.4, longSide / shortSide));
 })();
 
 /** Isometric 2:1 projection. */

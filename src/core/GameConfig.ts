@@ -17,17 +17,21 @@ import { UIScene } from '../scenes/UIScene';
  */
 export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  // On mobile use landscape dimensions regardless of current orientation.
-  const dispW = IS_MOBILE ? Math.max(window.innerWidth, window.innerHeight) : window.innerWidth;
-  const dispH = IS_MOBILE ? Math.min(window.innerWidth, window.innerHeight) : window.innerHeight;
+  // On mobile the game is PORTRAIT: width = the phone's SHORT side, height = long,
+  // regardless of how the device is currently held.
+  const dispW = IS_MOBILE ? Math.min(window.innerWidth, window.innerHeight) : window.innerWidth;
+  const dispH = IS_MOBILE ? Math.max(window.innerWidth, window.innerHeight) : window.innerHeight;
   // Backing needed to match the device pixels the FIT canvas spans, in game-units.
   const need = Math.min(
     (dispW * dpr) / GAME_WIDTH,
     (dispH * dpr) / LIVE_GAME_HEIGHT
   );
-  // Quantise to 1/8 steps (keeps 2560×1600 × R integral) and clamp to [1, 1.5] →
-  // 1440p backing on standard displays, up to ~4K (3840×2400) on retina/4K.
-  renderScale.value = Phaser.Math.Clamp(Math.round(need * 8) / 8, 1, 1.5);
+  // Quantise to 1/8 steps (keeps 2560×1600 × R integral) and clamp. Desktop floors
+  // at 1 (crisp 1440p backing, up to ~4K on retina). The portrait mobile canvas is
+  // ~2× taller, so a lower floor (0.75) keeps the backing off a phone GPU's limit
+  // (~14M px at floor 1) while staying device-crisp.
+  const floor = IS_MOBILE ? 0.75 : 1;
+  renderScale.value = Phaser.Math.Clamp(Math.round(need * 8) / 8, floor, 1.5);
 
   return {
     type: Phaser.AUTO,

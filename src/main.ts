@@ -52,8 +52,10 @@ declare global {
 }
 
 if (IS_MOBILE && 'orientation' in screen) {
+  // The game is portrait on mobile; best-effort lock (iOS ignores it — the
+  // #rotate-hint overlay in index.html covers the landscape-held case).
   (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> })
-    .lock?.('landscape')
+    .lock?.('portrait')
     ?.catch(() => {});
 }
 
