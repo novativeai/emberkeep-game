@@ -7,6 +7,7 @@ describe('dragon passive generation (the standing advantage)', () => {
     const ctx = createTestContext();
     ctx.systems.board.spawn('ember_dragon', 3, 2, 2, 'init'); // Red Dragon: passive generator
     const produced = capture(ctx.bus, 'item:produced');
+    ctx.state.energyCurrent = ctx.state.energyMax; // start full so the 300s advance's regen can't confound the "no Warmth spent" check
     const energyBefore = ctx.state.energyCurrent;
 
     // First tick only arms the timer; nothing is produced yet.

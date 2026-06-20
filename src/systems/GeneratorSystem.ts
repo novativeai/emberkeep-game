@@ -62,14 +62,14 @@ export class GeneratorSystem {
     // Two ways to skip: GOLD (default) or WARMTH (cheaper). Both expensive at the
     // start, ~1 near the end.
     if (currency === 'warmth') {
-      const cost = skipWarmthCost(timer.at - now, timer.total);
+      const cost = skipWarmthCost(timer.at - now, timer.total, cfg.skipMaxGold);
       if (this.state.energyCurrent < cost) {
         this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
         return;
       }
       this.bus.emit('energy:spend', { amount: cost, reason: 'skip_cooldown' });
     } else {
-      const cost = skipEnergyCost(timer.at - now, timer.total);
+      const cost = skipEnergyCost(timer.at - now, timer.total, cfg.skipMaxGold);
       if (this.state.coins < cost) {
         this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
         return;

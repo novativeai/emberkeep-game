@@ -99,16 +99,25 @@ export const GENERATOR_SKIP_MAX_ENERGY = 9;
  * down (cost ∝ fraction remaining). Always ≥ 1 while anything remains.
  *   skipEnergyCost = the GOLD price; skipWarmthCost ≈ 0.55× (the cheaper Warmth).
  */
-export function skipEnergyCost(remainingMs: number, totalMs: number): number {
+export function skipEnergyCost(
+  remainingMs: number,
+  totalMs: number,
+  maxGold: number = GENERATOR_SKIP_MAX_ENERGY
+): number {
   if (remainingMs <= 0) return 0;
   if (totalMs <= 0) return 1;
   const frac = Math.min(1, Math.max(0, remainingMs / totalMs));
-  return Math.min(GENERATOR_SKIP_MAX_ENERGY, Math.max(1, Math.ceil(GENERATOR_SKIP_MAX_ENERGY * frac)));
+  return Math.min(maxGold, Math.max(1, Math.ceil(maxGold * frac)));
 }
 /** Warmth (energy) price of a skip — cheaper than the Gold price (e.g. 10 min
- *  ≈ 5 Warmth vs 9 Gold). 0 when nothing remains. */
-export function skipWarmthCost(remainingMs: number, totalMs: number): number {
-  const gold = skipEnergyCost(remainingMs, totalMs);
+ *  ≈ 5 Warmth vs 9 Gold). Scales with the SAME per-generator `maxGold`, so a
+ *  dearer skip can't be dodged by paying Warmth. 0 when nothing remains. */
+export function skipWarmthCost(
+  remainingMs: number,
+  totalMs: number,
+  maxGold: number = GENERATOR_SKIP_MAX_ENERGY
+): number {
+  const gold = skipEnergyCost(remainingMs, totalMs, maxGold);
   return gold <= 0 ? 0 : Math.max(1, Math.round(gold * 0.55));
 }
 
@@ -144,18 +153,18 @@ export const ITEM_SCALE: Record<string, number> = {
   // placeholder art — scale down so a gem reads ~1 tile wide (SVG-sized).
   // Egg + ruby reduced 70% on request (small speckled egg / small ruby shard).
   ember_dragon_1: 0.18,
-  ember_dragon_2: 0.10, // Red Egg (red-egg.png 1162×1437) — scaled to ~emerald visual size
+  ember_dragon_2: 0.08, // Red Egg (red-egg.png 1162×1437) — reduced 20% on request (0.10 → 0.08)
   ember_dragon_3: 1.0, // Red Dragon rig host — same canvas scale as the Green Dragon
   flame_gem_1: 0.15,
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
-  lumber_1: 0.48, // a log — bumped up so it reads clearly, planted on the ground
+  lumber_1: 0.336, // a log (wood.png) — reduced 30% on request (0.48 → 0.336)
   lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
   bigtree_1: 0.31, // the level-2 wood tree — reduced 50% on request
-  chest_1: 0.30, // a treasure chest — reduced so it reads clearly without dominating
+  chest_1: 0.24, // a treasure chest (chest.png) — reduced 20% on request (0.30 → 0.24)
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
   emerald_1: 0.25, // Emerald gem (emerald.png 467×392)
-  emerald_2: 0.10, // Green Egg (green-egg.png 1147×1438) — scaled to ~red egg visual size
+  emerald_2: 0.08, // Green Egg (green-egg.png 1147×1438) — reduced 20% on request (0.10 → 0.08)
   emerald_3: 1.0, // dragon host (the rig overlays it)
   golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
   coin_1: 0.12, // SMALLER than an egg, per spec
@@ -195,6 +204,9 @@ export const SKIP_GOLD_MAX = 8;
 
 /** Energy. */
 export const ENERGY_MAX = 20;
+/** Warmth a brand-new game starts with — 2 below max, so the tutorial's free
+ *  Ember Spark visibly tops the gauge back to full (18/20 → 20/20). */
+export const ENERGY_START = 18;
 export const ENERGY_REGEN_MS = 180_000; // 1 Warmth every 3 minutes
 export const ENERGY_REGEN_AMOUNT = 1;
 
@@ -295,8 +307,8 @@ export const DRAGON_ANIM = {
 /** Per-dragon-chain rig scale factor so different art reads at the SAME on-board
  *  size. The emerald rig renders larger, so it's taken down 40% to match red. */
 export const DRAGON_RIG_SCALE: Record<string, number> = {
-  emerald: 0.6,
-  ember_dragon: 0.7 // red dragon taken down a further 20% on request
+  emerald: 0.54, // green dragon taken down 10% on request (0.6 → 0.54)
+  ember_dragon: 0.56 // red dragon taken down a further 20% on request (0.7 → 0.56)
 };
 
 /**

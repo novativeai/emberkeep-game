@@ -51,6 +51,9 @@ export interface GeneratorConfig {
   /** Tap-to-harvest? Passive-only generators (house, big tree) set false: they
    *  auto-produce on their passive timer; a tap only offers the energy skip. */
   tappable?: boolean;
+  /** Most GOLD the "buy now" skip can cost on THIS generator (the Crystal's
+   *  emeralds are dear). Falls back to GENERATOR_SKIP_MAX_ENERGY when unset. */
+  skipMaxGold?: number;
 }
 
 export interface ChainTierConfig {
@@ -256,7 +259,8 @@ export type TutorialEffect =
   | { retier: { chain: string; fromTier: number; toTier: number } }
   | { grantKeys: number }
   | { grantXp: number }
-  | { advanceClock: number };
+  | { advanceClock: number }
+  | { setEnergy: number };
 
 export interface TutorialStepConfig {
   id: string;
@@ -340,6 +344,7 @@ export interface EventMap {
   /* -- cross-system commands (systems handle, synchronously) -- */
   'energy:spend': { amount: number; reason: string };
   'energy:add': { amount: number; reason: string };
+  'energy:set': { value: number; reason: string };
   'economy:add': { coins?: number; keys?: number; xp?: number; reason: string };
   'economy:spend_keys': { keys: number; reason: string };
   'board:consume_items': { itemIds: number[]; reason: string };

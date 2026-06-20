@@ -45,6 +45,7 @@ export class EnergySystem {
   ) {
     bus.on('energy:spend', ({ amount }) => this.spend(amount));
     bus.on('energy:add', ({ amount }) => this.gain(amount));
+    bus.on('energy:set', ({ value }) => this.setTo(value));
     bus.on('energy:refill', () => this.refill());
     bus.on('time:advanced', () => this.catchUp());
     bus.on('state:loaded', () => this.catchUp());
@@ -73,6 +74,18 @@ export class EnergySystem {
     const max = this.state.energyMax;
     if (amount <= 0 || this.state.energyCurrent >= max) return;
     this.state.energyCurrent = Math.min(max, this.state.energyCurrent + amount);
+    this.bus.emit('energy:changed', { current: this.state.energyCurrent, max });
+  }
+
+  /** Set Warmth to an exact value, clamped to [0, max] (the tutorial scripts the
+   *  gauge to 18/20 before the "claim your free Spark" step). Pins the regen
+   *  clock so the next +1 counts from now. */
+  private setTo(value: number): void {
+    const max = this.state.energyMax;
+    const next = Math.max(0, Math.min(max, value));
+    if (next === this.state.energyCurrent) return;
+    this.state.energyCurrent = next;
+    this.state.energyLastRegenAt = this.clock.now();
     this.bus.emit('energy:changed', { current: this.state.energyCurrent, max });
   }
 

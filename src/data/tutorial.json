@@ -184,6 +184,10 @@
       "speaker": "laurah",
       "text": "Your first Ember Spark — on the house! Tap the ⚡ + button at the top to open the Emporium and claim it free. Just this once!",
       "gate": { "type": "event", "event": "marketplace:purchased" },
+      "effects": [
+        { "setEnergy": 18 }
+      ],
+      "hand": { "ui": "marketplace" },
       "arrow": { "ui": "marketplace" },
       "allow": { "marketplace": true }
     },

@@ -62,6 +62,9 @@ export class ShopPanel extends Phaser.GameObjects.Container {
   private titleText: Phaser.GameObjects.Text;
   private titleBg: Phaser.GameObjects.Graphics;
   private cards: Phaser.GameObjects.Container;
+  /** The current "FREE!" purchase button, while the energy shop shows one — the
+   *  tutorial points its guiding hand here once the Emporium opens. */
+  private freeBtn?: Phaser.GameObjects.Container;
 
   constructor(
     scene: Phaser.Scene,
@@ -122,6 +125,15 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     });
   }
 
+  /** Screen position of the live "FREE!" button (UIScene camera is fixed, so the
+   *  container's world transform IS its screen point), or null when the Emporium
+   *  is closed or showing no free card. Drives the tutorial's guiding hand. */
+  getFreeButtonPos(): { x: number; y: number } | null {
+    if (!this.isOpen || !this.freeBtn?.active) return null;
+    const m = this.freeBtn.getWorldTransformMatrix();
+    return { x: m.tx, y: m.ty };
+  }
+
   private drawBanner(width: number): void {
     const w = Math.max(560, width);
     this.titleBg.clear();
@@ -135,6 +147,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
 
   private buildCards(currency: Currency, cfg: (typeof SHOP)[Currency]): void {
     this.cards.removeAll(true);
+    this.freeBtn = undefined; // rebuilt below only if this open shows a FREE! card
     const n = cfg.items.length;
     const gap = 430;
     const startX = -((n - 1) * gap) / 2;
@@ -197,6 +210,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5)
       .setShadow(0, 3, 'rgba(30,80,10,0.7)', 4);
     priceBtn.add([pg, price]);
+    if (isFreeFirst) this.freeBtn = priceBtn; // tutorial hand anchors here
     priceBtn.setSize(260, 84).setInteractive({ useHandCursor: true });
     priceBtn.on('pointerover', () => priceBtn.setScale(1.05));
     priceBtn.on('pointerout', () => priceBtn.setScale(1));

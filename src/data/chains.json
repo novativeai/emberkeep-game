@@ -126,9 +126,10 @@
           "xp": 0,
           "generator": {
             "produces": { "chain": "emerald", "tier": 1 },
-            "cooldownMs": 60000,
+            "cooldownMs": 1200000,
             "energyCost": 0,
-            "tappable": true
+            "tappable": true,
+            "skipMaxGold": 50
           }
         }
       ]

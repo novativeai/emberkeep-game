@@ -379,7 +379,9 @@ export class UIScene extends Phaser.Scene {
 
   private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' } | { fogRegion: string }): { x: number; y: number } | null {
     if ('ui' in ref) {
-      if (ref.ui === 'marketplace') return { x: 374, y: 88 };
+      // The ⚡+ button until the Emporium opens, then the FREE! card inside it —
+      // handPoint/arrowAnchor re-evaluate each frame, so the marker follows live.
+      if (ref.ui === 'marketplace') return this.shop.getFreeButtonPos() ?? { x: 374, y: 88 };
       if (ref.ui === 'ledger') return this.hud.getLedgerPos();
       return this.ledger.isOpen ? this.ledger.getDeliverPos() : null;
     }

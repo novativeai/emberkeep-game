@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ENERGY_MAX, ENERGY_REGEN_MS, SAVE_KEY } from '../../src/core/Constants';
+import { ENERGY_REGEN_MS, ENERGY_START, SAVE_KEY } from '../../src/core/Constants';
 import { capture, createTestContext, drag, MemoryStorage } from './helpers';
 
 describe('SaveSystem', () => {
@@ -43,7 +43,7 @@ describe('SaveSystem', () => {
     ctx2.systems.save.load();
 
     expect(loadedEvents[0]?.energyRecovered).toBe(3);
-    expect(ctx2.state.energyCurrent).toBe(ENERGY_MAX - 5 + 3);
+    expect(ctx2.state.energyCurrent).toBe(ENERGY_START - 5 + 3);
   });
 
   it('autosaves on mutations (merge updates storage without an explicit save)', () => {

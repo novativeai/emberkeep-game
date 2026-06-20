@@ -143,6 +143,8 @@ export class TutorialDirector {
       } else if ('advanceClock' in effect) {
         this.clock.advance(effect.advanceClock);
         this.bus.emit('time:advanced', { ms: effect.advanceClock });
+      } else if ('setEnergy' in effect) {
+        this.bus.emit('energy:set', { value: effect.setEnergy, reason: 'tutorial' });
       }
     }
   }

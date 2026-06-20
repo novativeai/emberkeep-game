@@ -1,4 +1,4 @@
-import { ENERGY_MAX, energyMaxForLevel, LEVEL_XP } from './Constants';
+import { ENERGY_START, energyMaxForLevel, LEVEL_XP } from './Constants';
 import type {
   BoardItemState,
   ItemKind,
@@ -26,7 +26,7 @@ export class GameState {
   private tileRegion = new Map<string, string>();
 
   nextItemId = 1;
-  energyCurrent = ENERGY_MAX;
+  energyCurrent = ENERGY_START;
   energyLastRegenAt = 0;
   coins = 0;
   keys = 0;
@@ -57,7 +57,7 @@ export class GameState {
       this.regionStatus.set(region.id, region.status);
     }
     this.nextItemId = 1;
-    this.energyCurrent = ENERGY_MAX;
+    this.energyCurrent = ENERGY_START;
     this.energyLastRegenAt = now;
     this.coins = 0;
     this.keys = 0;

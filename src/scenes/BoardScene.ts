@@ -89,6 +89,7 @@ export class BoardScene extends Phaser.Scene {
   private skipGoldLabel?: Phaser.GameObjects.Text;
   private skipWarmthLabel?: Phaser.GameObjects.Text;
   private skipForId = 0;
+  private skipMaxGold?: number; // per-generator gold cap for the live skip price
   /** Dragon job menu (Work / Harvest) + the dragon it belongs to. */
   private dragonMenu?: Phaser.GameObjects.Container;
   private dragonMenuLabel?: Phaser.GameObjects.Text;
@@ -1199,8 +1200,17 @@ export class BoardScene extends Phaser.Scene {
     if (snap.chain === 'crystal') {
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(4, -324, 144, 428);
     } else if (snap.chain === 'chest') {
-      // chest_1 at scale 0.30, anchor 0.92, height≈153px; test-space: top=-65, bottom=88
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(4, -65, 144, 153);
+      // chest.png 537×511 @ scale 0.24, anchor 0.5/0.92 — full-sprite tap.
+      // displayW≈129, displayH≈123; container origin +76 → rx=76−0.5·129, ry=76−0.92·123.
+      sprite.input!.hitArea = new Phaser.Geom.Rectangle(12, -37, 129, 123);
+    } else if (snap.chain === 'lumber' && snap.tier === 2) {
+      // The House (house.png 361×380 @ scale 0.9, anchor 0.5/0.9) — full-sprite tap.
+      // displayW≈325, displayH≈342; container origin +76 → rx=76−0.5·325, ry=76−0.9·342.
+      sprite.input!.hitArea = new Phaser.Geom.Rectangle(-86, -232, 325, 342);
+    } else if (snap.chain === 'bigtree') {
+      // The Ancient Tree (bigtree.png 622×823 @ scale 0.31, anchor 0.5/0.92) — full-sprite
+      // tap. displayW≈193, displayH≈255; origin +76 → rx=76−0.5·193, ry=76−0.92·255.
+      sprite.input!.hitArea = new Phaser.Geom.Rectangle(-20, -159, 193, 255);
     } else {
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(4, 16, 144, 88);
     }
@@ -1265,7 +1275,7 @@ export class BoardScene extends Phaser.Scene {
     // with the time left); a ready tap-generator harvests as usual.
     const timer = isGenerator ? this.genTimer(item) : null;
     if (timer) {
-      this.showSkipButton(sprite, timer.remaining, timer.total);
+      this.showSkipButton(sprite, timer.remaining, timer.total, cfg?.skipMaxGold);
       return;
     }
     // Passive-only generators (house, big tree) never tap-harvest — they pay out
@@ -1346,8 +1356,14 @@ export class BoardScene extends Phaser.Scene {
   /** Two floating skip buttons under a waiting generator: GOLD (🪙) and the
    *  cheaper WARMTH (⚡). Hovering a button shows WHICH currency it spends ("Par
    *  or" / "Par énergie"). Both prices are dynamic and refresh live. */
-  private showSkipButton(sprite: BoardItem, remaining: number, total: number): void {
+  private showSkipButton(
+    sprite: BoardItem,
+    remaining: number,
+    total: number,
+    maxGold?: number
+  ): void {
     this.hideSkipButton();
+    this.skipMaxGold = maxGold; // per-generator gold cap (Crystal emeralds are dear)
     const btn = this.add.container(sprite.x, sprite.y + 100).setDepth(DEPTHS.dragged - 1);
     // Caption shown on hover, telling the player which payment a button uses.
     const caption = this.add
@@ -1392,8 +1408,8 @@ export class BoardScene extends Phaser.Scene {
       btn.add([bg, label]);
       return label;
     };
-    this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Par or', `🪙 ${skipEnergyCost(remaining, total)}`);
-    this.skipWarmthLabel = make(150, 0xa9d6ff, 'warmth', 'Par énergie', `⚡ ${skipWarmthCost(remaining, total)}`);
+    this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Par or', `🪙 ${skipEnergyCost(remaining, total, maxGold)}`);
+    this.skipWarmthLabel = make(150, 0xa9d6ff, 'warmth', 'Par énergie', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
     btn.add(caption); // on top of the buttons
     this.skipButton = btn;
     this.skipForId = sprite.itemId;
@@ -1401,8 +1417,8 @@ export class BoardScene extends Phaser.Scene {
 
   /** Keep both skip prices in step as the timer drains. */
   private updateSkipCost(remaining: number, total: number): void {
-    this.skipGoldLabel?.setText(`🪙 ${skipEnergyCost(remaining, total)}`);
-    this.skipWarmthLabel?.setText(`⚡ ${skipWarmthCost(remaining, total)}`);
+    this.skipGoldLabel?.setText(`🪙 ${skipEnergyCost(remaining, total, this.skipMaxGold)}`);
+    this.skipWarmthLabel?.setText(`⚡ ${skipWarmthCost(remaining, total, this.skipMaxGold)}`);
   }
 
   private hideSkipButton(): void {
