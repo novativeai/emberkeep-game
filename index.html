@@ -71,6 +71,39 @@
         opacity: 0.55;
         pointer-events: none;
       }
+      /* Portrait-mode hint for touch devices (iOS ignores orientation.lock) */
+      @media (pointer: coarse) and (orientation: portrait) {
+        #rotate-hint { display: flex !important; }
+      }
+      #rotate-hint {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #160d0b;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        color: #fff6e8;
+        font: 600 18px/1.4 -apple-system, 'Segoe UI', sans-serif;
+        text-align: center;
+        pointer-events: none;
+      }
+      #rotate-hint svg {
+        width: 72px;
+        height: 72px;
+        fill: none;
+        stroke: #d4a843;
+        stroke-width: 4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        animation: spin90 1.6s ease-in-out infinite;
+      }
+      @keyframes spin90 {
+        0%,30% { transform: rotate(0deg); }
+        60%,100% { transform: rotate(90deg); }
+      }
     </style>
   </head>
   <body>
@@ -78,6 +111,14 @@
     <img class="title-logo" id="title-logo" src="/sprites/ui/title-logo.png" alt="" />
     <div id="game"></div>
     <div class="boot-note" id="boot-note">stoking the ember&hellip;</div>
+    <div id="rotate-hint">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <rect x="12" y="8" width="28" height="48" rx="4"/>
+        <path d="M48 20 L56 28 L48 36"/>
+        <line x1="56" y1="28" x2="40" y2="28"/>
+      </svg>
+      Rotate to landscape to play
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

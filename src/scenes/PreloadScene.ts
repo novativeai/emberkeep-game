@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SCENES } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
 
 /**
@@ -22,11 +22,11 @@ export class PreloadScene extends Phaser.Scene {
     const fileEntries = ctx.data.assets.images.filter((e) => e.source === 'file' && e.file);
     if (fileEntries.length > 0) {
       const barBg = this.add
-        .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
+        .rectangle(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
         .setStrokeStyle(2, num(PALETTE.gold));
       const bar = this.add.rectangle(
         GAME_WIDTH / 2 - 176,
-        GAME_HEIGHT / 2,
+        LIVE_GAME_HEIGHT / 2,
         4,
         10,
         num(PALETTE.gold)

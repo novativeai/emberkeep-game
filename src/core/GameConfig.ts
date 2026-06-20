@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE } from './Constants';
+import { GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
 import { renderScale } from './render-scale';
 import { BoardScene } from '../scenes/BoardScene';
 import { BootScene } from '../scenes/BootScene';
@@ -17,10 +17,13 @@ import { UIScene } from '../scenes/UIScene';
  */
 export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  // On mobile use landscape dimensions regardless of current orientation.
+  const dispW = IS_MOBILE ? Math.max(window.innerWidth, window.innerHeight) : window.innerWidth;
+  const dispH = IS_MOBILE ? Math.min(window.innerWidth, window.innerHeight) : window.innerHeight;
   // Backing needed to match the device pixels the FIT canvas spans, in game-units.
   const need = Math.min(
-    (window.innerWidth * dpr) / GAME_WIDTH,
-    (window.innerHeight * dpr) / GAME_HEIGHT
+    (dispW * dpr) / GAME_WIDTH,
+    (dispH * dpr) / LIVE_GAME_HEIGHT
   );
   // Quantise to 1/8 steps (keeps 2560×1600 × R integral) and clamp to [1, 1.5] →
   // 1440p backing on standard displays, up to ~4K (3840×2400) on retina/4K.
@@ -30,7 +33,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     type: Phaser.AUTO,
     parent,
     width: GAME_WIDTH * renderScale.value,
-    height: GAME_HEIGHT * renderScale.value,
+    height: LIVE_GAME_HEIGHT * renderScale.value,
     // Transparent canvas: the authored backdrop is painted in-canvas + as the page
     // background (index.html). backgroundColor is the fallback if transparency is
     // ignored.

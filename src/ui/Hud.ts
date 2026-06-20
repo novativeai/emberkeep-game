@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 
@@ -56,7 +56,7 @@ export class Hud {
     // Ledger button: bigger, with the scroll icon.
     this.ledgerButton = this.roundIconButton(
       GAME_WIDTH - 156,
-      GAME_HEIGHT - 168,
+      LIVE_GAME_HEIGHT - 168,
       'ui_icon_scroll',
       1.5,
       () => {
@@ -78,7 +78,7 @@ export class Hud {
     });
 
     // Level disc + XP bar.
-    const xpY = GAME_HEIGHT - 92;
+    const xpY = LIVE_GAME_HEIGHT - 92;
     const disc = scene.add.image(112, xpY, 'ui_btn_round').setScale(0.82);
     this.levelText = scene.add
       .text(112, xpY - 10, '1', {
@@ -242,7 +242,7 @@ export class Hud {
     this.keyPill.value.setText(`${this.state.keys}`);
     this.levelText.setText(`${this.state.level}`);
     const [gained, span] = this.state.levelProgress;
-    const xpY = GAME_HEIGHT - 92;
+    const xpY = LIVE_GAME_HEIGHT - 92;
     this.xpFill.clear();
     const width = Math.max(0.04, Math.min(1, gained / span)) * 424;
     this.xpFill.fillStyle(num(PALETTE.gold), 1);

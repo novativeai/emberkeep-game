@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
-import { GAME_HEIGHT, GAME_WIDTH, SAVE_KEY, SCENES } from './core/Constants';
+import { GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
 import { createGameConfig } from './core/GameConfig';
 import { gridToWorld } from './core/iso';
 
@@ -49,6 +49,12 @@ declare global {
     };
     webkitAudioContext?: typeof AudioContext;
   }
+}
+
+if (IS_MOBILE && 'orientation' in screen) {
+  (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> })
+    .lock?.('landscape')
+    ?.catch(() => {});
 }
 
 const ctx = new GameContext(window.localStorage);
@@ -180,7 +186,7 @@ window.__emberkeep = {
     }
     return {
       x: rect.left + (world.x / GAME_WIDTH) * rect.width,
-      y: rect.top + (world.y / GAME_HEIGHT) * rect.height
+      y: rect.top + (world.y / LIVE_GAME_HEIGHT) * rect.height
     };
   },
   /** Centre the board camera on a cell (test hook; the closer camera can leave

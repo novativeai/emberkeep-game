@@ -10,8 +10,8 @@ import {
   DRAGON_RIG_SCALE,
   ITEM_SCALE,
   EMBER_MOTES,
-  GAME_HEIGHT,
   GAME_WIDTH,
+  LIVE_GAME_HEIGHT,
   num,
   PALETTE,
   SCENES,
@@ -388,7 +388,7 @@ export class BoardScene extends Phaser.Scene {
     const zoomCfg = this.ctx.data.map.cameraZoom ?? { min: 0.2, max: 1.4 };
     if (bgRect) {
       cam.setBounds(bgRect.x, bgRect.y, bgRect.w, bgRect.h);
-      const fitZoom = Math.max(GAME_WIDTH / bgRect.w, GAME_HEIGHT / bgRect.h);
+      const fitZoom = Math.max(GAME_WIDTH / bgRect.w, LIVE_GAME_HEIGHT / bgRect.h);
       this.minZoom = Math.max(zoomCfg.min, fitZoom);
     } else {
       // Fallback (no backdrop): hold to the playable extent, the old behaviour.
@@ -453,7 +453,7 @@ export class BoardScene extends Phaser.Scene {
     // multiplier tweaks did nothing. Lower ceiling = a real zoom-out: the start
     // area fills the view comfortably without being right on top of it.
     const zoom = Phaser.Math.Clamp(
-      Math.min((GAME_WIDTH / 2 - pad) / halfW, (GAME_HEIGHT / 2 - pad) / halfH) * 1.15,
+      Math.min((GAME_WIDTH / 2 - pad) / halfW, (LIVE_GAME_HEIGHT / 2 - pad) / halfH) * 1.15,
       0.45,
       1.05
     );
@@ -465,7 +465,7 @@ export class BoardScene extends Phaser.Scene {
       const f = this.levelFrames.get(l);
       if (f) return f;
     }
-    return this.levelFrames.get(1) ?? { x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2, zoom: 0.5 };
+    return this.levelFrames.get(1) ?? { x: GAME_WIDTH / 2, y: LIVE_GAME_HEIGHT / 2, zoom: 0.5 };
   }
 
   private flyToLevel(level: number): void {
@@ -522,7 +522,7 @@ export class BoardScene extends Phaser.Scene {
         const star = this.add
           .image(
             Phaser.Math.Between(80, GAME_WIDTH - 80),
-            Phaser.Math.Between(60, GAME_HEIGHT * 0.45),
+            Phaser.Math.Between(60, LIVE_GAME_HEIGHT * 0.45),
             'fx_spark'
           )
           .setScale(0.1)

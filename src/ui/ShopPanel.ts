@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
@@ -67,10 +67,10 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     scene: Phaser.Scene,
     private bus: EventBus
   ) {
-    super(scene, GAME_WIDTH / 2, GAME_HEIGHT / 2);
+    super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
     this.dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, num(PALETTE.night), 0.55)
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 

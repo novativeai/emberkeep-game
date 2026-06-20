@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
-import { ENERGY_REGEN_MS, GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SCENES } from '../core/Constants';
+import { ENERGY_REGEN_MS, GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
 import { gridToWorld } from '../core/iso';
 import type { ResolvedArrow, ResolvedHand, TilePos, TutorialStepEvent } from '../core/types';
 import { CharacterBubble } from '../entities/CharacterBubble';
@@ -73,7 +73,7 @@ export class UIScene extends Phaser.Scene {
     this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
-    this.bubble.setPosition(GAME_WIDTH / 2 - 80, GAME_HEIGHT - 232);
+    this.bubble.setPosition(GAME_WIDTH / 2 - 80, LIVE_GAME_HEIGHT - 232);
     this.bubble.setDepth(DEPTH_TUTORIAL);
 
     this.hand = this.add.image(0, 0, 'ui_hand').setDepth(DEPTH_TUTORIAL + 2).setVisible(false);
@@ -261,7 +261,7 @@ export class UIScene extends Phaser.Scene {
   /** The level-up reward beat: a warm banner — Warmth refilled + Gold. */
   private celebrateLevelUp(level: number): void {
     const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT * 0.34;
+    const cy = LIVE_GAME_HEIGHT * 0.34;
     const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);
     const g = this.add.graphics();
     g.fillStyle(num(PALETTE.night), 0.22);
@@ -353,7 +353,7 @@ export class UIScene extends Phaser.Scene {
     if (view && view.width > 0 && view.height > 0) {
       return {
         x: ((wx - view.x) / view.width) * GAME_WIDTH,
-        y: ((wy - view.y) / view.height) * GAME_HEIGHT
+        y: ((wy - view.y) / view.height) * LIVE_GAME_HEIGHT
       };
     }
     return { x: wx, y: wy };
@@ -490,9 +490,9 @@ export class UIScene extends Phaser.Scene {
 
   private openResetDialog(): void {
     if (this.dialog) return;
-    const container = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
+    const container = this.add.container(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
     const dim = this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, num(PALETTE.night), 0.55)
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
       .setInteractive();
     const panel = this.add.graphics();
     panel.fillStyle(num(PALETTE.night), 0.25);

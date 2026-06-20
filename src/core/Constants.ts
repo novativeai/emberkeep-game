@@ -41,6 +41,25 @@ export const RES = 2;
 export const GAME_WIDTH = 2560;
 export const GAME_HEIGHT = 1600;
 
+/** True when the primary input is touch (phone/tablet). */
+export const IS_MOBILE: boolean =
+  typeof window !== 'undefined' &&
+  (navigator.maxTouchPoints > 0 || 'ontouchstart' in window);
+
+/**
+ * Viewport height in game-space units.
+ * On desktop stays at GAME_HEIGHT (1600) — no change.
+ * On phones wider than 1.6:1 in landscape, shrinks so FIT mode fills the
+ * full screen width with zero black bars. Clamped to ≤ GAME_HEIGHT so
+ * squarish tablets (iPad etc.) get normal letterboxing, not extra blank space.
+ */
+export const LIVE_GAME_HEIGHT: number = (() => {
+  if (typeof window === 'undefined' || !IS_MOBILE) return GAME_HEIGHT;
+  const lw = Math.max(window.innerWidth, window.innerHeight); // landscape width
+  const lh = Math.min(window.innerWidth, window.innerHeight); // landscape height
+  return Math.min(GAME_HEIGHT, Math.round(GAME_WIDTH * lh / lw));
+})();
+
 /** Isometric 2:1 projection. */
 export const TILE_W = 256;
 export const TILE_H = 128;

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
@@ -14,7 +14,7 @@ export class EndScreen extends Phaser.GameObjects.Container {
     super(scene, 0, 0);
 
     const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT / 2;
+    const cy = LIVE_GAME_HEIGHT / 2;
     const panelW = 1100;
     const panelH = 680;
 
@@ -25,7 +25,7 @@ export class EndScreen extends Phaser.GameObjects.Container {
 
     // Dim overlay
     const dim = scene.add
-      .rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, num(PALETTE.night), 0.72)
+      .rectangle(cx, cy, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.72)
       .setInteractive();
     this.add(dim);
 

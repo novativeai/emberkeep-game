@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, ITEM_SCALE, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { OrderConfig, OrdersData } from '../core/types';
@@ -37,10 +37,10 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     private gameState: GameState,
     private orders: OrdersData
   ) {
-    super(scene, GAME_WIDTH / 2, GAME_HEIGHT / 2);
+    super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
     this.dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, num(PALETTE.night), 0.45)
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
       .setInteractive(); // swallow board input behind the panel
     this.dim.on('pointerup', () => this.requestClose());
 
