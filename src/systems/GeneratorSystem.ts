@@ -24,6 +24,22 @@ export class GeneratorSystem {
     bus.on('item:tapped', ({ itemId }) => this.onTapped(itemId));
     bus.on('generator:skip', ({ itemId, currency }) => this.onSkip(itemId, currency));
     bus.on('time:advanced', () => this.tickPassive());
+    bus.on('generator:set_timer', ({ chain, tier, remainingMs }) =>
+      this.setTimer(chain, tier, remainingMs)
+    );
+  }
+
+  /** Tutorial staging: put the first generator of chain+tier into a wait with
+   *  `remainingMs` left, so a scripted step can offer an affordable skip. Passive
+   *  generators (house, big tree) wait on passiveAt; tap generators on readyAt. */
+  private setTimer(chain: string, tier: number, remainingMs: number): void {
+    const item = [...this.state.items.values()].find(
+      (i) => i.kind === 'item' && i.chain === chain && i.tier === tier
+    );
+    if (!item) return;
+    const at = this.clock.now() + remainingMs;
+    if (this.generatorConfig(chain, tier)?.tappable === false) item.passiveAt = at;
+    else item.readyAt = at;
   }
 
   private generatorConfig(chain: string, tier: number): GeneratorConfig | undefined {
@@ -78,6 +94,7 @@ export class GeneratorSystem {
     }
     if (timer.kind === 'ready') item.readyAt = now;
     else item.passiveAt = now; // next passive tick fires immediately
+    this.bus.emit('generator:skipped', { itemId, chain: item.chain, currency });
   }
 
   private onTapped(itemId: number): void {

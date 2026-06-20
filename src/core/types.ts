@@ -214,7 +214,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'chest:open' | 'dragon:working' | 'marketplace:purchased'; chain?: string }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'chest:open' | 'dragon:working' | 'marketplace:purchased' | 'generator:skipped'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number };
 
 export interface TutorialAllow {
@@ -255,12 +255,14 @@ export type TutorialArrowConfig =
  * the bush after the hatch, hand over the key before the fog lesson.
  */
 export type TutorialEffect =
-  | { spawn: { chain: string; tier: number; count: number; nearChain?: string } }
+  | { spawn: { chain: string; tier: number; count: number; nearChain?: string; at?: [number, number] } }
   | { retier: { chain: string; fromTier: number; toTier: number } }
   | { grantKeys: number }
   | { grantXp: number }
   | { advanceClock: number }
-  | { setEnergy: number };
+  | { setEnergy: number }
+  | { move: { chain: string; tier: number; to: [number, number] } }
+  | { setTimer: { chain: string; tier: number; remainingMs: number } };
 
 export interface TutorialStepConfig {
   id: string;
@@ -352,9 +354,14 @@ export interface EventMap {
   'board:spawn': { chain: string; tier: number; count: number; nearChain?: string };
   /** Transform one on-board item of `chain`+`fromTier` into `toTier` in place. */
   'board:retier': { chain: string; fromTier: number; toTier: number };
+  /** Relocate one on-board item of `chain`+`tier` to a cell (tutorial staging). */
+  'board:move': { chain: string; tier: number; to: [number, number] };
+  /** Force a generator's tap-cooldown to `remainingMs` left (tutorial staging). */
+  'generator:set_timer': { chain: string; tier: number; remainingMs: number };
 
   /** A treasure chest was tapped — ChestSystem grants a random reward + removes it. */
   'chest:open': { itemId: number };
+  'chest:claimed': { chestId: number; label: string };
 
   /* -- state-change notifications (systems emit; UI + audio subscribe) -- */
   'item:spawned': { item: ItemSnapshot; cause: SpawnCause };
@@ -377,6 +384,8 @@ export interface EventMap {
   'item:produced': { generatorId: number; output: ItemSnapshot };
   /** A reward generator (the house) paid out currency/energy on its timer. */
   'generator:reward': { generatorId: number; coins: number; xp: number; energy: number };
+  /** A generator's wait was paid off (the skip button) — currency tells which. */
+  'generator:skipped': { itemId: number; chain: string; currency: 'gold' | 'warmth' };
   /** A Gold coin was tapped to bank it — UI flies a coin to the Gold gauge. */
   'gold:collected': { at: TilePos };
   'item:removed': { itemId: number; at: TilePos; reason: 'sold' | 'delivered' };

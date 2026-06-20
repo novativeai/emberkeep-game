@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
   ANIMATED_TILE_NAMES,
+  CHEST_INTERVAL_MS,
   COLLECTIBLE_REWARD,
   DECOR_SCALE,
   DEPTHS,
@@ -103,6 +104,7 @@ export class BoardScene extends Phaser.Scene {
   private highlights: Phaser.GameObjects.Image[] = [];
   private allow: Required<TutorialAllow> = { ...NO_ALLOW };
   private tutorialDone = false;
+  private tutorialStepId = ''; // current tutorial step id (drives in-board hints)
   private dragFrom: TilePos | null = null;
   /** Live drag: the lifted sprite eases toward this pointer-tracked target. */
   private dragSprite: BoardItem | null = null;
@@ -217,7 +219,7 @@ export class BoardScene extends Phaser.Scene {
         if (DRAGON_RIGS[sprite.chain]) continue; // dragons never show the timer pill
         const item = this.ctx.state.items.get(sprite.itemId);
         if (!item) continue;
-        const timer = this.genTimer(item);
+        const timer = sprite.chain === 'chest' ? this.chestTimer(item) : this.genTimer(item);
         sprite.setCooling(timer !== null);
         if (timer) {
           sprite.setCooldownRemaining(timer.remaining);
@@ -1084,6 +1086,14 @@ export class BoardScene extends Phaser.Scene {
     return null;
   }
 
+  /** The chest's gift cooldown — null when a gift is ready (readyAt unset = a
+   *  freshly placed chest is ready at once). Drives the same pill/ready UI. */
+  private chestTimer(item: BoardItemState): { remaining: number; total: number } | null {
+    if (item.readyAt === undefined) return null;
+    const remaining = item.readyAt - this.ctx.clock.now();
+    return remaining > 0 ? { remaining, total: CHEST_INTERVAL_MS } : null;
+  }
+
   /** Build the soft radial-gradient shadow texture once (a dark core fading to
    *  transparent → reads as a blurred, realistic ground shadow when squashed). */
   private ensureShadowTexture(): void {
@@ -1216,7 +1226,11 @@ export class BoardScene extends Phaser.Scene {
     }
     // Passive-only generators (house, big tree) have no readyAt, so the snapshot
     // doesn't flag them — recognise them by their chain config for the timer UI.
-    if (snap.kind === 'item' && this.generatorConfigFor(snap.chain, snap.tier)) {
+    // The chest is a recurring gift box: borrow the same cooldown/ready UI.
+    if (
+      snap.chain === 'chest' ||
+      (snap.kind === 'item' && this.generatorConfigFor(snap.chain, snap.tier))
+    ) {
       sprite.isGenerator = true;
     }
     this.itemSprites.set(snap.id, sprite);
@@ -1251,10 +1265,15 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.bus.emit('board:consume_items', { itemIds: [item.id], reason: 'sold' });
       return;
     }
-    // A treasure chest: tap to open — ChestSystem grants a random gift (Gold,
-    // Warmth, or a fan of Wood) and consumes the chest. Always tappable.
+    // A treasure chest: a standing gift box (never disappears). Tap it READY to
+    // claim a random gift; tap it mid-cooldown and it just nudges — the countdown
+    // pill already shows the wait. The reveal animation rides chest:claimed.
     if (item.chain === 'chest') {
-      this.sparks.explode(10, sprite.x, sprite.y - 40);
+      const now = this.ctx.clock.now();
+      if (item.readyAt !== undefined && now < item.readyAt) {
+        scalePulse(this, sprite, 1.06, 110); // gift not ready yet — a small nudge
+        return;
+      }
       this.ctx.bus.emit('chest:open', { itemId: item.id });
       return;
     }
@@ -1411,6 +1430,20 @@ export class BoardScene extends Phaser.Scene {
     this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Par or', `🪙 ${skipEnergyCost(remaining, total, maxGold)}`);
     this.skipWarmthLabel = make(150, 0xa9d6ff, 'warmth', 'Par énergie', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
     btn.add(caption); // on top of the buttons
+    // Tutorial: bounce an arrow over the WARMTH (⚡) skip so the player learns to
+    // pay the House's timer with energy (and watches their Warmth drop).
+    if (this.tutorialStepId === 'house_skip') {
+      const hint = this.add.image(150, -52, 'ui_arrow').setScale(0.5);
+      btn.add(hint);
+      this.tweens.add({
+        targets: hint,
+        y: -38,
+        duration: 420,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+    }
     this.skipButton = btn;
     this.skipForId = sprite.itemId;
   }
@@ -1700,6 +1733,7 @@ export class BoardScene extends Phaser.Scene {
       bus.on('generator:reward', ({ generatorId, coins, xp, energy }) =>
         this.onGeneratorReward(generatorId, coins, xp, energy)
       ),
+      bus.on('chest:claimed', ({ chestId, label }) => this.onChestClaimed(chestId, label)),
       bus.on('dragon:rest', ({ dragonId }) => {
         this.returnDragonHome(dragonId);
         this.showRestBadge(dragonId);
@@ -1743,6 +1777,7 @@ export class BoardScene extends Phaser.Scene {
       bus.on('tutorial:step', (step) => {
         this.allow = step.allow;
         this.tutorialDone = step.done;
+        this.tutorialStepId = step.id;
         this.refreshAllDraggable();
         this.setHighlights(step.highlight);
         // Key badges appear only on the key_unlock step (during tutorial); always
@@ -1902,6 +1937,25 @@ export class BoardScene extends Phaser.Scene {
     if (xp) parts.push(`+${xp} XP`);
     if (energy) parts.push(`+${energy}⚡`);
     if (parts.length) this.floatText(gen.x, gen.y - 150, parts.join('  '), PALETTE.goldAccent);
+  }
+
+  /** The standing chest paid out a gift — a treasure-reveal beat: pop open, a
+   *  sparkle ring + glow, the gift label floats up, and a little hop so it MOVES
+   *  rather than vanishing. The 10-minute recharge tint/countdown then rides the
+   *  update loop (readyAt is already set). Deferred a frame so it never allocates
+   *  GameObjects mid bus-emit (which can collide with a coincident level-up). */
+  private onChestClaimed(chestId: number, label: string): void {
+    this.time.delayedCall(0, () => {
+      const chest = this.itemSprites.get(chestId);
+      if (!chest || !chest.active) return;
+      scalePulse(this, chest, 1.28, 240);
+      this.burst.explode(12, chest.x, chest.y - 52);
+      this.sparks.explode(18, chest.x, chest.y - 52);
+      this.glowFlash(chest.x, chest.y - 46, PALETTE.goldAccent, 0.6, 1.15);
+      this.floatText(chest.x, chest.y - 150, label, PALETTE.goldAccent);
+      const y0 = chest.y; // a little hop in place: it moves, it does not disappear
+      this.tweens.add({ targets: chest, y: y0 - 30, duration: 150, yoyo: true, ease: 'Sine.easeOut' });
+    });
   }
 
   /** Nudge a live rigged dragon into one celebration cycle (e.g. on a gift). */

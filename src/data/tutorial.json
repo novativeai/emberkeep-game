@@ -20,7 +20,7 @@
       "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch a Red Egg.",
       "gate": { "type": "event", "event": "item:merged", "chain": "ember_dragon" },
       "effects": [
-        { "spawn": { "chain": "ember_dragon", "tier": 1, "count": 3 } }
+        { "spawn": { "chain": "ember_dragon", "tier": 1, "count": 3, "at": [9, 4] } }
       ],
       "highlight": [
         { "chain": "ember_dragon", "nth": 0 },
@@ -40,7 +40,7 @@
       "text": "A Red Egg! Two more have appeared. Drag all three together — the Red Dragon stirs inside!",
       "gate": { "type": "event", "event": "item:hatched", "chain": "ember_dragon" },
       "effects": [
-        { "spawn": { "chain": "ember_dragon", "tier": 2, "count": 2 } }
+        { "spawn": { "chain": "ember_dragon", "tier": 2, "count": 2, "nearChain": "ember_dragon" } }
       ],
       "highlight": [
         { "chain": "ember_dragon", "nth": 0 },
@@ -108,7 +108,8 @@
       "text": "A Treasure Chest! The isle rewards brave Keepers. Tap it to claim what is inside.",
       "gate": { "type": "event", "event": "chest:open" },
       "effects": [
-        { "spawn": { "chain": "chest", "tier": 1, "count": 1, "nearChain": "ember_dragon" } }
+        { "move": { "chain": "emerald", "tier": 3, "to": [9, 6] } },
+        { "spawn": { "chain": "chest", "tier": 1, "count": 1, "at": [7, 2] } }
       ],
       "arrow": { "tile": { "chain": "chest", "nth": 0 } },
       "allow": { "tapGenerators": true }
@@ -155,7 +156,7 @@
     {
       "id": "dragon_work",
       "speaker": "laurah",
-      "text": "Dragons can speed the House! Drag your dragon and drop it directly onto the House tile. Red Dragon speeds it to ×1.5 — Green Dragon to ×2!",
+      "text": "Dragons can speed the House! Drag your dragon and drop it directly onto the House tile. Each working dragon doubles the speed — ×2 with one, ×4 with two!",
       "gate": { "type": "event", "event": "dragon:working" },
       "highlight": [
         { "chain": "ember_dragon", "nth": 0 },
@@ -171,22 +172,29 @@
     {
       "id": "dragon_rest",
       "speaker": "laurah",
-      "text": "Hard work tires even dragons! After 3 minutes they need rest. Watch — your dragon just nodded off. Warmth Emporium has you covered — tap the ⚡ button to refill!",
+      "text": "Hard work tires even dragons! After 3 minutes they need rest — watch, your dragon just nodded off and flew home to recover.",
       "gate": { "type": "tap" },
       "effects": [
         { "advanceClock": 185000 }
       ],
-      "arrow": { "ui": "marketplace" },
       "allow": {}
+    },
+    {
+      "id": "house_skip",
+      "speaker": "laurah",
+      "text": "Your House earns coins slowly — but you can rush it! Tap the House, then spend Warmth (⚡) to skip its timer. Watch your Warmth drop!",
+      "gate": { "type": "event", "event": "generator:skipped", "chain": "lumber", "currency": "warmth" },
+      "effects": [
+        { "setTimer": { "chain": "lumber", "tier": 2, "remainingMs": 600000 } }
+      ],
+      "arrow": { "tile": { "chain": "lumber", "nth": 0, "tier": 2 } },
+      "allow": { "tapGenerators": true, "drag": ["ember_dragon", "emerald"] }
     },
     {
       "id": "buy_energy",
       "speaker": "laurah",
-      "text": "Your first Ember Spark — on the house! Tap the ⚡ + button at the top to open the Emporium and claim it free. Just this once!",
+      "text": "Low on Warmth now? Your first Ember Spark is free! Tap the ⚡ + button at the top to open the Emporium and claim it. Just this once!",
       "gate": { "type": "event", "event": "marketplace:purchased" },
-      "effects": [
-        { "setEnergy": 18 }
-      ],
       "hand": { "ui": "marketplace" },
       "arrow": { "ui": "marketplace" },
       "allow": { "marketplace": true }

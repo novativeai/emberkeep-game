@@ -1,4 +1,4 @@
-import { DRAGON_REST_MS, DRAGON_WORK_MS, DRAGON_WORK_SPEED } from '../core/Constants';
+import { DRAGON_REST_MS, DRAGON_WORK_MS, DRAGON_WORK_PER_DRAGON } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -64,17 +64,13 @@ export class DragonJobSystem {
 
   private tick(ms: number): void {
     const now = this.clock.now();
-    // GLOBAL speed-up: sum each working dragon's per-chain bonus and advance
-    // every timed object by that total. ember_dragon adds 0.5× (→ 1.5× total),
-    // emerald adds 1.0× (→ 2× total); the base 1× is the clock's own advance.
+    // GLOBAL speed-up: with N working dragons every timed object advances at
+    // PER × N seconds per real second (1 dragon = 2×, 2 = 4×, …). The base 1×
+    // is the clock's own advance, so we add the remainder ((PER·N − 1) × ms).
     let bonusMs = 0;
     if (ms > 0) {
-      for (const [dragonId, job] of this.jobs) {
-        if (job.state === 'working') {
-          const chain = this.state.items.get(dragonId)?.chain ?? '';
-          bonusMs += (DRAGON_WORK_SPEED[chain] ?? 1.0) * ms;
-        }
-      }
+      const workers = this.workingCount();
+      if (workers > 0) bonusMs = (DRAGON_WORK_PER_DRAGON * workers - 1) * ms;
     }
     if (bonusMs > 0) {
       for (const item of this.state.items.values()) {

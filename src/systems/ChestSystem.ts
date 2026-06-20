@@ -1,39 +1,55 @@
-import { CHEST_REWARDS } from '../core/Constants';
+import { CHEST_GIFTS, CHEST_INTERVAL_MS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
 
-type ChestReward = (typeof CHEST_REWARDS)[number];
+type ChestGift = (typeof CHEST_GIFTS)[number];
 
 /**
- * Treasure chests. Tapping one (BoardScene emits `chest:open`) grants ONE random
- * reward from CHEST_REWARDS — Gold or Warmth — then the chest is consumed. (Wood
- * is deliberately NOT a chest reward; lumber only appears when its cloud zone is
- * cleared.) The loot table lives in Constants so designers tune it without
- * touching code. Phaser-free, so it runs in the node unit tests.
+ * The standing treasure chest. It is a PERMANENT fixture — never consumed. Every
+ * CHEST_INTERVAL_MS a gift readies; tapping the ready chest (BoardScene emits
+ * `chest:open`) grants ONE random gift from CHEST_GIFTS — Gold, or a few Emeralds
+ * / Rubies popped onto the tiles beside it — then the chest recharges its timer
+ * and emits `chest:claimed` so the scene can play the reveal. Tapping it while a
+ * gift is still cooking does nothing. Phaser-free, so it runs in the node tests.
  */
 export class ChestSystem {
   constructor(
     private state: GameState,
-    private bus: EventBus
+    private bus: EventBus,
+    private clock: GameClock
   ) {
     bus.on('chest:open', ({ itemId }) => this.open(itemId));
   }
 
-  /** Which reward to grant — split out so a test can force a branch. */
-  protected pick(): ChestReward {
-    return CHEST_REWARDS[Math.floor(Math.random() * CHEST_REWARDS.length)]!;
+  /** Which gift to grant — split out so a test can force a branch. */
+  protected pick(): ChestGift {
+    return CHEST_GIFTS[Math.floor(Math.random() * CHEST_GIFTS.length)]!;
   }
 
   private open(itemId: number): void {
     const chest = this.state.items.get(itemId);
     if (!chest || chest.chain !== 'chest') return;
-    const reward = this.pick();
-    // Consume the chest, then pay out its currency reward.
-    this.bus.emit('board:consume_items', { itemIds: [itemId], reason: 'sold' });
-    if (reward.kind === 'coins') {
-      this.bus.emit('economy:add', { coins: reward.amount, reason: 'chest' });
+    const now = this.clock.now();
+    if (chest.readyAt !== undefined && now < chest.readyAt) return; // gift still cooking
+
+    const gift = this.pick();
+    if (gift.kind === 'coins') {
+      this.bus.emit('economy:add', { coins: gift.amount, reason: 'chest' });
     } else {
-      this.bus.emit('energy:add', { amount: reward.amount, reason: 'chest' });
+      this.spawnItems(chest.col, chest.row, gift.chain, gift.tier, gift.count);
+    }
+    chest.readyAt = now + CHEST_INTERVAL_MS; // recharge; the chest is never consumed
+    this.bus.emit('chest:claimed', { chestId: itemId, label: gift.label });
+  }
+
+  /** Pop `count` merge pieces onto the free tiles nearest the chest. */
+  private spawnItems(col: number, row: number, chain: string, tier: number, count: number): void {
+    const now = this.clock.now();
+    const cells = this.state.freeActiveTilesNear(col, row).slice(0, count);
+    for (const cell of cells) {
+      const item = this.state.addItem({ chain, tier, col: cell.col, row: cell.row, kind: 'item' });
+      this.bus.emit('item:spawned', { item: this.state.snapshot(item, now), cause: 'generator' });
     }
   }
 }

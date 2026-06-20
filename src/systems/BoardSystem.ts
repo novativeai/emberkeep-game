@@ -20,6 +20,26 @@ export class BoardSystem {
     bus.on('board:consume_items', ({ itemIds, reason }) => this.consume(itemIds, reason));
     bus.on('board:spawn', (p) => this.spawnReward(p));
     bus.on('board:retier', (p) => this.retier(p));
+    bus.on('board:move', (p) => this.moveReward(p));
+  }
+
+  /** Scripted relocation (tutorial): slide one item of `chain`+`tier` to `to`
+   *  (or the nearest free active tile to it). The scene re-anchors the sprite. */
+  private moveReward({ chain, tier, to }: { chain: string; tier: number; to: [number, number] }): void {
+    const item = [...this.state.items.values()].find(
+      (i) => i.kind === 'item' && i.chain === chain && i.tier === tier
+    );
+    if (!item) return;
+    let [col, row] = to;
+    if (!this.state.isTileActive(col, row) || this.state.itemIdAt(col, row) !== null) {
+      const free = this.state.freeActiveTilesNear(col, row)[0];
+      if (!free) return;
+      ({ col, row } = free);
+    }
+    if (item.col === col && item.row === row) return;
+    const from = { col: item.col, row: item.row };
+    this.state.moveItem(item.id, { col, row });
+    this.bus.emit('item:moved', { itemId: item.id, from, to: { col, row } });
   }
 
   /** Scripted reward spawn (tutorial): drop `count` items into free tiles near
@@ -28,13 +48,22 @@ export class BoardSystem {
     chain,
     tier,
     count,
-    nearChain
+    nearChain,
+    at
   }: {
     chain: string;
     tier: number;
     count: number;
     nearChain?: string;
+    at?: [number, number];
   }): void {
+    // An explicit `at` cell wins: drop the blob there (the nearest free active
+    // tile to it), regardless of where other items sit.
+    if (at) {
+      const cells = this.freeBlobNear(at[0], at[1], count);
+      for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, 'unlock');
+      return;
+    }
     const items = [...this.state.items.values()].filter((i) => i.kind === 'item');
     const anchor = (nearChain && items.find((i) => i.chain === nearChain)) || items[0] || null;
     let anchorCol = anchor?.col ?? 0;

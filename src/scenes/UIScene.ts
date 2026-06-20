@@ -130,7 +130,21 @@ export class UIScene extends Phaser.Scene {
     }
     if (this.arrow.visible && this.arrowAnchor) {
       const a = this.arrowAnchor();
-      if (a) this.arrow.setPosition(a.x, a.y - this.arrowLift + this.arrowBob.v);
+      if (a) {
+        // A target near the top of the screen (the ⚡+ Warmth button) would push
+        // the down-pointing arrow off-screen above it — so flip it UP and sit it
+        // just BELOW, pointing at the button. Mid/low targets keep the normal
+        // above-and-pointing-down arrow. Re-evaluated each frame so the smart
+        // marketplace target (top +button vs centred FREE card) is handled live.
+        const nearTop = a.y < 220;
+        this.arrow.setFlipY(nearTop);
+        this.arrow.setPosition(
+          a.x,
+          nearTop
+            ? a.y + 18 + this.arrow.displayHeight + this.arrowBob.v
+            : a.y - this.arrowLift + this.arrowBob.v
+        );
+      }
     }
 
     // ~Twice a second, refresh the "next +1 Warmth" countdown on the energy gauge.
@@ -258,8 +272,14 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  /** The level-up reward beat: a warm banner — Warmth refilled + Gold. */
+  /** The level-up reward beat: a warm banner — Warmth refilled + Gold. Deferred a
+   *  frame: keeper:leveled can fire mid bus-emit (even from an external trigger),
+   *  and allocating Text/particles right then can hit a not-yet-ready canvas. */
   private celebrateLevelUp(level: number): void {
+    this.time.delayedCall(0, () => this.buildLevelUpBanner(level));
+  }
+
+  private buildLevelUpBanner(level: number): void {
     const cx = GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT * 0.34;
     const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);

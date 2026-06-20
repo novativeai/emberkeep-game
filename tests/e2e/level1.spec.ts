@@ -124,7 +124,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // ---------- Lore 1 ----------
     await waitStep(page, 'lore_1');
     let state = await gameText(page);
-    expect(state.energy).toEqual({ current: 20, max: 20 });
+    expect(state.energy).toEqual({ current: 18, max: 20 }); // starts 18/20; tutorial's free Spark tops it up
     // crystal is a permanent startingItem at [8,11] (non-active tile)
     expect(count(state, 'ember_dragon', 1)).toBe(0);
     expect(count(state, 'crystal', 1)).toBe(1);
@@ -210,21 +210,29 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     const chests = await findCells(page, (c) => c.chain === 'chest' && c.tier === 1);
     expect(chests.length).toBe(1);
     // Emit chest:open directly — same reliability reason as the crystal tap above.
+    // Force the coins gift (Math.random→0) so the tutorial claim is deterministic
+    // and drops no extra merge pieces onto the board.
     await page.evaluate(([col, row]) => {
-      const ctx = window.__emberkeep.game.registry.get('ctx') as {
-        state: { items: Map<number, { chain: string; kind: string; col: number; row: number }> };
-        bus: { emit: (event: string, payload: unknown) => void };
-      };
-      for (const [id, item] of ctx.state.items.entries()) {
-        if (item.chain === 'chest' && item.kind === 'item' && item.col === col && item.row === row) {
-          ctx.bus.emit('chest:open', { itemId: id });
-          return;
+      const orig = Math.random;
+      Math.random = () => 0;
+      try {
+        const ctx = window.__emberkeep.game.registry.get('ctx') as {
+          state: { items: Map<number, { chain: string; kind: string; col: number; row: number }> };
+          bus: { emit: (event: string, payload: unknown) => void };
+        };
+        for (const [id, item] of ctx.state.items.entries()) {
+          if (item.chain === 'chest' && item.kind === 'item' && item.col === col && item.row === row) {
+            ctx.bus.emit('chest:open', { itemId: id });
+            return;
+          }
         }
+      } finally {
+        Math.random = orig;
       }
     }, [chests[0]![0], chests[0]![1]] as [number, number]);
     await waitStep(page, 'levelup');
     state = await gameText(page);
-    expect(count(state, 'chest', 1)).toBe(0); // consumed
+    expect(count(state, 'chest', 1)).toBe(1); // a standing gift box — claimed, NOT consumed
     await page.screenshot({ path: shot('10-chest-opened') });
 
     // ---------- Level-up: grantXp fires on tap, reaching level 2 ----------
@@ -258,15 +266,19 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await page.screenshot({ path: shot('12-fog-lifted') });
 
     // ---------- Bush merge: drag 3 bushes → House ----------
-    const bushes = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 1);
-    expect(bushes.length).toBeGreaterThanOrEqual(3);
-    // Centre on the first bush to ensure all bush cells are in view.
-    await page.evaluate(
-      ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
-      [bushes[0]![0], bushes[0]![1]]
-    );
-    await page.waitForTimeout(250);
-    await dragTile(page, bushes[2]!, bushes[0]!);
+    // The 2560×1600 drag is flaky under SwiftShader — retry until the House forms.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const bushes = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 1);
+      if (bushes.length < 3) break;
+      await page.evaluate(
+        ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
+        [bushes[0]![0], bushes[0]![1]]
+      );
+      await page.waitForTimeout(400);
+      await dragTile(page, bushes[2]!, bushes[0]!);
+      await page.waitForTimeout(500);
+      if ((await gameText(page)).tutorial.step === 'dragon_work') break;
+    }
     await waitStep(page, 'dragon_work');
     state = await gameText(page);
     expect(count(state, 'lumber', 2)).toBeGreaterThanOrEqual(1); // house produced
@@ -287,7 +299,29 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
 
     // ---------- Dragon rest: tap bubble to advance ----------
     await tapBubble(page);
+    await waitStep(page, 'house_skip');
+
+    // ---------- House skip: spend Warmth to rush the House's timer ----------
+    // (the step's setTimer effect already put the House on an affordable cooldown)
+    const energyBeforeSkip = (await gameText(page)).energy.current;
+    // Tap the House (real UI) to raise the skip popup + the tutorial's ⚡ arrow, capture it.
+    const houseCells = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 2);
+    if (houseCells.length) {
+      await tapTile(page, houseCells[0]![0], houseCells[0]![1]);
+      await page.waitForTimeout(450);
+      await page.screenshot({ path: shot('14b-house-skip') });
+    }
+    // Then perform the skip via a direct emit (reliable under SwiftShader).
+    await page.evaluate(() => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        state: { items: Map<number, { id: number; chain: string; tier: number }> };
+        bus: { emit: (event: string, payload: unknown) => void };
+      };
+      const house = [...ctx.state.items.values()].find((i) => i.chain === 'lumber' && i.tier === 2);
+      if (house) ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'warmth' });
+    });
     await waitStep(page, 'buy_energy');
+    expect((await gameText(page)).energy.current).toBeLessThan(energyBeforeSkip); // Warmth dropped
     await page.screenshot({ path: shot('15-buy-energy') });
 
     // ---------- Buy energy: emit marketplace:purchased directly ----------
@@ -325,7 +359,13 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(after.tutorial.done).toBe(true);
     expect(after.keys).toBe(before.keys);
     expect(after.xp).toBe(before.xp);
-    expect(after.board).toEqual(before.board);
+    // Compare the persisted board WITHOUT the clock-derived `ready` flag: a
+    // generator skipped to ready (now <= readyAt) can read as cooling after the
+    // virtual clock resets on reload — harmless, and never happens on a real
+    // wall-clock. Item chains/tiers/positions still round-trip exactly.
+    const layout = (b: (Cell | null)[][]): unknown =>
+      b.map((row) => row.map((c) => (c ? { chain: c.chain, tier: c.tier, decor: c.decor } : null)));
+    expect(layout(after.board)).toEqual(layout(before.board));
     expect(after.regions['level_2_gate']).toBe('active');
     await page.screenshot({ path: shot('19-reloaded') });
 

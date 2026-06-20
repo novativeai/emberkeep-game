@@ -61,6 +61,9 @@ export class TutorialDirector {
     bus.on('item:harvested', ({ output }) => this.onGateEvent('item:harvested', output.chain));
     bus.on('chest:open', () => this.onGateEvent('chest:open'));
     bus.on('dragon:working', () => this.onGateEvent('dragon:working'));
+    bus.on('generator:skipped', ({ chain, currency }) =>
+      this.onGateEvent('generator:skipped', chain, currency)
+    );
     bus.on('marketplace:purchased', () => this.onGateEvent('marketplace:purchased'));
     bus.on('order:completed', () => this.onGateEvent('order:completed'));
     bus.on('region:unlocked', () => this.onGateEvent('region:unlocked'));
@@ -96,11 +99,12 @@ export class TutorialDirector {
     return this.state.tutorialDone;
   }
 
-  private onGateEvent(event: string, chain?: string): void {
+  private onGateEvent(event: string, chain?: string, currency?: string): void {
     const step = this.currentStep;
     if (!step || step.gate.type !== 'event') return;
     if (step.gate.event !== event) return;
     if (step.gate.chain && step.gate.chain !== chain) return;
+    if (step.gate.currency && step.gate.currency !== currency) return;
     this.advance();
   }
 
@@ -145,6 +149,10 @@ export class TutorialDirector {
         this.bus.emit('time:advanced', { ms: effect.advanceClock });
       } else if ('setEnergy' in effect) {
         this.bus.emit('energy:set', { value: effect.setEnergy, reason: 'tutorial' });
+      } else if ('move' in effect) {
+        this.bus.emit('board:move', effect.move);
+      } else if ('setTimer' in effect) {
+        this.bus.emit('generator:set_timer', effect.setTimer);
       }
     }
   }

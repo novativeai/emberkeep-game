@@ -154,7 +154,7 @@ export const ITEM_SCALE: Record<string, number> = {
   // placeholder art — scale down so a gem reads ~1 tile wide (SVG-sized).
   // Egg + ruby reduced 70% on request (small speckled egg / small ruby shard).
   ember_dragon_1: 0.18,
-  ember_dragon_2: 0.08, // Red Egg (red-egg.png 1162×1437) — reduced 20% on request (0.10 → 0.08)
+  ember_dragon_2: 0.064, // Red Egg (red-egg.png 1162×1437) — −20% again on request (0.08 → 0.064)
   ember_dragon_3: 1.0, // Red Dragon rig host — same canvas scale as the Green Dragon
   flame_gem_1: 0.15,
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
@@ -165,7 +165,7 @@ export const ITEM_SCALE: Record<string, number> = {
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
   emerald_1: 0.25, // Emerald gem (emerald.png 467×392)
-  emerald_2: 0.08, // Green Egg (green-egg.png 1147×1438) — reduced 20% on request (0.10 → 0.08)
+  emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
   emerald_3: 1.0, // dragon host (the rig overlays it)
   golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
   coin_1: 0.12, // SMALLER than an egg, per spec
@@ -186,17 +186,23 @@ export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
  */
 export const HIDDEN_CHAINS = new Set<string>(['sparkweed']);
 
+/** A standing treasure chest readies a fresh gift every this-many ms (10 min). */
+export const CHEST_INTERVAL_MS = 600_000;
+
 /**
- * Treasure-chest loot table. Tapping a chest grants ONE of these at random —
- * currency only. (Wood is intentionally NOT a chest reward: lumber must appear
- * ONLY when its cloud zone is cleared, never dropped loose by a chest.) Kept tiny
- * and readable — designers tune it here, not in code.
+ * Recurring treasure-chest gifts. The chest is a PERMANENT fixture: every
+ * CHEST_INTERVAL_MS a gift is ready; claiming it grants ONE of these at random,
+ * then the chest recharges (it never disappears). `coins` is currency; `item`
+ * pops that many merge pieces onto free tiles by the chest. (No wood — lumber
+ * appears only when its cloud zone clears.) Designers tune it here, not in code.
  */
-export const CHEST_REWARDS: ReadonlyArray<
-  { kind: 'coins'; amount: number } | { kind: 'energy'; amount: number }
+export const CHEST_GIFTS: ReadonlyArray<
+  | { kind: 'coins'; amount: number; label: string }
+  | { kind: 'item'; chain: string; tier: number; count: number; label: string }
 > = [
-  { kind: 'coins', amount: 2 },
-  { kind: 'energy', amount: 3 }
+  { kind: 'coins', amount: 5, label: '+5 🪙' },
+  { kind: 'item', chain: 'emerald', tier: 1, count: 3, label: '3 Emeralds!' },
+  { kind: 'item', chain: 'ember_dragon', tier: 1, count: 3, label: '3 Rubies!' }
 ];
 
 /** Gold (coins) spent to skip a generator timer — dynamic like the energy cost
@@ -308,23 +314,23 @@ export const DRAGON_ANIM = {
 /** Per-dragon-chain rig scale factor so different art reads at the SAME on-board
  *  size. The emerald rig renders larger, so it's taken down 40% to match red. */
 export const DRAGON_RIG_SCALE: Record<string, number> = {
-  emerald: 0.54, // green dragon taken down 10% on request (0.6 → 0.54)
-  ember_dragon: 0.56 // red dragon taken down a further 20% on request (0.7 → 0.56)
+  emerald: 0.486, // green dragon −10% again on request (0.54 → 0.486)
+  ember_dragon: 0.448 // red dragon −20% again on request (0.56 → 0.448)
 };
 
 /**
- * Dragon Job system. A working dragon stands by a House and speeds its timer:
- * each worker adds +1× (1 dragon = 2× speed, 2 = 3×, …). It tires after
- * WORK_MS, returns home and rests REST_MS before it can work again.
+ * Dragon Job system. A working dragon stands by a House and speeds every timed
+ * object: each worker advances it DRAGON_WORK_PER_DRAGON seconds per real second,
+ * so the rate is PER × workers (1 dragon = 2×, 2 = 4×, …). It tires after WORK_MS,
+ * returns home and rests REST_MS before it can work again.
  */
 export const DRAGON_WORK_MS = 180_000; // 3 minutes of work
 export const DRAGON_REST_MS = 300_000; // then 5 minutes of rest (fatigue)
 
-/** Per-chain work-speed bonus (added on top of the base 1×). ember_dragon → 1.5× total, emerald → 2× total. */
-export const DRAGON_WORK_SPEED: Record<string, number> = {
-  ember_dragon: 0.5,
-  emerald: 1.0
-};
+/** Seconds a single working dragon advances timers per real second. Total rate =
+ *  PER × workers; the base 1× already comes from the clock, so the job system
+ *  adds the remainder ((PER × workers − 1) × ms). */
+export const DRAGON_WORK_PER_DRAGON = 2;
 
 /** Input (game-resolution pixels; CSS pixels are half of these under FIT). */
 export const TAP_MAX_DISTANCE_PX = 16;
@@ -347,9 +353,13 @@ export const EMBER_MOTES = {
  *  of layering stale items onto the new map. v1→v2: map/items reshuffled (red
  *  dragon→ruby, golden egg, region contents) left phantom wood + a duplicate
  *  House on deployed saves; v2 forced a clean départ-0 for them. v2→v3: chests no
- *  longer drop wood — wipe saves that already banked that loose wood / 2nd House. */
+ *  longer drop wood — wipe saves that already banked that loose wood / 2nd House.
+ *  v3→v4: the chest is now a PERMANENT recurring gift box — wipe saves whose
+ *  one-shot chest was already consumed so it comes back. v4→v5: tutorial reworked
+ *  (House energy-skip, repositioned dragons/chest) — wipe so deployed players get
+ *  the same fresh départ-0 as a local run. */
 export const SAVE_KEY = 'emberkeep_save';
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 5;
 
 /** Audio master volumes 0..1. */
 export const AUDIO = {
