@@ -9,11 +9,23 @@ import {
 import type { Facing, RigDoc, RigPose, ResolvedPart, RigVec } from './rigTypes';
 
 const D2R = Math.PI / 180;
+const TAU = Math.PI * 2;
+const WAVE_STRIPS = 16; // strips per wave-deformable layer
+const WAVE_COUNT = 1.1; // sine cycles across the full layer (matches animator)
 
 interface LayerSprite {
   name: string;
   img: Phaser.GameObjects.Image;
   isEyelid: boolean;
+}
+
+/** Pre-computed geometry for a pin-chain wave-deformable layer (e.g. body_tail). */
+interface WaveLayerInfo {
+  baseY: number;    // layer.y - root.y — rest Y for all strips in inner space
+  horiz: boolean;   // true: horizontal sweep (y-offset per strip); false: vertical (x-offset)
+  rootNorm: number; // chain's first-pin normalized position along the sweep axis
+  tipNorm: number;  // chain's last-pin normalized position along the sweep axis
+  strips: Phaser.GameObjects.Image[];
 }
 
 /**
@@ -40,6 +52,10 @@ export class RigPlayer {
   private elapsed = 0;
   private displayScale: number;
   private scratchRot = new Map<string, number>();
+  /** Parts resolved as pin-chain fallback → layer name (no own layer = wave-deform only). */
+  private wavePartToLayer = new Map<string, string>();
+  /** Per-layer wave geometry and strip images. */
+  private waveLayerInfo = new Map<string, WaveLayerInfo>();
 
   constructor(
     scene: Phaser.Scene,
@@ -58,17 +74,59 @@ export class RigPlayer {
     this.inner = scene.add.container(0, 0);
     this.container.add(this.inner);
 
-    // Resolve which part drives each layer, and with what origin.
+    // Phase 1: identify wave-deformable parts (pin-chain fallback — no own layer).
+    // These must NOT be driven by rigid rotation; build strips instead.
+    const waveLayerToChain = new Map<string, typeof rig.pins>();
+    for (const part of ANIM_PARTS) {
+      const r = this.resolved[part]!;
+      if (r.via !== 'pin' || !r.layer) continue;
+      if (rig.layers.some((l) => l.name === part)) continue; // has own layer → rotation OK
+      const chain = rig.pins
+        .filter((p) => p.chain === part && p.name !== 'root_ground')
+        .sort((a, b) => a.order - b.order);
+      if (chain.length < 2) continue;
+      waveLayerToChain.set(r.layer, chain);
+      this.wavePartToLayer.set(part, r.layer);
+    }
+
+    // Phase 2: resolve which non-wave part drives each layer, and with what origin.
     const originByLayer = new Map<string, RigVec>();
     for (const part of ANIM_PARTS) {
       const r = this.resolved[part]!;
       if (r.via === 'skip' || !r.layer) continue;
+      if (this.wavePartToLayer.has(part)) continue; // handled as wave
       this.partToLayer.set(part, r.layer);
       if (!originByLayer.has(r.layer)) originByLayer.set(r.layer, r.originNorm);
     }
 
+    // Phase 3: build layer images in z-order (wave layers → strips; others → single image).
     for (const layer of [...rig.layers].sort((a, b) => a.z - b.z)) {
       if (layer.visible === false) continue;
+
+      const chain = waveLayerToChain.get(layer.name);
+      if (chain) {
+        // Wave-deformable layer: N horizontal (or vertical) strips, y-offset updated per frame.
+        const first = chain[0]!.norm;
+        const last = chain[chain.length - 1]!.norm;
+        const horiz = Math.abs(last.x - first.x) >= Math.abs(last.y - first.y);
+        const rootNorm = horiz ? first.x : first.y;
+        const tipNorm = horiz ? last.x : last.y;
+        const sw = layer.width / WAVE_STRIPS;
+        const baseY = layer.y - this.root.y;
+        const strips: Phaser.GameObjects.Image[] = [];
+        for (let i = 0; i < WAVE_STRIPS; i++) {
+          const strip = scene.add
+            .image(layer.x + i * sw - this.root.x, baseY, textureKey(layer.name))
+            .setOrigin(0, 0)
+            .setCrop(i * sw, 0, sw + 1, layer.height);
+          this.inner.add(strip);
+          strips.push(strip);
+        }
+        this.waveLayerInfo.set(layer.name, { baseY, horiz, rootNorm, tipNorm, strips });
+        continue;
+      }
+
+      // Normal layer: single image, rotates around its resolved pivot.
       const origin = originByLayer.get(layer.name) ?? { x: 0.5, y: 0.92 };
       const pivotRigX = layer.x + origin.x * layer.width;
       const pivotRigY = layer.y + origin.y * layer.height;
@@ -76,12 +134,11 @@ export class RigPlayer {
         .image(pivotRigX - this.root.x, pivotRigY - this.root.y, textureKey(layer.name))
         .setOrigin(origin.x, origin.y);
       this.inner.add(img);
-      const ls: LayerSprite = {
+      this.layers.push({
         name: layer.name,
         img,
         isEyelid: layer.name === 'eyelid_left' || layer.name === 'eyelid_right'
-      };
-      this.layers.push(ls);
+      });
     }
   }
 
@@ -137,6 +194,34 @@ export class RigPlayer {
     for (const ls of this.layers) {
       if (ls.isEyelid) { ls.img.scaleY = pose.eyelid ?? 1; continue; }
       ls.img.rotation = (this.scratchRot.get(ls.name) ?? 0) * D2R;
+    }
+
+    // Pin-chain wave deformation: slice the owning layer into strips and offset each.
+    for (const [layerName, info] of this.waveLayerInfo.entries()) {
+      const { baseY, horiz, rootNorm, tipNorm, strips } = info;
+      // Collect wave params for this layer from the pose (zero if not driven this frame).
+      let wvAmp = 0;
+      let wvPhase = 0;
+      if (pose.wave) {
+        for (const [part, wv] of Object.entries(pose.wave)) {
+          if (this.wavePartToLayer.get(part) === layerName) {
+            wvAmp = wv.amp;
+            wvPhase = wv.phase;
+            break;
+          }
+        }
+      }
+      const N = strips.length;
+      const span = tipNorm - rootNorm || 1;
+      for (let i = 0; i < N; i++) {
+        const u = (i + 0.5) / N;
+        const ramp = Math.max(0, Math.min(1, (u - rootNorm) / span));
+        const offset = wvAmp * ramp * Math.sin(wvPhase - u * WAVE_COUNT * TAU);
+        if (horiz) {
+          strips[i]!.y = baseY + offset;
+        }
+        // Vertical wave (future): strips[i]!.x = baseX_i + offset;
+      }
     }
   }
 

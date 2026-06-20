@@ -66,4 +66,12 @@ export interface RigPose {
   partDeg: Record<string, number>;
   /** eyelid squash 0..1 (1 = open) when blink is active and eyelids exist. */
   eyelid?: number;
+  /**
+   * Pin-chain wave deformation, keyed by PART name (e.g. 'tail').
+   * amp = amplitude in rig-space pixels; phase = sin argument.
+   * The renderer maps this to the owning layer's strip images.
+   * Use this instead of partDeg for parts resolved as pin-chain fallback
+   * (no own layer) — rigid rotation of such layers detaches anchored children.
+   */
+  wave?: Record<string, { amp: number; phase: number }>;
 }

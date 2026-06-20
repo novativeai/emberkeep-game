@@ -133,7 +133,7 @@ export const PRESETS: PresetDef[] = [
       p.root.sy = 1 + 0.004 * Math.sin(t * TAU * 0.5);
       p.root.dy = -0.7 * Math.sin(t * TAU * 0.5);
       p.partDeg['head'] = 0.7 * Math.sin(t * TAU * 0.33);
-      p.partDeg['tail'] = 6 * Math.sin(t * TAU * 0.4);
+      p.wave = { tail: { amp: 9 + 3 * Math.sin(t), phase: Math.sin(t * TAU * 0.4) * 1.4 } };
       p.partDeg['wing_left'] = 2.4 * Math.sin(t * TAU * 0.5 + 0.3);
       p.partDeg['wing_right'] = -2.4 * Math.sin(t * TAU * 0.5 + 0.3); // mirror of L
       const phase = (t % 3.1) / 3.1;
@@ -153,7 +153,7 @@ export const PRESETS: PresetDef[] = [
       const flap = Math.sin(beat);
       p.partDeg['wing_left'] = K.nearAmp('wing_left', 28) + 14 * flap;
       p.partDeg['wing_right'] = -(K.nearAmp('wing_right', 28) + 14 * flap); // mirror of L
-      p.partDeg['tail'] = 10 * Math.sin(beat * 0.5);
+      p.wave = { tail: { amp: 16, phase: beat * 0.5 } };
       p.partDeg['foot_left'] = 10 * Math.sin(beat) - 6;
       p.partDeg['foot_right'] = 10 * Math.sin(beat) - 6;
       p.partDeg['head'] = -3 + 2 * Math.sin(beat);
@@ -174,7 +174,7 @@ export const PRESETS: PresetDef[] = [
       p.partDeg['hand_right'] = -38 - 18 * pump;
       p.partDeg['wing_left'] = K.nearAmp('wing_left', 28) + 6 * pump;
       p.partDeg['wing_right'] = -(K.nearAmp('wing_right', 28) + 6 * pump); // mirror of L
-      p.partDeg['tail'] = 14 * Math.sin(t * TAU * 3);
+      p.wave = { tail: { amp: 14, phase: t * TAU * 3 } };
       p.partDeg['head'] = 1.5 * Math.sin(t * Math.PI * hopF) - 1;
       const phase = (t % 1.4) / 1.4;
       p.eyelid = phase > 0.92 ? clamp(Math.abs((phase - 0.96) / 0.04), 0.1, 1) : 1;
@@ -198,7 +198,7 @@ export const PRESETS: PresetDef[] = [
       p.partDeg['wing_right'] = -K.nearAmp('wing_right', 46) * rear; // mirror of L
       p.partDeg['hand_left'] = -26 * rear + tremble;
       p.partDeg['hand_right'] = -26 * rear + tremble;
-      p.partDeg['tail'] = 6 * rear;
+      p.wave = { tail: { amp: 8 * rear, phase: Math.PI } };
       return p;
     }
   },
@@ -216,7 +216,7 @@ export const PRESETS: PresetDef[] = [
       jaw(p, K, 22 * yawn);
       p.partDeg['wing_left'] = K.nearAmp('wing_left', 40) * rise;
       p.partDeg['wing_right'] = -K.nearAmp('wing_right', 10) * rise; // mirror of L
-      p.partDeg['tail'] = 10 * rise * Math.sin(k * TAU);
+      p.wave = { tail: { amp: 12 * rise, phase: k * TAU } };
       p.partDeg['hand_left'] = -14 * rise;
       return p;
     }
@@ -237,7 +237,7 @@ export const PRESETS: PresetDef[] = [
       p.root.dy = -5 * Math.abs(Math.sin(step)) - 2;
       p.root.rotDeg = 1.7 * Math.sin(step);
       p.partDeg['head'] = 3 * Math.sin(step + 0.4);
-      p.partDeg['tail'] = 8 * Math.sin(step + Math.PI);
+      p.wave = { tail: { amp: 11, phase: step + Math.PI } };
       p.partDeg['wing_left'] = 5;
       p.partDeg['wing_right'] = -5;
       return p;
