@@ -949,6 +949,26 @@ export class BoardScene extends Phaser.Scene {
         this.dragSprite = null;
         this.dragCell.setVisible(false);
         const to = worldToGrid(pointer.worldX, pointer.worldY + 24);
+
+        // Dragon dragged onto a passive generator (House) → start working directly.
+        if (
+          DRAGON_RIGS[obj.chain] &&
+          (this.tutorialDone || this.allow.dragonWork) &&
+          !this.ctx.systems.jobs.restRemaining(obj.itemId)
+        ) {
+          const tgt = [...this.itemSprites.values()].find(
+            (s) => s.col === to.col && s.row === to.row && s.itemId !== obj.itemId
+          );
+          const tgtCfg = tgt ? this.generatorConfigFor(tgt.chain, tgt.tier) : null;
+          if (tgt && tgtCfg?.tappable === false && !DRAGON_RIGS[tgt.chain]) {
+            const home = gridToWorld(this.dragFrom.col, this.dragFrom.row);
+            this.dragFrom = null;
+            this.time.delayedCall(60, () => obj.setData('dragged', false));
+            this.startDragonWork(obj, home);
+            return;
+          }
+        }
+
         this.ctx.bus.emit('drag:dropped', {
           itemId: obj.itemId,
           from: this.dragFrom,
@@ -1462,7 +1482,7 @@ export class BoardScene extends Phaser.Scene {
 
   /** Send a dragon to WORK the nearest House: it flies over and stands by it,
    *  speeding its timer (+1× per worker) until it tires. */
-  private startDragonWork(sprite: BoardItem): void {
+  private startDragonWork(sprite: BoardItem, home?: { x: number; y: number }): void {
     if (this.ctx.systems.jobs.restRemaining(sprite.itemId) > 0) {
       this.floatText(sprite.x, sprite.y - 150, 'Resting…', PALETTE.cream);
       return;
@@ -1485,7 +1505,7 @@ export class BoardScene extends Phaser.Scene {
       return;
     }
     this.busyDragons.add(sprite.itemId);
-    this.dragonHomes.set(sprite.itemId, { x: sprite.x, y: sprite.y });
+    this.dragonHomes.set(sprite.itemId, home ?? { x: sprite.x, y: sprite.y });
     const ld = this.liveDragons.get(sprite.itemId);
     if (ld) ld.busy = true;
     sprite.setDepth(DEPTHS.dragged);

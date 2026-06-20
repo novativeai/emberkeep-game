@@ -155,7 +155,7 @@
     {
       "id": "dragon_work",
       "speaker": "laurah",
-      "text": "Dragons can speed the House! Drag one to a tile beside it, tap the dragon, and choose ⛏ Work. Red Dragon pushes it to ×1.5 — Green Dragon to ×2!",
+      "text": "Dragons can speed the House! Drag your dragon and drop it directly onto the House tile. Red Dragon speeds it to ×1.5 — Green Dragon to ×2!",
       "gate": { "type": "event", "event": "dragon:working" },
       "highlight": [
         { "chain": "ember_dragon", "nth": 0 },
