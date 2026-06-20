@@ -341,9 +341,13 @@ export const EMBER_MOTES = {
   lifespanMs: 9000
 } as const;
 
-/** Save. */
+/** Save. Bump SAVE_VERSION whenever the map/chains change incompatibly, so old
+ *  localStorage saves are discarded on load (Context.beginRun → newGame) instead
+ *  of layering stale items onto the new map. v1→v2: map/items reshuffled (red
+ *  dragon→ruby, golden egg, region contents) left phantom wood + a duplicate
+ *  House on deployed saves; v2 forces a clean départ-0 for them. */
 export const SAVE_KEY = 'emberkeep_save';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** Audio master volumes 0..1. */
 export const AUDIO = {
