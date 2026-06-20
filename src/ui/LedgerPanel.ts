@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE } from '../core/Constants';
+import { GAME_HEIGHT, GAME_WIDTH, ITEM_SCALE, num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { OrderConfig, OrdersData } from '../core/types';
@@ -19,6 +19,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private orderTitle: Phaser.GameObjects.Text;
   private blurb: Phaser.GameObjects.Text;
   private rewardKeys: Phaser.GameObjects.Text;
+  private rewardIcon: Phaser.GameObjects.Image;
   private rewardRow: Phaser.GameObjects.Container;
   private slotIcon: Phaser.GameObjects.Image;
   private slotCount: Phaser.GameObjects.Text;
@@ -98,13 +99,11 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       fontStyle: 'bold',
       color: PALETTE.textBrown
     });
-    // Coin reward hidden for now (the coin pill is off); the Gold Key is the
-    // reward shown. Keys take the coin's old slot so the row stays tidy.
-    const keyIcon = scene.add.image(32, 8, 'ui_icon_key').setScale(0.85);
+    this.rewardIcon = scene.add.image(32, 8, 'ui_icon_key').setScale(0.85);
     this.rewardKeys = scene.add
-      .text(72, 8, '×1', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: PALETTE.goldShade })
+      .text(96, 8, '×1', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: PALETTE.goldShade })
       .setOrigin(0, 0.5);
-    this.rewardRow.add([rewardLabel, keyIcon, this.rewardKeys]);
+    this.rewardRow.add([rewardLabel, this.rewardIcon, this.rewardKeys]);
 
     // Right column: Cindra card with the requirement slot + deliver.
     this.card = scene.add.container(300, 16);
@@ -262,9 +261,20 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       haveOverride ??
       Math.min(this.gameState.countItems(requirement.chain, requirement.tier), requirement.count);
     this.orderTitle.setText(this.currentOrder.title);
-    this.blurb.setText(`“${this.currentOrder.blurb}”`);
-    this.rewardKeys.setText(`×${this.currentOrder.rewards.keys}`);
-    this.slotIcon.setTexture(`item_${requirement.chain}_${requirement.tier}`);
+    this.blurb.setText(`”${this.currentOrder.blurb}”`);
+    const spawnReward = this.currentOrder.rewards.spawn;
+    if (spawnReward) {
+      const spawnKey = `item_${spawnReward.chain}_${spawnReward.tier}`;
+      const boardScale = ITEM_SCALE[`${spawnReward.chain}_${spawnReward.tier}`] ?? ITEM_SCALE[spawnReward.chain] ?? 0.1;
+      this.rewardIcon.setTexture(spawnKey).setScale(boardScale * 0.75);
+      this.rewardKeys.setText(`×${spawnReward.count}`);
+    } else {
+      this.rewardIcon.setTexture('ui_icon_key').setScale(0.85);
+      this.rewardKeys.setText(`×${this.currentOrder.rewards.keys}`);
+    }
+    const slotKey = `item_${requirement.chain}_${requirement.tier}`;
+    const slotBoardScale = ITEM_SCALE[`${requirement.chain}_${requirement.tier}`] ?? ITEM_SCALE[requirement.chain];
+    this.slotIcon.setTexture(slotKey).setScale(slotBoardScale != null ? slotBoardScale * 2.0 : 0.72);
     this.slotCount.setText(`${have}/${requirement.count}`);
     this.deliverable = have >= requirement.count;
     this.slotIcon.setAlpha(this.deliverable ? 1 : 0.75);

@@ -56,10 +56,10 @@
           "sell": 25,
           "xp": 26,
           "generator": {
-            "produces": { "chain": "flame_gem", "tier": 1 },
-            "cooldownMs": 600000,
+            "produces": { "chain": "ember_dragon", "tier": 1 },
+            "cooldownMs": 300000,
             "energyCost": 1,
-            "passiveMs": 600000
+            "passiveMs": 300000
           }
         }
       ]
@@ -156,11 +156,18 @@
           "xp": 24,
           "generator": {
             "produces": { "chain": "flame_gem", "tier": 1 },
-            "cooldownMs": 20000,
+            "cooldownMs": 300000,
             "energyCost": 1,
-            "passiveMs": 180000
+            "passiveMs": 300000
           }
         }
+      ]
+    },
+    {
+      "id": "golden_egg",
+      "name": "Golden Egg",
+      "tiers": [
+        { "tier": 1, "id": "golden_egg_1", "name": "Golden Egg", "sell": 200, "xp": 80 }
       ]
     },
     {

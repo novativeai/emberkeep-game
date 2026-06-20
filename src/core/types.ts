@@ -105,7 +105,7 @@ export interface OrderConfig {
   title: string;
   blurb: string;
   requires: OrderRequirement[];
-  rewards: { coins: number; keys: number; xp?: number };
+  rewards: { coins: number; keys: number; xp?: number; spawn?: { chain: string; tier: number; count: number } };
 }
 
 export interface OrdersData {

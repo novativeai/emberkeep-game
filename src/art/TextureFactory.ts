@@ -53,6 +53,7 @@ export class TextureFactory {
       case 'item_sparkweed_2': return this.sparkweed2(key);
       case 'item_sparkweed_3': return this.sparkweed3(key);
       case 'item_ember_dragon_1': return this.egg(key);
+      case 'item_golden_egg_1': return this.egg(key);
       case 'item_ember_dragon_2': return this.dragon(key, false);
       case 'item_ember_dragon_3': return this.dragon(key, true);
       case 'item_flame_gem_1': return this.gemShard(key);

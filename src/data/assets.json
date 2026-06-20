@@ -692,6 +692,12 @@
       "file": "sprites/environment/map/decor/space_rose.png"
     },
     {
+      "key": "item_golden_egg_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/golden-egg.png"
+    },
+    {
       "key": "item_emerald_1",
       "source": "file",
       "generator": "item",

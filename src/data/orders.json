@@ -4,9 +4,9 @@
       "id": "cindra_brazier",
       "giver": "cindra",
       "title": "Rekindle the Brazier",
-      "blurb": "Two Flame Gems, Keeper. The old brazier will not light itself, and I am far too dignified to dig.",
-      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 2 }],
-      "rewards": { "coins": 50, "keys": 1, "xp": 20 }
+      "blurb": "Twenty Gem Shards, Keeper. My brazier has been cold since the last keeper fled — light it, and I shall give you something truly golden.",
+      "requires": [{ "chain": "flame_gem", "tier": 1, "count": 20 }],
+      "rewards": { "coins": 0, "keys": 0, "xp": 30, "spawn": { "chain": "golden_egg", "tier": 1, "count": 1 } }
     },
     {
       "id": "cindra_hearth",

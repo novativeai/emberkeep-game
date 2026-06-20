@@ -62,9 +62,12 @@ export class OrderSystem {
     this.bus.emit('economy:add', {
       coins: order.rewards.coins,
       keys: order.rewards.keys,
-      xp: order.rewards.xp, // orders feed the level bar — the core-loop pacing lever
+      xp: order.rewards.xp,
       reason: `order:${order.id}`
     });
+    if (order.rewards.spawn) {
+      this.bus.emit('board:spawn', { ...order.rewards.spawn });
+    }
     this.state.completedOrderIds.push(order.id);
     this.bus.emit('order:completed', { orderId: order.id, rewards: order.rewards });
     if (!this.activeOrder) {

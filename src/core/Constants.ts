@@ -138,6 +138,7 @@ export const ITEM_SCALE: Record<string, number> = {
   emerald_1: 0.25, // Emerald gem (emerald.png 467×392)
   emerald_2: 0.10, // Green Egg (green-egg.png 1147×1438) — scaled to ~red egg visual size
   emerald_3: 1.0, // dragon host (the rig overlays it)
+  golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
   coin_1: 0.12, // SMALLER than an egg, per spec
   coin_2: 0.20  // Gold Pouch — bigger than the single coin (0.12)
 };
