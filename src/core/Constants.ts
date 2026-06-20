@@ -187,16 +187,16 @@ export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
 export const HIDDEN_CHAINS = new Set<string>(['sparkweed']);
 
 /**
- * Treasure-chest loot table. Tapping a chest grants ONE of these at random.
- * `wood` spawns that many lumber logs next to the chest; the others are
- * currency. Kept tiny and readable — designers tune it here, not in code.
+ * Treasure-chest loot table. Tapping a chest grants ONE of these at random —
+ * currency only. (Wood is intentionally NOT a chest reward: lumber must appear
+ * ONLY when its cloud zone is cleared, never dropped loose by a chest.) Kept tiny
+ * and readable — designers tune it here, not in code.
  */
 export const CHEST_REWARDS: ReadonlyArray<
-  { kind: 'coins'; amount: number } | { kind: 'energy'; amount: number } | { kind: 'wood'; amount: number }
+  { kind: 'coins'; amount: number } | { kind: 'energy'; amount: number }
 > = [
   { kind: 'coins', amount: 2 },
-  { kind: 'energy', amount: 3 },
-  { kind: 'wood', amount: 5 }
+  { kind: 'energy', amount: 3 }
 ];
 
 /** Gold (coins) spent to skip a generator timer — dynamic like the energy cost
@@ -346,9 +346,10 @@ export const EMBER_MOTES = {
  *  localStorage saves are discarded on load (Context.beginRun → newGame) instead
  *  of layering stale items onto the new map. v1→v2: map/items reshuffled (red
  *  dragon→ruby, golden egg, region contents) left phantom wood + a duplicate
- *  House on deployed saves; v2 forces a clean départ-0 for them. */
+ *  House on deployed saves; v2 forced a clean départ-0 for them. v2→v3: chests no
+ *  longer drop wood — wipe saves that already banked that loose wood / 2nd House. */
 export const SAVE_KEY = 'emberkeep_save';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /** Audio master volumes 0..1. */
 export const AUDIO = {

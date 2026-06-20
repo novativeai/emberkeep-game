@@ -28,16 +28,15 @@ describe('ChestSystem', () => {
     expect(ctx.state.items.get(chest.id)).toBeUndefined();
   });
 
-  it('spawns 5 Wood logs (random → wood) and consumes the chest', () => {
+  it('never spawns wood (lumber appears only from cleared cloud zones, never from a chest)', () => {
     const ctx = createTestContext();
-    vi.spyOn(Math, 'random').mockReturnValue(0.99); // index 2 → wood
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // the old "wood" roll
     const chest = ctx.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
     const spawned = capture(ctx.bus, 'item:spawned');
 
     ctx.bus.emit('chest:open', { itemId: chest.id });
 
-    const woods = spawned.filter((s) => s.item.chain === 'lumber' && s.item.tier === 1);
-    expect(woods).toHaveLength(5);
+    expect(spawned.some((s) => s.item.chain === 'lumber')).toBe(false);
     expect(ctx.state.items.get(chest.id)).toBeUndefined();
   });
 

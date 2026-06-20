@@ -86,7 +86,7 @@ export class GameContext {
       order: new OrderSystem(this.state, this.bus, this.data.orders),
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       reward: new RewardSystem(this.bus),
-      chest: new ChestSystem(this.state, this.bus, this.clock),
+      chest: new ChestSystem(this.state, this.bus),
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains, this.data.map),
       save,
       tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial)
