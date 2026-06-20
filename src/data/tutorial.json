@@ -126,7 +126,7 @@
     {
       "id": "key_unlock",
       "speaker": "laurah",
-      "text": "Your dragons gifted you a Gold Key! See that clouded strip? Tap it to burn the fog away.",
+      "text": "Your dragons gifted you a Stone Key! See that clouded strip? Tap it to burn the fog away.",
       "gate": { "type": "event", "event": "region:unlocked" },
       "effects": [
         { "grantKeys": 1 }
