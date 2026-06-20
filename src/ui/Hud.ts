@@ -124,8 +124,6 @@ export class Hud {
       bus.on('item:harvest_failed', ({ reason }) => { if (reason === 'energy') this.shakeEnergy(); })
     );
 
-    // Ledger button hidden — not part of this demo build.
-    this.ledgerButton.setVisible(false);
     // Key pill hidden until the tutorial unlock step makes it relevant.
     this.keyPill.container.setVisible(false);
   }
