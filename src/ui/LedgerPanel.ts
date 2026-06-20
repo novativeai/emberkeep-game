@@ -13,6 +13,7 @@ const FONT = 'Trebuchet MS, Verdana, sans-serif';
  */
 export class LedgerPanel extends Phaser.GameObjects.Container {
   isOpen = false;
+  private readonly offBus: Array<() => void> = [];
   private dim: Phaser.GameObjects.Rectangle;
   private titleText: Phaser.GameObjects.Text;
   private orderTitle: Phaser.GameObjects.Text;
@@ -178,11 +179,18 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     scene.add.existing(this);
     this.setVisible(false);
 
-    bus.on('order:progress', ({ have, deliverable }) => {
-      this.deliverable = deliverable;
-      this.refresh(have[0] ?? 0);
-    });
-    bus.on('order:completed', () => this.refresh(0));
+    this.offBus.push(
+      bus.on('order:progress', ({ have, deliverable }) => {
+        this.deliverable = deliverable;
+        this.refresh(have[0] ?? 0);
+      }),
+      bus.on('order:completed', () => this.refresh(0))
+    );
+  }
+
+  teardown(): void {
+    this.offBus.forEach((off) => off());
+    this.offBus.length = 0;
   }
 
   /** World position of the Deliver button (for the tutorial hand). */

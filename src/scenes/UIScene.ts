@@ -99,7 +99,13 @@ export class UIScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.offBus.forEach((off) => off());
       this.offBus = [];
+      // Clean up UI-class bus subscriptions (not tracked in offBus above).
+      this.hud.teardown();
+      this.ledger.teardown();
     });
+
+    // If resuming from a completed-tutorial save, key pill is permanently hidden.
+    if (this.ctx.state.tutorialDone) this.hud.setKeyVisible(false);
 
     // Everything is wired: load the save (or start fresh) and roll the tutorial.
     this.ctx.beginRun();
@@ -306,6 +312,8 @@ export class UIScene extends Phaser.Scene {
     this.lastStep = step;
     this.hud.setLedgerEnabled(step.done || step.allow.ledger);
     this.ledger.setDeliverAllowed(step.done || step.allow.deliver);
+    // Show key pill only during the key_unlock step; hide it otherwise.
+    this.hud.setKeyVisible(!step.done && step.id === 'key_unlock');
     // A step that no longer involves the Ledger closes it, so its dim never
     // sits over the board and swallows the next tap (e.g. the post-deliver fog).
     if (!step.done && !step.allow.ledger && this.ledger.isOpen) this.ledger.requestClose();

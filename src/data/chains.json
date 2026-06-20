@@ -29,9 +29,9 @@
           "xp": 14,
           "generator": {
             "produces": { "chain": "strawberry", "tier": 1 },
-            "cooldownMs": 10000,
+            "cooldownMs": 20000,
             "energyCost": 1,
-            "passiveMs": 120000
+            "passiveMs": 240000
           }
         }
       ]
@@ -57,9 +57,9 @@
           "xp": 26,
           "generator": {
             "produces": { "chain": "flame_gem", "tier": 1 },
-            "cooldownMs": 90000,
+            "cooldownMs": 600000,
             "energyCost": 1,
-            "passiveMs": 300000
+            "passiveMs": 600000
           }
         }
       ]
@@ -86,9 +86,9 @@
           "xp": 0,
           "generator": {
             "produces": { "chain": "coin", "tier": 1 },
-            "cooldownMs": 300000,
+            "cooldownMs": 600000,
             "energyCost": 0,
-            "passiveMs": 300000,
+            "passiveMs": 600000,
             "tappable": false
           }
         }
@@ -106,9 +106,9 @@
           "xp": 0,
           "generator": {
             "produces": { "chain": "lumber", "tier": 1 },
-            "cooldownMs": 600000,
+            "cooldownMs": 1200000,
             "energyCost": 0,
-            "passiveMs": 600000,
+            "passiveMs": 1200000,
             "tappable": false
           }
         }
@@ -126,7 +126,7 @@
           "xp": 0,
           "generator": {
             "produces": { "chain": "emerald", "tier": 1 },
-            "cooldownMs": 30000,
+            "cooldownMs": 60000,
             "energyCost": 0,
             "tappable": true
           }
@@ -156,9 +156,9 @@
           "xp": 24,
           "generator": {
             "produces": { "chain": "flame_gem", "tier": 1 },
-            "cooldownMs": 10000,
+            "cooldownMs": 20000,
             "energyCost": 1,
-            "passiveMs": 90000
+            "passiveMs": 180000
           }
         }
       ]

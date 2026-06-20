@@ -95,8 +95,8 @@ export class BoardScene extends Phaser.Scene {
   private dragonMenuForId = 0;
   /** Home position a working dragon flies back to when it tires. */
   private dragonHomes = new Map<number, { x: number; y: number }>();
-  /** "💤 m:ss" fatigue badge over a resting dragon (until the fatigue lifts). */
-  private restBadges = new Map<number, Phaser.GameObjects.Text>();
+  /** Styled "Zzz" fatigue badge (Container) over a resting dragon. */
+  private restBadges = new Map<number, Phaser.GameObjects.Container>();
   /** One floating key badge per key-locked region, so it reads as "needs a key". */
   private keyBadges = new Map<string, Phaser.GameObjects.Image>();
   private highlights: Phaser.GameObjects.Image[] = [];
@@ -206,7 +206,10 @@ export class BoardScene extends Phaser.Scene {
           continue;
         }
         const s = Math.ceil(rest / 1000);
-        badge.setPosition(sp.x, sp.y - 132).setText(`💤 ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+        badge.setPosition(sp.x, sp.y - 160);
+        (badge.getData('label') as Phaser.GameObjects.Text).setText(
+          `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+        );
       }
       for (const sprite of this.itemSprites.values()) {
         if (!sprite.isGenerator) continue;
@@ -1535,25 +1538,51 @@ export class BoardScene extends Phaser.Scene {
     this.ctx.bus.emit('dragon:work', { dragonId: sprite.itemId, houseId: house.itemId });
   }
 
-  /** Float a "💤 m:ss" fatigue badge over a resting dragon (cool loop updates it). */
+  /** Styled "💤 Zzz" fatigue pill floating above a resting dragon. */
   private showRestBadge(dragonId: number): void {
     this.restBadges.get(dragonId)?.destroy();
     const sprite = this.itemSprites.get(dragonId);
     if (!sprite) return;
-    const badge = this.add
-      .text(sprite.x, sprite.y - 132, '💤', {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: '32px',
-        fontStyle: 'bold',
-        color: '#cfe8ff',
-        stroke: '#1a3a66',
-        strokeThickness: 5,
-        backgroundColor: 'rgba(28,20,40,0.7)',
-        padding: { x: 12, y: 5 }
-      })
-      .setOrigin(0.5)
-      .setDepth(DEPTHS.flash);
-    this.restBadges.set(dragonId, badge);
+
+    const W = 296, H = 118, R = 32;
+    const pill = this.add.container(sprite.x, sprite.y - 160).setDepth(DEPTHS.flash);
+
+    const g = this.add.graphics();
+    // drop shadow
+    g.fillStyle(num(PALETTE.night), 0.22);
+    g.fillRoundedRect(-W / 2 + 5, -H / 2 + 5, W, H, R);
+    // cream fill
+    g.fillStyle(num(PALETTE.cream), 0.97);
+    g.fillRoundedRect(-W / 2, -H / 2, W, H, R);
+    // lava stroke
+    g.lineStyle(8, num(PALETTE.lava), 1);
+    g.strokeRoundedRect(-W / 2, -H / 2, W, H, R);
+    pill.add(g);
+
+    const font = 'Trebuchet MS, Verdana, sans-serif';
+    const zzzText = this.add.text(0, -18, '💤 Zzz', {
+      fontFamily: font,
+      fontSize: '38px',
+      fontStyle: 'bold',
+      color: PALETTE.textBrown,
+    }).setOrigin(0.5);
+
+    const rest = this.ctx.systems.jobs.restRemaining(dragonId);
+    const s0 = Math.ceil(rest / 1000);
+    const countdown = this.add.text(0, 30, `${Math.floor(s0 / 60)}:${String(s0 % 60).padStart(2, '0')}`, {
+      fontFamily: font,
+      fontSize: '30px',
+      fontStyle: 'bold',
+      color: PALETTE.plum,
+    }).setOrigin(0.5);
+
+    pill.add([zzzText, countdown]);
+    pill.setData('label', countdown);
+
+    pill.setScale(0);
+    this.tweens.add({ targets: pill, scale: 1, duration: 170, ease: 'Back.easeOut' });
+
+    this.restBadges.set(dragonId, pill);
   }
 
   /** The fatigue lifted — pop the badge, sparkle, and a "Refreshed!" cue so the

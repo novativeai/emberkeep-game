@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SAVE_KEY } from '../core/Constants';
+import type { GameContext } from '../core/Context';
+import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE } from '../core/Constants';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
@@ -87,8 +88,8 @@ export class EndScreen extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     btnPlayImg.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
-      window.localStorage.removeItem(SAVE_KEY);
-      window.location.reload();
+      const ctx = scene.registry.get('ctx') as GameContext;
+      ctx.bus.emit('game:reset_requested', {});
     });
     btnPlayImg.on('pointerover', () =>
       scene.tweens.add({ targets: btnPlayImg, scale: 0.94, duration: 110 })

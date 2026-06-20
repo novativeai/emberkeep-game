@@ -142,7 +142,7 @@
       "key": "item_flame_gem_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/rewards/ruby.png"
+      "file": "sprites/items/diamond.png"
     },
     {
       "key": "item_flame_gem_2",

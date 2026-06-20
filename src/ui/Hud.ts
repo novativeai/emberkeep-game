@@ -19,14 +19,15 @@ export class Hud {
   ledgerButton: Phaser.GameObjects.Container;
   gearButton: Phaser.GameObjects.Container;
   private energyPill: Pill;
-  private coinPill?: Pill; // hidden for now (per request)
+  private coinPill?: Pill;
   private keyPill: Pill;
-  private regenLabel: Phaser.GameObjects.Text; // "next +1 in m:ss" under energy
+  private regenLabel: Phaser.GameObjects.Text;
   private xpFill: Phaser.GameObjects.Graphics;
   private levelText: Phaser.GameObjects.Text;
   private xpLabel: Phaser.GameObjects.Text;
   private ledgerDot: Phaser.GameObjects.Arc;
   private ledgerEnabled = true;
+  private readonly offBus: Array<() => void> = [];
 
   constructor(
     private scene: Phaser.Scene,
@@ -115,13 +116,29 @@ export class Hud {
     this.refreshEconomy();
     this.refreshEnergy(state.energyCurrent);
 
-    bus.on('energy:changed', ({ current }) => this.refreshEnergy(current));
-    bus.on('economy:changed', () => this.refreshEconomy());
-    bus.on('order:progress', ({ deliverable }) => this.ledgerDot.setVisible(deliverable));
-    bus.on('order:completed', () => this.ledgerDot.setVisible(false));
-    bus.on('item:harvest_failed', ({ reason }) => {
-      if (reason === 'energy') this.shakeEnergy();
-    });
+    this.offBus.push(
+      bus.on('energy:changed', ({ current }) => this.refreshEnergy(current)),
+      bus.on('economy:changed', () => this.refreshEconomy()),
+      bus.on('order:progress', ({ deliverable }) => this.ledgerDot.setVisible(deliverable)),
+      bus.on('order:completed', () => this.ledgerDot.setVisible(false)),
+      bus.on('item:harvest_failed', ({ reason }) => { if (reason === 'energy') this.shakeEnergy(); })
+    );
+
+    // Ledger button hidden — not part of this demo build.
+    this.ledgerButton.setVisible(false);
+    // Key pill hidden until the tutorial unlock step makes it relevant.
+    this.keyPill.container.setVisible(false);
+  }
+
+  /** Unsubscribe all bus listeners — call on scene shutdown to prevent stale handlers. */
+  teardown(): void {
+    this.offBus.forEach((off) => off());
+    this.offBus.length = 0;
+  }
+
+  /** Show or hide the key pill (hidden after tutorial in demo mode). */
+  setKeyVisible(visible: boolean): void {
+    this.keyPill.container.setVisible(visible);
   }
 
   setLedgerEnabled(enabled: boolean): void {
