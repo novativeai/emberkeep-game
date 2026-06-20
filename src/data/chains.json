@@ -59,7 +59,7 @@
             "produces": { "chain": "flame_gem", "tier": 1 },
             "cooldownMs": 90000,
             "energyCost": 1,
-            "passiveMs": 180000
+            "passiveMs": 300000
           }
         }
       ]
@@ -136,7 +136,10 @@
     {
       "id": "coin",
       "name": "Gold",
-      "tiers": [{ "tier": 1, "id": "coin_1", "name": "Gold Coin", "sell": 0, "xp": 0 }]
+      "tiers": [
+        { "tier": 1, "id": "coin_1", "name": "Gold Coin", "sell": 0, "xp": 0 },
+        { "tier": 2, "id": "coin_2", "name": "Gold Pouch", "sell": 5, "xp": 60 }
+      ]
     },
     {
       "id": "emerald",

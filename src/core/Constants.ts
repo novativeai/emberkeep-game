@@ -138,12 +138,14 @@ export const ITEM_SCALE: Record<string, number> = {
   emerald_1: 0.25, // Emerald gem (emerald.png 467×392)
   emerald_2: 0.10, // Green Egg (green-egg.png 1147×1438) — scaled to ~red egg visual size
   emerald_3: 1.0, // dragon host (the rig overlays it)
-  coin_1: 0.12 // SMALLER than an egg, per spec
+  coin_1: 0.12, // SMALLER than an egg, per spec
+  coin_2: 0.20  // Gold Pouch — bigger than the single coin (0.12)
 };
 
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
 export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
-  coin: { coins: 1 }
+  coin: { coins: 1 },
+  coin_2: { coins: 5 }
 };
 
 /**
@@ -284,6 +286,12 @@ export const DRAGON_RIG_SCALE: Record<string, number> = {
  */
 export const DRAGON_WORK_MS = 180_000; // 3 minutes of work
 export const DRAGON_REST_MS = 300_000; // then 5 minutes of rest (fatigue)
+
+/** Per-chain work-speed bonus (added on top of the base 1×). ember_dragon → 1.5× total, emerald → 2× total. */
+export const DRAGON_WORK_SPEED: Record<string, number> = {
+  ember_dragon: 0.5,
+  emerald: 1.0
+};
 
 /** Input (game-resolution pixels; CSS pixels are half of these under FIT). */
 export const TAP_MAX_DISTANCE_PX = 16;

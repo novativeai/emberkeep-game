@@ -67,7 +67,9 @@ const NO_ALLOW: Required<TutorialAllow> = {
   ledger: false,
   deliver: false,
   fog: false,
-  sell: false
+  sell: false,
+  dragonWork: false,
+  marketplace: false
 };
 
 /**
@@ -1204,7 +1206,7 @@ export class BoardScene extends Phaser.Scene {
     if (!item) return;
     // Collectible (a Gold coin): tap banks it — +Gold, a coin flies to the gauge
     // (UIScene), and the board coin is consumed.
-    const collect = COLLECTIBLE_REWARD[item.chain];
+    const collect = COLLECTIBLE_REWARD[`${item.chain}_${item.tier}`] ?? COLLECTIBLE_REWARD[item.chain];
     if (collect) {
       // Always collectable (even mid-tutorial) — banking a coin never interferes.
       this.ctx.bus.emit('economy:add', { coins: collect.coins, reason: 'collect' });
@@ -1229,7 +1231,7 @@ export class BoardScene extends Phaser.Scene {
     if (isGenerator && !this.tutorialDone && !this.allow.tapGenerators) return;
     if (!isGenerator && !this.tutorialDone && !this.allow.sell) return;
     // A DRAGON (with a generator) opens its Job menu (Work / Harvest, with rest & ruby timers).
-    if (DRAGON_RIGS[item.chain] && isGenerator && this.tutorialDone) {
+    if (DRAGON_RIGS[item.chain] && isGenerator && (this.tutorialDone || this.allow.dragonWork)) {
       this.showDragonMenu(sprite);
       return;
     }

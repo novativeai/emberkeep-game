@@ -139,7 +139,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     const gap = 430;
     const startX = -((n - 1) * gap) / 2;
     cfg.items.forEach((item, i) => {
-      this.cards.add(this.makeCard(startX + i * gap, item, currency, cfg.icon, cfg.iconScale));
+      const isFreeFirst = currency === 'energy' && i === 0 && !sessionStorage.getItem('ek_energy_free_used');
+      this.cards.add(this.makeCard(startX + i * gap, item, currency, cfg.icon, cfg.iconScale, isFreeFirst));
     });
   }
 
@@ -148,7 +149,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     item: Product,
     currency: Currency,
     icon: string,
-    iconScale: number
+    iconScale: number,
+    isFreeFirst = false
   ): Phaser.GameObjects.Container {
     const W = 380;
     const H = 560;
@@ -183,12 +185,15 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     // Green price button (mock purchase → grant the currency).
     const priceBtn = this.scene.add.container(0, 188);
     const pg = this.scene.add.graphics();
-    pg.fillStyle(GREEN_DARK, 1);
+    const btnColor = isFreeFirst ? 0x22c55e : GREEN;
+    const btnColorDark = isFreeFirst ? 0x16a34a : GREEN_DARK;
+    pg.fillStyle(btnColorDark, 1);
     pg.fillRoundedRect(-130, -42 + 8, 260, 84, 42);
-    pg.fillStyle(GREEN, 1);
+    pg.fillStyle(btnColor, 1);
     pg.fillRoundedRect(-130, -42, 260, 84, 42);
+    const priceLabel = isFreeFirst ? 'FREE!' : item.price;
     const price = this.scene.add
-      .text(0, -2, item.price, { fontFamily: FONT, fontSize: '46px', fontStyle: 'bold', color: '#ffffff' })
+      .text(0, -2, priceLabel, { fontFamily: FONT, fontSize: '46px', fontStyle: 'bold', color: '#ffffff' })
       .setOrigin(0.5)
       .setShadow(0, 3, 'rgba(30,80,10,0.7)', 4);
     priceBtn.add([pg, price]);
@@ -197,7 +202,10 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     priceBtn.on('pointerout', () => priceBtn.setScale(1));
     priceBtn.on('pointerup', () => {
       priceBtn.setScale(1);
-      this.purchase(currency, item.amount);
+      if (isFreeFirst) {
+        sessionStorage.setItem('ek_energy_free_used', '1');
+      }
+      this.purchase(currency, item.amount, isFreeFirst);
     });
     card.add(priceBtn);
 
@@ -219,10 +227,15 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     return card;
   }
 
-  private purchase(currency: Currency, amount: number): void {
-    if (currency === 'energy') this.bus.emit('energy:add', { amount, reason: 'shop' });
-    else if (currency === 'coins') this.bus.emit('economy:add', { coins: amount, reason: 'shop' });
-    else this.bus.emit('economy:add', { keys: amount, reason: 'shop' });
+  private purchase(currency: Currency, amount: number, isFree = false): void {
+    if (currency === 'energy') {
+      this.bus.emit('energy:add', { amount, reason: 'shop' });
+      this.bus.emit('marketplace:purchased', { energy: amount, free: isFree });
+    } else if (currency === 'coins') {
+      this.bus.emit('economy:add', { coins: amount, reason: 'shop' });
+    } else {
+      this.bus.emit('economy:add', { keys: amount, reason: 'shop' });
+    }
     this.requestClose();
   }
 }

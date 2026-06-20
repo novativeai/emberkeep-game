@@ -211,7 +211,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'chest:open'; chain?: string }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'chest:open' | 'dragon:working' | 'marketplace:purchased'; chain?: string }
   | { type: 'count'; chain: string; tier: number; count: number };
 
 export interface TutorialAllow {
@@ -222,6 +222,10 @@ export interface TutorialAllow {
   deliver?: boolean;
   fog?: boolean;
   sell?: boolean;
+  /** Allow tapping a dragon to open the Work/Harvest job menu during tutorial. */
+  dragonWork?: boolean;
+  /** Allow tapping the energy ⚡ shop button during tutorial. */
+  marketplace?: boolean;
 }
 
 /**
@@ -234,12 +238,12 @@ export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: 
 
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
-  | { ui: 'ledger' | 'deliver' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' }
   | { fogRegion: string };
 
 export type TutorialArrowConfig =
   | { tile: TileRef }
-  | { ui: 'ledger' | 'deliver' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' }
   | { fogRegion: string };
 
 /**
@@ -251,7 +255,8 @@ export type TutorialEffect =
   | { spawn: { chain: string; tier: number; count: number; nearChain?: string } }
   | { retier: { chain: string; fromTier: number; toTier: number } }
   | { grantKeys: number }
-  | { grantXp: number };
+  | { grantXp: number }
+  | { advanceClock: number };
 
 export interface TutorialStepConfig {
   id: string;
@@ -380,6 +385,7 @@ export interface EventMap {
   'order:all_done': Record<string, never>;
   'region:unlocked': { regionId: string; tiles: TilePos[]; revealed: ItemSnapshot[] };
   'region:unlock_failed': { regionId: string; reason: 'keys' | 'not_unlockable' | 'level' };
+  'marketplace:purchased': { energy: number; free: boolean };
   'tutorial:step': TutorialStepEvent;
   'state:saved': { at: number };
   'state:loaded': { offlineMs: number; energyRecovered: number };
@@ -388,12 +394,12 @@ export interface EventMap {
 
 export type ResolvedHand =
   | { from: TilePos; to: TilePos }
-  | { ui: 'ledger' | 'deliver' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' }
   | { fogRegion: string };
 
 export type ResolvedArrow =
   | { tile: TilePos }
-  | { ui: 'ledger' | 'deliver' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' }
   | { fogRegion: string };
 
 export interface TutorialStepEvent {

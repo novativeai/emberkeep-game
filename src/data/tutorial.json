@@ -153,9 +153,44 @@
       "allow": { "drag": ["ember_dragon", "emerald", "lumber"], "tapGenerators": true }
     },
     {
-      "id": "thank_you",
+      "id": "dragon_work",
       "speaker": "laurah",
-      "text": "You have lit the ember, Keeper. Emberkeep is alive again — and the adventure is just beginning.",
+      "text": "Dragons can speed the House! Drag one to a tile beside it, tap the dragon, and choose ⛏ Work. Red Dragon pushes it to ×1.5 — Green Dragon to ×2!",
+      "gate": { "type": "event", "event": "dragon:working" },
+      "highlight": [
+        { "chain": "ember_dragon", "nth": 0 },
+        { "chain": "lumber", "nth": 0 }
+      ],
+      "hand": {
+        "from": { "chain": "ember_dragon", "nth": 0 },
+        "to": { "chain": "lumber", "nth": 0 }
+      },
+      "arrow": { "tile": { "chain": "ember_dragon", "nth": 0 } },
+      "allow": { "drag": ["ember_dragon", "emerald"], "dragonWork": true }
+    },
+    {
+      "id": "dragon_rest",
+      "speaker": "laurah",
+      "text": "Hard work tires even dragons! After 3 minutes they need rest. Watch — your dragon just nodded off. Warmth Emporium has you covered — tap the ⚡ button to refill!",
+      "gate": { "type": "tap" },
+      "effects": [
+        { "advanceClock": 185000 }
+      ],
+      "arrow": { "ui": "marketplace" },
+      "allow": {}
+    },
+    {
+      "id": "buy_energy",
+      "speaker": "laurah",
+      "text": "Your first Ember Spark — on the house! Tap the ⚡ + button at the top to open the Emporium and claim it free. Just this once!",
+      "gate": { "type": "event", "event": "marketplace:purchased" },
+      "arrow": { "ui": "marketplace" },
+      "allow": { "marketplace": true }
+    },
+    {
+      "id": "free_play",
+      "speaker": "laurah",
+      "text": "Emberkeep is yours now, Keeper! Grow your dragons, discover hidden lands — and reach Keeper Level 3 for a grand surprise awaiting you!",
       "gate": { "type": "tap" },
       "allow": {}
     }

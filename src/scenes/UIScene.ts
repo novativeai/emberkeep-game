@@ -164,7 +164,10 @@ export class UIScene extends Phaser.Scene {
         }
       }),
       bus.on('gold:collected', ({ at }) => this.flyCoinToGold(at)),
-      bus.on('ui:shop_requested', ({ currency }) => this.shop.open(currency)),
+      bus.on('ui:shop_requested', ({ currency }) => {
+        if (!(this.lastStep?.done || (this.lastStep?.allow.marketplace ?? false))) return;
+        this.shop.open(currency);
+      }),
       bus.on('order:completed', () => {
         this.time.delayedCall(650, () => {
           if (this.ledger.isOpen && this.lastStep?.gateType === 'tap') this.ledger.requestClose();
@@ -287,6 +290,16 @@ export class UIScene extends Phaser.Scene {
       targets: c, alpha: 0, scale: 1.04, delay: 1500, duration: 360, ease: 'Sine.easeIn',
       onComplete: () => c.destroy()
     });
+    // Level 3 is the demo's milestone — show the end-game popup after the banner fades.
+    if (level >= 3 && !this.endScreen) {
+      this.time.delayedCall(2200, () => {
+        if (!this.endScreen) {
+          this.endScreen = new EndScreen(this, this.ctx.bus, 'level3');
+          this.add.existing(this.endScreen);
+          this.endScreen.setDepth(DEPTH_DIALOG + 50);
+        }
+      });
+    }
   }
 
   private onTutorialStep(step: TutorialStepEvent): void {
@@ -299,11 +312,6 @@ export class UIScene extends Phaser.Scene {
     if (step.done) {
       this.bubble.hide();
       this.clearMarkers();
-      if (!this.endScreen) {
-        this.endScreen = new EndScreen(this, this.ctx.bus);
-        this.add.existing(this.endScreen);
-        this.endScreen.setDepth(DEPTH_DIALOG + 50);
-      }
       return;
     }
     this.bubble.show(step);
@@ -361,8 +369,9 @@ export class UIScene extends Phaser.Scene {
     if (step.arrow) this.placeArrow(step.arrow);
   }
 
-  private uiTarget(ref: { ui: 'ledger' | 'deliver' } | { fogRegion: string }): { x: number; y: number } | null {
+  private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' } | { fogRegion: string }): { x: number; y: number } | null {
     if ('ui' in ref) {
+      if (ref.ui === 'marketplace') return { x: 374, y: 88 };
       if (ref.ui === 'ledger') return this.hud.getLedgerPos();
       return this.ledger.isOpen ? this.ledger.getDeliverPos() : null;
     }

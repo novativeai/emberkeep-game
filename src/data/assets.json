@@ -192,6 +192,7 @@
       "generator": "item",
       "file": "sprites/items/coin.png"
     },
+    { "key": "item_coin_2", "source": "file", "generator": "item", "file": "sprites/items/coin.png" },
     {
       "key": "item_diamond_1",
       "source": "file",

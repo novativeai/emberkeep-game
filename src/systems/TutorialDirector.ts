@@ -1,4 +1,5 @@
 import type { EventBus } from '../core/EventBus';
+import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
 import type {
   ResolvedArrow,
@@ -17,7 +18,9 @@ const ALLOW_NOTHING: Required<TutorialAllow> = {
   ledger: false,
   deliver: false,
   fog: false,
-  sell: false
+  sell: false,
+  dragonWork: false,
+  marketplace: false
 };
 
 const ALLOW_EVERYTHING: Required<TutorialAllow> = {
@@ -26,7 +29,9 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
   ledger: true,
   deliver: true,
   fog: true,
-  sell: true
+  sell: true,
+  dragonWork: true,
+  marketplace: true
 };
 
 /**
@@ -42,6 +47,7 @@ export class TutorialDirector {
   constructor(
     private state: GameState,
     private bus: EventBus,
+    private clock: GameClock,
     private data: TutorialData
   ) {
     bus.on('item:hatched', ({ item }) => {
@@ -54,6 +60,8 @@ export class TutorialDirector {
     });
     bus.on('item:harvested', ({ output }) => this.onGateEvent('item:harvested', output.chain));
     bus.on('chest:open', () => this.onGateEvent('chest:open'));
+    bus.on('dragon:working', () => this.onGateEvent('dragon:working'));
+    bus.on('marketplace:purchased', () => this.onGateEvent('marketplace:purchased'));
     bus.on('order:completed', () => this.onGateEvent('order:completed'));
     bus.on('region:unlocked', () => this.onGateEvent('region:unlocked'));
     bus.on('ui:ledger_toggled', ({ open }) => {
@@ -132,6 +140,9 @@ export class TutorialDirector {
         this.bus.emit('economy:add', { keys: effect.grantKeys, reason: 'tutorial' });
       } else if ('grantXp' in effect) {
         this.bus.emit('economy:add', { xp: effect.grantXp, reason: 'tutorial' });
+      } else if ('advanceClock' in effect) {
+        this.clock.advance(effect.advanceClock);
+        this.bus.emit('time:advanced', { ms: effect.advanceClock });
       }
     }
   }

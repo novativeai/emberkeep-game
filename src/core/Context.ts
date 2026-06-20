@@ -89,7 +89,7 @@ export class GameContext {
       chest: new ChestSystem(this.state, this.bus, this.clock),
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains, this.data.map),
       save,
-      tutorial: new TutorialDirector(this.state, this.bus, this.data.tutorial)
+      tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial)
     };
     this.bus.on('game:reset_requested', () => this.resetGame());
   }

@@ -4,7 +4,8 @@ import { expect, test, type Page } from '@playwright/test';
  * Drives the full scripted tutorial:
  *   lore × 2 → rubies merge (red egg) → 3 eggs merge (red dragon) →
  *   crystal tap → 3 emeralds merge (green egg) → 3 green eggs merge (green dragon) →
- *   chest → level-up → key+fog → bushes merge → thank-you → EndScreen
+ *   chest → level-up → key+fog → bushes merge → dragon-work → dragon-rest →
+ *   marketplace → free-play → level-3 EndScreen
  *
  * Cells are located dynamically via window.render_game_to_text() and
  * __emberkeep.gridToPage(); game-space coordinates are ÷2 for CSS clicks.
@@ -94,7 +95,7 @@ const count = (s: GameText, chain: string, tier: number): number =>
   s.inventory[`${chain}:${tier}`] ?? 0;
 
 test.describe('Level 1 — Emberkeep tutorial', () => {
-  test('lore → rubies → red egg → red dragon → crystal → emeralds → green eggs → green dragon → chest → level-up → fog → bushes → end', async ({
+  test('lore → rubies → red egg → red dragon → crystal → emeralds → green eggs → green dragon → chest → level-up → fog → bushes → dragon-work → rest → marketplace → level-3-end', async ({
     page
   }) => {
     const consoleErrors: string[] = [];
@@ -266,16 +267,51 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     );
     await page.waitForTimeout(250);
     await dragTile(page, bushes[2]!, bushes[0]!);
-    await waitStep(page, 'thank_you');
+    await waitStep(page, 'dragon_work');
     state = await gameText(page);
     expect(count(state, 'lumber', 2)).toBeGreaterThanOrEqual(1); // house produced
     await page.screenshot({ path: shot('13-house-built') });
 
-    // ---------- Thank you: tap → EndScreen + tutorialDone ----------
+    // ---------- Dragon work: emit dragon:work directly (same pattern as chest/crystal) ----------
+    await page.evaluate(() => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        state: { items: Map<number, { id: number; chain: string; tier: number; kind: string }> };
+        bus: { emit: (event: string, payload: unknown) => void };
+      };
+      const dragon = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon' && i.tier === 3);
+      const house = [...ctx.state.items.values()].find((i) => i.chain === 'lumber' && i.tier === 2);
+      if (dragon && house) ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+    });
+    await waitStep(page, 'dragon_rest');
+    await page.screenshot({ path: shot('14-dragon-resting') });
+
+    // ---------- Dragon rest: tap bubble to advance ----------
+    await tapBubble(page);
+    await waitStep(page, 'buy_energy');
+    await page.screenshot({ path: shot('15-buy-energy') });
+
+    // ---------- Buy energy: emit marketplace:purchased directly ----------
+    await page.evaluate(() => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        bus: { emit: (event: string, payload: unknown) => void };
+      };
+      ctx.bus.emit('marketplace:purchased', { energy: 5, free: true });
+    });
+    await waitStep(page, 'free_play');
+    await page.screenshot({ path: shot('16-free-play') });
+
+    // ---------- Free play: tap → tutorialDone, game continues ----------
     await tapBubble(page);
     await expect.poll(async () => (await gameText(page)).tutorial.done, { timeout: 8_000 }).toBe(true);
-    await page.waitForTimeout(500);
-    await page.screenshot({ path: shot('14-end-screen') });
+    state = await gameText(page);
+    expect(state.level).toBe(2); // still level 2 after tutorial
+    await page.screenshot({ path: shot('17-tutorial-done') });
+
+    // ---------- Reach level 3 → end game popup ----------
+    await page.evaluate(() => window.__emberkeep.grantXp(80));
+    await expect.poll(async () => (await gameText(page)).level, { timeout: 8_000 }).toBe(3);
+    await page.waitForTimeout(2500); // let the banner + delayed EndScreen appear
+    await page.screenshot({ path: shot('18-level3-end') });
 
     // ---------- Save / reload restores mid-game state ----------
     const before = await gameText(page);
@@ -291,7 +327,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(after.xp).toBe(before.xp);
     expect(after.board).toEqual(before.board);
     expect(after.regions['level_2_gate']).toBe('active');
-    await page.screenshot({ path: shot('15-reloaded') });
+    await page.screenshot({ path: shot('19-reloaded') });
 
     // ---------- Offline energy regen on load ----------
     const savedRaw = await page.evaluate(() => localStorage.getItem(window.__emberkeep.saveKey));

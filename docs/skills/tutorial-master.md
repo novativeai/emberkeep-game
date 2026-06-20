@@ -245,14 +245,21 @@ All startingItems have been removed. Each tutorial step spawns exactly what it n
 |---|---|------|------------|
 | 0 | lore_1 | tap | — |
 | 1 | lore_2 | tap | — |
-| 2 | ruby_merge | item:hatched (chain:ember_dragon) | spawn 3× ember_dragon_1 |
-| 3 | emerald_tap | item:harvested (chain:emerald) | spawn 2× emerald_1 (crystal is permanent startingItem at [8,11]) |
-| 4 | emerald_merge | item:hatched (chain:emerald) | — |
-| 5 | chest | chest:open | spawn 1× chest (near ember_dragon) |
-| 6 | levelup | tap | grantXp 38 → triggers level 2 → level_2 + camera fly |
-| 7 | key_unlock | region:unlocked | grantKeys 1 |
-| 8 | bush_merge | item:merged (chain:lumber) | — (3 bushes in level_2_gate) |
-| 9 | thank_you | tap | EndScreen shown on step.done |
+| 2 | ruby_merge | item:merged (chain:ember_dragon) | spawn 3× ember_dragon_1 |
+| 3 | dragon_hatch | item:hatched (chain:ember_dragon) | spawn 2× ember_dragon_2 |
+| 4 | emerald_tap | item:harvested (chain:emerald) | spawn 2× emerald_1 |
+| 5 | emerald_egg_merge | item:merged (chain:emerald) | — |
+| 6 | green_dragon_hatch | item:hatched (chain:emerald) | spawn 2× emerald_2 |
+| 7 | chest | chest:open | spawn 1× chest (near ember_dragon) |
+| 8 | levelup | tap | grantXp 10 → triggers level 2 → level_2 + camera fly |
+| 9 | key_unlock | region:unlocked | grantKeys 1 |
+| 10 | bush_merge | item:merged (chain:lumber) | — (3 bushes in level_2_gate) |
+| 11 | dragon_work | dragon:working | — teaches drag-dragon-next-to-house → tap → ⛏ Work |
+| 12 | dragon_rest | tap | Effect: advanceClock 185000 (dragon enters rest) |
+| 13 | buy_energy | marketplace:purchased | arrow: marketplace ⚡ button; first pack free |
+| 14 | free_play | tap | tutorialDone; EndScreen deferred to Level 3 |
+
+**Note:** Level 3 = EndScreen trigger (not tutorialDone). The `celebrateLevelUp` in UIScene creates EndScreen with variant `'level3'` when `level >= 3`.
 
 ### XP accounting
 - merge ember_dragon: +12 XP (ember_dragon_2.xp)

@@ -10,13 +10,18 @@ const FONT = 'Trebuchet MS, Verdana, sans-serif';
  * player can keep exploring freely (tutorial is already marked done).
  */
 export class EndScreen extends Phaser.GameObjects.Container {
-  constructor(scene: Phaser.Scene, bus: EventBus) {
+  constructor(scene: Phaser.Scene, bus: EventBus, variant: 'tutorial' | 'level3' = 'tutorial') {
     super(scene, 0, 0);
 
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
     const panelW = 1100;
     const panelH = 680;
+
+    const titleText = variant === 'level3' ? 'Keeper Level 3!' : 'Thank You, Keeper!';
+    const bodyText = variant === 'level3'
+      ? 'You have mastered the basics of Emberkeep!\nThe adventure is just beginning — the full world awaits.'
+      : 'You have lit the first flame.\nYour dragons are stirring — Emberkeep awaits.';
 
     // Dim overlay
     const dim = scene.add
@@ -43,7 +48,7 @@ export class EndScreen extends Phaser.GameObjects.Container {
     this.add(lo);
 
     const title = scene.add
-      .text(cx, cy - panelH / 2, 'Thank You, Keeper!', {
+      .text(cx, cy - panelH / 2, titleText, {
         fontFamily: FONT,
         fontSize: '52px',
         fontStyle: 'bold',
@@ -58,7 +63,7 @@ export class EndScreen extends Phaser.GameObjects.Container {
       .text(
         cx,
         cy - 80,
-        'You have lit the first flame.\nYour dragons are stirring — Emberkeep awaits.',
+        bodyText,
         {
           fontFamily: FONT,
           fontSize: '38px',
