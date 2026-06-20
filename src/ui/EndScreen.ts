@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
-import type { EventBus } from '../core/EventBus';
-import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE } from '../core/Constants';
+import { GAME_HEIGHT, GAME_WIDTH, num, PALETTE, SAVE_KEY } from '../core/Constants';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
@@ -10,7 +9,7 @@ const FONT = 'Trebuchet MS, Verdana, sans-serif';
  * player can keep exploring freely (tutorial is already marked done).
  */
 export class EndScreen extends Phaser.GameObjects.Container {
-  constructor(scene: Phaser.Scene, bus: EventBus, variant: 'tutorial' | 'level3' = 'tutorial') {
+  constructor(scene: Phaser.Scene, variant: 'tutorial' | 'level3' = 'tutorial') {
     super(scene, 0, 0);
 
     const cx = GAME_WIDTH / 2;
@@ -88,7 +87,8 @@ export class EndScreen extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     btnPlayImg.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
-      bus.emit('game:reset_requested', {});
+      window.localStorage.removeItem(SAVE_KEY);
+      window.location.reload();
     });
     btnPlayImg.on('pointerover', () =>
       scene.tweens.add({ targets: btnPlayImg, scale: 0.94, duration: 110 })

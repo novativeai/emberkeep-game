@@ -294,7 +294,7 @@ export class UIScene extends Phaser.Scene {
     if (level >= 3 && !this.endScreen) {
       this.time.delayedCall(2200, () => {
         if (!this.endScreen) {
-          this.endScreen = new EndScreen(this, this.ctx.bus, 'level3');
+          this.endScreen = new EndScreen(this, 'level3');
           this.add.existing(this.endScreen);
           this.endScreen.setDepth(DEPTH_DIALOG + 50);
         }

@@ -132,7 +132,7 @@ export const ITEM_SCALE: Record<string, number> = {
   lumber_1: 0.48, // a log — bumped up so it reads clearly, planted on the ground
   lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
   bigtree_1: 0.31, // the level-2 wood tree — reduced 50% on request
-  chest_1: 0.48, // a treasure chest — SAME size as the wood, per spec
+  chest_1: 0.30, // a treasure chest — reduced so it reads clearly without dominating
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
   emerald_1: 0.25, // Emerald gem (emerald.png 467×392)
@@ -265,7 +265,7 @@ export const DRAGON_ANIM = {
   fadeInMs: 220,
   hatchlingScale: 0.34,
   whelpScale: 0.46,
-  groundLift: 10, // px the rig sits above the tile centre so feet meet the floor
+  groundLift: -20, // px: negative moves rig DOWN so dragon feet land on the tile floor
   /** Worker harvest (Phase 3): the dragon flies to a tapped plant, works, returns. */
   flyToMs: 520, // glide out to the plant
   workMs: 700, // breathing magic onto the plant before the loot drops
