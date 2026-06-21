@@ -4,24 +4,33 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 const CANVAS_W = 256;
 const CANVAS_H = 512;
 
-// Camera: portrait canvas (0.5 aspect), SE direction at iso ~26.5°
-const CAM_DIST      = 4;
-const CAM_ELEVATION = THREE.MathUtils.degToRad(26.5);
-const CAM_AZIMUTH   = THREE.MathUtils.degToRad(135); // SE
-const CAM_LOOK_Y    = 0.85; // waist height
+/**
+ * Orthographic half-height in world units. Controls how much of the character
+ * fits in the frame (2 * ORTHO_H is the visible height).
+ * Tune this if Laurah is too big or too small.
+ */
+const ORTHO_H = 1.1; // → 2.2m visible; character is ~1.8m after scaling
 
 // Idle alternation timing (ms)
 const IDLE_MIN_MS = 6000;
 const IDLE_MAX_MS = 8000;
 
-// Clip indices from the GLB export order (NlaTrack.00x naming)
-const CLIP = { idle: 0, foldArms: 1, run: 2, walk: 3 } as const;
+/**
+ * GLB clip order (NlaTrack.00x — confirmed by user):
+ *   0 = NlaTrack     = foldArms (idle variant)
+ *   1 = NlaTrack.001 = idle
+ *   2 = NlaTrack.002 = run
+ *   3 = NlaTrack.003 = walk
+ */
+const CLIP = { foldArms: 0, idle: 1, run: 2, walk: 3 } as const;
 
 /**
  * Offscreen Three.js renderer for Laurah. BoardScene owns one instance (created
  * lazily in initLaurah so it never runs in the Node unit-test environment).
- * Renders to a 256×512 HTMLCanvasElement
- * with alpha; BoardScene copies the pixels into a Phaser CanvasTexture each frame.
+ *
+ * Camera: orthographic, matching the board's isometric parallel projection.
+ *   Positioned NE+above of character (same angle as Crystal3D).
+ *   Elevation ≈ 26.5° (matches game TILE_H/TILE_W = 128/256 = 0.5).
  *
  * Lighting: sunset from NW — warm DirectionalLight key, dusk HemisphereLight,
  * orange rim from below-back.
@@ -34,7 +43,7 @@ export class Character3D {
 
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
+  private camera: THREE.OrthographicCamera;
 
   private mixer: THREE.AnimationMixer | null = null;
   private clips: THREE.AnimationClip[] = [];
@@ -62,15 +71,22 @@ export class Character3D {
 
     this.scene = new THREE.Scene();
 
-    const hFov = CANVAS_W / CANVAS_H;
-    this.camera = new THREE.PerspectiveCamera(28, hFov, 0.1, 200);
-    const hDist = CAM_DIST * Math.cos(CAM_ELEVATION);
-    this.camera.position.set(
-      Math.sin(CAM_AZIMUTH) * hDist,
-      CAM_DIST * Math.sin(CAM_ELEVATION) + CAM_LOOK_Y,
-      Math.cos(CAM_AZIMUTH) * hDist
+    // Orthographic camera — matches board's parallel (iso) projection.
+    // Aspect = 256/512 = 0.5 (portrait canvas).
+    const aspect = CANVAS_W / CANVAS_H;
+    this.camera = new THREE.OrthographicCamera(
+      -ORTHO_H * aspect, // left
+       ORTHO_H * aspect, // right
+       ORTHO_H,          // top
+      -ORTHO_H,          // bottom
+      -100,
+       100
     );
-    this.camera.lookAt(0, CAM_LOOK_Y, 0);
+    // NE + above: mirrors Crystal3D's position (4.4, 6.2, 7) scaled for Laurah's height.
+    // Gives elevation ≈ 26.5° — exact isometric angle (arctan(TILE_H/TILE_W) = arctan(0.5)).
+    // lookAt waist level so the character is framed head-to-toe.
+    this.camera.position.set(4, 5, 7);
+    this.camera.lookAt(0, 0.9, 0);
 
     this.setupLighting();
     this.loadCharacter();
@@ -104,28 +120,26 @@ export class Character3D {
         url,
         (gltf) => {
           const model = gltf.scene;
+          const box   = new THREE.Box3().setFromObject(model);
+          const size  = box.getSize(new THREE.Vector3());
 
-          // Center feet on origin
-          const box = new THREE.Box3().setFromObject(model);
-          const size = box.getSize(new THREE.Vector3());
-          const center = box.getCenter(new THREE.Vector3());
-          model.position.set(-center.x, -box.min.y, -center.z);
+          // Place feet at Y = 0; center horizontally
+          model.position.set(-box.getCenter(new THREE.Vector3()).x, -box.min.y, -box.getCenter(new THREE.Vector3()).z);
 
-          // Face the SE camera (rotate 180° so front faces viewer)
-          model.rotation.y = Math.PI;
+          // Scale to a consistent height so the ortho frustum frames her correctly
+          if (size.y > 0) model.scale.setScalar(1.8 / size.y);
+
+          // Face toward camera (camera is at +X,+Y,+Z; front toward that direction).
+          // 210° gives iso-forward facing: character looks toward the viewer's left
+          // while still showing their front face to the NE camera.
+          model.rotation.y = THREE.MathUtils.degToRad(210);
 
           this.scene.add(model);
 
           this.mixer = new THREE.AnimationMixer(model);
           this.clips = gltf.animations;
 
-          if (this.clips.length === 0) {
-            console.warn('[Character3D] No animations found in', url);
-          }
-
-          // Scale to a sensible height (~1.8 Three.js units expected)
-          const targetH = 1.8;
-          if (size.y > 0) model.scale.setScalar(targetH / size.y);
+          if (this.clips.length === 0) console.warn('[Character3D] No animations found in', url);
 
           this.play('idle');
         },
@@ -199,4 +213,3 @@ export class Character3D {
     this.renderer.dispose();
   }
 }
-
