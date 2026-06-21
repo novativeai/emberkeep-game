@@ -404,6 +404,10 @@ export interface EventMap {
   'state:saved': { at: number };
   'state:loaded': { offlineMs: number; energyRecovered: number };
   'game:reset': Record<string, never>;
+
+  /* -- Laurah MC movement -- */
+  'laurah:move_to': { col: number; row: number };
+  'laurah:arrived': { col: number; row: number };
 }
 
 export type ResolvedHand =

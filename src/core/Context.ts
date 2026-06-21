@@ -4,6 +4,7 @@ import { DragonJobSystem } from '../systems/DragonJobSystem';
 import { EconomySystem } from '../systems/EconomySystem';
 import { EnergySystem } from '../systems/EnergySystem';
 import { GeneratorSystem } from '../systems/GeneratorSystem';
+import { LaurahSystem } from '../systems/LaurahSystem';
 import { MergeSystem } from '../systems/MergeSystem';
 import { OrderSystem } from '../systems/OrderSystem';
 import { RewardSystem } from '../systems/RewardSystem';
@@ -43,6 +44,7 @@ export interface GameSystems {
   energy: EnergySystem;
   generator: GeneratorSystem;
   jobs: DragonJobSystem;
+  laurah: LaurahSystem;
   order: OrderSystem;
   economy: EconomySystem;
   reward: RewardSystem;
@@ -83,6 +85,7 @@ export class GameContext {
       energy: new EnergySystem(this.state, this.bus, this.clock),
       generator: new GeneratorSystem(this.state, this.bus, this.clock, this.data.chains),
       jobs: new DragonJobSystem(this.state, this.bus, this.clock),
+      laurah: new LaurahSystem(this.bus),
       order: new OrderSystem(this.state, this.bus, this.data.orders),
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       reward: new RewardSystem(this.bus),

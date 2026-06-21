@@ -28,6 +28,7 @@ import { gridToWorld, setProjection, worldToGrid } from '../core/iso';
 import { renderScale } from '../core/render-scale';
 import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAllow } from '../core/types';
 import { BoardItem } from '../entities/BoardItem';
+import { Character3D } from '../render/Character3D';
 import { Crystal3D } from '../render/Crystal3D';
 import { RigPlayer } from '../render/RigPlayer';
 import type { RigDoc } from '../render/rigTypes';
@@ -129,6 +130,11 @@ export class BoardScene extends Phaser.Scene {
    *  Theme-Crystal generator's look) + any authored 3D-decor placement. */
   private crystal3d?: Crystal3D;
   private crystalTex?: Phaser.Textures.CanvasTexture;
+  /** Laurah — 3D character rendered offscreen and composited into the board. */
+  private laurah3d?: Character3D;
+  private laurahTex?: Phaser.Textures.CanvasTexture;
+  private laurahSprite?: Phaser.GameObjects.Image;
+  private laurahPrevState: 'idle' | 'walking' | 'running' = 'idle';
   /** Lowest zoom the wheel/flights allow — raised so the camera can never show
    *  past the authored background image (the world border). */
   private minZoom = 0.2;
@@ -160,6 +166,7 @@ export class BoardScene extends Phaser.Scene {
 
     this.ensureShadowTexture(); // soft radial shadow used by every object
     this.ensureCrystal3D(); // live 3D emerald → item_crystal_1 (before items build)
+    this.initLaurah();
     this.buildSky();
     this.buildBackground(); // authored backdrop, below the floor (shows through invisible tiles)
     this.buildGround();
@@ -184,6 +191,11 @@ export class BoardScene extends Phaser.Scene {
       this.crystal3d?.dispose();
       this.crystal3d = undefined;
       this.crystalTex = undefined;
+      this.ctx.systems.laurah.dispose();
+      this.laurah3d?.dispose();
+      this.laurah3d = undefined;
+      this.laurahTex = undefined;
+      this.laurahSprite = undefined;
     });
   }
 
@@ -193,6 +205,7 @@ export class BoardScene extends Phaser.Scene {
       this.crystal3d.update(time); // spin + render the live emerald
       this.crystalTex.refresh(); // re-upload to the GPU for this frame
     }
+    this.updateLaurah(delta);
     this.updateDrag(delta);
     this.updateLiveDragons(delta);
 
@@ -694,6 +707,50 @@ export class BoardScene extends Phaser.Scene {
    * spec comes from the world's `decor3d` (the world-builder's `model3d`), or a
    * default emerald. WebGL-less contexts keep the PNG (the try/catch falls back).
    */
+  /** Create the Character3D instance, wrap its canvas in a Phaser CanvasTexture,
+   *  and place the Laurah sprite at her starting grid position. */
+  private initLaurah(): void {
+    try {
+      const c3d = new Character3D();
+      if (this.textures.exists('laurah3d')) this.textures.remove('laurah3d');
+      const tex = this.textures.addCanvas('laurah3d', c3d.canvas);
+      if (!tex) { c3d.dispose(); return; }
+      this.laurah3d   = c3d;
+      this.laurahTex  = tex;
+      const laurah = this.ctx.systems.laurah;
+      this.laurahSprite = this.add
+        .image(laurah.worldX, laurah.worldY, 'laurah3d')
+        .setOrigin(0.5, 0.9)
+        .setScale(0.5) // 256×512 → 128×256 game-px (1 tile wide, 2 tile-heights)
+        .setDepth(DEPTHS.itemBase + laurah.worldY);
+    } catch (err) {
+      console.warn('[Character3D] Could not init Laurah:', err);
+    }
+  }
+
+  /** Drive the Laurah system each frame; sync animation and blit to texture. */
+  private updateLaurah(delta: number): void {
+    const laurah = this.ctx.systems.laurah;
+    laurah.update(delta);
+
+    // Drive Character3D animation on state change (system stays Phaser-free).
+    if (laurah.state !== this.laurahPrevState) {
+      this.laurahPrevState = laurah.state;
+      if (this.laurah3d) {
+        const anim = laurah.state === 'running' ? 'run' : laurah.state === 'walking' ? 'walk' : 'idle';
+        this.laurah3d.play(anim);
+      }
+    }
+
+    if (!this.laurah3d || !this.laurahTex || !this.laurahSprite) return;
+
+    this.laurah3d.render(delta);
+    this.laurahTex.refresh();
+
+    this.laurahSprite.setPosition(laurah.worldX, laurah.worldY);
+    this.laurahSprite.setDepth(DEPTHS.itemBase + laurah.worldY);
+  }
+
   private ensureCrystal3D(): void {
     const map = this.ctx.data.map;
     const spec = map.decor3d?.find((d) => d.model3d)?.model3d ?? undefined;
@@ -1026,11 +1083,21 @@ export class BoardScene extends Phaser.Scene {
       cam.scrollX = this.panFrom.sx - (pointer.x - this.panFrom.px) / cam.zoom;
       cam.scrollY = this.panFrom.sy - (pointer.y - this.panFrom.py) / cam.zoom;
     });
-    const endPan = (): void => {
+    const endPan = (pointer: Phaser.Input.Pointer): void => {
+      // Tap on empty ground (not a pan) → move Laurah to that tile.
+      if (this.panFrom && this.isTap(pointer)) {
+        const cell = worldToGrid(pointer.worldX, pointer.worldY);
+        if (
+          this.ctx.state.isTileActive(cell.col, cell.row) &&
+          this.ctx.state.itemIdAt(cell.col, cell.row) === null
+        ) {
+          this.ctx.bus.emit('laurah:move_to', { col: cell.col, row: cell.row });
+        }
+      }
       this.panFrom = null;
     };
     this.input.on(Phaser.Input.Events.POINTER_UP, endPan);
-    this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, endPan);
+    this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, (): void => { this.panFrom = null; });
     this.input.on(
       Phaser.Input.Events.POINTER_WHEEL,
       (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
