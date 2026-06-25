@@ -97,6 +97,9 @@ export class BoardScene extends Phaser.Scene {
   private dragonMenuForId = 0;
   /** Home position a working dragon flies back to when it tires. */
   private dragonHomes = new Map<number, { x: number; y: number }>();
+  /** Which standing slot (index) each working dragon holds at its building, so
+   *  two workers never land on the same spot. Cleared when the dragon leaves. */
+  private dragonSlots = new Map<number, { houseId: number; idx: number }>();
   /** Styled "Zzz" fatigue badge (Container) over a resting dragon. */
   private restBadges = new Map<number, Phaser.GameObjects.Container>();
   /** One floating key badge per key-locked region, so it reads as "needs a key". */
@@ -150,6 +153,7 @@ export class BoardScene extends Phaser.Scene {
     this.dragonMenu = undefined;
     this.dragonMenuForId = 0;
     this.dragonHomes.clear();
+    this.dragonSlots.clear();
     this.restBadges.clear();
     this.highlights = [];
     this.allow = { ...NO_ALLOW };
@@ -970,7 +974,7 @@ export class BoardScene extends Phaser.Scene {
             const home = gridToWorld(this.dragFrom.col, this.dragFrom.row);
             this.dragFrom = null;
             this.time.delayedCall(60, () => obj.setData('dragged', false));
-            this.startDragonWork(obj, home);
+            this.startDragonWork(obj, home, tgt); // work the EXACT house it was dropped on
             return;
           }
         }
@@ -1536,26 +1540,32 @@ export class BoardScene extends Phaser.Scene {
     this.dragonMenuForId = 0;
   }
 
-  /** Send a dragon to WORK the nearest House: it flies over and stands by it,
-   *  speeding its timer (+1× per worker) until it tires. */
-  private startDragonWork(sprite: BoardItem, home?: { x: number; y: number }): void {
+  /** Send a dragon to WORK a House: it flies over and stands by it, speeding its
+   *  timer until it tires. Works `targetHouse` when given (the tile it was dropped
+   *  on), else the NEAREST passive production building. */
+  private startDragonWork(
+    sprite: BoardItem,
+    home?: { x: number; y: number },
+    targetHouse?: BoardItem
+  ): void {
     if (this.ctx.systems.jobs.restRemaining(sprite.itemId) > 0) {
       this.floatText(sprite.x, sprite.y - 150, 'Resting…', PALETTE.cream);
       return;
     }
-    // Work the NEAREST timed production building (House, Crystal, Ancient Tree —
-    // any passive generator, not another dragon), so a 10-min object finishes in
-    // 5 with one worker.
-    const house = [...this.itemSprites.values()]
-      .filter((s) => {
-        const cfg = this.generatorConfigFor(s.chain, s.tier);
-        return cfg?.tappable === false && !DRAGON_RIGS[s.chain] && s.itemId !== sprite.itemId;
-      })
-      .sort(
-        (a, b) =>
-          Phaser.Math.Distance.Between(a.x, a.y, sprite.x, sprite.y) -
-          Phaser.Math.Distance.Between(b.x, b.y, sprite.x, sprite.y)
-      )[0];
+    // The dropped-on building, else the NEAREST passive production building
+    // (House, Ancient Tree — never a dragon or the tap-only Crystal).
+    const house =
+      targetHouse ??
+      [...this.itemSprites.values()]
+        .filter((s) => {
+          const cfg = this.generatorConfigFor(s.chain, s.tier);
+          return cfg?.tappable === false && !DRAGON_RIGS[s.chain] && s.itemId !== sprite.itemId;
+        })
+        .sort(
+          (a, b) =>
+            Phaser.Math.Distance.Between(a.x, a.y, sprite.x, sprite.y) -
+            Phaser.Math.Distance.Between(b.x, b.y, sprite.x, sprite.y)
+        )[0];
     if (!house) {
       this.floatText(sprite.x, sprite.y - 150, 'Nothing to work yet', PALETTE.cream);
       return;
@@ -1565,8 +1575,7 @@ export class BoardScene extends Phaser.Scene {
     const ld = this.liveDragons.get(sprite.itemId);
     if (ld) ld.busy = true;
     sprite.setDepth(DEPTHS.dragged);
-    // Stand at a DISTINCT spot around the building (offset by how many dragons
-    // already work it) so two dragons never overlap on the same place.
+    // Stand at a DISTINCT spot around the building so two dragons never overlap.
     const slots = [
       { dx: -110, dy: 24 },
       { dx: 110, dy: 24 },
@@ -1575,7 +1584,17 @@ export class BoardScene extends Phaser.Scene {
       { dx: 0, dy: 70 },
       { dx: 0, dy: -78 }
     ];
-    const slot = slots[this.ctx.systems.jobs.workersFor(house.itemId) % slots.length]!;
+    // Take the first slot NOT already held by another dragon at this same
+    // building. (The live worker count repeats as dragons cycle in and out, so
+    // `count % slots` collided — track the actual assignments instead.)
+    const taken = new Set(
+      [...this.dragonSlots.values()].filter((s) => s.houseId === house.itemId).map((s) => s.idx)
+    );
+    let idx = 0;
+    while (idx < slots.length && taken.has(idx)) idx++;
+    idx %= slots.length; // all six full → wrap (only with >6 workers on one building)
+    this.dragonSlots.set(sprite.itemId, { houseId: house.itemId, idx });
+    const slot = slots[idx]!;
     const target = { x: house.x + slot.dx, y: house.y + slot.dy };
     this.tweens.add({
       targets: sprite,
@@ -1658,6 +1677,7 @@ export class BoardScene extends Phaser.Scene {
 
   /** A tired dragon flies back to its home tile to rest. */
   private returnDragonHome(dragonId: number): void {
+    this.dragonSlots.delete(dragonId); // free its standing slot for the next worker
     const sprite = this.itemSprites.get(dragonId);
     const home = this.dragonHomes.get(dragonId);
     if (!sprite || !home) return;
