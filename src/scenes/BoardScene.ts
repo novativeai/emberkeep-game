@@ -1485,11 +1485,12 @@ export class BoardScene extends Phaser.Scene {
       const label = this.add
         .text(dx, -2, text, {
           fontFamily: 'Segoe UI, sans-serif',
-          fontSize: '30px',
+          fontSize: '26px',
           fontStyle: 'bold',
           color: '#fff6e0',
           stroke: '#1f3a14',
-          strokeThickness: 5
+          strokeThickness: 5,
+          align: 'center'
         })
         .setOrigin(0.5);
       bg.setInteractive({ useHandCursor: true });
@@ -1500,8 +1501,11 @@ export class BoardScene extends Phaser.Scene {
       });
       menu.add([bg, label]);
     };
-    mkBtn(-150, '⛏ Work', () => this.startDragonWork(sprite));
-    mkBtn(150, '✋ Harvest', () => this.ctx.bus.emit('item:tapped', { itemId: sprite.itemId }));
+    // Spell out the Warmth cost of each action BEFORE it runs: Work is free,
+    // Harvest spends the dragon's energyCost (so the player isn't surprised).
+    const harvestCost = this.generatorConfigFor(sprite.chain, sprite.tier)?.energyCost ?? 0;
+    mkBtn(-150, '⛏ Work · free', () => this.startDragonWork(sprite));
+    mkBtn(150, `✋ Harvest · ⚡${harvestCost}`, () => this.ctx.bus.emit('item:tapped', { itemId: sprite.itemId }));
     menu.add(this.dragonMenuLabel);
     this.dragonMenu = menu;
     this.dragonMenuForId = sprite.itemId;

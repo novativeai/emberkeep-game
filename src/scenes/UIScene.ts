@@ -73,7 +73,9 @@ export class UIScene extends Phaser.Scene {
     this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
-    this.bubble.setPosition(GAME_WIDTH / 2 - 80, LIVE_GAME_HEIGHT - 232);
+    // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
+    // cover, over the empty bottom-right margin during tutorial steps.
+    this.bubble.setPosition(GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
     this.bubble.setDepth(DEPTH_TUTORIAL);
 
     this.hand = this.add.image(0, 0, 'ui_hand').setDepth(DEPTH_TUTORIAL + 2).setVisible(false);

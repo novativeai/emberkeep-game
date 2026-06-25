@@ -79,7 +79,7 @@ async function tapTile(page: Page, col: number, row: number): Promise<void> {
 
 /** The bubble sits at game coords ≈ (1280, 1368); CSS is ÷2. */
 async function tapBubble(page: Page): Promise<void> {
-  await page.mouse.click(640, 684);
+  await page.mouse.click(750, 725); // bubble centre (game (GAME_WIDTH/2+220, LIVE-150) ÷ RES)
 }
 
 async function waitStep(page: Page, stepId: string): Promise<void> {
