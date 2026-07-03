@@ -1876,10 +1876,14 @@ export class BoardScene extends Phaser.Scene {
 
   /** Shell-crack flash, spark confetti, then the hatchling pops in. */
   private hatchSequence(snap: ItemSnapshot): void {    const { x, y } = gridToWorld(snap.col, snap.row);
+    // The shaking pre-hatch shape is the EGG the merge consumed: same chain,
+    // one tier down (works for every hatching chain — ember, emerald, ...).
+    const eggKey = `item_${snap.chain}_${snap.tier - 1}`;
+    const [ax, ay] = this.ctx.data.anchors.byKey[eggKey] ?? this.ctx.data.anchors.default;
     const ghost = this.add
-      .image(x, y, 'item_ember_dragon_1')
-      .setOrigin(0.5, 0.85)
-      .setScale(ITEM_SCALE.ember_dragon_1 ?? 1) // match the enlarged egg
+      .image(x, y, eggKey)
+      .setOrigin(ax, ay)
+      .setScale(ITEM_SCALE[`${snap.chain}_${snap.tier - 1}`] ?? ITEM_SCALE[snap.chain] ?? 1)
       .setDepth(DEPTHS.itemBase + y);
     this.tweens.add({
       targets: ghost,

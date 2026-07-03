@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PALETTE, RES } from '../core/Constants';
+import { ITEM_SCALE, PALETTE, RES } from '../core/Constants';
 import type { AssetsManifest } from '../core/types';
 import { darken, lighten, seededRandom, withAlpha } from './colors';
 
@@ -82,6 +82,16 @@ export class TextureFactory {
       case 'ui_icon_gear': return this.iconGear(key);
       case 'ui_icon_scroll': return this.iconScroll(key);
       default:
+        // File-backed art with no bespoke generator (house, chest, coins, map
+        // tiles…) still lands here when its PNG fails to load. Those get a
+        // palette-friendly stand-in so a flaky load never shows the magenta
+        // debug square in-game; magenta stays for genuinely unknown keys.
+        if (key.startsWith('tile_')) {
+          return this.tile(key, P.moss, P.mossShade, 'moss', this.seedFrom(key));
+        }
+        if (key.startsWith('item_') || key.startsWith('decor_')) {
+          return this.genericItem(key);
+        }
         // Unknown key: paint a loud magenta square so it is impossible to miss.
         // eslint-disable-next-line no-console
         console.warn(`[TextureFactory] no generator for key: ${key}`);
@@ -93,6 +103,60 @@ export class TextureFactory {
   }
 
   /* ------------------------------------------------------------------ */
+
+  /** Deterministic seed from a texture key, for seeded placeholder detail. */
+  private seedFrom(key: string): number {
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) & 0xffff;
+    return h || 1;
+  }
+
+  /**
+   * Stand-in for any file-based merge item / decor whose PNG failed to load:
+   * a plum parcel with a gold ribbon and a "?" tag. BoardScene multiplies file
+   * art by ITEM_SCALE (tuned to the real PNG's pixel size — e.g. 0.064 for the
+   * huge red-egg source), so the canvas is counter-sized to still read roughly
+   * one tile on the board after that scale is applied.
+   */
+  private genericItem(key: string): void {
+    const artScale = key.startsWith('item_') ? (ITEM_SCALE[key.slice(5)] ?? 1) : 1;
+    const size = Math.round(96 / Math.min(1, Math.max(0.125, artScale)));
+    const u = size / 96; // design space stays 96×96
+    this.paint(key, size, size, (g) => {
+      g.scale(u, u);
+      this.contactShadow(g, 48, 84, 24, 8);
+      // Parcel body.
+      const grad = g.createLinearGradient(0, 30, 0, 82);
+      grad.addColorStop(0, P.plumHighlight);
+      grad.addColorStop(0.55, P.plum);
+      grad.addColorStop(1, darken(P.plumShade, 0.1));
+      g.fillStyle = grad;
+      this.roundRectPath(g, 22, 32, 52, 50, 10);
+      g.fill();
+      g.lineWidth = 2;
+      g.strokeStyle = withAlpha(darken(P.plumShade, 0.35), 0.9);
+      g.stroke();
+      // Gold ribbon.
+      g.fillStyle = P.gold;
+      g.fillRect(44, 32, 8, 50);
+      g.fillRect(22, 53, 52, 8);
+      g.fillStyle = withAlpha(P.goldAccent, 0.9);
+      g.fillRect(44, 32, 3, 50);
+      // Top gloss.
+      g.fillStyle = 'rgba(255,255,255,0.14)';
+      this.roundRectPath(g, 26, 36, 44, 12, 6);
+      g.fill();
+      // "?" tag so it clearly reads as art-to-come.
+      g.font = 'bold 26px Trebuchet MS, Verdana, sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.lineWidth = 4;
+      g.strokeStyle = withAlpha(darken(P.plumShade, 0.4), 0.9);
+      g.strokeText('?', 48, 58);
+      g.fillStyle = P.cream;
+      g.fillText('?', 48, 58);
+    });
+  }
 
   private paint(key: string, w: number, h: number, draw: (g: Ctx2D) => void): void {
     if (this.scene.textures.exists(key)) return;

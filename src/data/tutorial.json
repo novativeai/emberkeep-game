@@ -159,14 +159,14 @@
       "text": "Dragons can speed the House! Drag your dragon and drop it directly onto the House tile. Each working dragon doubles the speed — ×2 with one, ×4 with two!",
       "gate": { "type": "event", "event": "dragon:working" },
       "highlight": [
-        { "chain": "ember_dragon", "nth": 0 },
-        { "chain": "lumber", "nth": 0 }
+        { "chain": "ember_dragon", "nth": 0, "tier": 3 },
+        { "chain": "lumber", "nth": 0, "tier": 2 }
       ],
       "hand": {
-        "from": { "chain": "ember_dragon", "nth": 0 },
-        "to": { "chain": "lumber", "nth": 0 }
+        "from": { "chain": "ember_dragon", "nth": 0, "tier": 3 },
+        "to": { "chain": "lumber", "nth": 0, "tier": 2 }
       },
-      "arrow": { "tile": { "chain": "ember_dragon", "nth": 0 } },
+      "arrow": { "tile": { "chain": "ember_dragon", "nth": 0, "tier": 3 } },
       "allow": { "drag": ["ember_dragon", "emerald"], "dragonWork": true }
     },
     {
