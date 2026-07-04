@@ -119,15 +119,20 @@ export interface PresetDef {
 function emptyPose(): RigPose {
   return { root: { dx: 0, dy: 0, rotDeg: 0, sx: 1, sy: 1 }, partDeg: {} };
 }
-/** jaw if present, else tilt the head back (adaptive fallback). */
+/** Max jaw degrees any preset asks for (stretch's yawn) — normalizes mouth. */
+const JAW_MAX_DEG = 22;
+
+/** jaw if present, else tilt the head back (adaptive fallback). Either way the
+ *  openness is recorded on the pose so face-frame rigs can show a real mouth. */
 function jaw(pose: RigPose, K: PresetContext, deg: number): void {
+  pose.mouth = Math.max(pose.mouth ?? 0, clamp(deg / JAW_MAX_DEG, 0, 1));
   if (K.has('jaw')) pose.partDeg['jaw'] = (pose.partDeg['jaw'] ?? 0) + deg;
   else pose.partDeg['head'] = (pose.partDeg['head'] ?? 0) - deg * 0.35;
 }
 
 export const PRESETS: PresetDef[] = [
   {
-    key: 'idle', emoji: '🌿', name: 'Idle', desc: 'breathing, head sway, tail drift, blink',
+    key: 'idle', emoji: '🌿', name: 'Idle', desc: 'breathing, head sway, tail drift (blink scheduled by the player)',
     fn: (t) => {
       const p = emptyPose();
       p.root.sy = 1 + 0.004 * Math.sin(t * TAU * 0.5);
@@ -136,8 +141,8 @@ export const PRESETS: PresetDef[] = [
       p.partDeg['tail'] = 1.5 * Math.sin(t * TAU * 0.4);
       p.partDeg['wing_left'] = 2.4 * Math.sin(t * TAU * 0.5 + 0.3);
       p.partDeg['wing_right'] = -2.4 * Math.sin(t * TAU * 0.5 + 0.3); // mirror of L
-      const phase = (t % 3.1) / 3.1;
-      p.eyelid = phase > 0.94 ? clamp(1 - (1 - Math.abs((phase - 0.97) / 0.03)), 0.08, 1) : 1;
+      // Blink is NOT a fixed function of t — a randomized BlinkScheduler owned by
+      // RigPlayer injects pose.eyelid, so the cadence is natural and per-dragon.
       return p;
     }
   },
@@ -176,8 +181,7 @@ export const PRESETS: PresetDef[] = [
       p.partDeg['wing_right'] = -(K.nearAmp('wing_right', 28) + 6 * pump); // mirror of L
       p.partDeg['tail'] = 2 * Math.sin(t * TAU * 3);
       p.partDeg['head'] = 1.5 * Math.sin(t * Math.PI * hopF) - 1;
-      const phase = (t % 1.4) / 1.4;
-      p.eyelid = phase > 0.92 ? clamp(Math.abs((phase - 0.96) / 0.04), 0.1, 1) : 1;
+      // Blink handled by RigPlayer's scheduler (excited cadence during celebrate).
       return p;
     }
   },

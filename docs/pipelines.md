@@ -54,6 +54,43 @@ cross-file invariants these pipelines participate in.
   `sprites/characters/dragon/red-dragon/rig/dragon-red.rig.json`; if absent, the egg
   art remains. Keep the Play button at its position (e2e taps it).
 
+## Head-animation face frames (blink / roar-talk)
+
+- Pre-rendered head frame sets live in
+  `assets/sprites/characters/dragon/<char>/head-animation/<set>/` — PNGs + a
+  `frames.json` (per-frame durationMs, from the Sprite Studio export). Current
+  sets for red-dragon: **blink** `[open, halfOpen, closed, halfOpen2]` (open ≈
+  the rig's base head and is never worn; halfOpen2 is a byte-dup of halfOpen)
+  and **talk** `[closed, half, wide, half]` (the roar/mouth-flap cycle).
+- `scripts/calibrate-faces.mjs` → `src/data/faces.json` (GENERATED — never
+  hand-edit). It aligns each set onto the rig's `head` layer by alpha-bbox +
+  top-band (horn) centroid, emitting per-set `textureScale`/`originX/Y` so a
+  worn frame has the EXACT content scale of the original head and the anchor
+  pivot stays on the same content point. The script self-verifies: content
+  width drift must be ≤0.5px and silhouette IoU ≥94%, else it throws. Re-run it
+  whenever a set is re-exported, a new set/character is added (edit its
+  `CHARACTERS` table), or the rig's head layer/anchor changes.
+- Runtime: `src/render/faceAnimations.ts` (pure, unit-tested) picks the frame;
+  `RigPlayer.attachFace()/playFace()` wear it. Selection precedence:
+  scripted talk override → `pose.mouth` (jaw() records it; roar/stretch) →
+  `pose.eyelid` (scheduled blink) → base texture. Rigs WITHOUT face sets
+  (emerald) keep the old fallbacks untouched.
+- Blink cadence is NOT a fixed period. `BlinkScheduler` (also in
+  faceAnimations.ts) is a randomized, stateful clock: it fires a blink at a
+  fresh random gap in a realistic range every time (`BLINK_GAP_CALM` 2.8–6.5s
+  idle, `BLINK_GAP_EXCITED` 1.4–3.0s while celebrating/hovering), with a ~14%
+  chance of a quick double-blink. RigPlayer owns ONE per rig (per-instance rng),
+  so a crowd of dragons never blinks in unison, and injects its output into
+  `pose.eyelid` — which BOTH the eyelid-layer path and the face-frame path read.
+  It's suppressed while the mouth is open (no blinking mid-roar) and reset flat
+  in `bake()`. Because it runs off the frame delta (not GameClock) it's purely
+  cosmetic and doesn't touch `advanceTime` determinism.
+- BoardScene wires beats: hatch intro roars (`playFace(2)`), passive-gift
+  celebrate and rest-wake chirp (`playFace(1)`).
+- Visual regression harness: `node tools/facetest.mjs [outDir]` (needs
+  `pnpm build && pnpm exec vite preview`) — spawns a live dragon, freezes one
+  pose and screenshots base/blink/talk faces; the head must not move or resize.
+
 ## World building pipeline (tools/worldbuilder)
 
 - `tools/worldbuilder/index.html` — standalone browser app (open directly, zero

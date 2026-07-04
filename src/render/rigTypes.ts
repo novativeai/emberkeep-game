@@ -66,4 +66,7 @@ export interface RigPose {
   partDeg: Record<string, number>;
   /** eyelid squash 0..1 (1 = open) when blink is active and eyelids exist. */
   eyelid?: number;
+  /** mouth openness 0..1, recorded by the jaw() helper — consumed by rigs with
+   *  face frame sets (faceAnimations); rigs with a jaw layer ignore it. */
+  mouth?: number;
 }

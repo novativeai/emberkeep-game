@@ -319,7 +319,10 @@ const PRESETS = {
   }}
 };
 function blink(t, period) {
-  // eyelids close briefly; only if eyelid layers exist, else no-op (recorded).
+  // Preview only: a fixed-period eyelid dip for rigs that HAVE eyelid layers.
+  // In-game, blink cadence is a randomized per-dragon BlinkScheduler
+  // (src/render/faceAnimations.ts) and drives face-frame heads too — this tool
+  // shows neither, so the period here is illustrative, not the shipped timing.
   const phase = (t % period) / period;
   const closed = phase > 0.92 ? 1 - Math.abs((phase - 0.96) / 0.04) : 0;
   let any = false;

@@ -122,6 +122,18 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   tools/rigger (`LAYER_PARTS`, `ANCHOR_NAMES`, `PIN_NAMES`); `rigAnimations` resolves
   anchor → pin-chain → bare-layer → skip. Game + animator tool must keep the same order.
   `root_ground` pin is required.
+- **TOUCH head-animation frames OR the rig's head layer/anchor → RULE** re-run
+  `scripts/calibrate-faces.mjs` — `src/data/faces.json` is GENERATED calibration
+  (per-set textureScale/origin) and self-verifies (content-scale drift ≤0.5px,
+  silhouette IoU ≥94%). Frame ORDER is semantic: blink `[open,half,closed,half2]`,
+  talk `[closed,half,wide,half2]` — `faceAnimations.ts` indexes into it. Consumed
+  by BoardScene (`FACES`) + `RigPlayer.attachFace`; `pose.mouth` is recorded by
+  rigAnimations' `jaw()`. Visual check: `node tools/facetest.mjs`.
+- **TOUCH blink cadence → WHERE** `BlinkScheduler` in `faceAnimations.ts` (NOT the
+  presets — a fixed `t`-based blink there makes all dragons blink in unison).
+  RigPlayer owns one per rig and injects `pose.eyelid`; ranges `BLINK_GAP_CALM`/
+  `BLINK_GAP_EXCITED`. Runs on frame delta, not GameClock (cosmetic, doesn't
+  affect `advanceTime` determinism). anim-tuning.json's `blinkGapSec` is reference-only.
 - **TOUCH RES / GAME_WIDTH → CHECK** every coordinate is authored in 2560×1600 space;
   CSS/e2e coords are game÷2; TextureFactory paints ×RES; `gridToPage` maps through the
   board camera worldView.

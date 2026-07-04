@@ -1,12 +1,12 @@
 {
-  "_note": "Numeric knobs for rigAnimations.ts presets. Edit here first, then mirror into rigAnimations.ts and tools/rigger/animator.html.",
+  "_note": "Numeric knobs for rigAnimations.ts presets. Edit here first, then mirror into rigAnimations.ts and tools/rigger/animator.html. Blink is NOT here — it's a randomized per-dragon BlinkScheduler in src/render/faceAnimations.ts (blinkGapSec ranges below are for reference only).",
+  "blinkGapSec": { "calm": [2.8, 6.5], "excited": [1.4, 3.0], "_note": "random gap picked fresh each blink; ~14% chance of a quick double-blink" },
   "idle": {
     "breatheScale": 0.004,
     "breatheLift": 0.7,
     "headSway": 0.7,
     "tailSwing": 6,
-    "wingSettle": 2.4,
-    "blinkPeriod": 3.1
+    "wingSettle": 2.4
   },
   "hover": {
     "liftBase": 16,
@@ -32,8 +32,7 @@
     "tailFreqMult": 3,
     "tailAmp": 14,
     "headBob": 1.5,
-    "headOffset": -1,
-    "blinkPeriod": 1.4
+    "headOffset": -1
   },
   "roar": {
     "period": 2.6,

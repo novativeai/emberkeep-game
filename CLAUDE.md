@@ -64,6 +64,12 @@ nothing is throwaway.
 - Dragon rigs animate via `rigAnimations.ts` resolution (anchor → pin-chain →
   bare-layer → skip) — reuse it, don't re-derive. Right-facing = single
   `container.scaleX = -1` flip (`setFacing`); source art faces LEFT.
+- Head blink/talk frames swap the head TEXTURE (`faceAnimations.ts`), driven by
+  the pose's `eyelid`/`mouth` — `src/data/faces.json` is GENERATED calibration
+  (`scripts/calibrate-faces.mjs`); re-run it if head art changes (see pipelines.md).
+- Blink is a randomized per-dragon `BlinkScheduler` (faceAnimations.ts), NOT a
+  preset period; RigPlayer injects `pose.eyelid`. Don't reintroduce a fixed
+  `t`-based blink in the presets — dragons would blink in unison.
 
 ## World data (essentials)
 - Re-export of the world requires re-running BOTH `scripts/ingest-world.mjs` and
