@@ -7,181 +7,240 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#130c1a;--panel:#1e1228;--panel2:#271830;--border:#3d2858;
-  --accent:#c87840;--accent2:#9060d0;--text:#e8d8c0;--text2:#9080a8;
-  --green:#58c070;--red:#e04858;--gold:#d4a843;--teal:#40b8b0;
-  --eye:#6090e0;--mouth:#e06080;--brow:#a0c050;
+  --bg:#100a17;--panel:#1a1126;--panel2:#221530;--border:#3a2554;
+  --accent:#c07830;--accent2:#8850c8;--text:#e8d8c0;--text2:#8878a8;
+  --green:#58c070;--red:#d84050;--gold:#d4a843;--teal:#40b8a8;
+  --eye:#5890d8;--mouth:#d85070;--brow:#88b840;
+  --step-w:860px;
 }
 body{
   background:var(--bg);color:var(--text);
-  font:13px/1.4 'Segoe UI',system-ui,sans-serif;
-  height:100vh;display:flex;flex-direction:column;overflow:hidden;
+  font:13px/1.5 'Segoe UI',system-ui,sans-serif;
+  min-height:100vh;display:flex;flex-direction:column;
   user-select:none;
 }
 header{
   background:var(--panel);border-bottom:1px solid var(--border);
-  padding:7px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;
+  padding:10px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;
 }
-header h1{font-size:14px;font-weight:700;color:var(--gold);}
-header .sub{color:var(--text2);font-size:11px;margin-left:auto;}
-.main{display:flex;flex:1;overflow:hidden;}
+header h1{font-size:15px;font-weight:700;color:var(--gold);letter-spacing:.02em;}
+.version{color:var(--text2);font-size:11px;margin-left:auto;}
 
-/* ── SIDEBAR ── */
-.sidebar{
-  width:210px;background:var(--panel);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;
+/* ── Wizard progress bar ─────────────────────────────── */
+.wiz-bar{
+  background:var(--panel);border-bottom:1px solid var(--border);
+  padding:14px 0 12px;display:flex;justify-content:center;
 }
-.sec{border-bottom:1px solid var(--border);padding:10px;}
-.sec-title{
-  font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
-  color:var(--text2);margin-bottom:7px;
+.wiz-steps{
+  display:flex;align-items:flex-start;gap:0;max-width:var(--step-w);width:100%;
+  position:relative;padding:0 10px;
 }
+.wiz-steps::before{
+  content:'';position:absolute;top:14px;left:30px;right:30px;height:2px;
+  background:var(--border);z-index:0;
+}
+.wiz-step{
+  display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;
+  cursor:pointer;position:relative;z-index:1;
+}
+.wiz-num{
+  width:28px;height:28px;border-radius:50%;border:2px solid var(--border);
+  background:var(--panel2);color:var(--text2);font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;
+}
+.wiz-step.done .wiz-num{background:var(--green);border-color:var(--green);color:#0d1a10;}
+.wiz-step.active .wiz-num{background:var(--accent2);border-color:var(--accent2);color:#fff;box-shadow:0 0 0 4px rgba(136,80,200,.25);}
+.wiz-label{font-size:10px;color:var(--text2);text-align:center;line-height:1.3;max-width:72px;}
+.wiz-step.active .wiz-label{color:var(--text);}
+.wiz-step.done .wiz-label{color:var(--green);}
 
-/* tool buttons */
-.tool-row{display:flex;gap:5px;margin-bottom:2px;}
-.tool-btn{
-  flex:1;padding:5px 4px;border:1px solid var(--border);background:var(--panel2);
-  color:var(--text2);border-radius:4px;font:11px/1 'Segoe UI',sans-serif;
-  cursor:pointer;text-align:center;transition:all .12s;
+/* ── Main content ────────────────────────────────────── */
+.content{
+  flex:1;display:flex;justify-content:center;align-items:flex-start;
+  padding:28px 20px 40px;
 }
-.tool-btn:hover{border-color:var(--accent);color:var(--text);}
-.tool-btn.active{
-  background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:700;
+.step-card{
+  max-width:var(--step-w);width:100%;
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  padding:28px 32px;box-shadow:0 8px 40px rgba(0,0,0,.4);
+  display:none;flex-direction:column;gap:20px;
 }
+.step-card.active{display:flex;}
 
-/* region list */
-.region-item{
-  display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:4px;
-  border:1px solid transparent;cursor:pointer;margin-bottom:3px;transition:all .12s;
-}
-.region-item:hover{background:var(--panel2);border-color:var(--border);}
-.region-item.active{background:var(--panel2);border-color:var(--accent2);}
-.region-item .dot{
-  width:10px;height:10px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(255,255,255,.3);
-}
-.region-item .label{font-size:12px;flex:1;}
-.region-item .status{font-size:10px;color:var(--text2);}
-.region-item.has-region .status{color:var(--green);}
+.step-header{display:flex;flex-direction:column;gap:4px;}
+.step-title{font-size:20px;font-weight:700;color:var(--gold);}
+.step-sub{font-size:13px;color:var(--text2);line-height:1.6;}
 
-/* sliders */
-label.param{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;}
-label.param .param-row{display:flex;justify-content:space-between;align-items:center;}
-label.param .param-name{font-size:11px;color:var(--text2);}
-label.param .param-val{font-size:11px;color:var(--gold);font-weight:700;min-width:36px;text-align:right;}
-input[type=range]{
-  width:100%;accent-color:var(--accent2);height:3px;cursor:pointer;
+/* Industry tip box */
+.tip-box{
+  background:rgba(136,80,200,.1);border:1px solid rgba(136,80,200,.3);
+  border-radius:8px;padding:12px 14px;font-size:12px;color:var(--text2);
+  line-height:1.6;
 }
+.tip-box strong{color:var(--accent2);}
+.tip-box em{color:var(--text);font-style:normal;}
 
-/* buttons */
+/* Sprite upload / preview */
+.sprite-zone{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;}
+.sprite-preview-wrap{
+  position:relative;flex-shrink:0;
+  width:220px;height:220px;border-radius:8px;
+  background:radial-gradient(ellipse at center,#1a102a 0%,#0d0810 100%);
+  border:1px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;
+}
+#sprite-preview-img{max-width:100%;max-height:100%;display:none;}
+.sprite-placeholder{color:var(--text2);text-align:center;font-size:12px;line-height:2;}
+.sprite-meta{font-size:11px;color:var(--text2);margin-top:6px;text-align:center;}
+
+.upload-actions{display:flex;flex-direction:column;gap:8px;flex:1;min-width:180px;}
+.upload-btn{
+  position:relative;overflow:hidden;
+  padding:10px 16px;border:1px dashed var(--border);background:var(--panel2);
+  color:var(--text2);border-radius:6px;font:12px 'Segoe UI',sans-serif;
+  cursor:pointer;text-align:center;transition:all .15s;
+}
+.upload-btn:hover{border-color:var(--accent);color:var(--accent);}
+.upload-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;}
 .btn{
-  display:block;width:100%;padding:6px 10px;border:1px solid var(--border);
-  background:var(--panel2);color:var(--text);border-radius:4px;
-  font:12px 'Segoe UI',sans-serif;cursor:pointer;text-align:center;
-  transition:all .12s;margin-bottom:5px;
+  padding:10px 16px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--text);border-radius:6px;font:12px 'Segoe UI',sans-serif;
+  cursor:pointer;transition:all .15s;width:100%;text-align:center;
 }
 .btn:hover{border-color:var(--accent);color:var(--accent);}
 .btn.primary{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:700;}
-.btn.primary:hover{background:#a070e0;}
-.btn.danger{border-color:var(--red);color:var(--red);}
-.btn.danger:hover{background:var(--red);color:#fff;}
+.btn.primary:hover{background:#9a60e0;}
+.btn.secondary{border-color:var(--teal);color:var(--teal);}
+.btn.secondary:hover{background:var(--teal);color:#0d1a18;}
 
-/* file input */
-.upload-btn{
-  position:relative;overflow:hidden;display:block;
-  width:100%;padding:6px 10px;border:1px dashed var(--border);
-  background:var(--panel2);color:var(--text2);border-radius:4px;
-  font:12px 'Segoe UI',sans-serif;cursor:pointer;text-align:center;
-  transition:all .12s;margin-bottom:5px;
+/* Perspective selector */
+.persp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.persp-card{
+  border:2px solid var(--border);border-radius:8px;padding:12px 8px;
+  cursor:pointer;text-align:center;transition:all .15s;background:var(--panel2);
 }
-.upload-btn:hover{border-color:var(--accent);color:var(--accent);}
-.upload-btn input[type=file]{
-  position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;
-}
+.persp-card:hover{border-color:var(--text2);}
+.persp-card.selected{border-color:var(--accent2);background:rgba(136,80,200,.12);}
+.persp-face{font-size:36px;margin-bottom:6px;}
+.persp-label{font-size:12px;font-weight:700;color:var(--text);}
+.persp-sub{font-size:10px;color:var(--text2);margin-top:2px;line-height:1.4;}
 
-/* overlay items */
-.overlay-item{
-  display:flex;align-items:center;gap:6px;padding:4px 6px;
-  border-radius:4px;margin-bottom:3px;background:var(--panel2);
-  border:1px solid var(--border);
-}
-.overlay-item .ov-label{font-size:11px;flex:1;color:var(--text2);}
-.overlay-item.loaded .ov-label{color:var(--green);}
-.overlay-item .ov-clear{
-  width:16px;height:16px;border:none;background:transparent;
-  color:var(--text2);cursor:pointer;font-size:13px;line-height:1;padding:0;
-}
-.overlay-item .ov-clear:hover{color:var(--red);}
-
-/* ── CANVAS AREA ── */
+/* Region marking canvas area */
+.canvas-area{display:flex;gap:16px;flex-wrap:wrap;}
 .canvas-wrap{
-  flex:1;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(ellipse at center,#1a1028 0%,#0d0810 70%);
-  position:relative;overflow:hidden;
+  position:relative;flex-shrink:0;
+  background:radial-gradient(ellipse at center,#1a102a 0%,#0d0810 100%);
+  border:1px solid var(--border);border-radius:8px;overflow:hidden;
 }
-#preview{
-  border:1px solid var(--border);
-  cursor:crosshair;
-  box-shadow:0 0 40px rgba(100,60,200,.15);
+#mark-canvas{display:block;cursor:crosshair;}
+
+.canvas-guide{flex:1;min-width:200px;display:flex;flex-direction:column;gap:12px;}
+.region-list-item{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;
+  border-radius:6px;border:1px solid var(--border);background:var(--panel2);
+  cursor:pointer;transition:all .15s;
 }
-.canvas-hint{
-  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
-  font-size:11px;color:var(--text2);pointer-events:none;
-  background:rgba(19,12,26,.7);padding:4px 10px;border-radius:20px;
+.region-list-item:hover{border-color:var(--text2);}
+.region-list-item.active-region{border-color:var(--accent2);background:rgba(136,80,200,.1);}
+.region-list-item.marked{border-color:var(--green);}
+.region-list-item .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.region-list-item .rl-name{font-size:12px;font-weight:700;flex:1;}
+.region-list-item .rl-status{font-size:10px;color:var(--text2);}
+.region-list-item.marked .rl-status{color:var(--green);}
+.region-list-item .rl-clear{background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:0 2px;}
+.region-list-item .rl-clear:hover{color:var(--red);}
+.region-instruction{
+  padding:10px 12px;border-radius:6px;
+  background:rgba(216,80,112,.08);border:1px solid rgba(216,80,112,.25);
+  font-size:12px;color:var(--text2);line-height:1.6;
 }
 
-/* ── BOTTOM BAR ── */
-.bottom{
-  background:var(--panel);border-top:1px solid var(--border);
-  padding:8px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;
-  flex-wrap:wrap;
+/* Phoneme grid */
+.phoneme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.phoneme-card{
+  border:1px solid var(--border);border-radius:8px;background:var(--panel2);overflow:hidden;
 }
-.anim-tabs{display:flex;gap:4px;}
+.phoneme-card .ph-header{
+  padding:8px 10px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.phoneme-card .ph-key{font-size:16px;font-weight:700;color:var(--gold);width:28px;text-align:center;}
+.phoneme-card .ph-name{font-size:11px;color:var(--text2);flex:1;}
+.phoneme-card .ph-examples{font-size:10px;color:var(--accent2);}
+.phoneme-card .ph-preview{
+  width:100%;height:90px;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at center,#1a102a 0%,#0d0810 100%);overflow:hidden;
+}
+.phoneme-card .ph-preview canvas{display:block;}
+.phoneme-card .ph-desc{padding:6px 8px;font-size:10px;color:var(--text2);line-height:1.4;min-height:40px;}
+.phoneme-card .ph-actions{padding:8px 10px;display:flex;gap:6px;}
+.phoneme-required{border-color:rgba(216,120,48,.5)!important;}
+.phoneme-loaded{border-color:rgba(88,192,112,.5)!important;}
+
+/* Eye blink section */
+.blink-section{display:flex;gap:14px;flex-wrap:wrap;}
+.blink-option{
+  flex:1;min-width:200px;border:2px solid var(--border);border-radius:8px;
+  padding:16px;cursor:pointer;transition:all .15s;
+}
+.blink-option:hover{border-color:var(--text2);}
+.blink-option.selected{border-color:var(--accent2);background:rgba(136,80,200,.08);}
+.blink-option h4{font-size:13px;color:var(--text);margin-bottom:6px;}
+.blink-option p{font-size:11px;color:var(--text2);line-height:1.5;}
+.opt-tag{
+  display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;
+  margin-bottom:8px;font-weight:700;letter-spacing:.05em;
+}
+.opt-tag.best{background:rgba(88,192,112,.2);color:var(--green);}
+.opt-tag.easy{background:rgba(64,184,168,.2);color:var(--teal);}
+
+/* Preview */
+.preview-layout{display:flex;gap:20px;flex-wrap:wrap;}
+.preview-canvas-wrap{
+  flex-shrink:0;position:relative;
+  background:radial-gradient(ellipse at center,#1a102a 0%,#0d0810 100%);
+  border:1px solid var(--border);border-radius:8px;overflow:hidden;
+}
+#preview-canvas{display:block;}
+.preview-controls{flex:1;min-width:200px;display:flex;flex-direction:column;gap:12px;}
+.anim-tabs{display:flex;gap:6px;flex-wrap:wrap;}
 .anim-tab{
-  padding:5px 14px;border:1px solid var(--border);background:var(--panel2);
-  color:var(--text2);border-radius:4px;font:11px/1 'Segoe UI',sans-serif;
-  cursor:pointer;transition:all .12s;font-weight:600;
+  padding:6px 14px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--text2);border-radius:6px;font:11px/1.3 'Segoe UI',sans-serif;
+  cursor:pointer;transition:all .15s;font-weight:600;
 }
 .anim-tab:hover{border-color:var(--text2);color:var(--text);}
-.anim-tab.active.idle{background:#1a3040;border-color:var(--teal);color:var(--teal);}
-.anim-tab.active.blink{background:#1a2040;border-color:var(--eye);color:var(--eye);}
-.anim-tab.active.talking{background:#401a28;border-color:var(--mouth);color:var(--mouth);}
-
+.anim-tab.active{background:var(--accent2);border-color:var(--accent2);color:#fff;}
+.play-row{display:flex;gap:8px;align-items:center;}
 .play-btn{
-  padding:5px 18px;border:1px solid var(--green);background:transparent;
-  color:var(--green);border-radius:4px;font:12px/1.2 'Segoe UI',sans-serif;
-  cursor:pointer;font-weight:700;transition:all .12s;
+  padding:7px 20px;border:1px solid var(--green);background:transparent;
+  color:var(--green);border-radius:6px;font:700 12px 'Segoe UI',sans-serif;
+  cursor:pointer;transition:all .15s;
 }
-.play-btn:hover{background:var(--green);color:#0d0810;}
+.play-btn:hover{background:var(--green);color:#0d1a10;}
 .play-btn.playing{border-color:var(--red);color:var(--red);}
 .play-btn.playing:hover{background:var(--red);color:#fff;}
+.param-row{display:flex;flex-direction:column;gap:3px;}
+.param-row label{font-size:11px;color:var(--text2);display:flex;justify-content:space-between;}
+.param-row label span{color:var(--gold);font-weight:700;}
+.param-row input[type=range]{width:100%;accent-color:var(--accent2);}
 
-.speed-wrap{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text2);}
-.speed-wrap input{width:90px;accent-color:var(--accent2);}
+/* Nav */
+.nav{display:flex;justify-content:space-between;align-items:center;margin-top:4px;}
+.nav .step-info{font-size:11px;color:var(--text2);}
 
-.status-pill{
-  font-size:11px;color:var(--text2);padding:3px 9px;
-  border:1px solid var(--border);border-radius:20px;background:var(--panel2);
-  margin-left:auto;
+label.inline-file{
+  position:relative;overflow:hidden;
+  padding:6px 12px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--text2);border-radius:6px;font:11px 'Segoe UI',sans-serif;
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  transition:all .15s;white-space:nowrap;
 }
+label.inline-file:hover{border-color:var(--accent);color:var(--accent);}
+label.inline-file input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;}
 
-/* ── RIGHT PANEL ── */
-.right-panel{
-  width:190px;background:var(--panel);border-left:1px solid var(--border);
-  display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;
-}
-
-/* Scrollbar */
 ::-webkit-scrollbar{width:5px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-
-/* tooltip */
-.tooltip{
-  position:fixed;pointer-events:none;z-index:999;
-  background:rgba(19,12,26,.95);border:1px solid var(--border);
-  padding:4px 8px;border-radius:4px;font-size:11px;color:var(--text);
-  display:none;white-space:nowrap;
-}
 </style>
 </head>
 <body>
@@ -189,1080 +248,892 @@ input[type=range]{
 <header>
   <h1>🐉 Face Animator</h1>
   <span style="color:var(--border)">|</span>
-  <span style="color:var(--text2);font-size:12px;">Emberkeep Tools</span>
-  <span class="sub">drag to mark regions · preview animations · export rig</span>
+  <span style="color:var(--text2);font-size:12px;">Replacement-animation workflow · industry standard</span>
+  <span class="version">Emberkeep Tools</span>
 </header>
 
-<div class="main">
-
-  <!-- LEFT SIDEBAR -->
-  <div class="sidebar">
-
-    <!-- Tools -->
-    <div class="sec">
-      <div class="sec-title">Tool</div>
-      <div class="tool-row">
-        <button class="tool-btn active" id="btn-mark" onclick="setTool('mark')">✏ Mark</button>
-        <button class="tool-btn" id="btn-select" onclick="setTool('select')">↖ Select</button>
-        <button class="tool-btn" id="btn-preview" onclick="setTool('preview')">▶ Preview</button>
-      </div>
+<!-- WIZARD PROGRESS -->
+<div class="wiz-bar">
+  <div class="wiz-steps">
+    <div class="wiz-step active" data-step="0" onclick="goStep(0)">
+      <div class="wiz-num">1</div><div class="wiz-label">Load Sprite</div>
     </div>
-
-    <!-- Regions -->
-    <div class="sec">
-      <div class="sec-title">Regions</div>
-      <div id="region-list">
-        <div class="region-item active" data-key="eyeLeft" onclick="setActiveRegion('eyeLeft')">
-          <div class="dot" style="background:var(--eye)"></div>
-          <span class="label">Left Eye</span>
-          <span class="status" id="status-eyeLeft">—</span>
-        </div>
-        <div class="region-item" data-key="eyeRight" onclick="setActiveRegion('eyeRight')">
-          <div class="dot" style="background:var(--eye)"></div>
-          <span class="label">Right Eye</span>
-          <span class="status" id="status-eyeRight">—</span>
-        </div>
-        <div class="region-item" data-key="mouth" onclick="setActiveRegion('mouth')">
-          <div class="dot" style="background:var(--mouth)"></div>
-          <span class="label">Mouth</span>
-          <span class="status" id="status-mouth">—</span>
-        </div>
-        <div class="region-item" data-key="browLeft" onclick="setActiveRegion('browLeft')">
-          <div class="dot" style="background:var(--brow)"></div>
-          <span class="label">Left Brow</span>
-          <span class="status" id="status-browLeft">—</span>
-        </div>
-        <div class="region-item" data-key="browRight" onclick="setActiveRegion('browRight')">
-          <div class="dot" style="background:var(--brow)"></div>
-          <span class="label">Right Brow</span>
-          <span class="status" id="status-browRight">—</span>
-        </div>
-      </div>
-      <button class="btn danger" style="margin-top:7px;font-size:11px;" onclick="clearActiveRegion()">Clear Selected</button>
+    <div class="wiz-step" data-step="1" onclick="goStep(1)">
+      <div class="wiz-num">2</div><div class="wiz-label">Define View</div>
     </div>
-
-    <!-- Sprite -->
-    <div class="sec">
-      <div class="sec-title">Sprite</div>
-      <button class="btn primary" onclick="loadDefault()">⤓ Load Laurah</button>
-      <label class="upload-btn">
-        Upload PNG
-        <input type="file" accept="image/png,image/jpeg,image/webp" onchange="loadFile(this)"/>
-      </label>
-      <div id="sprite-name" style="font-size:10px;color:var(--text2);text-align:center;margin-top:3px;"></div>
+    <div class="wiz-step" data-step="2" onclick="goStep(2)">
+      <div class="wiz-num">3</div><div class="wiz-label">Mark Regions</div>
     </div>
-
-    <!-- Idle params -->
-    <div class="sec" id="panel-idle">
-      <div class="sec-title">Idle Params</div>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Breathe scale</span>
-          <span class="param-val" id="val-breatheScale">0.006</span>
-        </div>
-        <input type="range" min="0" max="20" value="6" id="sl-breatheScale"
-               oninput="updateParam('breatheScale',this.value/1000,'val-breatheScale',v=>v.toFixed(3))"/>
-      </label>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Float px</span>
-          <span class="param-val" id="val-floatPx">3</span>
-        </div>
-        <input type="range" min="0" max="12" value="3" id="sl-floatPx"
-               oninput="updateParam('floatPx',+this.value,'val-floatPx',v=>v)"/>
-      </label>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Breathe speed</span>
-          <span class="param-val" id="val-breatheSpeed">1.0</span>
-        </div>
-        <input type="range" min="3" max="25" value="10" id="sl-breatheSpeed"
-               oninput="updateParam('breatheSpeed',this.value/10,'val-breatheSpeed',v=>v.toFixed(1))"/>
-      </label>
+    <div class="wiz-step" data-step="3" onclick="goStep(3)">
+      <div class="wiz-num">4</div><div class="wiz-label">Blink Setup</div>
     </div>
-
-    <!-- Blink params -->
-    <div class="sec" id="panel-blink">
-      <div class="sec-title">Blink Params</div>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Interval (s)</span>
-          <span class="param-val" id="val-blinkInterval">3.5</span>
-        </div>
-        <input type="range" min="10" max="80" value="35" id="sl-blinkInterval"
-               oninput="updateParam('blinkInterval',this.value*100,'val-blinkInterval',v=>(v/1000).toFixed(1));resetBlink()"/>
-      </label>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Close ms</span>
-          <span class="param-val" id="val-blinkCloseMs">80</span>
-        </div>
-        <input type="range" min="20" max="200" value="80" id="sl-blinkCloseMs"
-               oninput="updateParam('blinkCloseMs',+this.value,'val-blinkCloseMs',v=>v)"/>
-      </label>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Hold ms</span>
-          <span class="param-val" id="val-blinkHoldMs">55</span>
-        </div>
-        <input type="range" min="0" max="200" value="55" id="sl-blinkHoldMs"
-               oninput="updateParam('blinkHoldMs',+this.value,'val-blinkHoldMs',v=>v)"/>
-      </label>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Open ms</span>
-          <span class="param-val" id="val-blinkOpenMs">100</span>
-        </div>
-        <input type="range" min="30" max="250" value="100" id="sl-blinkOpenMs"
-               oninput="updateParam('blinkOpenMs',+this.value,'val-blinkOpenMs',v=>v)"/>
-      </label>
+    <div class="wiz-step" data-step="4" onclick="goStep(4)">
+      <div class="wiz-num">5</div><div class="wiz-label">Mouth Shapes</div>
     </div>
-
-  </div><!-- /sidebar -->
-
-  <!-- CANVAS -->
-  <div class="canvas-wrap" id="canvas-wrap">
-    <canvas id="preview" width="500" height="500"></canvas>
-    <div class="canvas-hint" id="hint">Load a sprite to begin</div>
+    <div class="wiz-step" data-step="5" onclick="goStep(5)">
+      <div class="wiz-num">6</div><div class="wiz-label">Preview</div>
+    </div>
   </div>
-
-  <!-- RIGHT PANEL -->
-  <div class="right-panel">
-
-    <!-- Talk params -->
-    <div class="sec">
-      <div class="sec-title">Talk Params</div>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Speed</span>
-          <span class="param-val" id="val-talkSpeed">1.0</span>
-        </div>
-        <input type="range" min="3" max="30" value="10" id="sl-talkSpeed"
-               oninput="updateParam('talkSpeed',this.value/10,'val-talkSpeed',v=>v.toFixed(1))"/>
-      </label>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Max open</span>
-          <span class="param-val" id="val-talkMaxOpen">0.70</span>
-        </div>
-        <input type="range" min="10" max="100" value="70" id="sl-talkMaxOpen"
-               oninput="updateParam('talkMaxOpen',this.value/100,'val-talkMaxOpen',v=>v.toFixed(2))"/>
-      </label>
-      <label class="param">
-        <div class="param-row">
-          <span class="param-name">Brow raise</span>
-          <span class="param-val" id="val-browRaise">0.30</span>
-        </div>
-        <input type="range" min="0" max="100" value="30" id="sl-browRaise"
-               oninput="updateParam('browRaise',this.value/100,'val-browRaise',v=>v.toFixed(2))"/>
-      </label>
-    </div>
-
-    <!-- Overlays -->
-    <div class="sec">
-      <div class="sec-title">Overlays (optional)</div>
-      <p style="font-size:10px;color:var(--text2);margin-bottom:7px;line-height:1.5;">
-        Upload same-size PNGs to replace regions during animation for higher fidelity.
-      </p>
-      <div class="overlay-item" id="ov-eyeClosed">
-        <span class="ov-label">👁 Eye-closed</span>
-        <label style="cursor:pointer;font-size:11px;color:var(--accent);white-space:nowrap;">
-          Upload<input type="file" accept="image/png" style="display:none" onchange="loadOverlay('eyeClosed',this)"/>
-        </label>
-        <button class="ov-clear" onclick="clearOverlay('eyeClosed')" title="Clear">✕</button>
-      </div>
-      <div class="overlay-item" id="ov-mouthOpen">
-        <span class="ov-label">👄 Mouth-open</span>
-        <label style="cursor:pointer;font-size:11px;color:var(--accent);white-space:nowrap;">
-          Upload<input type="file" accept="image/png" style="display:none" onchange="loadOverlay('mouthOpen',this)"/>
-        </label>
-        <button class="ov-clear" onclick="clearOverlay('mouthOpen')" title="Clear">✕</button>
-      </div>
-    </div>
-
-    <!-- Auto-detect -->
-    <div class="sec">
-      <div class="sec-title">Auto-detect</div>
-      <p style="font-size:10px;color:var(--text2);margin-bottom:7px;line-height:1.5;">
-        Attempts to auto-find face feature regions using brightness/contrast.
-      </p>
-      <button class="btn" onclick="autoDetect()">🔍 Auto-detect Regions</button>
-    </div>
-
-    <!-- Export -->
-    <div class="sec">
-      <div class="sec-title">Export</div>
-      <button class="btn primary" onclick="exportRig()">💾 Export rig.json</button>
-      <button class="btn" onclick="exportSpriteSheet()">🎞 Export Frames (PNG)</button>
-      <button class="btn" onclick="copyRigJSON()">📋 Copy JSON</button>
-      <div id="export-msg" style="font-size:10px;color:var(--green);text-align:center;margin-top:4px;min-height:14px;"></div>
-    </div>
-
-    <!-- Info -->
-    <div class="sec" style="flex:1;">
-      <div class="sec-title">Region Info</div>
-      <div id="region-info" style="font-size:11px;color:var(--text2);line-height:1.8;">
-        Select a region to inspect.
-      </div>
-    </div>
-
-  </div><!-- /right-panel -->
-
-</div><!-- /main -->
-
-<!-- BOTTOM BAR -->
-<div class="bottom">
-  <div class="anim-tabs">
-    <button class="anim-tab active idle" data-mode="idle" onclick="setMode('idle')">Idle</button>
-    <button class="anim-tab" data-mode="blink" onclick="setMode('blink')">Blink</button>
-    <button class="anim-tab" data-mode="talking" onclick="setMode('talking')">Talking</button>
-  </div>
-
-  <button class="play-btn" id="play-btn" onclick="togglePlay()">▶ Play</button>
-
-  <div class="speed-wrap">
-    <span>Speed</span>
-    <input type="range" min="25" max="300" value="100" id="sl-speed"
-           oninput="globalSpeed=this.value/100;document.getElementById('speed-val').textContent=globalSpeed.toFixed(2)+'×'"/>
-    <span id="speed-val">1.00×</span>
-  </div>
-
-  <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);cursor:pointer;">
-    <input type="checkbox" id="cb-autoblink" checked style="accent-color:var(--eye);"/>
-    Auto-blink
-  </label>
-
-  <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);cursor:pointer;">
-    <input type="checkbox" id="cb-showregions" checked style="accent-color:var(--accent2);"/>
-    Show regions
-  </label>
-
-  <div class="status-pill" id="status-pill">no sprite</div>
 </div>
 
-<div class="tooltip" id="tooltip"></div>
+<div class="content">
+
+<!-- ═══ STEP 1: LOAD SPRITE ═══ -->
+<div class="step-card active" id="step-0">
+  <div class="step-header">
+    <div class="step-title">Step 1 — Load Your Sprite</div>
+    <div class="step-sub">Upload the character's portrait. It should show the <strong>neutral resting face</strong>: mouth closed, eyes open, relaxed expression.</div>
+  </div>
+
+  <div class="tip-box">
+    <strong>How this tool works:</strong> This uses <em>replacement animation</em> — the industry-standard technique in Disney/Warner 2D animation, visual novels, and game cut-scenes.<br>
+    Instead of warping pixels, you supply hand-drawn replacement images for each expression state (closed eyes, open mouth shapes). The engine composites them over the base sprite at the position you mark. This handles any perspective correctly — because <em>you</em> drew the shapes at the right angle.
+  </div>
+
+  <div class="sprite-zone">
+    <div>
+      <div class="sprite-preview-wrap" id="sprite-preview-wrap">
+        <img id="sprite-preview-img" alt="sprite preview"/>
+        <div class="sprite-placeholder" id="sprite-placeholder">🐉<br>No sprite loaded</div>
+      </div>
+      <div class="sprite-meta" id="sprite-meta"></div>
+    </div>
+    <div class="upload-actions">
+      <label class="upload-btn">
+        📁 Upload PNG / JPG / WebP
+        <input type="file" accept="image/png,image/jpeg,image/webp" onchange="loadSpriteFile(this)"/>
+      </label>
+      <button class="btn secondary" onclick="loadDefault()">⤓ Load Laurah (test sprite)</button>
+      <div style="margin-top:10px;font-size:12px;color:var(--text2);line-height:1.8;">
+        <strong style="color:var(--text);">What to upload:</strong><br>
+        • Transparent PNG recommended<br>
+        • Neutral face: mouth closed, eyes open<br>
+        • The same image size you will use for all overlay drawings<br>
+        • Any resolution — tool adapts
+      </div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <div class="step-info">Step 1 of 6</div>
+    <button class="btn primary" id="next-0" onclick="goStep(1)" disabled>Next →</button>
+  </div>
+</div>
+
+<!-- ═══ STEP 2: DEFINE VIEW ═══ -->
+<div class="step-card" id="step-1">
+  <div class="step-header">
+    <div class="step-title">Step 2 — Define the Perspective</div>
+    <div class="step-sub">This affects the instructions you receive in the next step for marking regions, and how overlays should be drawn.</div>
+  </div>
+
+  <div class="tip-box">
+    <strong>Why this matters:</strong> Most character sprites are <em>not</em> straight-on. Visual novel portraits, game dialogue busts, and cut-scene characters are typically in <em>3/4 view</em> — the face turned 30–45° to one side. In 3/4 view the far eye is smaller (foreshortening), the mouth axis is tilted, and the near cheek is wider. All mouth-shape overlays should be drawn to match this angle — which you already know because you drew the sprite.
+  </div>
+
+  <div class="persp-grid">
+    <div class="persp-card" data-persp="frontal" onclick="selectPersp(this,'frontal')">
+      <div class="persp-face">🙂</div>
+      <div class="persp-label">Frontal</div>
+      <div class="persp-sub">Both eyes perfectly symmetric. Horizontal mouth axis. Rare in game art.</div>
+    </div>
+    <div class="persp-card selected" data-persp="3q-left" onclick="selectPersp(this,'3q-left')">
+      <div class="persp-face" style="transform:scaleX(-1);display:inline-block">😤</div>
+      <div class="persp-label">3/4 Left</div>
+      <div class="persp-sub">Face turned to viewer's left. Near eye (right side of face) is larger. Most common.</div>
+    </div>
+    <div class="persp-card" data-persp="3q-right" onclick="selectPersp(this,'3q-right')">
+      <div class="persp-face">😤</div>
+      <div class="persp-label">3/4 Right</div>
+      <div class="persp-sub">Face turned to viewer's right. Near eye (left side of face) is larger.</div>
+    </div>
+    <div class="persp-card" data-persp="profile" onclick="selectPersp(this,'profile')">
+      <div class="persp-face">🫤</div>
+      <div class="persp-label">Profile</div>
+      <div class="persp-sub">Full side view. One eye only. Mark only the visible eye.</div>
+    </div>
+  </div>
+
+  <div id="persp-info" style="padding:12px 14px;background:var(--panel2);border-radius:8px;border:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.8;"></div>
+
+  <div class="nav">
+    <button class="btn" onclick="goStep(0)">← Back</button>
+    <div class="step-info">Step 2 of 6</div>
+    <button class="btn primary" onclick="goStep(2)">Next →</button>
+  </div>
+</div>
+
+<!-- ═══ STEP 3: MARK REGIONS ═══ -->
+<div class="step-card" id="step-2">
+  <div class="step-header">
+    <div class="step-title">Step 3 — Mark Facial Regions</div>
+    <div class="step-sub">Select a region below, then <strong>drag on the sprite</strong> to outline it. These bounding boxes tell the engine where to composite overlays.</div>
+  </div>
+
+  <div class="canvas-area">
+    <div class="canvas-wrap">
+      <canvas id="mark-canvas" width="400" height="400"></canvas>
+    </div>
+    <div class="canvas-guide">
+      <div id="region-instruction" class="region-instruction" style="display:block;">
+        Select a region from the list, then drag on the sprite.
+      </div>
+      <div id="region-list-ui" style="display:flex;flex-direction:column;gap:6px;">
+        <div class="region-list-item active-region" data-key="eyeLeft" onclick="setActiveRegion('eyeLeft')">
+          <div class="dot" style="background:var(--eye)"></div>
+          <div class="rl-name">Left Eye <small style="font-weight:400;color:var(--text2);">(near / larger in 3/4)</small></div>
+          <span class="rl-status" id="rs-eyeLeft">not marked</span>
+          <button class="rl-clear" onclick="event.stopPropagation();clearRegion('eyeLeft')">✕</button>
+        </div>
+        <div class="region-list-item" data-key="eyeRight" onclick="setActiveRegion('eyeRight')">
+          <div class="dot" style="background:var(--eye)"></div>
+          <div class="rl-name">Right Eye <small style="font-weight:400;color:var(--text2);">(far / smaller in 3/4)</small></div>
+          <span class="rl-status" id="rs-eyeRight">not marked</span>
+          <button class="rl-clear" onclick="event.stopPropagation();clearRegion('eyeRight')">✕</button>
+        </div>
+        <div class="region-list-item" data-key="mouth" onclick="setActiveRegion('mouth')">
+          <div class="dot" style="background:var(--mouth)"></div>
+          <div class="rl-name">Mouth <span style="font-size:10px;color:var(--accent);font-weight:400;">required</span></div>
+          <span class="rl-status" id="rs-mouth">not marked</span>
+          <button class="rl-clear" onclick="event.stopPropagation();clearRegion('mouth')">✕</button>
+        </div>
+        <div class="region-list-item" data-key="browLeft" onclick="setActiveRegion('browLeft')">
+          <div class="dot" style="background:var(--brow)"></div>
+          <div class="rl-name">Left Brow <small style="font-weight:400;color:var(--text2);">optional</small></div>
+          <span class="rl-status" id="rs-browLeft">not marked</span>
+          <button class="rl-clear" onclick="event.stopPropagation();clearRegion('browLeft')">✕</button>
+        </div>
+        <div class="region-list-item" data-key="browRight" onclick="setActiveRegion('browRight')">
+          <div class="dot" style="background:var(--brow)"></div>
+          <div class="rl-name">Right Brow <small style="font-weight:400;color:var(--text2);">optional</small></div>
+          <span class="rl-status" id="rs-browRight">not marked</span>
+          <button class="rl-clear" onclick="event.stopPropagation();clearRegion('browRight')">✕</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.7;padding:8px 0;">
+        <strong style="color:var(--text);">Eyes + Mouth are required.</strong> Brows are optional — used for expression raises during speech.
+      </div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="btn" onclick="goStep(1)">← Back</button>
+    <div class="step-info" id="mark-progress">0 / 5 regions marked</div>
+    <button class="btn primary" id="next-2" onclick="goStep(3)" disabled>Next →</button>
+  </div>
+</div>
+
+<!-- ═══ STEP 4: BLINK SETUP ═══ -->
+<div class="step-card" id="step-3">
+  <div class="step-header">
+    <div class="step-title">Step 4 — Eye Blink Setup</div>
+    <div class="step-sub">Choose how closed eyes are rendered during the blink animation.</div>
+  </div>
+
+  <div class="tip-box">
+    <strong>Industry standard:</strong> In hand-drawn 2D animation, the "blink frame" is simply a separate drawing of closed eyes. The engine cross-fades from open (base sprite) → closed (overlay) → open. This works perfectly regardless of perspective — you draw the eyelids at the correct angle for your character.
+  </div>
+
+  <div class="blink-section">
+    <div class="blink-option selected" id="blink-opt-overlay" onclick="selectBlinkMode('overlay')">
+      <div class="opt-tag best">BEST QUALITY</div>
+      <h4>👁 Upload Closed-Eye Overlay <em style="font-size:10px;color:var(--green);font-style:normal;">(recommended)</em></h4>
+      <p>A transparent PNG, <strong>same size as the sprite</strong>. Draw the closed eyelids in exactly the right position, at the correct perspective angle. Everything else stays transparent.</p>
+      <br>
+      <label class="inline-file">
+        📁 Upload closed-eye PNG
+        <input type="file" accept="image/png" onchange="loadBlinkOverlay(this)"/>
+      </label>
+      <div id="blink-status" style="margin-top:8px;font-size:11px;color:var(--text2);">No file loaded</div>
+      <canvas id="blink-preview-canvas" width="160" height="120"
+        style="margin-top:10px;display:none;border:1px solid var(--border);border-radius:6px;
+               background:radial-gradient(ellipse at center,#1a102a 0%,#0d0810 100%);"></canvas>
+    </div>
+
+    <div class="blink-option" id="blink-opt-computed" onclick="selectBlinkMode('computed')">
+      <div class="opt-tag easy">QUICK SETUP</div>
+      <h4>⚡ Computed Blink</h4>
+      <p>No upload needed. The engine samples the eyelid colour from the eye region you marked and slides a lid fill toward center. Works well for cartoon/flat styles. Less accurate on detailed or realistic eyes.</p>
+      <br>
+      <p style="color:var(--text2);">Activated immediately — no extra files needed.</p>
+    </div>
+  </div>
+
+  <div style="font-size:12px;color:var(--text2);line-height:1.8;padding:12px 14px;background:var(--panel2);border-radius:8px;border:1px solid var(--border);">
+    <strong style="color:var(--text);">How to draw the closed-eye overlay:</strong><br>
+    1. Open your sprite in your drawing app (Aseprite, Photoshop, Krita, Procreate…)<br>
+    2. Create a new layer on top<br>
+    3. Draw closed eyelids at the exact position of the open eyes — match the perspective angle of the face<br>
+    4. Hide all other layers — export only this overlay layer as a transparent PNG<br>
+    5. The PNG dimensions must match the sprite exactly
+  </div>
+
+  <div class="nav">
+    <button class="btn" onclick="goStep(2)">← Back</button>
+    <div class="step-info">Step 4 of 6</div>
+    <button class="btn primary" onclick="goStep(4)">Next →</button>
+  </div>
+</div>
+
+<!-- ═══ STEP 5: MOUTH SHAPES ═══ -->
+<div class="step-card" id="step-4">
+  <div class="step-header">
+    <div class="step-title">Step 5 — Mouth Shapes (Visemes)</div>
+    <div class="step-sub">Upload a transparent overlay PNG for each mouth position. <strong style="color:var(--gold);">Minimum: REST, A, O</strong> for basic lip sync. Upload all 8 for professional quality.</div>
+  </div>
+
+  <div class="tip-box">
+    <strong>Preston Blair phoneme set</strong> — the industry standard used in Disney, Hanna-Barbera, anime, and most video games.<br>
+    Each overlay is the <em>same size as your sprite</em>, with only the mouth pixels on a transparent background. Draw each mouth shape at the correct perspective angle and position for your character's face — you know the angle because you drew the sprite.<br>
+    <br>
+    <strong>Smoothness comes from cross-fading, not from more shapes.</strong> The preview engine cross-fades between consecutive phoneme frames over ~55ms. This turns 8 hard poses into fluid, natural-looking speech — the same technique used in Cuphead, Hades, and most professional 2D games. Drag the <em>Phoneme crossfade</em> slider in Step 6 to feel the difference.
+  </div>
+
+  <div class="phoneme-grid" id="phoneme-grid"></div>
+
+  <div id="phoneme-count" style="font-size:12px;color:var(--text2);margin-top:4px;"></div>
+
+  <div style="font-size:12px;color:var(--text2);line-height:1.8;padding:12px 14px;background:var(--panel2);border-radius:8px;border:1px solid var(--border);">
+    <strong style="color:var(--text);">How to draw mouth overlays:</strong><br>
+    1. Open your sprite in your drawing app<br>
+    2. Create a new layer on top<br>
+    3. Draw the mouth shape in the exact position it sits on the face<br>
+    4. For 3/4 perspective: the mouth corners follow the face's foreshortening — the far corner is slightly higher/smaller<br>
+    5. Export only the mouth layer as transparent PNG (same dimensions as sprite)<br>
+    6. Repeat for each shape you want to support
+  </div>
+
+  <div class="nav">
+    <button class="btn" onclick="goStep(3)">← Back</button>
+    <div class="step-info">Step 5 of 6</div>
+    <button class="btn primary" onclick="goStep(5)">Next →</button>
+  </div>
+</div>
+
+<!-- ═══ STEP 6: PREVIEW ═══ -->
+<div class="step-card" id="step-5">
+  <div class="step-header">
+    <div class="step-title">Step 6 — Preview &amp; Export</div>
+    <div class="step-sub">Preview your animations and export the rig JSON for use in the game engine.</div>
+  </div>
+
+  <div class="preview-layout">
+    <div class="preview-canvas-wrap">
+      <canvas id="preview-canvas" width="320" height="320"></canvas>
+    </div>
+    <div class="preview-controls">
+
+      <div class="anim-tabs">
+        <button class="anim-tab active" data-mode="idle"    onclick="setPreviewMode('idle')">Idle</button>
+        <button class="anim-tab"        data-mode="blink"   onclick="setPreviewMode('blink')">Blink</button>
+        <button class="anim-tab"        data-mode="talking" onclick="setPreviewMode('talking')">Talking</button>
+        <button class="anim-tab"        data-mode="all"     onclick="setPreviewMode('all')">All</button>
+      </div>
+
+      <div class="play-row">
+        <button class="play-btn" id="prev-play-btn" onclick="togglePreviewPlay()">▶ Play</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);cursor:pointer;">
+          <input type="checkbox" id="cb-show-regions" checked style="accent-color:var(--accent2);"/>
+          Show regions
+        </label>
+      </div>
+
+      <div class="param-row">
+        <label>Speed <span id="v-speed">1.0×</span></label>
+        <input type="range" min="25" max="300" value="100" oninput="previewParams.speed=this.value/100;document.getElementById('v-speed').textContent=previewParams.speed.toFixed(1)+'×'"/>
+      </div>
+      <div class="param-row">
+        <label>Breathe amplitude <span id="v-breathe">0.006</span></label>
+        <input type="range" min="0" max="25" value="6" oninput="previewParams.breatheScale=this.value/1000;document.getElementById('v-breathe').textContent=previewParams.breatheScale.toFixed(3)"/>
+      </div>
+      <div class="param-row">
+        <label>Float pixels <span id="v-float">3</span></label>
+        <input type="range" min="0" max="16" value="3" oninput="previewParams.floatPx=+this.value;document.getElementById('v-float').textContent=+this.value"/>
+      </div>
+      <div class="param-row">
+        <label>Blink interval (s) <span id="v-blink-int">3.5</span></label>
+        <input type="range" min="10" max="100" value="35" oninput="previewParams.blinkInterval=this.value*100;document.getElementById('v-blink-int').textContent=(this.value/10).toFixed(1)"/>
+      </div>
+      <div class="param-row">
+        <label>Phoneme crossfade (ms) <span id="v-xfade">55</span></label>
+        <input type="range" min="0" max="160" value="55" oninput="previewParams.crossfadeMs=+this.value;document.getElementById('v-xfade').textContent=+this.value"/>
+      </div>
+      <div style="font-size:10px;color:var(--text2);line-height:1.5;padding:6px 0 2px;">
+        ↑ <strong style="color:var(--text);">Crossfade is the key to smooth lip sync.</strong> 0 = hard cuts (choppy). 40–80ms = natural flow. Preston Blair's 8 shapes + 55ms crossfade = industry-quality result.
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+        <button class="btn primary" onclick="exportRig()">💾 Export rig.json</button>
+        <button class="btn secondary" onclick="copyJSON()">📋 Copy JSON</button>
+      </div>
+      <div id="export-msg" style="font-size:11px;color:var(--green);min-height:16px;text-align:center;"></div>
+
+      <div id="setup-summary" style="font-size:11px;color:var(--text2);line-height:1.9;padding:10px 12px;background:var(--panel2);border-radius:6px;border:1px solid var(--border);"></div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="btn" onclick="goStep(4)">← Back</button>
+    <div class="step-info">Step 6 of 6</div>
+    <div></div>
+  </div>
+</div>
+
+</div><!-- /content -->
 
 <script>
 'use strict';
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
+// ── Global state ───────────────────────────────────────────────────────────────
+let baseImage = null, spriteName = '';
+let perspective = '3q-left';
+let blinkMode = 'overlay';
+let blinkOverlay = null;
+let currentStep = 0;
 
-const canvas  = document.getElementById('preview');
-const ctx     = canvas.getContext('2d');
+const REGION_KEYS = ['eyeLeft','eyeRight','mouth','browLeft','browRight'];
+const REGION_COLORS = {
+  eyeLeft:'#5890d8',eyeRight:'#5890d8',
+  mouth:'#d85070',browLeft:'#88b840',browRight:'#88b840'
+};
+const regions = Object.fromEntries(REGION_KEYS.map(k=>[k,null]));
 
-let baseImage  = null;
-let spriteName = '';
-let tool       = 'mark';   // 'mark' | 'select' | 'preview'
-let animMode   = 'idle';   // 'idle' | 'blink' | 'talking'
-let playing    = false;
-let startTime  = 0;
-let rafId      = null;
-let globalSpeed = 1.0;
-let activeRegionKey = 'eyeLeft';
+// Preston Blair phoneme set — standard 8 mouth shapes
+const PHONEMES = [
+  {
+    key:'rest', name:'Rest / Closed', phonetic:'"M" "B" "P"', req:true,
+    desc:'Lips pressed gently together. Default neutral — use this between words or in silence.',
+    shape:'━',
+  },
+  {
+    key:'A', name:'Open — Ah', phonetic:'"ah" "aw" "I" "Ai"', req:true,
+    desc:'Wide open mouth, jaw dropped. Most open position. "father", "sky", "ride".',
+    shape:'◯',
+  },
+  {
+    key:'O', name:'Round — Oh', phonetic:'"oh" "ow" "U"', req:true,
+    desc:'Round, medium opening. Lips pushed slightly forward. "go", "know", "you".',
+    shape:'○',
+  },
+  {
+    key:'E', name:'Smile — Ee', phonetic:'"ee" "i" "ay"', req:false,
+    desc:'Wide smile showing teeth. Lips pulled back horizontally. "see", "eat", "say".',
+    shape:'⌣',
+  },
+  {
+    key:'U', name:'Pucker — Oo', phonetic:'"oo" "w" "wh"', req:false,
+    desc:'Small tight round opening, lips pushed very forward. "blue", "who", "wow".',
+    shape:'•',
+  },
+  {
+    key:'F', name:'Bite — Ff', phonetic:'"f" "v"', req:false,
+    desc:'Upper front teeth rest on lower lip. "five", "very", "love".',
+    shape:'⌐',
+  },
+  {
+    key:'L', name:'Tongue — Lh', phonetic:'"l" "th" "d" "n"', req:false,
+    desc:'Tongue tip visible at or behind upper teeth. "love", "the", "no", "day".',
+    shape:'△',
+  },
+  {
+    key:'Sch', name:'Slight — Sh', phonetic:'"s" "sh" "ch" "z"', req:false,
+    desc:'Slightly parted, teeth nearly together. "see", "she", "choose", "zero".',
+    shape:'᎑',
+  },
+];
 
-// Regions in image-pixel space: { x, y, w, h, lidColor? }
-const regions = {
-  eyeLeft:   null,
-  eyeRight:  null,
-  mouth:     null,
-  browLeft:  null,
-  browRight: null,
+const phonemeImages = Object.fromEntries(PHONEMES.map(p=>[p.key,null]));
+
+const previewParams = {
+  speed:1.0, breatheScale:0.006, floatPx:3, blinkInterval:3500, crossfadeMs:55
 };
 
-// Pre-rendered eye/brow patches (offscreen Canvas)
-const patches = {
-  eyeLeft:   null,
-  eyeRight:  null,
-  browLeft:  null,
-  browRight: null,
+// Preview playback state
+let prevPlaying=false, prevStartTime=0, prevRafId=null, prevMode='idle';
+let blinkNextAt=1500, blinkPhaseStart=null;
+
+// Talking state — cross-faded phoneme transitions
+let talkCur={key:'rest',holdEnd:0}, talkPrev={key:'rest'}, talkFadeStart=0;
+
+// Phoneme hold durations (ms) and Markov transition weights
+// Consonants flash briefly; vowels and REST hold longer
+const PH_HOLD = {
+  rest:[80,200], A:[80,160], O:[70,140], E:[60,120],
+  U:[60,120], F:[25,60], L:[25,60], Sch:[30,65],
+};
+// next:[weight,...] — weights need not sum to 1
+const PH_MARKOV = {
+  rest:{ rest:.5, A:3.5, O:2,   E:1,   U:.5,  F:.4,  L:.4,  Sch:.4 },
+  A:   { rest:3,  A:.3,  O:2,   E:1.2, U:.5,  F:.4,  L:.6,  Sch:.4 },
+  O:   { rest:3,  A:2,   O:.3,  E:.6,  U:1.2, F:.3,  L:.3,  Sch:.4 },
+  E:   { rest:3,  A:2,   O:1,   E:.2,  U:.5,  F:.3,  L:1.2, Sch:.6 },
+  U:   { rest:3,  A:1,   O:2,   E:.5,  U:.2,  F:.3,  L:.3,  Sch:.3 },
+  F:   { rest:3,  A:2,   O:.8,  E:.8,  U:.3,  F:.1,  L:.5,  Sch:.6 },
+  L:   { rest:2,  A:2,   O:.8,  E:.8,  U:.3,  F:.3,  L:.1,  Sch:.6 },
+  Sch: { rest:2,  A:2,   O:.8,  E:.8,  U:.3,  F:.4,  L:.6,  Sch:.1 },
 };
 
-const overlays = { eyeClosed: null, mouthOpen: null };
-
-const params = {
-  breatheScale:  0.006,
-  floatPx:       3,
-  breatheSpeed:  1.0,
-  blinkInterval: 3500,
-  blinkCloseMs:  80,
-  blinkHoldMs:   55,
-  blinkOpenMs:   100,
-  talkSpeed:     1.0,
-  talkMaxOpen:   0.70,
-  browRaise:     0.30,
-};
-
-// ─── BLINK SCHEDULER ─────────────────────────────────────────────────────────
-
-const blinkSched = {
-  _nextBlink: 1500,
-  _blinkStart: null,
-  reset() { this._nextBlink = 1000 + Math.random() * 2000; this._blinkStart = null; },
-  getValue(t) {
-    if (!document.getElementById('cb-autoblink').checked && animMode !== 'blink') return 0;
-    const dur = params.blinkCloseMs + params.blinkHoldMs + params.blinkOpenMs;
-    if (t >= this._nextBlink && this._blinkStart === null) {
-      this._blinkStart = t;
-      const jitter = params.blinkInterval * (0.7 + Math.random() * 0.6);
-      this._nextBlink = t + dur + jitter;
-    }
-    if (this._blinkStart === null) return 0;
-    const el = t - this._blinkStart;
-    if (el >= dur) { this._blinkStart = null; return 0; }
-    if (el < params.blinkCloseMs) return smoothstep(el / params.blinkCloseMs);
-    if (el < params.blinkCloseMs + params.blinkHoldMs) return 1;
-    return 1 - smoothstep((el - params.blinkCloseMs - params.blinkHoldMs) / params.blinkOpenMs);
-  }
-};
-
-// ─── MATH ────────────────────────────────────────────────────────────────────
-
-function smoothstep(t) {
-  t = Math.max(0, Math.min(1, t));
-  return t * t * (3 - 2 * t);
+function pickNextPhoneme(cur) {
+  const available = PHONEMES.filter(p => phonemeImages[p.key] || p.key === 'rest');
+  if (available.length === 0) return 'rest';
+  const weights = PH_MARKOV[cur] || PH_MARKOV.rest;
+  let total = 0;
+  for (const p of available) total += weights[p.key] ?? 0.2;
+  let r = Math.random() * total;
+  for (const p of available) { r -= weights[p.key] ?? 0.2; if (r <= 0) return p.key; }
+  return available[0].key;
+}
+function holdDuration(key) {
+  const [lo,hi] = PH_HOLD[key] || [60,130];
+  return lo + Math.random()*(hi-lo);
 }
 
-function getBreathing(t) {
-  const s = params.breatheSpeed;
-  const sc = 1 + Math.sin(t * s * 0.00063) * params.breatheScale;
-  const fy = Math.sin(t * s * 0.000714) * params.floatPx;
-  return { scale: sc, floatY: fy };
+// ── Wizard ────────────────────────────────────────────────────────────────────
+function goStep(n) {
+  if (n===currentStep) return;
+  document.getElementById(`step-${currentStep}`)?.classList.remove('active');
+  document.getElementById(`step-${n}`)?.classList.add('active');
+  document.querySelectorAll('.wiz-step').forEach((el,i)=>{
+    el.classList.remove('active','done');
+    if (i<n) el.classList.add('done');
+    else if (i===n) el.classList.add('active');
+  });
+  currentStep = n;
+  if (n===2) initMarkCanvas();
+  if (n===4) buildPhonemeGrid();
+  if (n===5) { buildSummary(); startPreviewLoop(); }
 }
 
-function getTalkAmount(t) {
-  const s = params.talkSpeed;
-  const a = Math.abs(Math.sin(t * s * 0.025));
-  const b = Math.abs(Math.sin(t * s * 0.017 + 0.7));
-  const c = Math.abs(Math.sin(t * s * 0.0093 + 1.3));
-  return Math.min(1, (a * 0.5 + b * 0.3 + c * 0.2)) * params.talkMaxOpen;
-}
-
-// ─── TRANSFORM HELPERS ───────────────────────────────────────────────────────
-
-function getBaseTransform() {
-  if (!baseImage) return null;
-  const MARGIN = 0.88;
-  const s = Math.min(
-    canvas.width  / baseImage.width,
-    canvas.height / baseImage.height
-  ) * MARGIN;
-  const iw = baseImage.width  * s;
-  const ih = baseImage.height * s;
-  const ix = (canvas.width  - iw) / 2;
-  const iy = (canvas.height - ih) / 2;
-  return { ix, iy, iw, ih, s };
-}
-
-// image-space → canvas-space (ignores breathing, used for region drawing)
-function imgToCanvas(x, y, tf) {
-  return { x: tf.ix + x * tf.s, y: tf.iy + y * tf.s };
-}
-
-// canvas-space → image-space
-function canvasToImg(cx, cy, tf) {
-  return { x: (cx - tf.ix) / tf.s, y: (cy - tf.iy) / tf.s };
-}
-
-// ─── PATCH CREATION ──────────────────────────────────────────────────────────
-
-function createPatch(key) {
-  const r = regions[key];
-  if (!r || !baseImage) { patches[key] = null; return; }
-
-  const off = document.createElement('canvas');
-  off.width  = Math.ceil(r.w);
-  off.height = Math.ceil(r.h);
-  const offCtx = off.getContext('2d');
-  offCtx.drawImage(baseImage, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-
-  // Sample lid color from top rows + bottom rows of patch
-  if (key === 'eyeLeft' || key === 'eyeRight') {
-    const rows = Math.max(3, Math.floor(r.h * 0.15));
-    const topData   = offCtx.getImageData(0, 0, r.w, rows);
-    const botData   = offCtx.getImageData(0, r.h - rows, r.w, rows);
-    let rs=0,gs=0,bs=0,n=0;
-    for (const d of [topData.data, botData.data]) {
-      for (let i=0;i<d.length;i+=4) {
-        if (d[i+3] > 100) { rs+=d[i]; gs+=d[i+1]; bs+=d[i+2]; n++; }
-      }
-    }
-    r.lidColor = n>0
-      ? `rgb(${rs/n|0},${gs/n|0},${bs/n|0})`
-      : '#c0a07a';
-  }
-
-  patches[key] = off;
-}
-
-function rebuildPatches() {
-  for (const key of Object.keys(patches)) createPatch(key);
-}
-
-// ─── RENDERING ───────────────────────────────────────────────────────────────
-
-function applyBlink(ctx2, blinkT, tf) {
-  for (const key of ['eyeLeft','eyeRight']) {
-    const r = regions[key];
-    if (!r) continue;
-
-    const rx = tf.ix + r.x * tf.s;
-    const ry = tf.iy + r.y * tf.s;
-    const rw = r.w * tf.s;
-    const rh = r.h * tf.s;
-    const halfH = rh / 2;
-    const offset = blinkT * halfH;
-
-    ctx2.save();
-    ctx2.beginPath();
-    ctx2.rect(rx, ry, rw, rh);
-    ctx2.clip();
-
-    // Fill with eyelid color
-    ctx2.fillStyle = r.lidColor || '#c0a07a';
-    ctx2.fillRect(rx, ry, rw, rh);
-
-    // Check for overlay
-    if (overlays.eyeClosed && blinkT > 0.5) {
-      ctx2.globalAlpha = (blinkT - 0.5) * 2;
-      ctx2.drawImage(overlays.eyeClosed, tf.ix, tf.iy, tf.iw, tf.ih);
-      ctx2.globalAlpha = 1;
-    } else if (patches[key]) {
-      const p = patches[key];
-      // Top half → moves DOWN on close
-      ctx2.drawImage(p, 0, 0, p.width, p.height/2,
-                       rx, ry + offset, rw, halfH);
-      // Bottom half → moves UP on close
-      ctx2.drawImage(p, 0, p.height/2, p.width, p.height/2,
-                       rx, ry + halfH - offset, rw, halfH);
-    }
-
-    ctx2.restore();
-  }
-}
-
-function applyBrowRaise(ctx2, amount, tf) {
-  if (amount < 0.01) return;
-  for (const key of ['browLeft','browRight']) {
-    const r = regions[key];
-    const p = patches[key];
-    if (!r || !p) continue;
-
-    const rx = tf.ix + r.x * tf.s;
-    const ry = tf.iy + r.y * tf.s;
-    const rw = r.w * tf.s;
-    const rh = r.h * tf.s;
-    const raiseY = amount * rh * 0.5;
-
-    ctx2.save();
-    ctx2.beginPath();
-    ctx2.rect(rx, ry - rh, rw, rh * 2);
-    ctx2.clip();
-    ctx2.fillStyle = r.lidColor || '#c0a07a';
-    ctx2.fillRect(rx, ry, rw, rh);
-    ctx2.drawImage(p, 0, 0, p.width, p.height,
-                     rx, ry - raiseY, rw, rh);
-    ctx2.restore();
-  }
-}
-
-function applyTalk(ctx2, talkT, tf) {
-  const r = regions.mouth;
-  if (!r || talkT < 0.02) return;
-
-  // Use overlay if provided
-  if (overlays.mouthOpen && talkT > 0.15) {
-    ctx2.save();
-    ctx2.globalAlpha = smoothstep((talkT - 0.15) / 0.85);
-    ctx2.drawImage(overlays.mouthOpen, tf.ix, tf.iy, tf.iw, tf.ih);
-    ctx2.restore();
-    return;
-  }
-
-  const cx = tf.ix + (r.x + r.w * 0.5) * tf.s;
-  const cy = tf.iy + (r.y + r.h * 0.55) * tf.s;
-  const ow = r.w * tf.s * 0.78 * talkT;
-  const oh = r.h * tf.s * 0.85 * talkT;
-
-  if (ow < 1.5 || oh < 1.5) return;
-
-  ctx2.save();
-
-  // Dark oral cavity
-  ctx2.fillStyle = '#180806';
-  ctx2.beginPath();
-  ctx2.ellipse(cx, cy, ow/2, oh/2, 0, 0, Math.PI*2);
-  ctx2.fill();
-
-  // Upper teeth
-  if (oh > 5) {
-    ctx2.fillStyle = 'rgba(255,248,240,0.92)';
-    ctx2.beginPath();
-    ctx2.ellipse(cx, cy - oh*0.18, ow*0.42, oh*0.28, 0, 0, Math.PI);
-    ctx2.fill();
-  }
-
-  // Lower lip / tongue hint
-  if (oh > 10 && talkT > 0.45) {
-    const alpha = smoothstep((talkT - 0.45) / 0.55) * 0.55;
-    ctx2.fillStyle = `rgba(190,70,70,${alpha})`;
-    ctx2.beginPath();
-    ctx2.ellipse(cx, cy + oh*0.12, ow*0.28, oh*0.18, 0, 0, Math.PI);
-    ctx2.fill();
-  }
-
-  // Outer lip line
-  ctx2.strokeStyle = 'rgba(120,50,40,0.5)';
-  ctx2.lineWidth = 1;
-  ctx2.beginPath();
-  ctx2.ellipse(cx, cy, ow/2, oh/2, 0, 0, Math.PI*2);
-  ctx2.stroke();
-
-  ctx2.restore();
-}
-
-function drawRegionOutlines(ctx2, tf) {
-  const colors = {
-    eyeLeft:'#6090e0', eyeRight:'#6090e0',
-    mouth:'#e06080',
-    browLeft:'#a0c050', browRight:'#a0c050',
-  };
-  for (const [key, r] of Object.entries(regions)) {
-    if (!r) continue;
-    const x = tf.ix + r.x * tf.s;
-    const y = tf.iy + r.y * tf.s;
-    const w = r.w * tf.s;
-    const h = r.h * tf.s;
-    const isActive = key === activeRegionKey;
-    ctx2.strokeStyle = colors[key] || '#ffffff';
-    ctx2.lineWidth = isActive ? 2 : 1;
-    ctx2.setLineDash(isActive ? [] : [4,3]);
-    ctx2.strokeRect(x, y, w, h);
-    ctx2.setLineDash([]);
-
-    // Label
-    ctx2.fillStyle = colors[key] || '#ffffff';
-    ctx2.font = `bold ${Math.max(9,10*tf.s|0)}px Segoe UI, sans-serif`;
-    ctx2.fillText(key.replace('eye','eye ').replace('brow',' brow '), x+3, y-3);
-  }
-}
-
-function renderFrame(timestamp) {
-  if (!baseImage) { rafId = requestAnimationFrame(renderFrame); return; }
-
-  const t = playing ? (timestamp - startTime) * globalSpeed : 0;
-  const breathe = getBreathing(t);
-  const tf = getBaseTransform();
-  const blinkT = blinkSched.getValue(t);
-  const talkT  = (animMode === 'talking') ? getTalkAmount(t) : 0;
-  const browT  = (animMode === 'talking') ? talkT * params.browRaise : 0;
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // All drawing in breathing-transform space
-  const bpx = canvas.width  / 2;
-  const bpy = canvas.height / 2;
-
-  ctx.save();
-  ctx.translate(bpx, bpy + breathe.floatY);
-  ctx.scale(breathe.scale, breathe.scale);
-  ctx.translate(-bpx, -bpy);
-
-  // 1. Base image
-  ctx.drawImage(baseImage, tf.ix, tf.iy, tf.iw, tf.ih);
-
-  // 2. Blink
-  if (blinkT > 0.01) applyBlink(ctx, blinkT, tf);
-
-  // 3. Brow raise (during talk)
-  if (browT > 0.01) applyBrowRaise(ctx, browT, tf);
-
-  // 4. Talking
-  if (talkT > 0.02) applyTalk(ctx, talkT, tf);
-
-  // 5. Region overlays (mark / select mode)
-  if (tool !== 'preview' && document.getElementById('cb-showregions').checked) {
-    drawRegionOutlines(ctx, tf);
-  }
-
-  // 6. Current drag rect
-  if (dragState.active) {
-    const { x1,y1,x2,y2 } = dragState;
-    ctx.strokeStyle = '#a0c8ff';
-    ctx.lineWidth   = 1.5;
-    ctx.setLineDash([5,3]);
-    ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
-    ctx.setLineDash([]);
-  }
-
-  ctx.restore();
-
-  rafId = requestAnimationFrame(renderFrame);
-}
-
-// ─── DRAG TO MARK REGIONS ─────────────────────────────────────────────────────
-
-const dragState = { active:false, x1:0,y1:0,x2:0,y2:0 };
-let selectHandle = null; // { key, edge:'move'|'tl'|'tr'|'bl'|'br', ox,oy }
-
-canvas.addEventListener('mousedown', e => {
-  if (!baseImage) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = (e.clientX - rect.left) * (canvas.width  / rect.width);
-  const my = (e.clientY - rect.top)  * (canvas.height / rect.height);
-
-  if (tool === 'mark') {
-    dragState.active = true;
-    dragState.x1 = dragState.x2 = mx;
-    dragState.y1 = dragState.y2 = my;
-  } else if (tool === 'select') {
-    startSelectDrag(mx, my);
-  }
-});
-
-canvas.addEventListener('mousemove', e => {
-  if (!baseImage) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = (e.clientX - rect.left) * (canvas.width  / rect.width);
-  const my = (e.clientY - rect.top)  * (canvas.height / rect.height);
-
-  if (tool === 'mark' && dragState.active) {
-    dragState.x2 = mx;
-    dragState.y2 = my;
-  } else if (tool === 'select' && selectHandle) {
-    doSelectDrag(mx, my);
-  }
-  updateCursor(mx, my);
-});
-
-canvas.addEventListener('mouseup', e => {
-  if (tool === 'mark' && dragState.active) {
-    dragState.active = false;
-    commitMarkRegion();
-  } else if (tool === 'select' && selectHandle) {
-    selectHandle = null;
-  }
-});
-
-canvas.addEventListener('mouseleave', () => {
-  if (tool === 'mark') dragState.active = false;
-  selectHandle = null;
-});
-
-function commitMarkRegion() {
-  const tf = getBaseTransform();
-  if (!tf) return;
-  const { x1,y1,x2,y2 } = dragState;
-  const left   = Math.min(x1,x2);
-  const top    = Math.min(y1,y2);
-  const width  = Math.abs(x2-x1);
-  const height = Math.abs(y2-y1);
-  if (width < 5 || height < 5) return;
-
-  const imgX = (left   - tf.ix) / tf.s;
-  const imgY = (top    - tf.iy) / tf.s;
-  const imgW = width   / tf.s;
-  const imgH = height  / tf.s;
-
-  regions[activeRegionKey] = { x:imgX, y:imgY, w:imgW, h:imgH };
-  createPatch(activeRegionKey);
-  updateRegionUI();
-
-  // Auto-advance to next unmarked region
-  const order = ['eyeLeft','eyeRight','mouth','browLeft','browRight'];
-  const idx = order.indexOf(activeRegionKey);
-  for (let i=1;i<order.length;i++) {
-    const next = order[(idx+i)%order.length];
-    if (!regions[next]) { setActiveRegion(next); break; }
-  }
-}
-
-function startSelectDrag(mx, my) {
-  const tf = getBaseTransform();
-  if (!tf) return;
-  const HANDLE = 10;
-  for (const [key, r] of Object.entries(regions)) {
-    if (!r) continue;
-    const rx = tf.ix + r.x * tf.s;
-    const ry = tf.iy + r.y * tf.s;
-    const rw = r.w * tf.s;
-    const rh = r.h * tf.s;
-    // Check corner handles
-    for (const [edge, hx, hy] of [
-      ['tl', rx,    ry   ],['tr', rx+rw,ry   ],
-      ['bl', rx,    ry+rh],['br', rx+rw,ry+rh],
-    ]) {
-      if (Math.abs(mx-hx)<HANDLE && Math.abs(my-hy)<HANDLE) {
-        setActiveRegion(key);
-        selectHandle = { key, edge, ox:mx, oy:my, r:{...r} };
-        return;
-      }
-    }
-    // Check body (move)
-    if (mx>rx && mx<rx+rw && my>ry && my<ry+rh) {
-      setActiveRegion(key);
-      selectHandle = { key, edge:'move', ox:mx, oy:my, r:{...r} };
-      return;
-    }
-  }
-}
-
-function doSelectDrag(mx, my) {
-  const tf = getBaseTransform();
-  if (!tf || !selectHandle) return;
-  const { key, edge, ox, oy, r } = selectHandle;
-  const dx = (mx-ox)/tf.s;
-  const dy = (my-oy)/tf.s;
-  let nr = {...r};
-  switch(edge) {
-    case 'move': nr.x=r.x+dx; nr.y=r.y+dy; break;
-    case 'tl':   nr.x=r.x+dx; nr.y=r.y+dy; nr.w=r.w-dx; nr.h=r.h-dy; break;
-    case 'tr':   nr.y=r.y+dy; nr.w=r.w+dx; nr.h=r.h-dy; break;
-    case 'bl':   nr.x=r.x+dx; nr.w=r.w-dx; nr.h=r.h+dy; break;
-    case 'br':   nr.w=r.w+dx; nr.h=r.h+dy; break;
-  }
-  if (nr.w < 5 || nr.h < 5) return;
-  regions[key] = nr;
-  createPatch(key);
-  updateRegionUI();
-}
-
-function updateCursor(mx, my) {
-  if (tool === 'mark') { canvas.style.cursor='crosshair'; return; }
-  if (tool === 'preview') { canvas.style.cursor='default'; return; }
-  const tf = getBaseTransform();
-  if (!tf) return;
-  const HANDLE=10;
-  for (const r of Object.values(regions)) {
-    if (!r) continue;
-    const rx=tf.ix+r.x*tf.s,ry=tf.iy+r.y*tf.s,rw=r.w*tf.s,rh=r.h*tf.s;
-    for (const [,hx,hy,cur] of [
-      ['tl',rx,ry,'nw-resize'],['tr',rx+rw,ry,'ne-resize'],
-      ['bl',rx,ry+rh,'sw-resize'],['br',rx+rw,ry+rh,'se-resize'],
-    ]) {
-      if (Math.abs(mx-hx)<HANDLE && Math.abs(my-hy)<HANDLE) {
-        canvas.style.cursor=cur; return;
-      }
-    }
-    if (mx>rx&&mx<rx+rw&&my>ry&&my<ry+rh) { canvas.style.cursor='move'; return; }
-  }
-  canvas.style.cursor='default';
-}
-
-// ─── AUTO-DETECT REGIONS ────────────────────────────────────────────────────
-
-function autoDetect() {
-  if (!baseImage) { showMsg('Load a sprite first.'); return; }
-
-  // Render base image to an offscreen canvas to read pixels
-  const off = document.createElement('canvas');
-  off.width = baseImage.width; off.height = baseImage.height;
-  const oc = off.getContext('2d');
-  oc.drawImage(baseImage, 0, 0);
-
-  const { data, width, height } = oc.getImageData(0, 0, off.width, off.height);
-  const W = width, H = height;
-
-  // Find bounding box of non-transparent pixels
-  let minX=W,maxX=0,minY=H,maxY=0;
-  for (let y=0;y<H;y++) for (let x=0;x<W;x++) {
-    if (data[(y*W+x)*4+3]>30) {
-      if(x<minX)minX=x;if(x>maxX)maxX=x;
-      if(y<minY)minY=y;if(y>maxY)maxY=y;
-    }
-  }
-  const faceCX = (minX+maxX)/2;
-  const faceCY = (minY+maxY)/2;
-  const faceW  = maxX-minX;
-  const faceH  = maxY-minY;
-
-  // Heuristic regions based on typical face proportions
-  // Eyes: 30-45% height, left/right of center
-  const eyeY  = faceCY - faceH * 0.08;
-  const eyeH  = faceH  * 0.14;
-  const eyeW  = faceW  * 0.20;
-  const eyeOff = faceW * 0.155;
-
-  regions.eyeLeft  = { x: faceCX-eyeOff-eyeW/2, y: eyeY-eyeH/2, w: eyeW, h: eyeH };
-  regions.eyeRight = { x: faceCX+eyeOff-eyeW/2, y: eyeY-eyeH/2, w: eyeW, h: eyeH };
-
-  // Mouth: 68% of face height
-  const mouthY = faceCY + faceH * 0.18;
-  const mouthW = faceW * 0.30;
-  const mouthH = faceH * 0.12;
-  regions.mouth = { x: faceCX-mouthW/2, y: mouthY-mouthH/2, w: mouthW, h: mouthH };
-
-  // Brows: just above eyes
-  const browY = eyeY - eyeH * 0.9;
-  const browH = eyeH * 0.45;
-  const browW = eyeW * 1.2;
-  regions.browLeft  = { x: faceCX-eyeOff-browW/2, y: browY, w: browW, h: browH };
-  regions.browRight = { x: faceCX+eyeOff-browW/2, y: browY, w: browW, h: browH };
-
-  rebuildPatches();
-  updateRegionUI();
-  showMsg('Auto-detected — adjust with Select tool');
-}
-
-// ─── IMAGE LOADING ─────────────────────────────────────────────────────────
-
+// ── Step 1 ────────────────────────────────────────────────────────────────────
 function loadDefault() {
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.onload = () => setBaseImage(img, 'guide-character-bubble-icon.png');
-  img.onerror = () => showMsg('Could not load default sprite — try uploading manually.');
+  const img = new Image(); img.crossOrigin='anonymous';
+  img.onload  = ()=> setBaseImage(img,'guide-character-bubble-icon.png');
+  img.onerror = ()=> alert('Default sprite not found at ../../assets/sprites/guide-characters/laurah-dragonMaster/guide-character-bubble-icon.png\nPlease upload manually.');
   img.src = '../../assets/sprites/guide-characters/laurah-dragonMaster/guide-character-bubble-icon.png';
 }
-
-function loadFile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => setBaseImage(img, file.name);
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+function loadSpriteFile(input) {
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{const img=new Image(); img.onload=()=>setBaseImage(img,f.name); img.src=e.target.result;};
+  r.readAsDataURL(f);
+}
+function setBaseImage(img,name) {
+  baseImage=img; spriteName=name;
+  const p=document.getElementById('sprite-preview-img');
+  p.src=img.src; p.style.display='block';
+  document.getElementById('sprite-placeholder').style.display='none';
+  document.getElementById('sprite-meta').textContent=`${img.width}×${img.height} · ${name}`;
+  document.getElementById('next-0').disabled=false;
+  for (const k of REGION_KEYS) regions[k]=null;
 }
 
-function setBaseImage(img, name) {
-  baseImage  = img;
-  spriteName = name;
-  document.getElementById('sprite-name').textContent = name;
-  document.getElementById('hint').textContent = 'Mark regions: drag to define L.Eye, R.Eye, Mouth';
-  document.getElementById('status-pill').textContent = `${img.width}×${img.height}`;
-  // Reset regions
-  for (const k of Object.keys(regions)) regions[k]=null;
-  for (const k of Object.keys(patches)) patches[k]=null;
-  updateRegionUI();
+// ── Step 2 ────────────────────────────────────────────────────────────────────
+const PERSP_INFO = {
+  'frontal':  '<strong style="color:var(--text)">Frontal.</strong> Both eyes are at the same height and symmetric in size. Mouth axis is horizontal. Mark eyes at the same vertical position. All overlays should be drawn straight-on.',
+  '3q-left':  '<strong style="color:var(--text)">3/4 Left (most common).</strong> The face turns toward the viewer\'s left. The <em>right eye</em> (from your view) is the near eye — it is larger and slightly lower. The <em>left eye</em> is the far eye — smaller and slightly higher. The mouth corners angle very slightly upward to the right. Draw all overlays to match this angle.',
+  '3q-right': '<strong style="color:var(--text)">3/4 Right.</strong> Mirror of 3/4 Left. The <em>left eye</em> (from your view) is the near eye — larger. The <em>right eye</em> is far — smaller. Mouth angles slightly upward to the left.',
+  'profile':  '<strong style="color:var(--text)">Profile.</strong> Only one eye is visible. Skip the far-eye region entirely — leave it unmarked. The mouth is seen from the side: a thin, curved line. Draw mouth overlays as side-profile lips.',
+};
+function selectPersp(el,val) {
+  document.querySelectorAll('.persp-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected'); perspective=val;
+  document.getElementById('persp-info').innerHTML = PERSP_INFO[val]||'';
 }
+// Set initial info
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('persp-info').innerHTML = PERSP_INFO['3q-left'];
+  updateRegionListUI();
+});
 
-function loadOverlay(key, input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      overlays[key] = img;
-      const el = document.getElementById(`ov-${key}`);
-      if (el) el.classList.add('loaded');
-      const lbl = el?.querySelector('.ov-label');
-      if (lbl) lbl.textContent = (key==='eyeClosed'?'👁':'👄') + ' ' + file.name.slice(0,18);
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+// ── Step 3: Region marking ─────────────────────────────────────────────────────
+let markCanvas, markCtx, activeRegKey='eyeLeft', markDrag=null;
+
+const REGION_INSTRUCTIONS = {
+  eyeLeft:  '<strong style="color:var(--eye)">Left Eye</strong> — Drag to outline the <em>entire</em> eye: iris, white, lid, lashes. Leave 2–3px margin on all sides. In 3/4 view this is usually the near (larger) eye.',
+  eyeRight: '<strong style="color:var(--eye)">Right Eye</strong> — Same as left. In 3/4-left view this is the far (smaller, slightly higher) eye. The region can be narrower.',
+  mouth:    '<strong style="color:var(--mouth)">Mouth</strong> — Cover the full mouth including lips. Make the box <em>tall enough to contain the most open phoneme shape</em> — wider than the resting mouth. The region must contain all mouth-overlay pixels.',
+  browLeft: '<strong style="color:var(--brow)">Left Brow</strong> — Cover the brow + space above for a raised position. Add ~50% extra height above the brow in the box.',
+  browRight:'<strong style="color:var(--brow)">Right Brow</strong> — Same as left brow. In 3/4 view the far brow appears slightly thinner.',
+};
+
+function initMarkCanvas() {
+  markCanvas = document.getElementById('mark-canvas');
+  markCtx    = markCanvas.getContext('2d');
+  if (!baseImage) return;
+  const maxW=420, maxH=380;
+  const s=Math.min(maxW/baseImage.width, maxH/baseImage.height);
+  markCanvas.width  = Math.round(baseImage.width*s);
+  markCanvas.height = Math.round(baseImage.height*s);
+  drawMarkCanvas();
+  markCanvas.onmousedown=e=>{const m=markMouse(e); markDrag={x1:m.mx,y1:m.my,x2:m.mx,y2:m.my};};
+  markCanvas.onmousemove=e=>{if(!markDrag) return; const m=markMouse(e); markDrag.x2=m.mx; markDrag.y2=m.my; drawMarkCanvas();};
+  markCanvas.onmouseup  =()=>{if(markDrag) commitRegion(markDrag); markDrag=null;};
+  markCanvas.onmouseleave=()=>{markDrag=null; drawMarkCanvas();};
 }
-
-function clearOverlay(key) {
-  overlays[key] = null;
-  const el = document.getElementById(`ov-${key}`);
-  if (el) el.classList.remove('loaded');
-  const lbl = el?.querySelector('.ov-label');
-  if (lbl) lbl.textContent = key==='eyeClosed'?'👁 Eye-closed':'👄 Mouth-open';
+function markMouse(e) {
+  const r=markCanvas.getBoundingClientRect();
+  return {mx:(e.clientX-r.left)*(markCanvas.width/r.width), my:(e.clientY-r.top)*(markCanvas.height/r.height)};
 }
-
-// ─── UI HELPERS ─────────────────────────────────────────────────────────────
-
-function setTool(t) {
-  tool = t;
-  ['mark','select','preview'].forEach(id =>
-    document.getElementById(`btn-${id}`)?.classList.toggle('active', id===t)
-  );
-  document.getElementById('hint').textContent =
-    t==='mark'    ? 'Drag to mark selected region' :
-    t==='select'  ? 'Click & drag regions to adjust' :
-                    'Preview mode — no overlays shown';
+function markScale(){return baseImage ? markCanvas.width/baseImage.width : 1;}
+function commitRegion(drag) {
+  if (!baseImage) return;
+  const s=markScale();
+  const x=Math.min(drag.x1,drag.x2)/s, y=Math.min(drag.y1,drag.y2)/s;
+  const w=Math.abs(drag.x2-drag.x1)/s, h=Math.abs(drag.y2-drag.y1)/s;
+  if (w<5||h<5) return;
+  regions[activeRegKey]={x,y,w,h};
+  updateRegionListUI(); drawMarkCanvas();
+  // Advance to next unmarked region
+  const i=REGION_KEYS.indexOf(activeRegKey);
+  for(let j=1;j<REGION_KEYS.length;j++){
+    const next=REGION_KEYS[(i+j)%REGION_KEYS.length];
+    if(!regions[next]){setActiveRegion(next);break;}
+  }
 }
-
-function setMode(m) {
-  animMode = m;
-  document.querySelectorAll('.anim-tab').forEach(b => {
-    b.classList.toggle('active', b.dataset.mode===m);
-    b.classList.toggle('idle',    m==='idle');
-    b.classList.toggle('blink',   m==='blink');
-    b.classList.toggle('talking', m==='talking');
-    if (!b.classList.contains('active')) {
-      b.classList.remove('idle','blink','talking');
-    }
-  });
-  if (m==='blink') blinkSched.reset();
+function drawMarkCanvas() {
+  if(!markCanvas||!baseImage) return;
+  const s=markScale();
+  markCtx.clearRect(0,0,markCanvas.width,markCanvas.height);
+  markCtx.drawImage(baseImage,0,0,markCanvas.width,markCanvas.height);
+  for(const [key,r] of Object.entries(regions)){
+    if(!r) continue;
+    const isA=key===activeRegKey, col=REGION_COLORS[key];
+    markCtx.globalAlpha=isA?1:0.55;
+    markCtx.strokeStyle=col; markCtx.lineWidth=isA?2:1;
+    markCtx.setLineDash(isA?[]:[4,3]);
+    markCtx.strokeRect(r.x*s,r.y*s,r.w*s,r.h*s);
+    markCtx.fillStyle=col; markCtx.globalAlpha=isA?.12:.05;
+    markCtx.fillRect(r.x*s,r.y*s,r.w*s,r.h*s);
+    markCtx.globalAlpha=1; markCtx.setLineDash([]);
+    markCtx.fillStyle=col; markCtx.font='10px Segoe UI,sans-serif';
+    markCtx.textBaseline='bottom';
+    markCtx.fillText(key, r.x*s+3, r.y*s-2);
+  }
+  if(markDrag){
+    const col=REGION_COLORS[activeRegKey]||'#fff';
+    const lx=Math.min(markDrag.x1,markDrag.x2), ly=Math.min(markDrag.y1,markDrag.y2);
+    const lw=Math.abs(markDrag.x2-markDrag.x1), lh=Math.abs(markDrag.y2-markDrag.y1);
+    markCtx.strokeStyle=col; markCtx.lineWidth=1.5; markCtx.setLineDash([5,3]);
+    markCtx.strokeRect(lx,ly,lw,lh);
+    markCtx.fillStyle=col; markCtx.globalAlpha=0.15; markCtx.fillRect(lx,ly,lw,lh);
+    markCtx.globalAlpha=1; markCtx.setLineDash([]);
+  }
 }
-
 function setActiveRegion(key) {
-  activeRegionKey = key;
-  document.querySelectorAll('.region-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.key===key);
-  });
-  updateRegionInfo();
+  activeRegKey=key;
+  document.querySelectorAll('.region-list-item').forEach(el=>
+    el.classList.toggle('active-region',el.dataset.key===key));
+  const inst=document.getElementById('region-instruction');
+  if(inst){inst.innerHTML=REGION_INSTRUCTIONS[key]||'';}
+  drawMarkCanvas();
+}
+function clearRegion(key){regions[key]=null;updateRegionListUI();drawMarkCanvas();}
+function updateRegionListUI(){
+  let count=0;
+  for(const key of REGION_KEYS){
+    const r=regions[key];
+    const el=document.getElementById(`rs-${key}`);
+    const item=document.querySelector(`.region-list-item[data-key="${key}"]`);
+    if(el){el.textContent=r?'✓ marked':'not marked'; el.style.color=r?'var(--green)':'var(--text2)';}
+    if(item) item.classList.toggle('marked',!!r);
+    if(r) count++;
+  }
+  const prog=document.getElementById('mark-progress');
+  if(prog) prog.textContent=`${count} / ${REGION_KEYS.length} regions marked`;
+  const btn=document.getElementById('next-2');
+  if(btn) btn.disabled=!(regions.eyeLeft&&regions.mouth);
 }
 
-function clearActiveRegion() {
-  regions[activeRegionKey] = null;
-  patches[activeRegionKey] = null;
-  updateRegionUI();
+// ── Step 4: Blink ─────────────────────────────────────────────────────────────
+function selectBlinkMode(m){
+  blinkMode=m;
+  document.getElementById('blink-opt-overlay')?.classList.toggle('selected',m==='overlay');
+  document.getElementById('blink-opt-computed')?.classList.toggle('selected',m==='computed');
+}
+function loadBlinkOverlay(input){
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    const img=new Image(); img.onload=()=>{
+      blinkOverlay=img;
+      const s=document.getElementById('blink-status');
+      s.textContent=`✓ ${f.name} (${img.width}×${img.height})`;
+      s.style.color='var(--green)';
+      const pc=document.getElementById('blink-preview-canvas');
+      const pctx=pc.getContext('2d');
+      pctx.clearRect(0,0,160,120);
+      if(baseImage) pctx.drawImage(baseImage,0,0,160,120);
+      pctx.drawImage(img,0,0,160,120);
+      pc.style.display='block';
+    }; img.src=e.target.result;
+  }; r.readAsDataURL(f);
 }
 
-function togglePlay() {
-  playing = !playing;
-  const btn = document.getElementById('play-btn');
-  if (playing) {
-    startTime = performance.now();
-    blinkSched.reset();
-    btn.textContent = '■ Stop';
-    btn.classList.add('playing');
+// ── Step 5: Phoneme grid ───────────────────────────────────────────────────────
+function buildPhonemeGrid(){
+  const grid=document.getElementById('phoneme-grid');
+  grid.innerHTML='';
+  for(const ph of PHONEMES){
+    const hasImg=!!phonemeImages[ph.key];
+    const card=document.createElement('div');
+    card.className='phoneme-card'+(ph.req&&!hasImg?' phoneme-required':'')+(hasImg?' phoneme-loaded':'');
+    card.id=`ph-card-${ph.key}`;
+    card.innerHTML=`
+      <div class="ph-header">
+        <div class="ph-key" title="${ph.phonetic}">${ph.key}</div>
+        <div style="display:flex;flex-direction:column;flex:1;min-width:0;">
+          <div class="ph-name">${ph.name}</div>
+          <div class="ph-examples" title="Phonetic examples">${ph.phonetic}</div>
+        </div>
+        ${ph.req?'<div style="font-size:9px;color:var(--accent);font-weight:700;border:1px solid rgba(192,120,48,.4);border-radius:3px;padding:1px 5px;flex-shrink:0;align-self:flex-start;">REQ</div>':''}
+      </div>
+      <div class="ph-preview">
+        <canvas width="120" height="86" id="ph-canvas-${ph.key}"></canvas>
+      </div>
+      <div class="ph-desc">${ph.desc}</div>
+      <div class="ph-actions">
+        <label class="inline-file" style="flex:1;">
+          ${hasImg?'🔄 Replace':'📁 Upload overlay'}
+          <input type="file" accept="image/png" onchange="loadPhoneme('${ph.key}',this)"/>
+        </label>
+        ${hasImg?`<button style="padding:5px 8px;font-size:11px;border:1px solid var(--red);color:var(--red);background:transparent;border-radius:6px;cursor:pointer;" onclick="clearPhoneme('${ph.key}')">✕</button>`:''}
+      </div>
+    `;
+    grid.appendChild(card);
+    renderPhonemePreview(ph.key);
+  }
+  updatePhonemeCount();
+}
+function renderPhonemePreview(key){
+  const c=document.getElementById(`ph-canvas-${key}`); if(!c) return;
+  const ctx2=c.getContext('2d');
+  ctx2.clearRect(0,0,120,86);
+  if(baseImage) ctx2.drawImage(baseImage,0,0,120,86);
+  const img=phonemeImages[key];
+  if(img) ctx2.drawImage(img,0,0,120,86);
+  else {
+    // Draw a mouth-shape doodle hint
+    const ph=PHONEMES.find(p=>p.key===key);
+    if(ph){
+      ctx2.fillStyle='rgba(216,80,112,0.2)';
+      ctx2.fillRect(35,50,50,22);
+      ctx2.font='bold 18px serif';
+      ctx2.fillStyle='rgba(216,80,112,0.7)';
+      ctx2.textAlign='center'; ctx2.textBaseline='middle';
+      ctx2.fillText(ph.shape||'?',60,61);
+    }
+  }
+}
+function loadPhoneme(key,input){
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{const img=new Image(); img.onload=()=>{phonemeImages[key]=img;buildPhonemeGrid();}; img.src=e.target.result;};
+  r.readAsDataURL(f);
+}
+function clearPhoneme(key){phonemeImages[key]=null;buildPhonemeGrid();}
+function updatePhonemeCount(){
+  const total=PHONEMES.length;
+  const loaded=PHONEMES.filter(p=>phonemeImages[p.key]).length;
+  const missingReq=PHONEMES.filter(p=>p.req&&!phonemeImages[p.key]).length;
+  const el=document.getElementById('phoneme-count'); if(!el) return;
+  el.innerHTML=`${loaded}/${total} shapes uploaded.`+(missingReq>0
+    ?` <span style="color:var(--accent);">${missingReq} required shape(s) missing.</span>`
+    :` <span style="color:var(--green);">All required shapes present ✓</span>`);
+}
+
+// ── Step 6: Preview ────────────────────────────────────────────────────────────
+function buildSummary(){
+  const el=document.getElementById('setup-summary'); if(!el) return;
+  const marked=REGION_KEYS.filter(k=>regions[k]).length;
+  const phonLoaded=PHONEMES.filter(p=>phonemeImages[p.key]).length;
+  el.innerHTML=
+    `<b>Sprite:</b> ${spriteName||'—'}<br>`+
+    `<b>Perspective:</b> ${perspective}<br>`+
+    `<b>Blink:</b> ${blinkMode==='overlay'&&blinkOverlay?'overlay ✓ ('+blinkOverlay.width+'×'+blinkOverlay.height+')':blinkMode==='overlay'?'overlay (no file yet)':'computed'}<br>`+
+    `<b>Regions:</b> ${marked}/${REGION_KEYS.length} marked<br>`+
+    `<b>Phonemes:</b> ${phonLoaded}/${PHONEMES.length} loaded`;
+}
+
+function startPreviewLoop(){
+  const canvas=document.getElementById('preview-canvas'); if(!canvas||!baseImage) return;
+  const s=Math.min(360/baseImage.width,360/baseImage.height);
+  canvas.width=Math.round(baseImage.width*s);
+  canvas.height=Math.round(baseImage.height*s);
+  if(prevRafId) cancelAnimationFrame(prevRafId);
+  prevPlaying=false;
+  const btn=document.getElementById('prev-play-btn');
+  if(btn){btn.textContent='▶ Play';btn.classList.remove('playing');}
+  prevRafId=requestAnimationFrame(renderPreviewFrame);
+}
+
+function togglePreviewPlay(){
+  prevPlaying=!prevPlaying;
+  const btn=document.getElementById('prev-play-btn'); if(!btn) return;
+  if(prevPlaying){
+    prevStartTime=performance.now();
+    blinkNextAt=1200+Math.random()*1200; blinkPhaseStart=null;
+    talkCur={key:'rest',holdEnd:0}; talkPrev={key:'rest'}; talkFadeStart=-9999;
+    btn.textContent='■ Stop'; btn.classList.add('playing');
   } else {
-    btn.textContent = '▶ Play';
-    btn.classList.remove('playing');
+    btn.textContent='▶ Play'; btn.classList.remove('playing');
   }
 }
 
-function updateParam(key, val, displayId, fmt) {
-  params[key] = val;
-  document.getElementById(displayId).textContent = fmt(val);
+function setPreviewMode(m){
+  prevMode=m;
+  document.querySelectorAll('.anim-tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===m));
+  if(!prevPlaying) togglePreviewPlay();
 }
 
-function resetBlink() { blinkSched.reset(); }
+function renderPreviewFrame(ts){
+  const canvas=document.getElementById('preview-canvas');
+  if(!canvas||!baseImage){prevRafId=requestAnimationFrame(renderPreviewFrame);return;}
+  const ctx2=canvas.getContext('2d');
+  const S=canvas.width/baseImage.width;
+  const t=prevPlaying?(ts-prevStartTime)*previewParams.speed:0;
 
-function updateRegionUI() {
-  const labels = {eyeLeft:'L.Eye',eyeRight:'R.Eye',mouth:'Mouth',browLeft:'L.Brow',browRight:'R.Brow'};
-  for (const [key, r] of Object.entries(regions)) {
-    const el = document.getElementById(`status-${key}`);
-    const item = document.querySelector(`.region-item[data-key="${key}"]`);
-    if (el) el.textContent = r ? '✓' : '—';
-    if (item) item.classList.toggle('has-region', !!r);
+  const breatheY=Math.sin(t*.00063)*previewParams.floatPx*S;
+  const breatheS=1+Math.sin(t*.000714)*previewParams.breatheScale;
+  const blinkT=getBlinkT(t);
+  const doTalk=prevMode==='talking'||prevMode==='all';
+  if(doTalk) advanceTalkState(t);
+
+  ctx2.clearRect(0,0,canvas.width,canvas.height);
+  ctx2.save();
+  const cx=canvas.width/2, cy=canvas.height/2;
+  ctx2.translate(cx,cy+breatheY);
+  ctx2.scale(breatheS,breatheS);
+  ctx2.translate(-cx,-cy);
+
+  // Base sprite
+  ctx2.drawImage(baseImage,0,0,canvas.width,canvas.height);
+
+  // Blink overlay
+  if((prevMode==='blink'||prevMode==='all')&&blinkT>.05){
+    if(blinkMode==='overlay'&&blinkOverlay){
+      ctx2.globalAlpha=blinkT;
+      ctx2.drawImage(blinkOverlay,0,0,canvas.width,canvas.height);
+      ctx2.globalAlpha=1;
+    } else {
+      for(const key of['eyeLeft','eyeRight']){
+        const r=regions[key]; if(!r) continue;
+        ctx2.fillStyle='rgba(140,100,80,0.94)';
+        ctx2.globalAlpha=blinkT;
+        ctx2.fillRect(r.x*S, r.y*S+(1-blinkT)*r.h*S*0.5, r.w*S, r.h*S*blinkT);
+        ctx2.globalAlpha=1;
+      }
+    }
   }
-  updateRegionInfo();
+
+  // Talking: cross-fade between previous and current phoneme overlays
+  if(doTalk){
+    const fadeT = Math.min(1,(t-talkFadeStart)/Math.max(1,previewParams.crossfadeMs));
+    // Draw outgoing (prev) at 1-fadeT, then incoming (cur) at fadeT
+    const drawPhoneme = (key, alpha) => {
+      if(alpha<0.01) return;
+      const img=phonemeImages[key];
+      if(img){
+        ctx2.globalAlpha=alpha;
+        ctx2.drawImage(img,0,0,canvas.width,canvas.height);
+        ctx2.globalAlpha=1;
+      } else if(regions.mouth && key!=='rest'){
+        const r=regions.mouth;
+        const ph=PHONEMES.find(p=>p.key===key);
+        const openness=ph?Math.min(1,(PHONEMES.indexOf(ph)+1)/PHONEMES.length)*0.85:0.4;
+        ctx2.globalAlpha=alpha;
+        ctx2.fillStyle='#1a0806';
+        ctx2.beginPath();
+        ctx2.ellipse(r.x*S+r.w*S/2,r.y*S+r.h*S/2,
+          r.w*S*(.25+openness*.18),r.h*S*(.28+openness*.32),0,0,Math.PI*2);
+        ctx2.fill();
+        ctx2.globalAlpha=1;
+      }
+    };
+    if(fadeT<1) drawPhoneme(talkPrev.key, smoothstep(1-fadeT));
+    drawPhoneme(talkCur.key, smoothstep(fadeT));
+  }
+
+  // Region outlines
+  if(document.getElementById('cb-show-regions')?.checked){
+    for(const[key,r]of Object.entries(regions)){
+      if(!r) continue;
+      ctx2.strokeStyle=REGION_COLORS[key]; ctx2.lineWidth=1;
+      ctx2.globalAlpha=.4; ctx2.setLineDash([4,3]);
+      ctx2.strokeRect(r.x*S,r.y*S,r.w*S,r.h*S);
+      ctx2.setLineDash([]); ctx2.globalAlpha=1;
+    }
+  }
+
+  ctx2.restore();
+  prevRafId=requestAnimationFrame(renderPreviewFrame);
 }
 
-function updateRegionInfo() {
-  const r = regions[activeRegionKey];
-  const el = document.getElementById('region-info');
-  if (!r) { el.textContent = 'No region marked.'; return; }
-  el.innerHTML =
-    `Key: <b>${activeRegionKey}</b><br>` +
-    `x: ${r.x.toFixed(1)}  y: ${r.y.toFixed(1)}<br>` +
-    `w: ${r.w.toFixed(1)}  h: ${r.h.toFixed(1)}<br>` +
-    (r.lidColor ? `Lid: <span style="color:${r.lidColor}">■</span> ${r.lidColor}` : '');
+function getBlinkT(t){
+  if(prevMode!=='blink'&&prevMode!=='all') return 0;
+  const dur=80+55+100;
+  if(t>=blinkNextAt&&blinkPhaseStart===null){
+    blinkPhaseStart=t;
+    blinkNextAt=t+dur+previewParams.blinkInterval*(.7+Math.random()*.6);
+  }
+  if(blinkPhaseStart===null) return 0;
+  const el=t-blinkPhaseStart;
+  if(el>=dur){blinkPhaseStart=null;return 0;}
+  if(el<80)   return smoothstep(el/80);
+  if(el<135)  return 1;
+  return 1-smoothstep((el-135)/100);
 }
-
-function showMsg(msg, dur=2500) {
-  const el = document.getElementById('export-msg');
-  el.textContent = msg;
-  setTimeout(()=>{ if(el.textContent===msg) el.textContent=''; }, dur);
+function advanceTalkState(t){
+  if(t>=talkCur.holdEnd){
+    const next=pickNextPhoneme(talkCur.key);
+    talkPrev={key:talkCur.key};
+    talkFadeStart=t;
+    talkCur={key:next, holdEnd:t+holdDuration(next)};
+  }
 }
+function smoothstep(t){t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);}
 
-// ─── EXPORT ──────────────────────────────────────────────────────────────────
-
-function buildRigJSON() {
-  const rigRegions = {};
-  for (const [k,r] of Object.entries(regions)) {
-    if (r) rigRegions[k] = { x:+r.x.toFixed(2), y:+r.y.toFixed(2), w:+r.w.toFixed(2), h:+r.h.toFixed(2), ...(r.lidColor?{lidColor:r.lidColor}:{}) };
+// ── Export ─────────────────────────────────────────────────────────────────────
+function buildRigData(){
+  const reg={};
+  for(const[k,r]of Object.entries(regions)){
+    if(r) reg[k]={x:+r.x.toFixed(1),y:+r.y.toFixed(1),w:+r.w.toFixed(1),h:+r.h.toFixed(1)};
   }
   return {
-    spriteKey: spriteName.replace(/\.[^.]+$/,'').replace(/[^a-z0-9_]/gi,'_'),
-    spriteFile: spriteName,
-    imageSize: baseImage ? { w: baseImage.width, h: baseImage.height } : null,
-    regions: rigRegions,
-    animations: {
-      idle: {
-        breatheScale:  params.breatheScale,
-        floatPx:       params.floatPx,
-        breatheSpeed:  params.breatheSpeed,
-      },
-      blink: {
-        intervalMs:  params.blinkInterval,
-        closeMs:     params.blinkCloseMs,
-        holdMs:      params.blinkHoldMs,
-        openMs:      params.blinkOpenMs,
-      },
-      talking: {
-        speed:      params.talkSpeed,
-        maxOpen:    params.talkMaxOpen,
-        browRaise:  params.browRaise,
-      },
+    spriteFile:spriteName,
+    imageSize:baseImage?{w:baseImage.width,h:baseImage.height}:null,
+    perspective,
+    blinkMode,
+    hasBlinkOverlay:!!blinkOverlay,
+    regions:reg,
+    phonemesAvailable:PHONEMES.filter(p=>phonemeImages[p.key]).map(p=>p.key),
+    phonemeSet:PHONEMES.map(p=>p.key),
+    animations:{
+      idle:{breatheScale:previewParams.breatheScale,floatPx:previewParams.floatPx},
+      blink:{intervalMs:previewParams.blinkInterval,closeMs:80,holdMs:55,openMs:100},
+      talking:{crossfadeMs:previewParams.crossfadeMs, holdMsRange:[60,200]},
     },
   };
 }
-
-function exportRig() {
-  if (!baseImage) { showMsg('Load a sprite first.'); return; }
-  const rig  = buildRigJSON();
-  const blob = new Blob([JSON.stringify(rig,null,2)], { type:'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url;
-  a.download = (rig.spriteKey || 'face') + '.face.rig.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  showMsg('Exported rig.json ✓');
+function exportRig(){
+  if(!baseImage){showMsg('Load a sprite first.');return;}
+  const json=JSON.stringify(buildRigData(),null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=(spriteName||'sprite').replace(/\.[^.]+$/,'')+'.face.rig.json';
+  a.click(); URL.revokeObjectURL(url);
+  showMsg('Exported ✓');
+}
+function copyJSON(){
+  if(!baseImage){showMsg('Load a sprite first.');return;}
+  navigator.clipboard.writeText(JSON.stringify(buildRigData(),null,2)).then(()=>showMsg('Copied ✓'));
+}
+function showMsg(m){
+  const el=document.getElementById('export-msg'); if(!el) return;
+  el.textContent=m; setTimeout(()=>{if(el.textContent===m)el.textContent='';},2500);
 }
 
-function copyRigJSON() {
-  if (!baseImage) { showMsg('Load a sprite first.'); return; }
-  navigator.clipboard.writeText(JSON.stringify(buildRigJSON(),null,2)).then(()=>showMsg('Copied to clipboard ✓'));
-}
-
-function exportSpriteSheet() {
-  if (!baseImage) { showMsg('Load a sprite first.'); return; }
-
-  const FRAMES   = 24;
-  const COLS     = 8;
-  const ROWS     = Math.ceil(FRAMES / COLS);
-  const FW       = baseImage.width;
-  const FH       = baseImage.height;
-
-  const sheet    = document.createElement('canvas');
-  sheet.width    = FW * COLS;
-  sheet.height   = FH * ROWS;
-  const sc       = sheet.getContext('2d');
-
-  // Render FRAMES frames of the talking animation at even time steps
-  const tf = { ix:0, iy:0, iw:FW, ih:FH, s:1 };
-
-  for (let f=0; f<FRAMES; f++) {
-    const t      = (f / FRAMES) * 3000; // 3s cycle
-    const talkT  = getTalkAmount(t);
-    const col    = f % COLS;
-    const row    = Math.floor(f / COLS);
-    const ox     = col * FW;
-    const oy     = row * FH;
-
-    sc.save();
-    sc.translate(ox, oy);
-    sc.drawImage(baseImage, 0, 0);
-    if (talkT > 0.02) applyTalk(sc, talkT, tf);
-    sc.restore();
-  }
-
-  sheet.toBlob(blob => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (spriteName.replace(/\.[^.]+$/,'') || 'face') + '-frames.png';
-    a.click();
-    URL.revokeObjectURL(url);
-    showMsg(`Exported ${FRAMES}-frame sprite sheet ✓`);
-  });
-}
-
-// ─── INIT ─────────────────────────────────────────────────────────────────
-
-function resizeCanvas() {
-  const wrap = document.getElementById('canvas-wrap');
-  const sz   = Math.min(wrap.clientWidth, wrap.clientHeight, 600);
-  canvas.style.width  = sz + 'px';
-  canvas.style.height = sz + 'px';
-}
-
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-// Start RAF
-rafId = requestAnimationFrame(renderFrame);
-
-// Auto-load Laurah
+// Init
 loadDefault();
 </script>
 </body>
