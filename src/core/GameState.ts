@@ -1,4 +1,4 @@
-import { ENERGY_START, energyMaxForLevel, LEVEL_XP } from './Constants';
+import { EMBERFONT, ENERGY_START, energyMaxForLevel, LEVEL_XP } from './Constants';
 import type {
   BoardItemState,
   ItemKind,
@@ -32,8 +32,17 @@ export class GameState {
   keys = 0;
   xp = 0;
   completedOrderIds: string[] = [];
+  claimedMilestoneIds: string[] = [];
   tutorialIndex = 0;
   tutorialDone = false;
+
+  /* Emberfont (Spark Well) — mutated only by EmberfontSystem. */
+  emberSparks: number = EMBERFONT.startSparks;
+  emberSparkAt = 0;
+  emberStoke = 0;
+  emberStokeAt = 0;
+  emberSurgeUntil = 0;
+  emberVeinIndex = 0;
 
   constructor(private map: MapData) {
     this.cols = map.cols;
@@ -63,8 +72,15 @@ export class GameState {
     this.keys = 0;
     this.xp = 0;
     this.completedOrderIds = [];
+    this.claimedMilestoneIds = [];
     this.tutorialIndex = 0;
     this.tutorialDone = false;
+    this.emberSparks = EMBERFONT.startSparks;
+    this.emberSparkAt = now;
+    this.emberStoke = 0;
+    this.emberStokeAt = now;
+    this.emberSurgeUntil = 0;
+    this.emberVeinIndex = 0;
   }
 
   hydrate(save: SaveDataV1): void {
@@ -83,6 +99,14 @@ export class GameState {
     this.keys = save.keys;
     this.xp = save.xp;
     this.completedOrderIds = [...save.orderProgress.completedIds];
+    this.claimedMilestoneIds = [...(save.milestoneProgress?.claimedIds ?? [])];
+    const ef = save.emberfontProgress;
+    this.emberSparks = ef ? ef.sparks : EMBERFONT.startSparks;
+    this.emberSparkAt = ef ? ef.sparkAt : save.energy.lastRegenAt;
+    this.emberStoke = ef ? ef.stoke : 0;
+    this.emberStokeAt = ef ? ef.stokeAt : save.energy.lastRegenAt;
+    this.emberSurgeUntil = ef ? ef.surgeUntil : 0;
+    this.emberVeinIndex = ef ? ef.veinIndex : 0;
     this.tutorialIndex = save.tutorial.index;
     this.tutorialDone = save.tutorial.done;
   }
@@ -99,6 +123,15 @@ export class GameState {
       keys: this.keys,
       xp: this.xp,
       orderProgress: { completedIds: [...this.completedOrderIds] },
+      milestoneProgress: { claimedIds: [...this.claimedMilestoneIds] },
+      emberfontProgress: {
+        sparks: this.emberSparks,
+        sparkAt: this.emberSparkAt,
+        stoke: this.emberStoke,
+        stokeAt: this.emberStokeAt,
+        surgeUntil: this.emberSurgeUntil,
+        veinIndex: this.emberVeinIndex
+      },
       tutorial: { index: this.tutorialIndex, done: this.tutorialDone }
     };
   }

@@ -37,6 +37,8 @@ export class AudioManager {
     bus.on('order:completed', () => this.fanfare());
     bus.on('keeper:leveled', () => this.levelUp());
     bus.on('region:unlocked', () => this.fogWhoosh());
+    bus.on('emberfont:sparked', () => this.sparkPop());
+    bus.on('emberfont:surge', ({ active }) => { if (active) this.surgeRoar(); });
     bus.on('item:move_bounced', () => this.deny(140, 0.05));
     bus.on('item:harvest_failed', () => this.deny(200, 0.07));
     bus.on('ui:ledger_toggled', () => this.click());
@@ -182,6 +184,20 @@ export class AudioManager {
     this.tone(880, 0.1, { type: 'sine', gain: 0.07, delay: 0, release: 0.18 });
     this.tone(1320, 0.12, { type: 'triangle', gain: 0.06, delay: 0.07, release: 0.2 });
     this.noiseSweep(0.18, 3200, 6400, 0.025, 0.02);
+  }
+
+  /** A bright ember blip when the Spark Well draws a vein. */
+  private sparkPop(): void {
+    this.tone(520, 0.06, { type: 'triangle', gain: 0.14, slideTo: 940 });
+    this.tone(1180, 0.05, { type: 'sine', gain: 0.05, delay: 0.05 });
+    this.noiseSweep(0.12, 3000, 6200, 0.02);
+  }
+
+  /** A warm rising roar as the well ignites into a Surge. */
+  private surgeRoar(): void {
+    this.noiseSweep(0.5, 300, 2200, 0.08);
+    this.tone(150, 0.5, { type: 'sawtooth', gain: 0.08, slideTo: 440, release: 0.4 });
+    this.tone(300, 0.42, { type: 'triangle', gain: 0.05, delay: 0.06, slideTo: 660, release: 0.35 });
   }
 
   private coinBlip(): void {

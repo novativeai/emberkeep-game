@@ -1,13 +1,23 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
-import { ENERGY_REGEN_MS, GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
+import {
+  ENERGY_REGEN_MS,
+  GAME_WIDTH,
+  LEVELUP_REWARD,
+  LIVE_GAME_HEIGHT,
+  num,
+  PALETTE,
+  SCENES
+} from '../core/Constants';
 import { gridToWorld } from '../core/iso';
 import type { ResolvedArrow, ResolvedHand, TilePos, TutorialStepEvent } from '../core/types';
 import { CharacterBubble } from '../entities/CharacterBubble';
 import { EndScreen } from '../ui/EndScreen';
 import { Hud } from '../ui/Hud';
 import { LedgerPanel } from '../ui/LedgerPanel';
+import { MilestoneGift } from '../ui/MilestoneGift';
 import { ShopPanel } from '../ui/ShopPanel';
+import { StokeMeter } from '../ui/StokeMeter';
 import { renderScale } from '../core/render-scale';
 import { getMusicMuted, setMusicMuted } from '../audio/musicPref';
 import { Tooltip } from '../ui/Tooltip';
@@ -30,6 +40,8 @@ export class UIScene extends Phaser.Scene {
   private tooltip!: Tooltip;
   private ledger!: LedgerPanel;
   private shop!: ShopPanel;
+  private milestoneGift!: MilestoneGift;
+  private stokeMeter!: StokeMeter;
   private bubble!: CharacterBubble;
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
@@ -71,6 +83,16 @@ export class UIScene extends Phaser.Scene {
 
     this.shop = new ShopPanel(this, this.ctx.bus);
     this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
+
+    // Milestone "gift" — a round 🎁 button (bottom-right) that unfolds the quest
+    // field to its left when tapped.
+    this.milestoneGift = new MilestoneGift(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 344);
+    this.milestoneGift.setDepth(DEPTH_HUD);
+
+    // The Emberfont "Spark Well" — a round orb parked in the bottom-left corner.
+    // Hidden until the tutorial finishes (the well wakes post-tutorial).
+    this.stokeMeter = new StokeMeter(this, this.ctx.bus, 132, LIVE_GAME_HEIGHT - 300);
+    this.stokeMeter.setDepth(DEPTH_HUD);
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
@@ -285,25 +307,45 @@ export class UIScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT * 0.34;
     const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);
-    const g = this.add.graphics();
-    g.fillStyle(num(PALETTE.night), 0.22);
-    g.fillRoundedRect(-360, -96 + 10, 720, 192, 30);
-    g.fillStyle(num(PALETTE.gold), 1);
-    g.fillRoundedRect(-360, -96, 720, 192, 30);
-    g.fillStyle(0xfffdf6, 1);
-    g.fillRoundedRect(-348, -84, 696, 168, 24);
-    const ribbon = this.add
-      .text(0, -46, `KEEPER LEVEL ${level}`, {
-        fontFamily: FONT, fontSize: '60px', fontStyle: 'bold', color: PALETTE.textBrown
-      })
-      .setOrigin(0.5)
-      .setStroke(PALETTE.cream, 6);
-    const sub = this.add
-      .text(0, 34, '⚡ Warmth refilled    ◎ Gold reward', {
-        fontFamily: FONT, fontSize: '34px', fontStyle: 'bold', color: PALETTE.goldShade
-      })
-      .setOrigin(0.5);
-    c.add([g, ribbon, sub]);
+    const coins = LEVELUP_REWARD.coinsBase + level * LEVELUP_REWARD.coinsPerLevel;
+
+    if (this.textures.exists('ui_levelup_emblem')) {
+      // Winged-medal emblem (honeur.png): the level number sits in the medal, the
+      // prize in the "Prix:" banner baked into the art.
+      const emblem = this.add.image(0, 0, 'ui_levelup_emblem').setScale(0.62);
+      const levelNum = this.add
+        .text(0, -12, `${level}`, {
+          fontFamily: FONT, fontSize: '150px', fontStyle: 'bold', color: PALETTE.textBrown
+        })
+        .setOrigin(0.5)
+        .setStroke('#fff7e0', 8);
+      const prize = this.add
+        .text(120, 250, `🪙 ${coins}  ⚡`, {
+          fontFamily: FONT, fontSize: '46px', fontStyle: 'bold', color: '#ffffff'
+        })
+        .setOrigin(0, 0.5)
+        .setStroke(PALETTE.plumShade, 6);
+      c.add([emblem, levelNum, prize]);
+    } else {
+      // Fallback (emblem art missing): the plain gold banner.
+      const g = this.add.graphics();
+      g.fillStyle(num(PALETTE.gold), 1);
+      g.fillRoundedRect(-360, -96, 720, 192, 30);
+      g.fillStyle(0xfffdf6, 1);
+      g.fillRoundedRect(-348, -84, 696, 168, 24);
+      const ribbon = this.add
+        .text(0, -46, `KEEPER LEVEL ${level}`, {
+          fontFamily: FONT, fontSize: '60px', fontStyle: 'bold', color: PALETTE.textBrown
+        })
+        .setOrigin(0.5)
+        .setStroke(PALETTE.cream, 6);
+      const sub = this.add
+        .text(0, 34, `⚡ Warmth refilled    🪙 ${coins}`, {
+          fontFamily: FONT, fontSize: '34px', fontStyle: 'bold', color: PALETTE.goldShade
+        })
+        .setOrigin(0.5);
+      c.add([g, ribbon, sub]);
+    }
     // burst of sparks behind the banner.
     this.add
       .particles(cx, cy, 'fx_spark', {

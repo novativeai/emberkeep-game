@@ -115,6 +115,32 @@ export interface OrdersData {
   orders: OrderConfig[];
 }
 
+/** A "gift" goal shown by the quest journal: reach `count` of chain+tier on the
+ *  board, then claim `coins` (Farmland-style milestone chain). */
+export interface MilestoneConfig {
+  id: string;
+  chain: string;
+  tier: number;
+  count: number;
+  coins: number;
+}
+
+export interface MilestonesData {
+  milestones: MilestoneConfig[];
+}
+
+/** One drawable "vein" of the Emberfont Spark Well — a tier-1 merge piece the
+ *  well can draw, and its relative frequency in the draw cycle. */
+export interface EmberfontVein {
+  chain: string;
+  tier: number;
+  weight: number;
+}
+
+export interface EmberfontData {
+  veins: EmberfontVein[];
+}
+
 export interface MapItemPlacement {
   chain: string;
   tier: number;
@@ -314,6 +340,17 @@ export interface SaveDataV1 {
   keys: number;
   xp: number;
   orderProgress: { completedIds: string[] };
+  /** Claimed milestone-gift ids (optional — pre-milestone saves omit it). */
+  milestoneProgress?: { claimedIds: string[] };
+  /** Emberfont Spark Well progress (optional — pre-Emberfont saves omit it). */
+  emberfontProgress?: {
+    sparks: number;
+    sparkAt: number;
+    stoke: number;
+    stokeAt: number;
+    surgeUntil: number;
+    veinIndex: number;
+  };
   tutorial: { index: number; done: boolean };
 }
 
@@ -336,6 +373,8 @@ export interface EventMap {
   /** A gauge "+" button opened the shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' | 'keys' };
   'ui:sell_requested': { itemId: number };
+  /** The Emberfont Spark Well was tapped — spend a Spark, draw a vein. */
+  'emberfont:tap': Record<string, never>;
   /** Settings toggled the background music on/off (AudioManager applies it). */
   'audio:set_music_muted': { muted: boolean };
   'fog:tapped': { regionId: string };
@@ -396,6 +435,34 @@ export interface EventMap {
   'energy:refill': { reason: string };
   'order:progress': { orderId: string; have: number[]; need: number[]; deliverable: boolean };
   'order:completed': { orderId: string; rewards: { coins: number; keys: number; xp?: number } };
+  /** Milestone "gift" (Farmland-style): the player taps to claim when ready. */
+  'milestone:claim': Record<string, never>;
+  'milestone:changed': {
+    id: string | null;
+    chain: string;
+    tier: number;
+    have: number;
+    need: number;
+    coins: number;
+    ready: boolean;
+    done: boolean;
+  };
+  'milestone:claimed': { id: string; coins: number };
+  /** Emberfont Spark Well state (drives the StokeMeter HUD widget). */
+  'emberfont:changed': {
+    sparks: number;
+    maxSparks: number;
+    stoke: number;
+    maxStoke: number;
+    surging: boolean;
+    surgeRemainingMs: number;
+    nextVein: { chain: string; tier: number };
+    active: boolean;
+  };
+  /** A Spark was drawn: a vein piece dropped at `at` (scene plays the pop). */
+  'emberfont:sparked': { at: TilePos; chain: string; tier: number };
+  /** The well entered/left a Surge (scene/audio react). */
+  'emberfont:surge': { active: boolean; remainingMs: number };
   'order:all_done': Record<string, never>;
   'region:unlocked': { regionId: string; tiles: TilePos[]; revealed: ItemSnapshot[] };
   'region:unlock_failed': { regionId: string; reason: 'keys' | 'not_unlockable' | 'level' };

@@ -223,11 +223,7 @@ export class BoardScene extends Phaser.Scene {
           this.restBadges.delete(id);
           continue;
         }
-        const s = Math.ceil(rest / 1000);
-        badge.setPosition(sp.x, sp.y - 160);
-        (badge.getData('label') as Phaser.GameObjects.Text).setText(
-          `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-        );
+        badge.setPosition(sp.x, sp.y - 150); // follow the dragon; the Zzz floats within
       }
       for (const sprite of this.itemSprites.values()) {
         if (!sprite.isGenerator) continue;
@@ -1641,45 +1637,34 @@ export class BoardScene extends Phaser.Scene {
     const sprite = this.itemSprites.get(dragonId);
     if (!sprite) return;
 
-    const W = 296, H = 118, R = 32;
-    const pill = this.add.container(sprite.x, sprite.y - 160).setDepth(DEPTHS.flash);
+    // No frame — just a "💤 Zzz" that gently drifts up and back down, forever.
+    const badge = this.add.container(sprite.x, sprite.y - 150).setDepth(DEPTHS.flash);
+    const zzz = this.add
+      .text(0, 0, '💤 Zzz', {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '46px',
+        fontStyle: 'bold',
+        color: PALETTE.cream,
+        stroke: PALETTE.night,
+        strokeThickness: 7
+      })
+      .setOrigin(0.5);
+    badge.add(zzz);
 
-    const g = this.add.graphics();
-    // drop shadow
-    g.fillStyle(num(PALETTE.night), 0.22);
-    g.fillRoundedRect(-W / 2 + 5, -H / 2 + 5, W, H, R);
-    // cream fill
-    g.fillStyle(num(PALETTE.cream), 0.97);
-    g.fillRoundedRect(-W / 2, -H / 2, W, H, R);
-    // lava stroke
-    g.lineStyle(8, num(PALETTE.lava), 1);
-    g.strokeRoundedRect(-W / 2, -H / 2, W, H, R);
-    pill.add(g);
+    // The float: the text rises ~30px then settles back, looping (sine = smooth).
+    this.tweens.add({
+      targets: zzz,
+      y: -30,
+      duration: 950,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    // Soft pop-in.
+    badge.setScale(0.6).setAlpha(0);
+    this.tweens.add({ targets: badge, scale: 1, alpha: 1, duration: 200, ease: 'Back.easeOut' });
 
-    const font = 'Trebuchet MS, Verdana, sans-serif';
-    const zzzText = this.add.text(0, -18, '💤 Zzz', {
-      fontFamily: font,
-      fontSize: '38px',
-      fontStyle: 'bold',
-      color: PALETTE.textBrown,
-    }).setOrigin(0.5);
-
-    const rest = this.ctx.systems.jobs.restRemaining(dragonId);
-    const s0 = Math.ceil(rest / 1000);
-    const countdown = this.add.text(0, 30, `${Math.floor(s0 / 60)}:${String(s0 % 60).padStart(2, '0')}`, {
-      fontFamily: font,
-      fontSize: '30px',
-      fontStyle: 'bold',
-      color: PALETTE.plum,
-    }).setOrigin(0.5);
-
-    pill.add([zzzText, countdown]);
-    pill.setData('label', countdown);
-
-    pill.setScale(0);
-    this.tweens.add({ targets: pill, scale: 1, duration: 170, ease: 'Back.easeOut' });
-
-    this.restBadges.set(dragonId, pill);
+    this.restBadges.set(dragonId, badge);
   }
 
   /** The fatigue lifted — pop the badge, sparkle, and a "Refreshed!" cue so the

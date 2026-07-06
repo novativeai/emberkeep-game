@@ -28,7 +28,10 @@ export class SaveSystem {
     'economy:changed',
     'order:completed',
     'region:unlocked',
-    'tutorial:step'
+    'tutorial:step',
+    // The Emberfont mutates AFTER SaveSystem's item:merged autosave (later
+    // subscriber), so a surge ignited by a merge needs its own save trigger.
+    'emberfont:surge'
   ] as const;
 
   private suspended = false;

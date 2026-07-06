@@ -150,26 +150,23 @@ export const DECOR_SCALE: Record<string, number> = {
  * without re-exporting art (e.g. the red dragon egg looks small at native size).
  */
 export const ITEM_SCALE: Record<string, number> = {
-  // reward/egg.png (396×501) and reward/ruby.png (474×382) are ~2× the old
-  // placeholder art — scale down so a gem reads ~1 tile wide (SVG-sized).
-  // Egg + ruby reduced 70% on request (small speckled egg / small ruby shard).
-  ember_dragon_1: 0.18,
-  ember_dragon_2: 0.064, // Red Egg (red-egg.png 1162×1437) — −20% again on request (0.08 → 0.064)
-  ember_dragon_3: 1.0, // Red Dragon rig host — same canvas scale as the Green Dragon
-  flame_gem_1: 0.15,
-  // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
-  lumber_1: 0.336, // a log (wood.png) — reduced 30% on request (0.48 → 0.336)
-  lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
-  bigtree_1: 0.31, // the level-2 wood tree — reduced 50% on request
-  chest_1: 0.24, // a treasure chest (chest.png) — reduced 20% on request (0.30 → 0.24)
-  // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
-  crystal_1: 0.4, // ~1.3 tiles
-  emerald_1: 0.25, // Emerald gem (emerald.png 467×392)
-  emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
-  emerald_3: 1.0, // dragon host (the rig overlays it)
-  golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
-  coin_1: 0.12, // SMALLER than an egg, per spec
-  coin_2: 0.20  // Gold Pouch — bigger than the single coin (0.12)
+  // Mergeable board PIECES shrunk −40% (×0.6) on request; generators, dragon rig
+  // hosts and the chest fixture keep their sizes.
+  ember_dragon_1: 0.108, // Dragon Ruby (was 0.18)
+  ember_dragon_2: 0.0384, // Red Egg (was 0.064)
+  ember_dragon_3: 1.0, // Red Dragon rig host — unchanged
+  flame_gem_1: 0.09, // Gem Shard (was 0.15)
+  lumber_1: 0.2016, // a log / Bush (was 0.336)
+  lumber_2: 0.9, // House generator — unchanged
+  bigtree_1: 0.31, // Ancient Tree generator — unchanged
+  chest_1: 0.24, // Treasure Chest fixture — unchanged
+  crystal_1: 0.4, // Crystal generator — unchanged
+  emerald_1: 0.15, // Emerald gem (was 0.25)
+  emerald_2: 0.0384, // Green Egg (was 0.064)
+  emerald_3: 1.0, // dragon host — unchanged
+  golden_egg_1: 0.06, // Golden Egg (was 0.10)
+  coin_1: 0.072, // Gold Coin (was 0.12)
+  coin_2: 0.12 // Gold Pouch (was 0.20)
 };
 
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
@@ -242,6 +239,34 @@ export function energyMaxForLevel(level: number): number {
 export const LEVELUP_REWARD = {
   coinsBase: 25,
   coinsPerLevel: 15
+} as const;
+
+/**
+ * The Emberfont — the anti-idle "Spark Well" (see EmberfontSystem). It slowly
+ * fills with Sparks (a small ember pool); tapping it draws a *vein* — one merge
+ * piece dropped onto the play area — so an idle keep still trickles fodder to
+ * come back to. Active merging *stokes* the well: fill the Stoke bar and it
+ * SURGES — Sparks recharge far faster and every merge grants bonus XP — which
+ * rewards long, sustained sessions. All values are tunable here (no magic
+ * numbers in the system). Times in ms.
+ */
+export const EMBERFONT = {
+  maxSparks: 5,
+  startSparks: 5,
+  /** Idle drip: one Spark every this-many ms. */
+  rechargeMs: 30_000,
+  /** While Surging: one Spark every this-many ms (~5× the idle rate). */
+  surgeRechargeMs: 6_000,
+  stokeMax: 100,
+  /** Stoke gained per merge (5 merges fill the bar → Surge). */
+  stokePerMerge: 20,
+  /** Idle Stoke cooldown: lose this much every `stokeDecayMs`. */
+  stokeDecayPerTick: 5,
+  stokeDecayMs: 4_000,
+  /** How long a Surge lasts once triggered. */
+  surgeMs: 20_000,
+  /** Bonus XP granted per merge while Surging. */
+  surgeXpBonus: 2
 } as const;
 
 /** Item motion & juice timings (ms unless noted). */
@@ -357,9 +382,10 @@ export const EMBER_MOTES = {
  *  v3→v4: the chest is now a PERMANENT recurring gift box — wipe saves whose
  *  one-shot chest was already consumed so it comes back. v4→v5: tutorial reworked
  *  (House energy-skip, repositioned dragons/chest) — wipe so deployed players get
- *  the same fresh départ-0 as a local run. */
+ *  the same fresh départ-0 as a local run. v5→v6: the Emberfont (Spark Well)
+ *  adds new persisted progress; wipe so its fields seed cleanly from départ-0. */
 export const SAVE_KEY = 'emberkeep_save';
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 /** Audio master volumes 0..1. */
 export const AUDIO = {

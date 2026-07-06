@@ -2,9 +2,11 @@ import { BoardSystem } from '../systems/BoardSystem';
 import { ChestSystem } from '../systems/ChestSystem';
 import { DragonJobSystem } from '../systems/DragonJobSystem';
 import { EconomySystem } from '../systems/EconomySystem';
+import { EmberfontSystem } from '../systems/EmberfontSystem';
 import { EnergySystem } from '../systems/EnergySystem';
 import { GeneratorSystem } from '../systems/GeneratorSystem';
 import { MergeSystem } from '../systems/MergeSystem';
+import { MilestoneSystem } from '../systems/MilestoneSystem';
 import { OrderSystem } from '../systems/OrderSystem';
 import { RewardSystem } from '../systems/RewardSystem';
 import { SaveSystem, type StorageLike } from '../systems/SaveSystem';
@@ -17,20 +19,26 @@ import type {
   AnchorsData,
   AssetsManifest,
   ChainsData,
+  EmberfontData,
   MapData,
+  MilestonesData,
   OrdersData,
   TutorialData
 } from './types';
 import anchorsJson from '../data/anchors.json';
 import assetsJson from '../data/assets.json';
 import chainsJson from '../data/chains.json';
+import emberfontJson from '../data/emberfont.json';
 import mapJson from '../data/map.json';
+import milestonesJson from '../data/milestones.json';
 import ordersJson from '../data/orders.json';
 import tutorialJson from '../data/tutorial.json';
 
 export interface GameData {
   chains: ChainsData;
   orders: OrdersData;
+  milestones: MilestonesData;
+  emberfont: EmberfontData;
   map: MapData;
   tutorial: TutorialData;
   assets: AssetsManifest;
@@ -44,6 +52,8 @@ export interface GameSystems {
   generator: GeneratorSystem;
   jobs: DragonJobSystem;
   order: OrderSystem;
+  milestone: MilestoneSystem;
+  emberfont: EmberfontSystem;
   economy: EconomySystem;
   reward: RewardSystem;
   chest: ChestSystem;
@@ -69,6 +79,8 @@ export class GameContext {
     this.data = {
       chains: chainsJson as unknown as ChainsData,
       orders: ordersJson as unknown as OrdersData,
+      milestones: milestonesJson as unknown as MilestonesData,
+      emberfont: emberfontJson as unknown as EmberfontData,
       map: mapJson as unknown as MapData,
       tutorial: tutorialJson as unknown as TutorialData,
       assets: assetsJson as unknown as AssetsManifest,
@@ -84,6 +96,8 @@ export class GameContext {
       generator: new GeneratorSystem(this.state, this.bus, this.clock, this.data.chains),
       jobs: new DragonJobSystem(this.state, this.bus, this.clock),
       order: new OrderSystem(this.state, this.bus, this.data.orders),
+      milestone: new MilestoneSystem(this.state, this.bus, this.data.milestones),
+      emberfont: new EmberfontSystem(this.state, this.bus, this.clock, this.data.emberfont),
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       reward: new RewardSystem(this.bus),
       chest: new ChestSystem(this.state, this.bus, this.clock),
