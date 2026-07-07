@@ -1,0 +1,21 @@
+{
+  "fps": 12,
+  "blendFrames": false,
+  "width": 215,
+  "height": 398,
+  "frameCount": 2,
+  "frames": [
+    {
+      "index": 0,
+      "file": "Gemini_Generated_Image_8pbl838pbl838pbl_loop_00000.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "Gemini_Generated_Image_8pbl838pbl838pbl_loop_00001.png",
+      "durationMs": 83,
+      "blend": false
+    }
+  ]
+}

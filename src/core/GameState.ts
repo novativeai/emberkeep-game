@@ -44,6 +44,9 @@ export class GameState {
   emberSurgeUntil = 0;
   emberVeinIndex = 0;
 
+  /* Dragon Duel — per-dragon-colour level + 0..gaugeMax gauge (systems only). */
+  dragonLevels = new Map<string, { level: number; gauge: number }>();
+
   constructor(private map: MapData) {
     this.cols = map.cols;
     this.rows = map.rows;
@@ -81,6 +84,7 @@ export class GameState {
     this.emberStokeAt = now;
     this.emberSurgeUntil = 0;
     this.emberVeinIndex = 0;
+    this.dragonLevels.clear();
   }
 
   hydrate(save: SaveDataV1): void {
@@ -107,6 +111,10 @@ export class GameState {
     this.emberStokeAt = ef ? ef.stokeAt : save.energy.lastRegenAt;
     this.emberSurgeUntil = ef ? ef.surgeUntil : 0;
     this.emberVeinIndex = ef ? ef.veinIndex : 0;
+    this.dragonLevels.clear();
+    for (const [chain, v] of Object.entries(save.dragonLevels ?? {})) {
+      this.dragonLevels.set(chain, { level: v.level, gauge: v.gauge });
+    }
     this.tutorialIndex = save.tutorial.index;
     this.tutorialDone = save.tutorial.done;
   }
@@ -132,6 +140,9 @@ export class GameState {
         surgeUntil: this.emberSurgeUntil,
         veinIndex: this.emberVeinIndex
       },
+      dragonLevels: Object.fromEntries(
+        [...this.dragonLevels.entries()].map(([k, v]) => [k, { level: v.level, gauge: v.gauge }])
+      ),
       tutorial: { index: this.tutorialIndex, done: this.tutorialDone }
     };
   }
@@ -254,6 +265,22 @@ export class GameState {
     return [...this.items.values()].filter(
       (i) => i.kind === 'item' && i.chain === chain && i.tier === tier
     );
+  }
+
+  /** A dragon colour's duel level + gauge (default Lv1 / 0 if never trained). */
+  dragonStat(chain: string): { level: number; gauge: number } {
+    const d = this.dragonLevels.get(chain);
+    return d ? { ...d } : { level: 1, gauge: 0 };
+  }
+
+  /** The stored (mutable) duel record for a dragon colour, created on first use. */
+  ensureDragon(chain: string): { level: number; gauge: number } {
+    let d = this.dragonLevels.get(chain);
+    if (!d) {
+      d = { level: 1, gauge: 0 };
+      this.dragonLevels.set(chain, d);
+    }
+    return d;
   }
 
   get level(): number {

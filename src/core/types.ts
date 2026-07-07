@@ -141,6 +141,21 @@ export interface EmberfontData {
   veins: EmberfontVein[];
 }
 
+/* -- Dragon Duel (rock-paper-scissors level-up mode) -- */
+export type DuelThrow = 'rock' | 'paper' | 'scissors';
+export type DuelOutcome = 'win' | 'lose' | 'tie';
+
+/** A dragon color in the duel roster (red = ember_dragon, green = emerald, …). */
+export interface DuelDragon {
+  chain: string;
+  /** Art/loop colour key: 'red' | 'green' | … (drives duel_<throw>_<color>). */
+  color: string;
+  name: string;
+  owned: boolean;
+  level: number;
+  gauge: number;
+}
+
 export interface MapItemPlacement {
   chain: string;
   tier: number;
@@ -351,6 +366,8 @@ export interface SaveDataV1 {
     surgeUntil: number;
     veinIndex: number;
   };
+  /** Per-dragon-colour duel level/gauge (optional — pre-duel saves omit it). */
+  dragonLevels?: Record<string, { level: number; gauge: number }>;
   tutorial: { index: number; done: boolean };
 }
 
@@ -375,6 +392,11 @@ export interface EventMap {
   'ui:sell_requested': { itemId: number };
   /** The Emberfont Spark Well was tapped — spend a Spark, draw a vein. */
   'emberfont:tap': Record<string, never>;
+  /* -- Dragon Duel intents (UI emits, DragonDuelSystem handles) -- */
+  'duel:choose': { chain: string };
+  'duel:start': Record<string, never>;
+  /** The player threw `move` for the current match — resolve it. */
+  'duel:play': { move: DuelThrow };
   /** Settings toggled the background music on/off (AudioManager applies it). */
   'audio:set_music_muted': { muted: boolean };
   'fog:tapped': { regionId: string };
@@ -463,6 +485,35 @@ export interface EventMap {
   'emberfont:sparked': { at: TilePos; chain: string; tier: number };
   /** The well entered/left a Surge (scene/audio react). */
   'emberfont:surge': { active: boolean; remainingMs: number };
+  /* -- Dragon Duel notifications (DragonDuelSystem emits; UI + audio subscribe) -- */
+  'duel:changed': {
+    unlocked: boolean;
+    roster: DuelDragon[];
+    selected: string | null;
+    matchesLeft: number;
+    canAfford: boolean;
+    energyCost: number;
+    gaugeMax: number;
+  };
+  /** A set of matches began — `energyCost` was paid, `matches` to play. */
+  'duel:set_started': { chain: string; matches: number };
+  /** Couldn't start a set. */
+  'duel:start_failed': { reason: 'energy' | 'locked' | 'no_dragon' };
+  /** One match resolved (UI animates the reveal from this). */
+  'duel:match': {
+    chain: string;
+    oppChain: string;
+    color: string;
+    oppColor: string;
+    playerThrow: DuelThrow;
+    oppThrow: DuelThrow;
+    outcome: DuelOutcome;
+    gauge: number;
+    gaugeMax: number;
+    level: number;
+    leveledUp: boolean;
+    matchesLeft: number;
+  };
   'order:all_done': Record<string, never>;
   'region:unlocked': { regionId: string; tiles: TilePos[]; revealed: ItemSnapshot[] };
   'region:unlock_failed': { regionId: string; reason: 'keys' | 'not_unlockable' | 'level' };

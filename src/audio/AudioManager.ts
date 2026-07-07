@@ -39,6 +39,8 @@ export class AudioManager {
     bus.on('region:unlocked', () => this.fogWhoosh());
     bus.on('emberfont:sparked', () => this.sparkPop());
     bus.on('emberfont:surge', ({ active }) => { if (active) this.surgeRoar(); });
+    bus.on('duel:set_started', () => this.duelReady());
+    bus.on('duel:match', ({ outcome }) => this.duelResult(outcome));
     bus.on('item:move_bounced', () => this.deny(140, 0.05));
     bus.on('item:harvest_failed', () => this.deny(200, 0.07));
     bus.on('ui:ledger_toggled', () => this.click());
@@ -198,6 +200,26 @@ export class AudioManager {
     this.noiseSweep(0.5, 300, 2200, 0.08);
     this.tone(150, 0.5, { type: 'sawtooth', gain: 0.08, slideTo: 440, release: 0.4 });
     this.tone(300, 0.42, { type: 'triangle', gain: 0.05, delay: 0.06, slideTo: 660, release: 0.35 });
+  }
+
+  /** Three rising blips that land with the duel's 3-2-1 countdown (~700ms apart). */
+  private duelReady(): void {
+    this.tone(440, 0.09, { type: 'square', gain: 0.08 });
+    this.tone(520, 0.09, { type: 'square', gain: 0.08, delay: 0.7 });
+    this.tone(660, 0.12, { type: 'square', gain: 0.1, delay: 1.4, release: 0.15 });
+  }
+
+  /** Match outcome sting — bright chime on a win, soft thud on a loss. */
+  private duelResult(outcome: 'win' | 'lose' | 'tie'): void {
+    if (outcome === 'win') {
+      this.tone(660, 0.1, { type: 'triangle', gain: 0.12 });
+      this.tone(990, 0.14, { type: 'triangle', gain: 0.1, delay: 0.08, release: 0.2 });
+      this.noiseSweep(0.2, 3000, 6000, 0.03, 0.02);
+    } else if (outcome === 'lose') {
+      this.tone(300, 0.16, { type: 'sine', gain: 0.1, slideTo: 150, release: 0.2 });
+    } else {
+      this.tone(440, 0.1, { type: 'sine', gain: 0.07 });
+    }
   }
 
   private coinBlip(): void {

@@ -1,5 +1,6 @@
 import { BoardSystem } from '../systems/BoardSystem';
 import { ChestSystem } from '../systems/ChestSystem';
+import { DragonDuelSystem } from '../systems/DragonDuelSystem';
 import { DragonJobSystem } from '../systems/DragonJobSystem';
 import { EconomySystem } from '../systems/EconomySystem';
 import { EmberfontSystem } from '../systems/EmberfontSystem';
@@ -54,6 +55,7 @@ export interface GameSystems {
   order: OrderSystem;
   milestone: MilestoneSystem;
   emberfont: EmberfontSystem;
+  duel: DragonDuelSystem;
   economy: EconomySystem;
   reward: RewardSystem;
   chest: ChestSystem;
@@ -98,6 +100,7 @@ export class GameContext {
       order: new OrderSystem(this.state, this.bus, this.data.orders),
       milestone: new MilestoneSystem(this.state, this.bus, this.data.milestones),
       emberfont: new EmberfontSystem(this.state, this.bus, this.clock, this.data.emberfont),
+      duel: new DragonDuelSystem(this.state, this.bus, this.data.chains),
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       reward: new RewardSystem(this.bus),
       chest: new ChestSystem(this.state, this.bus, this.clock),

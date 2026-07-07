@@ -1,5 +1,13 @@
 {
   "images": [
+    { "key": "duel_rock_red", "source": "file", "generator": "icon", "file": "sprites/duel/duel_rock_red.png" },
+    { "key": "duel_paper_red", "source": "file", "generator": "icon", "file": "sprites/duel/duel_paper_red.png" },
+    { "key": "duel_scissors_red", "source": "file", "generator": "icon", "file": "sprites/duel/duel_scissors_red.png" },
+    { "key": "duel_rock_green", "source": "file", "generator": "icon", "file": "sprites/duel/duel_rock_green.png" },
+    { "key": "duel_paper_green", "source": "file", "generator": "icon", "file": "sprites/duel/duel_paper_green.png" },
+    { "key": "duel_scissors_green", "source": "file", "generator": "icon", "file": "sprites/duel/duel_scissors_green.png" },
+    { "key": "duel_face_red", "source": "file", "generator": "icon", "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-head.png" },
+    { "key": "duel_face_green", "source": "file", "generator": "icon", "file": "sprites/characters/dragon/emerald-dragon/sprite/emerald-dragon-head.png" },
     {
       "key": "tile_ash",
       "source": "file",

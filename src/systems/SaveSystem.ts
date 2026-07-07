@@ -31,7 +31,9 @@ export class SaveSystem {
     'tutorial:step',
     // The Emberfont mutates AFTER SaveSystem's item:merged autosave (later
     // subscriber), so a surge ignited by a merge needs its own save trigger.
-    'emberfont:surge'
+    'emberfont:surge',
+    // Dragon-duel gauge/level changes (energy spend already saves the set start).
+    'duel:match'
   ] as const;
 
   private suspended = false;

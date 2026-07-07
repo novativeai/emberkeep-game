@@ -269,6 +269,29 @@ export const EMBERFONT = {
   surgeXpBonus: 2
 } as const;
 
+/**
+ * Dragon Duel — the rock-paper-scissors level-up mode (see DragonDuelSystem).
+ * Unlocks once every dragon is hatched AND the Keeper is level ≥ 2. You pick a
+ * dragon to train, pay `energyCost` for a set of `matchesPerSet` auto-battles
+ * against a random OTHER owned dragon whose throws are biased weak (`winRate`),
+ * and each win adds `winGauge` to that dragon's 0..`gaugeMax` level gauge. A
+ * dragon's own passive production ("work") drips `workGauge`. Filling the gauge
+ * levels the dragon up (+reward, gauge carries the overflow). Tunables only.
+ */
+export const DUEL = {
+  matchesPerSet: 3,
+  energyCost: 2,
+  winGauge: 3,
+  workGauge: 1,
+  gaugeMax: 100,
+  countdownMs: 3000,
+  /** Player win / tie probabilities per match (remainder = loss). Opponent weak. */
+  winRate: 0.62,
+  tieRate: 0.13,
+  /** Coins granted when a dragon's gauge fills and it levels up. */
+  levelReward: { coinsBase: 20, coinsPerLevel: 10 }
+} as const;
+
 /** Item motion & juice timings (ms unless noted). */
 export const TIMINGS = {
   dragReturn: 220,
@@ -383,9 +406,10 @@ export const EMBER_MOTES = {
  *  one-shot chest was already consumed so it comes back. v4→v5: tutorial reworked
  *  (House energy-skip, repositioned dragons/chest) — wipe so deployed players get
  *  the same fresh départ-0 as a local run. v5→v6: the Emberfont (Spark Well)
- *  adds new persisted progress; wipe so its fields seed cleanly from départ-0. */
+ *  adds new persisted progress; wipe so its fields seed cleanly from départ-0.
+ *  v6→v7: the Dragon Duel adds per-dragon level/gauge state; wipe to seed it. */
 export const SAVE_KEY = 'emberkeep_save';
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 /** Audio master volumes 0..1. */
 export const AUDIO = {

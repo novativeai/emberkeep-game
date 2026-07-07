@@ -16,6 +16,8 @@ import { EndScreen } from '../ui/EndScreen';
 import { Hud } from '../ui/Hud';
 import { LedgerPanel } from '../ui/LedgerPanel';
 import { MilestoneGift } from '../ui/MilestoneGift';
+import { DuelButton } from '../ui/DuelButton';
+import { DuelPanel } from '../ui/DuelPanel';
 import { ShopPanel } from '../ui/ShopPanel';
 import { StokeMeter } from '../ui/StokeMeter';
 import { renderScale } from '../core/render-scale';
@@ -42,6 +44,8 @@ export class UIScene extends Phaser.Scene {
   private shop!: ShopPanel;
   private milestoneGift!: MilestoneGift;
   private stokeMeter!: StokeMeter;
+  private duelButton!: DuelButton;
+  private duelPanel!: DuelPanel;
   private bubble!: CharacterBubble;
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
@@ -93,6 +97,12 @@ export class UIScene extends Phaser.Scene {
     // Hidden until the tutorial finishes (the well wakes post-tutorial).
     this.stokeMeter = new StokeMeter(this, this.ctx.bus, 132, LIVE_GAME_HEIGHT - 300);
     this.stokeMeter.setDepth(DEPTH_HUD);
+
+    // Dragon Duel arena — the modal + a round ✌️ launcher just above the gift.
+    this.duelPanel = new DuelPanel(this, this.ctx.bus);
+    this.duelPanel.setDepth(DEPTH_PANEL + 20);
+    this.duelButton = new DuelButton(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 466, () => this.duelPanel.open());
+    this.duelButton.setDepth(DEPTH_HUD);
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
