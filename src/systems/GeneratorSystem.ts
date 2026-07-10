@@ -1,6 +1,7 @@
 import {
   GENERATOR_PASSIVE_RETRY_MS,
   OFFLINE_BANK_CYCLES,
+  REWARD_SPAWN_RADIUS,
   skipEnergyCost,
   skipWarmthCost
 } from '../core/Constants';
@@ -56,9 +57,7 @@ export class GeneratorSystem {
         Math.floor((now - item.passiveAt) / generator.passiveMs) + 1
       );
       for (let i = 0; i < overdue; i++) {
-        const target: TilePos | undefined =
-          this.state.freeActiveNeighbors(item.col, item.row)[0] ??
-          this.state.freeActiveTilesNear(item.col, item.row)[0];
+        const target: TilePos | undefined = this.dropTileFor(item);
         if (!target) break; // board full — the live retry loop takes over
         const output = this.produceItem(generator, target, now);
         this.lastOfflineGifts++;
@@ -152,12 +151,7 @@ export class GeneratorSystem {
       this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
       return;
     }
-    // Prefer an immediate neighbour; fall back to the nearest free active tile so
-    // out-of-zone fixtures (e.g. the crystal fixture at a non-playable position)
-    // can still drop produce somewhere reachable on the active board.
-    const target =
-      this.state.freeActiveNeighbors(item.col, item.row)[0] ??
-      this.state.freeActiveTilesNear(item.col, item.row)[0];
+    const target = this.dropTileFor(item);
     if (!target) {
       this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'no_space' });
       return;
@@ -167,6 +161,22 @@ export class GeneratorSystem {
     item.readyAt = now + generator.cooldownMs;
     const output = this.produceItem(generator, target, now);
     this.bus.emit('item:harvested', { generatorId: itemId, output: this.state.snapshot(output, now) });
+  }
+
+  /** Where a generator's produce may land: an adjacent tile, else a NEARBY
+   *  free active tile (REWARD_SPAWN_RADIUS — a crowded neighbourhood blocks
+   *  the drop rather than teleporting it across the map). Out-of-zone fixtures
+   *  (the crystal at a non-active cell) keep the unbounded search: their whole
+   *  neighbourhood is non-active, and their produce must reach the board.
+   */
+  private dropTileFor(item: BoardItemState): TilePos | undefined {
+    return (
+      this.state.freeActiveNeighbors(item.col, item.row)[0] ??
+      this.state.freeActiveTilesNear(item.col, item.row, REWARD_SPAWN_RADIUS)[0] ??
+      (!this.state.isTileActive(item.col, item.row)
+        ? this.state.freeActiveTilesNear(item.col, item.row)[0]
+        : undefined)
+    );
   }
 
   /** Every generator with a `passiveMs` pays out when its timer is due — an item
@@ -190,10 +200,8 @@ export class GeneratorSystem {
         continue;
       }
 
-      // Item producer: prefer a neighbour; otherwise the nearest free active tile.
-      const target: TilePos | undefined =
-        this.state.freeActiveNeighbors(item.col, item.row)[0] ??
-        this.state.freeActiveTilesNear(item.col, item.row)[0];
+      // Item producer: nearby tiles only (see dropTileFor).
+      const target: TilePos | undefined = this.dropTileFor(item);
       if (!target) {
         item.passiveAt = now + GENERATOR_PASSIVE_RETRY_MS; // board full — try again soon
         continue;

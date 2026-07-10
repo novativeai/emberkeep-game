@@ -71,6 +71,28 @@ describe('ChestSystem (standing gift box)', () => {
     expect(chest.readyAt).toBe(ready); // untouched
   });
 
+  it('pays GOLD instead when no free tile sits within the reward radius', () => {
+    const ctx = createTestContext();
+    const chest = ctx.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
+    // Pack every free active tile so an item gift has nowhere NEAR to land.
+    for (const cell of ctx.state.freeActiveTilesNear(3, 3)) {
+      ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: cell.col, row: cell.row, kind: 'item' });
+    }
+    const economy = capture(ctx.bus, 'economy:add');
+    const spawned = capture(ctx.bus, 'item:spawned');
+    const origRandom = Math.random;
+    Math.random = () => 0.99; // force an ITEM gift (last CHEST_GIFTS entry)
+    try {
+      ctx.bus.emit('chest:open', { itemId: chest.id });
+    } finally {
+      Math.random = origRandom;
+    }
+
+    expect(spawned).toHaveLength(0); // nothing teleports across the map
+    expect(economy).toHaveLength(1); // the Gold gift pays out instead
+    expect(economy[0]!.coins).toBeGreaterThan(0);
+  });
+
   it('ignores a chest:open for a non-chest item', () => {
     const ctx = createTestContext();
     const weed = ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 2, row: 2, kind: 'item' });

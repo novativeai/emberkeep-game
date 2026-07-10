@@ -725,3 +725,28 @@ untouched and re-verified end-to-end):
 - **Tree sizes**: Ancient Tree 0.31 → 0.22 (hit-rect re-derived per the
   ripple-map invariant) and the emberberry plant 1.0 → 0.75.
 - e2e extended with the tease beat (glide + shot) — full suite green.
+
+## 2026-07-10 — Reward-radius blocking · tutorial flow fixes · emerald bake
+
+- **Rewards never leave their neighbourhood**: new REWARD_SPAWN_RADIUS (3
+  manhattan tiles) caps every reward drop — harvests fail with no_space,
+  passives skip their tick, merge 5-bonus extras just don't spawn, and the
+  chest pays its GOLD gift instead — rather than teleporting items across the
+  map onto far/edge cells that read as floating off-platform. Out-of-zone
+  fixtures (the crystal) keep the unbounded search (GeneratorSystem.dropTileFor).
+- **cookbook_close step**: the player closes the book themselves (arrow on the
+  ✕, new ui:cookbook_closed gate + 'cookbook_close' ui target) — replaces the
+  auto-close hold. 21 tutorial steps.
+- **buy_energy stuck-step fix**: the free-Ember-Spark one-shot lived in
+  sessionStorage, surviving resets — replays had no FREE card and the
+  marketplace gate could never pass. Now a save-backed stat (freeSparkUsed,
+  recorded by EconomySystem on marketplace:purchased{free}); ShopPanel reads
+  the save. e2e now drives the REAL ⚡+ → Emporium → FREE claim path.
+- **Marker rule**: gauntlet = action demos (drags) ONLY; arrow = static
+  targets; never both (UIScene enforces hand-else-arrow; data cleaned across
+  all 21 steps).
+- **Sizes**: Ancient Tree 0.22 → 0.17 (hit-rect re-derived), emberberry plant
+  0.75 → 0.58, bush 0.8, sprout 0.85.
+- **Emerald dragon baked**: composited from its rig layers (1054×1074, same
+  format as the red) → item_emerald_3 real art (scale 0.21) — the Cookbook's
+  Green Dragon row no longer shows a fallback.

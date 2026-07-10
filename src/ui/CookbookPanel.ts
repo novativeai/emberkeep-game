@@ -336,5 +336,13 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
       ease: 'Sine.easeIn',
       onComplete: () => this.setVisible(false)
     });
+    this.bus.emit('ui:cookbook_closed', {
+      discovered: this.gameState.discoveredRecipes.length
+    });
+  }
+
+  /** World position of the ✕ button (the tutorial's close-the-book arrow). */
+  getClosePos(): { x: number; y: number } {
+    return { x: this.x + 592, y: this.y - 392 };
   }
 }

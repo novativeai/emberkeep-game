@@ -805,9 +805,9 @@
     },
     {
       "key": "item_emerald_3",
-      "source": "placeholder",
+      "source": "file",
       "generator": "item",
-      "file": "sprites/items/emerald-egg.png"
+      "file": "sprites/characters/dragon/emerald-dragon/sprite/emerald-dragon-baked.png"
     },
     {
       "key": "background_emberkeep",

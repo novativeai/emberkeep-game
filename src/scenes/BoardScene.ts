@@ -1694,9 +1694,9 @@ export class BoardScene extends Phaser.Scene {
       // displayW≈325, displayH≈342; container origin +76 → rx=76−0.5·325, ry=76−0.9·342.
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(-86, -232, 325, 342);
     } else if (snap.chain === 'bigtree') {
-      // The Ancient Tree (bigtree.png 622×823 @ scale 0.22, anchor 0.5/0.92) — full-sprite
-      // tap. displayW≈137, displayH≈181; origin +76 → rx=76−0.5·137, ry=76−0.92·181.
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(8, -91, 137, 181);
+      // The Ancient Tree (bigtree.png 622×823 @ scale 0.17, anchor 0.5/0.92) — full-sprite
+      // tap. displayW≈106, displayH≈140; origin +76 → rx=76−0.5·106, ry=76−0.92·140.
+      sprite.input!.hitArea = new Phaser.Geom.Rectangle(23, -53, 106, 140);
     } else {
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(4, 16, 144, 88);
     }

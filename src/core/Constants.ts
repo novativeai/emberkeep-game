@@ -161,14 +161,16 @@ export const ITEM_SCALE: Record<string, number> = {
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
   lumber_1: 0.336, // a log (wood.png) — reduced 30% on request (0.48 → 0.336)
   lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
-  bigtree_1: 0.22, // the level-2 wood tree — reduced again on request (0.31 → 0.22)
+  bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
   chest_1: 0.24, // a treasure chest (chest.png) — reduced 20% on request (0.30 → 0.24)
-  strawberry_3: 0.75, // the emberberry plant reads tree-like — reduced 25% on request
+  strawberry_1: 0.85, // emberberry sprout — reduced on request
+  strawberry_2: 0.8, // emberberry bush — reduced on request
+  strawberry_3: 0.58, // the emberberry plant reads tree-like — reduced again (0.75 → 0.58)
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
   emerald_1: 0.18, // Emerald gem (emerald.png 467×392) — reduced ~28% on request (0.25 → 0.18)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
-  emerald_3: 1.0, // dragon host (the rig overlays it)
+  emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red
   golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
   coin_1: 0.12, // SMALLER than an egg, per spec
   coin_2: 0.20  // Gold Pouch — bigger than the single coin (0.12)
@@ -199,6 +201,11 @@ export const CHEST_INTERVAL_MS = 300_000;
  * pops that many merge pieces onto free tiles by the chest. (No wood — lumber
  * appears only when its cloud zone clears.) Designers tune it here, not in code.
  */
+/** How far (manhattan tiles) a reward drop may land from its source. Beyond
+ *  this the drop is BLOCKED (harvest fails / chest pays Gold / passive skips)
+ *  — rewards must never teleport across the map or off the platforms. */
+export const REWARD_SPAWN_RADIUS = 3;
+
 export const CHEST_GIFTS: ReadonlyArray<
   | { kind: 'coins'; amount: number; label: string }
   | { kind: 'item'; chain: string; tier: number; count: number; label: string }

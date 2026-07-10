@@ -270,7 +270,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'chest:open' | 'dragon:working' | 'marketplace:purchased' | 'generator:skipped'; chain?: string; currency?: 'gold' | 'warmth' }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'chest:open' | 'dragon:working' | 'marketplace:purchased' | 'generator:skipped'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number };
 
 export interface TutorialAllow {
@@ -299,12 +299,12 @@ export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: 
 
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
   | { fogRegion: string };
 
 export type TutorialArrowConfig =
   | { tile: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
   | { fogRegion: string };
 
 /**
@@ -396,8 +396,9 @@ export interface EventMap {
   'dragon:rest': { dragonId: number };
   'dragon:rested': { dragonId: number };
   'ui:ledger_toggled': { open: boolean };
-  /** The Emberkeep Cookbook panel opened (tutorial gate + analytics). */
+  /** The Emberkeep Cookbook panel opened/closed (tutorial gates + analytics). */
   'ui:cookbook_opened': { discovered: number };
+  'ui:cookbook_closed': { discovered: number };
   'ui:deliver_requested': { orderId: string };
   /** A gauge "+" button opened the shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' };
@@ -481,12 +482,12 @@ export interface EventMap {
 
 export type ResolvedHand =
   | { from: TilePos; to: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
   | { fogRegion: string };
 
 export type ResolvedArrow =
   | { tile: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
   | { fogRegion: string };
 
 export interface TutorialStepEvent {

@@ -42,7 +42,7 @@ export class UiEditorScene extends Phaser.Scene {
     const ledger = new LedgerPanel(this, ctx.bus, ctx.systems.order, ctx.systems.tasks, ctx.state);
     ledger.setDepth(60);
 
-    const shop = new ShopPanel(this, ctx.bus);
+    const shop = new ShopPanel(this, ctx.bus, ctx.state);
     shop.setDepth(68);
 
     const bubble = new CharacterBubble(this, ctx.bus);

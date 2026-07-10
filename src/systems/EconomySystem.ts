@@ -29,6 +29,12 @@ export class EconomySystem {
       this.state.keys -= keys;
       this.announce();
     });
+    // The one-time free Ember Spark is a SAVE fact, not a browser-session one:
+    // sessionStorage survived game resets, so replays lost their FREE card and
+    // the tutorial's buy_energy step could never be completed.
+    bus.on('marketplace:purchased', ({ free }) => {
+      if (free && this.state.stat('freeSparkUsed') === 0) this.state.addStat('freeSparkUsed', 1);
+    });
     bus.on('ui:sell_requested', ({ itemId }) => this.sell(itemId));
   }
 

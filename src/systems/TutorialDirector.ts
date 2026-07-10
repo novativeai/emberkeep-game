@@ -73,6 +73,7 @@ export class TutorialDirector {
       if (open) this.onGateEvent('ui:ledger_opened');
     });
     bus.on('ui:cookbook_opened', () => this.onGateEvent('ui:cookbook_opened'));
+    bus.on('ui:cookbook_closed', () => this.onGateEvent('ui:cookbook_closed'));
     bus.on('item:spawned', () => this.checkCountGate());
     bus.on('item:removed', () => this.checkCountGate());
     bus.on('tutorial:advance_requested', ({ stepId }) => {

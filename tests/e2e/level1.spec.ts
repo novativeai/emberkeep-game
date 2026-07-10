@@ -155,11 +155,12 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await page.screenshot({ path: shot('04b-cookbook-intro') });
     // Tap the Cookbook button (game 2404,1244 → CSS ÷2) — opening it is the gate.
     await page.mouse.click(1202, 622);
-    await waitStep(page, 'dragon_hatch');
+    await waitStep(page, 'cookbook_close');
     await page.screenshot({ path: shot('04c-cookbook-open') });
-    // The next step auto-closes the panel after a short hold; wait it out so
-    // its dim never swallows the upcoming egg drags.
-    await page.waitForTimeout(1700);
+    // Close the book YOURSELF (✕ at game 1872,408 → CSS ÷2) — that's the gate.
+    await page.mouse.click(936, 204);
+    await waitStep(page, 'dragon_hatch');
+    await page.waitForTimeout(500);
     state = await gameText(page);
     expect(count(state, 'ember_dragon', 2)).toBe(3); // 1 red egg + 2 spawned by step effects
     await page.screenshot({ path: shot('05-red-egg') });
@@ -377,13 +378,20 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect((await gameText(page)).energy.current).toBeLessThan(energyBeforeSkip); // Warmth dropped
     await page.screenshot({ path: shot('15-buy-energy') });
 
-    // ---------- Buy energy: emit marketplace:purchased directly ----------
-    await page.evaluate(() => {
-      const ctx = window.__emberkeep.game.registry.get('ctx') as {
-        bus: { emit: (event: string, payload: unknown) => void };
+    // ---------- Buy energy: the REAL UI path — ⚡+ opens the Emporium, claim FREE ----------
+    // (Regression cover: the free-spark one-shot used to live in sessionStorage,
+    // surviving resets and leaving replays with no FREE card — a stuck step.)
+    await page.mouse.click(187, 44); // the ⚡ gauge's + button (game 374,88 → CSS ÷2)
+    await page.waitForTimeout(700); // Emporium slides open
+    await page.screenshot({ path: shot('15a-emporium') });
+    const freePos = await page.evaluate(() => {
+      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+        shop: { getFreeButtonPos: () => { x: number; y: number } | null };
       };
-      ctx.bus.emit('marketplace:purchased', { energy: 5, free: true });
+      return ui.shop.getFreeButtonPos();
     });
+    expect(freePos).not.toBeNull(); // the FREE card must exist on a fresh save
+    await page.mouse.click(freePos!.x / 2, freePos!.y / 2);
 
     // ---------- Golden tease: the camera glides west to the sleeping egg ----------
     await waitStep(page, 'golden_tease');

@@ -103,7 +103,7 @@ export class UIScene extends Phaser.Scene {
     this.ledger = new LedgerPanel(this, this.ctx.bus, this.ctx.systems.order, this.ctx.systems.tasks, this.ctx.state);
     this.ledger.setDepth(DEPTH_PANEL);
 
-    this.shop = new ShopPanel(this, this.ctx.bus);
+    this.shop = new ShopPanel(this, this.ctx.bus, this.ctx.state);
     this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
 
     this.cookbook = new CookbookPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
@@ -276,13 +276,10 @@ export class UIScene extends Phaser.Scene {
       bus.on('tutorial:step', (step) => {
         // Appears for its tutorial introduction, then permanently post-tutorial.
         this.cookbookButton.setVisible(step.done || step.allow.cookbook);
-        // A step that no longer involves the Cookbook closes it — after a short
-        // hold, so the intro step's freshly opened page gets its moment.
+        // Safety net only — the cookbook_close step has the player close the
+        // book themselves; any later step that disallows it just shuts it.
         if (!step.done && !step.allow.cookbook && this.cookbook.isOpen) {
-          this.time.delayedCall(1200, () => {
-            const now = this.lastStep;
-            if (now && !now.done && !now.allow.cookbook) this.cookbook.requestClose();
-          });
+          this.cookbook.requestClose();
         }
       }),
       bus.on('cookbook:discovered', () => {
@@ -693,17 +690,21 @@ export class UIScene extends Phaser.Scene {
 
   private applyMarkers(step: TutorialStepEvent): void {
     this.clearMarkers();
+    // The gauntlet demonstrates ACTIONS (drags); the arrow points at static
+    // targets. They are mutually exclusive — a step defining both shows only
+    // the hand (data should define exactly one).
     if (step.hand) this.placeHand(step.hand);
-    if (step.arrow) this.placeArrow(step.arrow);
+    else if (step.arrow) this.placeArrow(step.arrow);
   }
 
-  private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' } | { fogRegion: string }): { x: number; y: number } | null {
+  private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' } | { fogRegion: string }): { x: number; y: number } | null {
     if ('ui' in ref) {
       // The ⚡+ button until the Emporium opens, then the FREE! card inside it —
       // handPoint/arrowAnchor re-evaluate each frame, so the marker follows live.
       if (ref.ui === 'marketplace') return this.shop.getFreeButtonPos() ?? { x: 374, y: 88 };
       if (ref.ui === 'ledger') return this.hud.getLedgerPos();
       if (ref.ui === 'cookbook') return { x: this.cookbookButton.x, y: this.cookbookButton.y };
+      if (ref.ui === 'cookbook_close') return this.cookbook.isOpen ? this.cookbook.getClosePos() : null;
       return this.ledger.isOpen ? this.ledger.getDeliverPos() : null;
     }
     const region = this.ctx.data.map.regions.find((r) => r.id === ref.fogRegion);

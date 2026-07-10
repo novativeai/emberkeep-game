@@ -1,3 +1,4 @@
+import { REWARD_SPAWN_RADIUS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -163,8 +164,9 @@ export class MergeSystem {
     const outputs: ItemSnapshot[] = [];
     const spawnTiles: TilePos[] = [dropPos];
     if (outputCount > 1) {
+      // Bonus outputs land NEAR the merge or not at all (never across the map).
       const extra = this.state
-        .freeActiveTilesNear(dropPos.col, dropPos.row)
+        .freeActiveTilesNear(dropPos.col, dropPos.row, REWARD_SPAWN_RADIUS)
         .filter((p) => !(p.col === dropPos.col && p.row === dropPos.row))
         .slice(0, outputCount - 1);
       spawnTiles.push(...extra);

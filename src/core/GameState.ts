@@ -214,13 +214,16 @@ export class GameState {
   }
 
   /** All free active tiles, ordered by Manhattan distance from (col,row). */
-  freeActiveTilesNear(col: number, row: number): TilePos[] {
+  /** Free active tiles sorted nearest-first. `maxDist` (manhattan) caps the
+   *  search — reward drops use it so a full neighbourhood BLOCKS the drop
+   *  instead of teleporting it across the map (or off the platforms). */
+  freeActiveTilesNear(col: number, row: number, maxDist?: number): TilePos[] {
     const free: TilePos[] = [];
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
-        if (this.isTileActive(c, r) && this.grid[r]![c] === null) {
-          free.push({ col: c, row: r });
-        }
+        if (!this.isTileActive(c, r) || this.grid[r]![c] !== null) continue;
+        if (maxDist !== undefined && Math.abs(c - col) + Math.abs(r - row) > maxDist) continue;
+        free.push({ col: c, row: r });
       }
     }
     return free.sort(

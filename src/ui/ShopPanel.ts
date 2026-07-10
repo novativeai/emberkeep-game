@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import type { GameState } from '../core/GameState';
 import { uiRegistry } from './theme';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
@@ -58,7 +59,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
 
   constructor(
     scene: Phaser.Scene,
-    private bus: EventBus
+    private bus: EventBus,
+    private gameState: GameState
   ) {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
@@ -172,7 +174,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     const gap = 470;
     const startX = -((n - 1) * gap) / 2;
     cfg.items.forEach((item, i) => {
-      const isFreeFirst = currency === 'energy' && i === 0 && !sessionStorage.getItem('ek_energy_free_used');
+      // Save-backed one-shot (survives reloads, resets with the game).
+      const isFreeFirst = currency === 'energy' && i === 0 && this.gameState.stat('freeSparkUsed') === 0;
       const card = this.makeCard(startX + i * gap, item, currency, cfg.icon, cfg.iconScale, isFreeFirst, i);
       // The BEST VALUE card is the hero of the shelf: a touch larger + raised.
       if (item.best) card.setScale(1.07).setY(-10);
@@ -237,10 +240,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     btnImg.on('pointerout', () => priceBtn.setScale(1));
     btnImg.on('pointerup', () => {
       priceBtn.setScale(1);
-      if (isFreeFirst) {
-        sessionStorage.setItem('ek_energy_free_used', '1');
-      }
-      this.purchase(currency, item.amount, isFreeFirst);
+      this.purchase(currency, item.amount, isFreeFirst); // EconomySystem records the one-shot
     });
     card.add(priceBtn);
     if (isFreeFirst) {
