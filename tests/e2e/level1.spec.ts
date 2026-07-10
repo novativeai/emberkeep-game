@@ -124,7 +124,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // ---------- Lore 1 ----------
     await waitStep(page, 'lore_1');
     let state = await gameText(page);
-    expect(state.energy).toEqual({ current: 18, max: 20 }); // starts 18/20; tutorial's free Spark tops it up
+    expect(state.energy).toEqual({ current: 28, max: 30 }); // starts 28/30; tutorial's free Spark tops it up
     // crystal is a permanent startingItem at [8,11] (non-active tile)
     expect(count(state, 'ember_dragon', 1)).toBe(0);
     expect(count(state, 'crystal', 1)).toBe(1);
@@ -341,10 +341,12 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(state.level).toBe(2); // still level 2 after tutorial
     await page.screenshot({ path: shot('17-tutorial-done') });
 
-    // ---------- Reach level 3 → end game popup ----------
-    await page.evaluate(() => window.__emberkeep.grantXp(80));
+    // ---------- Reach level 3 → the Chapter One finale ----------
+    // Tutorial ends at exactly 60 XP; Level 3 sits at 220 (the finale curve).
+    await page.evaluate(() => window.__emberkeep.grantXp(160));
     await expect.poll(async () => (await gameText(page)).level, { timeout: 8_000 }).toBe(3);
-    await page.waitForTimeout(2500); // let the banner + delayed EndScreen appear
+    // The finale choreography runs ~12.6s (hatch → glimpse → Cindra → card).
+    await page.waitForTimeout(13_500);
     await page.screenshot({ path: shot('18-level3-end') });
 
     // ---------- Save / reload restores mid-game state ----------
@@ -389,9 +391,10 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await page.mouse.click(640, 670); // Continue
     await expect.poll(async () => (await gameText(page)).scene).toBe('BoardScene');
     const regenerated = await gameText(page);
-    // Use the actual energyMax (grows with level: level 2 = 23) so the cap is correct.
+    // Use the actual energyMax (grows with level: level 3 = 36) so the cap is correct.
+    // 540.5s offline at +1/60s = 9 Warmth recovered.
     const energyMax = regenerated.energy.max;
-    const expectedEnergy = Math.min(energyMax, saved.energy.current + 3);
+    const expectedEnergy = Math.min(energyMax, saved.energy.current + 9);
     expect(regenerated.energy.current).toBeGreaterThanOrEqual(expectedEnergy);
     expect(regenerated.energy.current).toBeLessThanOrEqual(Math.min(energyMax, expectedEnergy + 1));
 

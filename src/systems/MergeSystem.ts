@@ -194,6 +194,17 @@ export class MergeSystem {
       xp: nextTier.xp * outputs.length
     });
 
+    // First time this recipe is performed → a new Emberkeep Cookbook page.
+    const recipeKey = `${seed.chain}:${seed.tier}>${nextTier.tier}`;
+    if (!this.state.discoveredRecipes.includes(recipeKey)) {
+      this.state.discoveredRecipes.push(recipeKey);
+      this.bus.emit('cookbook:discovered', {
+        chain: seed.chain,
+        fromTier: seed.tier,
+        resultTier: nextTier.tier
+      });
+    }
+
     if (config.hatchAtTier === nextTier.tier) {
       for (const output of outputs) {
         this.bus.emit('item:hatched', { item: output });

@@ -3,6 +3,30 @@ import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
 import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
+import { BUILTIN_SEQUENCES, builtinSequence, builtinSequenceFiles, type BuiltinSequence } from '../render/sequenceCatalog';
+import { applyUiReplacements, sequenceFrameKey, uiRegistry, uploadKey } from '../ui/theme';
+import type { UiThemeDoc } from '../ui/themeCore';
+
+/** Built-in sequences the saved theme references — anim layers in custom
+ *  components AND `sequence` part patches on built-in elements (e.g. the
+ *  bubble portrait playing a talk bank) — so the game loads only the heavy
+ *  banks it actually needs. */
+function referencedBuiltins(doc: UiThemeDoc): BuiltinSequence[] {
+  const seen = new Map<string, BuiltinSequence>();
+  const add = (name: string | null | undefined): void => {
+    const seq = name ? builtinSequence(name) : undefined;
+    if (seq) seen.set(seq.key, seq);
+  };
+  for (const comp of Object.values(doc.custom)) {
+    for (const layer of comp.layers) {
+      if (layer.kind === 'anim') add(layer.sequence);
+    }
+  }
+  for (const patch of Object.values(doc.elements)) {
+    for (const part of Object.values(patch.parts ?? {})) add(part.sequence);
+  }
+  return [...seen.values()];
+}
 
 /**
  * Loads real-art files for any assets.json entry flipped to source:"file"
@@ -44,9 +68,37 @@ export class PreloadScene extends Phaser.Scene {
         this.load.image(entry.key, entry.file as string);
       }
     }
+    // UI Builder uploads (ui-theme.json `assets`, self-contained data URLs).
+    for (const [name, uri] of Object.entries(uiRegistry.doc.assets)) {
+      if (!this.textures.exists(uploadKey(name))) this.load.image(uploadKey(name), uri);
+    }
+    // UI Builder PNG-sequence animations — every frame as its own texture, so
+    // `anim` layers in custom components play in dev, preview and production.
+    for (const [name, seq] of Object.entries(uiRegistry.doc.sequences)) {
+      seq.frames.forEach((uri, i) => {
+        const key = sequenceFrameKey(name, i);
+        if (!this.textures.exists(key)) this.load.image(key, uri);
+      });
+    }
+    // Built-in (Laurah) sequences are FILE-backed. The editor preloads ALL of
+    // them so the Animations rail is instantly draggable; the game loads only
+    // the banks a saved component actually references (they're heavy).
+    const uiedit = new URLSearchParams(window.location.search).has('uiedit');
+    const wanted = uiedit ? BUILTIN_SEQUENCES : referencedBuiltins(uiRegistry.doc);
+    for (const seq of wanted) {
+      builtinSequenceFiles(seq).forEach((file, i) => {
+        const key = sequenceFrameKey(seq.key, i);
+        if (!this.textures.exists(key)) this.load.image(key, file);
+      });
+    }
   }
 
   create(): void {
-    this.scene.start(SCENES.title);
+    // Saved art replacements repaint generated textures IN PLACE before any
+    // scene builds objects — consumers get the new art with zero object churn.
+    applyUiReplacements(this);
+    // The UI Builder boots into its own document scene — the game NEVER runs.
+    const uiedit = new URLSearchParams(window.location.search).has('uiedit');
+    this.scene.start(uiedit ? SCENES.uiEditor : SCENES.title);
   }
 }

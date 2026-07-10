@@ -5,6 +5,7 @@ import { BoardScene } from '../scenes/BoardScene';
 import { BootScene } from '../scenes/BootScene';
 import { PreloadScene } from '../scenes/PreloadScene';
 import { TitleScene } from '../scenes/TitleScene';
+import { UiEditorScene } from '../scenes/UiEditorScene';
 import { UIScene } from '../scenes/UIScene';
 
 /**
@@ -61,6 +62,6 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
       failIfMajorPerformanceCaveat: false,
       powerPreference: 'low-power'
     },
-    scene: [BootScene, PreloadScene, TitleScene, BoardScene, UIScene]
+    scene: [BootScene, PreloadScene, TitleScene, BoardScene, UIScene, UiEditorScene]
   };
 }

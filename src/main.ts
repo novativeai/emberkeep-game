@@ -60,7 +60,11 @@ if (IS_MOBILE && 'orientation' in screen) {
 }
 
 const ctx = new GameContext(window.localStorage);
-const audio = new AudioManager(ctx.bus);
+// The UI Builder's editor document (?uiedit=1) is a silent canvas — no audio
+// engine exists there at all: no music loop, no SFX subscriptions, nothing to
+// unlock. Only the real game gets an AudioManager.
+const uiEditMode = new URLSearchParams(window.location.search).has('uiedit');
+const audio = uiEditMode ? null : new AudioManager(ctx.bus);
 
 const game = new Phaser.Game({
   ...createGameConfig('game'),
@@ -75,7 +79,7 @@ const game = new Phaser.Game({
 });
 
 // WebAudio unlock must come from a user gesture; resume on any pointer.
-document.addEventListener('pointerdown', () => audio.unlock());
+if (audio) document.addEventListener('pointerdown', () => audio.unlock());
 
 /* ------------------- agent instrumentation (spec §5) ------------------ */
 

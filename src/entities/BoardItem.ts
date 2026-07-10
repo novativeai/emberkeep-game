@@ -28,6 +28,9 @@ export class BoardItem extends Phaser.GameObjects.Container {
   private timeIcon: Phaser.GameObjects.Arc;
   private bobPaused = false;
   private cooling = false;
+  /** Art hidden behind a live rig — cooldown/ready visuals are suppressed
+   *  (they'd render UNDER the rig); BoardScene floats a badge instead. */
+  private artHidden = false;
 
   constructor(scene: Phaser.Scene) {
     super(scene, 0, 0);
@@ -95,6 +98,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.isGenerator = snapshot.ready !== undefined;
     this.bobPaused = false;
     this.cooling = false;
+    this.artHidden = false;
     this.sprite.setTexture(textureKey);
     const [ax, ay] = anchors.byKey[textureKey] ?? anchors.default;
     this.sprite.setOrigin(ax, ay);
@@ -151,10 +155,18 @@ export class BoardItem extends Phaser.GameObjects.Container {
    * art is hidden.
    */
   setArtVisible(visible: boolean): void {
+    this.artHidden = !visible;
     this.sprite.setVisible(visible);
     // A live rig stands in for the art and brings its own shadow — hide ours.
     this.groundShadow.setVisible(visible);
-    if (!visible) this.readyStar.setVisible(false);
+    if (!visible) {
+      this.readyStar.setVisible(false);
+      // The in-container pill would render UNDER the rig — never show it here;
+      // BoardScene's floating cool-badge carries the countdown instead.
+      this.cooldownLabel.setVisible(false);
+      this.timePill.setVisible(false);
+      this.timeIcon.setVisible(false);
+    }
   }
 
   liftForDrag(): void {
@@ -239,14 +251,15 @@ export class BoardItem extends Phaser.GameObjects.Container {
     if (cooling) {
       this.sprite.setTint(COOLING_TINT);
       this.readyStar.setVisible(false);
-      this.cooldownLabel.setVisible(true);
-      this.timePill.setVisible(true);
-      this.timeIcon.setVisible(true);
+      this.cooldownLabel.setVisible(!this.artHidden);
+      this.timePill.setVisible(!this.artHidden);
+      this.timeIcon.setVisible(!this.artHidden);
     } else {
       this.sprite.clearTint();
       this.cooldownLabel.setVisible(false);
       this.timePill.setVisible(false);
       this.timeIcon.setVisible(false);
+      if (this.artHidden) return; // the rig host shows no ready-star pulse
       this.readyStar.setVisible(true);
       this.readyStar.setAlpha(0);
       this.readyStar.setScale(0.2);

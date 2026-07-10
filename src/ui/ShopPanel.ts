@@ -1,17 +1,13 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import { uiRegistry } from './theme';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
-type Currency = 'energy' | 'coins' | 'keys';
+type Currency = 'energy' | 'coins';
 
-/** Recreated "Ruby-Shop" palette (matching theme-pay-reel, not the image). */
-const PINK = 0xe8528a;
-const PINK_DARK = 0xc63a73;
-const CREAM = 0xfffdf2;
-const ORANGE = 0xf5a01e;
-const GREEN = 0x6cc24a;
-const GREEN_DARK = 0x4e9a32;
+/** Card height in game units (the ui_shop_card texture is 420×620). */
+const CARD_H = 620;
 
 interface Product {
   amount: number;
@@ -38,17 +34,9 @@ const SHOP: Record<Currency, { title: string; icon: string; iconScale: number; i
       { amount: 900, price: '$9.99', best: true },
       { amount: 2100, price: '$19.99' }
     ]
-  },
-  keys: {
-    title: 'Key Shop',
-    icon: 'ui_icon_key',
-    iconScale: 1.4,
-    items: [
-      { amount: 1, price: '$0.99' },
-      { amount: 5, price: '$2.99', best: true },
-      { amount: 12, price: '$9.99' }
-    ]
   }
+  // No Key shop: keys gate STORY and are never sold (MECHANICS §7 — monetise
+  // impatience and friction, never progression).
 };
 
 /**
@@ -65,6 +53,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
   /** The current "FREE!" purchase button, while the energy shop shows one — the
    *  tutorial points its guiding hand here once the Emporium opens. */
   private freeBtn?: Phaser.GameObjects.Container;
+  /** Sparkle/pulse tweens on the current cards — killed before every rebuild. */
+  private fxTweens: Phaser.Tweens.Tween[] = [];
 
   constructor(
     scene: Phaser.Scene,
@@ -73,32 +63,43 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
     this.dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.62)
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
-    // Pink scroll-banner title.
+    // The framed Emporium board (TextureFactory ui_shop_panel — themable).
+    const frame = scene.add.image(0, 40, 'ui_shop_panel');
+
+    // Title banner: gold-trimmed lava lozenge riding the panel's top edge.
     this.titleBg = scene.add.graphics();
     this.titleText = scene.add
-      .text(0, -440, '', { fontFamily: FONT, fontSize: '64px', fontStyle: 'bold', color: '#ffffff' })
+      .text(0, -586, '', { fontFamily: FONT, fontSize: '64px', fontStyle: 'bold', color: PALETTE.cream })
       .setOrigin(0.5)
-      .setShadow(0, 4, 'rgba(120,30,70,0.6)', 6);
+      .setShadow(0, 5, 'rgba(36,27,34,0.55)', 6);
 
-    // Close button (red disc, top-right).
-    const close = scene.add.container(820, -440);
-    const closeBg = scene.add.circle(0, 0, 50, 0xe23b3b).setStrokeStyle(7, num(PALETTE.cream));
+    // Close button: gold disc chrome with a lava ✕.
+    const close = scene.add.container(956, -540);
+    const closeBg = scene.add.image(0, 6, 'ui_btn_round').setScale(0.92).setTint(num(PALETTE.lavaHighlight));
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: '#ffffff' })
+      .text(0, -2, '✕', { fontFamily: FONT, fontSize: '54px', fontStyle: 'bold', color: PALETTE.lavaShade })
       .setOrigin(0.5);
     close.add([closeBg, closeX]);
-    close.setSize(110, 110).setInteractive({ useHandCursor: true });
+    close.setSize(120, 120).setInteractive({ useHandCursor: true });
+    close.on('pointerover', () => close.setScale(1.08));
+    close.on('pointerout', () => close.setScale(1));
     close.on('pointerup', () => this.requestClose());
 
     this.cards = scene.add.container(0, 60);
 
-    this.add([this.dim, this.titleBg, this.titleText, close, this.cards]);
+    this.add([this.dim, frame, this.titleBg, this.titleText, close, this.cards]);
     scene.add.existing(this);
     this.setVisible(false);
+
+    uiRegistry.register(scene, 'panel.shop', 'Ember Emporium panel', 'Panels', this, {
+      frame,
+      title: this.titleText,
+      cards: this.cards
+    });
   }
 
   open(currency: Currency): void {
@@ -135,25 +136,47 @@ export class ShopPanel extends Phaser.GameObjects.Container {
   }
 
   private drawBanner(width: number): void {
-    const w = Math.max(560, width);
-    this.titleBg.clear();
-    this.titleBg.fillStyle(PINK_DARK, 1);
-    this.titleBg.fillRoundedRect(-w / 2, -484, w, 96, 28);
-    this.titleBg.fillStyle(PINK, 1);
-    this.titleBg.fillRoundedRect(-w / 2, -490, w, 92, 26);
-    this.titleBg.lineStyle(6, ORANGE, 1);
-    this.titleBg.strokeRoundedRect(-w / 2, -490, w, 92, 26);
+    const w = Math.max(620, width);
+    const y = -640; // banner top (panel top edge is ≈ -620)
+    const g = this.titleBg;
+    g.clear();
+    // Plate shadow, lava body, gold trim — the pseudo-3D language of the HUD.
+    g.fillStyle(num(PALETTE.lavaShade), 1);
+    g.fillRoundedRect(-w / 2, y + 10, w, 104, 34);
+    g.fillStyle(num(PALETTE.lava), 1);
+    g.fillRoundedRect(-w / 2, y, w, 104, 34);
+    g.lineStyle(6, num(PALETTE.gold), 1);
+    g.strokeRoundedRect(-w / 2, y, w, 104, 34);
+    g.fillStyle(0xffffff, 0.22);
+    g.fillRoundedRect(-w / 2 + 14, y + 8, w - 28, 34, 18);
+    // Wing gems flanking the banner.
+    for (const side of [-1, 1]) {
+      const gx = side * (w / 2 + 44);
+      g.fillStyle(num(PALETTE.gold), 1);
+      g.save();
+      g.translateCanvas(gx, y + 52);
+      g.rotateCanvas(Math.PI / 4);
+      g.fillRect(-16, -16, 32, 32);
+      g.lineStyle(4, num(PALETTE.goldShade), 1);
+      g.strokeRect(-16, -16, 32, 32);
+      g.restore();
+    }
   }
 
   private buildCards(currency: Currency, cfg: (typeof SHOP)[Currency]): void {
+    for (const t of this.fxTweens) t.remove();
+    this.fxTweens = [];
     this.cards.removeAll(true);
     this.freeBtn = undefined; // rebuilt below only if this open shows a FREE! card
     const n = cfg.items.length;
-    const gap = 430;
+    const gap = 470;
     const startX = -((n - 1) * gap) / 2;
     cfg.items.forEach((item, i) => {
       const isFreeFirst = currency === 'energy' && i === 0 && !sessionStorage.getItem('ek_energy_free_used');
-      this.cards.add(this.makeCard(startX + i * gap, item, currency, cfg.icon, cfg.iconScale, isFreeFirst));
+      const card = this.makeCard(startX + i * gap, item, currency, cfg.icon, cfg.iconScale, isFreeFirst, i);
+      // The BEST VALUE card is the hero of the shelf: a touch larger + raised.
+      if (item.best) card.setScale(1.07).setY(-10);
+      this.cards.add(card);
     });
   }
 
@@ -163,58 +186,56 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     currency: Currency,
     icon: string,
     iconScale: number,
-    isFreeFirst = false
+    isFreeFirst = false,
+    tier = 0
   ): Phaser.GameObjects.Container {
-    const W = 380;
-    const H = 560;
     const card = this.scene.add.container(x, 0);
-    const g = this.scene.add.graphics();
-    g.fillStyle(PINK, 1);
-    g.fillRoundedRect(-W / 2, -H / 2, W, H, 40);
-    g.fillStyle(CREAM, 1);
-    g.fillRoundedRect(-W / 2 + 16, -H / 2 + 16, W - 32, H - 32, 30);
-    card.add(g);
 
-    card.add(this.scene.add.image(0, -150, icon).setScale(iconScale));
+    // Textured card face (gold rim, cream face, gloss, stitching).
+    card.add(this.scene.add.image(0, 0, 'ui_shop_card'));
 
-    // Orange quantity ribbon.
-    const ribbon = this.scene.add.graphics();
-    ribbon.fillStyle(ORANGE, 1);
-    ribbon.fillRect(-W / 2, 0, W, 84);
-    card.add(ribbon);
-    card.add(this.scene.add.image(-90, 42, icon).setScale(iconScale * 0.42));
-    card.add(
-      this.scene.add
-        .text(-40, 42, `${item.amount.toLocaleString()}`, {
-          fontFamily: FONT,
-          fontSize: '52px',
-          fontStyle: 'bold',
-          color: '#ffffff'
-        })
-        .setOrigin(0, 0.5)
-        .setShadow(0, 3, 'rgba(120,60,0,0.5)', 4)
+    // The product on a lit stage: radial sunburst behind a BIG icon.
+    const burst = this.scene.add.image(0, -128, 'ui_shop_burst').setScale(1.35);
+    card.add(burst);
+    // Bigger bundle → bigger goods on the stage (reads at a glance).
+    const tierScale = [1.05, 1.3, 1.55][tier] ?? 1.3;
+    const productIcon = this.scene.add.image(0, -128, icon).setScale(iconScale * tierScale);
+    card.add(productIcon);
+    // Slow ambient spin on the rays sells the "prize" feel.
+    this.fxTweens.push(
+      this.scene.tweens.add({ targets: burst, angle: 360, duration: 24000, repeat: -1 })
     );
 
-    // Green price button (mock purchase → grant the currency).
-    const priceBtn = this.scene.add.container(0, 188);
-    const pg = this.scene.add.graphics();
-    const btnColor = isFreeFirst ? 0x22c55e : GREEN;
-    const btnColorDark = isFreeFirst ? 0x16a34a : GREEN_DARK;
-    pg.fillStyle(btnColorDark, 1);
-    pg.fillRoundedRect(-130, -42 + 8, 260, 84, 42);
-    pg.fillStyle(btnColor, 1);
-    pg.fillRoundedRect(-130, -42, 260, 84, 42);
+    // Amount on a chevron-notched gold ribbon.
+    const ribbon = this.scene.add.image(0, 52, 'ui_shop_ribbon');
+    card.add(ribbon);
+    card.add(
+      this.scene.add
+        .text(0, 50, `×${item.amount.toLocaleString()}`, {
+          fontFamily: FONT,
+          fontSize: '48px',
+          fontStyle: 'bold',
+          color: '#FFFFFF'
+        })
+        .setOrigin(0.5)
+        .setShadow(0, 3, 'rgba(120,60,0,0.55)', 4)
+    );
+
+    // Beveled price button (TextureFactory pseudo-3D chrome; FREE! is gold).
+    const priceBtn = this.scene.add.container(0, 208);
+    const btnImg = this.scene.add.image(0, 0, isFreeFirst ? 'ui_btn_free' : 'ui_btn_price');
     const priceLabel = isFreeFirst ? 'FREE!' : item.price;
     const price = this.scene.add
-      .text(0, -2, priceLabel, { fontFamily: FONT, fontSize: '46px', fontStyle: 'bold', color: '#ffffff' })
+      .text(0, -8, priceLabel, { fontFamily: FONT, fontSize: '48px', fontStyle: 'bold', color: '#FFFFFF' })
       .setOrigin(0.5)
-      .setShadow(0, 3, 'rgba(30,80,10,0.7)', 4);
-    priceBtn.add([pg, price]);
+      .setShadow(0, 3, 'rgba(36,27,34,0.55)', 4);
+    priceBtn.add([btnImg, price]);
     if (isFreeFirst) this.freeBtn = priceBtn; // tutorial hand anchors here
-    priceBtn.setSize(260, 84).setInteractive({ useHandCursor: true });
-    priceBtn.on('pointerover', () => priceBtn.setScale(1.05));
-    priceBtn.on('pointerout', () => priceBtn.setScale(1));
-    priceBtn.on('pointerup', () => {
+    priceBtn.setSize(460, 132);
+    btnImg.setInteractive({ useHandCursor: true });
+    btnImg.on('pointerover', () => priceBtn.setScale(1.06));
+    btnImg.on('pointerout', () => priceBtn.setScale(1));
+    btnImg.on('pointerup', () => {
       priceBtn.setScale(1);
       if (isFreeFirst) {
         sessionStorage.setItem('ek_energy_free_used', '1');
@@ -222,21 +243,58 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       this.purchase(currency, item.amount, isFreeFirst);
     });
     card.add(priceBtn);
-
-    if (item.best) {
-      const badge = this.scene.add.container(-W / 2 + 30, -H / 2 + 24);
-      const star = this.scene.add.star(0, 0, 12, 58, 74, 0xffd23f).setStrokeStyle(5, 0xe8a000);
-      const txt = this.scene.add
-        .text(0, 0, 'BEST\nSELLER', {
-          fontFamily: FONT,
-          fontSize: '22px',
-          fontStyle: 'bold',
-          color: '#b5402f',
-          align: 'center'
+    if (isFreeFirst) {
+      // A gentle heartbeat so the tutorial's free gift reads as tappable.
+      this.fxTweens.push(
+        this.scene.tweens.add({
+          targets: priceBtn,
+          scale: { from: 1, to: 1.07 },
+          duration: 560,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
         })
-        .setOrigin(0.5);
-      badge.add([star, txt]).setAngle(-12);
+      );
+    }
+
+    // BEST VALUE sash pill riding the card's top edge.
+    if (item.best) {
+      const badge = this.scene.add.container(0, -CARD_H / 2 + 6);
+      badge.add(this.scene.add.image(0, 0, 'ui_shop_badge').setScale(1.15));
+      badge.add(
+        this.scene.add
+          .text(0, -3, 'BEST VALUE', {
+            fontFamily: FONT,
+            fontSize: '26px',
+            fontStyle: 'bold',
+            color: PALETTE.cream
+          })
+          .setOrigin(0.5)
+          .setShadow(0, 2, 'rgba(36,27,34,0.5)', 3)
+      );
       card.add(badge);
+    }
+
+    // Sparkles on the hero cards (best seller + the free gift).
+    if (item.best || isFreeFirst) {
+      for (const [sx, sy, d] of [[-150, -240, 0], [150, -70, 400], [120, -250, 800]]) {
+        const spark = this.scene.add.image(sx!, sy!, 'fx_spark').setScale(0.9).setAlpha(0);
+        card.add(spark);
+        this.fxTweens.push(
+          this.scene.tweens.add({
+            targets: spark,
+            alpha: { from: 0, to: 1 },
+            scale: { from: 0.4, to: 1.05 },
+            angle: 90,
+            delay: d!,
+            duration: 900,
+            yoyo: true,
+            repeat: -1,
+            repeatDelay: 700,
+            ease: 'Sine.easeInOut'
+          })
+        );
+      }
     }
     return card;
   }
@@ -245,10 +303,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     if (currency === 'energy') {
       this.bus.emit('energy:add', { amount, reason: 'shop' });
       this.bus.emit('marketplace:purchased', { energy: amount, free: isFree });
-    } else if (currency === 'coins') {
-      this.bus.emit('economy:add', { coins: amount, reason: 'shop' });
     } else {
-      this.bus.emit('economy:add', { keys: amount, reason: 'shop' });
+      this.bus.emit('economy:add', { coins: amount, reason: 'shop' });
     }
     this.requestClose();
   }

@@ -52,5 +52,59 @@
         ]
       }
     }
+  },
+  "dragon-golden": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/golden-dragon/head-animation",
+    "sets": {
+      "blink": {
+        "dir": "golden-dragon-blink-animation",
+        "textureScale": 0.27575,
+        "originX": 0.44835,
+        "originY": 0.83769,
+        "frames": [
+          {
+            "file": "golden-dragon-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "golden-dragon-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "golden-dragon-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "golden-dragon-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "golden-dragon-roar_talk-animation",
+        "textureScale": 0.27096,
+        "originX": 0.45722,
+        "originY": 0.78881,
+        "frames": [
+          {
+            "file": "golden-dragon-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "golden-dragon-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "golden-dragon-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "golden-dragon-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
   }
 }

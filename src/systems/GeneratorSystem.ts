@@ -1,4 +1,9 @@
-import { GENERATOR_PASSIVE_RETRY_MS, skipEnergyCost, skipWarmthCost } from '../core/Constants';
+import {
+  GENERATOR_PASSIVE_RETRY_MS,
+  OFFLINE_BANK_CYCLES,
+  skipEnergyCost,
+  skipWarmthCost
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -15,6 +20,10 @@ import type { BoardItemState, ChainsData, GeneratorConfig, TilePos } from '../co
  * the start, nearly free at the end). All timing reads the virtual GameClock.
  */
 export class GeneratorSystem {
+  /** Gifts banked by the last offline catch-up (state:loaded) — the UI's
+   *  "While you were away" card reads it right after load. */
+  lastOfflineGifts = 0;
+
   constructor(
     private state: GameState,
     private bus: EventBus,
@@ -27,6 +36,36 @@ export class GeneratorSystem {
     bus.on('generator:set_timer', ({ chain, tier, remainingMs }) =>
       this.setTimer(chain, tier, remainingMs)
     );
+    bus.on('state:loaded', ({ offlineMs }) => this.bankOffline(offlineMs));
+  }
+
+  /** Offline harvest: each passive producer pays up to OFFLINE_BANK_CYCLES
+   *  overdue gifts on load — a small waiting harvest, never a flood
+   *  (MECHANICS §4.3: "you return to a small harvest waiting"). */
+  private bankOffline(offlineMs: number): void {
+    this.lastOfflineGifts = 0;
+    if (offlineMs <= 0) return;
+    const now = this.clock.now();
+    for (const item of [...this.state.items.values()]) {
+      if (item.kind !== 'item') continue;
+      const generator = this.generatorConfig(item.chain, item.tier);
+      if (!generator?.passiveMs || !generator.produces) continue;
+      if (item.passiveAt === undefined || now < item.passiveAt) continue;
+      const overdue = Math.min(
+        OFFLINE_BANK_CYCLES,
+        Math.floor((now - item.passiveAt) / generator.passiveMs) + 1
+      );
+      for (let i = 0; i < overdue; i++) {
+        const target: TilePos | undefined =
+          this.state.freeActiveNeighbors(item.col, item.row)[0] ??
+          this.state.freeActiveTilesNear(item.col, item.row)[0];
+        if (!target) break; // board full — the live retry loop takes over
+        const output = this.produceItem(generator, target, now);
+        this.lastOfflineGifts++;
+        this.bus.emit('item:produced', { generatorId: item.id, output: this.state.snapshot(output, now) });
+      }
+      item.passiveAt = now + generator.passiveMs;
+    }
   }
 
   /** Tutorial staging: put the first generator of chain+tier into a wait with

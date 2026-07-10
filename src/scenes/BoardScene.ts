@@ -9,6 +9,13 @@ import {
   DRAG,
   DRAGON_ANIM,
   DRAGON_RIG_SCALE,
+  FINALE,
+  FINALE_REGION,
+  GOLDEN_ALTAR,
+  GOLDEN_CHAIN,
+  GOLDEN_TINT,
+  GOLDEN_TREMBLE_PROGRESS,
+  GOLDEN_ELDER_TIER,
   ITEM_SCALE,
   EMBER_MOTES,
   GAME_WIDTH,
@@ -56,10 +63,18 @@ interface CameraFrame {
 const smootherstep = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 
 const DRAGON_CHAIN = 'ember_dragon';
-/** Chains whose generator tiers wear a live rig, and where to fetch each rig. */
+/** Chains whose dragon tiers wear a live rig, and where to fetch each rig.
+ *  ember/emerald rig their GENERATOR tiers; golden_egg rigs the Whelp (tier 2,
+ *  NOT a generator — she's a baby). See wearsRigTier. */
 const DRAGON_RIGS: Record<string, string> = {
   ember_dragon: 'sprites/characters/dragon/red-dragon/rig/dragon-red.rig.json',
-  emerald: 'sprites/characters/dragon/emerald-dragon/rig/dragon-emerald.rig.json'
+  emerald: 'sprites/characters/dragon/emerald-dragon/rig/dragon-emerald.rig.json',
+  golden_egg: 'sprites/characters/dragon/golden-dragon/rig-adult/golden-dragon.rig.json'
+};
+/** Canonical character id for a rig exported with the tool's default name —
+ *  MUST match characterCatalog ids and the faces.json keys (calibrate-faces). */
+const DRAGON_RIG_NAMES: Record<string, string> = {
+  golden_egg: 'dragon-golden'
 };
 
 /** Pre-rendered face frame sets (blink / roar-talk) per rig character —
@@ -111,6 +126,10 @@ export class BoardScene extends Phaser.Scene {
   /** Which standing slot (index) each working dragon holds at its building, so
    *  two workers never land on the same spot. Cleared when the dragon leaves. */
   private dragonSlots = new Map<number, { houseId: number; idx: number }>();
+  /** Countdown pill floating above a rig-hosted dragon: the BoardItem's own
+   *  pill renders UNDER the rig (glued at host.depth + 0.5), so the timer
+   *  lives in a scene-level badge instead. Keyed by dragon itemId. */
+  private coolBadges = new Map<number, Phaser.GameObjects.Container>();
   /** Styled "Zzz" fatigue badge (Container) over a resting dragon. */
   private restBadges = new Map<number, Phaser.GameObjects.Container>();
   /** One floating key badge per key-locked region, so it reads as "needs a key". */
@@ -143,6 +162,18 @@ export class BoardScene extends Phaser.Scene {
    *  Theme-Crystal generator's look) + any authored 3D-decor placement. */
   private crystal3d?: Crystal3D;
   private crystalTex?: Phaser.Textures.CanvasTexture;
+  /** Golden Egg ambient tremble (starts near the Level-3 threshold). */
+  private goldenTremble?: Phaser.Tweens.Tween;
+  /** The Golden Altar (scenic non-playable ledge, west of the isle) — the
+   *  egg/Elder LORE FIXTURE. Never a board item: no merge, sell, drag, work. */
+  private altarEgg?: Phaser.GameObjects.Image;
+  private altarElder?: RigPlayer;
+  private altarElderFallback?: Phaser.GameObjects.Image;
+  private altarZone?: Phaser.GameObjects.Zone;
+  private altarElderRoll = { mode: 'idle' as 'idle' | 'hover', remainMs: 0 };
+  /** The Level-3 finale runs exactly once per session. */
+  private finaleRan = false;
+  private finaleStartedMs = 0;
   /** Lowest zoom the wheel/flights allow — raised so the camera can never show
    *  past the authored background image (the world border). */
   private minZoom = 0.2;
@@ -181,7 +212,9 @@ export class BoardScene extends Phaser.Scene {
     this.buildMapDecor();
     this.buildMapDecor3d(); // authored Three.js 3D-decor placements
     this.buildFog();
+    this.buildSouthPromise();
     this.buildKeyBadges();
+    this.syncGoldenAltar();
     this.buildEmitters();
     this.buildDragCell();
     this.wireInput();
@@ -196,6 +229,8 @@ export class BoardScene extends Phaser.Scene {
       this.offBus = [];
       for (const ld of this.liveDragons.values()) ld.player.destroy();
       this.liveDragons.clear();
+      this.altarElder?.destroy();
+      this.altarElder = undefined;
       this.crystal3d?.dispose();
       this.crystal3d = undefined;
       this.crystalTex = undefined;
@@ -210,6 +245,19 @@ export class BoardScene extends Phaser.Scene {
     }
     this.updateDrag(delta);
     this.updateLiveDragons(delta);
+    if (this.altarElder) {
+      this.altarElder.update(delta);
+      this.altarElderRoll.remainMs -= delta;
+      if (this.altarElderRoll.remainMs <= 0) {
+        if (this.altarElderRoll.mode === 'idle' && Math.random() < DRAGON_ANIM.celebrateChance) {
+          this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.celebrateMs };
+          this.altarElder.play('hover');
+        } else {
+          this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs() };
+          this.altarElder.play('idle');
+        }
+      }
+    }
 
     this.coolAccum += delta;
     if (this.coolAccum >= 240) {
@@ -229,12 +277,23 @@ export class BoardScene extends Phaser.Scene {
           `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
         );
       }
+      for (const [id, badge] of this.coolBadges) {
+        if (!this.itemSprites.has(id)) {
+          badge.destroy();
+          this.coolBadges.delete(id);
+        }
+      }
       for (const sprite of this.itemSprites.values()) {
         if (!sprite.isGenerator) continue;
-        if (DRAGON_RIGS[sprite.chain]) continue; // dragons never show the timer pill
         const item = this.ctx.state.items.get(sprite.itemId);
         if (!item) continue;
         const timer = sprite.chain === 'chest' ? this.chestTimer(item) : this.genTimer(item);
+        if (this.liveDragons.has(sprite.itemId)) {
+          // Rig-hosted dragon: its in-container pill would hide behind the rig —
+          // the countdown floats above its head instead.
+          this.updateDragonCoolBadge(sprite, timer);
+          continue;
+        }
         sprite.setCooling(timer !== null);
         if (timer) {
           sprite.setCooldownRemaining(timer.remaining);
@@ -257,15 +316,12 @@ export class BoardScene extends Phaser.Scene {
 
   /* ------------------------- live rigged dragons ------------------------- */
 
-  /** True if this item is a dragon generator that should wear a live rig
-   *  (ember hatchling/whelp, emerald dragon). */
-  private wearsRig(chain: string, isGenerator: boolean): boolean {
-    return DRAGON_RIGS[chain] !== undefined && isGenerator;
-  }
-
-  /** Same test from a chain+tier (a snapshot before its sprite is acquired). */
+  /** True if this chain+tier is a dragon BOARD ITEM that wears a live rig
+   *  (the ember/emerald generator tiers). The Golden Elder is not a board
+   *  item — she lives on the Golden Altar fixture (see syncGoldenAltar). */
   private wearsRigTier(chain: string, tier: number): boolean {
-    return DRAGON_RIGS[chain] !== undefined && this.generatorConfigFor(chain, tier) !== undefined;
+    if (DRAGON_RIGS[chain] === undefined) return false;
+    return this.generatorConfigFor(chain, tier) !== undefined;
   }
 
   /** Fetch + load every dragon rig once. Any failure leaves that dragon as the
@@ -279,6 +335,13 @@ export class BoardScene extends Phaser.Scene {
         if (!res.ok || !this.scene.isActive()) continue;
         const rig = (await res.json()) as RigDoc;
         if (rig.format !== 'emberkeep-rig' || !rig.images || !this.scene.isActive()) continue;
+        // A rig exported with the tool's default name would collide with any
+        // other default-named rig on the shared texture keys — give it its
+        // canonical id (the golden-dragon export ships as 'character'), which
+        // also keys its FACES entry (faces.json) and catalog id.
+        if (!rig.character || rig.character === 'character') {
+          rig.character = DRAGON_RIG_NAMES[chain] ?? chain;
+        }
         await RigPlayer.loadTextures(this, rig, (layer) => `rig:${rig.character}:${layer}`);
         if (!this.scene.isActive()) continue;
         // Face frame sets are optional per character; a failed frame simply
@@ -293,9 +356,10 @@ export class BoardScene extends Phaser.Scene {
           if (!this.scene.isActive()) continue;
         }
         this.dragonRigs.set(chain, rig);
+        if (chain === GOLDEN_CHAIN) this.syncGoldenAltar(); // fallback art → live rig
         // Re-skin any dragons of this chain that spawned before the rig loaded.
         for (const sprite of this.itemSprites.values()) {
-          if (sprite.chain === chain && this.wearsRig(sprite.chain, sprite.isGenerator) && !this.liveDragons.has(sprite.itemId)) {
+          if (sprite.chain === chain && this.wearsRigTier(sprite.chain, sprite.tier) && !this.liveDragons.has(sprite.itemId)) {
             this.attachDragon(sprite, false);
           }
         }
@@ -442,8 +506,300 @@ export class BoardScene extends Phaser.Scene {
     cam.centerOn(frame.x, frame.y);
 
     this.offBus.push(
-      this.ctx.bus.on('keeper:leveled', ({ level }) => this.flyToLevel(level))
+      this.ctx.bus.on('keeper:leveled', ({ level }) => {
+        // Level 3 is the finale — a scripted sequence, not a plain glide.
+        if (level >= 3) this.runFinale();
+        else this.flyToLevel(level);
+      })
     );
+  }
+
+  /* ------------------------- the Level-3 finale ------------------------- */
+
+  /**
+   * The grand surprise, made real (DEMO-PLAN §THE FINALE): the Golden Egg
+   * cracks → the camera glides to the south terrace → the ash-fog parts
+   * HALFWAY for a two-second glimpse of warm light → the fog settles and the
+   * camera returns. UIScene runs Cindra's line + the chapter card on the same
+   * FINALE timeline, so the two scenes stay in step.
+   */
+  private runFinale(): void {
+    if (this.finaleRan) return;
+    this.finaleRan = true;
+    this.finaleStartedMs = this.time.now;
+    this.stopGoldenTremble();
+
+    // 1 — the camera glides WEST to the Golden Altar, where the whole golden
+    // lore lives (authored spot, golden-egg.json)…
+    this.time.delayedCall(FINALE.hatchAtMs, () => {
+      if (!this.altarEgg) return;
+      const p = this.altarPoint();
+      this.glideToWorld(p.x, p.y + 60, 900);
+    });
+    // …and the Golden Egg cracks: the legendary Elder AWAKENS on her ledge.
+    this.time.delayedCall(FINALE.awakenAtMs, () => this.awakenAltarElder());
+
+    const region = this.ctx.data.map.regions.find((r) => r.id === FINALE_REGION);
+    if (!region || region.tiles.length === 0) return; // no terrace — hatch + card still play
+    const centroid = this.regionCentroid(region.tiles.map(([c, r]) => ({ col: c, row: r })));
+
+    // 2 — glide to the south terrace.
+    this.time.delayedCall(FINALE.flyAtMs, () => this.glideToWorld(centroid.x, centroid.y, FINALE.flyMs));
+
+    // 3 — the fog parts halfway; warm light floods; SHAPES appear in the murk
+    // (the shrine + two unfamiliar dragons — teaser silhouettes, not reveals);
+    // then the ash settles back over them.
+    this.time.delayedCall(FINALE.glimpseAtMs, () => {
+      const puffs: Phaser.GameObjects.Image[] = [];
+      for (const [col, row] of region.tiles) {
+        const puff = this.fog.get(`${col},${row}`);
+        if (puff) puffs.push(puff);
+      }
+      for (const puff of puffs) {
+        this.tweens.killTweensOf(puff);
+        this.tweens.add({
+          targets: puff,
+          alpha: FINALE.fogDipAlpha,
+          duration: 700,
+          ease: 'Sine.easeInOut'
+        });
+      }
+      // Silhouettes fade in UNDER the half-parted clouds (depth just below the
+      // fog band) so they read as shapes caught in the light, not placed art.
+      const shapes: Phaser.GameObjects.Image[] = [];
+      const silhouettes: Array<[string, number, number]> = [
+        ['fx_glimpse_shrine', 0, -60],
+        ['fx_glimpse_dragon_a', -250, 30],
+        ['fx_glimpse_dragon_b', 235, 50]
+      ];
+      for (const [key, dx, dy] of silhouettes) {
+        if (!this.textures.exists(key)) continue;
+        shapes.push(
+          this.add
+            .image(centroid.x + dx, centroid.y + dy, key)
+            .setOrigin(0.5, 1)
+            .setDepth(DEPTHS.itemBase + centroid.y + 1)
+            .setAlpha(0)
+        );
+      }
+      this.tweens.add({ targets: shapes, alpha: 0.92, duration: 800, delay: 250, ease: 'Sine.easeOut' });
+      this.glowFlash(centroid.x, centroid.y - 30, PALETTE.goldAccent, 0.8, 4.2);
+      this.burst.explode(14, centroid.x, centroid.y - 20);
+      this.time.delayedCall(FINALE.glimpseHoldMs, () => {
+        // The shapes sink back into the dark with the settling ash.
+        this.tweens.add({
+          targets: shapes,
+          alpha: 0,
+          duration: 900,
+          ease: 'Sine.easeIn',
+          onComplete: () => shapes.forEach((s) => s.destroy())
+        });
+        for (const puff of puffs) {
+          this.tweens.add({
+            targets: puff,
+            alpha: 0.97,
+            duration: 800,
+            ease: 'Sine.easeInOut',
+            onComplete: () => {
+              // Resume the slow rolling breath the glimpse interrupted.
+              this.tweens.add({
+                targets: puff,
+                alpha: 0.9,
+                scaleX: 1.02,
+                scaleY: 1.035,
+                duration: TIMINGS.fogPulsePeriodMs / 2,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+              });
+            }
+          });
+        }
+      });
+    });
+
+    // 4 — home again (the chapter card lands shortly after, from UIScene).
+    this.time.delayedCall(FINALE.returnAtMs, () => {
+      const frame = this.frameForLevel(this.ctx.state.level);
+      this.glideToWorld(frame.x, frame.y, 1100);
+    });
+  }
+
+  /** Ambient anticipation: the altar egg trembles once the Keeper is close
+   *  to Level 3 (XP progress ≥ threshold) — "look at the egg!". */
+  private updateGoldenTremble(): void {
+    const egg = this.altarEgg;
+    const [gained, span] = this.ctx.state.levelProgress;
+    const near =
+      egg !== undefined &&
+      this.ctx.state.level === 2 &&
+      gained / span >= GOLDEN_TREMBLE_PROGRESS;
+    if (near && !this.goldenTremble && egg) {
+      this.goldenTremble = this.tweens.add({
+        targets: egg,
+        angle: { from: -2.4, to: 2.4 },
+        duration: 90,
+        yoyo: true,
+        repeat: -1,
+        repeatDelay: 1400,
+        ease: 'Sine.easeInOut'
+      });
+    } else if (!near) {
+      this.stopGoldenTremble();
+    }
+  }
+
+  private stopGoldenTremble(): void {
+    if (!this.goldenTremble) return;
+    const target = this.goldenTremble.targets?.[0] as Phaser.GameObjects.Image | undefined;
+    this.goldenTremble.stop();
+    this.goldenTremble = undefined;
+    target?.setAngle(0);
+  }
+
+  /* --------------------------- the Golden Altar --------------------------- */
+
+  /** World point + art scale of the altar (authored decor placement from
+   *  golden-egg.json — cell, calibration and ratio math mirror buildMapDecor). */
+  private altarPoint(): { x: number; y: number; scale: number } {
+    const ratio = TILE_W / (this.ctx.data.map.tile?.width ?? TILE_W);
+    const cal = GOLDEN_ALTAR.calibration;
+    const w = gridToWorld(GOLDEN_ALTAR.cell.col, GOLDEN_ALTAR.cell.row);
+    return { x: w.x + cal.offsetX * ratio, y: w.y + cal.offsetY * ratio, scale: cal.scale * ratio };
+  }
+
+  /** Derive the altar's state from save-derivable facts (nothing extra is
+   *  persisted): the Golden Egg is AUTHORED DECOR (golden-egg.json) — it sits
+   *  on the old altar from the very start; once Cindra's first order is
+   *  delivered AND Level 3 is reached, the awakened Elder stands there
+   *  instead. Idempotent — safe on load, resync and rig-arrival. */
+  private syncGoldenAltar(): void {
+    const delivered = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
+    const awake = delivered && this.ctx.state.level >= 3;
+    if (awake) this.showAltarElder();
+    else this.showAltarEgg(false);
+  }
+
+  /** Ensure the authored Golden Egg decor stands on the altar. With `ceremony`
+   *  (Order 1 just delivered) the camera glides west and the egg FLARES — the
+   *  old altar answering the rekindled brazier. */
+  private showAltarEgg(ceremony: boolean): void {
+    if (!this.altarEgg && !this.altarElder && !this.altarElderFallback) {
+      const p0 = this.altarPoint();
+      const cal = GOLDEN_ALTAR.calibration;
+      this.altarEgg = this.add
+        .image(p0.x, p0.y, `item_${GOLDEN_CHAIN}_1`)
+        .setOrigin(cal.anchor.x, cal.anchor.y)
+        .setScale(p0.scale)
+        .setDepth(DEPTHS.itemBase + p0.y);
+      this.ensureAltarZone();
+    }
+    if (!ceremony || !this.altarEgg) return;
+    const p = this.altarPoint();
+    const home = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
+    this.glideToWorld(p.x, p.y + 60, 900);
+    this.time.delayedCall(1000, () => {
+      this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.85, 1.6);
+      this.sparks.explode(22, p.x, p.y + 40);
+      this.floatText(p.x, p.y - 40, '???', PALETTE.goldAccent);
+    });
+    this.time.delayedCall(2600, () => this.glideToWorld(home.x, home.y, 900));
+  }
+
+  /** The Elder stands on the altar — live rig when available, gold-tinted
+   *  stand-in otherwise (upgraded automatically when the rig arrives). */
+  private showAltarElder(): void {
+    if (this.altarElder) return;
+    const p = this.altarPoint();
+    const eggBottom = p.y + 1451 * p.scale; // egg art is 1176×1451, anchored top
+    this.altarEgg?.destroy();
+    this.altarEgg = undefined;
+    this.stopGoldenTremble();
+    const rig = this.dragonRigs.get(GOLDEN_CHAIN);
+    if (rig) {
+      this.altarElderFallback?.destroy();
+      this.altarElderFallback = undefined;
+      const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, {
+        scale: GOLDEN_ALTAR.elderScale
+      });
+      const face = FACES[rig.character];
+      if (face) player.attachFace(this, face, faceTextureKey(rig.character));
+      player.setFacing('right').play('idle'); // she watches over the isle, to the east
+      player.container.setPosition(p.x, eggBottom - DRAGON_ANIM.groundLift);
+      player.container.setDepth(DEPTHS.itemBase + p.y + 1);
+      this.altarElder = player;
+      this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs() };
+    } else if (!this.altarElderFallback) {
+      this.altarElderFallback = this.add
+        .image(p.x, eggBottom, `item_${GOLDEN_CHAIN}_${GOLDEN_ELDER_TIER}`)
+        .setOrigin(0.5, 0.88)
+        .setScale(0.16)
+        .setTint(GOLDEN_TINT)
+        .setDepth(DEPTHS.itemBase + p.y + 1);
+    }
+    this.addGroundShadow(p.x, eggBottom, 170, DEPTHS.itemBase + p.y);
+    this.ensureAltarZone();
+  }
+
+  /** The finale's awakening beat AT the altar: the egg shakes, cracks in a
+   *  flood of gold, and the legendary Elder rises where it stood. */
+  private awakenAltarElder(): void {
+    const egg = this.altarEgg;
+    if (!egg) return;
+    const p = this.altarPoint();
+    this.stopGoldenTremble();
+    this.tweens.add({
+      targets: egg,
+      x: egg.x + 3,
+      angle: 5,
+      duration: 60,
+      yoyo: true,
+      repeat: Math.floor(TIMINGS.hatchShake / 120),
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 1, 2.6);
+        this.shells.explode(12, p.x, p.y + 40);
+        this.sparks.explode(40, p.x, p.y + 44);
+        this.burst.explode(20, p.x, p.y + 48);
+        this.showAltarElder();
+        if (this.altarElder) {
+          this.altarElder.play('hover');
+          this.altarElder.playFace(2); // the Elder announces herself — a ROAR
+          this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.introCelebrateMs };
+        }
+      }
+    });
+  }
+
+  /** Order 1 delivered AFTER the finale: the arrival and the awakening play
+   *  as one held sequence at the altar — glide west, the egg lands in gold,
+   *  cracks, the Elder rises, then home. */
+  private lateGoldenAwakening(): void {
+    const p = this.altarPoint();
+    const home = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
+    this.showAltarEgg(false); // no competing camera script — this one drives
+    this.glideToWorld(p.x, p.y + 60, 900);
+    this.time.delayedCall(1000, () => {
+      this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.85, 1.6);
+      this.sparks.explode(22, p.x, p.y + 40);
+      this.floatText(p.x, p.y - 40, '???', PALETTE.goldAccent);
+    });
+    this.time.delayedCall(2400, () => this.awakenAltarElder());
+    this.time.delayedCall(5600, () => this.glideToWorld(home.x, home.y, 900));
+  }
+
+  /** One tap zone covers the altar for both states (egg wobble / commune). */
+  private ensureAltarZone(): void {
+    if (this.altarZone) return;
+    const p = this.altarPoint();
+    this.altarZone = this.add
+      .zone(p.x, p.y + 90, 200, 240)
+      .setInteractive({ useHandCursor: true });
+    this.altarZone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (!this.isTap(pointer)) return;
+      if (this.altarElder || this.altarElderFallback) this.communeWithElder();
+      else if (this.altarEgg) this.wobbleGoldenEgg();
+    });
   }
 
   /** World centre + zoom that frames `tiles` around the focal cell. */
@@ -788,6 +1144,33 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /**
+   * The far promise (DEMO-PLAN §Act I): a faint golden shimmer breathing over
+   * the south terrace's ash-clouds all game long — the visible, unreachable
+   * place the Level-3 finale finally glimpses into. Pure ambience.
+   */
+  private buildSouthPromise(): void {
+    const region = this.ctx.data.map.regions.find((r) => r.id === FINALE_REGION);
+    if (!region || region.tiles.length === 0) return;
+    const c = this.regionCentroid(region.tiles.map(([col, row]) => ({ col, row })));
+    const glow = this.add
+      .image(c.x, c.y - 30, 'fx_glow')
+      .setTint(num(PALETTE.goldAccent))
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(DEPTHS.itemBase + c.y + 2400) // above the region's cloud band
+      .setScale(2.6)
+      .setAlpha(0.07);
+    this.tweens.add({
+      targets: glow,
+      alpha: 0.16,
+      scale: 3.1,
+      duration: 2600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+  }
+
+  /**
    * Float a Bronze Key over each key-locked region so the player reads "spend a
    * key here". Sits above the cloud band at the region centroid; lifts away when
    * the region unlocks (see onRegionUnlocked).
@@ -979,11 +1362,15 @@ export class BoardScene extends Phaser.Scene {
     );
     this.input.on(
       Phaser.Input.Events.DRAG_END,
-      (pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+      (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
         if (!(obj instanceof BoardItem) || !this.dragFrom) return;
         this.dragSprite = null;
         this.dragCell.setVisible(false);
-        const to = worldToGrid(pointer.worldX, pointer.worldY + 24);
+        // WYSIWYG: drop into the cell the highlight diamond showed (the dragged
+        // item's tracked position), NOT the raw pointer — the two differ by the
+        // grab offset, so pointer-based drops could land one tile off and
+        // bounce home even though the item hovered a free tile.
+        const to = worldToGrid(this.dragTarget.x, this.dragTarget.y + 24);
 
         // Dragon dragged onto a passive generator (House) → start working directly.
         if (
@@ -1101,7 +1488,11 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /** The live wait a generator is in — tap-cooldown or passive timer — for the
-   *  countdown badge and the skip button. Null when it's ready/producing. */
+   *  countdown badge and the skip button. Null when it's ready/producing.
+   *  A pending PASSIVE wait only reads as "cooling" on passive-ONLY generators
+   *  (house, tree): a tappable one (the strawberry patch) must stay harvestable
+   *  while its free background gift cooks, or the cozy floor tap would open
+   *  the skip menu instead of harvesting. */
   private genTimer(item: BoardItemState): { remaining: number; total: number } | null {
     const cfg = this.generatorConfigFor(item.chain, item.tier);
     if (!cfg) return null;
@@ -1109,7 +1500,12 @@ export class BoardScene extends Phaser.Scene {
     if (item.readyAt !== undefined && now < item.readyAt) {
       return { remaining: item.readyAt - now, total: cfg.cooldownMs };
     }
-    if (cfg.passiveMs && item.passiveAt !== undefined && now < item.passiveAt) {
+    if (
+      cfg.tappable === false &&
+      cfg.passiveMs &&
+      item.passiveAt !== undefined &&
+      now < item.passiveAt
+    ) {
       return { remaining: item.passiveAt - now, total: cfg.passiveMs };
     }
     return null;
@@ -1336,6 +1732,48 @@ export class BoardScene extends Phaser.Scene {
     if (isGenerator && !DRAGON_RIGS[item.chain]) this.sendDragonFlourish(sprite);
   }
 
+  /** Altar egg tap: a wobble + a flavor line that escalates with XP progress
+   *  toward the Level-3 finale ("It's warm…" → "she is almost awake!"). */
+  private wobbleGoldenEgg(): void {
+    const egg = this.altarEgg;
+    if (!egg) return;
+    this.tweens.add({
+      targets: egg,
+      angle: { from: -5, to: 5 },
+      duration: 70,
+      yoyo: true,
+      repeat: 4,
+      ease: 'Sine.easeInOut',
+      onComplete: () => egg.setAngle(0)
+    });
+    const lines = this.ctx.data.dialogue.goldenEgg;
+    const [gained, span] = this.ctx.state.levelProgress;
+    const progress = this.ctx.state.level >= 2 ? gained / span : 0;
+    const bank = progress >= GOLDEN_TREMBLE_PROGRESS ? lines.near : progress >= 0.45 ? lines.mid : lines.early;
+    const line = bank[Math.floor(Math.random() * bank.length)] ?? bank[0]!;
+    this.floatText(egg.x, egg.y - 30, line, PALETTE.goldAccent);
+    this.sparks.explode(4, egg.x, egg.y + 40);
+  }
+
+  /** Communing with the Golden Elder at her altar — a flare of gold and an
+   *  answering rumble (the live rig plays its celebrate + mouth-flap). */
+  private communeWithElder(): void {
+    const p = this.altarPoint();
+    this.sparks.explode(14, p.x, p.y + 20);
+    this.glowFlash(p.x, p.y + 30, PALETTE.goldAccent, 0.55, 1.3);
+    this.floatText(p.x, p.y - 40, '✦', PALETTE.goldAccent);
+    if (this.altarElder) {
+      this.altarElder.play('hover');
+      this.altarElder.playFace(1);
+      this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.celebrateMs };
+    } else if (this.altarElderFallback) {
+      const f = this.altarElderFallback;
+      const y0 = f.y;
+      this.tweens.add({ targets: f, y: y0 - 30, duration: 170, yoyo: true, ease: 'Sine.easeOut', onComplete: () => f.setY(y0) });
+    }
+    this.ctx.bus.emit('elder:tapped', { itemId: 0 }); // Keeper's Tasks counts communes
+  }
+
   /** Cosmetic only: the nearest idle dragon swoops to a just-harvested plant,
    *  breathes a few sparks, and flies home. Drives the dragon's BOARD ITEM so it
    *  works with or without a live rig (the rig is glued to the host). No game
@@ -1462,7 +1900,9 @@ export class BoardScene extends Phaser.Scene {
     // Tutorial: bounce an arrow over the WARMTH (⚡) skip so the player learns to
     // pay the House's timer with energy (and watches their Warmth drop).
     if (this.tutorialStepId === 'house_skip') {
-      const hint = this.add.image(150, -52, 'ui_arrow').setScale(0.5);
+      // Small bounce hint over the ⚡ skip. Scaled to a ~74px height off the real
+      // arrow art (222×400) — the down-pointing tip reads clearly at this size.
+      const hint = this.add.image(150, -52, 'ui_arrow').setScale(0.185);
       btn.add(hint);
       this.tweens.add({
         targets: hint,
@@ -1635,51 +2075,99 @@ export class BoardScene extends Phaser.Scene {
     this.ctx.bus.emit('dragon:work', { dragonId: sprite.itemId, houseId: house.itemId });
   }
 
-  /** Styled "💤 Zzz" fatigue pill floating above a resting dragon. */
+  /** Create/update/remove the floating cooldown pill over a rig-hosted dragon.
+   *  Same visual language as the BoardItem pill (fx_timepill + gold dot +
+   *  mm:ss), at flash depth so the rig can never cover it. */
+  private updateDragonCoolBadge(
+    sprite: BoardItem,
+    timer: { remaining: number; total: number } | null
+  ): void {
+    // Keep the (invisible) host's cooling state coherent — its pill/tint/star
+    // visuals are suppressed while a rig stands in (BoardItem.artHidden).
+    sprite.setCooling(timer !== null);
+    const existing = this.coolBadges.get(sprite.itemId);
+    if (!timer) {
+      if (existing) {
+        existing.destroy();
+        this.coolBadges.delete(sprite.itemId);
+        // Ready again — the sparkle the tinted ready-star would have given.
+        this.sparks.explode(6, sprite.x, sprite.y - 110);
+      }
+      if (this.skipForId === sprite.itemId) this.hideSkipButton();
+      return;
+    }
+    let badge = existing;
+    if (!badge) {
+      badge = this.add.container(sprite.x, sprite.y).setDepth(DEPTHS.flash);
+      const pill = this.add.image(0, 0, 'fx_timepill');
+      const icon = this.add
+        .circle(0, 0, 18, num(PALETTE.gold))
+        .setStrokeStyle(4, num(PALETTE.plumShade));
+      const label = this.add
+        .text(18, 0, '', {
+          fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+          fontSize: '34px',
+          fontStyle: 'bold',
+          color: PALETTE.cream,
+          stroke: PALETTE.night,
+          strokeThickness: 4
+        })
+        .setOrigin(0.5);
+      badge.add([pill, icon, label]);
+      badge.setData('pill', pill);
+      badge.setData('icon', icon);
+      badge.setData('label', label);
+      badge.setScale(0);
+      this.tweens.add({ targets: badge, scale: 1, duration: 170, ease: 'Back.easeOut' });
+      this.coolBadges.set(sprite.itemId, badge);
+    }
+    const label = badge.getData('label') as Phaser.GameObjects.Text;
+    const secs = Math.max(0, Math.ceil(timer.remaining / 1000));
+    label.setText(
+      secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+    );
+    const pillW = Math.max(120, label.width + 96);
+    (badge.getData('pill') as Phaser.GameObjects.Image).setDisplaySize(pillW, 56);
+    (badge.getData('icon') as Phaser.GameObjects.Arc).setX(-pillW / 2 + 30);
+    label.setX(18);
+    if (this.skipForId === sprite.itemId) this.updateSkipCost(timer.remaining, timer.total);
+    // Above the dragon's head; stacked higher when the Zzz rest pill is up.
+    badge.setPosition(sprite.x, sprite.y - (this.restBadges.has(sprite.itemId) ? 320 : 226));
+  }
+
+  /** "💤 m:ss" fatigue pill floating above a resting dragon — the SAME
+   *  fx_timepill visual the cooldown countdowns use, with the sleep emoji in
+   *  place of the gold dot. */
   private showRestBadge(dragonId: number): void {
     this.restBadges.get(dragonId)?.destroy();
     const sprite = this.itemSprites.get(dragonId);
     if (!sprite) return;
 
-    const W = 296, H = 118, R = 32;
-    const pill = this.add.container(sprite.x, sprite.y - 160).setDepth(DEPTHS.flash);
-
-    const g = this.add.graphics();
-    // drop shadow
-    g.fillStyle(num(PALETTE.night), 0.22);
-    g.fillRoundedRect(-W / 2 + 5, -H / 2 + 5, W, H, R);
-    // cream fill
-    g.fillStyle(num(PALETTE.cream), 0.97);
-    g.fillRoundedRect(-W / 2, -H / 2, W, H, R);
-    // lava stroke
-    g.lineStyle(8, num(PALETTE.lava), 1);
-    g.strokeRoundedRect(-W / 2, -H / 2, W, H, R);
-    pill.add(g);
-
-    const font = 'Trebuchet MS, Verdana, sans-serif';
-    const zzzText = this.add.text(0, -18, '💤 Zzz', {
-      fontFamily: font,
-      fontSize: '38px',
-      fontStyle: 'bold',
-      color: PALETTE.textBrown,
-    }).setOrigin(0.5);
-
+    const badge = this.add.container(sprite.x, sprite.y - 160).setDepth(DEPTHS.flash);
+    const pill = this.add.image(0, 0, 'fx_timepill');
+    const zzz = this.add.text(0, -2, '💤', { fontSize: '32px' }).setOrigin(0.5);
     const rest = this.ctx.systems.jobs.restRemaining(dragonId);
     const s0 = Math.ceil(rest / 1000);
-    const countdown = this.add.text(0, 30, `${Math.floor(s0 / 60)}:${String(s0 % 60).padStart(2, '0')}`, {
-      fontFamily: font,
-      fontSize: '30px',
-      fontStyle: 'bold',
-      color: PALETTE.plum,
-    }).setOrigin(0.5);
+    const countdown = this.add
+      .text(18, 0, `${Math.floor(s0 / 60)}:${String(s0 % 60).padStart(2, '0')}`, {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '34px',
+        fontStyle: 'bold',
+        color: PALETTE.cream,
+        stroke: PALETTE.night,
+        strokeThickness: 4
+      })
+      .setOrigin(0.5);
+    const pillW = Math.max(140, countdown.width + 110);
+    pill.setDisplaySize(pillW, 56);
+    zzz.setX(-pillW / 2 + 34);
+    badge.add([pill, zzz, countdown]);
+    badge.setData('label', countdown);
 
-    pill.add([zzzText, countdown]);
-    pill.setData('label', countdown);
+    badge.setScale(0);
+    this.tweens.add({ targets: badge, scale: 1, duration: 170, ease: 'Back.easeOut' });
 
-    pill.setScale(0);
-    this.tweens.add({ targets: pill, scale: 1, duration: 170, ease: 'Back.easeOut' });
-
-    this.restBadges.set(dragonId, pill);
+    this.restBadges.set(dragonId, badge);
   }
 
   /** The fatigue lifted — pop the badge, sparkle, and a "Refreshed!" cue so the
@@ -1744,7 +2232,23 @@ export class BoardScene extends Phaser.Scene {
       bus.on('item:spawned', ({ item }) => {
         const sprite = this.acquireSprite(item, false);
         // Any dragon generator (ember or emerald) wears its live rig.
-        if (this.wearsRig(item.chain, sprite.isGenerator)) this.attachDragon(sprite, false);
+        if (this.wearsRigTier(item.chain, item.tier)) this.attachDragon(sprite, false);
+      }),
+      bus.on('economy:changed', () => this.updateGoldenTremble()),
+      // The Golden Egg materialises ON THE ALTAR when Cindra's first order
+      // completes — camera glide + gold flood (DEMO-PLAN §Act II, staged at
+      // the authored lore spot). Two special timings:
+      //  · delivery CROSSES Level 3 (keeper:leveled fired first, the finale is
+      //    live) → just create the egg; the running finale awakens it.
+      //  · delivery AFTER Level 3 → the LATE AWAKENING: arrival and awakening
+      //    in one held beat, so the promise never dead-ends as an inert egg.
+      bus.on('order:completed', ({ orderId }) => {
+        if (orderId !== GOLDEN_ALTAR.orderId) return;
+        const finaleLive =
+          this.finaleRan && this.time.now - this.finaleStartedMs < FINALE.cardAtMs;
+        if (finaleLive) this.showAltarEgg(false);
+        else if (this.ctx.state.level >= 3) this.lateGoldenAwakening();
+        else this.showAltarEgg(true);
       }),
       bus.on('item:moved', ({ itemId, to }) => {
         const sprite = this.itemSprites.get(itemId);
@@ -2174,7 +2678,7 @@ export class BoardScene extends Phaser.Scene {
       const sprite = this.acquireSprite(snap, false);
       // Restore the live rig for dragons already on the board (resting, not
       // celebrating — they didn't just hatch).
-      if (this.wearsRig(snap.chain, sprite.isGenerator)) this.attachDragon(sprite, false);
+      if (this.wearsRigTier(snap.chain, snap.tier)) this.attachDragon(sprite, false);
     }
     // Re-frame the camera on the loaded Keeper level (no glide).
     const frame = this.frameForLevel(this.ctx.state.level);
@@ -2182,6 +2686,7 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.centerOn(frame.x, frame.y);
     this.tutorialDone = this.ctx.state.tutorialDone;
     this.keyBadges.forEach((b) => b.setAlpha(this.tutorialDone ? 1 : 0));
+    this.syncGoldenAltar();
   }
 
   /* ----------------------------- helpers ---------------------------- */

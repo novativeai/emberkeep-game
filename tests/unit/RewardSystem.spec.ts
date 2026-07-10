@@ -24,9 +24,10 @@ describe('level-up rewards (the addictive beat)', () => {
   it('fires one level-up per level when a big XP grant skips multiple levels', () => {
     const ctx = createTestContext();
     const levels = capture(ctx.bus, 'keeper:leveled');
-    ctx.bus.emit('economy:add', { xp: LEVEL_XP[3], reason: 'test' }); // jump to level 4
-    expect(levels.map((l) => l.level)).toEqual([2, 3, 4]);
-    expect(ctx.state.level).toBe(4);
+    // Jump straight to the cap (level 3 — the demo's chapter ceiling).
+    ctx.bus.emit('economy:add', { xp: LEVEL_XP[2], reason: 'test' });
+    expect(levels.map((l) => l.level)).toEqual([2, 3]);
+    expect(ctx.state.level).toBe(3);
   });
 
   it('coins-only adds never trigger a level-up (no feedback loop)', () => {

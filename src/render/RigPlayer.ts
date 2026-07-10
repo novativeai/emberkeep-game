@@ -188,6 +188,12 @@ export class RigPlayer {
     return this;
   }
 
+  /** Re-arm a perpetual talk loop if it ever stopped (custom-UI 'talk' mode). */
+  playFaceIfIdle(): this {
+    if (this.face && !this.face.channel.talking) this.face.channel.playTalk(Number.POSITIVE_INFINITY);
+    return this;
+  }
+
   setFacing(facing: Facing): this {
     this.container.scaleX = (facing === 'right' ? -1 : 1) * this.displayScale;
     return this;

@@ -8,6 +8,7 @@ import { MergeSystem } from '../systems/MergeSystem';
 import { OrderSystem } from '../systems/OrderSystem';
 import { RewardSystem } from '../systems/RewardSystem';
 import { SaveSystem, type StorageLike } from '../systems/SaveSystem';
+import { TaskSystem } from '../systems/TaskSystem';
 import { TutorialDirector } from '../systems/TutorialDirector';
 import { UnlockSystem } from '../systems/UnlockSystem';
 import { EventBus } from './EventBus';
@@ -17,15 +18,19 @@ import type {
   AnchorsData,
   AssetsManifest,
   ChainsData,
+  DialogueData,
   MapData,
   OrdersData,
+  TasksData,
   TutorialData
 } from './types';
 import anchorsJson from '../data/anchors.json';
 import assetsJson from '../data/assets.json';
 import chainsJson from '../data/chains.json';
+import dialogueJson from '../data/dialogue.json';
 import mapJson from '../data/map.json';
 import ordersJson from '../data/orders.json';
+import tasksJson from '../data/tasks.json';
 import tutorialJson from '../data/tutorial.json';
 
 export interface GameData {
@@ -35,6 +40,8 @@ export interface GameData {
   tutorial: TutorialData;
   assets: AssetsManifest;
   anchors: AnchorsData;
+  dialogue: DialogueData;
+  tasks: TasksData;
 }
 
 export interface GameSystems {
@@ -48,6 +55,7 @@ export interface GameSystems {
   reward: RewardSystem;
   chest: ChestSystem;
   unlock: UnlockSystem;
+  tasks: TaskSystem;
   save: SaveSystem;
   tutorial: TutorialDirector;
 }
@@ -73,6 +81,8 @@ export class GameContext {
       tutorial: tutorialJson as unknown as TutorialData,
       assets: assetsJson as unknown as AssetsManifest,
       anchors: anchorsJson as unknown as AnchorsData,
+      dialogue: dialogueJson as unknown as DialogueData,
+      tasks: tasksJson as unknown as TasksData,
       ...overrides
     };
     this.state = new GameState(this.data.map);
@@ -88,6 +98,7 @@ export class GameContext {
       reward: new RewardSystem(this.bus),
       chest: new ChestSystem(this.state, this.bus, this.clock),
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains, this.data.map),
+      tasks: new TaskSystem(this.state, this.bus, this.data.tasks),
       save,
       tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial)
     };

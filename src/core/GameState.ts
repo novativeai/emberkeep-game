@@ -34,6 +34,12 @@ export class GameState {
   completedOrderIds: string[] = [];
   tutorialIndex = 0;
   tutorialDone = false;
+  /** Lifetime counters (hatches, merges, goldEarned, elderTaps, …) plus
+   *  one-shot numeric flags (finaleSeen, tasksClaimed). TaskSystem owns writes. */
+  stats: Record<string, number> = {};
+  /** Emberkeep Cookbook pages — first-time merge recipes, keyed
+   *  `"chain:fromTier>resultTier"`. MergeSystem owns writes. */
+  discoveredRecipes: string[] = [];
 
   constructor(private map: MapData) {
     this.cols = map.cols;
@@ -65,6 +71,8 @@ export class GameState {
     this.completedOrderIds = [];
     this.tutorialIndex = 0;
     this.tutorialDone = false;
+    this.stats = {};
+    this.discoveredRecipes = [];
   }
 
   hydrate(save: SaveDataV1): void {
@@ -85,6 +93,8 @@ export class GameState {
     this.completedOrderIds = [...save.orderProgress.completedIds];
     this.tutorialIndex = save.tutorial.index;
     this.tutorialDone = save.tutorial.done;
+    this.stats = { ...(save.stats ?? {}) };
+    this.discoveredRecipes = [...(save.discoveredRecipes ?? [])];
   }
 
   toSave(savedAt: number, version: number): SaveDataV1 {
@@ -99,8 +109,19 @@ export class GameState {
       keys: this.keys,
       xp: this.xp,
       orderProgress: { completedIds: [...this.completedOrderIds] },
-      tutorial: { index: this.tutorialIndex, done: this.tutorialDone }
+      tutorial: { index: this.tutorialIndex, done: this.tutorialDone },
+      stats: { ...this.stats },
+      discoveredRecipes: [...this.discoveredRecipes]
     };
+  }
+
+  /** Convenience for the stat counters (absent key = 0). */
+  stat(key: string): number {
+    return this.stats[key] ?? 0;
+  }
+
+  addStat(key: string, amount: number): void {
+    this.stats[key] = (this.stats[key] ?? 0) + amount;
   }
 
   /* ------------- board mutation primitives (systems only) ------------- */

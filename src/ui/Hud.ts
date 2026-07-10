@@ -1,13 +1,17 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, LEVEL_XP, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
+import { uiRegistry } from './theme';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
 interface Pill {
   container: Phaser.GameObjects.Container;
   value: Phaser.GameObjects.Text;
+  bg: Phaser.GameObjects.Image;
+  icon: Phaser.GameObjects.Image;
+  plus?: Phaser.GameObjects.Container;
 }
 
 /**
@@ -27,6 +31,8 @@ export class Hud {
   private xpLabel: Phaser.GameObjects.Text;
   private ledgerDot: Phaser.GameObjects.Arc;
   private ledgerEnabled = true;
+  /** Deliverability per visible order — the dot shows while ANY is ready. */
+  private deliverableByOrder = new Map<string, boolean>();
   private readonly offBus: Array<() => void> = [];
 
   constructor(
@@ -40,10 +46,11 @@ export class Hud {
     // reads like the others (icon + value), not an oversized coin.
     this.coinPill = this.pill(572, 88, 'ui_icon_coin', `${state.coins}`, 0.14);
     this.keyPill = this.pill(920, 88, 'ui_icon_key', `${state.keys}`);
-    // A green "+" on each gauge opens its shop.
+    // A green "+" on the Warmth/Gold gauges opens their shop. Keys are STORY
+    // gates and are never sold (MECHANICS §7: monetise impatience, never
+    // progression) — the key pill gets no shop button.
     this.addPlus(this.energyPill, 'energy', bus);
     this.addPlus(this.coinPill, 'coins', bus);
-    this.addPlus(this.keyPill, 'keys', bus);
     // Small countdown to the next +1 Warmth, just under the energy gauge.
     this.regenLabel = scene.add
       .text(224, 138, '', { fontFamily: FONT, fontSize: '27px', fontStyle: 'bold', color: PALETTE.cream })
@@ -77,25 +84,10 @@ export class Hud {
       ease: 'Sine.easeInOut'
     });
 
-    // Level disc + XP bar.
+    // Level disc + XP bar — one container so the whole cluster moves as one
+    // (children keep their authored absolute coords; the group sits at 0,0).
     const xpY = LIVE_GAME_HEIGHT - 92;
-    const disc = scene.add.image(112, xpY, 'ui_btn_round').setScale(0.82);
-    this.levelText = scene.add
-      .text(112, xpY - 10, '1', {
-        fontFamily: FONT,
-        fontSize: '52px',
-        fontStyle: 'bold',
-        color: PALETTE.textBrown
-      })
-      .setOrigin(0.5);
-    scene.add
-      .text(112, xpY + 32, 'LVL', {
-        fontFamily: FONT,
-        fontSize: '20px',
-        fontStyle: 'bold',
-        color: PALETTE.goldShade
-      })
-      .setOrigin(0.5);
+    const levelGroup = scene.add.container(0, 0);
     const barBg = scene.add.graphics();
     barBg.fillStyle(num(PALETTE.plumShade), 0.85);
     barBg.fillRoundedRect(172, xpY - 18, 440, 36, 18);
@@ -110,17 +102,65 @@ export class Hud {
         color: PALETTE.cream
       })
       .setOrigin(0.5);
-    disc.setDepth(2);
-    this.levelText.setDepth(3);
+    const lvlTag = scene.add
+      .text(112, xpY + 32, 'LVL', {
+        fontFamily: FONT,
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: PALETTE.goldShade
+      })
+      .setOrigin(0.5);
+    const disc = scene.add.image(112, xpY, 'ui_btn_round').setScale(0.82);
+    this.levelText = scene.add
+      .text(112, xpY - 10, '1', {
+        fontFamily: FONT,
+        fontSize: '52px',
+        fontStyle: 'bold',
+        color: PALETTE.textBrown
+      })
+      .setOrigin(0.5);
+    // Same paint order the old depth values produced: bar under disc, number on top.
+    levelGroup.add([barBg, this.xpFill, this.xpLabel, lvlTag, disc, this.levelText]);
 
     this.refreshEconomy();
     this.refreshEnergy(state.energyCurrent);
 
+    // ---- UI Builder registration (theme overrides apply on register) ----
+    uiRegistry.register(scene, 'hud.energy', 'Warmth gauge', 'HUD', this.energyPill.container, {
+      bg: this.energyPill.bg, icon: this.energyPill.icon, value: this.energyPill.value, plus: this.energyPill.plus!
+    });
+    if (this.coinPill) {
+      uiRegistry.register(scene, 'hud.gold', 'Gold gauge', 'HUD', this.coinPill.container, {
+        bg: this.coinPill.bg, icon: this.coinPill.icon, value: this.coinPill.value, plus: this.coinPill.plus!
+      });
+    }
+    uiRegistry.register(scene, 'hud.keys', 'Keys gauge', 'HUD', this.keyPill.container, {
+      bg: this.keyPill.bg, icon: this.keyPill.icon, value: this.keyPill.value
+    });
+    uiRegistry.register(scene, 'hud.regen', 'Warmth regen countdown', 'HUD', this.regenLabel, {
+      label: this.regenLabel
+    });
+    uiRegistry.register(scene, 'hud.gear', 'Settings button', 'HUD', this.gearButton, {
+      bg: this.gearButton.getAt(0), icon: this.gearButton.getAt(1)
+    });
+    uiRegistry.register(scene, 'hud.ledger', 'Ledger button', 'HUD', this.ledgerButton, {
+      bg: this.ledgerButton.getAt(0), icon: this.ledgerButton.getAt(1)
+    });
+    uiRegistry.register(scene, 'hud.level', 'Level badge + XP bar', 'HUD', levelGroup, {
+      disc, level: this.levelText, tag: lvlTag, xp: this.xpLabel
+    });
+
     this.offBus.push(
       bus.on('energy:changed', ({ current }) => this.refreshEnergy(current)),
       bus.on('economy:changed', () => this.refreshEconomy()),
-      bus.on('order:progress', ({ deliverable }) => this.ledgerDot.setVisible(deliverable)),
-      bus.on('order:completed', () => this.ledgerDot.setVisible(false)),
+      bus.on('order:progress', ({ orderId, deliverable }) => {
+        this.deliverableByOrder.set(orderId, deliverable);
+        this.refreshLedgerDot();
+      }),
+      bus.on('order:completed', ({ orderId }) => {
+        this.deliverableByOrder.delete(orderId);
+        this.refreshLedgerDot();
+      }),
       bus.on('item:harvest_failed', ({ reason }) => { if (reason === 'energy') this.shakeEnergy(); })
     );
 
@@ -137,6 +177,10 @@ export class Hud {
   /** Show or hide the key pill (hidden after tutorial in demo mode). */
   setKeyVisible(visible: boolean): void {
     this.keyPill.container.setVisible(visible);
+  }
+
+  private refreshLedgerDot(): void {
+    this.ledgerDot.setVisible([...this.deliverableByOrder.values()].some(Boolean));
   }
 
   setLedgerEnabled(enabled: boolean): void {
@@ -165,8 +209,9 @@ export class Hud {
   }
 
   /** A green "+" button hanging off a gauge's right edge → opens its shop. */
-  private addPlus(pill: Pill, currency: 'energy' | 'coins' | 'keys', bus: EventBus): void {
+  private addPlus(pill: Pill, currency: 'energy' | 'coins', bus: EventBus): void {
     const btn = this.scene.add.container(150, 0);
+    pill.plus = btn;
     const ring = this.scene.add.circle(0, 0, 31, 0x5fb43a).setStrokeStyle(6, num(PALETTE.cream));
     const plus = this.scene.add
       .text(0, -4, '+', { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: '#ffffff' })
@@ -196,7 +241,7 @@ export class Hud {
       })
       .setOrigin(0.5);
     container.add([bg, iconImg, text]);
-    return { container, value: text };
+    return { container, value: text, bg, icon: iconImg };
   }
 
   private roundIconButton(
@@ -241,15 +286,17 @@ export class Hud {
     this.coinPill?.value.setText(`${this.state.coins}`);
     this.keyPill.value.setText(`${this.state.keys}`);
     this.levelText.setText(`${this.state.level}`);
+    const atCap = this.state.level >= LEVEL_XP.length;
     const [gained, span] = this.state.levelProgress;
     const xpY = LIVE_GAME_HEIGHT - 92;
     this.xpFill.clear();
-    const width = Math.max(0.04, Math.min(1, gained / span)) * 424;
+    const width = (atCap ? 1 : Math.max(0.04, Math.min(1, gained / span))) * 424;
     this.xpFill.fillStyle(num(PALETTE.gold), 1);
     this.xpFill.fillRoundedRect(180, xpY - 11, width, 22, 11);
     this.xpFill.fillStyle(num(PALETTE.goldAccent), 0.65);
     this.xpFill.fillRoundedRect(180, xpY - 11, width, 9, 4.4);
-    this.xpLabel.setText(`${gained} / ${span} XP`);
+    // The chapter ends at the cap — the bar never fills toward nothing.
+    this.xpLabel.setText(atCap ? 'Chapter One complete ✦' : `${gained} / ${span} XP`);
   }
 
   private shakeEnergy(): void {

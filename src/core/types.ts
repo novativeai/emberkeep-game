@@ -63,6 +63,8 @@ export interface ChainTierConfig {
   sell: number;
   /** XP granted when a merge produces this tier. */
   xp: number;
+  /** false = the sell path refuses this tier (story items like the Golden Egg). */
+  sellable?: boolean;
   generator?: GeneratorConfig;
 }
 
@@ -108,11 +110,65 @@ export interface OrderConfig {
   title: string;
   blurb: string;
   requires: OrderRequirement[];
-  rewards: { coins: number; keys: number; xp?: number; spawn?: { chain: string; tier: number; count: number } };
+  rewards: {
+    coins: number;
+    keys: number;
+    xp?: number;
+    spawn?: { chain: string; tier: number; count: number };
+    /** Mystery-reward hint shown verbatim on the order card (e.g. "🥚 ???") —
+     *  for rewards staged OUTSIDE the board, like the Golden Altar egg. */
+    tease?: string;
+  };
 }
 
 export interface OrdersData {
   orders: OrderConfig[];
+  /** Encore templates cycled forever once the scripted orders are done, so the
+   *  Ledger never dead-ends. Ids are synthesised as `encore_<n>`. */
+  repeatable?: Omit<OrderConfig, 'id'>[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Dialogue + Keeper's Tasks data (src/data/dialogue.json, tasks.json)  */
+/* ------------------------------------------------------------------ */
+
+export interface DialogueData {
+  /** Short Cindra quotes stamped on the order-complete banner (rotating). */
+  orderComplete: string[];
+  /** Golden Egg tap flavor, keyed by XP progress toward the Level-3 finale. */
+  goldenEgg: { early: string[]; mid: string[]; near: string[] };
+  /** Cindra's first (and only pre-encore) spoken line — the finale beat. */
+  finaleCindra: string;
+  /** Finale variant when the Golden Egg was never earned (Order 1 skipped) —
+   *  reads as PROPHECY, pointing the player back to the un-filled promise. */
+  finaleCindraProphecy: string;
+  /** Cindra's banner quote the moment the egg materialises on the altar. */
+  goldenArrival: string;
+  /** Cindra's line when Order 1 completes AFTER Level 3 — the late awakening. */
+  lateAwakening: string;
+  /** One-shot Laurah nudges post-tutorial. */
+  hints: { zeroWarmth: string; boardFull: string; eggTrembles: string };
+  /** Cindra's line when all Keeper's Tasks complete. */
+  tasksComplete: string;
+}
+
+export type TaskKind = 'hatches' | 'orders' | 'goldEarned' | 'merges' | 'elderTaps';
+
+export interface TaskConfig {
+  id: string;
+  label: string;
+  kind: TaskKind;
+  target: number;
+  /** The task's subject doesn't exist before these gates (presentation only —
+   *  progress can't move anyway; e.g. the Elder pre-awakening). */
+  lockedUntil?: { order?: string; level?: number };
+  /** Shown in place of the progress bar while locked. */
+  lockedHint?: string;
+}
+
+export interface TasksData {
+  tasks: TaskConfig[];
+  reward: { coins: number; energy: number };
 }
 
 export interface MapItemPlacement {
@@ -315,6 +371,12 @@ export interface SaveDataV1 {
   xp: number;
   orderProgress: { completedIds: string[] };
   tutorial: { index: number; done: boolean };
+  /** Lifetime counters (Keeper's Tasks + chapter-card stats) and one-shot
+   *  flags (`finaleSeen`, `tasksClaimed`) — all numeric for easy versioning. */
+  stats: Record<string, number>;
+  /** First-time merge discoveries for the Emberkeep Cookbook — keys like
+   *  `"ember_dragon:1>2"`. Optional: older saves default to []. */
+  discoveredRecipes?: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -334,7 +396,7 @@ export interface EventMap {
   'ui:ledger_toggled': { open: boolean };
   'ui:deliver_requested': { orderId: string };
   /** A gauge "+" button opened the shop for that currency. */
-  'ui:shop_requested': { currency: 'energy' | 'coins' | 'keys' };
+  'ui:shop_requested': { currency: 'energy' | 'coins' };
   'ui:sell_requested': { itemId: number };
   /** Settings toggled the background music on/off (AudioManager applies it). */
   'audio:set_music_muted': { muted: boolean };
@@ -378,6 +440,9 @@ export interface EventMap {
     xp: number;
   };
   'item:hatched': { item: ItemSnapshot };
+  /** A merge recipe was performed for the FIRST time — the Emberkeep Cookbook
+   *  writes a new page (MergeSystem emits once per chain:fromTier>resultTier). */
+  'cookbook:discovered': { chain: string; fromTier: number; resultTier: number };
   'item:harvested': { generatorId: number; output: ItemSnapshot };
   'item:harvest_failed': { generatorId: number; reason: 'cooldown' | 'energy' | 'no_space' };
   /** A generator passively gifted an item (no tap, no energy). */
@@ -400,6 +465,10 @@ export interface EventMap {
   'region:unlocked': { regionId: string; tiles: TilePos[]; revealed: ItemSnapshot[] };
   'region:unlock_failed': { regionId: string; reason: 'keys' | 'not_unlockable' | 'level' };
   'marketplace:purchased': { energy: number; free: boolean };
+  /** The awakened Golden Elder was tapped (communing) — Keeper's Tasks counts it. */
+  'elder:tapped': { itemId: number };
+  /** Every Keeper's Task reached its target (fired once; reward already paid). */
+  'tasks:all_complete': Record<string, never>;
   'tutorial:step': TutorialStepEvent;
   'state:saved': { at: number };
   'state:loaded': { offlineMs: number; energyRecovered: number };

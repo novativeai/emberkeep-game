@@ -139,8 +139,12 @@
     {
       "id": "bush_merge",
       "speaker": "laurah",
-      "text": "Three Bushes grew in the opened land! Merge them to raise a House — it earns you coins while you rest. Dragons can Work nearby to speed it up.",
+      "text": "Look — Bushes grew in the opened land, and a wild emberberry patch! It feeds you for free, forever. Now merge the three Bushes to raise a House — it earns coins while you rest.",
       "gate": { "type": "event", "event": "item:merged", "chain": "lumber" },
+      "effects": [
+        { "spawn": { "chain": "strawberry", "tier": 3, "count": 1, "nearChain": "lumber" } },
+        { "spawn": { "chain": "strawberry", "tier": 1, "count": 2, "nearChain": "strawberry" } }
+      ],
       "highlight": [
         { "chain": "lumber", "nth": 0 },
         { "chain": "lumber", "nth": 1 },
@@ -185,7 +189,7 @@
       "text": "Your House earns coins slowly — but you can rush it! Tap the House, then spend Warmth (⚡) to skip its timer. Watch your Warmth drop!",
       "gate": { "type": "event", "event": "generator:skipped", "chain": "lumber", "currency": "warmth" },
       "effects": [
-        { "setTimer": { "chain": "lumber", "tier": 2, "remainingMs": 600000 } }
+        { "setTimer": { "chain": "lumber", "tier": 2, "remainingMs": 120000 } }
       ],
       "arrow": { "tile": { "chain": "lumber", "nth": 0, "tier": 2 } },
       "allow": { "tapGenerators": true, "drag": ["ember_dragon", "emerald"] }
@@ -202,7 +206,7 @@
     {
       "id": "free_play",
       "speaker": "laurah",
-      "text": "Emberkeep is yours now, Keeper! Grow your dragons, discover hidden lands — and reach Keeper Level 3 for a grand surprise awaiting you!",
+      "text": "Emberkeep is yours now, Keeper! Fill Cindra's Ledger — she guards something golden — and reach Keeper Level 3… they say something waits past the southern ash.",
       "gate": { "type": "tap" },
       "allow": {}
     }

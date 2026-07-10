@@ -295,4 +295,27 @@ describe('MergeSystem', () => {
     expect(ctx.state.items.size).toBe(2);
     expect(ctx.state.itemAt(3, 2)?.chain).toBe('sparkweed'); // just moved, no snap
   });
+
+  it('writes a Cookbook page on the FIRST merge of a recipe — and only once', () => {
+    const ctx = createTestContext();
+    const discovered = capture(ctx.bus, 'cookbook:discovered');
+    const setup = (): void => {
+      ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 1, kind: 'item' });
+      ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 2, kind: 'item' });
+      ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 3, row: 3, kind: 'item' });
+    };
+
+    setup();
+    drag(ctx, [3, 3], [1, 3]);
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0]).toMatchObject({ chain: 'sparkweed', fromTier: 1, resultTier: 2 });
+    expect(ctx.state.discoveredRecipes).toEqual(['sparkweed:1>2']);
+
+    // The same recipe again — the page is already written.
+    ctx.state.removeItem(ctx.state.itemAt(1, 3)!.id);
+    setup();
+    drag(ctx, [3, 3], [1, 3]);
+    expect(discovered).toHaveLength(1);
+    expect(ctx.state.discoveredRecipes).toEqual(['sparkweed:1>2']);
+  });
 });

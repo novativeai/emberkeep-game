@@ -134,9 +134,9 @@
     },
     {
       "key": "item_ember_dragon_3",
-      "source": "placeholder",
+      "source": "file",
       "generator": "item",
-      "file": "sprites/characters/dragon/red-dragon/_assembled-board.png"
+      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.png"
     },
     {
       "key": "item_flame_gem_1",
@@ -192,7 +192,12 @@
       "generator": "item",
       "file": "sprites/items/coin.png"
     },
-    { "key": "item_coin_2", "source": "file", "generator": "item", "file": "sprites/items/coin.png" },
+    {
+      "key": "item_coin_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/coin.png"
+    },
     {
       "key": "item_diamond_1",
       "source": "file",
@@ -255,15 +260,15 @@
     },
     {
       "key": "ui_hand",
-      "source": "placeholder",
+      "source": "file",
       "generator": "ui",
-      "file": "raw/ai/ui_hand.png"
+      "file": "sprites/pointer/gauntlet-pointer.png"
     },
     {
       "key": "ui_arrow",
-      "source": "placeholder",
+      "source": "file",
       "generator": "ui",
-      "file": "raw/ai/ui_arrow.png"
+      "file": "sprites/items/arrow.png"
     },
     {
       "key": "portrait_laurah",
@@ -273,9 +278,9 @@
     },
     {
       "key": "portrait_cindra",
-      "source": "placeholder",
+      "source": "file",
       "generator": "portrait",
-      "file": "raw/ai/portrait_cindra.png"
+      "file": "sprites/guide-characters/cindra/cindra-bubble-icon.png"
     },
     {
       "key": "ui_tile_highlight",
@@ -330,6 +335,41 @@
       "source": "placeholder",
       "generator": "ui",
       "file": "raw/ai/ui_slot.png"
+    },
+    {
+      "key": "ui_shop_panel",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_card",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_ribbon",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_badge",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_burst",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_btn_price",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_btn_free",
+      "source": "placeholder",
+      "generator": "ui"
     },
     {
       "key": "ui_icon_bolt",
@@ -698,6 +738,60 @@
       "file": "sprites/items/golden-egg.png"
     },
     {
+      "key": "item_golden_egg_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.png"
+    },
+    {
+      "key": "ui_teaser_terrace",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/teaser_terrace.png"
+    },
+    {
+      "key": "ui_teaser_breed",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/teaser_breed.png"
+    },
+    {
+      "key": "ui_teaser_flame",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/teaser_flame.png"
+    },
+    {
+      "key": "fx_glimpse_shrine",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/finale/glimpse_shrine.png"
+    },
+    {
+      "key": "fx_glimpse_dragon_a",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/finale/glimpse_dragon_a.png"
+    },
+    {
+      "key": "fx_glimpse_dragon_b",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/finale/glimpse_dragon_b.png"
+    },
+    {
+      "key": "ui_icon_tasks",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/ui/icon_tasks.png"
+    },
+    {
+      "key": "ui_icon_cookbook",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/ui/icon_cookbook.png"
+    },
+    {
       "key": "item_emerald_1",
       "source": "file",
       "generator": "item",
@@ -720,6 +814,48 @@
       "source": "file",
       "generator": "decor",
       "file": "sprites/background/emberkeep.jpg"
+    },
+    {
+      "key": "trailer_world_ice",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/world_ice.jpg"
+    },
+    {
+      "key": "trailer_world_crystal",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/world_crystal.jpg"
+    },
+    {
+      "key": "trailer_legend_frost",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_frost.png"
+    },
+    {
+      "key": "trailer_legend_crystal",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_crystal.png"
+    },
+    {
+      "key": "trailer_legend_storm",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_storm.png"
+    },
+    {
+      "key": "trailer_legend_tide",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_tide.png"
+    },
+    {
+      "key": "trailer_legend_shadow",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_shadow.png"
     }
   ]
 }

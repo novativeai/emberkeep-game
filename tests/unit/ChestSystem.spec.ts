@@ -5,7 +5,7 @@ import { capture, createTestContext } from './helpers';
 describe('ChestSystem (standing gift box)', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('grants 5 Gold (random → coins), keeps the chest, and recharges its timer', () => {
+  it('grants 15 Gold (random → coins), keeps the chest, and recharges its timer', () => {
     const ctx = createTestContext();
     vi.spyOn(Math, 'random').mockReturnValue(0); // index 0 → coins
     const chest = ctx.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
@@ -14,7 +14,7 @@ describe('ChestSystem (standing gift box)', () => {
     const before = ctx.clock.now();
     ctx.bus.emit('chest:open', { itemId: chest.id });
 
-    expect(economy.some((e) => e.coins === 5 && e.reason === 'chest')).toBe(true);
+    expect(economy.some((e) => e.coins === 15 && e.reason === 'chest')).toBe(true);
     expect(ctx.state.items.get(chest.id)).toBeDefined(); // NOT consumed
     expect(chest.readyAt).toBeGreaterThanOrEqual(before + CHEST_INTERVAL_MS); // recharged
     expect(chest.readyAt).toBeLessThanOrEqual(ctx.clock.now() + CHEST_INTERVAL_MS);
