@@ -123,7 +123,8 @@
     <button id="newWorld" title="Start a fresh world (clears the auto-saved session)">✦ New</button>
     <button id="loadProject" title="Load a saved .worldproject.json file">Load</button>
     <button id="saveProject" title="Download a .worldproject.json backup file">Save</button>
-    <button class="primary" id="exportWorld" title="World JSON: per-asset calibration (offset/scale/anchor), all placements, embedded PNGs">⬇ Export world.json</button>
+    <label id="embedArtLabel" title="Embed every PNG as base64 in the export (huge file — only needed to hand art to the extract scripts). Off = lean data-only JSON; art still round-trips via Save/Load project." style="display:inline-flex; align-items:center; gap:4px; font-size:11px; cursor:pointer"><input id="embedArt" type="checkbox" style="margin:0" />embed art</label>
+    <button class="primary" id="exportWorld" title="World JSON: per-asset calibration (offset/scale/anchor), all placements, level/fog map, camera keyframes. Lean by default — tick 'embed art' to inline the PNGs.">⬇ Export world.json</button>
     </div>
   </div>
 
@@ -213,6 +214,13 @@ try {
  * calibration table (offsetX/offsetY/scale/anchor). That table is the
  * point: it tells you the exact nudge each PNG needs to sit right, which
  * drops straight into the game's assets.json / anchors.json.
+ *
+ * Two file formats, one structure:
+ *  - Export world.json  — LEAN data-only by default (images map keeps its
+ *    keys but holds nulls; ~tens of KB, LLM/ingest-friendly). Tick 'embed
+ *    art' to inline base64 PNGs (only needed for the extract-* scripts).
+ *  - Save .worldproject.json — always full-fat (every PNG embedded); the
+ *    round-trip/backup format the artist re-loads to keep editing.
  *
  * Iso projection matches the game (Constants.ts): TILE_W x TILE_H, 2:1.
  *   worldOf(col,row) = ((col-row)*TILE_W/2, (col+row)*TILE_H/2)
@@ -1369,14 +1377,15 @@ function buildDoc(embed) {
     })
     .sort((a, b) => a.level - b.level);
   // merge-item catalogue: every element, with custom art where the artist
-  // dropped it in. `image` is embedded only for replaced slots (keeps it lean).
+  // dropped it in. `image` is embedded only for replaced slots — and only when
+  // embedding at all (lean exports keep the key→file mapping, art stays null).
   const mergeAssets = MERGE_SLOTS.map((def) => {
     const s = S.mergeSlots[def.key] ?? def;
     return {
       key: def.key, label: def.label, chain: def.chain, tier: def.tier,
       custom: !!s.custom,
       file: s.custom ? (s.fileName ?? `${def.key}.png`) : null,
-      image: s.custom ? s.src : null
+      image: embed && s.custom ? s.src : null
     };
   });
   const doc = {
@@ -1387,18 +1396,54 @@ function buildDoc(embed) {
     bounds, backgroundBounds, assets, placements, levels, cameraKeyframes, mergeAssets,
     cameraZoom: { min: +S.gameZoom.min, max: +S.gameZoom.max } // in-game wheel-zoom clamp
   };
+  // The images map ALWAYS keeps its keys so the export structure is stable.
+  // Lean mode (embed=false) writes null instead of base64 — every consumer
+  // (ingest, extract scripts, loadWorldDoc) already treats a missing image as
+  // "skip"; real art round-trips via the .worldproject.json instead.
   // Invisible tiles export a transparent pixel (the card icon is editor-only).
-  if (embed) { doc.images = {}; for (const a of Object.values(S.assets)) { if (a.is3d) continue; doc.images[a.file] = a.invisible ? TRANSPARENT_PX : a.img.src; } }
+  doc.images = {};
+  for (const a of Object.values(S.assets)) {
+    if (a.is3d) continue;
+    doc.images[a.file] = a.invisible ? TRANSPARENT_PX : (embed ? a.img.src : null);
+  }
   return doc;
 }
+// Lean pretty-printer: top-level keys indented, but each record (asset,
+// placement, level entry, image key) on ONE line — same JSON, a fraction of
+// the pretty-printed line noise, and still diff- and human-readable.
+function stringifyLean(doc) {
+  const lines = ['{'];
+  const entries = Object.entries(doc);
+  entries.forEach(([k, v], i) => {
+    const comma = i < entries.length - 1 ? ',' : '';
+    if (Array.isArray(v) && v.length) {
+      lines.push(`  ${JSON.stringify(k)}: [`);
+      v.forEach((el, j) => lines.push(`    ${JSON.stringify(el)}${j < v.length - 1 ? ',' : ''}`));
+      lines.push(`  ]${comma}`);
+    } else if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length && (k === 'levels' || k === 'images')) {
+      const es = Object.entries(v);
+      lines.push(`  ${JSON.stringify(k)}: {`);
+      es.forEach(([kk, vv], j) => lines.push(`    ${JSON.stringify(kk)}: ${JSON.stringify(vv)}${j < es.length - 1 ? ',' : ''}`));
+      lines.push(`  }${comma}`);
+    } else {
+      lines.push(`  ${JSON.stringify(k)}: ${JSON.stringify(v)}${comma}`);
+    }
+  });
+  lines.push('}');
+  return lines.join('\n');
+}
 document.getElementById('exportWorld').onclick = () => {
-  const doc = buildDoc(true);
-  download(`${doc.world}.world.json`, JSON.stringify(doc, null, 2));
+  const embed = document.getElementById('embedArt').checked;
+  const doc = buildDoc(embed);
+  const text = embed ? JSON.stringify(doc, null, 2) : stringifyLean(doc);
+  download(`${doc.world}.world.json`, text);
   const levelKeys = Object.keys(doc.levels);
   const levelSummary = levelKeys.length
     ? ` Levels: ${levelKeys.sort((a, b) => a - b).map((L) => `L${L}×${doc.levels[L].count}`).join(', ')}.`
     : '';
-  say(`Exported <b>${doc.world}.world.json</b> — ${doc.assets.length} assets, ${doc.placements.length} placements, images embedded.${levelSummary} ✔`);
+  const kb = Math.max(1, Math.round(text.length / 1024));
+  const artNote = embed ? 'images embedded' : 'lean (no art — Save carries the PNGs)';
+  say(`Exported <b>${doc.world}.world.json</b> — ${doc.assets.length} assets, ${doc.placements.length} placements, ${artNote}, ${kb} KB.${levelSummary} ✔`);
 };
 document.getElementById('saveProject').onclick = () => {
   const doc = buildDoc(true); doc.format = 'emberkeep-world-project';
@@ -1423,7 +1468,30 @@ function loadWorldDoc(doc, label) {
   }
   const byName = {};
   let remaining = (doc.assets ?? []).length;
+  let skipped = 0;
   if (!remaining) { markReady(); renderAssets(); render(); return; }
+  // Bind placements once EVERY asset has resolved — loaded OR failed. A single
+  // broken/missing image (e.g. the procedural 3D crystal carries no image in
+  // the export) must never deadlock the whole world load.
+  const finishOne = () => {
+    if (--remaining !== 0) return;
+    for (const pl of doc.placements) {
+      const aid = byName[`${pl.category}|${pl.asset}`] ?? byName[`tile|${pl.asset}`] ?? byName[`decotile|${pl.asset}`];
+      if (!aid) continue;
+      const place = { id: uid(), assetId: aid, col: pl.col, row: pl.row, z: pl.z ?? 0 };
+      if (pl.level !== undefined) place.level = pl.level;
+      if (pl.dx || pl.dy) { place.dx = pl.dx; place.dy = pl.dy; }
+      S.placements.push(place);
+    }
+    S.nextZ = Math.max(1, ...S.placements.map((p) => Math.abs(p.z))) + 1;
+    S.selectedAssetId = null;
+    renderAssets(); fitView(); refreshInspector();
+    markReady(); // resume auto-save and persist the loaded project
+    // A lean export (Export with 'embed art' off) has an images map of nulls —
+    // tell the artist the .worldproject.json is the editable-with-art format.
+    const leanDoc = skipped > 0 && doc.images && Object.values(doc.images).every((v) => !v || v.length < 200);
+    say(`Loaded <b>${label ?? doc.world}</b>: ${doc.assets.length} assets, ${doc.placements.length} placements${skipped ? ` (${skipped} asset image${skipped === 1 ? '' : 's'} missing — skipped)` : ''}.${leanDoc ? ' This is a <b>lean export</b> (no art inside) — load the <b>.worldproject.json</b> to edit with art.' : ''}`);
+  };
   doc.assets.forEach((ad) => {
     const img = new Image();
     img.onload = () => {
@@ -1434,23 +1502,12 @@ function loadWorldDoc(doc, label) {
       });
       S.assets[id].name = ad.name; if (ad.invisible) S.assets[id].invisible = true;
       byName[`${ad.category}|${ad.name}`] = id;
-      if (--remaining === 0) {
-        for (const pl of doc.placements) {
-          const aid = byName[`${pl.category}|${pl.asset}`] ?? byName[`tile|${pl.asset}`] ?? byName[`decotile|${pl.asset}`];
-          if (!aid) continue;
-          const place = { id: uid(), assetId: aid, col: pl.col, row: pl.row, z: pl.z ?? 0 };
-          if (pl.level !== undefined) place.level = pl.level;
-          if (pl.dx || pl.dy) { place.dx = pl.dx; place.dy = pl.dy; }
-          S.placements.push(place);
-        }
-        S.nextZ = Math.max(1, ...S.placements.map((p) => Math.abs(p.z))) + 1;
-        S.selectedAssetId = null;
-        renderAssets(); fitView(); refreshInspector();
-        markReady(); // resume auto-save and persist the loaded project
-        say(`Loaded <b>${label ?? doc.world}</b>: ${doc.assets.length} assets, ${doc.placements.length} placements.`);
-      }
+      finishOne();
     };
-    img.src = ad.invisible ? invisibleTileIcon() : (doc.images ?? {})[ad.file];
+    img.onerror = () => { skipped += 1; finishOne(); };
+    const src = ad.invisible ? invisibleTileIcon() : (doc.images ?? {})[ad.file];
+    if (src) img.src = src;
+    else { skipped += 1; setTimeout(finishOne, 0); } // no image in the file (3D/procedural)
   });
 }
 // Fetch the bundled current world (deployed alongside index.html). Returns true

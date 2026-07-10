@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI Builder — Emberkeep Tools</title>
+<style>
+  /* Emberkeep tool chrome — the game's own palette (src/core/Constants PALETTE). */
+  :root {
+    --night: #241B22; --panel: #2C222A; --panel2: #342832; --line: #4A3845;
+    --ink: #FFF6E8; --muted: #B4A2B0; --gold: #F7A437; --goldHi: #FFD84D;
+    --teal: #3FA8D9; --lava: #E8503C; --moss: #7ECB4F; --plum: #6A5468;
+    --font: 'Trebuchet MS', Verdana, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--night); color: var(--ink);
+    font-family: var(--font); font-size: 13px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  button, select, input { font-family: var(--font); font-size: 12.5px; color: var(--ink); }
+  button {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 12px; cursor: pointer;
+  }
+  button:hover { border-color: var(--gold); }
+  button.primary { background: var(--gold); border-color: var(--gold); color: #241B22; font-weight: 700; }
+  button.primary:hover { background: var(--goldHi); }
+  button.ghost { background: transparent; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  input[type=number], input[type=text], select {
+    background: var(--night); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; width: 100%;
+  }
+  input[type=color] { width: 34px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--night); cursor: pointer; }
+  input[type=range] { width: 100%; accent-color: var(--gold); }
+  .dia { display: inline-block; width: 10px; height: 10px; background: var(--gold); transform: rotate(45deg) scale(1,.62); border-radius: 2px; flex: none; }
+
+  /* ---- top bar ---- */
+  #topbar {
+    display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+    background: var(--panel); border-bottom: 1px solid var(--line); flex: none;
+  }
+  #topbar .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 15px; letter-spacing: .02em; margin-right: 8px; white-space: nowrap; }
+  #topbar .sep { width: 1px; height: 24px; background: var(--line); }
+  #gameUrl { width: 210px; }
+  #status { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  #statusDot { width: 10px; height: 10px; border-radius: 50%; background: var(--lava); }
+  #statusDot.on { background: var(--moss); }
+  #dirtyDot { color: var(--goldHi); font-weight: 700; visibility: hidden; }
+
+  /* ---- main split ---- */
+  #main { flex: 1; display: flex; min-height: 0; position: relative; }
+
+  /* left rail */
+  #left {
+    width: 292px; flex: none; background: var(--panel); border-right: 1px solid var(--line);
+    overflow-y: auto; padding: 12px;
+  }
+  .railTitle { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 700; margin: 16px 2px 8px; }
+  .railTitle:first-child { margin-top: 2px; }
+  .group-label { color: var(--muted); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; margin: 10px 4px 4px; }
+  .el-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 8px;
+    cursor: pointer; border: 1px solid transparent;
+  }
+  .el-item:hover { background: var(--panel2); }
+  .el-item.sel { background: var(--panel2); border-color: var(--teal); }
+  .el-item .nm { flex: 1; }
+  .el-item .mod { width: 7px; height: 7px; border-radius: 50%; background: var(--goldHi); visibility: hidden; }
+  .el-item.modified .mod { visibility: visible; }
+  .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .thumb {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 6px 4px 4px; text-align: center; cursor: pointer;
+  }
+  .thumb:hover { border-color: var(--gold); }
+  .thumb.sel { border-color: var(--teal); }
+  .thumb img { max-width: 100%; height: 44px; object-fit: contain; image-rendering: auto; }
+  .thumb .cap { font-size: 9.5px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 7px; }
+  .sw { width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.18); cursor: pointer; position: relative; }
+  .sw:hover { outline: 2px solid var(--goldHi); }
+  .fontRow { padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; cursor: pointer; font-size: 14px; }
+  .fontRow:hover { border-color: var(--gold); }
+  .hint { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 6px 2px; }
+
+  /* center stage */
+  #stage { flex: 1; min-width: 0; position: relative; overflow: hidden; background:
+    radial-gradient(1200px 600px at 50% 40%, #2b2129 0%, var(--night) 70%); }
+  #frameWrap { position: absolute; left: 0; top: 0; box-shadow: 0 18px 60px -18px rgba(0,0,0,.8); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; transform-origin: 0 0; }
+  button:disabled { opacity: .4; cursor: default; }
+  #gameFrame { width: 1280px; height: 800px; border: 0; display: block; background: #171116; }
+  #frameCover { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; background: #1d161c; color: var(--muted); text-align: center; padding: 30px; }
+  /* drop catcher — shown only while a rail item is being dragged */
+  #dropCatcher { position: absolute; inset: 0; z-index: 60; display: none; }
+  #main.dragging #dropCatcher { display: block; }
+  #dropCatcher.over { background: rgba(247,164,55,.07); box-shadow: inset 0 0 0 3px var(--gold); }
+  #dropCatcher .dropHint { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--gold); color: var(--gold); padding: 6px 15px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 6px 20px -8px rgba(0,0,0,.7); }
+  .thumb[draggable="true"] { cursor: grab; }
+  .thumb[draggable="true"]:active { cursor: grabbing; }
+
+  /* right properties: a REAL docked sidebar (never covers the canvas) */
+  #right {
+    width: 336px; flex: none; background: var(--panel);
+    border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #main.panel-hidden #right { display: none; }
+  #rightHead { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; gap: 8px; }
+  #rightHead .heads { flex: 1; min-width: 0; }
+  #rightCollapse { padding: 3px 9px; flex: none; }
+  #rightHead .ttl { font-weight: 700; font-size: 14px; }
+  #rightHead .sub { color: var(--muted); font-size: 11px; font-family: monospace; }
+  #rightBody { flex: 1; overflow-y: auto; padding: 12px 14px; }
+  .secT { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .13em; text-transform: uppercase; color: var(--gold); font-weight: 700; margin: 14px 0 8px; }
+  .secT:first-child { margin-top: 0; }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .row label { width: 76px; flex: none; color: var(--muted); font-size: 12px; }
+  .row .pair { display: flex; gap: 6px; flex: 1; }
+  .row .pair input { width: 50%; }
+  .layers .lay {
+    display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: 8px;
+    border: 1px solid transparent; cursor: pointer;
+  }
+  .layers .lay:hover { background: var(--panel2); }
+  .layers .lay.sel { background: var(--panel2); border-color: var(--teal); }
+  /* layer rows are DROP TARGETS (rail item → replace) and, for custom
+     components, DRAGGABLE to reorder (list order = z hierarchy) */
+  .layers .lay.dropOn { border-color: var(--gold); background: rgba(247,164,55,.14); box-shadow: inset 0 0 0 1px var(--gold); }
+  .layers .lay.rowDragging { opacity: .45; }
+  .layers.reorder .lay { cursor: grab; }
+  .layers .lay.hiddenLay > .kindTag, .layers .lay.hiddenLay > span { opacity: .4; }
+  .kindTag { font-size: 9px; letter-spacing: .08em; padding: 2px 7px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); text-transform: uppercase; }
+  .kindTag.text { color: var(--moss); } .kindTag.image { color: var(--teal); } .kindTag.shape { color: var(--plum); }
+  .btnRow { display: flex; gap: 8px; margin-top: 10px; }
+  .empty { color: var(--muted); text-align: center; padding: 36px 16px; line-height: 1.6; }
+  .paramRow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .paramRow label { flex: 1; color: var(--muted); }
+  .paramRow code { font-size: 10px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div id="topbar">
+    <div class="brand"><span class="dia"></span> UI Builder <span style="color:var(--muted);font-weight:400">· Emberkeep Tools</span></div>
+    <div class="sep"></div>
+    <input id="gameUrl" type="text" value="http://localhost:5173" title="Dev server URL (pnpm dev)">
+    <button id="btnConnect">Connect</button>
+    <div class="sep"></div>
+    <button id="btnMode" title="Editor = a static component canvas (the game NEVER runs in it) · Game preview = boots the real game in the frame">✏️ Editor</button>
+    <button id="btnUndo" disabled title="Undo (⌘Z) — unlimited history">↶</button>
+    <button id="btnRedo" disabled title="Redo (⇧⌘Z)">↷</button>
+    <select id="zoom" style="width:86px" title="Preview zoom — two-finger scroll pans, pinch zooms at the cursor">
+      <option value="fit" selected>Fit</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="custom" hidden>·</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:6px;color:var(--muted);white-space:nowrap" title="Alignment grid over the preview (game units)">
+      <input type="checkbox" id="chkGrid" style="accent-color:var(--gold);width:15px;height:15px"> Grid
+    </label>
+    <select id="gridSize" style="width:76px" title="Grid spacing in game units (canvas is 2560×1600)">
+      <option value="32">32</option><option value="64" selected>64</option><option value="128">128</option><option value="256">256</option>
+    </select>
+    <div class="sep"></div>
+    <button id="btnPanel" class="ghost" title="Show/hide the properties sidebar">◨ Panel</button>
+    <button id="btnResetEl" class="ghost" title="Clear every override on the selected element">Reset element</button>
+    <button id="btnExport" class="ghost" title="Download ui-theme.json">Export</button>
+    <button id="btnSave" class="primary" title="Write src/data/ui-theme.json — the game bundles this file">💾 Save to game</button>
+    <div id="status"><span id="dirtyDot">● unsaved</span><span id="statusDot"></span><span id="statusText">disconnected</span></div>
+  </div>
+
+  <div id="main">
+    <div id="left">
+      <div class="railTitle"><span class="dia"></span> Elements
+        <button id="btnNewComp" class="ghost" style="margin-left:auto;padding:2px 9px" title="Create a NEW component (exported in ui-theme.json, instantiated by the game)">＋ New</button>
+      </div>
+      <div id="elements"><div class="hint">Connect to the running game to list its UI elements.</div></div>
+
+      <div class="railTitle"><span class="dia"></span> Characters</div>
+      <div class="hint">Live animated rigs. Double-click to drop one into the selected custom component — pick body + face motions in the layer editor.</div>
+      <div id="characters" class="thumbs"></div>
+
+      <div class="railTitle"><span class="dia"></span> Uploads
+        <button id="btnUpload" class="ghost" style="margin-left:auto;padding:2px 9px" title="Upload a PNG — becomes part of ui-theme.json (self-contained) and can be used as a layer texture or to REPLACE game art">⬆ PNG</button>
+      </div>
+      <input type="file" id="fileUpload" accept="image/png,image/webp" style="display:none">
+      <div class="hint">Double-click: apply to the selected image layer (or add as a new layer). Use a frame/icon's panel to REPLACE game art with an upload.</div>
+      <div id="uploads" class="thumbs"></div>
+
+      <div class="railTitle"><span class="dia"></span> Animations
+        <button id="btnUploadSeq" class="ghost" style="margin-left:auto;padding:2px 9px" title="Upload a PNG-SEQUENCE animation folder (talk / idle character bank). Reads frames.json for exact per-frame timing.">⬆ Folder</button>
+      </div>
+      <input type="file" id="fileUploadSeq" accept="image/png,image/webp,application/json" webkitdirectory multiple style="display:none">
+      <div class="hint">Pick a folder of frames (+ its frames.json). Double-click a sequence to drop it as a LIVE animated layer on the selected custom component.</div>
+      <div id="sequences" class="thumbs"></div>
+
+      <div class="railTitle"><span class="dia"></span> Frames &amp; chrome</div>
+      <div class="hint">The game's generated UI frames. Click to restyle its colors; ⤵ applies it as the selected image layer's texture.</div>
+      <div id="chrome" class="thumbs"></div>
+
+      <div class="railTitle"><span class="dia"></span> Icons &amp; assets</div>
+      <div id="icons" class="thumbs"></div>
+
+      <div class="railTitle"><span class="dia"></span> Emberkeep palette</div>
+      <div id="palette" class="swatches"></div>
+      <div class="hint">Click a swatch to send it to the last-focused color field.</div>
+
+      <div class="railTitle"><span class="dia"></span> Fonts</div>
+      <div id="fonts"></div>
+    </div>
+
+    <div id="stage">
+      <div id="frameWrap">
+        <iframe id="gameFrame" title="Emberkeep (edit mode)"></iframe>
+        <div id="frameCover">
+          <div style="font-size:38px">🐉</div>
+          <div><b>Emberkeep isn't connected.</b><br>Run <code>pnpm dev</code> in the repo, then press <b>Connect</b>.<br>The preview is a game-sized component stage (the game itself only runs in Play mode).</div>
+        </div>
+      </div>
+      <!-- Captures drops over the iframe (which would otherwise swallow them);
+           only visible while dragging a rail item. -->
+      <div id="dropCatcher"><div class="dropHint">Drop on a layer to REPLACE it · on empty canvas to ADD it</div></div>
+    </div>
+
+    <div id="right">
+      <div id="rightHead">
+        <div class="heads">
+          <div class="ttl" id="selTitle">Nothing selected</div>
+          <div class="sub" id="selId">click an element in the preview or the list</div>
+        </div>
+        <button id="rightCollapse" class="ghost" title="Hide the properties sidebar (the ◨ Panel button reopens it)">⟩</button>
+      </div>
+      <div id="rightBody"><div class="empty">The stage is a blank canvas with the game's exact dimensions.<br><br>YOUR components sit exactly where they appear in-game — drag them on the canvas to place them.<br>Built-ins stage centered for editing; their offsets live in the Transform fields.<br>Click layers to drag them; arrow keys nudge (Shift = ×10); Esc steps out.<br>Drags snap to the canvas centre (pink guide) — hold Alt for precision.</div></div>
+    </div>
+  </div>
+
+<script>
+'use strict';
+/* ============================ state ============================ */
+const $ = (s) => document.querySelector(s);
+const frame = $('#gameFrame');
+let gameOrigin = 'http://localhost:5173';
+let connected = false;
+let inv = null;              // inventory from the game
+let sel = null;              // selected element info (UiElementInfo)
+let selPart = null;          // selected part name
+let selChrome = null;        // selected chrome texture key
+let dirty = false;
+let lastColorInput = null;   // palette swatch target
+let peekedId = null;
+let dragPayload = null;      // rail item currently being dragged to the canvas
+let rowDrag = null;          // layer-row name being drag-reordered
+
+function post(msg) { frame.contentWindow && frame.contentWindow.postMessage(Object.assign({ __uib: true }, msg), '*'); }
+
+/* Layer rows accept RAIL drops (replace that exact layer) and — for custom
+   components — drag to REORDER (the list order IS the z hierarchy). */
+function wireLayerRows(box, reorder) {
+  if (!box) return;
+  const rows = [...box.querySelectorAll('.lay')];
+  rows.forEach((row, idx) => {
+    row.addEventListener('dragover', (ev) => {
+      if (!dragPayload && rowDrag === null) return;
+      ev.preventDefault(); ev.stopPropagation();
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = dragPayload ? 'copy' : 'move';
+      row.classList.add('dropOn');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('dropOn'));
+    row.addEventListener('drop', (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      row.classList.remove('dropOn');
+      if (dragPayload) {
+        post({ type: 'layer:drop', id: sel.id, part: row.dataset.part, payload: dragPayload });
+        dragPayload = null;
+        document.querySelector('#main').classList.remove('dragging');
+        setDirty(true);
+      } else if (reorder && rowDrag !== null && rowDrag !== row.dataset.part) {
+        post({ type: 'custom:reorderLayer', id: sel.id, name: rowDrag, index: idx });
+        rowDrag = null;
+        setDirty(true);
+      }
+    });
+    if (reorder) {
+      row.setAttribute('draggable', 'true');
+      row.addEventListener('dragstart', (ev) => {
+        if (ev.target.tagName === 'BUTTON') { ev.preventDefault(); return; }
+        rowDrag = row.dataset.part;
+        row.classList.add('rowDragging');
+        try { ev.dataTransfer.setData('text/plain', 'layer:' + rowDrag); ev.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+      });
+      row.addEventListener('dragend', () => {
+        rowDrag = null;
+        rows.forEach((r) => r.classList.remove('rowDragging', 'dropOn'));
+      });
+    }
+  });
+}
+
+/* Make a rail thumbnail draggable onto the canvas. `payload` describes what to
+   drop ({kind:'character'|'sequence'|'upload'|'texture', id/name/key}). */
+function draggable(el, payload) {
+  el.setAttribute('draggable', 'true');
+  el.addEventListener('dragstart', (e) => {
+    dragPayload = payload;
+    try { e.dataTransfer.setData('text/plain', payload.kind); e.dataTransfer.effectAllowed = 'copy'; } catch (_) {}
+    document.querySelector('#main').classList.add('dragging');
+  });
+  el.addEventListener('dragend', () => {
+    document.querySelector('#main').classList.remove('dragging');
+    $('#dropCatcher').classList.remove('over');
+    dragPayload = null;
+  });
+}
+function setDirty(d) { dirty = d; $('#dirtyDot').style.visibility = d ? 'visible' : 'hidden'; }
+function setStatus(on, text) { connected = on; $('#statusDot').classList.toggle('on', on); $('#statusText').textContent = text; }
+
+/* ========================== connection ========================== */
+function connect() {
+  gameOrigin = $('#gameUrl').value.replace(/\/$/, '');
+  $('#frameCover').style.display = 'flex';
+  setStatus(false, 'connecting…');
+  frame.src = gameOrigin + '/?uiedit=1';
+}
+$('#btnConnect').onclick = connect;
+
+let helloTimer = setInterval(() => { if (editMode && !connected && frame.src) post({ type: 'hello' }); }, 900);
+
+window.addEventListener('message', (ev) => {
+  const m = ev.data;
+  if (!m || m.__uib !== true) return;
+  switch (m.type) {
+    case 'ready': post({ type: 'hello' }); break;
+    case 'inventory':
+      inv = m;
+      setStatus(true, 'stage ready — pick a component to edit');
+      $('#frameCover').style.display = 'none';
+      renderElements(); renderChrome(); renderIcons(); renderPalette(); renderFonts(); renderCharacters(); renderUploads(); renderSequences();
+      if (m.history) { $('#btnUndo').disabled = !m.history.undo; $('#btnRedo').disabled = !m.history.redo; }
+      sendGrid(); // survives reconnects/reloads
+      if (sel) { const again = m.elements.find((e) => e.id === sel.id); if (again) { sel = again; renderProps(); } }
+      break;
+    case 'selected':
+      sel = m.info; selPart = m.part || null;
+      if (sel) { selChrome = null; renderChrome(); renderIcons(); } // a selection closes the art styler
+      $('#statusText').textContent = sel ? sel.label + ' on the stage' : 'stage empty — pick a component';
+      renderElements(); renderProps();
+      break;
+    case 'changed':
+      if (m.info) {
+        if (sel && sel.id === m.info.id) { sel = m.info; if (m.part !== undefined && m.part !== null) selPart = m.part; renderProps(); }
+        if (inv) { const i = inv.elements.findIndex((e) => e.id === m.info.id); if (i >= 0) inv.elements[i] = m.info; }
+        setDirty(true); renderElements();
+      }
+      break;
+    case 'textureUpdated':
+      if (inv) {
+        const c = inv.chrome.find((x) => x.key === m.key);
+        if (c) { c.thumb = m.thumb; c.params = m.params; c.replaced = m.replaced ?? c.replaced ?? null; }
+        const ic = inv.icons.find((x) => x.key === m.key);
+        if (ic) { ic.thumb = m.thumb; ic.replaced = m.replaced ?? null; }
+      }
+      renderChrome(); renderIcons(); if (selChrome === m.key) renderProps();
+      setDirty(true);
+      break;
+    case 'nav': {
+      // Cursor position arrives in the frame's CSS pixels → stage coords.
+      const st = $('#stage').getBoundingClientRect();
+      const fr = $('#frameWrap').getBoundingClientRect();
+      navigate(m.pinch, m.dx, m.dy, (fr.left - st.left) + m.x * view.z, (fr.top - st.top) + m.y * view.z);
+      break;
+    }
+    case 'history':
+      $('#btnUndo').disabled = !m.undo;
+      $('#btnRedo').disabled = !m.redo;
+      break;
+    case 'assetAdded':
+      if (inv) { inv.uploads = (inv.uploads || []).filter((u) => u.name !== m.name); inv.uploads.push({ name: m.name, thumb: m.thumb }); }
+      renderUploads(); setDirty(true);
+      break;
+    case 'sequenceAdded':
+      if (inv) { inv.sequences = (inv.sequences || []).filter((s) => s.name !== m.name); inv.sequences.push({ name: m.name, frameCount: m.frameCount, thumb: m.thumb }); }
+      renderSequences(); setStatus(true, `animation "${m.name}" ready (${m.frameCount} frames) — double-click to add it`); setDirty(true);
+      break;
+    case 'note': setStatus(connected, m.text); break;
+    case 'doc': saveDoc(m.doc); break;
+  }
+});
+
+/* ============================ left rail ============================ */
+function renderElements() {
+  const box = $('#elements');
+  if (!inv) return;
+  box.innerHTML = '';
+  const groups = {};
+  for (const el of inv.elements) (groups[el.group] = groups[el.group] || []).push(el);
+  for (const [g, els] of Object.entries(groups)) {
+    const gl = document.createElement('div'); gl.className = 'group-label'; gl.textContent = g; box.appendChild(gl);
+    for (const el of els) {
+      const row = document.createElement('div');
+      row.className = 'el-item' + (sel && sel.id === el.id ? ' sel' : '') + (Object.keys(el.patch || {}).length ? ' modified' : '');
+      row.innerHTML = `<span class="nm">${el.label}</span><span class="mod" title="has overrides"></span>`;
+      row.onclick = () => post({ type: 'select', id: el.id });
+      row.title = el.id.startsWith('custom.')
+        ? 'select — shown at its EXACT in-game position; drag its body on the canvas to place it'
+        : 'select — the component appears centered on the stage';
+      box.appendChild(row);
+    }
+  }
+}
+
+function renderChrome() {
+  const box = $('#chrome'); if (!inv) return; box.innerHTML = '';
+  for (const c of inv.chrome) {
+    const t = document.createElement('div');
+    t.className = 'thumb' + (selChrome === c.key ? ' sel' : '');
+    t.innerHTML = `<img src="${c.thumb || ''}" alt=""><div class="cap">${c.key.replace('ui_', '')}${Object.keys(c.params).length ? ' ●' : ''}</div>`;
+    t.title = c.key + ' — click to restyle; drag onto the canvas (or double-click) to add/replace a layer';
+    t.onclick = () => { selChrome = (selChrome === c.key ? null : c.key); renderChrome(); renderProps(); };
+    t.ondblclick = () => applyTextureToPart(c.key);
+    draggable(t, { kind: 'texture', key: c.key });
+    box.appendChild(t);
+  }
+}
+
+function renderIcons() {
+  const box = $('#icons'); if (!inv) return; box.innerHTML = '';
+  for (const c of inv.icons) {
+    const t = document.createElement('div'); t.className = 'thumb' + (selChrome === c.key ? ' sel' : '');
+    t.innerHTML = `<img src="${c.thumb}" alt=""><div class="cap">${c.key.replace('ui_icon_', '').replace('ui_', '')}${c.replaced ? ' ⇄' : ''}</div>`;
+    t.title = c.key + ' — click to open (replace art…); drag onto the canvas (or double-click) to add/replace a layer';
+    t.onclick = () => { selChrome = (selChrome === c.key ? null : c.key); renderIcons(); renderChrome(); renderProps(); };
+    t.ondblclick = () => applyTextureToPart(c.key);
+    draggable(t, { kind: 'texture', key: c.key });
+    box.appendChild(t);
+  }
+}
+
+function renderCharacters() {
+  const box = $('#characters'); if (!inv || !inv.characters) return; box.innerHTML = '';
+  for (const c of inv.characters) {
+    const t = document.createElement('div'); t.className = 'thumb';
+    t.innerHTML = `<img src="${c.thumb || ''}" alt=""><div class="cap">${c.label}</div>`;
+    t.title = c.label + ' — drag onto the canvas (or double-click) to add as an animated layer';
+    t.ondblclick = () => addCustomLayer({ kind: 'rig', name: '', x: 0, y: 80, scale: 0.35, character: c.id, body: 'idle', face: (c.faces.includes('blink') ? 'blink' : 'none'), facing: 'left' });
+    draggable(t, { kind: 'character', id: c.id });
+    box.appendChild(t);
+  }
+}
+
+function renderUploads() {
+  const box = $('#uploads'); if (!inv) return; box.innerHTML = '';
+  for (const u of (inv.uploads || [])) {
+    const t = document.createElement('div'); t.className = 'thumb';
+    t.innerHTML = `<img src="${u.thumb || ''}" alt=""><div class="cap">${u.name}</div>`;
+    t.title = u.name + ' — drag onto the canvas (or double-click) to add/replace a layer';
+    t.ondblclick = () => applyTextureToPart('up_' + u.name);
+    draggable(t, { kind: 'upload', name: u.name });
+    box.appendChild(t);
+  }
+}
+
+function renderSequences() {
+  const box = $('#sequences'); if (!inv) return; box.innerHTML = '';
+  for (const s of (inv.sequences || [])) {
+    const label = s.label || s.name;
+    const t = document.createElement('div'); t.className = 'thumb';
+    const tag = s.builtin ? '<span style="color:var(--gold)">★</span> ' : '';
+    t.innerHTML = `<img src="${s.thumb || ''}" alt=""><div class="cap">${tag}${label} · ${s.frameCount}f</div>`;
+    t.title = `${label} — ${s.frameCount} frames${s.builtin ? ' (preloaded — ends on an idle pose)' : ''} — drag onto the canvas (or double-click) to add/replace with a LIVE animated layer`;
+    const loop = s.loop !== false;
+    t.ondblclick = () => addCustomLayer({ kind: 'anim', name: '', x: 0, y: 0, scale: 1, sequence: s.name, loop });
+    draggable(t, { kind: 'sequence', name: s.name, loop });
+    box.appendChild(t);
+  }
+}
+
+$('#btnUpload').onclick = () => $('#fileUpload').click();
+$('#fileUpload').onchange = () => {
+  const f = $('#fileUpload').files[0];
+  if (!f) return;
+  const name = f.name.replace(/\.[a-zA-Z0-9]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'upload';
+  const r = new FileReader();
+  r.onload = () => { post({ type: 'asset:add', name, dataUrl: r.result }); setDirty(true); };
+  r.readAsDataURL(f);
+  $('#fileUpload').value = '';
+};
+
+// ── PNG-sequence (animation) folder upload ──────────────────────────────────
+const readAsDataUrl = (file) => new Promise((res, rej) => {
+  const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file);
+});
+const readAsText = (file) => new Promise((res, rej) => {
+  const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(file);
+});
+$('#btnUploadSeq').onclick = () => $('#fileUploadSeq').click();
+$('#fileUploadSeq').onchange = async () => {
+  const all = Array.from($('#fileUploadSeq').files || []);
+  $('#fileUploadSeq').value = '';
+  if (!all.length) return;
+  const imgs = all.filter((f) => /\.(png|webp)$/i.test(f.name));
+  const jsonFile = all.find((f) => /frames\.json$/i.test(f.name));
+  if (!imgs.length) { alert('That folder has no PNG frames.'); return; }
+  // Folder name (from webkitRelativePath) or the lone file's base name.
+  const rel = (all[0].webkitRelativePath || all[0].name);
+  const folder = rel.includes('/') ? rel.split('/')[0] : rel.replace(/\.[a-zA-Z0-9]+$/, '');
+  const name = folder.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 60) || 'sequence';
+
+  // A single frame with no timing metadata is just a static image upload.
+  if (imgs.length === 1 && !jsonFile) {
+    const dataUrl = await readAsDataUrl(imgs[0]);
+    post({ type: 'asset:add', name, dataUrl });
+    setDirty(true);
+    setStatus(true, `uploaded ${name} (static)`);
+    return;
+  }
+
+  // Order + per-frame timing come from frames.json when present; else sort by
+  // filename and use a default 12fps.
+  let order = null, durations = null, fps = 12, width, height;
+  if (jsonFile) {
+    try {
+      const meta = JSON.parse(await readAsText(jsonFile));
+      if (typeof meta.fps === 'number') fps = meta.fps;
+      if (typeof meta.width === 'number') width = meta.width;
+      if (typeof meta.height === 'number') height = meta.height;
+      if (Array.isArray(meta.frames)) {
+        order = meta.frames.map((fr) => (typeof fr === 'string' ? fr : fr.file));
+        durations = meta.frames.map((fr) => (fr && typeof fr.durationMs === 'number' ? fr.durationMs : null));
+        if (durations.some((d) => d === null)) durations = null;
+      }
+    } catch (e) { /* fall back to filename sort */ }
+  }
+  const byName = new Map(imgs.map((f) => [f.name.split('/').pop(), f]));
+  const ordered = order
+    ? order.map((fn) => byName.get((fn || '').split('/').pop())).filter(Boolean)
+    : imgs.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  if (!ordered.length) { alert('Could not match frames to frames.json.'); return; }
+
+  setStatus(true, `reading ${ordered.length} frames of ${name}…`);
+  const frames = [];
+  for (const f of ordered) frames.push(await readAsDataUrl(f));
+  const seq = { frames, fps, width, height };
+  if (durations && durations.length === frames.length) seq.durations = durations;
+  post({ type: 'sequence:add', name, sequence: seq });
+  setDirty(true);
+};
+
+function renderPalette() {
+  const box = $('#palette'); if (!inv) return; box.innerHTML = '';
+  for (const [name, hex] of Object.entries(inv.palette)) {
+    const s = document.createElement('div'); s.className = 'sw'; s.style.background = hex; s.title = `${name} ${hex}`;
+    s.onclick = () => { if (lastColorInput) { lastColorInput.value = hex; lastColorInput.dispatchEvent(new Event('input')); } };
+    box.appendChild(s);
+  }
+}
+
+function renderFonts() {
+  const box = $('#fonts'); if (!inv) return; box.innerHTML = '';
+  for (const f of inv.fonts) {
+    const r = document.createElement('div'); r.className = 'fontRow'; r.style.fontFamily = f;
+    r.textContent = f.split(',')[0].replace(/"/g, '');
+    r.title = f + ' — click to apply to the selected text layer';
+    r.onclick = () => patchTextField('fontFamily', f);
+    box.appendChild(r);
+  }
+}
+
+function applyTextureToPart(key) {
+  if (!sel) return;
+  if (sel.custom) {
+    const layer = selPart && sel.custom.layers.find((l) => l.name === selPart);
+    if (layer && layer.kind === 'image') { sendCustomLayer(layer.name, { texture: key }); }
+    else addCustomLayer({ kind: 'image', name: '', x: 0, y: 0, texture: key, scale: 1 });
+    return;
+  }
+  if (!selPart) return;
+  const part = sel.parts.find((p) => p.name === selPart);
+  if (!part || part.kind !== 'image') return;
+  sendPartPatch({ texture: key });
+}
+function sendCustomLayer(name, props) {
+  post({ type: 'custom:updateLayer', id: sel.id, name, props });
+  setDirty(true);
+}
+function sendCustomRoot(props) {
+  post({ type: 'custom:update', id: sel.id, props });
+  setDirty(true);
+}
+
+/* ======================== right properties ======================== */
+function field(labelTxt, inputHtml) {
+  return `<div class="row"><label>${labelTxt}</label>${inputHtml}</div>`;
+}
+function pv(obj, path, dflt) { // patch value
+  let v = obj; for (const k of path) { v = (v || {})[k]; } return v === undefined || v === null ? dflt : v;
+}
+
+function renderProps() {
+  const head = $('#selTitle'), sub = $('#selId'), body = $('#rightBody');
+  if (selChrome && inv) { renderChromeProps(head, sub, body); return; }
+  if (!sel) {
+    head.textContent = 'Nothing selected';
+    sub.textContent = 'click an element in the preview or the list';
+    body.innerHTML = '<div class="empty">The stage is a blank canvas with the game’s exact dimensions.<br><br>YOUR components sit exactly where they appear in-game — drag them on the canvas to place them.<br>Built-ins stage centered for editing; their offsets live in the Transform fields.<br>Click layers to drag them; arrow keys nudge (Shift = ×10); Esc steps out.<br>Drags snap to the canvas centre (pink guide) — hold Alt for precision.</div>';
+    return;
+  }
+  head.textContent = sel.label;
+  sub.textContent = `${sel.id} · ${Math.round(sel.bounds.x)},${Math.round(sel.bounds.y)} · ${Math.round(sel.bounds.w)}×${Math.round(sel.bounds.h)}`;
+  if (sel.custom) { renderCustomProps(body); return; }
+  const p = sel.patch || {};
+  let html = '';
+  html += '<div class="secT"><span class="dia"></span> Transform</div>';
+  html += field('Offset X/Y', `<div class="pair"><input id="p_dx" type="number" step="1" value="${pv(p,['dx'],0)}"><input id="p_dy" type="number" step="1" value="${pv(p,['dy'],0)}"></div>`);
+  html += field('Scale', `<input id="p_scale" type="number" step="0.05" min="0.1" max="4" value="${pv(p,['scale'],1)}">`);
+  html += field('Alpha', `<input id="p_alpha" type="range" min="0" max="1" step="0.05" value="${pv(p,['alpha'],1)}">`);
+  html += field('Visible', `<select id="p_visible"><option value="">game default</option><option value="true" ${p.visible===true?'selected':''}>always shown</option><option value="false" ${p.visible===false?'selected':''}>hidden</option></select>`);
+  html += field('Depth', `<input id="p_depth" type="number" step="1" placeholder="auto" value="${p.depth ?? ''}">`);
+
+  if (sel.paramsSpec && sel.paramsSpec.length) {
+    html += '<div class="secT"><span class="dia"></span> Component</div>';
+    for (const ps of sel.paramsSpec) {
+      const cur = pv(p, ['params', ps.key], ps.dflt);
+      html += `<div class="row"><label>${ps.label}</label><div class="pair"><input class="knobN" data-key="${ps.key}" type="number" min="${ps.min}" max="${ps.max}" step="${ps.step}" value="${cur}" style="width:74px"><input class="knobR" data-key="${ps.key}" type="range" min="${ps.min}" max="${ps.max}" step="${ps.step}" value="${cur}"></div></div>`;
+    }
+  }
+  html += '<div class="secT"><span class="dia"></span> Layers <small style="color:var(--muted);text-transform:none;letter-spacing:0">— drop a rail item on a row to replace it</small></div><div class="layers">';
+  for (const part of sel.parts) {
+    const pp = (p.parts || {})[part.name] || {};
+    const touched = Object.keys(pp).length;
+    const hidden = pp.visible === false;
+    const anim = pp.sequence ? ' <span style="color:var(--gold)">▶</span>' : '';
+    html += `<div class="lay ${selPart===part.name?'sel':''} ${hidden?'hiddenLay':''}" data-part="${part.name}"><span class="kindTag ${part.kind}">${part.kind}</span><span style="flex:1">${part.name}${anim}</span>${touched?'<span style="color:var(--goldHi)">●</span>':''}
+      <button class="ghost layHide" data-n="${part.name}" style="padding:0 6px;color:${hidden?'var(--moss)':'var(--lava)'}" title="${hidden?'show this layer again':'delete (hide) this layer — Reset element restores it'}">${hidden?'👁':'✕'}</button></div>`;
+  }
+  html += '</div>';
+
+  if (selPart) {
+    const part = sel.parts.find((x) => x.name === selPart);
+    if (part) html += partEditor(part, (p.parts || {})[selPart] || {});
+  }
+  html += `<div class="btnRow"><button id="p_reset" class="ghost">Reset element</button></div>`;
+  body.innerHTML = html;
+
+  /* wire */
+  const send = (patch) => { post({ type: 'patch', id: sel.id, patch }); setDirty(true); };
+  $('#p_dx').oninput = (e) => send({ dx: +e.target.value || 0 });
+  $('#p_dy').oninput = (e) => send({ dy: +e.target.value || 0 });
+  $('#p_scale').oninput = (e) => send({ scale: +e.target.value || 1 });
+  $('#p_alpha').oninput = (e) => send({ alpha: +e.target.value });
+  $('#p_visible').onchange = (e) => send({ visible: e.target.value === '' ? undefined : e.target.value === 'true' });
+  $('#p_depth').onchange = (e) => send({ depth: e.target.value === '' ? null : +e.target.value });
+  $('#p_reset').onclick = () => { post({ type: 'resetElement', id: sel.id }); setDirty(true); };
+  document.querySelectorAll('.lay').forEach((el) => {
+    el.onclick = (ev) => { if (ev.target.tagName === 'BUTTON') return; selPart = el.dataset.part; post({ type: 'select', id: sel.id, part: selPart }); renderProps(); };
+  });
+  document.querySelectorAll('.layHide').forEach((b) => {
+    b.onclick = () => {
+      const hidden = ((p.parts || {})[b.dataset.n] || {}).visible === false;
+      post({ type: 'patch', id: sel.id, patch: { parts: { [b.dataset.n]: { visible: hidden ? true : false } } } });
+      setDirty(true);
+    };
+  });
+  wireLayerRows(body.querySelector('.layers'), false);
+  document.querySelectorAll('.knobN,.knobR').forEach((k) => {
+    k.oninput = () => {
+      const v = +k.value;
+      document.querySelectorAll(`[data-key="${k.dataset.key}"]`).forEach((o) => { if (o !== k) o.value = v; });
+      send({ params: { [k.dataset.key]: v } });
+    };
+  });
+  wirePartEditor();
+  body.querySelectorAll('input[type=color]').forEach((c) => c.addEventListener('focus', () => (lastColorInput = c)));
+  body.querySelectorAll('input[type=color]').forEach((c) => c.addEventListener('click', () => (lastColorInput = c)));
+}
+
+function partEditor(part, pp) {
+  let html = `<div class="secT"><span class="dia"></span> Layer · ${part.name}</div>`;
+  html += field('Offset X/Y', `<div class="pair"><input id="q_dx" type="number" value="${pv(pp,['dx'],0)}"><input id="q_dy" type="number" value="${pv(pp,['dy'],0)}"></div>`);
+  html += field('Scale', `<input id="q_scale" type="number" step="0.05" min="0.05" max="4" value="${pv(pp,['scale'],1)}">`);
+  html += field('Alpha', `<input id="q_alpha" type="range" min="0" max="1" step="0.05" value="${pv(pp,['alpha'],1)}">`);
+  html += field('Visible', `<select id="q_visible"><option value="">game default</option><option value="true" ${pp.visible===true?'selected':''}>shown</option><option value="false" ${pp.visible===false?'selected':''}>hidden</option></select>`);
+  if (part.kind === 'image') {
+    html += field('Tint', `<div class="pair"><input id="q_tint" type="color" value="${pp.tint || '#ffffff'}"><button id="q_tintClear" class="ghost" style="flex:1">clear</button></div>`);
+    html += field('Texture', `<input id="q_tex" type="text" placeholder="${part.textureKey || ''}" value="${pp.texture || ''}" title="double-click a frame/icon on the left to fill">`);
+    // Play a PNG sequence ON this layer (contain-fit to its footprint) — e.g.
+    // the bubble portrait becoming a Laurah talk bank.
+    const seqOpts = (inv ? inv.sequences || [] : []).map((s) => `<option value="${s.name}" ${pp.sequence===s.name?'selected':''}>${s.builtin?'★ ':'▶ '}${s.label||s.name} · ${s.frameCount}f</option>`).join('');
+    html += field('Animate', `<select id="q_seq"><option value="">— static image —</option>${seqOpts}</select>`);
+    if (pp.sequence) {
+      const meta = (inv ? inv.sequences || [] : []).find((s) => s.name === pp.sequence);
+      const loop = pp.loop !== undefined ? pp.loop : (meta ? meta.loop !== false : true);
+      html += field('Loop', `<select id="q_loop"><option value="false" ${!loop?'selected':''}>play once (rest on end)</option><option value="true" ${loop?'selected':''}>loop forever</option></select>`);
+    }
+  }
+  if (part.kind === 'text' && part.base.text) {
+    const b = part.base.text, t = pp.text || {};
+    html += '<div class="secT"><span class="dia"></span> Text style</div>';
+    html += field('Font', `<select id="t_font">${['', ...(inv?inv.fonts:[])].map((f)=>`<option value="${f.replace(/"/g,'&quot;')}" ${((t.fontFamily||'')===f)||(!t.fontFamily&&f==='')?'selected':''}>${f?f.split(',')[0].replace(/"/g,''):`game default (${b.fontFamily.split(',')[0]})`}</option>`).join('')}</select>`);
+    html += field('Size', `<input id="t_size" type="number" min="8" max="160" value="${t.fontSize ?? b.fontSize}">`);
+    html += field('Style', `<select id="t_style">${['','bold','italic','bold italic'].map((s)=>`<option value="${s}" ${((t.fontStyle??b.fontStyle)===s)?'selected':''}>${s||'normal'}</option>`).join('')}</select>`);
+    html += field('Color', `<input id="t_color" type="color" value="${t.color ?? b.color}">`);
+    html += field('Stroke', `<div class="pair"><input id="t_stroke" type="color" value="${t.stroke ?? (b.stroke==='#000000'?'#241B22':b.stroke)}"><input id="t_strokeW" type="number" min="0" max="20" value="${t.strokeThickness ?? b.strokeThickness}"></div>`);
+  }
+  return html;
+}
+
+function sendPartPatch(pp) {
+  if (!sel || !selPart) return;
+  post({ type: 'patch', id: sel.id, patch: { parts: { [selPart]: pp } } });
+  setDirty(true);
+}
+function patchTextField(k, v) { sendPartPatch({ text: { [k]: v } }); }
+
+function wirePartEditor() {
+  const on = (id, ev, fn) => { const el = $(id); if (el) el[ev] = fn; };
+  on('#q_dx', 'oninput', (e) => sendPartPatch({ dx: +e.target.value || 0 }));
+  on('#q_dy', 'oninput', (e) => sendPartPatch({ dy: +e.target.value || 0 }));
+  on('#q_scale', 'oninput', (e) => sendPartPatch({ scale: +e.target.value || 1 }));
+  on('#q_alpha', 'oninput', (e) => sendPartPatch({ alpha: +e.target.value }));
+  on('#q_visible', 'onchange', (e) => sendPartPatch({ visible: e.target.value === '' ? undefined : e.target.value === 'true' }));
+  on('#q_tint', 'oninput', (e) => sendPartPatch({ tint: e.target.value }));
+  on('#q_tintClear', 'onclick', () => sendPartPatch({ tint: null }));
+  on('#q_tex', 'onchange', (e) => sendPartPatch({ texture: e.target.value || undefined }));
+  on('#q_seq', 'onchange', (e) => sendPartPatch({ sequence: e.target.value || null }));
+  on('#q_loop', 'onchange', (e) => sendPartPatch({ loop: e.target.value === 'true' }));
+  on('#t_font', 'onchange', (e) => patchTextField('fontFamily', e.target.value || undefined));
+  on('#t_size', 'oninput', (e) => patchTextField('fontSize', +e.target.value || 12));
+  on('#t_style', 'onchange', (e) => patchTextField('fontStyle', e.target.value));
+  on('#t_color', 'oninput', (e) => patchTextField('color', e.target.value));
+  on('#t_stroke', 'oninput', (e) => patchTextField('stroke', e.target.value));
+  on('#t_strokeW', 'oninput', (e) => patchTextField('strokeThickness', +e.target.value || 0));
+}
+
+function renderCustomProps(body) {
+  const c = sel.custom;
+  let html = '';
+  html += '<div class="secT"><span class="dia"></span> Component (authored)</div>';
+  html += `<div class="row" title="In-game position — the canvas shows it exactly here; drag the component body on the canvas to move it"><label>Position</label><div class="pair"><input id="c_x" type="number" value="${c.x}"><input id="c_y" type="number" value="${c.y}"></div></div>`;
+  html += field('Scale', `<input id="c_scale" type="number" step="0.05" min="0.1" max="4" value="${c.scale ?? 1}">`);
+  html += field('Depth', `<input id="c_depth" type="number" value="${c.depth ?? 40}">`);
+  html += field('Visible', `<select id="c_visible"><option value="true" ${c.visible!==false?'selected':''}>shown</option><option value="false" ${c.visible===false?'selected':''}>hidden</option></select>`);
+  html += `<div class="btnRow"><button id="c_addImage" class="ghost">+ Frame/Image</button><button id="c_addText" class="ghost">+ Text</button><button id="c_addRig" class="ghost">+ Character</button></div>`;
+
+  html += '<div class="secT"><span class="dia"></span> Layers (bottom → top) <small style="color:var(--muted);text-transform:none;letter-spacing:0">— drag rows to restack (z order) · drop a rail item on a row to replace it</small></div><div class="layers reorder">';
+  for (const l of c.layers) {
+    html += `<div class="lay ${selPart===l.name?'sel':''} ${l.visible===false?'hiddenLay':''}" data-part="${l.name}"><span class="kindTag ${(l.kind==='rig'||l.kind==='anim')?'image':l.kind}">${l.kind}</span><span style="flex:1">${l.name}</span>
+      <button class="ghost layUp" data-n="${l.name}" style="padding:0 6px" title="raise (toward the viewer)">▲</button>
+      <button class="ghost layDn" data-n="${l.name}" style="padding:0 6px" title="lower (behind)">▼</button>
+      <button class="ghost layDel" data-n="${l.name}" style="padding:0 6px;color:var(--lava)" title="delete layer (Delete key works too)">✕</button></div>`;
+  }
+  html += '</div>';
+
+  const layer = selPart ? c.layers.find((l) => l.name === selPart) : null;
+  if (layer) {
+    html += `<div class="secT"><span class="dia"></span> Layer · ${layer.name}</div>`;
+    html += field('Position', `<div class="pair"><input id="l_x" type="number" value="${layer.x}"><input id="l_y" type="number" value="${layer.y}"></div>`);
+    html += field('Scale', `<input id="l_scale" type="number" step="0.05" min="0.05" max="4" value="${layer.scale ?? 1}">`);
+    html += field('Alpha', `<input id="l_alpha" type="range" min="0" max="1" step="0.05" value="${layer.alpha ?? 1}">`);
+    html += field('Angle', `<input id="l_angle" type="number" step="1" min="-180" max="180" value="${layer.angle ?? 0}">`);
+    if (layer.kind === 'image') {
+      html += field('Texture', `<input id="l_tex" type="text" value="${layer.texture || ''}" title="double-click a frame/icon/upload on the left to set">`);
+      html += field('Size W/H', `<div class="pair"><input id="l_w" type="number" min="0" step="4" placeholder="auto" value="${layer.w ?? ''}"><input id="l_h" type="number" min="0" step="4" placeholder="auto" value="${layer.h ?? ''}"></div>`);
+      html += field('9-slice', `<select id="l_slice"><option value="true" ${layer.slice!==false?'selected':''}>on (crisp corners)</option><option value="false" ${layer.slice===false?'selected':''}>off (stretch)</option></select>`);
+      html += field('Scale X/Y', `<div class="pair"><input id="l_sx" type="number" step="0.05" placeholder="1" value="${layer.scaleX ?? ''}"><input id="l_sy" type="number" step="0.05" placeholder="1" value="${layer.scaleY ?? ''}"></div>`);
+      html += field('Tint', `<div class="pair"><input id="l_tint" type="color" value="${layer.tint || '#ffffff'}"><button id="l_tintClear" class="ghost" style="flex:1">clear</button></div>`);
+    }
+    if (layer.kind === 'text') {
+      const st = layer.style || {};
+      html += field('Content', `<input id="l_text" type="text" value="${(layer.text || '').replace(/"/g,'&quot;')}">`);
+      html += field('Font', `<select id="l_font">${(inv?inv.fonts:[]).map((f)=>`<option value="${f.replace(/"/g,'&quot;')}" ${((st.fontFamily||inv.fonts[0])===f)?'selected':''}>${f.split(',')[0].replace(/"/g,'')}</option>`).join('')}</select>`);
+      html += field('Size', `<input id="l_size" type="number" min="8" max="160" value="${st.fontSize ?? 40}">`);
+      html += field('Color', `<input id="l_color" type="color" value="${st.color ?? '#FFF6E8'}">`);
+      html += field('Stroke', `<div class="pair"><input id="l_stroke" type="color" value="${st.stroke ?? '#241B22'}"><input id="l_strokeW" type="number" min="0" max="20" value="${st.strokeThickness ?? 0}"></div>`);
+    }
+    if (layer.kind === 'rig') {
+      const chars = inv && inv.characters ? inv.characters : [];
+      const ch = chars.find((x) => x.id === layer.character) || chars[0];
+      html += field('Character', `<select id="l_char">${chars.map((x)=>`<option value="${x.id}" ${layer.character===x.id?'selected':''}>${x.label}</option>`).join('')}</select>`);
+      html += field('Body motion', `<select id="l_body">${(ch?ch.bodies:[]).map((b)=>`<option value="${b.key}" ${(layer.body||'idle')===b.key?'selected':''}>${b.name}</option>`).join('')}</select>`);
+      html += field('Face motion', `<select id="l_face">${(ch?ch.faces:['none']).map((f)=>`<option value="${f}" ${(layer.face||'none')===f?'selected':''}>${f}</option>`).join('')}</select>`);
+      html += field('Facing', `<select id="l_facing"><option value="left" ${(layer.facing||'left')==='left'?'selected':''}>left</option><option value="right" ${layer.facing==='right'?'selected':''}>right</option></select>`);
+    }
+    if (layer.kind === 'anim') {
+      const seqs = inv && inv.sequences ? inv.sequences : [];
+      const cur = seqs.find((s) => s.name === layer.sequence);
+      html += field('Sequence', `<select id="l_seq">${seqs.map((s)=>`<option value="${s.name}" ${layer.sequence===s.name?'selected':''}>${s.builtin?'★ ':'▶ '}${s.label||s.name} · ${s.frameCount}f</option>`).join('')||`<option>${layer.sequence||'(none)'}</option>`}</select>`);
+      html += field('Frame rate', `<input id="l_fps" type="number" min="1" max="60" step="1" placeholder="${(cur&&cur.fps)||'from file'}" value="${layer.fps ?? ''}" title="Blank = use the sequence's own per-frame timing (frames.json)">`);
+      html += field('Loop', `<select id="l_loop"><option value="true" ${layer.loop!==false?'selected':''}>loop forever</option><option value="false" ${layer.loop===false?'selected':''}>play once (hold last)</option></select>`);
+      html += field('Size W/H', `<div class="pair"><input id="l_w" type="number" min="0" step="4" placeholder="auto" value="${layer.w ?? ''}"><input id="l_h" type="number" min="0" step="4" placeholder="auto" value="${layer.h ?? ''}"></div>`);
+    }
+  }
+  html += `<div class="btnRow"><button id="c_delete" class="ghost" style="color:var(--lava)">Delete component</button></div>`;
+  body.innerHTML = html;
+
+  /* wire */
+  const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+  $('#c_x').oninput = (e) => sendCustomRoot({ x: num(e.target.value, 0) });
+  $('#c_y').oninput = (e) => sendCustomRoot({ y: num(e.target.value, 0) });
+  $('#c_scale').oninput = (e) => sendCustomRoot({ scale: num(e.target.value, 1) });
+  $('#c_depth').oninput = (e) => sendCustomRoot({ depth: num(e.target.value, 40) });
+  $('#c_visible').onchange = (e) => sendCustomRoot({ visible: e.target.value === 'true' });
+  $('#c_delete').onclick = () => { if (confirm('Delete this component?')) { post({ type: 'custom:remove', id: sel.id }); setDirty(true); } };
+  $('#c_addImage').onclick = () => addCustomLayer({ kind: 'image', name: '', x: 0, y: 0, texture: 'ui_panel', w: 900, h: 700, slice: true });
+  $('#c_addText').onclick = () => addCustomLayer({ kind: 'text', name: '', x: 0, y: 0, text: 'New text', style: { fontSize: 44, color: '#FFF6E8', strokeThickness: 0 } });
+  $('#c_addRig').onclick = () => addCustomLayer({ kind: 'rig', name: '', x: 0, y: 80, scale: 0.35, character: 'dragon-red', body: 'idle', face: 'blink', facing: 'left' });
+  document.querySelectorAll('.lay').forEach((el) => {
+    el.onclick = (ev) => { if (ev.target.tagName === 'BUTTON') return; selPart = el.dataset.part; post({ type: 'select', id: sel.id, part: selPart }); renderProps(); };
+  });
+  document.querySelectorAll('.layUp').forEach((b) => { b.onclick = () => { post({ type: 'custom:moveLayer', id: sel.id, name: b.dataset.n, dir: 'up' }); setDirty(true); }; });
+  document.querySelectorAll('.layDn').forEach((b) => { b.onclick = () => { post({ type: 'custom:moveLayer', id: sel.id, name: b.dataset.n, dir: 'down' }); setDirty(true); }; });
+  document.querySelectorAll('.layDel').forEach((b) => { b.onclick = () => { post({ type: 'custom:removeLayer', id: sel.id, name: b.dataset.n }); setDirty(true); }; });
+  wireLayerRows(body.querySelector('.layers'), true);
+  if (layer) {
+    const on = (id, ev, fn) => { const el = $(id); if (el) el[ev] = fn; };
+    on('#l_x', 'oninput', (e) => sendCustomLayer(layer.name, { x: num(e.target.value, 0) }));
+    on('#l_y', 'oninput', (e) => sendCustomLayer(layer.name, { y: num(e.target.value, 0) }));
+    on('#l_scale', 'oninput', (e) => sendCustomLayer(layer.name, { scale: num(e.target.value, 1) }));
+    on('#l_alpha', 'oninput', (e) => sendCustomLayer(layer.name, { alpha: num(e.target.value, 1) }));
+    on('#l_angle', 'oninput', (e) => sendCustomLayer(layer.name, { angle: num(e.target.value, 0) }));
+    on('#l_tex', 'onchange', (e) => sendCustomLayer(layer.name, { texture: e.target.value }));
+    on('#l_w', 'onchange', (e) => sendCustomLayer(layer.name, { w: e.target.value === '' ? undefined : Math.max(0, parseInt(e.target.value, 10) || 0) || undefined }));
+    on('#l_h', 'onchange', (e) => sendCustomLayer(layer.name, { h: e.target.value === '' ? undefined : Math.max(0, parseInt(e.target.value, 10) || 0) || undefined }));
+    on('#l_slice', 'onchange', (e) => sendCustomLayer(layer.name, { slice: e.target.value === 'true' }));
+    on('#l_sx', 'onchange', (e) => sendCustomLayer(layer.name, { scaleX: e.target.value === '' ? undefined : parseFloat(e.target.value) }));
+    on('#l_sy', 'onchange', (e) => sendCustomLayer(layer.name, { scaleY: e.target.value === '' ? undefined : parseFloat(e.target.value) }));
+    on('#l_tint', 'oninput', (e) => sendCustomLayer(layer.name, { tint: e.target.value }));
+    on('#l_tintClear', 'onclick', () => sendCustomLayer(layer.name, { tint: null }));
+    on('#l_text', 'onchange', (e) => sendCustomLayer(layer.name, { text: e.target.value }));
+    on('#l_font', 'onchange', (e) => sendCustomLayer(layer.name, { style: Object.assign({}, layer.style, { fontFamily: e.target.value }) }));
+    on('#l_size', 'oninput', (e) => sendCustomLayer(layer.name, { style: Object.assign({}, layer.style, { fontSize: num(e.target.value, 40) }) }));
+    on('#l_color', 'oninput', (e) => sendCustomLayer(layer.name, { style: Object.assign({}, layer.style, { color: e.target.value }) }));
+    on('#l_stroke', 'oninput', (e) => sendCustomLayer(layer.name, { style: Object.assign({}, layer.style, { stroke: e.target.value }) }));
+    on('#l_strokeW', 'oninput', (e) => sendCustomLayer(layer.name, { style: Object.assign({}, layer.style, { strokeThickness: num(e.target.value, 0) }) }));
+    on('#l_char', 'onchange', (e) => { sendCustomLayer(layer.name, { character: e.target.value }); });
+    on('#l_body', 'onchange', (e) => sendCustomLayer(layer.name, { body: e.target.value }));
+    on('#l_face', 'onchange', (e) => sendCustomLayer(layer.name, { face: e.target.value }));
+    on('#l_facing', 'onchange', (e) => sendCustomLayer(layer.name, { facing: e.target.value }));
+    on('#l_seq', 'onchange', (e) => sendCustomLayer(layer.name, { sequence: e.target.value }));
+    on('#l_fps', 'onchange', (e) => sendCustomLayer(layer.name, { fps: e.target.value === '' ? undefined : Math.max(1, parseInt(e.target.value, 10) || 12) }));
+    on('#l_loop', 'onchange', (e) => sendCustomLayer(layer.name, { loop: e.target.value === 'true' }));
+  }
+  body.querySelectorAll('input[type=color]').forEach((cl) => cl.addEventListener('focus', () => (lastColorInput = cl)));
+}
+
+function renderChromeProps(head, sub, body) {
+  const c = inv.chrome.find((x) => x.key === selChrome) || inv.icons.find((x) => x.key === selChrome);
+  if (!c) { selChrome = null; renderProps(); return; }
+  const anchored = selChrome === 'ui_hand' || selChrome === 'ui_arrow';
+  head.textContent = 'Game art · ' + c.key;
+  sub.textContent = 'repaints IN PLACE — same key, same objects, events untouched';
+  let html = `<div style="text-align:center;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px"><img src="${c.thumb}" style="max-width:100%;max-height:90px"></div>`;
+  if (c.defaults) {
+    html += '<div class="secT"><span class="dia"></span> Colors</div>';
+    for (const [param, dflt] of Object.entries(c.defaults)) {
+      const cur = (c.params && c.params[param]) || dflt;
+      html += `<div class="paramRow"><input type="color" class="chromeC" data-param="${param}" value="${cur}"><label>${param}</label><code>${dflt}</code></div>`;
+    }
+  }
+  html += '<div class="secT"><span class="dia"></span> Replace with upload</div>';
+  const ups = (inv.uploads || []);
+  if (ups.length === 0) html += '<div class="hint">Upload a PNG first (⬆ PNG in the Uploads rail).</div>';
+  html += `<div class="row"><label>Art</label><select id="r_src"><option value="">— original —</option>${ups.map((u) => `<option value="${u.name}" ${c.replaced === u.name ? 'selected' : ''}>${u.name}</option>`).join('')}</select></div>`;
+  if (anchored) {
+    const a = (c.anchor && c.anchor[0] !== undefined && c.anchor[0] !== null) ? c.anchor : (selChrome === 'ui_hand' ? [0.3, 0.12] : [0.5, 1]);
+    html += `<div class="row"><label>Anchor X/Y</label><div class="pair"><input id="r_ax" type="number" min="0" max="1" step="0.01" value="${a[0]}"><input id="r_ay" type="number" min="0" max="1" step="0.01" value="${a[1]}"></div></div>`;
+    html += '<div class="hint">The anchor is where the ' + (selChrome === 'ui_hand' ? 'fingertip' : 'arrow tip') + ' touches the guided target — tune it for your art. Takes effect on the next game boot.</div>';
+  }
+  html += `<div class="btnRow"><button id="c_reset" class="ghost">Reset texture</button><button id="c_close" class="ghost">Close</button></div>`;
+  body.innerHTML = html;
+  body.querySelectorAll('.chromeC').forEach((inp) => {
+    inp.addEventListener('focus', () => (lastColorInput = inp));
+    inp.addEventListener('input', () => post({ type: 'texture', key: c.key, params: { [inp.dataset.param]: inp.value } }));
+  });
+  const sendReplace = () => {
+    const src = $('#r_src').value || null;
+    const msg = { type: 'replace', key: c.key, src };
+    if (anchored && src) { msg.anchorX = parseFloat($('#r_ax').value); msg.anchorY = parseFloat($('#r_ay').value); }
+    post(msg); setDirty(true);
+  };
+  $('#r_src').onchange = sendReplace;
+  if (anchored) { $('#r_ax').onchange = sendReplace; $('#r_ay').onchange = sendReplace; }
+  $('#c_reset').onclick = () => { post({ type: 'resetTexture', key: c.key }); if (c.replaced) post({ type: 'replace', key: c.key, src: null }); };
+  $('#c_close').onclick = () => { selChrome = null; renderIcons(); renderChrome(); renderProps(); };
+}
+
+/* ============================ top bar ============================ */
+// Editor and Game preview are two SEPARATE boots of the iframe: the editor
+// document (?uiedit=1) contains no game at all; Game preview loads the real
+// game (with your SAVED theme) purely for viewing/playing.
+let editMode = true;
+$('#btnMode').onclick = () => {
+  editMode = !editMode;
+  $('#btnMode').textContent = editMode ? '✏️ Editor' : '🎮 Game preview';
+  sel = null; selPart = null; selChrome = null; renderProps();
+  if (editMode) {
+    connect();
+  } else {
+    setStatus(false, 'game preview — the real game with your SAVED theme (read-only)');
+    frame.src = gameOrigin + '/';
+    $('#frameCover').style.display = 'none';
+  }
+};
+/* ---- view: pan/zoom (Figma-style trackpad navigation) ----
+   Two-finger scroll pans; pinch (ctrl/cmd+wheel) zooms at the cursor. Gestures
+   over the CANVAS are forwarded by the game frame ('nav' messages); gestures
+   over the dark margin are handled here directly. */
+const view = { z: 1, tx: 0, ty: 0 };
+function applyView() {
+  $('#frameWrap').style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.z})`;
+}
+function fitView() {
+  const st = $('#stage');
+  view.z = Math.max(0.15, Math.min((st.clientWidth - 48) / 1280, (st.clientHeight - 40) / 800, 1));
+  view.tx = (st.clientWidth - 1280 * view.z) / 2;
+  view.ty = (st.clientHeight - 800 * view.z) / 2;
+  applyView();
+}
+function zoomAt(sx, sy, factor) {
+  const z2 = Math.max(0.15, Math.min(4, view.z * factor));
+  view.tx = sx - ((sx - view.tx) / view.z) * z2;
+  view.ty = sy - ((sy - view.ty) / view.z) * z2;
+  view.z = z2;
+  const zs = $('#zoom');
+  zs.value = 'custom';
+  zs.options[zs.selectedIndex].textContent = Math.round(view.z * 100) + '%';
+  applyView();
+}
+function navigate(pinch, dx, dy, sx, sy) {
+  if (pinch) zoomAt(sx, sy, Math.exp(-dy * 0.01));
+  else { view.tx -= dx; view.ty -= dy; applyView(); }
+}
+$('#zoom').onchange = applyZoom;
+window.addEventListener('resize', applyZoom);
+function applyZoom() {
+  const v = $('#zoom').value;
+  if (v === 'custom') return;
+  if (v === 'fit') { fitView(); return; }
+  const st = $('#stage');
+  view.z = parseFloat(v);
+  view.tx = (st.clientWidth - 1280 * view.z) / 2;
+  view.ty = (st.clientHeight - 800 * view.z) / 2;
+  applyView();
+}
+// Gestures over the stage margin (outside the canvas).
+$('#stage').addEventListener('wheel', (ev) => {
+  ev.preventDefault();
+  const r = $('#stage').getBoundingClientRect();
+  navigate(ev.ctrlKey || ev.metaKey, ev.deltaX, ev.deltaY, ev.clientX - r.left, ev.clientY - r.top);
+}, { passive: false });
+
+/* ---- drag-drop rail item → canvas ----
+   The catcher sits over the iframe (which would otherwise swallow drops) while a
+   drag is active. Screen point → game coords via the frameWrap transform (the
+   iframe is 1280×800 CSS = 2560×1600 game px, so ×2), clamped onto the canvas. */
+const dropCatcher = $('#dropCatcher');
+dropCatcher.addEventListener('dragover', (ev) => {
+  if (!dragPayload) return;
+  ev.preventDefault();
+  if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
+  dropCatcher.classList.add('over');
+});
+dropCatcher.addEventListener('dragleave', (ev) => {
+  if (ev.target === dropCatcher) dropCatcher.classList.remove('over');
+});
+dropCatcher.addEventListener('drop', (ev) => {
+  ev.preventDefault();
+  const payload = dragPayload;
+  document.querySelector('#main').classList.remove('dragging');
+  dropCatcher.classList.remove('over');
+  dragPayload = null;
+  if (!payload || !connected) return;
+  const fr = $('#frameWrap').getBoundingClientRect();
+  const gx = Math.max(0, Math.min(2560, Math.round((ev.clientX - fr.left) / view.z * 2)));
+  const gy = Math.max(0, Math.min(1600, Math.round((ev.clientY - fr.top) / view.z * 2)));
+  post({ type: 'canvas:drop', payload, x: gx, y: gy });
+  setDirty(true);
+});
+$('#btnUndo').onclick = () => { post({ type: 'undo' }); setDirty(true); };
+$('#btnRedo').onclick = () => { post({ type: 'redo' }); setDirty(true); };
+window.addEventListener('keydown', (ev) => {
+  if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'z') {
+    ev.preventDefault();
+    post({ type: ev.shiftKey ? 'redo' : 'undo' });
+    setDirty(true);
+    return;
+  }
+  // Delete/Backspace removes the selected layer (custom) or hides it (built-in
+  // parts are code-authored — Reset element restores them).
+  if ((ev.key === 'Delete' || ev.key === 'Backspace') && sel && selPart) {
+    const t = document.activeElement && document.activeElement.tagName;
+    if (t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA') return;
+    ev.preventDefault();
+    if (sel.custom) post({ type: 'custom:removeLayer', id: sel.id, name: selPart });
+    else post({ type: 'patch', id: sel.id, patch: { parts: { [selPart]: { visible: false } } } });
+    setDirty(true);
+  }
+});
+
+function setPanelOpen(open) {
+  document.querySelector('#main').classList.toggle('panel-hidden', !open);
+  localStorage.setItem('uib_panel', open ? '1' : '0');
+  applyZoom();
+}
+$('#btnPanel').onclick = () => setPanelOpen(document.querySelector('#main').classList.contains('panel-hidden'));
+$('#rightCollapse').onclick = () => setPanelOpen(false);
+if (localStorage.getItem('uib_panel') === '0') setPanelOpen(false);
+
+$('#btnResetEl').onclick = () => { if (sel) { post({ type: 'resetElement', id: sel.id }); setDirty(true); } };
+$('#btnNewComp').onclick = () => {
+  const name = prompt('Component id (letters/numbers, e.g. welcomeBanner):', 'myComponent');
+  if (!name) return;
+  post({ type: 'custom:create', id: name, label: name });
+  setDirty(true);
+};
+function addCustomLayer(layer) {
+  if (!sel || !sel.custom) { alert('Select a CUSTOM component first (＋ New in the Elements rail).'); return; }
+  post({ type: 'custom:addLayer', id: sel.id, layer });
+  setDirty(true);
+}
+function sendGrid() {
+  post({ type: 'grid', on: $('#chkGrid').checked, size: parseInt($('#gridSize').value, 10) });
+  localStorage.setItem('uib_grid', JSON.stringify({ on: $('#chkGrid').checked, size: $('#gridSize').value }));
+}
+$('#chkGrid').onchange = sendGrid;
+$('#gridSize').onchange = sendGrid;
+try {
+  const g = JSON.parse(localStorage.getItem('uib_grid') || 'null');
+  if (g) { $('#chkGrid').checked = !!g.on; $('#gridSize').value = g.size || '64'; }
+} catch { /* fresh profile */ }
+
+/* save: pull the pruned doc from the game, then write it via the dev endpoint */
+let saveMode = 'file';
+$('#btnSave').onclick = () => { saveMode = 'file'; post({ type: 'getDoc' }); };
+$('#btnExport').onclick = () => { saveMode = 'download'; post({ type: 'getDoc' }); };
+async function saveDoc(doc) {
+  if (saveMode === 'download') {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }));
+    a.download = 'ui-theme.json';
+    a.click();
+    return;
+  }
+  try {
+    const res = await fetch(gameOrigin + '/__uibuilder/theme', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(doc)
+    });
+    const out = await res.json();
+    if (out.ok) { setDirty(false); setStatus(true, 'saved → src/data/ui-theme.json'); }
+    else setStatus(true, 'save failed: ' + out.error);
+  } catch (e) { setStatus(connected, 'save failed — is pnpm dev running?'); }
+}
+
+/* boot */
+connect();
+applyZoom();
+</script>
+</body>
+</html>

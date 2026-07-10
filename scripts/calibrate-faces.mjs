@@ -60,6 +60,34 @@ const CHARACTERS = {
         ref: 0
       }
     }
+  },
+  'dragon-golden': {
+    rig: 'assets/sprites/characters/dragon/golden-dragon/rig-adult/golden-dragon.rig.json',
+    layer: 'head',
+    fsDir: 'assets/sprites/characters/dragon/golden-dragon/head-animation',
+    basePath: 'sprites/characters/dragon/golden-dragon/head-animation',
+    sets: {
+      blink: {
+        dir: 'golden-dragon-blink-animation',
+        files: [
+          'golden-dragon-eyes-open.png',
+          'golden-dragon-eyes-halfOpen.png',
+          'golden-dragon-eyes-closed.png',
+          'golden-dragon-eyes-halfOpen2.png'
+        ],
+        ref: 0
+      },
+      talk: {
+        dir: 'golden-dragon-roar_talk-animation',
+        files: [
+          'golden-dragon-roar_talk_00000.png',
+          'golden-dragon-roar_talk_00001.png',
+          'golden-dragon-roar_talk_00002.png',
+          'golden-dragon-roar_talk_00003.png'
+        ],
+        ref: 0
+      }
+    }
   }
 };
 
