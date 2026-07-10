@@ -1,0 +1,33 @@
+{
+  "fps": 18,
+  "blendFrames": false,
+  "width": 1056,
+  "height": 1344,
+  "frameCount": 4,
+  "frames": [
+    {
+      "index": 0,
+      "file": "golden-dragon-roar_talk_00000.png",
+      "durationMs": 267,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "golden-dragon-roar_talk_00001.png",
+      "durationMs": 267,
+      "blend": false
+    },
+    {
+      "index": 2,
+      "file": "golden-dragon-roar_talk_00002.png",
+      "durationMs": 267,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "golden-dragon-roar_talk_00003.png",
+      "durationMs": 267,
+      "blend": false
+    }
+  ]
+}
