@@ -47,6 +47,17 @@ export const IS_MOBILE: boolean =
   (navigator.maxTouchPoints > 0 || 'ontouchstart' in window);
 
 /**
+ * True on iOS/iPadOS Safari (incl. iPadOS masquerading as Mac + touch). WebKit
+ * caps a tab's renderer-process memory FAR lower than Android Chrome, so the
+ * heaviest GPU paths are trimmed here (skip the second live WebGL context, render
+ * at a leaner backing) to stay under the "A problem repeatedly occurred" crash.
+ */
+export const IS_IOS: boolean =
+  typeof window !== 'undefined' &&
+  (/iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent)));
+
+/**
  * Viewport height in game-space units.
  * On desktop stays at GAME_HEIGHT (1600) — no change (e2e/landscape untouched).
  * On mobile the game is PORTRAIT: GAME_WIDTH (2560) spans the phone's SHORT side
@@ -163,9 +174,9 @@ export const ITEM_SCALE: Record<string, number> = {
   lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
   bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
   chest_1: 0.24, // a treasure chest (chest.png) — reduced 20% on request (0.30 → 0.24)
-  strawberry_1: 0.85, // emberberry sprout — reduced on request
+  strawberry_1: 0.65, // emberberry sprout — reduced again on request (0.85 → 0.65)
   strawberry_2: 0.8, // emberberry bush — reduced on request
-  strawberry_3: 0.58, // the emberberry plant reads tree-like — reduced again (0.75 → 0.58)
+  strawberry_3: 0.78, // the emberberry plant — back UP on request (0.58 → 0.78); t3 should read biggest
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
   emerald_1: 0.18, // Emerald gem (emerald.png 467×392) — reduced ~28% on request (0.25 → 0.18)

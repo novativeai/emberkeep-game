@@ -19,6 +19,7 @@ import {
   ITEM_SCALE,
   EMBER_MOTES,
   GAME_WIDTH,
+  IS_IOS,
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
@@ -62,7 +63,6 @@ interface CameraFrame {
 /** Zero velocity AND acceleration at both ends — no perceptible start/stop. */
 const smootherstep = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 
-const DRAGON_CHAIN = 'ember_dragon';
 /** Chains whose dragon tiers wear a live rig, and where to fetch each rig.
  *  ember/emerald rig their GENERATOR tiers; golden_egg rigs the Whelp (tier 2,
  *  NOT a generator — she's a baby). See wearsRigTier. */
@@ -131,8 +131,8 @@ export class BoardScene extends Phaser.Scene {
    *  pill renders UNDER the rig (glued at host.depth + 0.5), so the timer
    *  lives in a scene-level badge instead. Keyed by dragon itemId. */
   private coolBadges = new Map<number, Phaser.GameObjects.Container>();
-  /** Camera position to return to after the tutorial's golden-egg tease. */
-  private teaseReturn: { x: number; y: number } | null = null;
+  /** Camera pose to return to after the tutorial's golden-egg tease. */
+  private teaseReturn: { x: number; y: number; zoom: number } | null = null;
   /** The altar egg's post-tease golden aura (paired with its float tween). */
   private eggAura?: Phaser.GameObjects.Image;
   /** Styled "Zzz" fatigue badge (Container) over a resting dragon. */
@@ -542,7 +542,21 @@ export class BoardScene extends Phaser.Scene {
       this.glideToWorld(p.x, p.y + 60, 900);
     });
     // …and the Golden Egg cracks: the legendary Elder AWAKENS on her ledge.
-    this.time.delayedCall(FINALE.awakenAtMs, () => this.awakenAltarElder());
+    // ONLY if Cindra's golden order was delivered — the egg is authored decor
+    // now, so its mere existence no longer implies the promise was earned; the
+    // prophecy finale variant leaves her sleeping (deliver later → the late
+    // awakening plays instead).
+    this.time.delayedCall(FINALE.awakenAtMs, () => {
+      if (this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId)) {
+        this.awakenAltarElder();
+      } else if (this.altarEgg) {
+        // Prophecy variant: she stirs but does NOT wake — the un-filled order
+        // stays the hook.
+        const p = this.altarPoint();
+        this.wobbleGoldenEgg();
+        this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.7, 1.4);
+      }
+    });
 
     const region = this.ctx.data.map.regions.find((r) => r.id === FINALE_REGION);
     if (!region || region.tiles.length === 0) return; // no terrace — hatch + card still play
@@ -1131,6 +1145,11 @@ export class BoardScene extends Phaser.Scene {
    * default emerald. WebGL-less contexts keep the PNG (the try/catch falls back).
    */
   private ensureCrystal3D(): void {
+    // iOS Safari's renderer process crashes ("A problem repeatedly occurred") under
+    // the memory of a SECOND live WebGL context plus its per-frame GPU→CPU readback
+    // (drawImage of a WebGL canvas). Skip it there — the static `item_crystal_1` PNG
+    // (loaded in preload) stays as the crystal texture, so the gem still renders 2D.
+    if (IS_IOS) return;
     const map = this.ctx.data.map;
     const spec = map.decor3d?.find((d) => d.model3d)?.model3d ?? undefined;
     try {
@@ -1156,7 +1175,9 @@ export class BoardScene extends Phaser.Scene {
    */
   private buildMapDecor3d(): void {
     const map = this.ctx.data.map;
-    if (!map.decor3d?.length || !this.crystal3d || !this.textures.exists('item_crystal_1')) return;
+    // Render wherever the crystal texture exists — the live 3D gem when present,
+    // else the static PNG fallback (iOS / WebGL-less), so decor never silently drops.
+    if (!map.decor3d?.length || !this.textures.exists('item_crystal_1')) return;
     // The crystal GENERATOR already stands on the authored 3D-crystal spot (see
     // build-gamemap), so skip the scenery copy there — exactly ONE crystal renders.
     const genCells = new Set(
@@ -1413,7 +1434,7 @@ export class BoardScene extends Phaser.Scene {
     );
     this.input.on(
       Phaser.Input.Events.DRAG_END,
-      (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+      (pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
         if (!(obj instanceof BoardItem) || !this.dragFrom) return;
         this.dragSprite = null;
         this.dragCell.setVisible(false);
@@ -1429,11 +1450,18 @@ export class BoardScene extends Phaser.Scene {
           (this.tutorialDone || this.allow.dragonWork) &&
           !this.ctx.systems.jobs.restRemaining(obj.itemId)
         ) {
-          const tgt = [...this.itemSprites.values()].find(
-            (s) => s.col === to.col && s.row === to.row && s.itemId !== obj.itemId
-          );
-          const tgtCfg = tgt ? this.generatorConfigFor(tgt.chain, tgt.tier) : null;
-          if (tgt && tgtCfg?.tappable === false && !DRAGON_RIGS[tgt.chain]) {
+          // Match by CELL, or by the drop point landing anywhere on the
+          // generator's ART: the House is ~2.5 iso rows tall, so dropping onto
+          // its visible body resolves to the cell BEHIND its tile and a
+          // cell-only match silently bounced the dragon home.
+          const tgt = [...this.itemSprites.values()].find((s) => {
+            if (s.itemId === obj.itemId) return false;
+            const cfg = this.generatorConfigFor(s.chain, s.tier);
+            if (!cfg || cfg.tappable !== false || DRAGON_RIGS[s.chain]) return false;
+            if (s.col === to.col && s.row === to.row) return true;
+            return s.getBounds().contains(pointer.worldX, pointer.worldY);
+          });
+          if (tgt) {
             const home = gridToWorld(this.dragFrom.col, this.dragFrom.row);
             this.dragFrom = null;
             this.time.delayedCall(60, () => obj.setData('dragged', false));
@@ -1664,9 +1692,26 @@ export class BoardScene extends Phaser.Scene {
       // (76,76 here from setSize(152,152)), so the rect is offset accordingly:
       // true local coverage is x -72..72, y -60..28.
       const hit = new Phaser.Geom.Rectangle(4, 16, 144, 88);
+      // Tall-art generators (house/tree/chest/crystal) carry full-sprite rects
+      // spanning several iso rows — being nearer the camera they'd STEAL input
+      // from items standing behind them (an un-draggable dragon behind the
+      // House). Their hits YIELD when the pointed spot lies over another
+      // item's tile; plain footprint items test the rect directly.
+      const scene = this;
       sprite.setInteractive({
         hitArea: hit,
-        hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+        hitAreaCallback: (
+          area: Phaser.Geom.Rectangle,
+          x: number,
+          y: number,
+          obj: BoardItem
+        ): boolean => {
+          if (!Phaser.Geom.Rectangle.Contains(area, x, y)) return false;
+          if (!obj.getData('tallArt')) return true;
+          const cell = worldToGrid(obj.x + x - 76, obj.y + y - 76);
+          if (cell.col === obj.col && cell.row === obj.row) return true;
+          return !scene.ctx.state.itemAt(cell.col, cell.row); // yield to the occupant
+        },
         useHandCursor: true
       });
       sprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
@@ -1683,17 +1728,22 @@ export class BoardScene extends Phaser.Scene {
     // Phaser 3.90: calling setInteractive() on an already-interactive object
     // silently returns without updating hitArea. Mutate sprite.input.hitArea
     // directly instead. This also handles pool-reuse resets (else branch).
+    sprite.setData('tallArt', false);
     if (snap.chain === 'crystal') {
+      sprite.setData('tallArt', true);
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(4, -324, 144, 428);
     } else if (snap.chain === 'chest') {
+      sprite.setData('tallArt', true);
       // chest.png 537×511 @ scale 0.24, anchor 0.5/0.92 — full-sprite tap.
       // displayW≈129, displayH≈123; container origin +76 → rx=76−0.5·129, ry=76−0.92·123.
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(12, -37, 129, 123);
     } else if (snap.chain === 'lumber' && snap.tier === 2) {
       // The House (house.png 361×380 @ scale 0.9, anchor 0.5/0.9) — full-sprite tap.
       // displayW≈325, displayH≈342; container origin +76 → rx=76−0.5·325, ry=76−0.9·342.
+      sprite.setData('tallArt', true);
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(-86, -232, 325, 342);
     } else if (snap.chain === 'bigtree') {
+      sprite.setData('tallArt', true);
       // The Ancient Tree (bigtree.png 622×823 @ scale 0.17, anchor 0.5/0.92) — full-sprite
       // tap. displayW≈106, displayH≈140; origin +76 → rx=76−0.5·106, ry=76−0.92·140.
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(23, -53, 106, 140);
@@ -1833,7 +1883,7 @@ export class BoardScene extends Phaser.Scene {
     const dragon = [...this.itemSprites.values()]
       .filter(
         (s) =>
-          s.chain === DRAGON_CHAIN &&
+          DRAGON_RIGS[s.chain] !== undefined && // any rigged dragon, not just the red
           s.isGenerator &&
           s.itemId !== plant.itemId &&
           !this.busyDragons.has(s.itemId)
@@ -1945,8 +1995,8 @@ export class BoardScene extends Phaser.Scene {
       btn.add([bg, label]);
       return label;
     };
-    this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Par or', `🪙 ${skipEnergyCost(remaining, total, maxGold)}`);
-    this.skipWarmthLabel = make(150, 0xa9d6ff, 'warmth', 'Par énergie', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
+    this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Skip with Gold', `🪙 ${skipEnergyCost(remaining, total, maxGold)}`);
+    this.skipWarmthLabel = make(150, 0xa9d6ff, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
     btn.add(caption); // on top of the buttons
     // Tutorial: bounce an arrow over the WARMTH (⚡) skip so the player learns to
     // pay the House's timer with energy (and watches their Warmth drop).
@@ -2405,16 +2455,33 @@ export class BoardScene extends Phaser.Scene {
         // The golden tease: glide west to the sleeping egg while Laurah speaks;
         // it stirs (wobble + aura wakes) — the camera returns on the next step.
         if (step.id === 'golden_tease') {
-          this.teaseReturn = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
+          const cam = this.cameras.main;
+          this.teaseReturn = { x: cam.midPoint.x, y: cam.midPoint.y, zoom: cam.zoom };
           const p = this.altarPoint();
+          // Pull the camera OUT while gliding: the altar hugs the world's west
+          // edge, and the bounds clamp can otherwise leave the egg off-frame on
+          // wide/tall viewports (players saw only the aura's glow bleed in).
+          this.tweens.add({
+            targets: cam,
+            zoom: Math.max(this.minZoom * renderScale.value, cam.zoom * 0.72),
+            duration: 1100,
+            ease: 'Sine.easeInOut'
+          });
           this.glideToWorld(p.x, p.y + 60, 1100);
           this.time.delayedCall(1300, () => {
+            this.altarEgg?.setVisible(true).setAlpha(1); // belt-and-braces
             this.wobbleGoldenEgg();
             this.startEggAura();
           });
         } else if (this.teaseReturn) {
           const home = this.teaseReturn;
           this.teaseReturn = null;
+          this.tweens.add({
+            targets: this.cameras.main,
+            zoom: home.zoom,
+            duration: 1000,
+            ease: 'Sine.easeInOut'
+          });
           this.glideToWorld(home.x, home.y, 1000);
         }
       }),
