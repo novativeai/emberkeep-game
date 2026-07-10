@@ -95,7 +95,7 @@ const count = (s: GameText, chain: string, tier: number): number =>
   s.inventory[`${chain}:${tier}`] ?? 0;
 
 test.describe('Level 1 — Emberkeep tutorial', () => {
-  test('lore → rubies → red egg → red dragon → crystal → emeralds → green eggs → green dragon → chest → level-up → fog → bushes → dragon-work → rest → marketplace → level-3-end', async ({
+  test('lore → rubies → cookbook → red egg → red dragon → crystal → emeralds → green eggs → green dragon → chest → level-up → fog → emberberries → bushes → dragon-work → rest → marketplace → level-3-end', async ({
     page
   }) => {
     const consoleErrors: string[] = [];
@@ -146,9 +146,21 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     const rubies = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 1);
     expect(rubies.length).toBe(3);
     await dragTile(page, rubies[2]!, rubies[0]!);
-    await waitStep(page, 'dragon_hatch');
+
+    // ---------- Cookbook intro: the first merge wrote the first recipe page ----------
+    await waitStep(page, 'cookbook_intro');
     state = await gameText(page);
     expect(count(state, 'ember_dragon', 1)).toBe(0);
+    expect(count(state, 'ember_dragon', 2)).toBe(1); // just the merged Red Egg so far
+    await page.screenshot({ path: shot('04b-cookbook-intro') });
+    // Tap the Cookbook button (game 2404,1244 → CSS ÷2) — opening it is the gate.
+    await page.mouse.click(1202, 622);
+    await waitStep(page, 'dragon_hatch');
+    await page.screenshot({ path: shot('04c-cookbook-open') });
+    // The next step auto-closes the panel after a short hold; wait it out so
+    // its dim never swallows the upcoming egg drags.
+    await page.waitForTimeout(1700);
+    state = await gameText(page);
     expect(count(state, 'ember_dragon', 2)).toBe(3); // 1 red egg + 2 spawned by step effects
     await page.screenshot({ path: shot('05-red-egg') });
 
@@ -257,13 +269,54 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       await tapTile(page, cell[0], cell[1]);
       await page.waitForTimeout(360);
     }
-    await waitStep(page, 'bush_merge');
+    // ---------- Emberberry patch: free harvest in the opened land ----------
+    await waitStep(page, 'emberberry_tap');
     state = await gameText(page);
     expect(state.keys).toBe(0);
     expect(state.regions['level_2_gate']).toBe('active');
     expect(count(state, 'lumber', 1)).toBeGreaterThanOrEqual(3); // 3 bushes revealed
+    expect(count(state, 'strawberry', 3)).toBe(1); // the patch
+    expect(count(state, 'strawberry', 1)).toBe(0); // sprouts arrive with the merge lesson
     await page.waitForTimeout(600);
     await page.screenshot({ path: shot('12-fog-lifted') });
+    const energyBeforeBerry = state.energy.current;
+    // Harvest via a direct item:tapped emit (same reliability pattern as the crystal).
+    await page.evaluate(() => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        state: { items: Map<number, { chain: string; tier: number; kind: string }> };
+        bus: { emit: (event: string, payload: unknown) => void };
+      };
+      for (const [id, item] of ctx.state.items.entries()) {
+        if (item.chain === 'strawberry' && item.tier === 3 && item.kind === 'item') {
+          ctx.bus.emit('item:tapped', { itemId: id });
+          return;
+        }
+      }
+    });
+    await waitStep(page, 'emberberry_merge');
+    state = await gameText(page);
+    expect(count(state, 'strawberry', 1)).toBe(3); // 2 spawned + 1 harvested
+    expect(state.energy.current).toBe(energyBeforeBerry); // the patch is FREE
+    await page.screenshot({ path: shot('12b-emberberries') });
+
+    // ---------- Emberberry merge: 3 sprouts → an Emberberry Bush ----------
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const sprouts = await findCells(page, (c) => c.chain === 'strawberry' && c.tier === 1);
+      if (sprouts.length < 3) break;
+      await page.evaluate(
+        ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
+        [sprouts[0]![0], sprouts[0]![1]]
+      );
+      await page.waitForTimeout(400);
+      await dragTile(page, sprouts[2]!, sprouts[0]!);
+      await page.waitForTimeout(500);
+      if ((await gameText(page)).tutorial.step === 'bush_merge') break;
+    }
+    await waitStep(page, 'bush_merge');
+    state = await gameText(page);
+    expect(count(state, 'strawberry', 1)).toBe(0);
+    expect(count(state, 'strawberry', 2)).toBe(1); // Emberberry Bush
+    await page.screenshot({ path: shot('12c-emberberry-bush') });
 
     // ---------- Bush merge: drag 3 bushes → House ----------
     // The 2560×1600 drag is flaky under SwiftShader — retry until the House forms.

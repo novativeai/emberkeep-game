@@ -96,7 +96,8 @@ const NO_ALLOW: Required<TutorialAllow> = {
   fog: false,
   sell: false,
   dragonWork: false,
-  marketplace: false
+  marketplace: false,
+  cookbook: false
 };
 
 /**

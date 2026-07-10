@@ -270,7 +270,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'chest:open' | 'dragon:working' | 'marketplace:purchased' | 'generator:skipped'; chain?: string; currency?: 'gold' | 'warmth' }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'chest:open' | 'dragon:working' | 'marketplace:purchased' | 'generator:skipped'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number };
 
 export interface TutorialAllow {
@@ -285,6 +285,8 @@ export interface TutorialAllow {
   dragonWork?: boolean;
   /** Allow tapping the energy ⚡ shop button during tutorial. */
   marketplace?: boolean;
+  /** Allow tapping the Emberkeep Cookbook button during tutorial. */
+  cookbook?: boolean;
 }
 
 /**
@@ -297,12 +299,12 @@ export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: 
 
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' }
   | { fogRegion: string };
 
 export type TutorialArrowConfig =
   | { tile: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' }
   | { fogRegion: string };
 
 /**
@@ -311,7 +313,7 @@ export type TutorialArrowConfig =
  * the bush after the hatch, hand over the key before the fog lesson.
  */
 export type TutorialEffect =
-  | { spawn: { chain: string; tier: number; count: number; nearChain?: string; at?: [number, number] } }
+  | { spawn: { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number] } }
   | { retier: { chain: string; fromTier: number; toTier: number } }
   | { grantKeys: number }
   | { grantXp: number }
@@ -394,6 +396,8 @@ export interface EventMap {
   'dragon:rest': { dragonId: number };
   'dragon:rested': { dragonId: number };
   'ui:ledger_toggled': { open: boolean };
+  /** The Emberkeep Cookbook panel opened (tutorial gate + analytics). */
+  'ui:cookbook_opened': { discovered: number };
   'ui:deliver_requested': { orderId: string };
   /** A gauge "+" button opened the shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' };
@@ -413,7 +417,7 @@ export interface EventMap {
   'economy:spend_keys': { keys: number; reason: string };
   'board:consume_items': { itemIds: number[]; reason: string };
   /** Scripted spawn of `count` items, into free tiles near an item of `nearChain`. */
-  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string };
+  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number] };
   /** Transform one on-board item of `chain`+`fromTier` into `toTier` in place. */
   'board:retier': { chain: string; fromTier: number; toTier: number };
   /** Relocate one on-board item of `chain`+`tier` to a cell (tutorial staging). */
@@ -477,12 +481,12 @@ export interface EventMap {
 
 export type ResolvedHand =
   | { from: TilePos; to: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' }
   | { fogRegion: string };
 
 export type ResolvedArrow =
   | { tile: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' }
   | { fogRegion: string };
 
 export interface TutorialStepEvent {

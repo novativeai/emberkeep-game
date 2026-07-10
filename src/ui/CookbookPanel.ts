@@ -58,7 +58,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
 
   constructor(
     scene: Phaser.Scene,
-    bus: EventBus,
+    private bus: EventBus,
     private gameState: GameState,
     chains: ChainsData
   ) {
@@ -319,6 +319,9 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.scene.tweens.killTweensOf(this);
     this.setVisible(true).setAlpha(0).setScale(0.92);
     this.scene.tweens.add({ targets: this, alpha: 1, scale: 1, duration: 200, ease: 'Back.easeOut' });
+    this.bus.emit('ui:cookbook_opened', {
+      discovered: this.gameState.discoveredRecipes.length
+    });
   }
 
   requestClose(): void {

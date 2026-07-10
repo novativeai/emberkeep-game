@@ -35,6 +35,15 @@
       "allow": { "drag": ["ember_dragon"] }
     },
     {
+      "id": "cookbook_intro",
+      "speaker": "laurah",
+      "text": "Your first recipe! Every merge you discover is inscribed in the Emberkeep Cookbook. Tap the book to see your first page.",
+      "gate": { "type": "event", "event": "ui:cookbook_opened" },
+      "hand": { "ui": "cookbook" },
+      "arrow": { "ui": "cookbook" },
+      "allow": { "cookbook": true }
+    },
+    {
       "id": "dragon_hatch",
       "speaker": "laurah",
       "text": "A Red Egg! Two more have appeared. Drag all three together — the Red Dragon stirs inside!",
@@ -137,14 +146,41 @@
       "allow": { "fog": true }
     },
     {
+      "id": "emberberry_tap",
+      "speaker": "laurah",
+      "text": "A wild Emberberry patch grew in the opened land! It feeds you for FREE — tapping it never costs Warmth. Tap the patch to pick a sprout.",
+      "gate": { "type": "event", "event": "item:harvested", "chain": "strawberry" },
+      "effects": [
+        { "spawn": { "chain": "strawberry", "tier": 3, "count": 1, "nearChain": "lumber" } }
+      ],
+      "arrow": { "tile": { "chain": "strawberry", "nth": 0, "tier": 3 } },
+      "allow": { "tapGenerators": true }
+    },
+    {
+      "id": "emberberry_merge",
+      "speaker": "laurah",
+      "text": "Two more sprouts sprang up beside yours! Merge all three into a bush — the patch regrows forever, so you will never run out of things to merge.",
+      "gate": { "type": "event", "event": "item:merged", "chain": "strawberry" },
+      "effects": [
+        { "spawn": { "chain": "strawberry", "tier": 1, "count": 2, "nearChain": "strawberry", "nearTier": 1 } }
+      ],
+      "highlight": [
+        { "chain": "strawberry", "nth": 0, "tier": 1 },
+        { "chain": "strawberry", "nth": 1, "tier": 1 },
+        { "chain": "strawberry", "nth": 2, "tier": 1 }
+      ],
+      "hand": {
+        "from": { "chain": "strawberry", "nth": 2, "tier": 1 },
+        "to": { "chain": "strawberry", "nth": 0, "tier": 1 }
+      },
+      "arrow": { "tile": { "chain": "strawberry", "nth": 0, "tier": 1 } },
+      "allow": { "drag": ["strawberry"] }
+    },
+    {
       "id": "bush_merge",
       "speaker": "laurah",
-      "text": "Look — Bushes grew in the opened land, and a wild emberberry patch! It feeds you for free, forever. Now merge the three Bushes to raise a House — it earns coins while you rest.",
+      "text": "Those Bushes in the opened land can become shelter! Merge the three Bushes to raise a House — it earns coins while you rest.",
       "gate": { "type": "event", "event": "item:merged", "chain": "lumber" },
-      "effects": [
-        { "spawn": { "chain": "strawberry", "tier": 3, "count": 1, "nearChain": "lumber" } },
-        { "spawn": { "chain": "strawberry", "tier": 1, "count": 2, "nearChain": "strawberry" } }
-      ],
       "highlight": [
         { "chain": "lumber", "nth": 0 },
         { "chain": "lumber", "nth": 1 },

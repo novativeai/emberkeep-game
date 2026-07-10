@@ -75,6 +75,7 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | order:completed | OrderSystem | Hud, LedgerPanel, UIScene (celebration banner), AudioManager, TutorialDirector, TaskSystem, Save |
 | tasks:all_complete | TaskSystem (reward already paid) | UIScene (banner + Cindra line), LedgerPanel (Tasks-tab refresh) |
 | cookbook:discovered | MergeSystem (first merge of a chain:fromTier>resultTier; `state.discoveredRecipes`) | UIScene (cookbook-button dot + pulse), CookbookPanel (refresh while open) |
+| ui:cookbook_opened | CookbookPanel.open | TutorialDirector (cookbook_intro gate) |
 | region:unlocked | UnlockSystem | BoardScene (fog lift), AudioManager, OrderSystem, TutorialDirector (gate), Save |
 | region:unlock_failed | UnlockSystem | BoardScene |
 | marketplace:purchased | ShopPanel | TutorialDirector (gate) |

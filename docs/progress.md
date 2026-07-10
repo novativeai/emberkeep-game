@@ -690,3 +690,23 @@ ceremony plays on the EXISTING egg (glide west + gold flare — "the old altar
 answers"), goldenArrival quote reworded to match. Pre-delivery egg keeps its
 tap-wobble + escalating flavor lines. Screenshot-verified on a fresh save:
 egg standing in the crystal ring from the first tutorial line.
+
+## 2026-07-10 — Tutorial: Emberberry lesson + Cookbook introduction
+
+Two new scripted beats (tutorial.json now 19 steps; every existing step
+untouched and re-verified end-to-end):
+- **cookbook_intro** (after ruby_merge — the moment the first recipe page is
+  written): Laurah points at the Cookbook button (new `ui: "cookbook"` marker
+  target + `allow.cookbook`); opening the panel is the gate (new
+  `ui:cookbook_opened` bus event). The next step auto-closes the panel after a
+  1.2s hold. The button now appears for its introduction, then permanently.
+- **emberberry_tap + emberberry_merge** (after key_unlock): the patch spawns
+  in the opened land, one free tap-harvest gates step 1; two more sprouts then
+  spring up CONNECTED to the harvested one (new `nearTier` filter on scripted
+  spawns — anchoring by chain alone picked the patch, fanning the sprouts
+  non-adjacent so the taught drag could never merge). bush_merge slimmed to
+  bushes-only (spawns/text moved to the new lesson).
+- Invariants held: the levelup beat still lands at exactly 60 XP (the
+  emberberry merge's +6 XP comes after it); e2e retitled and extended
+  (cookbook open, free-harvest energy assertion, sprout blob merge) — full
+  suite green.

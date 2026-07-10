@@ -274,7 +274,16 @@ export class UIScene extends Phaser.Scene {
         this.maybeWelcomeBack(offlineMs, energyRecovered)
       ),
       bus.on('tutorial:step', (step) => {
-        this.cookbookButton.setVisible(step.done);
+        // Appears for its tutorial introduction, then permanently post-tutorial.
+        this.cookbookButton.setVisible(step.done || step.allow.cookbook);
+        // A step that no longer involves the Cookbook closes it — after a short
+        // hold, so the intro step's freshly opened page gets its moment.
+        if (!step.done && !step.allow.cookbook && this.cookbook.isOpen) {
+          this.time.delayedCall(1200, () => {
+            const now = this.lastStep;
+            if (now && !now.done && !now.allow.cookbook) this.cookbook.requestClose();
+          });
+        }
       }),
       bus.on('cookbook:discovered', () => {
         if (!this.ctx.state.tutorialDone || this.cookbook.isOpen) return;
@@ -314,6 +323,7 @@ export class UIScene extends Phaser.Scene {
     button.on('pointerover', () => button.setScale(1.06));
     button.on('pointerout', () => button.setScale(1));
     button.on('pointerup', () => {
+      if (!(this.lastStep?.done ?? this.ctx.state.tutorialDone) && !(this.lastStep?.allow.cookbook ?? false)) return;
       if (this.cookbook.isOpen) {
         this.cookbook.requestClose();
       } else {
@@ -687,12 +697,13 @@ export class UIScene extends Phaser.Scene {
     if (step.arrow) this.placeArrow(step.arrow);
   }
 
-  private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' } | { fogRegion: string }): { x: number; y: number } | null {
+  private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' } | { fogRegion: string }): { x: number; y: number } | null {
     if ('ui' in ref) {
       // The ⚡+ button until the Emporium opens, then the FREE! card inside it —
       // handPoint/arrowAnchor re-evaluate each frame, so the marker follows live.
       if (ref.ui === 'marketplace') return this.shop.getFreeButtonPos() ?? { x: 374, y: 88 };
       if (ref.ui === 'ledger') return this.hud.getLedgerPos();
+      if (ref.ui === 'cookbook') return { x: this.cookbookButton.x, y: this.cookbookButton.y };
       return this.ledger.isOpen ? this.ledger.getDeliverPos() : null;
     }
     const region = this.ctx.data.map.regions.find((r) => r.id === ref.fogRegion);

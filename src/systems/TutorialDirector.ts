@@ -20,7 +20,8 @@ const ALLOW_NOTHING: Required<TutorialAllow> = {
   fog: false,
   sell: false,
   dragonWork: false,
-  marketplace: false
+  marketplace: false,
+  cookbook: false
 };
 
 const ALLOW_EVERYTHING: Required<TutorialAllow> = {
@@ -31,7 +32,8 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
   fog: true,
   sell: true,
   dragonWork: true,
-  marketplace: true
+  marketplace: true,
+  cookbook: true
 };
 
 /**
@@ -70,6 +72,7 @@ export class TutorialDirector {
     bus.on('ui:ledger_toggled', ({ open }) => {
       if (open) this.onGateEvent('ui:ledger_opened');
     });
+    bus.on('ui:cookbook_opened', () => this.onGateEvent('ui:cookbook_opened'));
     bus.on('item:spawned', () => this.checkCountGate());
     bus.on('item:removed', () => this.checkCountGate());
     bus.on('tutorial:advance_requested', ({ stepId }) => {
