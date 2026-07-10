@@ -43,3 +43,16 @@ before-bubble-camera.png
 
 # personal Claude Code permissions (local)
 .claude/settings.local.json
+
+# API keys — never commit
+.env
+
+# Claude Code agent worktrees (large, transient)
+.claude/worktrees/
+
+# session debug screenshots (root)
+/app-title.jpg
+/app-title-real.jpg
+/face-animator-canvas.png
+/face-animator-initial.png
+/laurah-world-initial.png
