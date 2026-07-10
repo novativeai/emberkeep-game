@@ -131,6 +131,10 @@ export class BoardScene extends Phaser.Scene {
    *  pill renders UNDER the rig (glued at host.depth + 0.5), so the timer
    *  lives in a scene-level badge instead. Keyed by dragon itemId. */
   private coolBadges = new Map<number, Phaser.GameObjects.Container>();
+  /** Camera position to return to after the tutorial's golden-egg tease. */
+  private teaseReturn: { x: number; y: number } | null = null;
+  /** The altar egg's post-tease golden aura (paired with its float tween). */
+  private eggAura?: Phaser.GameObjects.Image;
   /** Styled "Zzz" fatigue badge (Container) over a resting dragon. */
   private restBadges = new Map<number, Phaser.GameObjects.Container>();
   /** One floating key badge per key-locked region, so it reads as "needs a key". */
@@ -678,7 +682,51 @@ export class BoardScene extends Phaser.Scene {
     const delivered = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
     const awake = delivered && this.ctx.state.level >= 3;
     if (awake) this.showAltarElder();
-    else this.showAltarEgg(false);
+    else {
+      this.showAltarEgg(false);
+      if (this.goldenTeaseSeen()) this.startEggAura();
+    }
+  }
+
+  /** True once the tutorial's golden-egg tease has played (save-derivable:
+   *  the tutorial index moved past the tease step, or the tutorial is done). */
+  private goldenTeaseSeen(): boolean {
+    if (this.ctx.state.tutorialDone) return true;
+    const idx = this.ctx.data.tutorial.steps.findIndex((s) => s.id === 'golden_tease');
+    return idx >= 0 && this.ctx.state.tutorialIndex > idx;
+  }
+
+  /** Post-tease presence: a soft pulsing golden aura behind the egg + a gentle
+   *  float — "something in there is awake". Idempotent; cleared with the egg. */
+  private startEggAura(): void {
+    const egg = this.altarEgg;
+    if (!egg || this.eggAura) return;
+    const p = this.altarPoint();
+    const cy = p.y + (1451 * p.scale) / 2; // egg art is 1176×1451, anchored top
+    this.eggAura = this.add
+      .image(p.x, cy, 'fx_glow')
+      .setTint(num(PALETTE.goldAccent))
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(DEPTHS.itemBase + p.y - 0.5)
+      .setScale(0.5)
+      .setAlpha(0.18);
+    this.tweens.add({
+      targets: this.eggAura,
+      alpha: 0.34,
+      scale: 0.62,
+      duration: 1700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    this.tweens.add({
+      targets: egg,
+      y: p.y - 7,
+      duration: 2300,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
   }
 
   /** Ensure the authored Golden Egg decor stands on the altar. With `ceremony`
@@ -715,6 +763,8 @@ export class BoardScene extends Phaser.Scene {
     const eggBottom = p.y + 1451 * p.scale; // egg art is 1176×1451, anchored top
     this.altarEgg?.destroy();
     this.altarEgg = undefined;
+    this.eggAura?.destroy();
+    this.eggAura = undefined;
     this.stopGoldenTremble();
     const rig = this.dragonRigs.get(GOLDEN_CHAIN);
     if (rig) {
@@ -1644,9 +1694,9 @@ export class BoardScene extends Phaser.Scene {
       // displayW≈325, displayH≈342; container origin +76 → rx=76−0.5·325, ry=76−0.9·342.
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(-86, -232, 325, 342);
     } else if (snap.chain === 'bigtree') {
-      // The Ancient Tree (bigtree.png 622×823 @ scale 0.31, anchor 0.5/0.92) — full-sprite
-      // tap. displayW≈193, displayH≈255; origin +76 → rx=76−0.5·193, ry=76−0.92·255.
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(-20, -159, 193, 255);
+      // The Ancient Tree (bigtree.png 622×823 @ scale 0.22, anchor 0.5/0.92) — full-sprite
+      // tap. displayW≈137, displayH≈181; origin +76 → rx=76−0.5·137, ry=76−0.92·181.
+      sprite.input!.hitArea = new Phaser.Geom.Rectangle(8, -91, 137, 181);
     } else {
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(4, 16, 144, 88);
     }
@@ -2352,6 +2402,21 @@ export class BoardScene extends Phaser.Scene {
           (step.arrow && 'fogRegion' in step.arrow && step.arrow.fogRegion) ||
           (step.hand && 'fogRegion' in step.hand && step.hand.fogRegion);
         if (fog) this.panToRegion(fog);
+        // The golden tease: glide west to the sleeping egg while Laurah speaks;
+        // it stirs (wobble + aura wakes) — the camera returns on the next step.
+        if (step.id === 'golden_tease') {
+          this.teaseReturn = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
+          const p = this.altarPoint();
+          this.glideToWorld(p.x, p.y + 60, 1100);
+          this.time.delayedCall(1300, () => {
+            this.wobbleGoldenEgg();
+            this.startEggAura();
+          });
+        } else if (this.teaseReturn) {
+          const home = this.teaseReturn;
+          this.teaseReturn = null;
+          this.glideToWorld(home.x, home.y, 1000);
+        }
       }),
       bus.on('state:loaded', () => this.fullResync())
     );

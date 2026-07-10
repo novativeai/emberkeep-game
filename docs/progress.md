@@ -710,3 +710,18 @@ untouched and re-verified end-to-end):
   emberberry merge's +6 XP comes after it); e2e retitled and extended
   (cookbook open, free-harvest energy assertion, sprout blob merge) — full
   suite green.
+
+## 2026-07-10 — Golden-egg tutorial tease, egg aura + float, smaller trees
+
+- **golden_tease** step (between marketplace and free_play, 20 steps total):
+  the camera glides west to the altar while Laurah tells the egg's lore ("it
+  has slept since the Great Flame was lost"); the egg wobbles awake. Camera
+  returns on the next step (teaseReturn pairing in BoardScene's tutorial:step
+  handler, same pattern as the emerald_tap glide).
+- **Post-tease presence**: from the tease onward (save-derivable via
+  tutorialIndex/tutorialDone), the altar egg carries a soft pulsing golden
+  aura (additive fx_glow) and floats gently (±7px, 2.3s sine). Cleared when
+  the Elder replaces the egg.
+- **Tree sizes**: Ancient Tree 0.31 → 0.22 (hit-rect re-derived per the
+  ripple-map invariant) and the emberberry plant 1.0 → 0.75.
+- e2e extended with the tease beat (glide + shot) — full suite green.

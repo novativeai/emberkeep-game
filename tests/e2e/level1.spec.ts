@@ -95,7 +95,7 @@ const count = (s: GameText, chain: string, tier: number): number =>
   s.inventory[`${chain}:${tier}`] ?? 0;
 
 test.describe('Level 1 — Emberkeep tutorial', () => {
-  test('lore → rubies → cookbook → red egg → red dragon → crystal → emeralds → green eggs → green dragon → chest → level-up → fog → emberberries → bushes → dragon-work → rest → marketplace → level-3-end', async ({
+  test('lore → rubies → cookbook → red egg → red dragon → crystal → emeralds → green eggs → green dragon → chest → level-up → fog → emberberries → bushes → dragon-work → rest → marketplace → golden-tease → level-3-end', async ({
     page
   }) => {
     const consoleErrors: string[] = [];
@@ -384,7 +384,14 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       };
       ctx.bus.emit('marketplace:purchased', { energy: 5, free: true });
     });
+
+    // ---------- Golden tease: the camera glides west to the sleeping egg ----------
+    await waitStep(page, 'golden_tease');
+    await page.waitForTimeout(2000); // glide (1.1s) + the egg's waking wobble/aura
+    await page.screenshot({ path: shot('15b-golden-tease') });
+    await tapBubble(page);
     await waitStep(page, 'free_play');
+    await page.waitForTimeout(1100); // camera glides home
     await page.screenshot({ path: shot('16-free-play') });
 
     // ---------- Free play: tap → tutorialDone, game continues ----------

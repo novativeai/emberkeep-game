@@ -161,8 +161,9 @@ export const ITEM_SCALE: Record<string, number> = {
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
   lumber_1: 0.336, // a log (wood.png) — reduced 30% on request (0.48 → 0.336)
   lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
-  bigtree_1: 0.31, // the level-2 wood tree — reduced 50% on request
+  bigtree_1: 0.22, // the level-2 wood tree — reduced again on request (0.31 → 0.22)
   chest_1: 0.24, // a treasure chest (chest.png) — reduced 20% on request (0.30 → 0.24)
+  strawberry_3: 0.75, // the emberberry plant reads tree-like — reduced 25% on request
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
   emerald_1: 0.18, // Emerald gem (emerald.png 467×392) — reduced ~28% on request (0.25 → 0.18)

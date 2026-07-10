@@ -240,6 +240,13 @@
       "allow": { "marketplace": true }
     },
     {
+      "id": "golden_tease",
+      "speaker": "laurah",
+      "text": "One more thing, Keeper — look west. A GOLDEN egg sleeps on the old altar. It has slept there since the Great Flame was lost… and see, it stirs at your coming. Cindra guards its story.",
+      "gate": { "type": "tap" },
+      "allow": {}
+    },
+    {
       "id": "free_play",
       "speaker": "laurah",
       "text": "Emberkeep is yours now, Keeper! Fill Cindra's Ledger — she guards something golden — and reach Keeper Level 3… they say something waits past the southern ash.",
