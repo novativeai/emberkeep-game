@@ -25,6 +25,7 @@
     border-radius:6px; padding:5px 9px; font:inherit; cursor:pointer; }
   button:hover { border-color:var(--gold); }
   button.tool.active { background:var(--gold); color:#3A2B38; font-weight:bold; }
+  button.toggled { background:var(--gold); color:#3A2B38; font-weight:bold; border-color:var(--gold); }
   button.primary { background:var(--moss); color:#1d3010; font-weight:bold; }
   button.warn { background:var(--lava); color:var(--cream); }
   /* animation tool (top bar) — appears only when a decor is selected */
@@ -110,6 +111,7 @@
     <button id="zoomFit" title="F">Fit</button>
     <button id="gridToggle" title="G — toggle grid">▦ Grid</button>
     <button id="tagToggle" title="T — show/hide cloud level tags">☁# Tags</button>
+    <button id="coordToggle" title="C — show/hide cell coordinates (col,row) — GAME grid (ingest-normalised: NW-most placement = 0,0), so labels match map.json / anchors.json cells exactly; hover badge also shows the raw builder cell">⌗ Coords</button>
     <span class="sep" id="animSep" style="display:none"></span>
     <span id="animTool" style="display:none">
       <span class="lbl">🎬 Animate</span>
@@ -240,6 +242,7 @@ const S = {
   cam: { x: 0, y: 0, zoom: 0.55 }, // screen offset of world-origin + zoom
   showGrid: true,
   showLevelTags: true,
+  showCoords: false,   // stamp col,row on every visible cell (targeted map edits)
   cameraKeyframes: {}, // level -> { wx, wy, zoom } focal world point + zoom
   gameZoom: { min: 0.2, max: 1.4 }, // in-game wheel-zoom clamp the game enforces
   flying: null,        // active smooth camera transition (raf id)
@@ -349,6 +352,16 @@ function cellOf(sx, sy) {
 }
 const assetById = (id) => S.assets[id];
 const placementById = (id) => S.placements.find((p) => p.id === id);
+// GAME-coordinate origin: scripts/ingest-world.mjs normalises the export so the
+// most-NW occupied cell lands on (0,0) — game (col,row) = builder cell − this
+// origin. Recomputed live from ALL placements (the export carries every
+// category, and ingest takes its min over the full list), so the coordinate
+// overlay always shows the cells the NEXT export will produce in map.json.
+function gameOrigin() {
+  let c = Infinity, r = Infinity;
+  for (const p of S.placements) { if (p.col < c) c = p.col; if (p.row < r) r = p.row; }
+  return c === Infinity ? { c: 0, r: 0 } : { c, r };
+}
 
 /* ----------------------------- canvas ----------------------------- */
 function resize() {
@@ -552,11 +565,62 @@ function render(transient) {
     drawDiamond(o.x, o.y, 'rgba(247,164,55,0.6)', 'rgba(247,164,55,0.08)');
   }
 
+  // cell coordinates — stamped on visible cells in GAME grid space (ingest-
+  // normalised, see gameOrigin) so a label here IS the cell to target in
+  // map.json / anchors.json — no mental +offset. When zoomed out too far for
+  // every label to fit, only every Nth cell is labelled (stride) so the overlay
+  // stays legible; the hover badge below reads out any cell at any zoom.
+  if (S.showCoords) {
+    const O = gameOrigin();
+    const fs = Math.max(9, Math.min(20, S.tileH * 0.22 * S.cam.zoom));
+    ctx.font = `bold ${fs}px Trebuchet MS`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = Math.max(2, fs / 5); ctx.strokeStyle = 'rgba(36,27,34,0.85)';
+    ctx.lineJoin = 'round';
+    // widest label in view vs the screen gap between same-screen-row neighbours
+    // (one apart on the col-row diagonal = one full tile width); same idea
+    // vertically against the half-tile row pitch.
+    const labelW = ctx.measureText(
+      `${-Math.max(Math.abs(minC - O.c), Math.abs(maxC - O.c))},${-Math.max(Math.abs(minR - O.r), Math.abs(maxR - O.r))}`
+    ).width;
+    const stride = Math.max(1,
+      Math.ceil((labelW + 8) / (S.tileW * S.cam.zoom)),
+      Math.ceil((fs + 6) / (S.tileH * S.cam.zoom)));
+    for (let row = minR; row <= maxR; row++) {
+      for (let col = minC; col <= maxC; col++) {
+        const gc = col - O.c, gr = row - O.r;
+        if (stride > 1 && ((gc % stride + stride) % stride || (gr % stride + stride) % stride)) continue;
+        const wc = worldOf(col, row);
+        const s = toScreen(wc.x, wc.y);
+        const label = `${gc},${gr}`;
+        ctx.strokeText(label, s.x, s.y);
+        ctx.fillStyle = (gc === 0 && gr === 0) ? '#F7A437' : 'rgba(255,246,232,0.88)';
+        ctx.fillText(label, s.x, s.y);
+      }
+    }
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+
   // hovered cell marker
   if (S.hover) {
     const wc = worldOf(S.hover.col, S.hover.row);
     const s = toScreen(wc.x, wc.y);
     drawDiamond(s.x, s.y, S.tool === 'erase' ? '#E8503C' : '#7ECB4F', 'rgba(126,203,79,0.12)');
+    if (S.showCoords) {
+      // floating readout above the hovered cell — works at any zoom, even when
+      // the per-cell labels are suppressed for being too small. GAME cell first
+      // (what map.json/anchors.json use), raw builder cell alongside.
+      const O = gameOrigin();
+      const label = `${S.hover.col - O.c}, ${S.hover.row - O.r}  (raw ${S.hover.col}, ${S.hover.row})`;
+      ctx.font = 'bold 13px Trebuchet MS';
+      const w = ctx.measureText(label).width + 12;
+      const hh = S.tileH / 2 * S.cam.zoom;
+      ctx.fillStyle = 'rgba(36,27,34,0.85)';
+      ctx.fillRect(s.x - w / 2, s.y - hh - 24, w, 19);
+      ctx.fillStyle = '#7ECB4F'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, s.x, s.y - hh - 14.5);
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+    }
   }
   // camera keyframe reticles
   for (const [lvl, kf] of Object.entries(S.cameraKeyframes)) {
@@ -1108,6 +1172,14 @@ document.getElementById('tagToggle').onclick = (e) => {
   render();
   say(`Cloud level tags ${S.showLevelTags ? 'shown' : 'hidden'} on the preview (export keeps the level data).`);
 };
+document.getElementById('coordToggle').onclick = (e) => {
+  S.showCoords = !S.showCoords;
+  e.currentTarget.classList.toggle('toggled', S.showCoords);
+  render();
+  say(S.showCoords
+    ? 'Cell coordinates <b>on</b> — every cell shows <b>col,row</b> (the exact cell in map.json / anchors.json). Hover any cell for a readout at any zoom.'
+    : 'Cell coordinates hidden.');
+};
 /* --------------------------- grid projection controls --------------------------- */
 // Tile size (W×H), iso Angle (edge pitch, linked to W/H) and Skew (perspective lean)
 // all drive the same parametric projection. Angle ⇄ height are kept in sync so the
@@ -1164,6 +1236,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'f' || e.key === 'F') fitView();
   if (e.key === 'g' || e.key === 'G') { S.showGrid = !S.showGrid; render(); }
   if (e.key === 't' || e.key === 'T') { document.getElementById('tagToggle').click(); }
+  if (e.key === 'c' || e.key === 'C') { document.getElementById('coordToggle').click(); }
   if (e.code === 'Space' && !S.spaceHeld) { S.spaceHeld = true; e.preventDefault(); stopFly(); updateCursor(); }
   // Arrow keys nudge-pan the view (Shift = coarse). A clear, no-mouse pan.
   const ARROWS = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
@@ -1617,7 +1690,7 @@ function serializeSession() {
   return {
     v: 1, world: document.getElementById('worldName').value,
     tileW: S.tileW, tileH: S.tileH, gridSkew: S.gridSkew, cam: S.cam,
-    showGrid: S.showGrid, showLevelTags: S.showLevelTags, nextZ: S.nextZ,
+    showGrid: S.showGrid, showLevelTags: S.showLevelTags, showCoords: S.showCoords, nextZ: S.nextZ,
     cameraKeyframes: S.cameraKeyframes, gameZoom: S.gameZoom,
     // 3D crystal placements (the crystal itself rebuilds from code when Three loads)
     crystalPlacements: S.placements.filter((p) => assetById(p.assetId)?.is3d).map((p) => ({ col: p.col, row: p.row, z: p.z, dx: p.dx, dy: p.dy })),
@@ -1683,6 +1756,8 @@ function restoreSession() {
   S.assets = {}; S.placements = []; S.selectedAssetId = null; S.selectedPlacement = null; S.nextId = 1;
   S.tileW = doc.tileW ?? 240; S.tileH = doc.tileH ?? 120; S.gridSkew = doc.gridSkew ?? 0;
   S.showGrid = doc.showGrid ?? true; S.showLevelTags = doc.showLevelTags ?? true;
+  S.showCoords = doc.showCoords ?? false;
+  document.getElementById('coordToggle').classList.toggle('toggled', S.showCoords);
   S.cameraKeyframes = doc.cameraKeyframes ?? {};
   if (doc.gameZoom) S.gameZoom = { min: doc.gameZoom.min ?? 0.2, max: doc.gameZoom.max ?? 1.4 };
   pendingCrystal = doc.crystalPlacements ?? []; // re-attached when Three builds the crystal
