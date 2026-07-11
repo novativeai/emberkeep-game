@@ -158,7 +158,7 @@
             "cooldownMs": 300000,
             "energyCost": 0,
             "tappable": true,
-            "skipMaxGold": 20
+            "skipMaxGold": 60
           }
         }
       ]

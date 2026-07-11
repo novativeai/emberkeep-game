@@ -1880,10 +1880,10 @@ export class BoardScene extends Phaser.Scene {
       // displayW≈129, displayH≈123; container origin +76 → rx=76−0.5·129, ry=76−0.92·123.
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(12, -37, 129, 123);
     } else if (snap.chain === 'lumber' && snap.tier === 2) {
-      // The House (house.png 361×380 @ scale 0.9, anchor 0.5/0.9) — full-sprite tap.
-      // displayW≈325, displayH≈342; container origin +76 → rx=76−0.5·325, ry=76−0.9·342.
+      // The House (house.png 361×380 @ scale 0.72, anchor 0.5/0.9) — full-sprite tap.
+      // displayW≈260, displayH≈274; container origin +76 → rx=76−0.5·260, ry=76−0.9·274.
       sprite.setData('tallArt', true);
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(-86, -232, 325, 342);
+      sprite.input!.hitArea = new Phaser.Geom.Rectangle(-54, -171, 260, 274);
     } else if (snap.chain === 'lumber' && snap.tier === 3) {
       // The Manor (manor.png 430×450 @ scale 0.82, anchor 0.5/0.9) — full-sprite tap.
       // displayW≈353, displayH≈369; container origin +76 → rx=76−0.5·353, ry=76−0.9·369.

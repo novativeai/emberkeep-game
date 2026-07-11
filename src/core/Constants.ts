@@ -115,10 +115,13 @@ export const DEPTHS = {
 /** When a dragon's passive gift has nowhere to land, retry this soon (ms). */
 export const GENERATOR_PASSIVE_RETRY_MS = 8000;
 
-/** Most GOLD a skip can cost — paid when the timer has just started. Gold is
- *  plentiful and under-sunk, so keep the skip cheap enough that spending gold to
- *  rush a cooldown is an attractive, real use of it (the demo's main gold sink). */
-export const GENERATOR_SKIP_MAX_ENERGY = 6;
+/** Most GOLD a skip can cost — paid when the timer has just started. Skips are
+ *  the demo's PREMIUM gold sink: a full skip should feel like a real spend
+ *  (roughly one order reward / four banked House coins), not pocket change —
+ *  the price still melts away as the timer drains, so patience is always the
+ *  free alternative. (Was 6 — skipping cost barely more than the coin the
+ *  House pays out, an almost-free loop.) */
+export const GENERATOR_SKIP_MAX_ENERGY = 20;
 
 /** Warmth skip premium over the Gold price. Gold is the sink-starved plentiful
  *  currency, so it is the CHEAP way to skip; Warmth is the session meter and
@@ -187,10 +190,10 @@ export const ITEM_SCALE: Record<string, number> = {
   ember_dragon_2: 0.064, // Red Egg (red-egg.png 1162×1437) — −20% again on request (0.08 → 0.064)
   ember_dragon_3: 0.21, // Red Dragon: real baked rig art (1054px) at the live rig's on-board size
   ember_dragon_4: 0.45, // Adult Red Dragon: baked adult rig (836px) — +50% on request (0.3 → 0.45); must read clearly bigger than the whelp
-  flame_gem_1: 0.15,
+  flame_gem_1: 0.12, // the diamond gem — reduced 20% on request (0.15 → 0.12)
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
   lumber_1: 0.27, // a log (wood.png) — reduced again on request (0.336 → 0.27)
-  lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
+  lumber_2: 0.72, // the House — reduced 20% on request (0.9 → 0.72)
   lumber_3: 0.82, // the Manor (manor.png 430×450) — a touch bigger than the House
   bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
   chest_1: 0.19, // a treasure chest (chest.png) — reduced again on request (0.24 → 0.19)
@@ -199,18 +202,18 @@ export const ITEM_SCALE: Record<string, number> = {
   strawberry_3: 0.78, // the emberberry plant — back UP on request (0.58 → 0.78); t3 should read biggest
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
-  emerald_1: 0.18, // Emerald gem (emerald.png 467×392) — reduced ~28% on request (0.25 → 0.18)
+  emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
   emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red
   golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
   coin_1: 0.12, // SMALLER than an egg, per spec
-  coin_2: 0.20  // Gold Pouch — bigger than the single coin (0.12)
+  coin_2: 0.15  // Gold Pouch — reduced 25% on request (0.20 → 0.15); still bigger than the coin (0.12)
 };
 
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
 export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
-  coin: { coins: 10 }, // Gold Coin — the House drops one each cycle
-  coin_2: { coins: 30 } // Gold Pouch (3 coins merged) — worth the merge
+  coin: { coins: 5 }, // Gold Coin — the House drops one each cycle
+  coin_2: { coins: 10 } // Gold Pouch (3 coins merged) — worth the merge
 };
 
 /**
