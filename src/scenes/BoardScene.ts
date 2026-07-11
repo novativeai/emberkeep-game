@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
   ANIMATED_TILE_NAMES,
+  ATMOSPHERE,
   CHEST_INTERVAL_MS,
   COLLECTIBLE_REWARD,
   DECOR_SCALE,
@@ -181,6 +182,8 @@ export class BoardScene extends Phaser.Scene {
    *  Theme-Crystal generator's look) + any authored 3D-decor placement. */
   private crystal3d?: Crystal3D;
   private crystalTex?: Phaser.Textures.CanvasTexture;
+  /** Ember-fly ambience: the emit zone tracks the camera's worldView. */
+  private fireflyZone?: Phaser.Geom.Rectangle;
   /** Golden Egg ambient tremble (starts near the Level-3 threshold). */
   private goldenTremble?: Phaser.Tweens.Tween;
   /** The Golden Altar (scenic non-playable ledge, west of the isle) — the
@@ -241,6 +244,7 @@ export class BoardScene extends Phaser.Scene {
     this.wireInput();
     this.subscribe();
     this.setupCamera();
+    this.buildAtmosphere(); // after setupCamera — layers place off the live worldView
 
     this.cameras.main.fadeIn(320, 36, 27, 34);
     this.scene.launch(SCENES.ui);
@@ -260,6 +264,11 @@ export class BoardScene extends Phaser.Scene {
 
   override update(time: number, delta: number): void {
     for (const sprite of this.itemSprites.values()) sprite.applyBob(time);
+    // Ember-flies live wherever the player is looking — track the view.
+    if (this.fireflyZone) {
+      const v = this.cameras.main.worldView;
+      this.fireflyZone.setTo(v.x, v.y, v.width, v.height);
+    }
     if (this.crystal3d && this.crystalTex) {
       this.crystal3d.update(time); // spin + render the live emerald
       this.crystalTex.refresh(); // re-upload to the GPU for this frame
@@ -346,52 +355,58 @@ export class BoardScene extends Phaser.Scene {
     return this.generatorConfigFor(chain, tier) !== undefined;
   }
 
-  /** Fetch + load every dragon rig once. Any failure leaves that dragon as the
-   *  pooled placeholder sprite (graceful: the board still works). */
+  /** Fetch + load every dragon rig once — ALL rigs in parallel (they're ~1MB
+   *  each; sequential fetches made cold loads wear the baked fallback for many
+   *  seconds). Any failure leaves that dragon as the pooled placeholder sprite
+   *  (graceful: the board still works). */
   private async loadDragonRigs(): Promise<void> {
     const base = (import.meta.env.BASE_URL ?? './').replace(/\/?$/, '/');
-    for (const [rigKey, url] of Object.entries(DRAGON_RIGS)) {
-      if (this.dragonRigs.has(rigKey)) continue;
-      try {
-        const res = await fetch(base + url);
-        if (!res.ok || !this.scene.isActive()) continue;
-        const rig = (await res.json()) as RigDoc;
-        if (rig.format !== 'emberkeep-rig' || !rig.images || !this.scene.isActive()) continue;
-        // A rig exported with the tool's default name would collide with any
-        // other default-named rig on the shared texture keys — give it its
-        // canonical id (the golden-dragon export ships as 'character'), which
-        // also keys its FACES entry (faces.json) and catalog id.
-        if (!rig.character || rig.character === 'character') {
-          rig.character = DRAGON_RIG_NAMES[rigKey] ?? rigKey;
-        }
-        await RigPlayer.loadTextures(this, rig, (layer) => `rig:${rig.character}:${layer}`);
-        if (!this.scene.isActive()) continue;
-        // Face frame sets are optional per character; a failed frame simply
-        // leaves that set unworn (attachFace validates per-set).
-        const face = FACES[rig.character];
-        if (face) {
-          try {
-            await RigPlayer.loadFaceTextures(this, face, faceTextureKey(rig.character), base);
-          } catch {
-            /* face art optional */
-          }
-          if (!this.scene.isActive()) continue;
-        }
-        this.dragonRigs.set(rigKey, rig);
-        if (rigKey === GOLDEN_CHAIN) this.syncGoldenAltar(); // fallback art → live rig
-        // Re-skin any dragons resolving to THIS rig that spawned before it loaded.
-        for (const sprite of this.itemSprites.values()) {
-          if (
-            rigKeyFor(sprite.chain, sprite.tier) === rigKey &&
-            this.wearsRigTier(sprite.chain, sprite.tier) &&
-            !this.liveDragons.has(sprite.itemId)
-          ) {
-            this.attachDragon(sprite, false);
-          }
-        }
-      } catch {
-        /* no rig available — pooled sprite stays */
+    await Promise.all(
+      Object.entries(DRAGON_RIGS).map(([rigKey, url]) => this.loadDragonRig(base, rigKey, url))
+    );
+  }
+
+  private async loadDragonRig(base: string, rigKey: string, url: string): Promise<void> {
+    if (this.dragonRigs.has(rigKey)) return;
+    try {
+      const res = await fetch(base + url);
+      if (!res.ok || !this.scene.isActive()) return;
+      const rig = (await res.json()) as RigDoc;
+      if (rig.format !== 'emberkeep-rig' || !rig.images || !this.scene.isActive()) return;
+      // A rig exported with the tool's default name would collide with any
+      // other default-named rig on the shared texture keys — give it its
+      // canonical id (the golden-dragon export ships as 'character'), which
+      // also keys its FACES entry (faces.json) and catalog id.
+      if (!rig.character || rig.character === 'character') {
+        rig.character = DRAGON_RIG_NAMES[rigKey] ?? rigKey;
       }
+      await RigPlayer.loadTextures(this, rig, (layer) => `rig:${rig.character}:${layer}`);
+      if (!this.scene.isActive()) return;
+      // Face frame sets are optional per character; a failed frame simply
+      // leaves that set unworn (attachFace validates per-set).
+      const face = FACES[rig.character];
+      if (face) {
+        try {
+          await RigPlayer.loadFaceTextures(this, face, faceTextureKey(rig.character), base);
+        } catch {
+          /* face art optional */
+        }
+        if (!this.scene.isActive()) return;
+      }
+      this.dragonRigs.set(rigKey, rig);
+      if (rigKey === GOLDEN_CHAIN) this.syncGoldenAltar(); // fallback art → live rig
+      // Re-skin any dragons resolving to THIS rig that spawned before it loaded.
+      for (const sprite of this.itemSprites.values()) {
+        if (
+          rigKeyFor(sprite.chain, sprite.tier) === rigKey &&
+          this.wearsRigTier(sprite.chain, sprite.tier) &&
+          !this.liveDragons.has(sprite.itemId)
+        ) {
+          this.attachDragon(sprite, false);
+        }
+      }
+    } catch {
+      /* no rig available — pooled sprite stays */
     }
   }
 
@@ -1392,33 +1407,104 @@ export class BoardScene extends Phaser.Scene {
       })
       .setDepth(DEPTHS.particles);
 
-    // Ambient ember motes, behind and in front of the isle.
+    // Ambient ember motes rising off the lava seams — spanning the WHOLE
+    // authored world (screenY reaches ~5100), not just the start terrace, so
+    // every zone the camera frames has updrafts.
+    const world = this.cameras.main.getBounds();
     this.add
       .particles(0, 0, 'fx_ember', {
-        x: { min: 80, max: GAME_WIDTH - 80 },
-        y: { min: 1240, max: 1520 },
+        x: { min: world.x + 80, max: world.right - 80 },
+        y: { min: 1240, max: Math.max(1520, world.bottom - 400) },
         speedY: { min: EMBER_MOTES.maxSpeedY, max: EMBER_MOTES.minSpeedY },
         speedX: { min: -EMBER_MOTES.driftX, max: EMBER_MOTES.driftX },
         lifespan: EMBER_MOTES.lifespanMs,
         scale: { start: EMBER_MOTES.minScale, end: 0 },
         alpha: { start: EMBER_MOTES.alpha * 0.8, end: 0 },
-        frequency: 720,
+        frequency: 420,
         blendMode: Phaser.BlendModes.ADD
       })
       .setDepth(DEPTHS.cliffs + 1);
     this.add
       .particles(0, 0, 'fx_ember', {
-        x: { min: 60, max: GAME_WIDTH - 60 },
-        y: { min: 1400, max: 1580 },
+        x: { min: world.x + 60, max: world.right - 60 },
+        y: { min: 1400, max: Math.max(1580, world.bottom - 300) },
         speedY: { min: -64, max: -36 },
         speedX: { min: -20, max: 20 },
         lifespan: EMBER_MOTES.lifespanMs,
         scale: { start: EMBER_MOTES.maxScale, end: 0 },
         alpha: { start: EMBER_MOTES.alpha * 0.55, end: 0 },
-        frequency: 1500,
+        frequency: 900,
         blendMode: Phaser.BlendModes.ADD
       })
       .setDepth(DEPTHS.particles);
+  }
+
+  /* --------------------------- world atmosphere --------------------------- */
+
+  /**
+   * The layered "isle is alive" ambience (ATMOSPHERE in Constants), near → far:
+   * ember-flies twinkling around the player's view and high mist sliding
+   * across the floating platforms. Everything lives in WORLD space (the board
+   * camera zooms, so screen-space layers would swim); the near layer tracks
+   * `worldView` each frame instead.
+   */
+  private buildAtmosphere(): void {
+    const A = ATMOSPHERE;
+    const cam = this.cameras.main;
+
+    // --- near: ember-flies. The emit zone is re-centred on worldView in
+    // update(), so the flies always live where the player is looking.
+    this.fireflyZone = new Phaser.Geom.Rectangle(cam.worldView.x, cam.worldView.y, cam.worldView.width, cam.worldView.height);
+    this.add
+      .particles(0, 0, 'fx_ember', {
+        emitZone: { type: 'random', source: this.fireflyZone, quantity: 1 },
+        lifespan: A.fireflies.lifespanMs,
+        speed: { min: A.fireflies.speedMin, max: A.fireflies.speedMax },
+        angle: { min: 0, max: 360 },
+        scale: { min: A.fireflies.scaleMin, max: A.fireflies.scaleMax },
+        // Sine bell over the life: 0 → peak → 0 — a slow twinkle, never a pop.
+        alpha: { onUpdate: (_p, _k, t) => Math.sin(Math.PI * t) * A.fireflies.alphaPeak },
+        tint: A.fireflies.tint,
+        frequency: A.fireflies.frequency,
+        blendMode: Phaser.BlendModes.ADD
+      })
+      .setDepth(DEPTHS.particles);
+
+    // --- mid-far: low clouds drifting beneath the platforms (altitude!).
+    const world = cam.getBounds();
+    if (this.textures.exists('cloud_tile')) {
+      for (let i = 0; i < A.wisps.count; i++) {
+        const t = i / Math.max(1, A.wisps.count - 1);
+        const y = Phaser.Math.Linear(world.y + world.height * 0.3, world.bottom - 300, t);
+        const wisp = this.add
+          .image(0, y, 'cloud_tile')
+          .setScale(Phaser.Math.FloatBetween(A.wisps.scale[0], A.wisps.scale[1]))
+          .setAlpha(Phaser.Math.FloatBetween(A.wisps.alpha[0], A.wisps.alpha[1]))
+          .setTint(A.wisps.tint)
+          .setDepth(A.wisps.depth); // high mist between the camera and the isles
+        const cross = Phaser.Math.Between(A.wisps.crossMs[0], A.wisps.crossMs[1]);
+        const fromX = world.x - 600;
+        const toX = world.right + 600;
+        wisp.x = Phaser.Math.Linear(fromX, toX, Math.random()); // start mid-journey
+        this.tweens.add({
+          targets: wisp,
+          x: toX,
+          duration: ((toX - wisp.x) / (toX - fromX)) * cross,
+          onComplete: () => {
+            wisp.x = fromX;
+            this.tweens.add({ targets: wisp, x: toX, duration: cross, repeat: -1, onRepeat: () => (wisp.x = fromX) });
+          }
+        });
+        this.tweens.add({
+          targets: wisp,
+          y: y + A.wisps.bobPx,
+          duration: Phaser.Math.Between(9000, 14000),
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+    }
   }
 
   /** The iso-diamond that lights up the cell a dragged item is hovering over. */

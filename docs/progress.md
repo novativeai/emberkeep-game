@@ -750,3 +750,86 @@ untouched and re-verified end-to-end):
 - **Emerald dragon baked**: composited from its rig layers (1054×1074, same
   format as the red) → item_emerald_3 real art (scale 0.21) — the Cookbook's
   Green Dragon row no longer shows a fallback.
+
+## 2026-07-10 — Gold gets real sinks (MECHANICS §7)
+
+Gold previously had one hidden sink (the cooldown-skip popup, with leftover
+French labels). Per MECHANICS §7 ("Gold buys comfort, never progression"):
+- **Warmth refills now cost GOLD**: after the one-time free Ember Spark, the
+  Warmth Shop's cards are ×5 → 🪙20, ×20 → 🪙60, ×50 → 🪙130 (Product.gold;
+  affordability checked with a deny shake + red flash; coins never negative).
+  The Gold Shop keeps its mock real-money tags as the IAP showcase.
+- **Skip popup surfaced**: hover captions now read "Skip with Gold" /
+  "Skip with Warmth" (were "Par or" / "Par énergie").
+Screenshot-verified; full suite green (114 unit, 21-step e2e incl. the real
+FREE-claim flow).
+
+## 2026-07-10 — Tease framing, grounded sprites, ledger overflow, finale gate
+
+- **"Aura but no egg"**: the tease's camera glide clamps at the world's west
+  bounds — on wide/tall viewports the tiny egg stayed off-frame while the big
+  additive aura bled in. The tease now ZOOMS OUT (×0.72, floor minZoom) while
+  gliding and restores pose on exit; the egg is re-asserted visible.
+- **Finale gate (real bug)**: the Level-3 finale awakened the Elder even when
+  Cindra's golden order was never delivered (the awaken was implicitly gated
+  by the egg's existence — now the egg is always-present decor). Awaken now
+  requires the delivered order; the prophecy variant plays a stir (wobble +
+  gold flash) instead, keeping the un-filled order as the hook.
+- **Grounding**: emberberries (all tiers) and the chest floated — their anchor
+  point coincided with the art's content bottom, planting bases on the tile's
+  mid-point. Anchors dropped (measured from alpha bounds): sprout 0.71, bush
+  0.74, plant 0.74, chest 0.79 — bases now sit into the tile face.
+- **Sizes**: sprout 0.85 → 0.65, plant 0.58 → 0.78 (t3 reads biggest again).
+- **Ledger overflow**: order cards poked past the panel frame — CARD_X 330 →
+  300, card art 0.96 → 0.9; both cards now sit fully inside with margins.
+
+## 2026-07-10 — Dragons behind tall art were un-draggable (input masking)
+
+Report: "the emerald dragon can't be drag-and-dropped like the red one."
+Reproduced + instrumented: grabbing the dragon actually grabbed the HOUSE —
+the tall-art full-sprite hit rects (house/tree/chest/crystal span 2–3 iso rows
+above their tile) sit nearer the camera and STEAL pointer-down from anything
+standing behind them. Chain-agnostic: the user's emerald just happened to
+stand in a masked zone. Two fixes:
+- Tall-art hits now YIELD: their hitAreaCallback rejects the hit when the
+  pointed spot projects onto ANOTHER item's tile (`tallArt` flag set in
+  acquireSprite) — full-sprite taps still work over empty ground.
+- The dragon→House work drop also matches the drop point against the
+  generator's ART bounds (the WYSIWYG cell resolved to the cell BEHIND the
+  tall house, silently bouncing the dragon home) — and the e2e's dragon_work
+  step now performs the REAL drag instead of emitting dragon:work directly,
+  so this can't regress silently again.
+- Parity nicety: the cosmetic harvest flourish now picks ANY rigged dragon,
+  not only the red (DRAGON_CHAIN removed).
+Probes: both dragons, spawned adjacent-behind the House, drag + start work ✓.
+
+## 2026-07-11 — Asset diet, world atmosphere, and the (9,6) desync root-caused
+
+- **Asset optimization** (no visible quality loss): 26 runtime PNGs → WebP
+  (19.0 → 2.1MB), both JPG backdrops recompressed (−9MB), and a new
+  `pruneDistArt` vite plugin strips art-workspace sources + PNG masters (kept
+  in-repo for editing) from dist — deploy 226 → ~90MB. Dragon rigs now fetch
+  in PARALLEL (cold start was serial ~10-15s).
+- **World atmosphere pass** (`ATMOSPHERE` in Constants — pure presentation):
+  dense-but-subtle ember-fly swarm tracking the player's view (~21 alive,
+  sine-bell twinkle), lava updrafts extended world-wide, slow high-mist wisps,
+  and a warm vignette grade (UIScene). Dragon flybys were tried and REMOVED on
+  request.
+- **Scale retunes**: Adult Red Dragon +50% (rig 0.93 / baked 0.45 — it read
+  SMALLER than the whelp), chest 0.24 → 0.19, wood log 0.336 → 0.27.
+- **Worldbuilder**: the ⌗ Coords overlay + hover badge now show GAME grid
+  coordinates (ingest-normalised: NW-most placement = 0,0) so labels match
+  map.json/anchors.json exactly; the hover badge keeps the raw builder cell.
+- **THE (9,6) BUG (root-caused + fixed)**: the tutorial chest step's scripted
+  `board:move` slides the green dragon to (9,6) SYNCHRONOUSLY inside its hatch
+  emit — before the 420ms hatch ceremony created a sprite. The item:moved was
+  dropped (`if (!sprite) return`) and the sprite was then born on the stale
+  merge cell: state at (9,6) (invisibly occupied — every drop there bounced),
+  sprite elsewhere (every drag of the dragon failed `from` validation and
+  snapped back, forever). Fixes: `acquireSprite` + `hatchSequence` bind every
+  sprite to the item's LIVE state cell; `trySnapMerge` now sizes the actual
+  orthogonal flood-fill group (its 8-neighbourhood count could promise a merge
+  that failed AFTER speculatively moving the item — same desync class) and
+  reverts the speculative move if a merge ever fails. Unit + e2e regressions
+  added (sprite cell === state cell after the chest step, then a REAL drag).
+  Affected saves heal on reload — state was never corrupted, only the scene.

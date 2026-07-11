@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
+  ATMOSPHERE,
   ENERGY_REGEN_MS,
   FINALE,
   GAME_WIDTH,
@@ -94,6 +95,8 @@ export class UIScene extends Phaser.Scene {
   create(): void {
     this.ctx = this.registry.get('ctx') as GameContext;
     this.cameras.main.setOrigin(0).setZoom(renderScale.value); // paint the 2560-space UI into the hi-DPI backing
+
+    this.buildVignette(); // warm finishing grade under the HUD, over the board
 
     this.hud = new Hud(this, this.ctx.bus, this.ctx.state, {
       onLedger: () => (this.ledger.isOpen ? this.ledger.requestClose() : this.ledger.open()),
@@ -553,6 +556,39 @@ export class UIScene extends Phaser.Scene {
       targets: c, alpha: 0, scale: 1.04, delay: 2100, duration: 340, ease: 'Sine.easeIn',
       onComplete: () => c.destroy()
     });
+  }
+
+  /** Warm dark vignette hugging the screen edges — the AAA finishing grade.
+   *  Painted once into a small canvas (radial falloff), stretched over the
+   *  viewport UNDER the HUD; linear filtering hides the low source res. */
+  private buildVignette(): void {
+    const KEY = 'fx_vignette';
+    if (!this.textures.exists(KEY)) {
+      const w = 256;
+      const h = 160;
+      const tex = this.textures.createCanvas(KEY, w, h);
+      if (!tex) return;
+      const c = tex.getContext();
+      // Elliptical radial falloff: fully clear across the middle ~70%, easing
+      // into the warm dark corners.
+      c.save();
+      c.translate(w / 2, h / 2);
+      c.scale(1, h / w);
+      const g = c.createRadialGradient(0, 0, w * 0.30, 0, 0, w * 0.62);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(0.72, 'rgba(42,14,18,0.45)');
+      g.addColorStop(1, ATMOSPHERE.vignette.color);
+      c.fillStyle = g;
+      c.fillRect(-w, -w, w * 2, w * 2);
+      c.restore();
+      tex.refresh();
+    }
+    this.add
+      .image(0, 0, KEY)
+      .setOrigin(0)
+      .setDisplaySize(GAME_WIDTH, LIVE_GAME_HEIGHT)
+      .setAlpha(ATMOSPHERE.vignette.alpha)
+      .setDepth(DEPTH_HUD - 1); // over the board render, under every UI element
   }
 
   /** One-shot Laurah nudge (post-tutorial guidance without a second tutorial). */

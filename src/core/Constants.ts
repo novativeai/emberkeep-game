@@ -186,14 +186,14 @@ export const ITEM_SCALE: Record<string, number> = {
   ember_dragon_1: 0.13, // Dragon Ruby — reduced ~28% on request (0.18 → 0.13)
   ember_dragon_2: 0.064, // Red Egg (red-egg.png 1162×1437) — −20% again on request (0.08 → 0.064)
   ember_dragon_3: 0.21, // Red Dragon: real baked rig art (1054px) at the live rig's on-board size
-  ember_dragon_4: 0.3, // Adult Red Dragon: baked adult rig (836px) — reads bigger than the whelp
+  ember_dragon_4: 0.45, // Adult Red Dragon: baked adult rig (836px) — +50% on request (0.3 → 0.45); must read clearly bigger than the whelp
   flame_gem_1: 0.15,
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
-  lumber_1: 0.336, // a log (wood.png) — reduced 30% on request (0.48 → 0.336)
+  lumber_1: 0.27, // a log (wood.png) — reduced again on request (0.336 → 0.27)
   lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
   lumber_3: 0.82, // the Manor (manor.png 430×450) — a touch bigger than the House
   bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
-  chest_1: 0.24, // a treasure chest (chest.png) — reduced 20% on request (0.30 → 0.24)
+  chest_1: 0.19, // a treasure chest (chest.png) — reduced again on request (0.24 → 0.19)
   strawberry_1: 0.65, // emberberry sprout — reduced again on request (0.85 → 0.65)
   strawberry_2: 0.8, // emberberry bush — reduced on request
   strawberry_3: 0.78, // the emberberry plant — back UP on request (0.58 → 0.78); t3 should read biggest
@@ -428,7 +428,8 @@ export const DRAGON_RIG_SCALE: Record<string, number> = {
   ember_dragon: 0.448, // red dragon −20% again on request (0.56 → 0.448)
   // Adult Red Dragon (tier-4 rig override; adult rig pieces are ~836px wide vs
   // the whelp's 1054) — sized to read clearly BIGGER than the whelp on-board.
-  'ember_dragon:4': 0.62
+  // +50% on request (0.62 → 0.93): at 0.62 the adult read SMALLER than the baby.
+  'ember_dragon:4': 0.93
   // (The Golden Elder is NOT a board dragon — her altar scale lives in
   //  GOLDEN_ALTAR.elderScale.)
 };
@@ -461,6 +462,45 @@ export const EMBER_MOTES = {
   maxScale: 0.9,
   alpha: 0.5,
   lifespanMs: 9000
+} as const;
+
+/**
+ * Ambient world atmosphere — the layered "the isle is alive" pass, near→far:
+ * ember-flies drifting around the player's view, slow ember updrafts off the
+ * lava seams, high mist sliding across the isles, and a warm vignette grade
+ * over everything. Pure presentation: no state, no input, no gameplay timing.
+ */
+export const ATMOSPHERE = {
+  /** Near layer: small orange ember-flies twinkling around the current view.
+   *  MANY tiny sparks (a swarm, not a few bugs) — subtlety comes from the small
+   *  scale and the sine-bell alpha, not from scarcity. */
+  fireflies: {
+    frequency: 320, // ms between spawns (emitter-paced; ~21 alive at a time)
+    lifespanMs: 6800,
+    speedMin: 6,
+    speedMax: 22,
+    scaleMin: 0.18,
+    scaleMax: 0.4,
+    alphaPeak: 0.5, // fades 0 → peak → 0 across the life (slow twinkle)
+    tint: 0xffb03a
+  },
+  /** High mist drifting across the view — a soft depth-haze between the camera
+   *  and the isles (the isles are baked into the backdrop, so "beneath" layers
+   *  are impossible; overhead haze is what reads at this camera angle). */
+  wisps: {
+    count: 3,
+    scale: [3.4, 4.6] as const,
+    alpha: [0.045, 0.075] as const,
+    crossMs: [260000, 420000] as const, // minutes per crossing — barely perceptible
+    bobPx: 40,
+    tint: 0xfff2e2, // sunset-warmed white
+    depth: 48800
+  },
+  /** Finishing grade: warm dark vignette hugging the screen edges (UIScene). */
+  vignette: {
+    alpha: 0.16,
+    color: '#2a0e12'
+  }
 } as const;
 
 /** Save. Bump SAVE_VERSION whenever the map/chains change incompatibly, so old
