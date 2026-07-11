@@ -66,6 +66,10 @@ export interface ChainTierConfig {
   /** false = the sell path refuses this tier (story items like the Golden Egg). */
   sellable?: boolean;
   generator?: GeneratorConfig;
+  /** Per-TIER merge recipe override — takes precedence over the chain-level
+   *  `merge` when merging items of THIS tier (e.g. 2 Houses → 1 Manor while
+   *  Bushes still merge 3 → 1 House). */
+  merge?: ChainMergeOverride;
 }
 
 /** Per-chain merge recipe override (e.g. 5 wood → 1 house). */
@@ -147,7 +151,13 @@ export interface DialogueData {
   /** Cindra's line when Order 1 completes AFTER Level 3 — the late awakening. */
   lateAwakening: string;
   /** One-shot Laurah nudges post-tutorial. */
-  hints: { zeroWarmth: string; boardFull: string; eggTrembles: string };
+  hints: {
+    zeroWarmth: string;
+    boardFull: string;
+    eggTrembles: string;
+    twoDragons: string;
+    twoHouses: string;
+  };
   /** Cindra's line when all Keeper's Tasks complete. */
   tasksComplete: string;
 }

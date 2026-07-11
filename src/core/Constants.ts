@@ -115,8 +115,10 @@ export const DEPTHS = {
 /** When a dragon's passive gift has nowhere to land, retry this soon (ms). */
 export const GENERATOR_PASSIVE_RETRY_MS = 8000;
 
-/** Most GOLD a skip can cost — paid when the timer has just started. */
-export const GENERATOR_SKIP_MAX_ENERGY = 9;
+/** Most GOLD a skip can cost — paid when the timer has just started. Gold is
+ *  plentiful and under-sunk, so keep the skip cheap enough that spending gold to
+ *  rush a cooldown is an attractive, real use of it (the demo's main gold sink). */
+export const GENERATOR_SKIP_MAX_ENERGY = 6;
 
 /** Warmth skip premium over the Gold price. Gold is the sink-starved plentiful
  *  currency, so it is the CHEAP way to skip; Warmth is the session meter and
@@ -184,10 +186,12 @@ export const ITEM_SCALE: Record<string, number> = {
   ember_dragon_1: 0.13, // Dragon Ruby — reduced ~28% on request (0.18 → 0.13)
   ember_dragon_2: 0.064, // Red Egg (red-egg.png 1162×1437) — −20% again on request (0.08 → 0.064)
   ember_dragon_3: 0.21, // Red Dragon: real baked rig art (1054px) at the live rig's on-board size
+  ember_dragon_4: 0.3, // Adult Red Dragon: baked adult rig (836px) — reads bigger than the whelp
   flame_gem_1: 0.15,
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
   lumber_1: 0.336, // a log (wood.png) — reduced 30% on request (0.48 → 0.336)
   lumber_2: 0.9, // a house reads ~1.4 tiles (−10% on request)
+  lumber_3: 0.82, // the Manor (manor.png 430×450) — a touch bigger than the House
   bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
   chest_1: 0.24, // a treasure chest (chest.png) — reduced 20% on request (0.30 → 0.24)
   strawberry_1: 0.65, // emberberry sprout — reduced again on request (0.85 → 0.65)
@@ -205,8 +209,8 @@ export const ITEM_SCALE: Record<string, number> = {
 
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
 export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
-  coin: { coins: 1 },
-  coin_2: { coins: 5 }
+  coin: { coins: 10 }, // Gold Coin — the House drops one each cycle
+  coin_2: { coins: 30 } // Gold Pouch (3 coins merged) — worth the merge
 };
 
 /**
@@ -307,8 +311,9 @@ export const GOLDEN_TREMBLE_PROGRESS = 0.8;
 export const GOLDEN_ALTAR = {
   cell: { col: -2, row: 2 }, // off-grid is fine — gridToWorld is unbounded
   calibration: { offsetX: 135, offsetY: -137, scale: 0.13, anchor: { x: 0.5, y: 0 } },
-  /** Elder rig display scale at the altar (rig pieces ~550px). */
-  elderScale: 0.34,
+  /** Elder rig display scale at the altar (rig pieces ~550px) — the legendary
+   *  Golden Elder reads bigger than a board dragon (upsized on request). */
+  elderScale: 0.44,
   /** Completing THIS order makes the egg appear on the altar. */
   orderId: 'cindra_brazier'
 } as const;
@@ -398,6 +403,14 @@ export const DRAGON_ANIM = {
   idleMinMs: 4500,
   idleMaxMs: 6500,
   celebrateChance: 0.15, // P(celebrate) per cycle → ~90% of time spent idle
+  /** ADULT dragons (the tier-4 Red Adult, the Golden Elder) are calm, wise
+   *  elders: the same idle + low-flight repertoire, but rolled far less often,
+   *  held longer, and played slower — a whelp fidgets, an elder breathes. */
+  adultIdleMinMs: 9000,
+  adultIdleMaxMs: 15000,
+  adultCelebrateChance: 0.06,
+  adultCelebrateMs: 2600, // a single unhurried low-flight when it does happen
+  adultSpeed: 0.62, // preset playback rate (breathing/wing-beat cadence)
   fadeInMs: 220,
   hatchlingScale: 0.34,
   whelpScale: 0.46,
@@ -412,7 +425,10 @@ export const DRAGON_ANIM = {
  *  size. The emerald rig renders larger, so it's taken down 40% to match red. */
 export const DRAGON_RIG_SCALE: Record<string, number> = {
   emerald: 0.486, // green dragon −10% again on request (0.54 → 0.486)
-  ember_dragon: 0.448 // red dragon −20% again on request (0.56 → 0.448)
+  ember_dragon: 0.448, // red dragon −20% again on request (0.56 → 0.448)
+  // Adult Red Dragon (tier-4 rig override; adult rig pieces are ~836px wide vs
+  // the whelp's 1054) — sized to read clearly BIGGER than the whelp on-board.
+  'ember_dragon:4': 0.62
   // (The Golden Elder is NOT a board dragon — her altar scale lives in
   //  GOLDEN_ALTAR.elderScale.)
 };

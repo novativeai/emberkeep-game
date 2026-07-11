@@ -55,11 +55,25 @@
           "name": "Red Dragon",
           "sell": 25,
           "xp": 26,
+          "merge": { "group": 2, "outputs": 1 },
           "generator": {
             "produces": { "chain": "ember_dragon", "tier": 1 },
-            "cooldownMs": 75000,
+            "cooldownMs": 45000,
             "energyCost": 1,
-            "passiveMs": 360000
+            "passiveMs": 180000
+          }
+        },
+        {
+          "tier": 4,
+          "id": "ember_dragon_4",
+          "name": "Adult Red Dragon",
+          "sell": 60,
+          "xp": 40,
+          "generator": {
+            "produces": { "chain": "ember_dragon", "tier": 1 },
+            "cooldownMs": 30000,
+            "energyCost": 1,
+            "passiveMs": 120000
           }
         }
       ]
@@ -84,11 +98,26 @@
           "name": "House",
           "sell": 0,
           "xp": 0,
+          "merge": { "group": 2, "outputs": 1 },
           "generator": {
             "produces": { "chain": "coin", "tier": 1 },
-            "cooldownMs": 420000,
+            "cooldownMs": 210000,
             "energyCost": 0,
-            "passiveMs": 420000,
+            "passiveMs": 210000,
+            "tappable": false
+          }
+        },
+        {
+          "tier": 3,
+          "id": "lumber_3",
+          "name": "Manor",
+          "sell": 0,
+          "xp": 20,
+          "generator": {
+            "produces": { "chain": "coin", "tier": 2 },
+            "cooldownMs": 210000,
+            "energyCost": 0,
+            "passiveMs": 210000,
             "tappable": false
           }
         }
@@ -106,9 +135,9 @@
           "xp": 0,
           "generator": {
             "produces": { "chain": "lumber", "tier": 1 },
-            "cooldownMs": 3600000,
+            "cooldownMs": 300000,
             "energyCost": 0,
-            "passiveMs": 3600000,
+            "passiveMs": 300000,
             "tappable": false
           }
         }
@@ -157,9 +186,9 @@
           "xp": 24,
           "generator": {
             "produces": { "chain": "flame_gem", "tier": 1 },
-            "cooldownMs": 75000,
+            "cooldownMs": 45000,
             "energyCost": 1,
-            "passiveMs": 360000
+            "passiveMs": 180000
           }
         }
       ]

@@ -51,6 +51,8 @@ interface LiveDragon {
   mode: 'hover' | 'idle';
   remainMs: number; // countdown until the next mode roll
   busy: boolean; // flying out to work a plant — pause idle rolls + further taps
+  /** Calm ADULT cadence: rare, unhurried low-flights and long idles. */
+  calm: boolean;
 }
 
 /** Where the camera sits to frame a given Keeper level (world centre + zoom). */
@@ -66,11 +68,23 @@ const smootherstep = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 /** Chains whose dragon tiers wear a live rig, and where to fetch each rig.
  *  ember/emerald rig their GENERATOR tiers; golden_egg rigs the Whelp (tier 2,
  *  NOT a generator — she's a baby). See wearsRigTier. */
+/** Keys are a CHAIN (that chain's default rig) or `chain:tier` (a tier-specific
+ *  override — e.g. the Adult Red Dragon at ember_dragon tier 4). */
 const DRAGON_RIGS: Record<string, string> = {
   ember_dragon: 'sprites/characters/dragon/red-dragon/rig/dragon-red.rig.json',
+  'ember_dragon:4': 'sprites/characters/dragon/red-dragon/rig-adult/red-dragon.rig.json',
   emerald: 'sprites/characters/dragon/emerald-dragon/rig/dragon-emerald.rig.json',
   golden_egg: 'sprites/characters/dragon/golden-dragon/rig-adult/golden-dragon.rig.json'
 };
+
+/** The DRAGON_RIGS key an item resolves to: its tier-specific rig if one is
+ *  declared, else the chain's default rig. */
+const rigKeyFor = (chain: string, tier: number): string =>
+  DRAGON_RIGS[`${chain}:${tier}`] !== undefined ? `${chain}:${tier}` : chain;
+
+/** ADULT dragons animate as calm elders (see DRAGON_ANIM.adult*): the Red
+ *  Adult and the Golden Elder — whelps keep the lively cadence. */
+const CALM_DRAGONS = new Set(['dragon-red-adult', 'dragon-golden']);
 /** Canonical character id for a rig exported with the tool's default name —
  *  MUST match characterCatalog ids and the faces.json keys (calibrate-faces). */
 const DRAGON_RIG_NAMES: Record<string, string> = {
@@ -172,6 +186,8 @@ export class BoardScene extends Phaser.Scene {
   /** The Golden Altar (scenic non-playable ledge, west of the isle) — the
    *  egg/Elder LORE FIXTURE. Never a board item: no merge, sell, drag, work. */
   private altarEgg?: Phaser.GameObjects.Image;
+  /** Soft radial ground shadow under the Golden Egg (parity with board items). */
+  private altarEggShadow?: Phaser.GameObjects.Image;
   private altarElder?: RigPlayer;
   private altarElderFallback?: Phaser.GameObjects.Image;
   private altarZone?: Phaser.GameObjects.Zone;
@@ -254,11 +270,12 @@ export class BoardScene extends Phaser.Scene {
       this.altarElder.update(delta);
       this.altarElderRoll.remainMs -= delta;
       if (this.altarElderRoll.remainMs <= 0) {
-        if (this.altarElderRoll.mode === 'idle' && Math.random() < DRAGON_ANIM.celebrateChance) {
-          this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.celebrateMs };
+        // The Elder is a calm ADULT: rare, unhurried low-flights between long idles.
+        if (this.altarElderRoll.mode === 'idle' && Math.random() < DRAGON_ANIM.adultCelebrateChance) {
+          this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.adultCelebrateMs };
           this.altarElder.play('hover');
         } else {
-          this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs() };
+          this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs(true) };
           this.altarElder.play('idle');
         }
       }
@@ -325,7 +342,7 @@ export class BoardScene extends Phaser.Scene {
    *  (the ember/emerald generator tiers). The Golden Elder is not a board
    *  item — she lives on the Golden Altar fixture (see syncGoldenAltar). */
   private wearsRigTier(chain: string, tier: number): boolean {
-    if (DRAGON_RIGS[chain] === undefined) return false;
+    if (DRAGON_RIGS[rigKeyFor(chain, tier)] === undefined) return false;
     return this.generatorConfigFor(chain, tier) !== undefined;
   }
 
@@ -333,8 +350,8 @@ export class BoardScene extends Phaser.Scene {
    *  pooled placeholder sprite (graceful: the board still works). */
   private async loadDragonRigs(): Promise<void> {
     const base = (import.meta.env.BASE_URL ?? './').replace(/\/?$/, '/');
-    for (const [chain, url] of Object.entries(DRAGON_RIGS)) {
-      if (this.dragonRigs.has(chain)) continue;
+    for (const [rigKey, url] of Object.entries(DRAGON_RIGS)) {
+      if (this.dragonRigs.has(rigKey)) continue;
       try {
         const res = await fetch(base + url);
         if (!res.ok || !this.scene.isActive()) continue;
@@ -345,7 +362,7 @@ export class BoardScene extends Phaser.Scene {
         // canonical id (the golden-dragon export ships as 'character'), which
         // also keys its FACES entry (faces.json) and catalog id.
         if (!rig.character || rig.character === 'character') {
-          rig.character = DRAGON_RIG_NAMES[chain] ?? chain;
+          rig.character = DRAGON_RIG_NAMES[rigKey] ?? rigKey;
         }
         await RigPlayer.loadTextures(this, rig, (layer) => `rig:${rig.character}:${layer}`);
         if (!this.scene.isActive()) continue;
@@ -360,11 +377,15 @@ export class BoardScene extends Phaser.Scene {
           }
           if (!this.scene.isActive()) continue;
         }
-        this.dragonRigs.set(chain, rig);
-        if (chain === GOLDEN_CHAIN) this.syncGoldenAltar(); // fallback art → live rig
-        // Re-skin any dragons of this chain that spawned before the rig loaded.
+        this.dragonRigs.set(rigKey, rig);
+        if (rigKey === GOLDEN_CHAIN) this.syncGoldenAltar(); // fallback art → live rig
+        // Re-skin any dragons resolving to THIS rig that spawned before it loaded.
         for (const sprite of this.itemSprites.values()) {
-          if (sprite.chain === chain && this.wearsRigTier(sprite.chain, sprite.tier) && !this.liveDragons.has(sprite.itemId)) {
+          if (
+            rigKeyFor(sprite.chain, sprite.tier) === rigKey &&
+            this.wearsRigTier(sprite.chain, sprite.tier) &&
+            !this.liveDragons.has(sprite.itemId)
+          ) {
             this.attachDragon(sprite, false);
           }
         }
@@ -378,13 +399,17 @@ export class BoardScene extends Phaser.Scene {
    *  which goes invisible but stays interactive/draggable. Returns false if the
    *  rig isn't ready yet (caller falls back to the sprite). */
   private attachDragon(host: BoardItem, intro: boolean): boolean {
-    const rig = this.dragonRigs.get(host.chain);
+    const rig = this.dragonRigs.get(rigKeyFor(host.chain, host.tier));
     if (!rig) return false;
     this.removeDragonRig(host.itemId);
     const scale =
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
-      (DRAGON_RIG_SCALE[host.chain] ?? 1);
-    const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, { scale });
+      (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1);
+    const calm = CALM_DRAGONS.has(rig.character);
+    const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, {
+      scale,
+      speed: calm ? DRAGON_ANIM.adultSpeed : 1
+    });
     const face = FACES[rig.character];
     if (face) player.attachFace(this, face, faceTextureKey(rig.character));
     player.setFacing('left').play(intro ? 'hover' : 'idle'); // rig's original (un-mirrored) orientation
@@ -397,8 +422,9 @@ export class BoardScene extends Phaser.Scene {
       host,
       shadow,
       mode: intro ? 'hover' : 'idle',
-      remainMs: intro ? DRAGON_ANIM.introCelebrateMs : this.idleSpanMs(),
-      busy: false
+      remainMs: intro ? DRAGON_ANIM.introCelebrateMs : this.idleSpanMs(calm),
+      busy: false,
+      calm
     };
     this.liveDragons.set(host.itemId, ld);
     this.syncDragon(ld);
@@ -414,7 +440,13 @@ export class BoardScene extends Phaser.Scene {
     return true;
   }
 
-  private idleSpanMs(): number {
+  private idleSpanMs(calm = false): number {
+    if (calm) {
+      return (
+        DRAGON_ANIM.adultIdleMinMs +
+        Math.random() * (DRAGON_ANIM.adultIdleMaxMs - DRAGON_ANIM.adultIdleMinMs)
+      );
+    }
     return DRAGON_ANIM.idleMinMs + Math.random() * (DRAGON_ANIM.idleMaxMs - DRAGON_ANIM.idleMinMs);
   }
 
@@ -433,13 +465,15 @@ export class BoardScene extends Phaser.Scene {
       ld.remainMs -= delta;
       if (ld.remainMs > 0) continue;
       // Roll the next segment: mostly idle (~90% of the time), the rest a burst.
-      if (ld.mode === 'idle' && Math.random() < DRAGON_ANIM.celebrateChance) {
+      // Calm ADULTS hover far more rarely and hold their idles much longer.
+      const chance = ld.calm ? DRAGON_ANIM.adultCelebrateChance : DRAGON_ANIM.celebrateChance;
+      if (ld.mode === 'idle' && Math.random() < chance) {
         ld.mode = 'hover';
-        ld.remainMs = DRAGON_ANIM.celebrateMs;
+        ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
         ld.player.play('hover');
       } else {
         ld.mode = 'idle';
-        ld.remainMs = this.idleSpanMs();
+        ld.remainMs = this.idleSpanMs(ld.calm);
         ld.player.play('idle');
       }
     }
@@ -755,6 +789,15 @@ export class BoardScene extends Phaser.Scene {
         .setOrigin(cal.anchor.x, cal.anchor.y)
         .setScale(p0.scale)
         .setDepth(DEPTHS.itemBase + p0.y);
+      // Soft radial ground shadow at the egg's base — the egg is anchored at its
+      // TOP (cal.anchor.y ≈ 0), so its foot sits one display-height below p0.y.
+      const eggBottom = p0.y + this.altarEgg.displayHeight * (1 - cal.anchor.y);
+      this.altarEggShadow = this.addGroundShadow(
+        p0.x,
+        eggBottom,
+        this.altarEgg.displayWidth * 0.6,
+        DEPTHS.itemBase + p0.y - 0.5
+      );
       this.ensureAltarZone();
     }
     if (!ceremony || !this.altarEgg) return;
@@ -777,6 +820,8 @@ export class BoardScene extends Phaser.Scene {
     const eggBottom = p.y + 1451 * p.scale; // egg art is 1176×1451, anchored top
     this.altarEgg?.destroy();
     this.altarEgg = undefined;
+    this.altarEggShadow?.destroy();
+    this.altarEggShadow = undefined;
     this.eggAura?.destroy();
     this.eggAura = undefined;
     this.stopGoldenTremble();
@@ -785,7 +830,8 @@ export class BoardScene extends Phaser.Scene {
       this.altarElderFallback?.destroy();
       this.altarElderFallback = undefined;
       const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, {
-        scale: GOLDEN_ALTAR.elderScale
+        scale: GOLDEN_ALTAR.elderScale,
+        speed: DRAGON_ANIM.adultSpeed // the Elder breathes slowly — a calm adult
       });
       const face = FACES[rig.character];
       if (face) player.attachFace(this, face, faceTextureKey(rig.character));
@@ -793,12 +839,12 @@ export class BoardScene extends Phaser.Scene {
       player.container.setPosition(p.x, eggBottom - DRAGON_ANIM.groundLift);
       player.container.setDepth(DEPTHS.itemBase + p.y + 1);
       this.altarElder = player;
-      this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs() };
+      this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs(true) };
     } else if (!this.altarElderFallback) {
       this.altarElderFallback = this.add
         .image(p.x, eggBottom, `item_${GOLDEN_CHAIN}_${GOLDEN_ELDER_TIER}`)
         .setOrigin(0.5, 0.88)
-        .setScale(0.16)
+        .setScale(0.21)
         .setTint(GOLDEN_TINT)
         .setDepth(DEPTHS.itemBase + p.y + 1);
     }
@@ -1742,6 +1788,11 @@ export class BoardScene extends Phaser.Scene {
       // displayW≈325, displayH≈342; container origin +76 → rx=76−0.5·325, ry=76−0.9·342.
       sprite.setData('tallArt', true);
       sprite.input!.hitArea = new Phaser.Geom.Rectangle(-86, -232, 325, 342);
+    } else if (snap.chain === 'lumber' && snap.tier === 3) {
+      // The Manor (manor.png 430×450 @ scale 0.82, anchor 0.5/0.9) — full-sprite tap.
+      // displayW≈353, displayH≈369; container origin +76 → rx=76−0.5·353, ry=76−0.9·369.
+      sprite.setData('tallArt', true);
+      sprite.input!.hitArea = new Phaser.Geom.Rectangle(-100, -256, 353, 369);
     } else if (snap.chain === 'bigtree') {
       sprite.setData('tallArt', true);
       // The Ancient Tree (bigtree.png 622×823 @ scale 0.17, anchor 0.5/0.92) — full-sprite
@@ -1866,7 +1917,7 @@ export class BoardScene extends Phaser.Scene {
     if (this.altarElder) {
       this.altarElder.play('hover');
       this.altarElder.playFace(1);
-      this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.celebrateMs };
+      this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.adultCelebrateMs };
     } else if (this.altarElderFallback) {
       const f = this.altarElderFallback;
       const y0 = f.y;
@@ -1916,7 +1967,7 @@ export class BoardScene extends Phaser.Scene {
         ld.busy = false;
         ld.player.play('idle');
         ld.mode = 'idle';
-        ld.remainMs = this.idleSpanMs();
+        ld.remainMs = this.idleSpanMs(ld.calm);
       }
     };
     this.tweens.add({
@@ -2286,7 +2337,7 @@ export class BoardScene extends Phaser.Scene {
       ld.player.play('hover');
       ld.player.playFace(1); // a refreshed chirp
       ld.mode = 'hover';
-      ld.remainMs = DRAGON_ANIM.celebrateMs;
+      ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
     }
   }
 
@@ -2458,12 +2509,14 @@ export class BoardScene extends Phaser.Scene {
           const cam = this.cameras.main;
           this.teaseReturn = { x: cam.midPoint.x, y: cam.midPoint.y, zoom: cam.zoom };
           const p = this.altarPoint();
-          // Pull the camera OUT while gliding: the altar hugs the world's west
-          // edge, and the bounds clamp can otherwise leave the egg off-frame on
-          // wide/tall viewports (players saw only the aura's glow bleed in).
+          // Pull the camera fully OUT to the backdrop-fit zoom (minZoom): the altar
+          // hugs the world's west edge, so any tighter zoom lets the bounds clamp
+          // leave the egg off-frame on some viewports (players saw only the aura's
+          // glow bleed in — or nothing). At minZoom the WHOLE backdrop — and thus the
+          // altar — is guaranteed in frame, with no black void on any aspect.
           this.tweens.add({
             targets: cam,
-            zoom: Math.max(this.minZoom * renderScale.value, cam.zoom * 0.72),
+            zoom: this.minZoom * renderScale.value,
             duration: 1100,
             ease: 'Sine.easeInOut'
           });
@@ -2654,7 +2707,7 @@ export class BoardScene extends Phaser.Scene {
     const ld = this.liveDragons.get(itemId);
     if (!ld) return;
     ld.mode = 'hover';
-    ld.remainMs = DRAGON_ANIM.celebrateMs;
+    ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
     ld.player.play('hover');
     ld.player.playFace(1); // one happy mouth-flap as the gift pops out
   }

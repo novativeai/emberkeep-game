@@ -193,6 +193,41 @@ describe('MergeSystem', () => {
     }
   });
 
+  it('merges TWO Houses into one Manor (per-tier 2→1 override, Bushes still need 3)', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'lumber', tier: 2, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 2, col: 1, row: 2, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    drag(ctx, [1, 2], [1, 1]); // drop one House onto the other — only two needed
+
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.consumedIds).toHaveLength(2); // the tier-2 override consumes TWO
+    expect(merges[0]!.resultTier).toBe(3);
+    expect(ctx.state.items.size).toBe(1);
+    const manor = [...ctx.state.items.values()][0];
+    expect(manor).toMatchObject({ chain: 'lumber', tier: 3 });
+    expect(manor?.readyAt).toBeDefined(); // the Manor is a passive gold generator
+  });
+
+  it('merges TWO Red Dragons into one Adult Red Dragon (per-tier 2→1 override)', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 2, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+    const hatches = capture(ctx.bus, 'item:hatched');
+
+    drag(ctx, [1, 2], [1, 1]); // two dragons meet — the elder rises
+
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.consumedIds).toHaveLength(2);
+    expect(merges[0]!.resultTier).toBe(4);
+    expect(hatches).toHaveLength(0); // hatchAtTier stays 3 — this is an ascension, not a hatch
+    const adult = [...ctx.state.items.values()][0];
+    expect(adult).toMatchObject({ chain: 'ember_dragon', tier: 4 });
+    expect(adult?.readyAt).toBeDefined(); // the Adult is a faster ruby generator
+  });
+
   it('emerald chain: 3 Emeralds → Green Egg — no item:hatched, no generator', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'emerald', tier: 1, col: 1, row: 1, kind: 'item' });

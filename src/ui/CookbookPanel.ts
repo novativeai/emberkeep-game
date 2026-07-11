@@ -124,11 +124,15 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     closeButton.on('pointerup', () => this.requestClose());
     this.add(closeButton);
 
-    // ---- Recipe rows: every mergeable tier pair, chains.json order. ----
+    // ---- Recipe rows: every mergeable tier pair, chains.json order. Two
+    // columns split evenly; with more than 6 rows per column the gap squeezes
+    // so the last row never collides with the counter line below. ----
     const recipes = this.enumerateRecipes(chains);
+    const half = Math.ceil(recipes.length / 2);
+    const gap = half <= 6 ? ROW_GAP : Math.floor((ROW_GAP * 6) / half);
     recipes.forEach((recipe, i) => {
-      const x = (i < 6 ? -1 : 1) * COL_X;
-      const y = ROW_TOP + (i % 6) * ROW_GAP;
+      const x = (i < half ? -1 : 1) * COL_X;
+      const y = ROW_TOP + (i % half) * gap;
       this.rows.push(this.buildRow(scene, recipe, x, y));
     });
 
@@ -159,10 +163,12 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     const out: Recipe[] = [];
     for (const chain of chains.chains) {
       if (chain.id === 'golden_egg') continue;
-      const count = chain.merge?.group ?? chains.mergeRule.minGroup;
       for (const tier of chain.tiers) {
         const next = chain.tiers.find((t) => t.tier === tier.tier + 1);
         if (!next) continue;
+        // Per-TIER recipe override first (2 Houses → Manor, 2 Dragons → Adult),
+        // then the chain-level one, then the global rule.
+        const count = tier.merge?.group ?? chain.merge?.group ?? chains.mergeRule.minGroup;
         out.push({
           key: `${chain.id}:${tier.tier}>${next.tier}`,
           chain: chain.id,
@@ -346,6 +352,8 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
 
   /** World position of the ✕ button (the tutorial's close-the-book arrow). */
   getClosePos(): { x: number; y: number } {
-    return { x: this.x + 592, y: this.y - 392 };
+    // Offset is panel-LOCAL — scale it by the panel's own scale (>1 on mobile)
+    // so the tutorial pointer lands on the ✕ instead of a shrunken/enlarged gap.
+    return { x: this.x + 592 * this.scaleX, y: this.y - 392 * this.scaleY };
   }
 }

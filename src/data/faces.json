@@ -53,6 +53,60 @@
       }
     }
   },
+  "dragon-red-adult": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/red-dragon/head-animation-adult",
+    "sets": {
+      "blink": {
+        "dir": "red-dragon-adult-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4247,
+        "originY": 0.951,
+        "frames": [
+          {
+            "file": "red-dragon-adult-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "red-dragon-adult-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "red-dragon-adult-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "red-dragon-adult-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "red-dragon-adult-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4247,
+        "originY": 0.951,
+        "frames": [
+          {
+            "file": "red-dragon-adult-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "red-dragon-adult-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "red-dragon-adult-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "red-dragon-adult-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
   "dragon-golden": {
     "layer": "head",
     "basePath": "sprites/characters/dragon/golden-dragon/head-animation",

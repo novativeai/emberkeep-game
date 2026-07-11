@@ -64,9 +64,10 @@ describe('skip cooldown for Warmth', () => {
     ctx.bus.emit('item:tapped', { itemId: gen.id }); // harvest → cooldown
     expect(gen.readyAt!).toBeGreaterThan(ctx.clock.now());
     ctx.state.coins = 20; // skip is paid in GOLD now
-    // Freshly cooled = full time left → the skip costs the MAX (most expensive).
-    // Total = the dragon's actual cooldownMs (75s after the pacing retune).
-    const fullCost = skipEnergyCost(gen.readyAt! - ctx.clock.now(), 75_000);
+    // Freshly cooled = full time left (remaining == total) → the skip costs the
+    // MAX, whatever the dragon's tuned cooldown happens to be.
+    const remaining = gen.readyAt! - ctx.clock.now();
+    const fullCost = skipEnergyCost(remaining, remaining);
     expect(fullCost).toBe(GENERATOR_SKIP_MAX_ENERGY);
 
     ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
@@ -105,7 +106,7 @@ describe('skip cooldown for Warmth', () => {
 });
 
 describe('the House (Gold generator)', () => {
-  it('produces one Gold coin every 10 minutes (passive, no tap)', () => {
+  it('drops one Gold Coin per passive cycle (passive, no tap)', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'lumber', tier: 2, col: 2, row: 2, kind: 'item' });
     const produced = capture(ctx.bus, 'item:produced');
@@ -113,9 +114,10 @@ describe('the House (Gold generator)', () => {
     ctx.bus.emit('time:advanced', { ms: 0 }); // arm
     expect(produced).toHaveLength(0);
 
-    ctx.clock.advance(600_001); // one 10-minute interval
-    ctx.bus.emit('time:advanced', { ms: 600_001 });
+    ctx.clock.advance(420_001); // one passive interval
+    ctx.bus.emit('time:advanced', { ms: 420_001 });
 
+    // A collectible Gold Coin lands on a nearby tile (worth +10 when tapped).
     expect(produced).toHaveLength(1);
     expect(produced[0]!.output).toMatchObject({ chain: 'coin', tier: 1 });
   });

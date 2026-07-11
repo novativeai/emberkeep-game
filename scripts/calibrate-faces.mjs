@@ -61,6 +61,34 @@ const CHARACTERS = {
       }
     }
   },
+  'dragon-red-adult': {
+    rig: `${DRAGON_DIR}/rig-adult/red-dragon.rig.json`,
+    layer: 'head',
+    fsDir: `${DRAGON_DIR}/head-animation-adult`,
+    basePath: `${DRAGON_DIR.replace(/^assets\//, '')}/head-animation-adult`,
+    sets: {
+      blink: {
+        dir: 'red-dragon-adult-blink-animation',
+        files: [
+          'red-dragon-adult-eyes-open.png',
+          'red-dragon-adult-eyes-halfOpen.png',
+          'red-dragon-adult-eyes-closed.png',
+          'red-dragon-adult-eyes-halfOpen2.png'
+        ],
+        ref: 0
+      },
+      talk: {
+        dir: 'red-dragon-adult-roar_talk-animation',
+        files: [
+          'red-dragon-adult-roar_talk_00000.png',
+          'red-dragon-adult-roar_talk_00001.png',
+          'red-dragon-adult-roar_talk_00002.png',
+          'red-dragon-adult-roar_talk_00003.png'
+        ],
+        ref: 0
+      }
+    }
+  },
   'dragon-golden': {
     rig: 'assets/sprites/characters/dragon/golden-dragon/rig-adult/golden-dragon.rig.json',
     layer: 'head',

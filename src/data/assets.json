@@ -139,6 +139,12 @@
       "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.png"
     },
     {
+      "key": "item_ember_dragon_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/sprite-adult/red-dragon-adult-baked.png"
+    },
+    {
       "key": "item_flame_gem_1",
       "source": "file",
       "generator": "item",
@@ -175,6 +181,12 @@
       "file": "sprites/items/house.png"
     },
     {
+      "key": "item_lumber_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/manor.png"
+    },
+    {
       "key": "item_bigtree_1",
       "source": "file",
       "generator": "item",
@@ -196,7 +208,7 @@
       "key": "item_coin_2",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/coin.png"
+      "file": "sprites/items/coin_pouch.png"
     },
     {
       "key": "item_diamond_1",

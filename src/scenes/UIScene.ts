@@ -58,6 +58,9 @@ export class UIScene extends Phaser.Scene {
   private finaleActive = false;
   /** One-shot Laurah nudges (per session). */
   private hintShown = new Set<string>();
+  /** Active recipe mini-tutorial (`chain:from>to`), if one is demonstrating. */
+  private recipeHint: string | null = null;
+  private recipeHintTimer: Phaser.Time.TimerEvent | null = null;
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
   private dialog: Phaser.GameObjects.Container | null = null;
@@ -226,13 +229,18 @@ export class UIScene extends Phaser.Scene {
     this.offBus.push(
       bus.on('tutorial:step', (step) => this.onTutorialStep(step)),
       bus.on('ui:ledger_toggled', () => {
+        // applyMarkers() below wipes ALL markers — retire an active recipe
+        // demonstration cleanly rather than leaving its state half-cleared.
+        this.clearRecipeHint();
         if (this.lastStep) this.applyMarkers(this.lastStep);
         this.tooltip.close();
       }),
       bus.on('item:tapped', ({ itemId }) => this.maybeShowTooltip(itemId)),
       bus.on('item:removed', ({ itemId }) => {
         if (this.tooltip.openItemId === itemId) this.tooltip.close();
+        this.refreshRecipeHint();
       }),
+      bus.on('item:moved', () => this.refreshRecipeHint()),
       bus.on('item:merged', (payload) => {
         this.tooltip.close();
         // A fresh Flame Gem flies toward the Ledger (where the magic happens) —
@@ -240,6 +248,9 @@ export class UIScene extends Phaser.Scene {
         if (payload.chain === 'flame_gem' && payload.resultTier === 2) {
           this.flyGemToLedger(payload.at, payload.resultTier);
         }
+        // A merge may have completed a 2→1 pair (2nd Dragon, 2nd House) — let
+        // the pop settle, then offer the recipe demonstration.
+        this.time.delayedCall(700, () => this.checkRecipeHints());
       }),
       bus.on('gold:collected', ({ at }) => this.flyCoinToGold(at)),
       bus.on('ui:shop_requested', ({ currency }) => {
@@ -272,9 +283,11 @@ export class UIScene extends Phaser.Scene {
       bus.on('item:harvest_failed', ({ reason }) => {
         if (reason === 'no_space') this.showHint('boardFull');
       }),
-      bus.on('state:loaded', ({ offlineMs, energyRecovered }) =>
-        this.maybeWelcomeBack(offlineMs, energyRecovered)
-      ),
+      bus.on('state:loaded', ({ offlineMs, energyRecovered }) => {
+        this.maybeWelcomeBack(offlineMs, energyRecovered);
+        // A returning save may already hold a ready 2→1 pair.
+        this.time.delayedCall(2500, () => this.checkRecipeHints());
+      }),
       bus.on('tutorial:step', (step) => {
         // Appears for its tutorial introduction, then permanently post-tutorial.
         this.cookbookButton.setVisible(step.done || step.allow.cookbook);
@@ -284,7 +297,9 @@ export class UIScene extends Phaser.Scene {
           this.cookbook.requestClose();
         }
       }),
-      bus.on('cookbook:discovered', () => {
+      bus.on('cookbook:discovered', ({ chain, fromTier, resultTier }) => {
+        // The demonstrated recipe was performed — retire the guiding hand.
+        if (`${chain}:${fromTier}>${resultTier}` === this.recipeHint) this.clearRecipeHint();
         if (!this.ctx.state.tutorialDone || this.cookbook.isOpen) return;
         this.cookbookDot.setVisible(true);
         this.tweens.add({
@@ -428,6 +443,7 @@ export class UIScene extends Phaser.Scene {
   private runFinaleUi(): void {
     if (this.finaleActive || this.endScreen) return;
     this.finaleActive = true;
+    this.clearRecipeHint(); // the finale owns the stage — no competing pointers
     this.ledger.requestClose();
     this.shop.requestClose();
     this.cookbook.requestClose();
@@ -540,10 +556,71 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** One-shot Laurah nudge (post-tutorial guidance without a second tutorial). */
-  private showHint(key: 'zeroWarmth' | 'boardFull' | 'eggTrembles'): void {
+  private showHint(key: keyof GameContext['data']['dialogue']['hints'], holdMs = 5200): void {
     if (!this.ctx.state.tutorialDone || this.finaleActive || this.hintShown.has(key)) return;
     this.hintShown.add(key);
-    this.bubble.say('laurah', this.ctx.data.dialogue.hints[key], 5200);
+    this.bubble.say('laurah', this.ctx.data.dialogue.hints[key], holdMs);
+  }
+
+  /**
+   * Contextual recipe mini-tutorials: the moment the board first holds the TWO
+   * pieces of a 2→1 recipe (two Red Dragons → Adult, two Houses → Manor),
+   * Laurah teases the merge and the guiding gauntlet demonstrates the drag
+   * between the actual pieces. Purely presentational — nothing is gated, no
+   * input is blocked; it clears itself on discovery, timeout, or the finale.
+   */
+  private checkRecipeHints(): void {
+    if (!this.ctx.state.tutorialDone || this.finaleActive || this.recipeHint) return;
+    const candidates = [
+      { key: 'twoDragons', recipe: 'ember_dragon:3>4', chain: 'ember_dragon', tier: 3 },
+      { key: 'twoHouses', recipe: 'lumber:2>3', chain: 'lumber', tier: 2 }
+    ] as const;
+    for (const c of candidates) {
+      if (this.hintShown.has(c.key)) continue;
+      if (this.ctx.state.discoveredRecipes.includes(c.recipe)) continue; // already learned
+      const pieces = [...this.ctx.state.items.values()].filter(
+        (i) => i.kind === 'item' && i.chain === c.chain && i.tier === c.tier
+      );
+      if (pieces.length < 2) continue;
+      this.recipeHint = c.recipe;
+      this.showHint(c.key, 6500);
+      // The gauntlet demonstrates the exact drag: piece B onto piece A.
+      this.placeHand({
+        from: { col: pieces[1]!.col, row: pieces[1]!.row },
+        to: { col: pieces[0]!.col, row: pieces[0]!.row }
+      });
+      this.recipeHintTimer?.remove();
+      this.recipeHintTimer = this.time.delayedCall(9500, () => this.clearRecipeHint());
+      return; // one guided beat at a time
+    }
+  }
+
+  /** Stop the recipe demonstration (discovered / timed out / superseded). */
+  private clearRecipeHint(): void {
+    if (!this.recipeHint) return;
+    this.recipeHint = null;
+    this.recipeHintTimer?.remove();
+    this.recipeHintTimer = null;
+    this.clearMarkers();
+  }
+
+  /** The board changed under an active demonstration: re-aim the gauntlet at the
+   *  pair's CURRENT cells, or retire it if the pair no longer exists. */
+  private refreshRecipeHint(): void {
+    if (!this.recipeHint) return;
+    const [chain, tiers] = this.recipeHint.split(':') as [string, string];
+    const fromTier = Number(tiers.split('>')[0]);
+    const pieces = [...this.ctx.state.items.values()].filter(
+      (i) => i.kind === 'item' && i.chain === chain && i.tier === fromTier
+    );
+    if (pieces.length < 2) {
+      this.clearRecipeHint(); // sold/consumed — the discovery handler covers the merge case
+      return;
+    }
+    this.placeHand({
+      from: { col: pieces[1]!.col, row: pieces[1]!.row },
+      to: { col: pieces[0]!.col, row: pieces[0]!.row }
+    });
   }
 
   /** "While you were away" — consumes the load payload nothing used to read:
@@ -707,7 +784,7 @@ export class UIScene extends Phaser.Scene {
     if ('ui' in ref) {
       // The ⚡+ button until the Emporium opens, then the FREE! card inside it —
       // handPoint/arrowAnchor re-evaluate each frame, so the marker follows live.
-      if (ref.ui === 'marketplace') return this.shop.getFreeButtonPos() ?? { x: 374, y: 88 };
+      if (ref.ui === 'marketplace') return this.shop.getFreeButtonPos() ?? this.hud.getEnergyPlusPos();
       if (ref.ui === 'ledger') return this.hud.getLedgerPos();
       if (ref.ui === 'cookbook') return { x: this.cookbookButton.x, y: this.cookbookButton.y };
       if (ref.ui === 'cookbook_close') return this.cookbook.isOpen ? this.cookbook.getClosePos() : null;

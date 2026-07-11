@@ -338,16 +338,22 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(count(state, 'lumber', 2)).toBeGreaterThanOrEqual(1); // house produced
     await page.screenshot({ path: shot('13-house-built') });
 
-    // ---------- Dragon work: emit dragon:work directly (same pattern as chest/crystal) ----------
-    await page.evaluate(() => {
-      const ctx = window.__emberkeep.game.registry.get('ctx') as {
-        state: { items: Map<number, { id: number; chain: string; tier: number; kind: string }> };
-        bus: { emit: (event: string, payload: unknown) => void };
-      };
-      const dragon = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon' && i.tier === 3);
-      const house = [...ctx.state.items.values()].find((i) => i.chain === 'lumber' && i.tier === 2);
-      if (dragon && house) ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
-    });
+    // ---------- Dragon work: the REAL gesture — drag the dragon ONTO the House ----------
+    // (Regression cover: the WYSIWYG drop resolution once bounced this drop —
+    // the House's tall art resolves to the cell BEHIND its tile.)
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const dragonCells = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 3);
+      const houseCells2 = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 2);
+      if (!dragonCells.length || !houseCells2.length) break;
+      await page.evaluate(
+        ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
+        [houseCells2[0]![0], houseCells2[0]![1]]
+      );
+      await page.waitForTimeout(400);
+      await dragTile(page, dragonCells[0]!, houseCells2[0]!);
+      await page.waitForTimeout(600);
+      if ((await gameText(page)).tutorial.step === 'dragon_rest') break;
+    }
     await waitStep(page, 'dragon_rest');
     await page.screenshot({ path: shot('14-dragon-resting') });
 

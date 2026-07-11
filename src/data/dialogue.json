@@ -17,7 +17,9 @@
   "hints": {
     "zeroWarmth": "Out of Warmth? Rest by the fire — it returns on its own. The emberberry patch never needs any!",
     "boardFull": "The board is crowded! Sell a spare piece, or deliver to Cindra's Ledger to make room.",
-    "eggTrembles": "Keeper — the egg! Look at the egg on the old altar, it's TREMBLING!"
+    "eggTrembles": "Keeper — the egg! Look at the egg on the old altar, it's TREMBLING!",
+    "twoDragons": "TWO grown Red Dragons?! Keeper, bring them together — when two flames meet, an ELDER rises!",
+    "twoHouses": "Two Houses standing… join them! Emberkeep folk raise a MANOR when hearths unite — grander gold within."
   },
   "tasksComplete": "“Every task, done. The Keep hasn't been this warm in an age… you've earned your rest, Keeper.” — Cindra"
 }

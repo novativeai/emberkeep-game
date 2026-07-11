@@ -320,7 +320,12 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   /** World position of the FIRST card's Deliver button (tutorial hand target). */
   getDeliverPos(): { x: number; y: number } {
     const card = this.cards[0]!;
-    return { x: this.x + card.root.x + card.deliverButton.x, y: this.y + card.root.y + card.deliverButton.y };
+    // Local offsets scaled by the panel's own scale (>1 on mobile) so the pointer
+    // tracks the Deliver button through the portrait magnification.
+    return {
+      x: this.x + (card.root.x + card.deliverButton.x) * this.scaleX,
+      y: this.y + (card.root.y + card.deliverButton.y) * this.scaleY
+    };
   }
 
   setDeliverAllowed(allowed: boolean): void {

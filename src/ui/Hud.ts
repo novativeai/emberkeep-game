@@ -218,6 +218,16 @@ export class Hud {
     return { x: this.coinPill?.container.x ?? 572, y: this.coinPill?.container.y ?? 88 };
   }
 
+  /** WORLD position of the Warmth gauge's "+" button — the tutorial points here to
+   *  open the Emporium. Uses the button's world matrix so it stays correct through
+   *  the mobile pill magnification/reposition (a fixed offset would drift). */
+  getEnergyPlusPos(): { x: number; y: number } {
+    const plus = this.energyPill.plus;
+    if (!plus) return { x: this.energyPill.container.x, y: this.energyPill.container.y };
+    const m = plus.getWorldTransformMatrix();
+    return { x: m.tx, y: m.ty };
+  }
+
   /** A little bump when Gold lands. */
   bumpCoin(): void {
     if (!this.coinPill) return;

@@ -5,6 +5,7 @@ import type { GameState } from '../core/GameState';
 import type {
   BoardItemState,
   ChainConfig,
+  ChainMergeOverride,
   ChainsData,
   ItemSnapshot,
   TilePos
@@ -29,6 +30,12 @@ export class MergeSystem {
 
   private chainConfig(chainId: string): ChainConfig | undefined {
     return this.chains.chains.find((c) => c.id === chainId);
+  }
+
+  /** The effective merge recipe when merging items of `seedTier`: a per-TIER
+   *  override wins, else the chain-level override, else undefined (global rule). */
+  private mergeOverrideFor(config: ChainConfig, seedTier: number): ChainMergeOverride | undefined {
+    return config.tiers.find((t) => t.tier === seedTier)?.merge ?? config.merge;
   }
 
   private onDropped({ itemId, from, to }: { itemId: number; from: TilePos; to: TilePos }): void {
@@ -84,7 +91,7 @@ export class MergeSystem {
   private trySnapMerge(item: BoardItemState, to: TilePos): boolean {
     const config = this.chainConfig(item.chain);
     if (!config || !config.tiers.some((t) => t.tier === item.tier + 1)) return false; // max tier
-    const minGroup = config.merge?.group ?? this.chains.mergeRule.minGroup;
+    const minGroup = this.mergeOverrideFor(config, item.tier)?.group ?? this.chains.mergeRule.minGroup;
     let best: { col: number; row: number; matches: number } | null = null;
     for (let dc = -1; dc <= 1; dc++) {
       for (let dr = -1; dr <= 1; dr++) {
@@ -142,9 +149,10 @@ export class MergeSystem {
     if (!nextTier) return false; // max tier: no merge
 
     const rule = this.chains.mergeRule;
-    // A chain may override the recipe (e.g. lumber: 5 wood → 1 house); otherwise
-    // the global rule applies, with its 5-for-2 bonus.
-    const override = config.merge;
+    // A tier (or the whole chain) may override the recipe — e.g. 2 Houses → 1
+    // Manor while Bushes still merge 3 → 1 House; otherwise the global rule applies
+    // with its 5-for-2 bonus.
+    const override = this.mergeOverrideFor(config, seed.tier);
     const minGroup = override?.group ?? rule.minGroup;
     if (members.length < minGroup) return false;
 
