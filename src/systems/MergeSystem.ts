@@ -92,7 +92,7 @@ export class MergeSystem {
     const config = this.chainConfig(item.chain);
     if (!config || !config.tiers.some((t) => t.tier === item.tier + 1)) return false; // max tier
     const minGroup = this.mergeOverrideFor(config, item.tier)?.group ?? this.chains.mergeRule.minGroup;
-    let best: { col: number; row: number; matches: number } | null = null;
+    let best: { col: number; row: number; size: number } | null = null;
     for (let dc = -1; dc <= 1; dc++) {
       for (let dr = -1; dr <= 1; dr++) {
         if (dc === 0 && dr === 0) continue; // the drop tile itself was already tried
@@ -101,24 +101,53 @@ export class MergeSystem {
         if (!this.state.isTileActive(col, row)) continue;
         const occ = this.state.itemIdAt(col, row);
         if (occ && occ !== item.id) continue; // candidate must be free
-        let matches = 0;
-        for (let ec = -1; ec <= 1; ec++) {
-          for (let er = -1; er <= 1; er++) {
-            if (ec === 0 && er === 0) continue;
-            const n = this.state.itemAt(col + ec, row + er);
-            if (n && n.id !== item.id && n.kind === 'item' && n.chain === item.chain && n.tier === item.tier) {
-              matches++;
-            }
-          }
-        }
-        if (matches >= minGroup - 1 && (!best || matches > best.matches)) {
-          best = { col, row, matches };
+        // Size the ACTUAL orthogonally-connected group the piece would join if
+        // it stood on this candidate — the same flood-fill collectGroup runs.
+        // (A looser count — e.g. 8-neighbourhood — can promise a merge that
+        // then fails, leaving the piece silently moved in state while the
+        // scene renders it on the drop tile: a permanent drag-bounce desync.)
+        const size = this.groupSizeAt(col, row, item);
+        if (size >= minGroup && (!best || size > best.size)) {
+          best = { col, row, size };
         }
       }
     }
     if (!best) return false;
     this.state.moveItem(item.id, { col: best.col, row: best.row });
-    return this.performMerge(this.collectGroup(item), { col: best.col, row: best.row });
+    if (this.performMerge(this.collectGroup(item), { col: best.col, row: best.row })) return true;
+    // Safety net (unreachable with the exact flood above): the snap didn't
+    // fuse — put the piece back on the drop tile so state matches the
+    // 'item:moved' the caller emits next.
+    this.state.moveItem(item.id, to);
+    return false;
+  }
+
+  /** The orthogonally-connected same-chain+tier group size if `item` stood at
+   *  (col,row) — `item`'s current tile is ignored (it would vacate it). */
+  private groupSizeAt(col: number, row: number, item: BoardItemState): number {
+    const visited = new Set<string>([`${col},${row}`]);
+    const queue: TilePos[] = [{ col, row }];
+    let size = 1; // the piece itself, standing on the candidate
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      for (const pos of this.state.neighbors(current.col, current.row)) {
+        const key = `${pos.col},${pos.row}`;
+        if (visited.has(key) || !this.state.isTileActive(pos.col, pos.row)) continue;
+        const nearby = this.state.itemAt(pos.col, pos.row);
+        if (
+          nearby &&
+          nearby.id !== item.id &&
+          nearby.kind === 'item' &&
+          nearby.chain === item.chain &&
+          nearby.tier === item.tier
+        ) {
+          visited.add(key);
+          queue.push(pos);
+          size++;
+        }
+      }
+    }
+    return size;
   }
 
   /** Merge the flood-filled group around `seed`, output at the seed's tile. */

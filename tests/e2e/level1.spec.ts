@@ -415,6 +415,64 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(state.level).toBe(2); // still level 2 after tutorial
     await page.screenshot({ path: shot('17-tutorial-done') });
 
+    // ---------- Regression: the chest step's scripted dragon move ----------
+    // The tutorial's chest step slid the GREEN dragon to (9,6) synchronously
+    // inside its hatch emit — before the hatch ceremony created a sprite. The
+    // sprite must be born on the item's LIVE cell: born on the stale merge
+    // cell, every later drag bounces forever and (9,6) stays invisibly
+    // occupied (nothing can ever be dropped there).
+    const greenSync = await page.evaluate(() => {
+      const board = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
+        ctx: {
+          state: {
+            items: Map<number, { id: number; chain: string; tier: number; col: number; row: number }>;
+            isTileActive: (c: number, r: number) => boolean;
+            itemIdAt: (c: number, r: number) => number | null;
+          };
+        };
+        itemSprites: Map<number, { col: number; row: number }>;
+      };
+      const dragon = [...board.ctx.state.items.values()].find(
+        (i) => i.chain === 'emerald' && i.tier === 3
+      );
+      if (!dragon) return null;
+      const sprite = board.itemSprites.get(dragon.id);
+      let free: [number, number] | null = null;
+      for (const [dc, dr] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1]
+      ]) {
+        const c = dragon.col + dc!;
+        const r = dragon.row + dr!;
+        if (board.ctx.state.isTileActive(c, r) && board.ctx.state.itemIdAt(c, r) === null) {
+          free = [c, r];
+          break;
+        }
+      }
+      return {
+        state: { col: dragon.col, row: dragon.row },
+        sprite: sprite ? { col: sprite.col, row: sprite.row } : null,
+        free
+      };
+    });
+    expect(greenSync).not.toBeNull();
+    expect(greenSync!.sprite).toEqual(greenSync!.state); // scene renders what state holds
+    expect(greenSync!.free).not.toBeNull();
+    // And the REAL gesture: drag the green dragon one tile — it must MOVE.
+    const gd: [number, number] = [greenSync!.state.col, greenSync!.state.row];
+    await page.evaluate(([c, r]) => window.__emberkeep.centerCell(c as number, r as number), gd);
+    await page.waitForTimeout(400);
+    await dragTile(page, gd, greenSync!.free!);
+    await expect
+      .poll(
+        async () =>
+          (await findCells(page, (c) => c.chain === 'emerald' && c.tier === 3))[0]!.join(','),
+        { timeout: 8_000 }
+      )
+      .toBe(greenSync!.free!.join(','));
+
     // ---------- Reach level 3 → the Chapter One finale ----------
     // Tutorial ends at exactly 60 XP; Level 3 sits at 220 (the finale curve).
     await page.evaluate(() => window.__emberkeep.grantXp(160));

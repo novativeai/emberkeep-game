@@ -331,6 +331,28 @@ describe('MergeSystem', () => {
     expect(ctx.state.itemAt(3, 2)?.chain).toBe('sparkweed'); // just moved, no snap
   });
 
+  it('never desyncs state from the announced move when a near-merge cannot fuse', () => {
+    const ctx = createTestContext();
+    // Two pieces DIAGONAL to a shared candidate cell (3,3): the old
+    // 8-neighbourhood count saw a completable pair there, snapped the piece in
+    // state, then collectGroup (orthogonal) found nobody — the merge failed and
+    // the emitted item:moved pointed at a tile the item no longer occupied.
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 2, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 4, row: 2, kind: 'item' });
+    const dragged = ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 4, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+    const moves = capture(ctx.bus, 'item:moved');
+
+    drag(ctx, [1, 4], [3, 4]);
+
+    expect(merges).toHaveLength(0);
+    expect(moves).toHaveLength(1);
+    // state and the announced move must agree — the scene renders the event.
+    const item = ctx.state.items.get(dragged.id)!;
+    expect({ col: item.col, row: item.row }).toEqual(moves[0]!.to);
+    expect(ctx.state.itemIdAt(moves[0]!.to.col, moves[0]!.to.row)).toBe(dragged.id);
+  });
+
   it('writes a Cookbook page on the FIRST merge of a recipe — and only once', () => {
     const ctx = createTestContext();
     const discovered = capture(ctx.bus, 'cookbook:discovered');

@@ -1728,6 +1728,16 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private acquireSprite(snap: ItemSnapshot, pop: boolean): BoardItem {
+    // Sprites are often created a beat AFTER the state event that announced
+    // them (hatch ceremony, merge pop-in run on delayed calls) — and scripted
+    // tutorial moves land synchronously inside those emits. Bind the sprite to
+    // the item's LIVE state cell: a sprite born on a stale snapshot cell
+    // desyncs every future drag validation (the item bounces forever) and
+    // leaves its real tile invisibly occupied.
+    const live = this.ctx.state.items.get(snap.id);
+    if (live && (live.col !== snap.col || live.row !== snap.row)) {
+      snap = { ...snap, col: live.col, row: live.row };
+    }
     let sprite = this.pool.find((s) => !s.active);
     if (!sprite) {
       sprite = new BoardItem(this);
@@ -2591,7 +2601,15 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /** Shell-crack flash, spark confetti, then the hatchling pops in. */
-  private hatchSequence(snap: ItemSnapshot): void {    const { x, y } = gridToWorld(snap.col, snap.row);
+  private hatchSequence(snap: ItemSnapshot): void {
+    // The tutorial can MOVE the hatchling in state synchronously inside the
+    // 'item:hatched' emit (the chest step slides the green dragon aside) —
+    // before this ceremony has created a sprite. Re-read the live cell so the
+    // whole ceremony (and the sprite acquireSprite binds below) happens where
+    // the item actually is.
+    const live = this.ctx.state.items.get(snap.id);
+    if (live) snap = { ...snap, col: live.col, row: live.row };
+    const { x, y } = gridToWorld(snap.col, snap.row);
     // The shaking pre-hatch shape is the EGG the merge consumed: same chain,
     // one tier down (works for every hatching chain — ember, emerald, ...).
     const eggKey = `item_${snap.chain}_${snap.tier - 1}`;
