@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import { uiRegistry } from './theme';
@@ -12,7 +12,11 @@ const CARD_H = 620;
 
 interface Product {
   amount: number;
+  /** Mock real-money price tag (the IAP showcase — Gold Shop). */
   price: string;
+  /** In-game GOLD price — the demo's Warmth refills are bought with the Gold
+   *  the player earns (MECHANICS §7: Gold buys comfort, never progression). */
+  gold?: number;
   best?: boolean;
 }
 const SHOP: Record<Currency, { title: string; icon: string; iconScale: number; items: Product[] }> = {
@@ -21,9 +25,9 @@ const SHOP: Record<Currency, { title: string; icon: string; iconScale: number; i
     icon: 'ui_icon_bolt',
     iconScale: 1.4,
     items: [
-      { amount: 2, price: '$0.99' },
-      { amount: 20, price: '$2.99', best: true },
-      { amount: 50, price: '$9.99' }
+      { amount: 5, price: '', gold: 20 },
+      { amount: 20, price: '', gold: 60, best: true },
+      { amount: 50, price: '', gold: 130 }
     ]
   },
   coins: {
@@ -41,8 +45,10 @@ const SHOP: Record<Currency, { title: string; icon: string; iconScale: number; i
 };
 
 /**
- * In-game currency shop. A gauge's "+" opens it; each card buys an amount for a
- * (mock) real-money price — tapping the green price button grants the currency.
+ * In-game currency shop. A gauge's "+" opens it. The WARMTH shop is a real
+ * GOLD SINK: after the one-time free Ember Spark, refills cost the Gold the
+ * player earns from orders/selling (MECHANICS §7 — Gold buys comfort, never
+ * progression). The GOLD shop keeps mock real-money price tags (IAP showcase).
  * Visual theme recreated from theme-pay-reel.jpeg with Phaser primitives.
  */
 export class ShopPanel extends Phaser.GameObjects.Container {
@@ -56,6 +62,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
   private freeBtn?: Phaser.GameObjects.Container;
   /** Sparkle/pulse tweens on the current cards — killed before every rebuild. */
   private fxTweens: Phaser.Tweens.Tween[] = [];
+  /** Open/rest scale — >1 on mobile so the frame fills the portrait width. */
+  private baseScale = 1;
 
   constructor(
     scene: Phaser.Scene,
@@ -71,6 +79,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
 
     // The framed Emporium board (TextureFactory ui_shop_panel — themable).
     const frame = scene.add.image(0, 40, 'ui_shop_panel');
+    this.baseScale = panelMobileScale(frame.width);
 
     // Title banner: gold-trimmed lava lozenge riding the panel's top edge.
     this.titleBg = scene.add.graphics();
@@ -111,8 +120,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     this.buildCards(currency, cfg);
 
     this.isOpen = true;
-    this.setVisible(true).setAlpha(0).setScale(0.92);
-    this.scene.tweens.add({ targets: this, alpha: 1, scale: 1, duration: 200, ease: 'Back.easeOut' });
+    this.setVisible(true).setAlpha(0).setScale(this.baseScale * 0.92);
+    this.scene.tweens.add({ targets: this, alpha: 1, scale: this.baseScale, duration: 200, ease: 'Back.easeOut' });
   }
 
   requestClose(): void {
@@ -121,7 +130,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     this.scene.tweens.add({
       targets: this,
       alpha: 0,
-      scale: 0.94,
+      scale: this.baseScale * 0.94,
       duration: 150,
       ease: 'Sine.easeIn',
       onComplete: () => this.setVisible(false)
@@ -227,7 +236,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     // Beveled price button (TextureFactory pseudo-3D chrome; FREE! is gold).
     const priceBtn = this.scene.add.container(0, 208);
     const btnImg = this.scene.add.image(0, 0, isFreeFirst ? 'ui_btn_free' : 'ui_btn_price');
-    const priceLabel = isFreeFirst ? 'FREE!' : item.price;
+    const priceLabel = isFreeFirst ? 'FREE!' : item.gold !== undefined ? `🪙 ${item.gold}` : item.price;
     const price = this.scene.add
       .text(0, -8, priceLabel, { fontFamily: FONT, fontSize: '48px', fontStyle: 'bold', color: '#FFFFFF' })
       .setOrigin(0.5)
@@ -240,6 +249,19 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     btnImg.on('pointerout', () => priceBtn.setScale(1));
     btnImg.on('pointerup', () => {
       priceBtn.setScale(1);
+      // GOLD-priced card: check the coffer; deny with a shake + red flash when
+      // short (the coins never go negative).
+      if (!isFreeFirst && item.gold !== undefined) {
+        if (this.gameState.coins < item.gold) {
+          price.setColor('#FF6B57');
+          this.scene.time.delayedCall(450, () => price.setColor('#FFFFFF'));
+          this.scene.tweens.add({
+            targets: priceBtn, x: priceBtn.x + 10, duration: 45, yoyo: true, repeat: 3
+          });
+          return;
+        }
+        this.bus.emit('economy:add', { coins: -item.gold, reason: 'shop:warmth' });
+      }
       this.purchase(currency, item.amount, isFreeFirst); // EconomySystem records the one-shot
     });
     card.add(priceBtn);

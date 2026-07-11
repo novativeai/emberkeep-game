@@ -6,10 +6,12 @@ import {
   GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_TREMBLE_PROGRESS,
+  IS_MOBILE,
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
   SCENES,
+  UI_SCALE,
   WELCOME_BACK_MIN_MS
 } from '../core/Constants';
 import { gridToWorld } from '../core/iso';
@@ -305,7 +307,11 @@ export class UIScene extends Phaser.Scene {
   /** Emberkeep Cookbook button — sits directly above the Ledger (quest)
    *  button; hidden during the tutorial. The lava dot marks new pages. */
   private buildCookbookButton(): Phaser.GameObjects.Container {
-    const button = this.add.container(GAME_WIDTH - 156, LIVE_GAME_HEIGHT - 356).setDepth(DEPTH_HUD);
+    // Bottom-right, stacked above the Ledger; magnified + lifted clear of it on mobile.
+    const button = this.add
+      .container(GAME_WIDTH - (IS_MOBILE ? 190 : 156), LIVE_GAME_HEIGHT - (IS_MOBILE ? 560 : 356))
+      .setScale(UI_SCALE)
+      .setDepth(DEPTH_HUD);
     const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.05);
     const icon = this.textures.exists('ui_icon_cookbook')
       ? this.add.image(0, -6, 'ui_icon_cookbook').setDisplaySize(100, 100)
@@ -317,8 +323,8 @@ export class UIScene extends Phaser.Scene {
     button.add([bg, icon, this.cookbookDot]);
     button.setSize(134, 134);
     button.setInteractive({ useHandCursor: true });
-    button.on('pointerover', () => button.setScale(1.06));
-    button.on('pointerout', () => button.setScale(1));
+    button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
+    button.on('pointerout', () => button.setScale(UI_SCALE));
     button.on('pointerup', () => {
       if (!(this.lastStep?.done ?? this.ctx.state.tutorialDone) && !(this.lastStep?.allow.cookbook ?? false)) return;
       if (this.cookbook.isOpen) {

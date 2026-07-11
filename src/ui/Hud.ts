@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, LEVEL_XP, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, IS_MOBILE, LEVEL_XP, LIVE_GAME_HEIGHT, num, PALETTE, UI_SCALE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import { uiRegistry } from './theme';
@@ -31,6 +31,9 @@ export class Hud {
   private xpLabel: Phaser.GameObjects.Text;
   private ledgerDot: Phaser.GameObjects.Arc;
   private ledgerEnabled = true;
+  /** Base scale of the gauge pills (>1 on mobile) — press/refresh tweens are
+   *  relative to this so the mobile magnification survives every bump. */
+  private pillScale = UI_SCALE;
   /** Deliverability per visible order — the dot shows while ANY is ready. */
   private deliverableByOrder = new Map<string, boolean>();
   private readonly offBus: Array<() => void> = [];
@@ -41,11 +44,16 @@ export class Hud {
     private state: GameState,
     callbacks: { onLedger: () => void; onGear: () => void }
   ) {
-    this.energyPill = this.pill(224, 88, 'ui_icon_bolt', `${state.energyCurrent}/${this.state.energyMax}`);
+    // Portrait phones magnify the HUD (pillScale) and spread the gauge row wider
+    // so the enlarged pills don't collide; desktop keeps its compact landscape row.
+    const L = IS_MOBILE
+      ? { energy: [330, 150], coin: [930, 150], key: [1530, 150], regen: [330, 280] }
+      : { energy: [224, 88], coin: [572, 88], key: [920, 88], regen: [224, 138] };
+    this.energyPill = this.pill(L.energy[0], L.energy[1], 'ui_icon_bolt', `${state.energyCurrent}/${this.state.energyMax}`);
     // coin.png is a big detailed coin — shrink the icon ~85% so the Gold gauge
     // reads like the others (icon + value), not an oversized coin.
-    this.coinPill = this.pill(572, 88, 'ui_icon_coin', `${state.coins}`, 0.14);
-    this.keyPill = this.pill(920, 88, 'ui_icon_key', `${state.keys}`);
+    this.coinPill = this.pill(L.coin[0], L.coin[1], 'ui_icon_coin', `${state.coins}`, 0.14);
+    this.keyPill = this.pill(L.key[0], L.key[1], 'ui_icon_key', `${state.keys}`);
     // A green "+" on the Warmth/Gold gauges opens their shop. Keys are STORY
     // gates and are never sold (MECHANICS §7: monetise impatience, never
     // progression) — the key pill gets no shop button.
@@ -53,17 +61,24 @@ export class Hud {
     this.addPlus(this.coinPill, 'coins', bus);
     // Small countdown to the next +1 Warmth, just under the energy gauge.
     this.regenLabel = scene.add
-      .text(224, 138, '', { fontFamily: FONT, fontSize: '27px', fontStyle: 'bold', color: PALETTE.cream })
+      .text(L.regen[0], L.regen[1], '', { fontFamily: FONT, fontSize: '27px', fontStyle: 'bold', color: PALETTE.cream })
       .setOrigin(0.5)
+      .setScale(this.pillScale)
       .setAlpha(0.9);
 
-    // Settings gear.
-    this.gearButton = this.roundIconButton(GAME_WIDTH - 112, 104, 'ui_icon_gear', 1, callbacks.onGear);
+    // Settings gear — top-right corner (nudged in on mobile for the fat pixels).
+    this.gearButton = this.roundIconButton(
+      GAME_WIDTH - (IS_MOBILE ? 150 : 112),
+      IS_MOBILE ? 150 : 104,
+      'ui_icon_gear',
+      1,
+      callbacks.onGear
+    );
 
-    // Ledger button: bigger, with the scroll icon.
+    // Ledger button: bigger, with the scroll icon. Bottom-right corner.
     this.ledgerButton = this.roundIconButton(
-      GAME_WIDTH - 156,
-      LIVE_GAME_HEIGHT - 168,
+      GAME_WIDTH - (IS_MOBILE ? 190 : 156),
+      LIVE_GAME_HEIGHT - (IS_MOBILE ? 260 : 168),
       'ui_icon_scroll',
       1.5,
       () => {
@@ -121,6 +136,12 @@ export class Hud {
       .setOrigin(0.5);
     // Same paint order the old depth values produced: bar under disc, number on top.
     levelGroup.add([barBg, this.xpFill, this.xpLabel, lvlTag, disc, this.levelText]);
+    // Mobile: magnify the whole cluster, anchored to the bottom-left corner. The
+    // children carry large absolute Y (~LIVE_GAME_HEIGHT), so scaling around that
+    // corner = scale k with the group offset by pivotY·(1−k) (plus a small inset).
+    if (IS_MOBILE) {
+      levelGroup.setScale(UI_SCALE).setPosition(24, LIVE_GAME_HEIGHT * (1 - UI_SCALE) - 30);
+    }
 
     this.refreshEconomy();
     this.refreshEnergy(state.energyCurrent);
@@ -202,7 +223,7 @@ export class Hud {
     if (!this.coinPill) return;
     this.scene.tweens.add({
       targets: this.coinPill.container,
-      scale: { from: 1.16, to: 1 },
+      scale: { from: this.pillScale * 1.16, to: this.pillScale },
       duration: 160,
       ease: 'Sine.easeOut'
     });
@@ -229,7 +250,7 @@ export class Hud {
   }
 
   private pill(x: number, y: number, icon: string, value: string, iconScale = 0.92): Pill {
-    const container = this.scene.add.container(x, y);
+    const container = this.scene.add.container(x, y).setScale(this.pillScale);
     const bg = this.scene.add.image(0, 0, 'ui_pill').setScale(0.95, 0.9);
     const iconImg = this.scene.add.image(-116, 0, icon).setScale(iconScale);
     const text = this.scene.add
@@ -251,17 +272,20 @@ export class Hud {
     scale: number,
     onTap: () => void
   ): Phaser.GameObjects.Container {
-    const container = this.scene.add.container(x, y);
+    // `base` is the mobile magnification (1 on desktop). The press/hover feedback
+    // multiplies it so the button never snaps back to un-magnified size on tap.
+    const base = UI_SCALE;
+    const container = this.scene.add.container(x, y).setScale(base);
     const bg = this.scene.add.image(0, 0, 'ui_btn_round').setScale(scale);
     const iconImg = this.scene.add.image(0, -8 * scale, icon).setScale(scale * 0.95);
     container.add([bg, iconImg]);
     container.setSize(128 * scale, 128 * scale);
     container.setInteractive({ useHandCursor: true });
-    container.on('pointerover', () => container.setScale(1.06));
-    container.on('pointerout', () => container.setScale(1));
-    container.on('pointerdown', () => container.setScale(0.94));
+    container.on('pointerover', () => container.setScale(base * 1.06));
+    container.on('pointerout', () => container.setScale(base));
+    container.on('pointerdown', () => container.setScale(base * 0.94));
     container.on('pointerup', () => {
-      container.setScale(1);
+      container.setScale(base);
       onTap();
     });
     return container;
@@ -276,7 +300,7 @@ export class Hud {
     this.energyPill.value.setText(`${current}/${this.state.energyMax}`);
     this.scene.tweens.add({
       targets: this.energyPill.container,
-      scale: { from: 1.08, to: 1 },
+      scale: { from: this.pillScale * 1.08, to: this.pillScale },
       duration: 140,
       ease: 'Sine.easeOut'
     });

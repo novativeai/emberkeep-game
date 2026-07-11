@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { OrderConfig } from '../core/types';
@@ -8,7 +8,9 @@ import type { TaskSystem } from '../systems/TaskSystem';
 import { uiRegistry } from './theme';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
-const CARD_X = 330;
+// Card centres: half the card art (640×0.9 → ±288) + this must stay inside the
+// ui_panel's inner face (~±612) — at 330/0.96 the cards overflowed the frame.
+const CARD_X = 300;
 const TAB_W = 520;
 const TAB_H = 104;
 const TAB_Y = -384;
@@ -53,6 +55,8 @@ interface TabHandle {
  */
 export class LedgerPanel extends Phaser.GameObjects.Container {
   isOpen = false;
+  /** Open/rest scale — >1 on mobile so the frame fills the portrait width. */
+  private baseScale = 1;
   private readonly offBus: Array<() => void> = [];
   private dim: Phaser.GameObjects.Rectangle;
   private blurb: Phaser.GameObjects.Text;
@@ -81,6 +85,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.dim.on('pointerup', () => this.requestClose());
 
     const panel = scene.add.image(0, 16, 'ui_panel');
+    this.baseScale = panelMobileScale(panel.width);
 
     // Tab lozenges along the top edge — Orders sits centred (classic Ledger
     // header) until the tutorial ends and the Tasks tab joins it.
@@ -241,7 +246,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   /** One order card: portrait, title, requirement slot, reward line, Deliver. */
   private buildCard(scene: Phaser.Scene, x: number): OrderCard {
     const root = scene.add.container(x, 16);
-    const cardBg = scene.add.image(0, 0, 'ui_card').setScale(0.96);
+    const cardBg = scene.add.image(0, 0, 'ui_card').setScale(0.9);
     // Fixed on-card size — the real 412px bubble-icon art and the 192px
     // painted fallback must both read the same here.
     const portrait = scene.add.image(0, -218, 'portrait_cindra').setDisplaySize(178, 178);
@@ -348,8 +353,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.scene.tweens.killTweensOf(this);
     this.setVisible(true);
     this.setAlpha(0);
-    this.setScale(0.92);
-    this.scene.tweens.add({ targets: this, alpha: 1, scale: 1, duration: 200, ease: 'Back.easeOut' });
+    this.setScale(this.baseScale * 0.92);
+    this.scene.tweens.add({ targets: this, alpha: 1, scale: this.baseScale, duration: 200, ease: 'Back.easeOut' });
     this.bus.emit('ui:ledger_toggled', { open: true });
   }
 
@@ -360,7 +365,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.scene.tweens.add({
       targets: this,
       alpha: 0,
-      scale: 0.94,
+      scale: this.baseScale * 0.94,
       duration: 150,
       ease: 'Sine.easeIn',
       onComplete: () => this.setVisible(false)

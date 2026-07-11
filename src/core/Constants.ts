@@ -58,6 +58,22 @@ export const IS_IOS: boolean =
     (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent)));
 
 /**
+ * HUD / popup magnification on mobile portrait. The UI is authored in the fixed
+ * 2560-wide space; on a phone that space FIT-scales to ~15%, so gauges/buttons
+ * render at half the size a thumb needs. Clusters multiply by this (anchored to
+ * their screen corner) and popups fill the portrait width. `1` on desktop — the
+ * landscape layout is untouched. See `panelMobileScale`.
+ */
+export const UI_SCALE: number = IS_MOBILE ? 1.5 : 1;
+
+/** Uniform scale so a centred popup FRAME of `frameWidth` fills ~94% of the
+ *  portrait width. `1` on desktop. Capped so a small frame never balloons. */
+export function panelMobileScale(frameWidth: number): number {
+  if (!IS_MOBILE) return 1;
+  return Math.min(2.2, (GAME_WIDTH * 0.94) / frameWidth);
+}
+
+/**
  * Viewport height in game-space units.
  * On desktop stays at GAME_HEIGHT (1600) — no change (e2e/landscape untouched).
  * On mobile the game is PORTRAIT: GAME_WIDTH (2560) spans the phone's SHORT side

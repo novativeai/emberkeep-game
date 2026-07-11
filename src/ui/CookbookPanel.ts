@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { ChainsData } from '../core/types';
@@ -55,6 +55,8 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   private readonly offBus: Array<() => void> = [];
   private rows: RecipeRow[] = [];
   private counter: Phaser.GameObjects.Text;
+  /** Open/rest scale — >1 on mobile so the frame fills the portrait width. */
+  private baseScale = 1;
 
   constructor(
     scene: Phaser.Scene,
@@ -71,6 +73,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.add(dim);
 
     const panel = scene.add.image(0, 16, 'ui_panel');
+    this.baseScale = panelMobileScale(panel.width);
     this.add(panel);
 
     // Title lozenge — gold, like the Keeper's Tasks header.
@@ -317,8 +320,8 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.isOpen = true;
     this.refresh();
     this.scene.tweens.killTweensOf(this);
-    this.setVisible(true).setAlpha(0).setScale(0.92);
-    this.scene.tweens.add({ targets: this, alpha: 1, scale: 1, duration: 200, ease: 'Back.easeOut' });
+    this.setVisible(true).setAlpha(0).setScale(this.baseScale * 0.92);
+    this.scene.tweens.add({ targets: this, alpha: 1, scale: this.baseScale, duration: 200, ease: 'Back.easeOut' });
     this.bus.emit('ui:cookbook_opened', {
       discovered: this.gameState.discoveredRecipes.length
     });
@@ -331,7 +334,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.scene.tweens.add({
       targets: this,
       alpha: 0,
-      scale: 0.94,
+      scale: this.baseScale * 0.94,
       duration: 150,
       ease: 'Sine.easeIn',
       onComplete: () => this.setVisible(false)
