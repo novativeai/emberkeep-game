@@ -466,8 +466,9 @@ export interface EventMap {
   'generator:reward': { generatorId: number; coins: number; xp: number; energy: number };
   /** A generator's wait was paid off (the skip button) — currency tells which. */
   'generator:skipped': { itemId: number; chain: string; currency: 'gold' | 'warmth' };
-  /** A Gold coin was tapped to bank it — UI flies a coin to the Gold gauge. */
-  'gold:collected': { at: TilePos };
+  /** A Gold coin was tapped to bank it — UI flies coin(s) to the Gold gauge,
+   *  one gauge pulse per arrival (the Pouch sends 3; default 1). */
+  'gold:collected': { at: TilePos; coins?: number };
   'item:removed': { itemId: number; at: TilePos; reason: 'sold' | 'delivered' };
   'item:sold': { itemId: number; coins: number };
   'energy:changed': { current: number; max: number };

@@ -255,7 +255,7 @@ export class UIScene extends Phaser.Scene {
         // the pop settle, then offer the recipe demonstration.
         this.time.delayedCall(700, () => this.checkRecipeHints());
       }),
-      bus.on('gold:collected', ({ at }) => this.flyCoinToGold(at)),
+      bus.on('gold:collected', ({ at, coins }) => this.flyCoinToGold(at, coins ?? 1)),
       bus.on('ui:shop_requested', ({ currency }) => {
         if (!(this.lastStep?.done || (this.lastStep?.allow.marketplace ?? false))) return;
         this.shop.open(currency);
@@ -393,36 +393,39 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  /** A tapped Gold coin arcs from its board cell up to the Gold gauge, then the
-   *  gauge bumps — smooth appearance + collection juice. */
-  private flyCoinToGold(at: TilePos): void {
+  /** Tapped Gold arcs from its board cell up to the Gold gauge — one coin
+   *  sprite per banked coin (the Pouch sends 3), staggered so each arrival
+   *  lands separately and pulses the gauge on impact. */
+  private flyCoinToGold(at: TilePos, count = 1): void {
     const start = this.cellToScreen(at.col, at.row);
     const end = this.hud.getCoinPos();
-    const coin = this.add
-      .image(start.x, start.y - 30, 'item_coin_1')
-      .setScale(0.16)
-      .setDepth(DEPTH_PANEL + 5);
-    coin.setScale(0.05);
-    this.tweens.add({ targets: coin, scale: 0.16, duration: 160, ease: 'Back.easeOut' });
-    const proxy = { t: 0 };
-    this.tweens.add({
-      targets: proxy,
-      t: 1,
-      duration: 560,
-      delay: 150,
-      ease: 'Sine.easeIn',
-      onUpdate: () => {
-        const t = proxy.t;
-        coin.x = Phaser.Math.Linear(start.x, end.x, t);
-        coin.y = Phaser.Math.Linear(start.y - 30, end.y, t) - Math.sin(Math.PI * t) * 120;
-        coin.rotation = t * Math.PI * 1.5;
-        coin.setScale(0.16 * (1 - 0.45 * t));
-      },
-      onComplete: () => {
-        coin.destroy();
-        this.hud.bumpCoin();
-      }
-    });
+    for (let i = 0; i < count; i++) {
+      const coin = this.add
+        .image(start.x, start.y - 30, 'item_coin_1')
+        .setScale(0.05)
+        .setAlpha(0) // invisible until its turn in the stagger
+        .setDepth(DEPTH_PANEL + 5);
+      this.tweens.add({ targets: coin, scale: 0.16, alpha: 1, duration: 160, delay: i * 220, ease: 'Back.easeOut' });
+      const proxy = { t: 0 };
+      this.tweens.add({
+        targets: proxy,
+        t: 1,
+        duration: 560,
+        delay: 150 + i * 220, // stagger: each coin rises after the previous one
+        ease: 'Sine.easeIn',
+        onUpdate: () => {
+          const t = proxy.t;
+          coin.x = Phaser.Math.Linear(start.x, end.x, t);
+          coin.y = Phaser.Math.Linear(start.y - 30, end.y, t) - Math.sin(Math.PI * t) * 120;
+          coin.rotation = t * Math.PI * 1.5;
+          coin.setScale(0.16 * (1 - 0.45 * t));
+        },
+        onComplete: () => {
+          coin.destroy();
+          this.hud.bumpCoin(); // one gauge pulse PER arriving coin
+        }
+      });
+    }
   }
 
   /** The level-up reward beat: a warm banner — Warmth refilled + Gold. Deferred a

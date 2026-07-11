@@ -137,11 +137,6 @@ export class BoardScene extends Phaser.Scene {
   private dragonMenu?: Phaser.GameObjects.Container;
   private dragonMenuLabel?: Phaser.GameObjects.Text;
   private dragonMenuForId = 0;
-  /** Home position a working dragon flies back to when it tires. */
-  private dragonHomes = new Map<number, { x: number; y: number }>();
-  /** Which standing slot (index) each working dragon holds at its building, so
-   *  two workers never land on the same spot. Cleared when the dragon leaves. */
-  private dragonSlots = new Map<number, { houseId: number; idx: number }>();
   /** Countdown pill floating above a rig-hosted dragon: the BoardItem's own
    *  pill renders UNDER the rig (glued at host.depth + 0.5), so the timer
    *  lives in a scene-level badge instead. Keyed by dragon itemId. */
@@ -218,8 +213,6 @@ export class BoardScene extends Phaser.Scene {
     this.skipForId = 0;
     this.dragonMenu = undefined;
     this.dragonMenuForId = 0;
-    this.dragonHomes.clear();
-    this.dragonSlots.clear();
     this.restBadges.clear();
     this.highlights = [];
     this.allow = { ...NO_ALLOW };
@@ -1933,7 +1926,10 @@ export class BoardScene extends Phaser.Scene {
     if (collect) {
       // Always collectable (even mid-tutorial) — banking a coin never interferes.
       this.ctx.bus.emit('economy:add', { coins: collect.coins, reason: 'collect' });
-      this.ctx.bus.emit('gold:collected', { at: { col: item.col, row: item.row } });
+      // The Pouch bursts into THREE coins riding to the gauge (one gauge pulse
+      // per arrival); a single coin sends one.
+      const flight = item.chain === 'coin' && item.tier === 2 ? 3 : 1;
+      this.ctx.bus.emit('gold:collected', { at: { col: item.col, row: item.row }, coins: flight });
       this.sparks.explode(8, sprite.x, sprite.y - 40);
       this.ctx.bus.emit('board:consume_items', { itemIds: [item.id], reason: 'sold' });
       return;
@@ -2087,9 +2083,9 @@ export class BoardScene extends Phaser.Scene {
     });
   }
 
-  /** Two floating skip buttons under a waiting generator: GOLD (🪙) and the
-   *  cheaper WARMTH (⚡). Hovering a button shows WHICH currency it spends ("Par
-   *  or" / "Par énergie"). Both prices are dynamic and refresh live. */
+  /** Two floating skip buttons under a waiting generator: GOLD (real coin art)
+   *  and the cheaper WARMTH (⚡). Hovering a button shows WHICH currency it
+   *  spends. Both prices are dynamic and refresh live. */
   private showSkipButton(
     sprite: BoardItem,
     remaining: number,
@@ -2142,7 +2138,11 @@ export class BoardScene extends Phaser.Scene {
       btn.add([bg, label]);
       return label;
     };
-    this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Skip with Gold', `🪙 ${skipEnergyCost(remaining, total, maxGold)}`);
+    // The gold button wears the REAL coin art (the 🪙 emoji read as a generic
+    // token); the label carries only the price and sits right of the icon.
+    this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
+    this.skipGoldLabel.setX(-150 + 22);
+    btn.add(this.add.image(-150 - 34, -2, 'item_coin_1').setScale(0.1));
     this.skipWarmthLabel = make(150, 0xa9d6ff, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
     btn.add(caption); // on top of the buttons
     // Tutorial: bounce an arrow over the WARMTH (⚡) skip so the player learns to
@@ -2167,7 +2167,7 @@ export class BoardScene extends Phaser.Scene {
 
   /** Keep both skip prices in step as the timer drains. */
   private updateSkipCost(remaining: number, total: number): void {
-    this.skipGoldLabel?.setText(`🪙 ${skipEnergyCost(remaining, total, this.skipMaxGold)}`);
+    this.skipGoldLabel?.setText(`${skipEnergyCost(remaining, total, this.skipMaxGold)}`);
     this.skipWarmthLabel?.setText(`⚡ ${skipWarmthCost(remaining, total, this.skipMaxGold)}`);
   }
 
@@ -2284,40 +2284,46 @@ export class BoardScene extends Phaser.Scene {
       return;
     }
     this.busyDragons.add(sprite.itemId);
-    this.dragonHomes.set(sprite.itemId, home ?? { x: sprite.x, y: sprite.y });
+    const homePos = home ?? { x: sprite.x, y: sprite.y };
     const ld = this.liveDragons.get(sprite.itemId);
-    if (ld) ld.busy = true;
+    const landX = house.x + 70; // land beside the building so the un-mirrored rig faces it
+    if (ld) {
+      ld.busy = true;
+      ld.player.setFacing('left');
+      ld.player.play('hover');
+    }
     sprite.setDepth(DEPTHS.dragged);
-    // Stand at a DISTINCT spot around the building so two dragons never overlap.
-    const slots = [
-      { dx: -110, dy: 24 },
-      { dx: 110, dy: 24 },
-      { dx: -120, dy: -48 },
-      { dx: 120, dy: -48 },
-      { dx: 0, dy: 70 },
-      { dx: 0, dy: -78 }
-    ];
-    // Take the first slot NOT already held by another dragon at this same
-    // building. (The live worker count repeats as dragons cycle in and out, so
-    // `count % slots` collided — track the actual assignments instead.)
-    const taken = new Set(
-      [...this.dragonSlots.values()].filter((s) => s.houseId === house.itemId).map((s) => s.idx)
-    );
-    let idx = 0;
-    while (idx < slots.length && taken.has(idx)) idx++;
-    idx %= slots.length; // all six full → wrap (only with >6 workers on one building)
-    this.dragonSlots.set(sprite.itemId, { houseId: house.itemId, idx });
-    const slot = slots[idx]!;
-    const target = { x: house.x + slot.dx, y: house.y + slot.dy };
+    // Same beat as the harvest flourish: fly over, breathe a brief burst of
+    // work-magic onto the building, and come STRAIGHT home. The job itself
+    // (DragonJobSystem's speed-up + fatigue cycle) runs on its own clock and
+    // never depended on the dragon standing there.
     this.tweens.add({
       targets: sprite,
-      x: target.x,
-      y: target.y,
+      x: landX,
+      y: house.y + 24,
       duration: DRAGON_ANIM.flyToMs,
       ease: 'Sine.easeInOut',
       onComplete: () => {
-        sprite.settleDepth();
-        if (ld) ld.player.play('idle'); // "floats" by the house, working
+        this.glowFlash(house.x, house.y - 36, PALETTE.goldAccent, 0.6, 1.2);
+        this.sparks.explode(14, house.x, house.y - 34);
+        this.tweens.add({
+          targets: sprite,
+          x: homePos.x,
+          y: homePos.y,
+          delay: DRAGON_ANIM.workMs,
+          duration: DRAGON_ANIM.flyBackMs,
+          ease: 'Sine.easeInOut',
+          onComplete: () => {
+            sprite.settleDepth();
+            this.busyDragons.delete(sprite.itemId);
+            if (ld) {
+              ld.busy = false;
+              ld.player.play('idle');
+              ld.mode = 'idle';
+              ld.remainMs = this.idleSpanMs(ld.calm);
+            }
+          }
+        });
       }
     });
     this.ctx.bus.emit('dragon:work', { dragonId: sprite.itemId, houseId: house.itemId });
@@ -2437,28 +2443,6 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
-  /** A tired dragon flies back to its home tile to rest. */
-  private returnDragonHome(dragonId: number): void {
-    this.dragonSlots.delete(dragonId); // free its standing slot for the next worker
-    const sprite = this.itemSprites.get(dragonId);
-    const home = this.dragonHomes.get(dragonId);
-    if (!sprite || !home) return;
-    sprite.setDepth(DEPTHS.dragged);
-    this.tweens.add({
-      targets: sprite,
-      x: home.x,
-      y: home.y,
-      duration: DRAGON_ANIM.flyBackMs,
-      ease: 'Sine.easeInOut',
-      onComplete: () => {
-        sprite.settleDepth();
-        this.busyDragons.delete(dragonId);
-        const ld = this.liveDragons.get(dragonId);
-        if (ld) ld.busy = false;
-      }
-    });
-  }
-
   private onFogTapped(regionId: string, col: number, row: number): void {
     const status = this.ctx.state.regionStatus.get(regionId);
     const { x, y } = gridToWorld(col, row);
@@ -2536,10 +2520,7 @@ export class BoardScene extends Phaser.Scene {
         this.onGeneratorReward(generatorId, coins, xp, energy)
       ),
       bus.on('chest:claimed', ({ chestId, label }) => this.onChestClaimed(chestId, label)),
-      bus.on('dragon:rest', ({ dragonId }) => {
-        this.returnDragonHome(dragonId);
-        this.showRestBadge(dragonId);
-      }),
+      bus.on('dragon:rest', ({ dragonId }) => this.showRestBadge(dragonId)), // already home — the work trip is a brief flourish
       bus.on('dragon:rested', ({ dragonId }) => this.wakeDragon(dragonId)),
       bus.on('item:harvest_failed', ({ generatorId, reason }) => {
         const sprite = this.itemSprites.get(generatorId);
