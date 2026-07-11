@@ -272,13 +272,14 @@ describe('MergeSystem', () => {
     const merges = capture(ctx.bus, 'item:merged');
 
     // (3,2) touches NEITHER pair tile (two columns away) — the exact-tile merge
-    // fails. The smart snap finds (2,1), which sits beside both, and fuses there.
+    // fails. The smart snap picks (2,2): the NEAREST free tile to the drop that
+    // completes an orthogonal trio ((2,2)→(1,2)→(1,1)), and fuses there.
     drag(ctx, [5, 5], [3, 2]);
 
     expect(merges).toHaveLength(1);
     expect(merges[0]!.consumedIds).toHaveLength(3);
     expect(ctx.state.items.size).toBe(1);
-    expect(ctx.state.itemAt(2, 1)).toMatchObject({ chain: 'sparkweed', tier: 2 });
+    expect(ctx.state.itemAt(2, 2)).toMatchObject({ chain: 'sparkweed', tier: 2 });
   });
 
   it('does NOT snap-merge when only ONE matching piece sits nearby', () => {
@@ -294,5 +295,20 @@ describe('MergeSystem', () => {
     expect(moves).toHaveLength(1);
     expect(ctx.state.items.size).toBe(2);
     expect(ctx.state.itemAt(3, 2)?.chain).toBe('sparkweed'); // just moved, no snap
+  });
+
+  it('dropping the 3rd piece just OFF a pair (diagonally) still fuses — no dead-centre needed', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 2, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 3, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 6, row: 6, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    // (4,3) sits diagonally off the pair — you didn't land on either piece.
+    drag(ctx, [6, 6], [4, 3]);
+
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.consumedIds).toHaveLength(3);
+    expect(ctx.state.items.size).toBe(1);
   });
 });

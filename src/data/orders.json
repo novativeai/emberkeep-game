@@ -9,6 +9,34 @@
       "rewards": { "coins": 0, "keys": 0, "xp": 30, "spawn": { "chain": "golden_egg", "tier": 1, "count": 1 } }
     },
     {
+      "id": "cindra_two_markets",
+      "giver": "cindra",
+      "title": "Cindra’s Two Markets",
+      "blurb": "I keep two ledgers, Keeper. Sell me twenty gem shards for good gold — or, if your purse is heavy, forty coins buys a Gold Key outright. Your choice.",
+      "requires": [{ "chain": "flame_gem", "tier": 1, "count": 20 }],
+      "rewards": { "coins": 90, "keys": 0, "xp": 20 },
+      "options": [
+        {
+          "label": "Sell",
+          "requires": [{ "chain": "flame_gem", "tier": 1, "count": 20 }],
+          "rewards": { "coins": 90, "keys": 0, "xp": 20 }
+        },
+        {
+          "label": "Buy Key",
+          "costCoins": 40,
+          "rewards": { "coins": 0, "keys": 1, "xp": 10 }
+        }
+      ]
+    },
+    {
+      "id": "cindra_diamond_key",
+      "giver": "cindra",
+      "title": "Three Diamonds for a Key",
+      "blurb": "Bring me three cut diamonds, Keeper — three Flame Gems — and I shall forge you a Gold Key worthy of the deep vaults.",
+      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 3 }],
+      "rewards": { "coins": 0, "keys": 1, "xp": 25 }
+    },
+    {
       "id": "cindra_hearth",
       "giver": "cindra",
       "title": "Warm the Long Hearth",

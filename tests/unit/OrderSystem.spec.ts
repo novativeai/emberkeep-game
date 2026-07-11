@@ -53,7 +53,7 @@ describe('OrderSystem', () => {
     expect(spawned).toHaveLength(1);
     expect(spawned[0]).toMatchObject({ chain: 'golden_egg', tier: 1, count: 1 });
     expect(ctx.state.completedOrderIds).toContain('cindra_brazier');
-    expect(ctx.systems.order.activeOrder?.id).toBe('cindra_hearth');
+    expect(ctx.systems.order.activeOrder?.id).toBe('cindra_two_markets');
   });
 
   it('refuses delivery when requirements are not met', () => {
@@ -76,7 +76,7 @@ describe('OrderSystem', () => {
     ctx.bus.emit('ui:deliver_requested', { orderId: 'cindra_brazier' });
 
     expect(ctx.state.completedOrderIds).toContain('cindra_brazier');
-    expect(ctx.systems.order.activeOrder?.id).toBe('cindra_hearth');
+    expect(ctx.systems.order.activeOrder?.id).toBe('cindra_two_markets');
   });
 
   it('ignores delivery for a non-active order id', () => {
@@ -87,5 +87,77 @@ describe('OrderSystem', () => {
 
     expect(ctx.state.coins).toBe(0);
     expect(ctx.state.countItems('flame_gem', 1)).toBe(20);
+  });
+
+  describe('two-option order (cindra_two_markets)', () => {
+    /** Mark the tutorial order done so the two-markets order (2nd) is active. */
+    function reachTwoMarkets(ctx: ReturnType<typeof createTestContext>): void {
+      ctx.state.completedOrderIds.push('cindra_brazier');
+      expect(ctx.systems.order.activeOrder?.id).toBe('cindra_two_markets');
+    }
+
+    it('option 0 (sell) consumes 20 gem shards and pays coins + xp', () => {
+      const ctx = createTestContext();
+      reachTwoMarkets(ctx);
+      spawnGemShards(ctx, 20);
+      const completed = capture(ctx.bus, 'order:completed');
+      const removed = capture(ctx.bus, 'item:removed');
+
+      ctx.bus.emit('ui:deliver_requested', { orderId: 'cindra_two_markets', optionIndex: 0 });
+
+      expect(completed).toHaveLength(1);
+      expect(removed).toHaveLength(20);
+      expect(ctx.state.coins).toBe(90);
+      expect(ctx.state.keys).toBe(0);
+      expect(ctx.state.xp).toBe(20);
+      expect(ctx.state.countItems('flame_gem', 1)).toBe(0);
+      expect(ctx.systems.order.activeOrder?.id).toBe('cindra_diamond_key');
+    });
+
+    it('option 1 (buy key) spends 40 coins for a key — no items consumed', () => {
+      const ctx = createTestContext();
+      reachTwoMarkets(ctx);
+      ctx.state.coins = 40;
+      spawnGemShards(ctx, 5); // bystanders — must survive
+      const completed = capture(ctx.bus, 'order:completed');
+      const removed = capture(ctx.bus, 'item:removed');
+
+      ctx.bus.emit('ui:deliver_requested', { orderId: 'cindra_two_markets', optionIndex: 1 });
+
+      expect(completed).toHaveLength(1);
+      expect(removed).toHaveLength(0);
+      expect(ctx.state.coins).toBe(0); // 40 spent
+      expect(ctx.state.keys).toBe(1);
+      expect(ctx.state.xp).toBe(10);
+      expect(ctx.state.countItems('flame_gem', 1)).toBe(5);
+      expect(ctx.systems.order.activeOrder?.id).toBe('cindra_diamond_key');
+    });
+
+    it('refuses the buy-key option when coins are short', () => {
+      const ctx = createTestContext();
+      reachTwoMarkets(ctx);
+      ctx.state.coins = 39; // one short
+      const completed = capture(ctx.bus, 'order:completed');
+
+      ctx.bus.emit('ui:deliver_requested', { orderId: 'cindra_two_markets', optionIndex: 1 });
+
+      expect(completed).toHaveLength(0);
+      expect(ctx.state.coins).toBe(39);
+      expect(ctx.state.keys).toBe(0);
+      expect(ctx.systems.order.activeOrder?.id).toBe('cindra_two_markets');
+    });
+
+    it('refuses the sell option without enough gem shards', () => {
+      const ctx = createTestContext();
+      reachTwoMarkets(ctx);
+      spawnGemShards(ctx, 5); // only 5 of 20
+      const completed = capture(ctx.bus, 'order:completed');
+
+      ctx.bus.emit('ui:deliver_requested', { orderId: 'cindra_two_markets', optionIndex: 0 });
+
+      expect(completed).toHaveLength(0);
+      expect(ctx.state.countItems('flame_gem', 1)).toBe(5);
+      expect(ctx.state.coins).toBe(0);
+    });
   });
 });

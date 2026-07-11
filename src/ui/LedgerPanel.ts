@@ -2,9 +2,22 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
-import type { OrderConfig, OrdersData } from '../core/types';
+import type { OrderConfig, OrderOption, OrdersData } from '../core/types';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
+
+/** One "market" row in a multi-option order: what you give → what you get + a
+ *  green claim button. */
+interface OptionRow {
+  root: Phaser.GameObjects.Container;
+  giveIcon: Phaser.GameObjects.Image;
+  giveText: Phaser.GameObjects.Text;
+  rewardIcon: Phaser.GameObjects.Image;
+  rewardText: Phaser.GameObjects.Text;
+  button: Phaser.GameObjects.Container;
+  buttonBg: Phaser.GameObjects.Image;
+  buttonLabel: Phaser.GameObjects.Text;
+}
 
 /**
  * Cindra's Ledger — the Magic-Orders-style panel: cream board with a warm
@@ -27,6 +40,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private deliverText: Phaser.GameObjects.Text;
   private emptyText: Phaser.GameObjects.Text;
   private card: Phaser.GameObjects.Container;
+  private optionsContainer: Phaser.GameObjects.Container;
+  private optionRows: OptionRow[] = [];
   private deliverable = false;
   private deliverAllowed = true;
   private currentOrder: OrderConfig | null = null;
@@ -163,6 +178,41 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .setVisible(false);
 
     this.card.add([cardBg, portrait, requiredLabel, slot, this.slotIcon, this.slotCount, this.deliverButton]);
+
+    // Multi-option layout ("two markets"): a stack of give → get rows, each with
+    // its own claim button. Occupies the right half (the single Cindra card is
+    // hidden in this mode). Built once, populated per active order in refresh().
+    this.optionsContainer = scene.add.container(240, 40);
+    for (let i = 0; i < 2; i++) {
+      const root = scene.add.container(0, i === 0 ? -140 : 140);
+      const slotBg = scene.add.image(-236, 0, 'ui_slot').setScale(0.62);
+      const giveIcon = scene.add.image(-236, -6, '__DEFAULT').setScale(0.7);
+      const giveText = scene.add
+        .text(-236, 62, '', { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: PALETTE.textBrown })
+        .setOrigin(0.5)
+        .setShadow(0, 2, '#FFFFFF', 4);
+      const arrow = scene.add
+        .text(-116, -10, '→', { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: PALETTE.lavaShade })
+        .setOrigin(0.5);
+      const rewardIcon = scene.add.image(-34, -6, '__DEFAULT').setScale(0.7);
+      const rewardText = scene.add
+        .text(26, -6, '', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: PALETTE.goldShade })
+        .setOrigin(0, 0.5);
+      const button = scene.add.container(236, 0);
+      const buttonBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.66);
+      const buttonLabel = scene.add
+        .text(0, -8, '', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: '#FFFFFF' })
+        .setOrigin(0.5)
+        .setShadow(0, 3, 'rgba(36,27,34,0.5)', 5);
+      button.add([buttonBg, buttonLabel]);
+      buttonBg.setInteractive({ useHandCursor: true });
+      buttonBg.on('pointerup', () => this.onOptionPressed(i));
+      root.add([slotBg, giveIcon, giveText, arrow, rewardIcon, rewardText, button]);
+      this.optionsContainer.add(root);
+      this.optionRows.push({ root, giveIcon, giveText, rewardIcon, rewardText, button, buttonBg, buttonLabel });
+    }
+    this.optionsContainer.setVisible(false);
+
     this.add([
       this.dim,
       panel,
@@ -173,6 +223,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       this.blurb,
       this.rewardRow,
       this.card,
+      this.optionsContainer,
       this.emptyText
     ]);
     scene.add.existing(this);
@@ -183,7 +234,11 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
         this.deliverable = deliverable;
         this.refresh(have[0] ?? 0);
       }),
-      bus.on('order:completed', () => this.refresh(0))
+      bus.on('order:completed', () => this.refresh(0)),
+      // Coins changed → re-check the "pay coins" option's affordability.
+      bus.on('economy:changed', () => {
+        if (this.isOpen) this.refresh();
+      })
     );
   }
 
@@ -245,15 +300,96 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     return this.orders.orders.find((o) => !this.gameState.completedOrderIds.includes(o.id)) ?? null;
   }
 
+  /** Can this option be claimed right now? (mirrors OrderSystem.optionDeliverable) */
+  private optionAffordable(opt: OrderOption): boolean {
+    if (opt.requires) {
+      for (const req of opt.requires) {
+        if (this.gameState.countItems(req.chain, req.tier) < req.count) return false;
+      }
+    }
+    if (opt.costCoins != null && this.gameState.coins < opt.costCoins) return false;
+    return true;
+  }
+
+  private onOptionPressed(index: number): void {
+    const order = this.currentOrder;
+    const opt = order?.options?.[index];
+    if (!order || !opt) return;
+    if (this.optionAffordable(opt) && this.deliverAllowed) {
+      this.bus.emit('ui:deliver_requested', { orderId: order.id, optionIndex: index });
+    } else {
+      const button = this.optionRows[index]?.button;
+      if (button) {
+        this.scene.tweens.add({ targets: button, x: button.x + 10, duration: 45, yoyo: true, repeat: 3 });
+      }
+    }
+  }
+
+  /** Populate the two market rows from the active order's options. */
+  private renderOptions(order: OrderConfig): void {
+    const options = order.options ?? [];
+    for (let i = 0; i < this.optionRows.length; i++) {
+      const row = this.optionRows[i]!;
+      const opt = options[i];
+      if (!opt) {
+        row.root.setVisible(false);
+        continue;
+      }
+      row.root.setVisible(true);
+
+      // Give side: board items ("have/need") or a coin cost ("×N").
+      const req = opt.requires?.[0];
+      if (req) {
+        const key = `item_${req.chain}_${req.tier}`;
+        const s = ITEM_SCALE[`${req.chain}_${req.tier}`] ?? ITEM_SCALE[req.chain];
+        row.giveIcon.setTexture(key).setScale(s != null ? s * 1.7 : 0.7);
+        const have = Math.min(this.gameState.countItems(req.chain, req.tier), req.count);
+        row.giveText.setText(`${have}/${req.count}`);
+      } else if (opt.costCoins != null) {
+        row.giveIcon.setTexture('ui_icon_coin').setScale(0.16);
+        row.giveText.setText(`×${opt.costCoins}`);
+      }
+
+      // Get side: a key, a spawned item, or coins.
+      const rw = opt.rewards;
+      if (rw.keys) {
+        row.rewardIcon.setTexture('ui_icon_key').setScale(0.62);
+        row.rewardText.setText(`×${rw.keys}`);
+      } else if (rw.spawn) {
+        const spawnKey = `item_${rw.spawn.chain}_${rw.spawn.tier}`;
+        const ss = ITEM_SCALE[`${rw.spawn.chain}_${rw.spawn.tier}`] ?? ITEM_SCALE[rw.spawn.chain];
+        row.rewardIcon.setTexture(spawnKey).setScale(ss != null ? ss * 1.5 : 0.62);
+        row.rewardText.setText(`×${rw.spawn.count}`);
+      } else {
+        row.rewardIcon.setTexture('ui_icon_coin').setScale(0.16);
+        row.rewardText.setText(`×${rw.coins ?? 0}`);
+      }
+
+      const ok = this.optionAffordable(opt);
+      row.buttonLabel.setText(opt.label);
+      row.buttonBg.setAlpha(ok ? 1 : 0.5);
+      row.giveText.setColor(ok ? PALETTE.moss : PALETTE.textBrown);
+    }
+  }
+
   private refresh(haveOverride?: number): void {
     this.currentOrder = this.activeOrder();
     const hasOrder = this.currentOrder !== null;
+    const optionsMode = !!this.currentOrder?.options?.length;
     this.orderTitle.setVisible(hasOrder);
     this.blurb.setVisible(hasOrder);
-    this.rewardRow.setVisible(hasOrder);
-    this.card.setVisible(hasOrder);
+    this.rewardRow.setVisible(hasOrder && !optionsMode);
+    this.card.setVisible(hasOrder && !optionsMode);
+    this.optionsContainer.setVisible(hasOrder && optionsMode);
     this.emptyText.setVisible(!hasOrder);
     if (!this.currentOrder) return;
+
+    if (optionsMode) {
+      this.orderTitle.setText(this.currentOrder.title);
+      this.blurb.setText(`”${this.currentOrder.blurb}”`);
+      this.renderOptions(this.currentOrder);
+      return;
+    }
 
     const requirement = this.currentOrder.requires[0];
     if (!requirement) return;

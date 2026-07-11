@@ -16,6 +16,7 @@ import { EndScreen } from '../ui/EndScreen';
 import { Hud } from '../ui/Hud';
 import { LedgerPanel } from '../ui/LedgerPanel';
 import { MilestoneGift } from '../ui/MilestoneGift';
+import { DragonGauges } from '../ui/DragonGauges';
 import { DuelButton } from '../ui/DuelButton';
 import { DuelPanel } from '../ui/DuelPanel';
 import { ShopPanel } from '../ui/ShopPanel';
@@ -46,6 +47,7 @@ export class UIScene extends Phaser.Scene {
   private stokeMeter!: StokeMeter;
   private duelButton!: DuelButton;
   private duelPanel!: DuelPanel;
+  private dragonGauges!: DragonGauges;
   private bubble!: CharacterBubble;
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
@@ -103,6 +105,10 @@ export class UIScene extends Phaser.Scene {
     this.duelPanel.setDepth(DEPTH_PANEL + 20);
     this.duelButton = new DuelButton(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 466, () => this.duelPanel.open());
     this.duelButton.setDepth(DEPTH_HUD);
+
+    // The two dragons' duel gauges, just above the Keeper level/XP bar.
+    this.dragonGauges = new DragonGauges(this, this.ctx.bus, 176, LIVE_GAME_HEIGHT - 150);
+    this.dragonGauges.setDepth(DEPTH_HUD);
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to

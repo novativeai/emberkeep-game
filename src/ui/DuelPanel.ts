@@ -4,7 +4,7 @@ import type { EventBus } from '../core/EventBus';
 import type { DuelDragon, DuelThrow, EventMap } from '../core/types';
 
 const MOVES: DuelThrow[] = ['rock', 'paper', 'scissors'];
-const MOVE_LABELS = ['PIERRE', 'PAPIER', 'CISEAUX'];
+const MOVE_LABELS = ['ROCK', 'PAPER', 'SCISSORS'];
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 const PW = 1560;
@@ -89,7 +89,7 @@ export class DuelPanel extends Phaser.GameObjects.Container {
     titleBg.lineStyle(7, num(PALETTE.cream), 0.95);
     titleBg.strokeRoundedRect(-430, -PH / 2 - 30, 860, 128, 64);
     const title = scene.add
-      .text(0, -PH / 2 + 34, '⚔️  ARÈNE DES DRAGONS', {
+      .text(0, -PH / 2 + 34, '⚔️  DRAGON ARENA', {
         fontFamily: FONT, fontSize: '58px', fontStyle: 'bold', color: PALETTE.cream
       })
       .setOrigin(0.5)
@@ -138,7 +138,7 @@ export class DuelPanel extends Phaser.GameObjects.Container {
 
   private buildSelect(scene: Phaser.Scene): void {
     this.prompt = scene.add
-      .text(0, -PH / 2 + 190, 'Quel dragon veux-tu entraîner ?', {
+      .text(0, -PH / 2 + 190, 'Which dragon do you want to train?', {
         fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: PALETTE.textBrown
       })
       .setOrigin(0.5);
@@ -160,7 +160,7 @@ export class DuelPanel extends Phaser.GameObjects.Container {
       this.slots.push({ root, bg, img, name, lv, gauge, gaugeText, zone, chain: null });
     }
 
-    const btn = this.greenButton(scene, 0, PH / 2 - 120, 460, 150, `⚔️  LANCER  (${DUEL.energyCost}⚡)`);
+    const btn = this.greenButton(scene, 0, PH / 2 - 120, 460, 150, `⚔️ PLAY  (${DUEL.energyCost}⚡)`);
     this.lancer = btn.root;
     this.lancerLabel = btn.label;
     btn.zone.on('pointerup', () => this.bus.emit('duel:start', {}));
@@ -183,11 +183,11 @@ export class DuelPanel extends Phaser.GameObjects.Container {
     this.replay = rbtn.root;
     this.replayLabel = rbtn.label;
     rbtn.zone.on('pointerup', () => this.bus.emit('duel:start', {}));
-    this.back = scene.add.text(320, PH / 2 - 130, '← Choisir', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: PALETTE.textBrown }).setOrigin(0.5);
+    this.back = scene.add.text(320, PH / 2 - 130, '← Choose', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: PALETTE.textBrown }).setOrigin(0.5);
     this.back.setInteractive({ useHandCursor: true }).on('pointerup', () => this.showSelect());
 
     // Interactive throw picker — the player taps their hand each match.
-    this.instruction = scene.add.text(0, -40, 'Choisis ta main !', { fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: PALETTE.textBrown }).setOrigin(0.5);
+    this.instruction = scene.add.text(0, -40, 'Choose your hand!', { fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: PALETTE.textBrown }).setOrigin(0.5);
     this.choiceRoot = scene.add.container(0, 170);
     const cx = [-360, 0, 360];
     for (let i = 0; i < 3; i++) {
@@ -274,7 +274,7 @@ export class DuelPanel extends Phaser.GameObjects.Container {
     this.renderSlots(m.roster);
     const ready = !!m.selected && m.canAfford;
     this.lancer.setAlpha(ready ? 1 : 0.5);
-    this.lancerLabel.setText(m.canAfford ? `⚔️  LANCER  (${m.energyCost}⚡)` : 'Pas assez d’⚡');
+    this.lancerLabel.setText(m.canAfford ? `⚔️  PLAY  (${m.energyCost}⚡)` : 'Not enough  ⚡');
   }
 
   /* ---------------------------- battle view ---------------------------- */

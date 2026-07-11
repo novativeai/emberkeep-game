@@ -102,6 +102,17 @@ export interface OrderRequirement {
   count: number;
 }
 
+/** One selectable way to fulfil an order: consume board items and/or spend
+ *  coins in exchange for this option's rewards. Delivering ANY option completes
+ *  the order (the player picks their path). Used by orders that carry
+ *  `options`; simple orders keep the legacy top-level `requires`/`rewards`. */
+export interface OrderOption {
+  label: string;
+  requires?: OrderRequirement[];
+  costCoins?: number;
+  rewards: { coins?: number; keys?: number; xp?: number; spawn?: { chain: string; tier: number; count: number } };
+}
+
 export interface OrderConfig {
   id: string;
   giver: string;
@@ -109,6 +120,10 @@ export interface OrderConfig {
   blurb: string;
   requires: OrderRequirement[];
   rewards: { coins: number; keys: number; xp?: number; spawn?: { chain: string; tier: number; count: number } };
+  /** When present, the ledger shows one row per option and delivering any one
+   *  completes the order. `requires`/`rewards` mirror option 0 for legacy
+   *  readers (progress text, tutorial). */
+  options?: OrderOption[];
 }
 
 export interface OrdersData {
@@ -386,7 +401,7 @@ export interface EventMap {
   'dragon:rest': { dragonId: number };
   'dragon:rested': { dragonId: number };
   'ui:ledger_toggled': { open: boolean };
-  'ui:deliver_requested': { orderId: string };
+  'ui:deliver_requested': { orderId: string; optionIndex?: number };
   /** A gauge "+" button opened the shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' | 'keys' };
   'ui:sell_requested': { itemId: number };

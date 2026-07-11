@@ -1,25 +1,25 @@
 {
   "fps": 1,
   "blendFrames": false,
-  "width": 331,
-  "height": 364,
+  "width": 454,
+  "height": 708,
   "frameCount": 3,
   "frames": [
     {
       "index": 0,
-      "file": "green_loop_00000.png",
+      "file": "greenhand_loop_00000.png",
       "durationMs": 1000,
       "blend": false
     },
     {
       "index": 1,
-      "file": "green_loop_00001.png",
+      "file": "greenhand_loop_00001.png",
       "durationMs": 1000,
       "blend": false
     },
     {
       "index": 2,
-      "file": "green_loop_00002.png",
+      "file": "greenhand_loop_00002.png",
       "durationMs": 1000,
       "blend": false
     }
