@@ -515,6 +515,25 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await expect.poll(async () => (await gameText(page)).level, { timeout: 8_000 }).toBe(3);
     // The finale choreography runs ~12.6s (hatch → glimpse → Cindra → card).
     await page.waitForTimeout(13_500);
+    // The "Beyond the demo" roadmap LEADS, unprompted — the ending's highlight,
+    // every session must see it. The Chapter One card waits underneath.
+    const uiBefore = await page.evaluate(() => {
+      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+        endScreen: unknown;
+      };
+      return { cardShown: !!ui.endScreen };
+    });
+    expect(uiBefore.cardShown).toBe(false); // the roadmap holds the stage first
+    await page.screenshot({ path: shot('18-beyond-demo') });
+    await page.mouse.click(40, 400); // tap the dim outside the panel → close
+    await page.waitForTimeout(600);
+    const uiAfter = await page.evaluate(() => {
+      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+        endScreen: unknown;
+      };
+      return { cardShown: !!ui.endScreen };
+    });
+    expect(uiAfter.cardShown).toBe(true); // …then the Chapter One card follows
     await page.screenshot({ path: shot('18-level3-end') });
 
     // ---------- Save / reload restores mid-game state ----------

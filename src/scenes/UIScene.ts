@@ -18,6 +18,7 @@ import {
 import { gridToWorld } from '../core/iso';
 import type { ResolvedArrow, ResolvedHand, TilePos, TutorialStepEvent } from '../core/types';
 import { CharacterBubble } from '../entities/CharacterBubble';
+import { BeyondDemoPanel } from '../ui/BeyondDemoPanel';
 import { CookbookPanel } from '../ui/CookbookPanel';
 import { EndScreen } from '../ui/EndScreen';
 import { Hud } from '../ui/Hud';
@@ -467,12 +468,26 @@ export class UIScene extends Phaser.Scene {
     this.time.delayedCall(FINALE.cardAtMs, () => {
       this.finaleActive = false;
       if (this.endScreen) return;
-      this.endScreen = new EndScreen(this, 'chapter');
-      this.add.existing(this.endScreen);
-      this.endScreen.setDepth(DEPTH_DIALOG + 50);
-      this.endScreen.once(Phaser.GameObjects.Events.DESTROY, () => {
-        this.endScreen = null;
-      });
+      const showCard = (): void => {
+        if (this.endScreen || !this.scene.isActive()) return;
+        this.endScreen = new EndScreen(this, 'chapter');
+        this.add.existing(this.endScreen);
+        this.endScreen.setDepth(DEPTH_DIALOG + 50);
+        this.endScreen.once(Phaser.GameObjects.Events.DESTROY, () => {
+          this.endScreen = null;
+        });
+      };
+      // "Beyond the demo" is the ending's HEADLINE — it leads, unprompted, so
+      // no session finishes without seeing it; the Chapter One card (its home,
+      // which keeps the reopen button) follows when the player closes it.
+      // Without the trailer art there is nothing to headline — straight to card.
+      if (this.textures.exists('trailer_world_ice') || this.textures.exists('trailer_legend_frost')) {
+        const panel = new BeyondDemoPanel(this);
+        panel.setDepth(DEPTH_DIALOG + 50);
+        panel.once(Phaser.GameObjects.Events.DESTROY, showCard);
+      } else {
+        showCard();
+      }
     });
   }
 
