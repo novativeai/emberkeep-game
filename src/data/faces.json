@@ -107,6 +107,114 @@
       }
     }
   },
+  "dragon-emerald": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/emerald-dragon/head-animation",
+    "sets": {
+      "blink": {
+        "dir": "emerald-dragon-blink-animation",
+        "textureScale": 0.93824,
+        "originX": 0.46404,
+        "originY": 0.93956,
+        "frames": [
+          {
+            "file": "emerald-dragon-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "emerald-dragon-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "emerald-dragon-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "emerald-dragon-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "emerald-dragon-roar_talk-animation",
+        "textureScale": 0.47136,
+        "originX": 0.46728,
+        "originY": 0.92421,
+        "frames": [
+          {
+            "file": "emerald-dragon-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "emerald-dragon-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "emerald-dragon-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "emerald-dragon-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-emerald-adult": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/emerald-dragon/head-animation-adult",
+    "sets": {
+      "blink": {
+        "dir": "emerald-dragon-adult-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4247,
+        "originY": 0.951,
+        "frames": [
+          {
+            "file": "emerald-dragon-adult-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "emerald-dragon-adult-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "emerald-dragon-adult-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "emerald-dragon-adult-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "emerald-dragon-adult-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4247,
+        "originY": 0.951,
+        "frames": [
+          {
+            "file": "emerald-dragon-adult-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "emerald-dragon-adult-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "emerald-dragon-adult-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "emerald-dragon-adult-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
   "dragon-golden": {
     "layer": "head",
     "basePath": "sprites/characters/dragon/golden-dragon/head-animation",

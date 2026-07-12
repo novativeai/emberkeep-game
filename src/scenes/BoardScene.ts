@@ -75,6 +75,7 @@ const DRAGON_RIGS: Record<string, string> = {
   ember_dragon: 'sprites/characters/dragon/red-dragon/rig/dragon-red.rig.json',
   'ember_dragon:4': 'sprites/characters/dragon/red-dragon/rig-adult/red-dragon.rig.json',
   emerald: 'sprites/characters/dragon/emerald-dragon/rig/dragon-emerald.rig.json',
+  'emerald:4': 'sprites/characters/dragon/emerald-dragon/rig-adult/emerald-dragon.rig.json',
   golden_egg: 'sprites/characters/dragon/golden-dragon/rig-adult/golden-dragon.rig.json'
 };
 
@@ -85,7 +86,7 @@ const rigKeyFor = (chain: string, tier: number): string =>
 
 /** ADULT dragons animate as calm elders (see DRAGON_ANIM.adult*): the Red
  *  Adult and the Golden Elder — whelps keep the lively cadence. */
-const CALM_DRAGONS = new Set(['dragon-red-adult', 'dragon-golden']);
+const CALM_DRAGONS = new Set(['dragon-red-adult', 'dragon-emerald-adult', 'dragon-golden']);
 /** Canonical character id for a rig exported with the tool's default name —
  *  MUST match characterCatalog ids and the faces.json keys (calibrate-faces). */
 const DRAGON_RIG_NAMES: Record<string, string> = {

@@ -25,6 +25,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DRAGON_DIR = 'assets/sprites/characters/dragon/red-dragon';
+const EMERALD_DIR = 'assets/sprites/characters/dragon/emerald-dragon';
 const OUT = path.join(ROOT, 'src/data/faces.json');
 
 /** Face sets per character. `files` is the PLAYBACK order; durations come from
@@ -84,6 +85,62 @@ const CHARACTERS = {
           'red-dragon-adult-roar_talk_00001.png',
           'red-dragon-adult-roar_talk_00002.png',
           'red-dragon-adult-roar_talk_00003.png'
+        ],
+        ref: 0
+      }
+    }
+  },
+  'dragon-emerald': {
+    rig: `${EMERALD_DIR}/rig/dragon-emerald.rig.json`,
+    layer: 'head',
+    fsDir: `${EMERALD_DIR}/head-animation`,
+    basePath: `${EMERALD_DIR.replace(/^assets\//, '')}/head-animation`,
+    sets: {
+      blink: {
+        dir: 'emerald-dragon-blink-animation',
+        files: [
+          'emerald-dragon-eyes-open.png',
+          'emerald-dragon-eyes-halfOpen.png',
+          'emerald-dragon-eyes-closed.png',
+          'emerald-dragon-eyes-halfOpen2.png'
+        ],
+        ref: 0
+      },
+      talk: {
+        dir: 'emerald-dragon-roar_talk-animation',
+        files: [
+          'emerald-dragon-roar_talk_00000.png',
+          'emerald-dragon-roar_talk_00001.png',
+          'emerald-dragon-roar_talk_00002.png',
+          'emerald-dragon-roar_talk_00003.png'
+        ],
+        ref: 0
+      }
+    }
+  },
+  'dragon-emerald-adult': {
+    rig: `${EMERALD_DIR}/rig-adult/emerald-dragon.rig.json`,
+    layer: 'head',
+    fsDir: `${EMERALD_DIR}/head-animation-adult`,
+    basePath: `${EMERALD_DIR.replace(/^assets\//, '')}/head-animation-adult`,
+    sets: {
+      blink: {
+        dir: 'emerald-dragon-adult-blink-animation',
+        files: [
+          'emerald-dragon-adult-eyes-open.png',
+          'emerald-dragon-adult-eyes-halfOpen.png',
+          'emerald-dragon-adult-eyes-closed.png',
+          'emerald-dragon-adult-eyes-halfOpen2.png'
+        ],
+        ref: 0
+      },
+      talk: {
+        dir: 'emerald-dragon-adult-roar_talk-animation',
+        files: [
+          'emerald-dragon-adult-roar_talk_00000.png',
+          'emerald-dragon-adult-roar_talk_00001.png',
+          'emerald-dragon-adult-roar_talk_00002.png',
+          'emerald-dragon-adult-roar_talk_00003.png'
         ],
         ref: 0
       }

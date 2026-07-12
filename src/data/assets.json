@@ -822,6 +822,12 @@
       "file": "sprites/characters/dragon/emerald-dragon/sprite/emerald-dragon-baked.webp"
     },
     {
+      "key": "item_emerald_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/emerald-dragon/sprite-adult/emerald-dragon-adult-baked.webp"
+    },
+    {
       "key": "background_emberkeep",
       "source": "file",
       "generator": "decor",

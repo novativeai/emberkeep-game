@@ -205,6 +205,7 @@ export const ITEM_SCALE: Record<string, number> = {
   emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
   emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red
+  emerald_4: 0.45, // Adult Emerald Dragon: baked adult rig (836px) — same treatment as the adult red
   golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
   coin_1: 0.12, // SMALLER than an egg, per spec
   coin_2: 0.15  // Gold Pouch — reduced 25% on request (0.20 → 0.15); still bigger than the coin (0.12)
@@ -437,7 +438,10 @@ export const DRAGON_RIG_SCALE: Record<string, number> = {
   // Adult Red Dragon (tier-4 rig override; adult rig pieces are ~836px wide vs
   // the whelp's 1054) — sized to read clearly BIGGER than the whelp on-board.
   // +50% on request (0.62 → 0.93): at 0.62 the adult read SMALLER than the baby.
-  'ember_dragon:4': 0.93
+  'ember_dragon:4': 0.93,
+  // Adult Emerald Dragon: same rig geometry as the adult red (identical part
+  // canvases/bounds), so it wears the same on-board scale.
+  'emerald:4': 0.93
   // (The Golden Elder is NOT a board dragon — her altar scale lives in
   //  GOLDEN_ALTAR.elderScale.)
 };

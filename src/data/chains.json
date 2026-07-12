@@ -184,11 +184,25 @@
           "name": "Green Dragon",
           "sell": 20,
           "xp": 24,
+          "merge": { "group": 2, "outputs": 1 },
           "generator": {
             "produces": { "chain": "flame_gem", "tier": 1 },
             "cooldownMs": 45000,
             "energyCost": 1,
             "passiveMs": 180000
+          }
+        },
+        {
+          "tier": 4,
+          "id": "emerald_4",
+          "name": "Adult Emerald Dragon",
+          "sell": 50,
+          "xp": 36,
+          "generator": {
+            "produces": { "chain": "flame_gem", "tier": 1 },
+            "cooldownMs": 30000,
+            "energyCost": 1,
+            "passiveMs": 120000
           }
         }
       ]

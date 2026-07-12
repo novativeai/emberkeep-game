@@ -1,0 +1,33 @@
+{
+  "fps": 7,
+  "blendFrames": false,
+  "width": 292,
+  "height": 286,
+  "frameCount": 4,
+  "frames": [
+    {
+      "index": 0,
+      "file": "emerald-dragon-adult-eyes-open.png",
+      "durationMs": 2600,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "emerald-dragon-adult-eyes-halfOpen.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 2,
+      "file": "emerald-dragon-adult-eyes-closed.png",
+      "durationMs": 70,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "emerald-dragon-adult-eyes-halfOpen2.png",
+      "durationMs": 55,
+      "blend": false
+    }
+  ]
+}

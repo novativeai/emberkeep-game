@@ -1,0 +1,33 @@
+{
+  "fps": 7,
+  "blendFrames": false,
+  "width": 423,
+  "height": 521,
+  "frameCount": 4,
+  "frames": [
+    {
+      "index": 0,
+      "file": "Generated-Image-July-04-2026-11_29AM_blink_00000.png",
+      "durationMs": 2600,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "Generated-Image-July-04-2026-11_29AM_blink_00001.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 2,
+      "file": "Generated-Image-July-04-2026-11_29AM_blink_00002.png",
+      "durationMs": 70,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "Generated-Image-July-04-2026-11_29AM_blink_00003.png",
+      "durationMs": 55,
+      "blend": false
+    }
+  ]
+}
