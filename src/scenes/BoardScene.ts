@@ -219,6 +219,22 @@ export class BoardScene extends Phaser.Scene {
     this.tutorialDone = this.ctx.state.tutorialDone;
     this.liveDragons.clear();
     this.busyDragons.clear();
+    // A restart reuses this scene INSTANCE (Title → Play after game:reset): the
+    // last run's display objects are destroyed but these fields still point at
+    // them. Stale refs block recreation — the Golden Egg vanished (its aura,
+    // positioned from altarPoint, still appeared), altar taps died, and the
+    // finale one-shot could never play again.
+    this.altarEgg = undefined;
+    this.altarEggShadow = undefined;
+    this.eggAura = undefined;
+    this.altarElder = undefined;
+    this.altarElderFallback = undefined;
+    this.altarElderRoll = { mode: 'idle', remainMs: 0 };
+    this.altarZone = undefined;
+    this.goldenTremble = undefined;
+    this.teaseReturn = null;
+    this.finaleRan = false;
+    this.finaleStartedMs = 0;
     void this.loadDragonRigs(); // lazy + fault-tolerant; ready well before the hatch
 
     this.ensureShadowTexture(); // soft radial shadow used by every object
@@ -1570,8 +1586,11 @@ export class BoardScene extends Phaser.Scene {
         const to = worldToGrid(this.dragTarget.x, this.dragTarget.y + 24);
 
         // Dragon dragged onto a passive generator (House) → start working directly.
+        // wearsRigTier — an actual DRAGON tier (base/adult generator tiers of the
+        // ember/emerald chains), never the chain's merge pieces: a Ruby or Egg
+        // shares the dragon's chain but can't be hired.
         if (
-          DRAGON_RIGS[obj.chain] &&
+          this.wearsRigTier(obj.chain, obj.tier) &&
           (this.tutorialDone || this.allow.dragonWork) &&
           !this.ctx.systems.jobs.restRemaining(obj.itemId)
         ) {
@@ -1668,6 +1687,19 @@ export class BoardScene extends Phaser.Scene {
     if (sprite.kind !== 'item') return false;
     if (this.tutorialDone) return true;
     return this.allow.drag.includes('*') || this.allow.drag.includes(sprite.chain);
+  }
+
+  /** Test hook (window.__emberkeep.itemToPage): world-space centre of the ART
+   *  of the item on (col,row). Hit zones follow the art, not the tile — art can
+   *  sit off the tile point (the wood log's opaque pixels miss the tile centre
+   *  entirely), so pointer-driven tests must aim where a player would. */
+  itemArtWorldPoint(col: number, row: number): { x: number; y: number } | null {
+    for (const s of this.itemSprites.values()) {
+      if (!s.active || s.col !== col || s.row !== row) continue;
+      const p = s.opaqueArtHitPoint();
+      return { x: s.x + p.x - s.displayOriginX, y: s.y + p.y - s.displayOriginY };
+    }
+    return null;
   }
 
   private refreshDraggable(sprite: BoardItem): void {
@@ -1821,32 +1853,20 @@ export class BoardScene extends Phaser.Scene {
     if (!sprite) {
       sprite = new BoardItem(this);
       this.pool.push(sprite);
-      // Footprint-sized hit area: anything taller than one iso row (64px above
-      // the tile centre) would mask the tile behind it from pointer input.
+      // The clickable zone is the ART's border, not the tile: the rect wraps the
+      // sprite's display bounds (swapped in per-acquire below) and transparent
+      // pixels yield (hitsOpaqueArt), so the pointer always lands on the item the
+      // player actually sees — depth order routes overlaps to the visual front.
       // Container hit areas are tested against local point + displayOrigin
-      // (76,76 here from setSize(152,152)), so the rect is offset accordingly:
-      // true local coverage is x -72..72, y -60..28.
-      const hit = new Phaser.Geom.Rectangle(4, 16, 144, 88);
-      // Tall-art generators (house/tree/chest/crystal) carry full-sprite rects
-      // spanning several iso rows — being nearer the camera they'd STEAL input
-      // from items standing behind them (an un-draggable dragon behind the
-      // House). Their hits YIELD when the pointed spot lies over another
-      // item's tile; plain footprint items test the rect directly.
-      const scene = this;
+      // (76,76 here from setSize(152,152)); artHitRect bakes that offset in.
       sprite.setInteractive({
-        hitArea: hit,
+        hitArea: new Phaser.Geom.Rectangle(4, 16, 144, 88),
         hitAreaCallback: (
           area: Phaser.Geom.Rectangle,
           x: number,
           y: number,
           obj: BoardItem
-        ): boolean => {
-          if (!Phaser.Geom.Rectangle.Contains(area, x, y)) return false;
-          if (!obj.getData('tallArt')) return true;
-          const cell = worldToGrid(obj.x + x - 76, obj.y + y - 76);
-          if (cell.col === obj.col && cell.row === obj.row) return true;
-          return !scene.ctx.state.itemAt(cell.col, cell.row); // yield to the occupant
-        },
+        ): boolean => Phaser.Geom.Rectangle.Contains(area, x, y) && obj.hitsOpaqueArt(x, y),
         useHandCursor: true
       });
       sprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
@@ -1862,34 +1882,12 @@ export class BoardScene extends Phaser.Scene {
     sprite.acquire(snap, this.ctx.data.anchors, this.textureFor(snap), artScale);
     // Phaser 3.90: calling setInteractive() on an already-interactive object
     // silently returns without updating hitArea. Mutate sprite.input.hitArea
-    // directly instead. This also handles pool-reuse resets (else branch).
-    sprite.setData('tallArt', false);
-    if (snap.chain === 'crystal') {
-      sprite.setData('tallArt', true);
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(4, -324, 144, 428);
-    } else if (snap.chain === 'chest') {
-      sprite.setData('tallArt', true);
-      // chest.png 537×511 @ scale 0.24, anchor 0.5/0.92 — full-sprite tap.
-      // displayW≈129, displayH≈123; container origin +76 → rx=76−0.5·129, ry=76−0.92·123.
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(12, -37, 129, 123);
-    } else if (snap.chain === 'lumber' && snap.tier === 2) {
-      // The House (house.png 361×380 @ scale 0.72, anchor 0.5/0.9) — full-sprite tap.
-      // displayW≈260, displayH≈274; container origin +76 → rx=76−0.5·260, ry=76−0.9·274.
-      sprite.setData('tallArt', true);
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(-54, -171, 260, 274);
-    } else if (snap.chain === 'lumber' && snap.tier === 3) {
-      // The Manor (manor.png 430×450 @ scale 0.82, anchor 0.5/0.9) — full-sprite tap.
-      // displayW≈353, displayH≈369; container origin +76 → rx=76−0.5·353, ry=76−0.9·369.
-      sprite.setData('tallArt', true);
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(-100, -256, 353, 369);
-    } else if (snap.chain === 'bigtree') {
-      sprite.setData('tallArt', true);
-      // The Ancient Tree (bigtree.png 622×823 @ scale 0.17, anchor 0.5/0.92) — full-sprite
-      // tap. displayW≈106, displayH≈140; origin +76 → rx=76−0.5·106, ry=76−0.92·140.
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(23, -53, 106, 140);
-    } else {
-      sprite.input!.hitArea = new Phaser.Geom.Rectangle(4, 16, 144, 88);
-    }
+    // directly instead. This also handles pool-reuse resets.
+    sprite.input!.hitArea = sprite.artHitRect();
+    // Decor is inert scenery: with art-bounds hit zones its (often huge, opaque)
+    // sprite would eclipse playable items behind it — pointer input passes
+    // through entirely. Re-enabled per-acquire since the pool recycles sprites.
+    sprite.input!.enabled = snap.kind !== 'decor';
     // Passive-only generators (house, big tree) have no readyAt, so the snapshot
     // doesn't flag them — recognise them by their chain config for the timer UI.
     // The chest is a recurring gift box: borrow the same cooldown/ready UI.
@@ -2599,7 +2597,6 @@ export class BoardScene extends Phaser.Scene {
           });
           this.glideToWorld(p.x, p.y + 60, 1100);
           this.time.delayedCall(1300, () => {
-            this.altarEgg?.setVisible(true).setAlpha(1); // belt-and-braces
             this.wobbleGoldenEgg();
             this.startEggAura();
           });

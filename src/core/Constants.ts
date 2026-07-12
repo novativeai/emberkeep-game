@@ -394,6 +394,11 @@ export const DRAG = {
   cellHighlightColor: 0xffd27a
 } as const;
 
+/** Pointer forgiveness (game px) around the exact hit point when alpha-testing
+ *  board-item art: near-misses on thin/holey sprites (sprout stems) still land,
+ *  while big transparent corners keep yielding to the item behind. */
+export const HIT_FORGIVENESS_PX = 14;
+
 /**
  * Live rigged dragon on the board (hatchling/whelp). Enters in the rig's original
  * (un-mirrored, facing LEFT) orientation celebrating, then alternates idle/celebrate

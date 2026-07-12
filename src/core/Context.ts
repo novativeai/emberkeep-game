@@ -92,7 +92,7 @@ export class GameContext {
       merge: new MergeSystem(this.state, this.bus, this.clock, this.data.chains),
       energy: new EnergySystem(this.state, this.bus, this.clock),
       generator: new GeneratorSystem(this.state, this.bus, this.clock, this.data.chains),
-      jobs: new DragonJobSystem(this.state, this.bus, this.clock),
+      jobs: new DragonJobSystem(this.state, this.bus, this.clock, this.data.chains),
       order: new OrderSystem(this.state, this.bus, this.data.orders),
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       reward: new RewardSystem(this.bus),

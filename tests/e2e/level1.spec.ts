@@ -57,19 +57,35 @@ async function gridToPage(page: Page, col: number, row: number): Promise<{ x: nu
   );
 }
 
+/** Where to AIM the pointer for the item on (col,row): the centre of its art.
+ *  Hit zones wrap the sprite's art, which can sit off the tile point (the wood
+ *  log's opaque pixels miss the tile centre entirely). */
+async function itemToPage(page: Page, col: number, row: number): Promise<{ x: number; y: number }> {
+  return page.evaluate(
+    ([c, r]) => window.__emberkeep.itemToPage(c as number, r as number),
+    [col, row]
+  );
+}
+
 async function dragTile(page: Page, from: [number, number], to: [number, number]): Promise<void> {
-  const a = await gridToPage(page, from[0], from[1]);
+  const a = await itemToPage(page, from[0], from[1]); // grab the item's ART
+  const aTile = await gridToPage(page, from[0], from[1]);
   const b = await gridToPage(page, to[0], to[1]);
+  // Phaser keeps the grab offset while dragging and drops resolve from the
+  // ITEM's position, not the pointer — carry the offset to the release point
+  // so the item (not the pointer) hovers the target cell.
+  const dx = a.x - aTile.x;
+  const dy = a.y - aTile.y;
   await page.mouse.move(a.x, a.y);
   await page.mouse.down();
   await page.mouse.move(a.x + 14, a.y - 10, { steps: 3 });
-  await page.mouse.move(b.x, b.y, { steps: 12 });
+  await page.mouse.move(b.x + dx, b.y + dy, { steps: 12 });
   await page.mouse.up();
   await page.waitForTimeout(450);
 }
 
 async function tapTile(page: Page, col: number, row: number): Promise<void> {
-  const p = await gridToPage(page, col, row);
+  const p = await itemToPage(page, col, row); // tap the item's ART
   await page.mouse.move(p.x, p.y);
   await page.mouse.down();
   await page.waitForTimeout(60);
@@ -364,22 +380,42 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // ---------- House skip: spend Warmth to rush the House's timer ----------
     // (the step's setTimer effect already put the House on an affordable cooldown)
     const energyBeforeSkip = (await gameText(page)).energy.current;
-    // Tap the House (real UI) to raise the skip popup + the tutorial's ⚡ arrow, capture it.
+    // Tap the House's ROOF (real UI) — a point ~90 game-px above its tile centre,
+    // whose world CELL belongs to the neighbour behind. The art-bounds hit zone
+    // must still route the tap to the House. (Regression: tile-yield hit areas
+    // sent this tap to the item behind — the player paid the WRONG generator's
+    // Warmth skip and the house_skip gate never advanced.)
     const houseCells = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 2);
-    if (houseCells.length) {
-      await tapTile(page, houseCells[0]![0], houseCells[0]![1]);
-      await page.waitForTimeout(450);
-      await page.screenshot({ path: shot('14b-house-skip') });
-    }
-    // Then perform the skip via a direct emit (reliable under SwiftShader).
-    await page.evaluate(() => {
+    expect(houseCells.length).toBeGreaterThanOrEqual(1);
+    const housePage = await gridToPage(page, houseCells[0]![0], houseCells[0]![1]);
+    await page.mouse.click(housePage.x, housePage.y - 45); // roof pixels (CSS = game ÷2)
+    await page.waitForTimeout(450);
+    await page.screenshot({ path: shot('14b-house-skip') });
+    const skipTarget = await page.evaluate(() => {
+      const scene = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
+        skipForId: number;
+      };
       const ctx = window.__emberkeep.game.registry.get('ctx') as {
         state: { items: Map<number, { id: number; chain: string; tier: number }> };
-        bus: { emit: (event: string, payload: unknown) => void };
       };
-      const house = [...ctx.state.items.values()].find((i) => i.chain === 'lumber' && i.tier === 2);
-      if (house) ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'warmth' });
+      const item = ctx.state.items.get(scene.skipForId);
+      return item ? `${item.chain}:${item.tier}` : 'none';
     });
+    expect(skipTarget).toBe('lumber:2'); // the roof tap raised the HOUSE's popup
+    // Pay with Warmth via the popup's real ⚡ button (game offset +150,+100 → CSS ÷2).
+    await page.mouse.click(housePage.x + 75, housePage.y + 50);
+    await page.waitForTimeout(500);
+    if ((await gameText(page)).tutorial.step !== 'buy_energy') {
+      // Flake fallback (software rendering): perform the skip via a direct emit.
+      await page.evaluate(() => {
+        const ctx = window.__emberkeep.game.registry.get('ctx') as {
+          state: { items: Map<number, { id: number; chain: string; tier: number }> };
+          bus: { emit: (event: string, payload: unknown) => void };
+        };
+        const house = [...ctx.state.items.values()].find((i) => i.chain === 'lumber' && i.tier === 2);
+        if (house) ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'warmth' });
+      });
+    }
     await waitStep(page, 'buy_energy');
     expect((await gameText(page)).energy.current).toBeLessThan(energyBeforeSkip); // Warmth dropped
     await page.screenshot({ path: shot('15-buy-energy') });
@@ -529,6 +565,35 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     const expectedEnergy = Math.min(energyMax, saved.energy.current + 9);
     expect(regenerated.energy.current).toBeGreaterThanOrEqual(expectedEnergy);
     expect(regenerated.energy.current).toBeLessThanOrEqual(Math.min(energyMax, expectedEnergy + 1));
+
+    // ---------- In-game restart reuses the scene INSTANCE ----------
+    // (Regression: stale altarEgg/altarZone/finaleRan refs from the previous
+    // run survived into the next one — the Golden Egg was never rebuilt, so
+    // players saw only the tease aura on the altar, and the finale one-shot
+    // could never play again.)
+    await page.evaluate(() => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        bus: { emit: (event: string, payload: unknown) => void };
+      };
+      ctx.bus.emit('game:reset_requested', {});
+    });
+    await expect.poll(async () => (await gameText(page)).scene).toBe('TitleScene');
+    await page.waitForTimeout(1200);
+    await page.mouse.click(640, 670); // Play — a fresh run on the SAME scene instance
+    await expect.poll(async () => (await gameText(page)).scene).toBe('BoardScene');
+    await page.waitForTimeout(600);
+    const altar = await page.evaluate(() => {
+      const board = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
+        altarEgg?: { active: boolean; displayList: unknown };
+        finaleRan: boolean;
+      };
+      return {
+        eggAlive: !!(board.altarEgg && board.altarEgg.active && board.altarEgg.displayList),
+        finaleRan: board.finaleRan
+      };
+    });
+    expect(altar.eggAlive).toBe(true); // the Golden Egg stands on the altar again
+    expect(altar.finaleRan).toBe(false); // the finale one-shot re-armed
 
     // ---------- No console errors anywhere in the run ----------
     expect(consoleErrors).toEqual([]);

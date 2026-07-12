@@ -41,6 +41,7 @@ declare global {
     advanceTime: (ms: number) => { now: number; offset: number };
     __emberkeep: {
       gridToPage: (col: number, row: number) => { x: number; y: number };
+      itemToPage: (col: number, row: number) => { x: number; y: number };
       centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
       reset: () => void;
@@ -164,6 +165,24 @@ window.render_game_to_text = (): RenderedGame => {
   };
 };
 
+/** Map a BOARD-world point to page (CSS) coordinates through the board camera
+ *  (which pans/zooms across the big map), wherever it currently sits. */
+const worldToPage = (world: { x: number; y: number }): { x: number; y: number } => {
+  const rect = game.canvas.getBoundingClientRect();
+  const board = game.scene.getScene(SCENES.board) as Phaser.Scene | undefined;
+  const view = board?.cameras?.main?.worldView;
+  if (view && view.width > 0 && view.height > 0) {
+    return {
+      x: rect.left + ((world.x - view.x) / view.width) * rect.width,
+      y: rect.top + ((world.y - view.y) / view.height) * rect.height
+    };
+  }
+  return {
+    x: rect.left + (world.x / GAME_WIDTH) * rect.width,
+    y: rect.top + (world.y / LIVE_GAME_HEIGHT) * rect.height
+  };
+};
+
 window.__emberkeep = {
   saveKey: SAVE_KEY,
   game,
@@ -177,23 +196,17 @@ window.__emberkeep = {
     window.localStorage.removeItem(SAVE_KEY);
     window.location.reload();
   },
-  gridToPage: (col: number, row: number) => {
-    const rect = game.canvas.getBoundingClientRect();
-    const world = gridToWorld(col, row);
-    // Map through the BOARD camera (which pans/zooms across the big map) so a
-    // cell's page position is correct wherever the camera currently sits.
-    const board = game.scene.getScene(SCENES.board) as Phaser.Scene | undefined;
-    const view = board?.cameras?.main?.worldView;
-    if (view && view.width > 0 && view.height > 0) {
-      return {
-        x: rect.left + ((world.x - view.x) / view.width) * rect.width,
-        y: rect.top + ((world.y - view.y) / view.height) * rect.height
-      };
-    }
-    return {
-      x: rect.left + (world.x / GAME_WIDTH) * rect.width,
-      y: rect.top + (world.y / LIVE_GAME_HEIGHT) * rect.height
-    };
+  gridToPage: (col: number, row: number) => worldToPage(gridToWorld(col, row)),
+  // The page position a pointer test should AIM at for the item on (col,row):
+  // the centre of its art (hit zones wrap the art, which can sit off the tile
+  // point). Falls back to the tile centre for empty cells.
+  itemToPage: (col: number, row: number) => {
+    const board = game.scene.getScene(SCENES.board) as
+      | (Phaser.Scene & {
+          itemArtWorldPoint?: (c: number, r: number) => { x: number; y: number } | null;
+        })
+      | undefined;
+    return worldToPage(board?.itemArtWorldPoint?.(col, row) ?? gridToWorld(col, row));
   },
   /** Centre the board camera on a cell (test hook; the closer camera can leave
    *  off-zone targets like the fog gate out of view). */

@@ -61,4 +61,36 @@ describe('DragonJobSystem (dragon jobs)', () => {
     ctx.bus.emit('time:advanced', { ms: 300_001 });
     expect(ctx.systems.jobs.restRemaining(dragon.id)).toBe(0);
   });
+
+  it('only actual DRAGON tiers work — the chain merge pieces (Ruby, Eggs) cannot be hired', () => {
+    const ctx = createTestContext();
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 2, col: 2, row: 2, kind: 'item' });
+    const ruby = ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 4, row: 4, kind: 'item' });
+    const redEgg = ctx.state.addItem({ chain: 'ember_dragon', tier: 2, col: 5, row: 4, kind: 'item' });
+    const greenEgg = ctx.state.addItem({ chain: 'emerald', tier: 2, col: 6, row: 4, kind: 'item' });
+
+    for (const impostor of [ruby, redEgg, greenEgg]) {
+      ctx.bus.emit('dragon:work', { dragonId: impostor.id, houseId: house.id });
+      expect(ctx.systems.jobs.isWorking(impostor.id)).toBe(false);
+    }
+    expect(ctx.systems.jobs.workersFor(house.id)).toBe(0);
+
+    // Both dragon forms qualify: base (t3) and adult (t4).
+    const red = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 4, row: 5, kind: 'item' });
+    const adult = ctx.state.addItem({ chain: 'ember_dragon', tier: 4, col: 5, row: 5, kind: 'item' });
+    ctx.bus.emit('dragon:work', { dragonId: red.id, houseId: house.id });
+    ctx.bus.emit('dragon:work', { dragonId: adult.id, houseId: house.id });
+    expect(ctx.systems.jobs.workersFor(house.id)).toBe(2);
+  });
+
+  it('only PASSIVE generators (House, Big Tree) can be worked — never another dragon or a gem', () => {
+    const ctx = createTestContext();
+    const dragon = ctx.state.addItem({ chain: 'emerald', tier: 3, col: 4, row: 4, kind: 'item' });
+    const otherDragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 5, row: 4, kind: 'item' });
+    const ruby = ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 6, row: 4, kind: 'item' });
+
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: otherDragon.id });
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: ruby.id });
+    expect(ctx.systems.jobs.isWorking(dragon.id)).toBe(false);
+  });
 });

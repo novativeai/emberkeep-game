@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEPTHS, DRAG, TIMINGS, num, PALETTE } from '../core/Constants';
+import { DEPTHS, DRAG, HIT_FORGIVENESS_PX, TIMINGS, num, PALETTE } from '../core/Constants';
 import { gridToWorld } from '../core/iso';
 import type { AnchorsData, ItemSnapshot } from '../core/types';
 
@@ -145,6 +145,79 @@ export class BoardItem extends Phaser.GameObjects.Container {
 
   settleDepth(): void {
     this.setDepth(DEPTHS.itemBase + this.y);
+  }
+
+  /** The art's display bounds in HIT-AREA space (container local point +
+   *  displayOrigin — see acquireSprite): the clickable zone wraps the sprite
+   *  the player sees, never the tile footprint. */
+  artHitRect(): Phaser.Geom.Rectangle {
+    const w = this.sprite.displayWidth;
+    const h = this.sprite.displayHeight;
+    return new Phaser.Geom.Rectangle(
+      this.displayOriginX - this.sprite.originX * w,
+      this.displayOriginY - this.sprite.originY * h,
+      w,
+      h
+    );
+  }
+
+  /** True when hit-area point (hx,hy) lands on (or within HIT_FORGIVENESS_PX
+   *  of) an opaque art pixel. Transparent regions FAIL the hit test, so the
+   *  pointer falls through to whatever is visually behind — a tall sprite's
+   *  empty corners never steal a tap — while the forgiveness ring keeps thin or
+   *  holey art (sprout stems) comfortably tappable. A rig host's hidden art
+   *  still answers (the live rig stands where the art would). */
+  hitsOpaqueArt(hx: number, hy: number): boolean {
+    if (this.artOpaqueAt(hx, hy)) return true;
+    const r = HIT_FORGIVENESS_PX;
+    return (
+      this.artOpaqueAt(hx + r, hy) ||
+      this.artOpaqueAt(hx - r, hy) ||
+      this.artOpaqueAt(hx, hy + r) ||
+      this.artOpaqueAt(hx, hy - r) ||
+      this.artOpaqueAt(hx + r, hy + r) ||
+      this.artOpaqueAt(hx - r, hy - r) ||
+      this.artOpaqueAt(hx + r, hy - r) ||
+      this.artOpaqueAt(hx - r, hy + r)
+    );
+  }
+
+  /** Hit-area point on OPAQUE art nearest the art centre — where a pointer test
+   *  should AIM (window.__emberkeep.itemToPage): generated placeholder art can
+   *  leave the geometric centre transparent. */
+  opaqueArtHitPoint(): { x: number; y: number } {
+    const r = this.artHitRect();
+    const samples = 13;
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (let i = 0; i < samples; i++) {
+      for (let j = 0; j < samples; j++) {
+        const x = r.x + ((i + 0.5) / samples) * r.width;
+        const y = r.y + ((j + 0.5) / samples) * r.height;
+        if (!this.artOpaqueAt(x, y)) continue;
+        const d = (x - r.centerX) ** 2 + (y - r.centerY) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = { x, y };
+        }
+      }
+    }
+    return best ?? { x: r.centerX, y: r.centerY };
+  }
+
+  private artOpaqueAt(hx: number, hy: number): boolean {
+    const s = this.sprite;
+    if (s.scaleX === 0 || s.scaleY === 0) return false;
+    if (!this.scene.textures.exists(s.texture.key)) return true; // no pixels to ask
+    const px = (hx - this.displayOriginX - s.x) / s.scaleX + s.displayOriginX;
+    const py = (hy - this.displayOriginY - s.y) / s.scaleY + s.displayOriginY;
+    const alpha = this.scene.textures.getPixelAlpha(
+      Math.floor(px),
+      Math.floor(py),
+      s.texture.key,
+      s.frame.name
+    );
+    return alpha !== null && alpha > 0;
   }
 
   /**

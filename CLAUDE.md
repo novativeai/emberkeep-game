@@ -59,8 +59,10 @@ nothing is throwaway.
 
 ## Phaser gotchas (do not regress)
 - Container hit areas test against `localPoint + displayOrigin` — custom hit rects
-  must be origin-shifted (see `acquireSprite`). Keep board hit areas ≤ one iso row
-  above tile centre or front items mask the tile behind them.
+  must be origin-shifted (see `acquireSprite`). Board-item hit zones are the ART's
+  display bounds (`BoardItem.artHitRect`), never tile-footprint rects; transparent
+  pixels yield the hit (`hitsOpaqueArt`) so depth order routes overlapping taps to
+  the sprite the player actually sees.
 - Pooled BoardItems: never `disableInteractive()` on release; `acquire()` must
   fully reset (a pooled item may have been a hidden rig host).
 - `setAlpha(0)`/`setVisible(false)` clear the render flag → Phaser skips hit-tests.
@@ -86,5 +88,5 @@ nothing is throwaway.
 
 ## Instrumentation contract (Playwright depends on it)
 Keep stable when refactoring `main.ts`/`TitleScene`: `window.render_game_to_text()`,
-`window.advanceTime(ms)`, `window.__emberkeep.{gridToPage,centerCell,grantXp,reset}`,
+`window.advanceTime(ms)`, `window.__emberkeep.{gridToPage,itemToPage,centerCell,grantXp,reset}`,
 and the Title Play button's position.
