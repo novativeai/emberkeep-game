@@ -910,7 +910,7 @@
     "emberkeep": {
       "offsetX": 0,
       "offsetY": 0,
-      "scale": 1,
+      "scale": 2,
       "anchor": {
         "x": 0.5,
         "y": 0.5
