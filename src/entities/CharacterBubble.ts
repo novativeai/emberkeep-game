@@ -118,12 +118,16 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
         color: PALETTE.cream
       })
       .setOrigin(0.5);
+    // Explicit continue cue — a lone chevron read as decoration; the words
+    // make the tap gate unmissable (pill behind it is drawn by layout()).
     this.chevron = scene.add
-      .text(BUBBLE_WIDTH / 2 - 60, 0, '▼', {
-        fontSize: '40px',
-        color: PALETTE.gold
+      .text(BUBBLE_WIDTH / 2 - 60, 0, 'Tap to continue  ▼', {
+        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontSize: '26px',
+        fontStyle: 'bold',
+        color: PALETTE.goldShade
       })
-      .setOrigin(0.5);
+      .setOrigin(1, 0.5);
     this.hitZone = scene.add.zone(0, 0, BUBBLE_WIDTH, MIN_HEIGHT);
     this.hitZone.setInteractive({ useHandCursor: true });
     this.hitZone.on('pointerup', () => {
@@ -320,8 +324,8 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       this.chevron.setAlpha(1);
       this.chevronTween = this.scene.tweens.add({
         targets: this.chevron,
-        alpha: 0.25,
-        y: this.chevron.y + 8,
+        alpha: 0.45,
+        y: this.chevron.y + 6,
         duration: 520,
         yoyo: true,
         repeat: -1,
@@ -443,9 +447,20 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.nameTagBg.lineStyle(4, num(PALETTE.cream), 0.9);
     this.nameTagBg.strokeRoundedRect(tagX - tagWidth / 2, tagY - tagHeight / 2, tagWidth, tagHeight, tagHeight / 2);
 
-    this.chevron.setPosition(width / 2 - 60 + oChevron.dx, height / 2 - 40 + oChevron.dy);
+    this.chevron.setPosition(width / 2 - 36 + oChevron.dx, height / 2 - 34 + oChevron.dy);
     this.chevron.setScale(oChevron.scale);
     this.chevron.setVisible(this.tapGated);
+    if (this.tapGated) {
+      // Soft gold pill behind the cue so it reads as a button-like affordance.
+      const cw = this.chevron.displayWidth + 40;
+      const chh = 46 * oChevron.scale;
+      const cxr = width / 2 - 36 + oChevron.dx + 14;
+      const cyy = height / 2 - 34 + oChevron.dy;
+      this.bg.fillStyle(num(PALETTE.gold), 0.16);
+      this.bg.fillRoundedRect(cxr - cw, cyy - chh / 2, cw, chh, chh / 2);
+      this.bg.lineStyle(2, num(PALETTE.gold), 0.45);
+      this.bg.strokeRoundedRect(cxr - cw, cyy - chh / 2, cw, chh, chh / 2);
+    }
   }
 
   hide(): void {

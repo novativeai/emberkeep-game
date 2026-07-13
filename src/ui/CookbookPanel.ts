@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { ChainsData } from '../core/types';
@@ -29,13 +29,14 @@ interface RecipeRow {
   caption: Phaser.GameObjects.Text;
   badge: Phaser.GameObjects.Container;
   arrow: Phaser.GameObjects.Graphics;
-  x: number;
-  y: number;
 }
 
-// Row geometry (panel-local). Two page columns, six recipes per page.
+// Row geometry (ROW-local; every row lives in its own container so crowded
+// books scale rows down UNIFORMLY instead of letting chips overlap).
+// Two page columns; up to six recipes per page render at full size.
 const COL_X = 310;
 const ROW_TOP = -238;
+const ROW_BOTTOM = 322; // last row centre must stay above the counter line
 const ROW_GAP = 102;
 const CHIP = 78;
 const CHIP_FROM_X = -196;
@@ -129,11 +130,14 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // so the last row never collides with the counter line below. ----
     const recipes = this.enumerateRecipes(chains);
     const half = Math.ceil(recipes.length / 2);
-    const gap = half <= 6 ? ROW_GAP : Math.floor((ROW_GAP * 6) / half);
+    // Crowded book: shrink the gap to spread rows across the page, and shrink
+    // each ROW by the same ratio so chips/captions can never overlap.
+    const gap = half <= 6 ? ROW_GAP : Math.floor((ROW_BOTTOM - ROW_TOP) / (half - 1));
+    const rowScale = Math.min(1, gap / ROW_GAP);
     recipes.forEach((recipe, i) => {
       const x = (i < half ? -1 : 1) * COL_X;
       const y = ROW_TOP + (i % half) * gap;
-      this.rows.push(this.buildRow(scene, recipe, x, y));
+      this.rows.push(this.buildRow(scene, recipe, x, y, rowScale));
     });
 
     this.counter = scene.add
@@ -183,23 +187,27 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     return out;
   }
 
-  /** One cookbook line: [chip ×N] ──▶ [chip], names beneath each chip. */
-  private buildRow(scene: Phaser.Scene, recipe: Recipe, x: number, y: number): RecipeRow {
+  /** One cookbook line: [chip ×N] ──▶ [chip], caption beneath the arrow.
+   *  Everything is ROW-LOCAL inside one container scaled by `rowScale`, so a
+   *  crowded book shrinks rows uniformly instead of overlapping them. */
+  private buildRow(scene: Phaser.Scene, recipe: Recipe, x: number, y: number, rowScale: number): RecipeRow {
+    const rowC = scene.add.container(x, y);
+    rowC.setScale(rowScale);
+    this.add(rowC);
+
     const fromChip = scene.add.graphics();
     const toChip = scene.add.graphics();
     const arrow = scene.add.graphics();
-    this.add([fromChip, toChip, arrow]);
+    rowC.add([fromChip, toChip, arrow]);
 
     const mkIcon = (tier: number, cx: number): Phaser.GameObjects.Image | null => {
       const key = `item_${recipe.chain}_${tier}`;
       if (!scene.textures.exists(key)) return null;
-      const icon = scene.add.image(x + cx, y - 8, key);
-      const s = ITEM_SCALE[`${recipe.chain}_${tier}`] ?? ITEM_SCALE[recipe.chain] ?? 1;
-      icon.setScale(s);
+      const icon = scene.add.image(cx, -8, key);
       // Normalise every icon to the chip's inner box — a recipe book wants a
       // tidy grid, not board-relative sizes.
-      icon.setScale((s * ICON_FIT) / Math.max(icon.displayWidth, icon.displayHeight));
-      this.add(icon);
+      icon.setScale(ICON_FIT / Math.max(icon.width, icon.height));
+      rowC.add(icon);
       return icon;
     };
     const fromIcon = mkIcon(recipe.fromTier, CHIP_FROM_X);
@@ -208,7 +216,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // "?" marks for undiscovered pages (also the fallback if art is missing).
     const mkMark = (cx: number): Phaser.GameObjects.Text => {
       const mark = scene.add
-        .text(x + cx, y - 8, '?', {
+        .text(cx, -8, '?', {
           fontFamily: FONT,
           fontSize: '44px',
           fontStyle: 'bold',
@@ -216,7 +224,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
         })
         .setOrigin(0.5)
         .setVisible(false);
-      this.add(mark);
+      rowC.add(mark);
       return mark;
     };
     const fromMark = mkMark(CHIP_FROM_X);
@@ -225,17 +233,17 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // One caption per row, written in the chip-free gap under the arrow —
     // "Dragon Ruby → Red Egg". Rows never collide vertically this way.
     const caption = scene.add
-      .text(x + (CHIP_FROM_X + CHIP_TO_X) / 2, y + 14, '', {
+      .text((CHIP_FROM_X + CHIP_TO_X) / 2, 14, '', {
         fontFamily: FONT,
         fontSize: '18px',
         fontStyle: 'bold',
         color: PALETTE.textBrown
       })
       .setOrigin(0.5, 0);
-    this.add(caption);
+    rowC.add(caption);
 
     // ×N badge riding the input chip's bottom edge.
-    const badge = scene.add.container(x + CHIP_FROM_X + 26, y + 26);
+    const badge = scene.add.container(CHIP_FROM_X + 26, 26);
     const badgeBg = scene.add.graphics();
     badgeBg.fillStyle(num(PALETTE.gold), 1);
     badgeBg.fillRoundedRect(-27, -15, 54, 30, 15);
@@ -250,29 +258,28 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     badge.add([badgeBg, badgeText]);
-    this.add(badge);
+    rowC.add(badge);
 
-    return { recipe, fromChip, toChip, fromIcon, toIcon, fromMark, toMark, caption, badge, arrow, x, y };
+    return { recipe, fromChip, toChip, fromIcon, toIcon, fromMark, toMark, caption, badge, arrow };
   }
 
-  /** Repaint one row for its discovered/undiscovered state. */
+  /** Repaint one row for its discovered/undiscovered state (row-local). */
   private paintRow(row: RecipeRow, discovered: boolean): void {
-    const { x, y } = row;
     const chip = (g: Phaser.GameObjects.Graphics, cx: number, size: number): void => {
       const half = size / 2;
       g.clear();
       if (discovered) {
         g.fillStyle(num(PALETTE.cream), 1);
-        g.fillRoundedRect(x + cx - half, y - 8 - half, size, size, 20);
+        g.fillRoundedRect(cx - half, -8 - half, size, size, 20);
         g.fillStyle(0xefe0c8, 1);
-        g.fillRoundedRect(x + cx - half + 4, y - 8 - half + 4, size - 8, size - 8, 16);
+        g.fillRoundedRect(cx - half + 4, -8 - half + 4, size - 8, size - 8, 16);
         g.lineStyle(4, num(PALETTE.goldShade), 0.55);
       } else {
         g.fillStyle(num(PALETTE.plumShade), 0.88);
-        g.fillRoundedRect(x + cx - half, y - 8 - half, size, size, 20);
+        g.fillRoundedRect(cx - half, -8 - half, size, size, 20);
         g.lineStyle(4, num(PALETTE.plumShade), 1);
       }
-      g.strokeRoundedRect(x + cx - half, y - 8 - half, size, size, 20);
+      g.strokeRoundedRect(cx - half, -8 - half, size, size, 20);
     };
     chip(row.fromChip, CHIP_FROM_X, CHIP);
     chip(row.toChip, CHIP_TO_X, CHIP + 8); // the result chip is the payoff — a touch larger
@@ -280,9 +287,9 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // Long tapered arrow: dark under-stroke, gold on top. Raised a touch so
     // the caption reads comfortably beneath it.
     const a = row.arrow;
-    const x1 = x + CHIP_FROM_X + CHIP / 2 + 26;
-    const x2 = x + CHIP_TO_X - (CHIP + 8) / 2 - 14;
-    const ay = y - 22;
+    const x1 = CHIP_FROM_X + CHIP / 2 + 26;
+    const x2 = CHIP_TO_X - (CHIP + 8) / 2 - 14;
+    const ay = -22;
     a.clear();
     a.setAlpha(discovered ? 1 : 0.3);
     a.fillStyle(num(PALETTE.plumShade), 1);

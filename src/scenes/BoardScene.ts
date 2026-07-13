@@ -1658,11 +1658,23 @@ export class BoardScene extends Phaser.Scene {
         (o) => o instanceof BoardItem || o.getData?.('regionId') !== undefined
       );
       if (onObject) return;
+      // A tap that lands on UI (energy pill, popups, buttons — they live in
+      // UIScene, invisible to this scene's hit test) must never start a pan:
+      // if the popup it opens swallows the pointer-up, the camera would stay
+      // glued to the mouse.
+      const ui = this.scene.get(SCENES.ui);
+      if (ui?.input?.hitTestPointer(pointer).length) return;
       this.flyTween?.stop();
       this.panFrom = { px: pointer.x, py: pointer.y, sx: cam.scrollX, sy: cam.scrollY };
     });
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => {
       if (!this.panFrom) return;
+      // Belt & braces for the same lock-up: if the button is no longer held
+      // (the matching pointer-up was consumed elsewhere), the pan is over.
+      if (!pointer.isDown) {
+        this.panFrom = null;
+        return;
+      }
       cam.scrollX = this.panFrom.sx - (pointer.x - this.panFrom.px) / cam.zoom;
       cam.scrollY = this.panFrom.sy - (pointer.y - this.panFrom.py) / cam.zoom;
     });
