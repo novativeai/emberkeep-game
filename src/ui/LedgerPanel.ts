@@ -1,56 +1,81 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
-import type { OrderConfig, OrderOption, OrdersData } from '../core/types';
+import type { OrderConfig } from '../core/types';
+import type { OrderSystem } from '../systems/OrderSystem';
+import type { TaskSystem } from '../systems/TaskSystem';
+import { uiRegistry } from './theme';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
+// Card centres: half the card art (640×0.9 → ±288) + this must stay inside the
+// ui_panel's inner face (~±612) — at 330/0.96 the cards overflowed the frame.
+const CARD_X = 300;
+const TAB_W = 520;
+const TAB_H = 104;
+const TAB_Y = -384;
 
-/** One "market" row in a multi-option order: what you give → what you get + a
- *  green claim button. */
-interface OptionRow {
+type LedgerTab = 'orders' | 'tasks';
+
+interface OrderCard {
   root: Phaser.GameObjects.Container;
-  giveIcon: Phaser.GameObjects.Image;
-  giveText: Phaser.GameObjects.Text;
-  rewardIcon: Phaser.GameObjects.Image;
+  title: Phaser.GameObjects.Text;
+  slotIcon: Phaser.GameObjects.Image;
+  slotCount: Phaser.GameObjects.Text;
   rewardText: Phaser.GameObjects.Text;
-  button: Phaser.GameObjects.Container;
-  buttonBg: Phaser.GameObjects.Image;
-  buttonLabel: Phaser.GameObjects.Text;
+  deliverButton: Phaser.GameObjects.Container;
+  order: OrderConfig | null;
+  deliverable: boolean;
+}
+
+interface TaskRow {
+  label: Phaser.GameObjects.Text;
+  count: Phaser.GameObjects.Text;
+  barBg: Phaser.GameObjects.Graphics;
+  fill: Phaser.GameObjects.Graphics;
+  check: Phaser.GameObjects.Text;
+  hint: Phaser.GameObjects.Text;
+}
+
+interface TabHandle {
+  root: Phaser.GameObjects.Container;
+  bg: Phaser.GameObjects.Graphics;
+  label: Phaser.GameObjects.Text;
 }
 
 /**
- * Cindra's Ledger — the Magic-Orders-style panel: cream board with a warm
- * red frame, title lozenge, Cindra's order card with required item slots and
- * a glossy green Deliver button.
+ * Cindra's Ledger — the game's single quest board. Two tabs under one frame:
+ *   • Orders — the two-slot order board (DEMO-PLAN §Act III): both active
+ *     orders visible at once, so the player CHOOSES what to chase.
+ *   • Tasks — the Keeper's Tasks chapter checklist (DEMO-PLAN §Act V) with
+ *     live progress bars; TaskSystem owns the reward, this page only renders.
+ * The Tasks tab appears once the tutorial ends (the checklist is the encore's
+ * spine, not a tutorial concern) — until then the Orders header sits centred
+ * and the panel reads exactly like the tutorial's original Ledger.
  */
 export class LedgerPanel extends Phaser.GameObjects.Container {
   isOpen = false;
+  /** Open/rest scale — >1 on mobile so the frame fills the portrait width. */
+  private baseScale = 1;
   private readonly offBus: Array<() => void> = [];
   private dim: Phaser.GameObjects.Rectangle;
-  private titleText: Phaser.GameObjects.Text;
-  private orderTitle: Phaser.GameObjects.Text;
   private blurb: Phaser.GameObjects.Text;
-  private rewardKeys: Phaser.GameObjects.Text;
-  private rewardIcon: Phaser.GameObjects.Image;
-  private rewardRow: Phaser.GameObjects.Container;
-  private slotIcon: Phaser.GameObjects.Image;
-  private slotCount: Phaser.GameObjects.Text;
-  private deliverButton: Phaser.GameObjects.Container;
-  private deliverText: Phaser.GameObjects.Text;
   private emptyText: Phaser.GameObjects.Text;
-  private card: Phaser.GameObjects.Container;
-  private optionsContainer: Phaser.GameObjects.Container;
-  private optionRows: OptionRow[] = [];
-  private deliverable = false;
+  private cards: OrderCard[] = [];
   private deliverAllowed = true;
-  private currentOrder: OrderConfig | null = null;
+  private activeTab: LedgerTab = 'orders';
+  private ordersPage: Phaser.GameObjects.Container;
+  private tasksPage: Phaser.GameObjects.Container;
+  private ordersTab: TabHandle;
+  private tasksTab: TabHandle;
+  private taskRows: TaskRow[] = [];
 
   constructor(
     scene: Phaser.Scene,
     private bus: EventBus,
-    private gameState: GameState,
-    private orders: OrdersData
+    private orderSystem: OrderSystem,
+    private taskSystem: TaskSystem,
+    private gameState: GameState
   ) {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
@@ -60,22 +85,12 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.dim.on('pointerup', () => this.requestClose());
 
     const panel = scene.add.image(0, 16, 'ui_panel');
+    this.baseScale = panelMobileScale(panel.width);
 
-    // Title lozenge.
-    const titleBg = scene.add.graphics();
-    titleBg.fillStyle(num(PALETTE.lava), 1);
-    titleBg.fillRoundedRect(-300, -436, 600, 104, 52);
-    titleBg.lineStyle(6, num(PALETTE.cream), 0.95);
-    titleBg.strokeRoundedRect(-300, -436, 600, 104, 52);
-    this.titleText = scene.add
-      .text(0, -384, 'Cindra’s Ledger', {
-        fontFamily: FONT,
-        fontSize: '52px',
-        fontStyle: 'bold',
-        color: PALETTE.cream
-      })
-      .setOrigin(0.5)
-      .setShadow(0, 4, 'rgba(36,27,34,0.5)', 6);
+    // Tab lozenges along the top edge — Orders sits centred (classic Ledger
+    // header) until the tutorial ends and the Tasks tab joins it.
+    this.ordersTab = this.buildTab(scene, 'Cindra’s Orders', () => this.switchTab('orders'));
+    this.tasksTab = this.buildTab(scene, 'Keeper’s Tasks', () => this.switchTab('tasks'));
 
     // Close button.
     const closeButton = scene.add.container(592, -392);
@@ -88,82 +103,21 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     closeButton.setInteractive({ useHandCursor: true });
     closeButton.on('pointerup', () => this.requestClose());
 
-    // Left column: order text + rewards.
-    this.orderTitle = scene.add
-      .text(-560, -240, '', {
-        fontFamily: FONT,
-        fontSize: '46px',
-        fontStyle: 'bold',
-        color: PALETTE.textBrown,
-        wordWrap: { width: 500 }
-      })
-      .setOrigin(0, 0);
-    this.blurb = scene.add
-      .text(-560, -148, '', {
-        fontFamily: FONT,
-        fontSize: '32px',
-        color: '#8A6248',
-        wordWrap: { width: 504 },
-        lineSpacing: 8
-      })
-      .setOrigin(0, 0);
-    this.rewardRow = scene.add.container(-560, 192);
-    const rewardLabel = scene.add.text(0, -68, 'Reward:', {
-      fontFamily: FONT,
-      fontSize: '34px',
-      fontStyle: 'bold',
-      color: PALETTE.textBrown
-    });
-    this.rewardIcon = scene.add.image(32, 8, 'ui_icon_key').setScale(0.85);
-    this.rewardKeys = scene.add
-      .text(96, 8, '×1', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: PALETTE.goldShade })
-      .setOrigin(0, 0.5);
-    this.rewardRow.add([rewardLabel, this.rewardIcon, this.rewardKeys]);
+    // ---- Orders page: two cards side by side + blurb + empty text. ----
+    this.ordersPage = scene.add.container(0, 0);
+    this.cards.push(this.buildCard(scene, -CARD_X), this.buildCard(scene, CARD_X));
 
-    // Right column: Cindra card with the requirement slot + deliver.
-    this.card = scene.add.container(300, 16);
-    const cardBg = scene.add.image(0, 0, 'ui_card').setScale(0.96);
-    const portrait = scene.add.image(0, -204, 'portrait_cindra').setScale(1.12);
-    const requiredLabel = scene.add
-      .text(0, -76, 'Required:', {
+    // The active card's flavor line runs along the bottom of the board.
+    this.blurb = scene.add
+      .text(0, 400, '', {
         fontFamily: FONT,
-        fontSize: '34px',
-        fontStyle: 'bold',
-        color: PALETTE.lavaShade
+        fontSize: '28px',
+        fontStyle: 'italic',
+        color: '#8A6248',
+        align: 'center',
+        wordWrap: { width: 1150 }
       })
       .setOrigin(0.5);
-    const slot = scene.add.image(0, 32, 'ui_slot');
-    this.slotIcon = scene.add.image(0, 24, 'item_flame_gem_2').setScale(0.72);
-    this.slotCount = scene.add
-      .text(48, 76, '0/2', {
-        fontFamily: FONT,
-        fontSize: '30px',
-        fontStyle: 'bold',
-        color: PALETTE.textBrown
-      })
-      .setOrigin(0.5)
-      .setShadow(0, 2, '#FFFFFF', 4);
-
-    this.deliverButton = scene.add.container(0, 232);
-    const deliverBg = scene.add.image(0, 0, 'ui_btn_green');
-    this.deliverText = scene.add
-      .text(0, -10, 'Deliver', {
-        fontFamily: FONT,
-        fontSize: '52px',
-        fontStyle: 'bold',
-        color: '#FFFFFF'
-      })
-      .setOrigin(0.5)
-      .setShadow(0, 4, 'rgba(36,27,34,0.5)', 6);
-    this.deliverButton.add([deliverBg, this.deliverText]);
-    // The button art is centred on the container origin. setSize + an explicit
-    // origin-centred hit rect makes the WHOLE button clickable (a plain setSize
-    // default hit rect (0,0,w,h) only covers the bottom-right quadrant of a
-    // centred container — clicks on the rest miss). The bg image carries the
-    // interaction so the nested-container transform doesn't muddle the hit test.
-    deliverBg.setInteractive({ useHandCursor: true });
-    deliverBg.on('pointerup', () => this.onDeliverPressed());
-    this.deliverButton.setSize(400, 140);
 
     this.emptyText = scene.add
       .text(0, 20, 'The brazier roars again!\nCindra will have new work for you soon.', {
@@ -176,70 +130,186 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5)
       .setVisible(false);
+    this.ordersPage.add([...this.cards.map((c) => c.root), this.blurb, this.emptyText]);
 
-    this.card.add([cardBg, portrait, requiredLabel, slot, this.slotIcon, this.slotCount, this.deliverButton]);
+    // ---- Tasks page: the chapter checklist. ----
+    this.tasksPage = scene.add.container(0, 0).setVisible(false);
+    this.buildTasksPage(scene);
 
-    // Multi-option layout ("two markets"): a stack of give → get rows, each with
-    // its own claim button. Occupies the right half (the single Cindra card is
-    // hidden in this mode). Built once, populated per active order in refresh().
-    this.optionsContainer = scene.add.container(240, 40);
-    for (let i = 0; i < 2; i++) {
-      const root = scene.add.container(0, i === 0 ? -140 : 140);
-      const slotBg = scene.add.image(-236, 0, 'ui_slot').setScale(0.62);
-      const giveIcon = scene.add.image(-236, -6, '__DEFAULT').setScale(0.7);
-      const giveText = scene.add
-        .text(-236, 62, '', { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: PALETTE.textBrown })
-        .setOrigin(0.5)
-        .setShadow(0, 2, '#FFFFFF', 4);
-      const arrow = scene.add
-        .text(-116, -10, '→', { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: PALETTE.lavaShade })
-        .setOrigin(0.5);
-      const rewardIcon = scene.add.image(-34, -6, '__DEFAULT').setScale(0.7);
-      const rewardText = scene.add
-        .text(26, -6, '', { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: PALETTE.goldShade })
-        .setOrigin(0, 0.5);
-      const button = scene.add.container(236, 0);
-      const buttonBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.66);
-      const buttonLabel = scene.add
-        .text(0, -8, '', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: '#FFFFFF' })
-        .setOrigin(0.5)
-        .setShadow(0, 3, 'rgba(36,27,34,0.5)', 5);
-      button.add([buttonBg, buttonLabel]);
-      buttonBg.setInteractive({ useHandCursor: true });
-      buttonBg.on('pointerup', () => this.onOptionPressed(i));
-      root.add([slotBg, giveIcon, giveText, arrow, rewardIcon, rewardText, button]);
-      this.optionsContainer.add(root);
-      this.optionRows.push({ root, giveIcon, giveText, rewardIcon, rewardText, button, buttonBg, buttonLabel });
-    }
-    this.optionsContainer.setVisible(false);
-
-    this.add([
-      this.dim,
-      panel,
-      titleBg,
-      this.titleText,
-      closeButton,
-      this.orderTitle,
-      this.blurb,
-      this.rewardRow,
-      this.card,
-      this.optionsContainer,
-      this.emptyText
-    ]);
+    this.add([this.dim, panel, this.ordersTab.root, this.tasksTab.root, closeButton, this.ordersPage, this.tasksPage]);
     scene.add.existing(this);
     this.setVisible(false);
 
+    uiRegistry.register(scene, 'panel.ledger', 'Cindra’s Ledger panel', 'Panels', this, {
+      frame: panel,
+      title: this.ordersTab.label,
+      orderTitle: this.cards[0]!.title,
+      blurb: this.blurb,
+      card: this.cards[0]!.root
+    });
+
     this.offBus.push(
-      bus.on('order:progress', ({ have, deliverable }) => {
-        this.deliverable = deliverable;
-        this.refresh(have[0] ?? 0);
-      }),
-      bus.on('order:completed', () => this.refresh(0)),
-      // Coins changed → re-check the "pay coins" option's affordability.
-      bus.on('economy:changed', () => {
-        if (this.isOpen) this.refresh();
-      })
+      bus.on('order:progress', () => this.refresh()),
+      bus.on('order:completed', () => this.refresh())
     );
+    // The checklist counts merges/hatches/orders/gold/elder-taps — refresh the
+    // Tasks page (and its tab counter) whenever any of those move while open.
+    for (const event of ['item:merged', 'item:hatched', 'order:completed', 'elder:tapped', 'economy:changed', 'tasks:all_complete'] as const) {
+      this.offBus.push(bus.on(event, () => this.isOpen && this.refreshTasks()));
+    }
+  }
+
+  /** One header lozenge — restyled active/inactive by layoutTabs(). */
+  private buildTab(scene: Phaser.Scene, text: string, onTap: () => void): TabHandle {
+    const root = scene.add.container(0, TAB_Y);
+    const bg = scene.add.graphics();
+    const label = scene.add
+      .text(0, 0, text, {
+        fontFamily: FONT,
+        fontSize: '40px',
+        fontStyle: 'bold',
+        color: PALETTE.cream
+      })
+      .setOrigin(0.5)
+      .setShadow(0, 4, 'rgba(36,27,34,0.5)', 6);
+    root.add([bg, label]);
+    root.setSize(TAB_W, TAB_H);
+    root.setInteractive({ useHandCursor: true });
+    root.on('pointerup', onTap);
+    return { root, bg, label };
+  }
+
+  /** Five checklist rows + the Cindra reward footer, in panel space. */
+  private buildTasksPage(scene: Phaser.Scene): void {
+    const rowTop = -236;
+    const rowGap = 118;
+    this.taskSystem.tasks.forEach((task, i) => {
+      const y = rowTop + i * rowGap;
+      const label = scene.add
+        .text(-548, y, task.label, {
+          fontFamily: FONT,
+          fontSize: '31px',
+          fontStyle: 'bold',
+          color: PALETTE.textBrown,
+          wordWrap: { width: 640 }
+        })
+        .setOrigin(0, 0.5);
+      const barX = 160;
+      const barBg = scene.add.graphics();
+      barBg.fillStyle(num(PALETTE.plumShade), 0.5);
+      barBg.fillRoundedRect(barX, y + 18, 320, 22, 11);
+      const fill = scene.add.graphics();
+      const count = scene.add
+        .text(barX + 160, y - 14, '', {
+          fontFamily: FONT,
+          fontSize: '27px',
+          fontStyle: 'bold',
+          color: PALETTE.goldShade
+        })
+        .setOrigin(0.5);
+      const check = scene.add
+        .text(548, y, '✓', {
+          fontFamily: FONT,
+          fontSize: '46px',
+          fontStyle: 'bold',
+          color: PALETTE.mossShade
+        })
+        .setOrigin(0.5)
+        .setVisible(false);
+      // Replaces the bar while the task's subject doesn't exist yet.
+      const hint = scene.add
+        .text(340, y, task.lockedHint ? `🔒 ${task.lockedHint}` : '', {
+          fontFamily: FONT,
+          fontSize: '24px',
+          fontStyle: 'italic',
+          color: '#8A6248',
+          align: 'center',
+          wordWrap: { width: 430 }
+        })
+        .setOrigin(0.5)
+        .setVisible(false);
+      this.tasksPage.add([label, barBg, fill, count, check, hint]);
+      this.taskRows.push({ label, count, barBg, fill, check, hint });
+    });
+
+    const footer = scene.add
+      .text(0, 348, `Finish all ${this.taskSystem.tasks.length} → a golden reward from Cindra`, {
+        fontFamily: FONT,
+        fontSize: '28px',
+        fontStyle: 'bold',
+        color: PALETTE.goldShade
+      })
+      .setOrigin(0.5);
+    this.tasksPage.add(footer);
+  }
+
+  /** One order card: portrait, title, requirement slot, reward line, Deliver. */
+  private buildCard(scene: Phaser.Scene, x: number): OrderCard {
+    const root = scene.add.container(x, 16);
+    const cardBg = scene.add.image(0, 0, 'ui_card').setScale(0.9);
+    // Fixed on-card size — the real 412px bubble-icon art and the 192px
+    // painted fallback must both read the same here.
+    const portrait = scene.add.image(0, -218, 'portrait_cindra').setDisplaySize(178, 178);
+    const title = scene.add
+      .text(0, -96, '', {
+        fontFamily: FONT,
+        fontSize: '30px',
+        fontStyle: 'bold',
+        color: PALETTE.textBrown,
+        align: 'center',
+        wordWrap: { width: 400 }
+      })
+      .setOrigin(0.5);
+    const slot = scene.add.image(0, 36, 'ui_slot');
+    const slotIcon = scene.add.image(0, 28, 'item_flame_gem_2').setScale(0.72);
+    const slotCount = scene.add
+      .text(48, 80, '0/0', {
+        fontFamily: FONT,
+        fontSize: '30px',
+        fontStyle: 'bold',
+        color: PALETTE.textBrown
+      })
+      .setOrigin(0.5)
+      .setShadow(0, 2, '#FFFFFF', 4);
+    const rewardText = scene.add
+      .text(0, 148, '', {
+        fontFamily: FONT,
+        fontSize: '28px',
+        fontStyle: 'bold',
+        color: PALETTE.goldShade
+      })
+      .setOrigin(0.5);
+
+    const deliverButton = scene.add.container(0, 232);
+    const deliverBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.86);
+    const deliverText = scene.add
+      .text(0, -8, 'Deliver', {
+        fontFamily: FONT,
+        fontSize: '44px',
+        fontStyle: 'bold',
+        color: '#FFFFFF'
+      })
+      .setOrigin(0.5)
+      .setShadow(0, 4, 'rgba(36,27,34,0.5)', 6);
+    deliverButton.add([deliverBg, deliverText]);
+    // The bg image carries the interaction so the nested-container transform
+    // doesn't muddle the hit test (see the original single-card notes).
+    deliverBg.setInteractive({ useHandCursor: true });
+    deliverButton.setSize(360, 124);
+
+    const card: OrderCard = {
+      root,
+      title,
+      slotIcon,
+      slotCount,
+      rewardText,
+      deliverButton,
+      order: null,
+      deliverable: false
+    };
+    deliverBg.on('pointerup', () => this.onDeliverPressed(card));
+    root.add([cardBg, portrait, title, slot, slotIcon, slotCount, rewardText, deliverButton]);
+    return card;
   }
 
   teardown(): void {
@@ -247,23 +317,29 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.offBus.length = 0;
   }
 
-  /** World position of the Deliver button (for the tutorial hand). */
+  /** World position of the FIRST card's Deliver button (tutorial hand target). */
   getDeliverPos(): { x: number; y: number } {
-    return { x: this.x + this.card.x + this.deliverButton.x, y: this.y + this.card.y + this.deliverButton.y };
+    const card = this.cards[0]!;
+    // Local offsets scaled by the panel's own scale (>1 on mobile) so the pointer
+    // tracks the Deliver button through the portrait magnification.
+    return {
+      x: this.x + (card.root.x + card.deliverButton.x) * this.scaleX,
+      y: this.y + (card.root.y + card.deliverButton.y) * this.scaleY
+    };
   }
 
   setDeliverAllowed(allowed: boolean): void {
     this.deliverAllowed = allowed;
   }
 
-  /** Deliver the active order, or shake the button if it isn't ready. */
-  private onDeliverPressed(): void {
-    if (this.deliverable && this.deliverAllowed && this.currentOrder) {
-      this.bus.emit('ui:deliver_requested', { orderId: this.currentOrder.id });
-    } else if (!this.deliverable) {
+  /** Deliver a card's order, or shake its button if it isn't ready. */
+  private onDeliverPressed(card: OrderCard): void {
+    if (card.deliverable && this.deliverAllowed && card.order) {
+      this.bus.emit('ui:deliver_requested', { orderId: card.order.id });
+    } else if (!card.deliverable) {
       this.scene.tweens.add({
-        targets: this.deliverButton,
-        x: this.deliverButton.x + 10,
+        targets: card.deliverButton,
+        x: card.deliverButton.x + 10,
         duration: 45,
         yoyo: true,
         repeat: 3
@@ -271,24 +347,30 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     }
   }
 
-  open(): void {
+  open(tab: LedgerTab = 'orders'): void {
     if (this.isOpen) return;
     this.isOpen = true;
+    this.activeTab = this.gameState.tutorialDone ? tab : 'orders';
     this.refresh();
+    this.refreshTasks();
+    this.layoutTabs();
+    // A still-running close tween would re-hide the panel from its onComplete.
+    this.scene.tweens.killTweensOf(this);
     this.setVisible(true);
     this.setAlpha(0);
-    this.setScale(0.92);
-    this.scene.tweens.add({ targets: this, alpha: 1, scale: 1, duration: 200, ease: 'Back.easeOut' });
+    this.setScale(this.baseScale * 0.92);
+    this.scene.tweens.add({ targets: this, alpha: 1, scale: this.baseScale, duration: 200, ease: 'Back.easeOut' });
     this.bus.emit('ui:ledger_toggled', { open: true });
   }
 
   requestClose(): void {
     if (!this.isOpen) return;
     this.isOpen = false;
+    this.scene.tweens.killTweensOf(this);
     this.scene.tweens.add({
       targets: this,
       alpha: 0,
-      scale: 0.94,
+      scale: this.baseScale * 0.94,
       duration: 150,
       ease: 'Sine.easeIn',
       onComplete: () => this.setVisible(false)
@@ -296,124 +378,105 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.bus.emit('ui:ledger_toggled', { open: false });
   }
 
-  private activeOrder(): OrderConfig | null {
-    return this.orders.orders.find((o) => !this.gameState.completedOrderIds.includes(o.id)) ?? null;
+  private switchTab(tab: LedgerTab): void {
+    if (tab === this.activeTab || (tab === 'tasks' && !this.gameState.tutorialDone)) return;
+    this.activeTab = tab;
+    if (tab === 'tasks') this.refreshTasks();
+    else this.refresh();
+    this.layoutTabs();
+    // A soft pop as the page lands.
+    const page = tab === 'tasks' ? this.tasksPage : this.ordersPage;
+    page.setAlpha(0);
+    this.scene.tweens.add({ targets: page, alpha: 1, duration: 140, ease: 'Sine.easeOut' });
   }
 
-  /** Can this option be claimed right now? (mirrors OrderSystem.optionDeliverable) */
-  private optionAffordable(opt: OrderOption): boolean {
-    if (opt.requires) {
-      for (const req of opt.requires) {
-        if (this.gameState.countItems(req.chain, req.tier) < req.count) return false;
-      }
-    }
-    if (opt.costCoins != null && this.gameState.coins < opt.costCoins) return false;
-    return true;
+  /** Position + restyle the header tabs, and flip page visibility. The Tasks
+   *  tab only exists post-tutorial; before that the Orders lozenge sits alone,
+   *  centred, exactly like the tutorial's original Ledger title. */
+  private layoutTabs(): void {
+    const twoTabs = this.gameState.tutorialDone;
+    this.tasksTab.root.setVisible(twoTabs);
+    this.ordersTab.root.x = twoTabs ? -270 : 0;
+    this.tasksTab.root.x = 270;
+    this.paintTab(this.ordersTab, PALETTE.lava, this.activeTab === 'orders');
+    this.paintTab(this.tasksTab, PALETTE.gold, this.activeTab === 'tasks');
+    // Gold's cream stroke washes out — the tasks tab keeps brown text.
+    this.tasksTab.label.setColor(this.activeTab === 'tasks' ? PALETTE.textBrown : PALETTE.cream);
+    this.ordersPage.setVisible(this.activeTab === 'orders');
+    this.tasksPage.setVisible(this.activeTab === 'tasks');
   }
 
-  private onOptionPressed(index: number): void {
-    const order = this.currentOrder;
-    const opt = order?.options?.[index];
-    if (!order || !opt) return;
-    if (this.optionAffordable(opt) && this.deliverAllowed) {
-      this.bus.emit('ui:deliver_requested', { orderId: order.id, optionIndex: index });
-    } else {
-      const button = this.optionRows[index]?.button;
-      if (button) {
-        this.scene.tweens.add({ targets: button, x: button.x + 10, duration: 45, yoyo: true, repeat: 3 });
-      }
-    }
+  private paintTab(tab: TabHandle, activeColor: string, active: boolean): void {
+    tab.bg.clear();
+    tab.bg.fillStyle(active ? num(activeColor) : num(PALETTE.plumShade), active ? 1 : 0.92);
+    tab.bg.fillRoundedRect(-TAB_W / 2, -TAB_H / 2, TAB_W, TAB_H, TAB_H / 2);
+    tab.bg.lineStyle(6, num(PALETTE.cream), active ? 0.95 : 0.4);
+    tab.bg.strokeRoundedRect(-TAB_W / 2, -TAB_H / 2, TAB_W, TAB_H, TAB_H / 2);
+    tab.label.setAlpha(active ? 1 : 0.8);
+    tab.root.setScale(active ? 1 : 0.94);
   }
 
-  /** Populate the two market rows from the active order's options. */
-  private renderOptions(order: OrderConfig): void {
-    const options = order.options ?? [];
-    for (let i = 0; i < this.optionRows.length; i++) {
-      const row = this.optionRows[i]!;
-      const opt = options[i];
-      if (!opt) {
-        row.root.setVisible(false);
-        continue;
-      }
-      row.root.setVisible(true);
+  private refresh(): void {
+    const orders = this.orderSystem.activeOrders;
+    this.emptyText.setVisible(orders.length === 0);
+    this.blurb.setVisible(orders.length > 0);
+    this.blurb.setText(orders[0] ? `”${orders[0].blurb}”` : '');
 
-      // Give side: board items ("have/need") or a coin cost ("×N").
-      const req = opt.requires?.[0];
-      if (req) {
-        const key = `item_${req.chain}_${req.tier}`;
-        const s = ITEM_SCALE[`${req.chain}_${req.tier}`] ?? ITEM_SCALE[req.chain];
-        row.giveIcon.setTexture(key).setScale(s != null ? s * 1.7 : 0.7);
-        const have = Math.min(this.gameState.countItems(req.chain, req.tier), req.count);
-        row.giveText.setText(`${have}/${req.count}`);
-      } else if (opt.costCoins != null) {
-        row.giveIcon.setTexture('ui_icon_coin').setScale(0.16);
-        row.giveText.setText(`×${opt.costCoins}`);
+    this.cards.forEach((card, i) => {
+      const order = orders[i] ?? null;
+      card.order = order;
+      card.root.setVisible(order !== null);
+      if (!order) {
+        card.deliverable = false;
+        return;
       }
-
-      // Get side: a key, a spawned item, or coins.
-      const rw = opt.rewards;
-      if (rw.keys) {
-        row.rewardIcon.setTexture('ui_icon_key').setScale(0.62);
-        row.rewardText.setText(`×${rw.keys}`);
-      } else if (rw.spawn) {
-        const spawnKey = `item_${rw.spawn.chain}_${rw.spawn.tier}`;
-        const ss = ITEM_SCALE[`${rw.spawn.chain}_${rw.spawn.tier}`] ?? ITEM_SCALE[rw.spawn.chain];
-        row.rewardIcon.setTexture(spawnKey).setScale(ss != null ? ss * 1.5 : 0.62);
-        row.rewardText.setText(`×${rw.spawn.count}`);
-      } else {
-        row.rewardIcon.setTexture('ui_icon_coin').setScale(0.16);
-        row.rewardText.setText(`×${rw.coins ?? 0}`);
-      }
-
-      const ok = this.optionAffordable(opt);
-      row.buttonLabel.setText(opt.label);
-      row.buttonBg.setAlpha(ok ? 1 : 0.5);
-      row.giveText.setColor(ok ? PALETTE.moss : PALETTE.textBrown);
-    }
+      const requirement = order.requires[0];
+      if (!requirement) return;
+      const { have, deliverable } = this.orderSystem.progressFor(order);
+      card.deliverable = deliverable;
+      card.title.setText(order.title);
+      const slotKey = `item_${requirement.chain}_${requirement.tier}`;
+      const slotBoardScale =
+        ITEM_SCALE[`${requirement.chain}_${requirement.tier}`] ?? ITEM_SCALE[requirement.chain];
+      card.slotIcon.setTexture(slotKey).setScale(slotBoardScale != null ? slotBoardScale * 2.0 : 0.72);
+      card.slotCount.setText(`${have[0] ?? 0}/${requirement.count}`);
+      const parts: string[] = [];
+      if (order.rewards.coins) parts.push(`🪙 ${order.rewards.coins}`);
+      if (order.rewards.xp) parts.push(`✦ ${order.rewards.xp} XP`);
+      if (order.rewards.spawn) parts.push('🎁 ???');
+      if (order.rewards.tease) parts.push(order.rewards.tease);
+      card.rewardText.setText(parts.join('   '));
+      card.slotIcon.setAlpha(deliverable ? 1 : 0.75);
+      card.deliverButton.setAlpha(deliverable ? 1 : 0.55);
+    });
   }
 
-  private refresh(haveOverride?: number): void {
-    this.currentOrder = this.activeOrder();
-    const hasOrder = this.currentOrder !== null;
-    const optionsMode = !!this.currentOrder?.options?.length;
-    this.orderTitle.setVisible(hasOrder);
-    this.blurb.setVisible(hasOrder);
-    this.rewardRow.setVisible(hasOrder && !optionsMode);
-    this.card.setVisible(hasOrder && !optionsMode);
-    this.optionsContainer.setVisible(hasOrder && optionsMode);
-    this.emptyText.setVisible(!hasOrder);
-    if (!this.currentOrder) return;
-
-    if (optionsMode) {
-      this.orderTitle.setText(this.currentOrder.title);
-      this.blurb.setText(`”${this.currentOrder.blurb}”`);
-      this.renderOptions(this.currentOrder);
-      return;
-    }
-
-    const requirement = this.currentOrder.requires[0];
-    if (!requirement) return;
-    const have =
-      haveOverride ??
-      Math.min(this.gameState.countItems(requirement.chain, requirement.tier), requirement.count);
-    this.orderTitle.setText(this.currentOrder.title);
-    this.blurb.setText(`”${this.currentOrder.blurb}”`);
-    const spawnReward = this.currentOrder.rewards.spawn;
-    if (spawnReward) {
-      const spawnKey = `item_${spawnReward.chain}_${spawnReward.tier}`;
-      const boardScale = ITEM_SCALE[`${spawnReward.chain}_${spawnReward.tier}`] ?? ITEM_SCALE[spawnReward.chain] ?? 0.1;
-      this.rewardIcon.setTexture(spawnKey).setScale(boardScale * 0.75);
-      this.rewardKeys.setText(`×${spawnReward.count}`);
-    } else {
-      this.rewardIcon.setTexture('ui_icon_key').setScale(0.85);
-      this.rewardKeys.setText(`×${this.currentOrder.rewards.keys}`);
-    }
-    const slotKey = `item_${requirement.chain}_${requirement.tier}`;
-    const slotBoardScale = ITEM_SCALE[`${requirement.chain}_${requirement.tier}`] ?? ITEM_SCALE[requirement.chain];
-    this.slotIcon.setTexture(slotKey).setScale(slotBoardScale != null ? slotBoardScale * 2.0 : 0.72);
-    this.slotCount.setText(`${have}/${requirement.count}`);
-    this.deliverable = have >= requirement.count;
-    this.slotIcon.setAlpha(this.deliverable ? 1 : 0.75);
-    this.deliverButton.setAlpha(this.deliverable ? 1 : 0.55);
+  /** Repaint the checklist rows AND the tab's live done-counter. */
+  private refreshTasks(): void {
+    const rowTop = -236;
+    const rowGap = 118;
+    const barX = 160;
+    let doneCount = 0;
+    this.taskSystem.tasks.forEach((task, i) => {
+      const row = this.taskRows[i];
+      if (!row) return;
+      const y = rowTop + i * rowGap;
+      const progress = this.taskSystem.progressFor(task);
+      const done = progress >= task.target;
+      if (done) doneCount += 1;
+      const locked = !done && this.taskSystem.isLocked(task);
+      row.barBg.setVisible(!locked);
+      row.count.setVisible(!locked);
+      row.hint.setVisible(locked);
+      row.count.setText(`${progress} / ${task.target}`);
+      row.check.setVisible(done);
+      row.fill.clear();
+      if (!locked) {
+        row.fill.fillStyle(num(done ? PALETTE.moss : PALETTE.gold), 1);
+        row.fill.fillRoundedRect(barX, y + 18, Math.max(12, (progress / task.target) * 320), 22, 11);
+      }
+      row.label.setAlpha(done ? 0.62 : locked ? 0.5 : 1);
+    });
+    this.tasksTab.label.setText(`Keeper’s Tasks  ${doneCount}/${this.taskSystem.tasks.length}`);
   }
 }

@@ -355,3 +355,481 @@ escalating Gold/XP. `item:produced` feeds order progress.
 **World builder — Merge asset library** (🔮 tab): all 11 merge items pre-labelled
 with placeholders, each replaceable by uploading your own PNG; export carries
 `mergeAssets[]`. See CLAUDE.md "World building pipeline".
+
+## 2026-07-09 — Chapter One: the perfect-demo build (DEMO-PLAN implemented)
+
+The full [docs/DEMO-PLAN.md](DEMO-PLAN.md) landed (per [docs/DESIGN-REVIEW.md](DESIGN-REVIEW.md),
+respecting MECHANICS.md): the Level-3 cap is now a CHAPTER ENDING, not a demo wall.
+
+- **Retune (the flow fix):** dragon cooldowns 5 min → **25 s** (passive 2 min),
+  Warmth regen 3 min → **1 min**, cap 20 → **30** (start 28), crystal 20 → 5 min,
+  chest 10 → 5 min (+15 gold), house 10 → 7 min. Warmth-skips now cost **1.5×**
+  the gold price (gold is the cheap skip; the session meter never discounts).
+  Orders re-curved: O1 = **6 shards + 25 gold** (was 20 + 0 gold); keys removed
+  from order payouts AND from the shop (story gates are never sold).
+- **The Golden Egg is the MacGuffin:** unsellable/untooltipped (`sellable:false`
+  in chains.json, honored by EconomySystem + UIScene), spawns with a gold flood
+  + '???', tap-wobbles with escalating flavor lines (dialogue.json), and TREMBLES
+  once XP progress passes 80% of Level 2.
+- **THE FINALE (keeper:leveled ≥ 3, shared `FINALE` timeline in Constants):**
+  the egg cracks (`board:hatch` → gold hatch ceremony → **Golden Whelp**,
+  red-dragon bake + gold tint until real art ships) → camera glides to the south
+  terrace (`level_5`, which now breathes a faint gold shimmer all game) → the
+  ash-fog parts HALFWAY for 2.4 s of warm light → it settles, the camera returns
+  → **Cindra speaks for the first time in the demo** ("The Great Flame… was
+  TAKEN") → the **CHAPTER ONE COMPLETE card** (stats + three Chapter-Two teaser
+  slots + Keep Playing/Play Again). LEVEL_XP re-curved to `[0, 60, 220]` so L3
+  lands on Order 3's delivery; the array ends at 3 — the XP bar reads "Chapter
+  One complete ✦" at the cap.
+- **Two orders visible at once** (LedgerPanel rebuilt as a two-card board driven
+  by OrderSystem) + **encore orders**: a `repeatable` pool in orders.json cycles
+  forever after the scripted four — the Ledger never dead-ends.
+- **Order completion celebrates** at level-up parity: banner + sparks + a
+  rotating Cindra QUOTE on the card (her bubble voice stays reserved for the
+  finale).
+- **Keeper's Tasks** (encore checklist): new Phaser-free `TaskSystem` owns
+  lifetime stats in `GameState.stats` (hatches/merges/orders/goldEarned/
+  whelpTaps); all five complete → one-time gold+Warmth bundle + Cindra line.
+  New ⭐ HUD button + TasksPanel (post-tutorial). The Whelp dances when tapped.
+- **Welcome-back moment:** GeneratorSystem banks up to **3 offline passive
+  cycles** on load (`state:loaded` finally consumed); UIScene shows "WHILE YOU
+  WERE AWAY" (+Warmth, +gifts) after 5+ min absent. Laurah gained two one-shot
+  post-tutorial nudges (0 Warmth, board full).
+- **The strawberry patch is real:** revealed with the key-gate land
+  (tutorial spawn effects), `energyCost: 0` — the designed free 20-second
+  producer ("always something to do at zero Warmth"). Fixed a real bug this
+  exposed: a pending PASSIVE timer no longer reads as "cooling" on tappable
+  generators (it blocked the free harvest behind the skip menu).
+- Save v5 → **v6** (`stats` on the save; wipes old saves for the new curve).
+  Ripple-map + CLAUDE.md updated (new events: `board:hatch`, `whelp:tapped`,
+  `tasks:all_complete`).
+
+`pnpm verify` green: typecheck, **111 unit tests** (incl. new TaskSystem +
+multi-order/encore OrderSystem specs), build, full-tutorial e2e THROUGH the
+finale (chapter card asserted on screenshot).
+
+**Awaiting art** (stand-ins live): 3 Chapter-Two teaser silhouettes, optional
+south-terrace glimpse silhouettes + ⭐ tasks icon.
+
+### Addendum — the golden dragon rig landed
+The art team's rigged golden dragon
+(`assets/sprites/characters/dragon/golden-dragon/rig-adult/golden-dragon.rig.json`,
+6 layers, head/arm/wing anchors + full pin chains) is now wired in:
+- `DRAGON_RIGS.golden_egg` → the **Golden Whelp wears the LIVE rig** in the
+  finale hatch and the encore (idle/hover cycles, dances on tap via
+  `celebrateDragon`); the gold-tinted red bake remains only as the
+  rig-unavailable fallback. Rig eligibility is now per chain+tier
+  (`wearsRigTier`): golden rigs tier 2 despite not being a generator.
+- She still NEVER works: drag-to-House excluded for `golden_egg`.
+- Default-named exports (`character: 'character'`) are normalised to their
+  chain/catalog id at load so texture keys can't collide.
+- Added to `characterCatalog` (`dragon-golden`) for the UI-builder rail.
+- Scale: whelp-size × `DRAGON_RIG_SCALE.golden_egg = 0.5` (tight-cropped
+  pieces vs the red set's padded canvases — tune there).
+
+## 2026-07-10 — AI art pipeline: Nano Banana Pro skill + the remaining assets
+
+- **New skill `.claude/skills/nano-banana/`** (+ `asset-artist` agent): validated
+  Google **Nano Banana Pro** (`gemini-3-pro-image`, generateContent, key in
+  `.env` — now gitignored) and built the full pipeline: `generate.py` (REST +
+  retries + certifi SSL) → `dekey.py` (magenta #FF00FF chroma-key → soft alpha
+  + de-spill that never touches warm golds) → `round-corners.py`. Prompting
+  rules encode the game's iso 2:1 perspective, LEFT-facing characters, and the
+  Emberkeep palette. ~$0.13/image; all outputs SynthID-watermarked.
+- **7 assets generated, QC'd and WIRED (all first-take):**
+  - Chapter-card teasers (`sprites/ui/chapter2/teaser_{terrace,breed,flame}.png`,
+    680×520, corners pre-rounded) — EndScreen now shows real art full-bleed in
+    the three Chapter-Two slots ('?' remains the missing-file fallback).
+  - Finale glimpse silhouettes (`sprites/finale/glimpse_{shrine,dragon_a,dragon_b}.png`)
+    — during the fog half-part, the shrine + two unfamiliar dragons now FADE IN
+    under the translucent clouds and sink back with the settling ash
+    (BoardScene.runFinale).
+  - Keeper's Tasks icon (`sprites/ui/icon_tasks.png`) — replaces the ⭐ emoji
+    on the HUD button (emoji stays as fallback).
+- assets/CREDITS.md notes the AI provenance. ART-REQUESTS items 1–3 marked
+  delivered (team can swap 1:1 with hand art later); open: golden head frames,
+  optional baby whelp rig.
+
+## 2026-07-10 — Golden dragon face animation via Sprite Studio + Nano Banana Pro
+
+The golden whelp now BLINKS and ROARS like the red dragon:
+- **Sprite Studio as an API**: compiled its real `lib/gridSheet.ts`
+  (Dev/Helper/SmartGrid/sprite-studio) and ran `buildGridSheet` headlessly in
+  Chromium — a 1×3 white-silhouette mask template of the golden head (512×502
+  cells) + a cell-framed base head, exactly the app's grid-sheet workflow.
+- **Frames from Nano Banana Pro** (generate.py grew `--ref` reference-image
+  support): head reference (Image 1) + mask template (Image 2) → one 3×1 blink
+  sheet (open / half / closed) and one 3×1 roar sheet (closed / half / wide),
+  Sprite-Studio-style prompt, magenta key. Both first-take.
+- **Sequenced the loops myself from the red dragon's format**: sliced cells →
+  de-keyed → `golden-dragon-blink-animation/` (open, halfOpen, closed,
+  halfOpen2=dup; 2600/45/70/55 ms) + `golden-dragon-roar_talk-animation/`
+  (4× 267 ms), matching red's frames.json exactly.
+- **Calibrated**: rig name canonicalised to `dragon-golden`
+  (BoardScene `DRAGON_RIG_NAMES` + characterCatalog agree), added to
+  `scripts/calibrate-faces.mjs` CHARACTERS → faces.json now carries golden:
+  blink IoU **97.5%**, talk **97.3%**, 0.00px width drift (self-verified).
+  RigPlayer picks the frames up automatically (BlinkScheduler ambient blink;
+  hatch/dance roar-flap via playFace).
+Remaining art: only the optional baby-whelp rig (ART-REQUESTS §5).
+
+## 2026-07-10 — Lore pivot: the Golden Egg AWAKENS the legendary Golden Elder
+
+The egg no longer hatches a baby — it wakes an ADULT legend (asleep since the
+Great Flame was taken). Renames + presentation across the board:
+- `golden_egg_2` = **"Golden Elder"** (chains.json); the adult rig is now
+  canonically correct — ART-REQUESTS §5 (baby variant) RETIRED, list fully closed.
+- Event `whelp:tapped` → **`elder:tapped`**, TaskKind `whelpTaps` →
+  `elderTaps`, task = "Commune with the Golden Elder (tap her 10×)"
+  (safe within save v6 — never shipped). `GOLDEN_WHELP_TIER` →
+  `GOLDEN_ELDER_TIER`; BoardScene `danceWhelp` → `communeWithElder`
+  (statelier: bigger gold flare, ✦, rig answers with hover + mouth-flap).
+- She still never works — justification flipped from "she's a baby" to
+  "a legend does not haul timber".
+- **Legendary presence**: `DRAGON_RIG_SCALE.golden_egg` 0.62 → **0.74** — she
+  reads clearly larger than the common dragons.
+- Dialogue: egg tap lines now foreshadow an ANCIENT awakening ("Something
+  ancient stirs within…", "she is almost awake!"); Cindra's finale line
+  acknowledges her: "So the Elder wakes for YOU… at dawn, we follow her past
+  the southern ash."
+
+## 2026-07-10 — The GOLDEN ALTAR: all golden lore staged at the authored spot
+
+Per the world-builder placement in `golden-egg.json` (decor `golden-egg` at
+world cell (-8,-2) — the crystal-ringed scenic ledge NW of the isle), every
+egg/Elder event now happens THERE, on non-playable scenery:
+- **New `GOLDEN_ALTAR` fixture** (BoardScene): cell (-2,2) in current map
+  coords (verified: the export's 45 tiles map 1:1 onto map.json with the +6,+4
+  normalization — no map regeneration needed), with the builder's measured
+  calibration. It is a SCENE FIXTURE, not a board item — the golden chain no
+  longer merges/sells/drags/works by construction.
+- **Lifecycle, fully save-derivable** (nothing new persisted): Order 1
+  delivered → the egg MATERIALISES on the altar (camera glides west, gold
+  flood, '???'); tap→wobble + flavor lines; trembles near L3; at the finale
+  the camera returns west and the egg cracks — the **Elder awakens on her
+  ledge** (live rig, faces the isle, ambient idle/hover + blink) before the
+  south-terrace glimpse; encore taps commune with her there (`elder:tapped`).
+- Removed the whole item-based golden path: `board:hatch` event +
+  BoardSystem.hatchTransform, order `spawn` reward (→ new `rewards.tease`
+  "🥚 ???" hint on the Ledger card), item tap/drag/tint special cases.
+  OrderSystem.spec updated; ripple-map updated.
+- World builder tool fix (same session): a broken/missing asset image no
+  longer deadlocks world loading (the 3D crystal's imageless export froze
+  `default-world.json` at 46 assets/0 placements rendered).
+
+## 2026-07-10 — Golden storytelling: every path through the promise now lands
+
+Closed the three seams found auditing the golden-egg narrative:
+- **Prophecy finale** (Order 1 skippable via the two-slot Ledger → L3 possible
+  with no egg): Cindra's finale line now has a variant that reads as PROPHECY
+  ("The old altar stirs — finish my first request, and what sleeps there will
+  wake for you") instead of claiming an awakening that never happened — and it
+  funnels the player back to the unfilled order.
+- **Late awakening**: delivering Order 1 after Level 3 plays arrival AND
+  awakening as one held beat at the altar (glide west → egg lands in gold →
+  cracks at 2.4s → the Elder rises → home), with Cindra's line landing as she
+  rises ("At last — she waited for YOU"). If the delivery itself CROSSES
+  Level 3 (keeper:leveled fires mid-deliver), the handler only seats the egg
+  and lets the already-running finale own the awakening — no double ceremony,
+  no camera fights (guarded by finaleStartedMs vs FINALE.cardAtMs).
+- **The missing signpost** (DEMO-PLAN Act IV): Laurah now cries "Look at the
+  egg on the old altar, it's TREMBLING!" once, when the egg exists and XP
+  crosses the tremble threshold — eyes guided to the altar right before the
+  payoff.
+- Plus: the arrival banner now carries a dedicated Cindra quote ("A golden
+  egg… on the OLD altar. So the stories were true.") instead of a generic
+  rotation. New dialogue keys: finaleCindraProphecy, goldenArrival,
+  lateAwakening, hints.eggTrembles. Both new paths screenshot-verified.
+
+## 2026-07-10 — The CHAPTER TWO TRAILER: 5 legends, 2 new worlds, in-engine
+
+An in-engine cinematic now plays from the chapter card ("▶ WATCH THE CHAPTER
+TWO TRAILER" — replaces the static teaser line; falls back to it when the art
+is absent). New `src/ui/ChapterTrailer.ts`: letterboxed slides with crossfades
+— cold open ("CHAPTER TWO / The Great Flame was TAKEN") → THE FROZEN REACHES
+(Ken Burns drift) → THE CRYSTAL DEPTHS → the LEGEND PARADE (five silhouettes
+revealed one by one with gold flares — "FIVE LEGENDS SLEEP. FIVE WORLDS
+WAIT.") → end card. Tap advances, ✕ closes, every slide skips cleanly if its
+texture is missing.
+
+Assets (all Nano Banana Pro, first-take, `sprites/ui/chapter2/trailer/`):
+- **2 world vistas** generated with the live `emberkeep.jpg` background as a
+  STYLE REFERENCE image — same painterly floating-isles language, chains +
+  golden lanterns, elevated 3/4 iso camera: ice world (frozen waterfalls,
+  icicle underbellies, aurora) and crystal world (dark stone isles crowned
+  with amethyst/emerald, violet cloud sea).
+- **5 legendary silhouettes** (500×520, magenta-keyed): frost (icicle spines),
+  crystal (faceted shard horns), storm (legless serpent coil), tide (fin wings
+  + angler-lure tail), shadow (hunched vulture, twin whip tails) — all
+  left-facing, gold rim, one glowing eye, teaser language consistent with the
+  chapter-card breed silhouette.
+
+## 2026-07-10 — Trailer → "BEYOND THE DEMO" one-page roadmap popup
+
+Design revision: the multi-slide cinematic was replaced by a single stylish
+popup (`src/ui/BeyondDemoPanel.ts`, chapter-card button now reads "SEE WHAT'S
+BEYOND THE DEMO"). One dark gold-framed page, plain factual copy: "5 NEW
+WORLDS — the first two" (ice + crystal vistas as rounded, name-plated preview
+cards) · "5 LEGENDARY DRAGONS TO AWAKEN" (the five silhouettes in a row) ·
+footer "Plus: new merge chains · more orders for the Ledger · the rest of the
+Great Flame story". Same 7 generated assets; ChapterTrailer.ts deleted.
+
+## 2026-07-10 — One quest board: Keeper's Tasks merged into Cindra's Ledger
+
+The two quest surfaces (Ledger orders board + a separate ⭐ HUD button opening
+the Keeper's Tasks checklist) had no visual or narrative cohesion. Merged into
+a single tabbed panel (`src/ui/LedgerPanel.ts`):
+
+- Header is now a two-tab lozenge pair: **Cindra's Orders** (lava, active
+  default) and **Keeper's Tasks n/5** (gold, live done-counter). Pages share
+  the same `ui_panel` frame; tab switch is a soft cross-fade.
+- The Tasks tab only exists post-tutorial — during the tutorial the Orders
+  lozenge sits centred, so every scripted beat (ledger open, deliver hand
+  target, `getDeliverPos`) is pixel-identical to before.
+- `TasksPanel.ts` and the floating ⭐ tasks button are deleted; the HUD's
+  single Ledger button is the one entry point (its deliverable dot unchanged).
+- Fixed a close→reopen race while here: `open()`/`requestClose()` now kill
+  stale panel tweens so a dangling close tween can't hide a reopened panel.
+- LedgerPanel refreshes the Tasks page on merge/hatch/order/elder-tap/economy
+  events and `tasks:all_complete` (ripple-map updated).
+
+Verified with Playwright screenshots (tutorial header, both tabs) + `pnpm verify`.
+
+## 2026-07-10 — Task-flow audit: every checklist loop verified unblockable
+
+Traced each Keeper's Task to its supply loop in the encore sandbox:
+- **Hatch 4** — tutorial banks 2; the ruby loop (dragon → rubies → eggs →
+  dragon) is self-sustaining. **Merge 30** — the strawberry generator is free
+  (0 Warmth, 20s), so merge fodder never dries up even at zero energy.
+- **5 orders / 500 gold** — order slot 1 always holds the oldest uncompleted
+  order and the encore pool is endless; the four authored orders pay 450 gold,
+  chests/houses/sales cover the rest. The two tasks complete on one horizon.
+- **Elder communes** — free, uncapped, fallback-art-safe; the altar is inside
+  the pannable camera bounds and both awakening paths (finale + late) reach it.
+
+One seam fixed: the Elder task showed a dead 0/10 bar from the encore's start,
+long before she exists. Tasks now support a data-driven lock
+(`lockedUntil: { order?, level? }` + `lockedHint` in tasks.json;
+`TaskSystem.isLocked`): the Ledger's Tasks tab dims the row and shows
+"🔒 She sleeps — fill Cindra's golden order and reach Level 3" until both
+gates lift (live, via the panel's existing refresh events). Unit-tested;
+locked/unlocked states screenshot-verified.
+
+## 2026-07-10 — Dragon countdown badge · WYSIWYG drops · Emberberry
+
+- **Dragon cooldown countdown**: rig-hosted dragons showed a phantom timer pill
+  hidden UNDER the rig (the rig glues at host.depth + 0.5) with no numbers
+  (the update loop skipped dragons, so the label never updated). Now: the
+  BoardItem suppresses its in-container pill while its art is rig-hidden
+  (`artHidden`), and BoardScene floats a scene-level cooldown badge
+  (fx_timepill + gold dot + live `24s`/`m:ss` text) above the dragon's head at
+  flash depth (`coolBadges`, updated in the 240ms cooling tick; stacks above
+  the Zzz pill; sparkle when it clears). Non-rig generators unchanged.
+- **WYSIWYG drag-drop**: drops resolved from the RAW POINTER (+24px), while the
+  highlight diamond tracked the dragged item — the grab offset could land the
+  drop one tile off and bounce an item that visibly hovered a free tile. Drops
+  now resolve from the same tracked position as the highlight: the highlighted
+  cell IS the drop cell. Free move onto any empty active tile already existed
+  in MergeSystem (bounce only for occupied/inactive tiles) and now behaves
+  that way in practice. Verified via a staged off-center-grab drag (landed
+  exactly on the intended tile) + screenshots.
+- **Strawberry → Emberberry**: display names + tutorial/hint copy re-themed to
+  Emberkeep's universe (chain id/asset keys unchanged — save-safe). New art
+  via Nano Banana Pro replaces the three 240×240 sprites in place.
+
+## 2026-07-10 — Economy pacing ×3, smaller gems, unified rest pill
+
+- **Gem sizes**: Dragon Ruby 0.18 → 0.13, Emerald 0.25 → 0.18 (ITEM_SCALE) —
+  merge fodder now reads as gems, not tile-fillers.
+- **Production ×3** (chains.json): red/green dragon tap cooldown 25s → 75s and
+  passive gift 120s → 360s; Ancient Tree wood 20min → 60min (cooldown+passive).
+  GeneratorSystem specs updated to the new intervals (the skip-cost spec pins
+  the dragon total at 75_000).
+- **Rest pill**: the big cream "💤 Zzz" card is now the SAME fx_timepill visual
+  as every countdown (💤 in place of the gold dot + live m:ss), so all three
+  dragon badges (cooldown, rest) and generator pills share one language.
+
+## 2026-07-10 — Emberkeep Cookbook (merge-recipe discovery log)
+
+New collection surface: a cookbook button (Nano-Banana-generated leather-book
+icon, `ui_icon_cookbook`) sits directly above the quest button; a lava dot +
+button pulse mark fresh discoveries (cleared on open). The panel
+(`src/ui/CookbookPanel.ts`) reads as an open two-page spread in the standard
+cream ui_panel: 12 recipe rows (all mergeable tier pairs from chains.json,
+golden lore chain excluded), each `[input chip + ×N badge] ──▶ [result chip]`
+with "Input → Result" inscribed under the arrow. Undiscovered recipes render
+as darkened "?" chips with a dim arrow — the footer counts
+"n / 12 recipes discovered".
+
+Wiring: `GameState.discoveredRecipes` (save-tolerant additive field, keys
+`chain:fromTier>resultTier`); MergeSystem records first-time merges and emits
+`cookbook:discovered` (ripple-map updated); button hidden during the tutorial
+(discoveries still record silently). Unit-tested (first merge writes the page
+once; repeats don't re-emit); layouts screenshot-verified.
+
+## 2026-07-10 — Cindra gets real art (flame-spirit bubble icon)
+
+The runtime-painted vector flame on Cindra's order cards is replaced with a
+Nano-Banana-generated portrait: a regal little ember spirit (white-gold core,
+crimson edges, tiny gold crown, imperious smirk) in the exact 412×412 gold-ring
+bubble-icon format as Laurah's — dark plum backdrop disc vs her green.
+`portrait_cindra` now loads from
+assets/sprites/guide-characters/cindra/cindra-bubble-icon.png (assets.json
+source:"file"; the TextureFactory painter remains the graceful fallback).
+LedgerPanel sizes the portrait with setDisplaySize(178,178) so file art and
+fallback read identically. Laurah's bubble icon untouched; Cindra's finale
+bubble lines pick up the new art automatically (same texture key).
+
+## 2026-07-10 — Golden Egg is authored decor (visible from game start)
+
+Fix per playtest: the egg placed in golden-egg.json (decor, world cell -8,-2 →
+altar cell -2,2) only APPEARED after delivering Cindra's first order — the
+authored isle sat empty on a fresh game. syncGoldenAltar now always shows the
+egg (the Elder replaces it post-awakening); clearAltar removed. The Order-1
+ceremony plays on the EXISTING egg (glide west + gold flare — "the old altar
+answers"), goldenArrival quote reworded to match. Pre-delivery egg keeps its
+tap-wobble + escalating flavor lines. Screenshot-verified on a fresh save:
+egg standing in the crystal ring from the first tutorial line.
+
+## 2026-07-10 — Tutorial: Emberberry lesson + Cookbook introduction
+
+Two new scripted beats (tutorial.json now 19 steps; every existing step
+untouched and re-verified end-to-end):
+- **cookbook_intro** (after ruby_merge — the moment the first recipe page is
+  written): Laurah points at the Cookbook button (new `ui: "cookbook"` marker
+  target + `allow.cookbook`); opening the panel is the gate (new
+  `ui:cookbook_opened` bus event). The next step auto-closes the panel after a
+  1.2s hold. The button now appears for its introduction, then permanently.
+- **emberberry_tap + emberberry_merge** (after key_unlock): the patch spawns
+  in the opened land, one free tap-harvest gates step 1; two more sprouts then
+  spring up CONNECTED to the harvested one (new `nearTier` filter on scripted
+  spawns — anchoring by chain alone picked the patch, fanning the sprouts
+  non-adjacent so the taught drag could never merge). bush_merge slimmed to
+  bushes-only (spawns/text moved to the new lesson).
+- Invariants held: the levelup beat still lands at exactly 60 XP (the
+  emberberry merge's +6 XP comes after it); e2e retitled and extended
+  (cookbook open, free-harvest energy assertion, sprout blob merge) — full
+  suite green.
+
+## 2026-07-10 — Golden-egg tutorial tease, egg aura + float, smaller trees
+
+- **golden_tease** step (between marketplace and free_play, 20 steps total):
+  the camera glides west to the altar while Laurah tells the egg's lore ("it
+  has slept since the Great Flame was lost"); the egg wobbles awake. Camera
+  returns on the next step (teaseReturn pairing in BoardScene's tutorial:step
+  handler, same pattern as the emerald_tap glide).
+- **Post-tease presence**: from the tease onward (save-derivable via
+  tutorialIndex/tutorialDone), the altar egg carries a soft pulsing golden
+  aura (additive fx_glow) and floats gently (±7px, 2.3s sine). Cleared when
+  the Elder replaces the egg.
+- **Tree sizes**: Ancient Tree 0.31 → 0.22 (hit-rect re-derived per the
+  ripple-map invariant) and the emberberry plant 1.0 → 0.75.
+- e2e extended with the tease beat (glide + shot) — full suite green.
+
+## 2026-07-10 — Reward-radius blocking · tutorial flow fixes · emerald bake
+
+- **Rewards never leave their neighbourhood**: new REWARD_SPAWN_RADIUS (3
+  manhattan tiles) caps every reward drop — harvests fail with no_space,
+  passives skip their tick, merge 5-bonus extras just don't spawn, and the
+  chest pays its GOLD gift instead — rather than teleporting items across the
+  map onto far/edge cells that read as floating off-platform. Out-of-zone
+  fixtures (the crystal) keep the unbounded search (GeneratorSystem.dropTileFor).
+- **cookbook_close step**: the player closes the book themselves (arrow on the
+  ✕, new ui:cookbook_closed gate + 'cookbook_close' ui target) — replaces the
+  auto-close hold. 21 tutorial steps.
+- **buy_energy stuck-step fix**: the free-Ember-Spark one-shot lived in
+  sessionStorage, surviving resets — replays had no FREE card and the
+  marketplace gate could never pass. Now a save-backed stat (freeSparkUsed,
+  recorded by EconomySystem on marketplace:purchased{free}); ShopPanel reads
+  the save. e2e now drives the REAL ⚡+ → Emporium → FREE claim path.
+- **Marker rule**: gauntlet = action demos (drags) ONLY; arrow = static
+  targets; never both (UIScene enforces hand-else-arrow; data cleaned across
+  all 21 steps).
+- **Sizes**: Ancient Tree 0.22 → 0.17 (hit-rect re-derived), emberberry plant
+  0.75 → 0.58, bush 0.8, sprout 0.85.
+- **Emerald dragon baked**: composited from its rig layers (1054×1074, same
+  format as the red) → item_emerald_3 real art (scale 0.21) — the Cookbook's
+  Green Dragon row no longer shows a fallback.
+
+## 2026-07-10 — Gold gets real sinks (MECHANICS §7)
+
+Gold previously had one hidden sink (the cooldown-skip popup, with leftover
+French labels). Per MECHANICS §7 ("Gold buys comfort, never progression"):
+- **Warmth refills now cost GOLD**: after the one-time free Ember Spark, the
+  Warmth Shop's cards are ×5 → 🪙20, ×20 → 🪙60, ×50 → 🪙130 (Product.gold;
+  affordability checked with a deny shake + red flash; coins never negative).
+  The Gold Shop keeps its mock real-money tags as the IAP showcase.
+- **Skip popup surfaced**: hover captions now read "Skip with Gold" /
+  "Skip with Warmth" (were "Par or" / "Par énergie").
+Screenshot-verified; full suite green (114 unit, 21-step e2e incl. the real
+FREE-claim flow).
+
+## 2026-07-10 — Tease framing, grounded sprites, ledger overflow, finale gate
+
+- **"Aura but no egg"**: the tease's camera glide clamps at the world's west
+  bounds — on wide/tall viewports the tiny egg stayed off-frame while the big
+  additive aura bled in. The tease now ZOOMS OUT (×0.72, floor minZoom) while
+  gliding and restores pose on exit; the egg is re-asserted visible.
+- **Finale gate (real bug)**: the Level-3 finale awakened the Elder even when
+  Cindra's golden order was never delivered (the awaken was implicitly gated
+  by the egg's existence — now the egg is always-present decor). Awaken now
+  requires the delivered order; the prophecy variant plays a stir (wobble +
+  gold flash) instead, keeping the un-filled order as the hook.
+- **Grounding**: emberberries (all tiers) and the chest floated — their anchor
+  point coincided with the art's content bottom, planting bases on the tile's
+  mid-point. Anchors dropped (measured from alpha bounds): sprout 0.71, bush
+  0.74, plant 0.74, chest 0.79 — bases now sit into the tile face.
+- **Sizes**: sprout 0.85 → 0.65, plant 0.58 → 0.78 (t3 reads biggest again).
+- **Ledger overflow**: order cards poked past the panel frame — CARD_X 330 →
+  300, card art 0.96 → 0.9; both cards now sit fully inside with margins.
+
+## 2026-07-10 — Dragons behind tall art were un-draggable (input masking)
+
+Report: "the emerald dragon can't be drag-and-dropped like the red one."
+Reproduced + instrumented: grabbing the dragon actually grabbed the HOUSE —
+the tall-art full-sprite hit rects (house/tree/chest/crystal span 2–3 iso rows
+above their tile) sit nearer the camera and STEAL pointer-down from anything
+standing behind them. Chain-agnostic: the user's emerald just happened to
+stand in a masked zone. Two fixes:
+- Tall-art hits now YIELD: their hitAreaCallback rejects the hit when the
+  pointed spot projects onto ANOTHER item's tile (`tallArt` flag set in
+  acquireSprite) — full-sprite taps still work over empty ground.
+- The dragon→House work drop also matches the drop point against the
+  generator's ART bounds (the WYSIWYG cell resolved to the cell BEHIND the
+  tall house, silently bouncing the dragon home) — and the e2e's dragon_work
+  step now performs the REAL drag instead of emitting dragon:work directly,
+  so this can't regress silently again.
+- Parity nicety: the cosmetic harvest flourish now picks ANY rigged dragon,
+  not only the red (DRAGON_CHAIN removed).
+Probes: both dragons, spawned adjacent-behind the House, drag + start work ✓.
+
+## 2026-07-11 — Asset diet, world atmosphere, and the (9,6) desync root-caused
+
+- **Asset optimization** (no visible quality loss): 26 runtime PNGs → WebP
+  (19.0 → 2.1MB), both JPG backdrops recompressed (−9MB), and a new
+  `pruneDistArt` vite plugin strips art-workspace sources + PNG masters (kept
+  in-repo for editing) from dist — deploy 226 → ~90MB. Dragon rigs now fetch
+  in PARALLEL (cold start was serial ~10-15s).
+- **World atmosphere pass** (`ATMOSPHERE` in Constants — pure presentation):
+  dense-but-subtle ember-fly swarm tracking the player's view (~21 alive,
+  sine-bell twinkle), lava updrafts extended world-wide, slow high-mist wisps,
+  and a warm vignette grade (UIScene). Dragon flybys were tried and REMOVED on
+  request.
+- **Scale retunes**: Adult Red Dragon +50% (rig 0.93 / baked 0.45 — it read
+  SMALLER than the whelp), chest 0.24 → 0.19, wood log 0.336 → 0.27.
+- **Worldbuilder**: the ⌗ Coords overlay + hover badge now show GAME grid
+  coordinates (ingest-normalised: NW-most placement = 0,0) so labels match
+  map.json/anchors.json exactly; the hover badge keeps the raw builder cell.
+- **THE (9,6) BUG (root-caused + fixed)**: the tutorial chest step's scripted
+  `board:move` slides the green dragon to (9,6) SYNCHRONOUSLY inside its hatch
+  emit — before the 420ms hatch ceremony created a sprite. The item:moved was
+  dropped (`if (!sprite) return`) and the sprite was then born on the stale
+  merge cell: state at (9,6) (invisibly occupied — every drop there bounced),
+  sprite elsewhere (every drag of the dragon failed `from` validation and
+  snapped back, forever). Fixes: `acquireSprite` + `hatchSequence` bind every
+  sprite to the item's LIVE state cell; `trySnapMerge` now sizes the actual
+  orthogonal flood-fill group (its 8-neighbourhood count could promise a merge
+  that failed AFTER speculatively moving the item — same desync class) and
+  reverts the speculative move if a merge ever fails. Unit + e2e regressions
+  added (sprite cell === state cell after the chest step, then a REAL drag).
+  Affected saves heal on reload — state was never corrupted, only the scene.

@@ -1,13 +1,17 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, IS_MOBILE, LEVEL_XP, LIVE_GAME_HEIGHT, num, PALETTE, UI_SCALE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
+import { uiRegistry } from './theme';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
 interface Pill {
   container: Phaser.GameObjects.Container;
   value: Phaser.GameObjects.Text;
+  bg: Phaser.GameObjects.Image;
+  icon: Phaser.GameObjects.Image;
+  plus?: Phaser.GameObjects.Container;
 }
 
 /**
@@ -27,6 +31,11 @@ export class Hud {
   private xpLabel: Phaser.GameObjects.Text;
   private ledgerDot: Phaser.GameObjects.Arc;
   private ledgerEnabled = true;
+  /** Base scale of the gauge pills (>1 on mobile) — press/refresh tweens are
+   *  relative to this so the mobile magnification survives every bump. */
+  private pillScale = UI_SCALE;
+  /** Deliverability per visible order — the dot shows while ANY is ready. */
+  private deliverableByOrder = new Map<string, boolean>();
   private readonly offBus: Array<() => void> = [];
 
   constructor(
@@ -35,28 +44,41 @@ export class Hud {
     private state: GameState,
     callbacks: { onLedger: () => void; onGear: () => void }
   ) {
-    this.energyPill = this.pill(224, 88, 'ui_icon_bolt', `${state.energyCurrent}/${this.state.energyMax}`);
+    // Portrait phones magnify the HUD (pillScale) and spread the gauge row wider
+    // so the enlarged pills don't collide; desktop keeps its compact landscape row.
+    const L = IS_MOBILE
+      ? { energy: [330, 150], coin: [930, 150], key: [1530, 150], regen: [330, 280] }
+      : { energy: [224, 88], coin: [572, 88], key: [920, 88], regen: [224, 138] };
+    this.energyPill = this.pill(L.energy[0], L.energy[1], 'ui_icon_bolt', `${state.energyCurrent}/${this.state.energyMax}`);
     // coin.png is a big detailed coin — shrink the icon ~85% so the Gold gauge
     // reads like the others (icon + value), not an oversized coin.
-    this.coinPill = this.pill(572, 88, 'ui_icon_coin', `${state.coins}`, 0.14);
-    this.keyPill = this.pill(920, 88, 'ui_icon_key', `${state.keys}`);
-    // A green "+" on each gauge opens its shop.
+    this.coinPill = this.pill(L.coin[0], L.coin[1], 'ui_icon_coin', `${state.coins}`, 0.14);
+    this.keyPill = this.pill(L.key[0], L.key[1], 'ui_icon_key', `${state.keys}`);
+    // A green "+" on the Warmth/Gold gauges opens their shop. Keys are STORY
+    // gates and are never sold (MECHANICS §7: monetise impatience, never
+    // progression) — the key pill gets no shop button.
     this.addPlus(this.energyPill, 'energy', bus);
     this.addPlus(this.coinPill, 'coins', bus);
-    this.addPlus(this.keyPill, 'keys', bus);
     // Small countdown to the next +1 Warmth, just under the energy gauge.
     this.regenLabel = scene.add
-      .text(224, 138, '', { fontFamily: FONT, fontSize: '27px', fontStyle: 'bold', color: PALETTE.cream })
+      .text(L.regen[0], L.regen[1], '', { fontFamily: FONT, fontSize: '27px', fontStyle: 'bold', color: PALETTE.cream })
       .setOrigin(0.5)
+      .setScale(this.pillScale)
       .setAlpha(0.9);
 
-    // Settings gear.
-    this.gearButton = this.roundIconButton(GAME_WIDTH - 112, 104, 'ui_icon_gear', 1, callbacks.onGear);
+    // Settings gear — top-right corner (nudged in on mobile for the fat pixels).
+    this.gearButton = this.roundIconButton(
+      GAME_WIDTH - (IS_MOBILE ? 150 : 112),
+      IS_MOBILE ? 150 : 104,
+      'ui_icon_gear',
+      1,
+      callbacks.onGear
+    );
 
-    // Ledger button: bigger, with the scroll icon.
+    // Ledger button: bigger, with the scroll icon. Bottom-right corner.
     this.ledgerButton = this.roundIconButton(
-      GAME_WIDTH - 156,
-      LIVE_GAME_HEIGHT - 168,
+      GAME_WIDTH - (IS_MOBILE ? 190 : 156),
+      LIVE_GAME_HEIGHT - (IS_MOBILE ? 260 : 168),
       'ui_icon_scroll',
       1.5,
       () => {
@@ -77,25 +99,10 @@ export class Hud {
       ease: 'Sine.easeInOut'
     });
 
-    // Level disc + XP bar.
+    // Level disc + XP bar — one container so the whole cluster moves as one
+    // (children keep their authored absolute coords; the group sits at 0,0).
     const xpY = LIVE_GAME_HEIGHT - 92;
-    const disc = scene.add.image(112, xpY, 'ui_btn_round').setScale(0.82);
-    this.levelText = scene.add
-      .text(112, xpY - 10, '1', {
-        fontFamily: FONT,
-        fontSize: '52px',
-        fontStyle: 'bold',
-        color: PALETTE.textBrown
-      })
-      .setOrigin(0.5);
-    scene.add
-      .text(112, xpY + 32, 'LVL', {
-        fontFamily: FONT,
-        fontSize: '20px',
-        fontStyle: 'bold',
-        color: PALETTE.goldShade
-      })
-      .setOrigin(0.5);
+    const levelGroup = scene.add.container(0, 0);
     const barBg = scene.add.graphics();
     barBg.fillStyle(num(PALETTE.plumShade), 0.85);
     barBg.fillRoundedRect(172, xpY - 18, 440, 36, 18);
@@ -110,17 +117,71 @@ export class Hud {
         color: PALETTE.cream
       })
       .setOrigin(0.5);
-    disc.setDepth(2);
-    this.levelText.setDepth(3);
+    const lvlTag = scene.add
+      .text(112, xpY + 32, 'LVL', {
+        fontFamily: FONT,
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: PALETTE.goldShade
+      })
+      .setOrigin(0.5);
+    const disc = scene.add.image(112, xpY, 'ui_btn_round').setScale(0.82);
+    this.levelText = scene.add
+      .text(112, xpY - 10, '1', {
+        fontFamily: FONT,
+        fontSize: '52px',
+        fontStyle: 'bold',
+        color: PALETTE.textBrown
+      })
+      .setOrigin(0.5);
+    // Same paint order the old depth values produced: bar under disc, number on top.
+    levelGroup.add([barBg, this.xpFill, this.xpLabel, lvlTag, disc, this.levelText]);
+    // Mobile: magnify the whole cluster, anchored to the bottom-left corner. The
+    // children carry large absolute Y (~LIVE_GAME_HEIGHT), so scaling around that
+    // corner = scale k with the group offset by pivotY·(1−k) (plus a small inset).
+    if (IS_MOBILE) {
+      levelGroup.setScale(UI_SCALE).setPosition(24, LIVE_GAME_HEIGHT * (1 - UI_SCALE) - 30);
+    }
 
     this.refreshEconomy();
     this.refreshEnergy(state.energyCurrent);
 
+    // ---- UI Builder registration (theme overrides apply on register) ----
+    uiRegistry.register(scene, 'hud.energy', 'Warmth gauge', 'HUD', this.energyPill.container, {
+      bg: this.energyPill.bg, icon: this.energyPill.icon, value: this.energyPill.value, plus: this.energyPill.plus!
+    });
+    if (this.coinPill) {
+      uiRegistry.register(scene, 'hud.gold', 'Gold gauge', 'HUD', this.coinPill.container, {
+        bg: this.coinPill.bg, icon: this.coinPill.icon, value: this.coinPill.value, plus: this.coinPill.plus!
+      });
+    }
+    uiRegistry.register(scene, 'hud.keys', 'Keys gauge', 'HUD', this.keyPill.container, {
+      bg: this.keyPill.bg, icon: this.keyPill.icon, value: this.keyPill.value
+    });
+    uiRegistry.register(scene, 'hud.regen', 'Warmth regen countdown', 'HUD', this.regenLabel, {
+      label: this.regenLabel
+    });
+    uiRegistry.register(scene, 'hud.gear', 'Settings button', 'HUD', this.gearButton, {
+      bg: this.gearButton.getAt(0), icon: this.gearButton.getAt(1)
+    });
+    uiRegistry.register(scene, 'hud.ledger', 'Ledger button', 'HUD', this.ledgerButton, {
+      bg: this.ledgerButton.getAt(0), icon: this.ledgerButton.getAt(1)
+    });
+    uiRegistry.register(scene, 'hud.level', 'Level badge + XP bar', 'HUD', levelGroup, {
+      disc, level: this.levelText, tag: lvlTag, xp: this.xpLabel
+    });
+
     this.offBus.push(
       bus.on('energy:changed', ({ current }) => this.refreshEnergy(current)),
       bus.on('economy:changed', () => this.refreshEconomy()),
-      bus.on('order:progress', ({ deliverable }) => this.ledgerDot.setVisible(deliverable)),
-      bus.on('order:completed', () => this.ledgerDot.setVisible(false)),
+      bus.on('order:progress', ({ orderId, deliverable }) => {
+        this.deliverableByOrder.set(orderId, deliverable);
+        this.refreshLedgerDot();
+      }),
+      bus.on('order:completed', ({ orderId }) => {
+        this.deliverableByOrder.delete(orderId);
+        this.refreshLedgerDot();
+      }),
       bus.on('item:harvest_failed', ({ reason }) => { if (reason === 'energy') this.shakeEnergy(); })
     );
 
@@ -139,6 +200,10 @@ export class Hud {
     this.keyPill.container.setVisible(visible);
   }
 
+  private refreshLedgerDot(): void {
+    this.ledgerDot.setVisible([...this.deliverableByOrder.values()].some(Boolean));
+  }
+
   setLedgerEnabled(enabled: boolean): void {
     this.ledgerEnabled = enabled;
     this.ledgerButton.setAlpha(enabled ? 1 : 0.55);
@@ -153,20 +218,31 @@ export class Hud {
     return { x: this.coinPill?.container.x ?? 572, y: this.coinPill?.container.y ?? 88 };
   }
 
+  /** WORLD position of the Warmth gauge's "+" button — the tutorial points here to
+   *  open the Emporium. Uses the button's world matrix so it stays correct through
+   *  the mobile pill magnification/reposition (a fixed offset would drift). */
+  getEnergyPlusPos(): { x: number; y: number } {
+    const plus = this.energyPill.plus;
+    if (!plus) return { x: this.energyPill.container.x, y: this.energyPill.container.y };
+    const m = plus.getWorldTransformMatrix();
+    return { x: m.tx, y: m.ty };
+  }
+
   /** A little bump when Gold lands. */
   bumpCoin(): void {
     if (!this.coinPill) return;
     this.scene.tweens.add({
       targets: this.coinPill.container,
-      scale: { from: 1.16, to: 1 },
+      scale: { from: this.pillScale * 1.16, to: this.pillScale },
       duration: 160,
       ease: 'Sine.easeOut'
     });
   }
 
   /** A green "+" button hanging off a gauge's right edge → opens its shop. */
-  private addPlus(pill: Pill, currency: 'energy' | 'coins' | 'keys', bus: EventBus): void {
+  private addPlus(pill: Pill, currency: 'energy' | 'coins', bus: EventBus): void {
     const btn = this.scene.add.container(150, 0);
+    pill.plus = btn;
     const ring = this.scene.add.circle(0, 0, 31, 0x5fb43a).setStrokeStyle(6, num(PALETTE.cream));
     const plus = this.scene.add
       .text(0, -4, '+', { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: '#ffffff' })
@@ -184,7 +260,7 @@ export class Hud {
   }
 
   private pill(x: number, y: number, icon: string, value: string, iconScale = 0.92): Pill {
-    const container = this.scene.add.container(x, y);
+    const container = this.scene.add.container(x, y).setScale(this.pillScale);
     const bg = this.scene.add.image(0, 0, 'ui_pill').setScale(0.95, 0.9);
     const iconImg = this.scene.add.image(-116, 0, icon).setScale(iconScale);
     const text = this.scene.add
@@ -196,7 +272,7 @@ export class Hud {
       })
       .setOrigin(0.5);
     container.add([bg, iconImg, text]);
-    return { container, value: text };
+    return { container, value: text, bg, icon: iconImg };
   }
 
   private roundIconButton(
@@ -206,17 +282,20 @@ export class Hud {
     scale: number,
     onTap: () => void
   ): Phaser.GameObjects.Container {
-    const container = this.scene.add.container(x, y);
+    // `base` is the mobile magnification (1 on desktop). The press/hover feedback
+    // multiplies it so the button never snaps back to un-magnified size on tap.
+    const base = UI_SCALE;
+    const container = this.scene.add.container(x, y).setScale(base);
     const bg = this.scene.add.image(0, 0, 'ui_btn_round').setScale(scale);
     const iconImg = this.scene.add.image(0, -8 * scale, icon).setScale(scale * 0.95);
     container.add([bg, iconImg]);
     container.setSize(128 * scale, 128 * scale);
     container.setInteractive({ useHandCursor: true });
-    container.on('pointerover', () => container.setScale(1.06));
-    container.on('pointerout', () => container.setScale(1));
-    container.on('pointerdown', () => container.setScale(0.94));
+    container.on('pointerover', () => container.setScale(base * 1.06));
+    container.on('pointerout', () => container.setScale(base));
+    container.on('pointerdown', () => container.setScale(base * 0.94));
     container.on('pointerup', () => {
-      container.setScale(1);
+      container.setScale(base);
       onTap();
     });
     return container;
@@ -231,7 +310,7 @@ export class Hud {
     this.energyPill.value.setText(`${current}/${this.state.energyMax}`);
     this.scene.tweens.add({
       targets: this.energyPill.container,
-      scale: { from: 1.08, to: 1 },
+      scale: { from: this.pillScale * 1.08, to: this.pillScale },
       duration: 140,
       ease: 'Sine.easeOut'
     });
@@ -241,15 +320,17 @@ export class Hud {
     this.coinPill?.value.setText(`${this.state.coins}`);
     this.keyPill.value.setText(`${this.state.keys}`);
     this.levelText.setText(`${this.state.level}`);
+    const atCap = this.state.level >= LEVEL_XP.length;
     const [gained, span] = this.state.levelProgress;
     const xpY = LIVE_GAME_HEIGHT - 92;
     this.xpFill.clear();
-    const width = Math.max(0.04, Math.min(1, gained / span)) * 424;
+    const width = (atCap ? 1 : Math.max(0.04, Math.min(1, gained / span))) * 424;
     this.xpFill.fillStyle(num(PALETTE.gold), 1);
     this.xpFill.fillRoundedRect(180, xpY - 11, width, 22, 11);
     this.xpFill.fillStyle(num(PALETTE.goldAccent), 0.65);
     this.xpFill.fillRoundedRect(180, xpY - 11, width, 9, 4.4);
-    this.xpLabel.setText(`${gained} / ${span} XP`);
+    // The chapter ends at the cap — the bar never fills toward nothing.
+    this.xpLabel.setText(atCap ? 'Chapter One complete ✦' : `${gained} / ${span} XP`);
   }
 
   private shakeEnergy(): void {

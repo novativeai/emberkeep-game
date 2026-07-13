@@ -17,20 +17,20 @@
     },
     {
       "id": "strawberry",
-      "name": "Strawberry Plants",
+      "name": "Emberberry Plants",
       "tiers": [
-        { "tier": 1, "id": "strawberry_1", "name": "Strawberry Sprout", "sell": 1, "xp": 0 },
-        { "tier": 2, "id": "strawberry_2", "name": "Strawberry Bush", "sell": 3, "xp": 6 },
+        { "tier": 1, "id": "strawberry_1", "name": "Emberberry Sprout", "sell": 1, "xp": 0 },
+        { "tier": 2, "id": "strawberry_2", "name": "Emberberry Bush", "sell": 3, "xp": 6 },
         {
           "tier": 3,
           "id": "strawberry_3",
-          "name": "Ripe Strawberry Plant",
+          "name": "Ripe Emberberry Plant",
           "sell": 8,
           "xp": 14,
           "generator": {
             "produces": { "chain": "strawberry", "tier": 1 },
             "cooldownMs": 20000,
-            "energyCost": 1,
+            "energyCost": 0,
             "passiveMs": 240000
           }
         }
@@ -55,11 +55,25 @@
           "name": "Red Dragon",
           "sell": 25,
           "xp": 26,
+          "merge": { "group": 2, "outputs": 1 },
           "generator": {
             "produces": { "chain": "ember_dragon", "tier": 1 },
-            "cooldownMs": 300000,
+            "cooldownMs": 45000,
             "energyCost": 1,
-            "passiveMs": 300000
+            "passiveMs": 180000
+          }
+        },
+        {
+          "tier": 4,
+          "id": "ember_dragon_4",
+          "name": "Adult Red Dragon",
+          "sell": 60,
+          "xp": 40,
+          "generator": {
+            "produces": { "chain": "ember_dragon", "tier": 1 },
+            "cooldownMs": 30000,
+            "energyCost": 1,
+            "passiveMs": 120000
           }
         }
       ]
@@ -84,11 +98,26 @@
           "name": "House",
           "sell": 0,
           "xp": 0,
+          "merge": { "group": 2, "outputs": 1 },
           "generator": {
             "produces": { "chain": "coin", "tier": 1 },
-            "cooldownMs": 600000,
+            "cooldownMs": 210000,
             "energyCost": 0,
-            "passiveMs": 600000,
+            "passiveMs": 210000,
+            "tappable": false
+          }
+        },
+        {
+          "tier": 3,
+          "id": "lumber_3",
+          "name": "Manor",
+          "sell": 0,
+          "xp": 20,
+          "generator": {
+            "produces": { "chain": "coin", "tier": 2 },
+            "cooldownMs": 210000,
+            "energyCost": 0,
+            "passiveMs": 210000,
             "tappable": false
           }
         }
@@ -106,9 +135,9 @@
           "xp": 0,
           "generator": {
             "produces": { "chain": "lumber", "tier": 1 },
-            "cooldownMs": 1200000,
+            "cooldownMs": 300000,
             "energyCost": 0,
-            "passiveMs": 1200000,
+            "passiveMs": 300000,
             "tappable": false
           }
         }
@@ -126,10 +155,10 @@
           "xp": 0,
           "generator": {
             "produces": { "chain": "emerald", "tier": 1 },
-            "cooldownMs": 1200000,
+            "cooldownMs": 300000,
             "energyCost": 0,
             "tappable": true,
-            "skipMaxGold": 50
+            "skipMaxGold": 60
           }
         }
       ]
@@ -155,20 +184,36 @@
           "name": "Green Dragon",
           "sell": 20,
           "xp": 24,
+          "merge": { "group": 2, "outputs": 1 },
           "generator": {
             "produces": { "chain": "flame_gem", "tier": 1 },
-            "cooldownMs": 300000,
+            "cooldownMs": 45000,
             "energyCost": 1,
-            "passiveMs": 300000
+            "passiveMs": 180000
+          }
+        },
+        {
+          "tier": 4,
+          "id": "emerald_4",
+          "name": "Adult Emerald Dragon",
+          "sell": 50,
+          "xp": 36,
+          "generator": {
+            "produces": { "chain": "flame_gem", "tier": 1 },
+            "cooldownMs": 30000,
+            "energyCost": 1,
+            "passiveMs": 120000
           }
         }
       ]
     },
     {
       "id": "golden_egg",
-      "name": "Golden Egg",
+      "name": "Golden Dragons",
+      "hatchAtTier": 2,
       "tiers": [
-        { "tier": 1, "id": "golden_egg_1", "name": "Golden Egg", "sell": 200, "xp": 80 }
+        { "tier": 1, "id": "golden_egg_1", "name": "Golden Egg", "sell": 0, "xp": 0, "sellable": false },
+        { "tier": 2, "id": "golden_egg_2", "name": "Golden Elder", "sell": 0, "xp": 0, "sellable": false }
       ]
     },
     {

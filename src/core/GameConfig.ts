@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
+import { GAME_WIDTH, IS_IOS, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
 import { renderScale } from './render-scale';
 import { BoardScene } from '../scenes/BoardScene';
 import { BootScene } from '../scenes/BootScene';
 import { PreloadScene } from '../scenes/PreloadScene';
 import { TitleScene } from '../scenes/TitleScene';
+import { UiEditorScene } from '../scenes/UiEditorScene';
 import { UIScene } from '../scenes/UIScene';
 
 /**
@@ -28,9 +29,12 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   );
   // Quantise to 1/8 steps (keeps 2560×1600 × R integral) and clamp. Desktop floors
   // at 1 (crisp 1440p backing, up to ~4K on retina). The portrait mobile canvas is
-  // ~2× taller, so a lower floor (0.75) keeps the backing off a phone GPU's limit
-  // (~14M px at floor 1) while staying device-crisp.
-  const floor = IS_MOBILE ? 0.75 : 1;
+  // ~2× taller, so a lower floor keeps the backing off a phone GPU's limit
+  // (~14M px at floor 1) while staying device-crisp. iOS's renderer-process memory
+  // budget is far tighter than Android's, so it floors lower still — at floor 0.75
+  // a hi-DPI iPhone SUPERSAMPLES well past its own screen (need≈0.46), needlessly
+  // inflating GPU memory into the WebKit crash zone; 0.5 tracks device pixels.
+  const floor = IS_IOS ? 0.5 : IS_MOBILE ? 0.75 : 1;
   renderScale.value = Phaser.Math.Clamp(Math.round(need * 8) / 8, floor, 1.5);
 
   return {
@@ -61,6 +65,6 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
       failIfMajorPerformanceCaveat: false,
       powerPreference: 'low-power'
     },
-    scene: [BootScene, PreloadScene, TitleScene, BoardScene, UIScene]
+    scene: [BootScene, PreloadScene, TitleScene, BoardScene, UIScene, UiEditorScene]
   };
 }

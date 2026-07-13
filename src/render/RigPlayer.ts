@@ -58,6 +58,8 @@ export class RigPlayer {
   private presetKey: string | null = null;
   private elapsed = 0;
   private displayScale: number;
+  /** Preset playback rate — <1 slows the whole pose cycle (calm adult dragons). */
+  private speed: number;
   private scratchRot = new Map<string, number>();
   private face: FaceWear | null = null;
   private faceCurrent: string | null = null; // "set:index" worn now (null = base)
@@ -67,11 +69,12 @@ export class RigPlayer {
     scene: Phaser.Scene,
     private rig: RigDoc,
     textureKey: (layerName: string) => string,
-    opts: { scale?: number } = {}
+    opts: { scale?: number; speed?: number } = {}
   ) {
     this.resolved = resolveRig(rig);
     this.ctx = makePresetContext(rig);
     this.displayScale = opts.scale ?? 1;
+    this.speed = opts.speed ?? 1;
     this.root = rig.root ?? {
       x: rig.bounds.x + rig.bounds.width / 2,
       y: rig.bounds.y + rig.bounds.height * 0.84
@@ -188,6 +191,12 @@ export class RigPlayer {
     return this;
   }
 
+  /** Re-arm a perpetual talk loop if it ever stopped (custom-UI 'talk' mode). */
+  playFaceIfIdle(): this {
+    if (this.face && !this.face.channel.talking) this.face.channel.playTalk(Number.POSITIVE_INFINITY);
+    return this;
+  }
+
   setFacing(facing: Facing): this {
     this.container.scaleX = (facing === 'right' ? -1 : 1) * this.displayScale;
     return this;
@@ -203,7 +212,7 @@ export class RigPlayer {
   update(deltaMs: number): void {
     let pose: RigPose | null = null;
     if (this.presetKey) {
-      this.elapsed += deltaMs / 1000;
+      this.elapsed += (deltaMs / 1000) * this.speed;
       const preset = PRESET_BY_KEY[this.presetKey];
       if (preset) pose = preset.fn(this.elapsed, this.ctx);
     }

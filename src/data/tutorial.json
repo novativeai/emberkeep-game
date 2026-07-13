@@ -4,123 +4,331 @@
       "id": "lore_1",
       "speaker": "laurah",
       "text": "Long ago, Emberkeep blazed with dragon fire. Then the cold came... and the dragons slept.",
-      "gate": { "type": "tap" },
+      "gate": {
+        "type": "tap"
+      },
       "allow": {}
     },
     {
       "id": "lore_2",
       "speaker": "laurah",
       "text": "I am Laurah, Dragon Master of the ancient flame. And you, Keeper, are the one who will wake them.",
-      "gate": { "type": "tap" },
+      "gate": {
+        "type": "tap"
+      },
       "allow": {}
     },
     {
       "id": "ruby_merge",
       "speaker": "laurah",
       "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch a Red Egg.",
-      "gate": { "type": "event", "event": "item:merged", "chain": "ember_dragon" },
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "ember_dragon"
+      },
       "effects": [
-        { "spawn": { "chain": "ember_dragon", "tier": 1, "count": 3, "at": [9, 4] } }
+        {
+          "spawn": {
+            "chain": "ember_dragon",
+            "tier": 1,
+            "count": 3,
+            "at": [
+              9,
+              4
+            ]
+          }
+        }
       ],
       "highlight": [
-        { "chain": "ember_dragon", "nth": 0 },
-        { "chain": "ember_dragon", "nth": 1 },
-        { "chain": "ember_dragon", "nth": 2 }
+        {
+          "chain": "ember_dragon",
+          "nth": 0
+        },
+        {
+          "chain": "ember_dragon",
+          "nth": 1
+        },
+        {
+          "chain": "ember_dragon",
+          "nth": 2
+        }
       ],
       "hand": {
-        "from": { "chain": "ember_dragon", "nth": 2 },
-        "to": { "chain": "ember_dragon", "nth": 0 }
+        "from": {
+          "chain": "ember_dragon",
+          "nth": 2
+        },
+        "to": {
+          "chain": "ember_dragon",
+          "nth": 0
+        }
       },
-      "arrow": { "tile": { "chain": "ember_dragon", "nth": 0 } },
-      "allow": { "drag": ["ember_dragon"] }
+      "allow": {
+        "drag": [
+          "ember_dragon"
+        ]
+      }
+    },
+    {
+      "id": "cookbook_intro",
+      "speaker": "laurah",
+      "text": "Your first recipe! Every merge you discover is inscribed in the Emberkeep Cookbook. Tap the book to see your first page.",
+      "gate": {
+        "type": "event",
+        "event": "ui:cookbook_opened"
+      },
+      "arrow": {
+        "ui": "cookbook"
+      },
+      "allow": {
+        "cookbook": true
+      }
+    },
+    {
+      "id": "cookbook_close",
+      "speaker": "laurah",
+      "text": "The Dragon Ruby recipe — your first page! Tap the ✕ to close the book, and let us wake that egg.",
+      "gate": {
+        "type": "event",
+        "event": "ui:cookbook_closed"
+      },
+      "arrow": {
+        "ui": "cookbook_close"
+      },
+      "allow": {
+        "cookbook": true
+      }
     },
     {
       "id": "dragon_hatch",
       "speaker": "laurah",
       "text": "A Red Egg! Two more have appeared. Drag all three together — the Red Dragon stirs inside!",
-      "gate": { "type": "event", "event": "item:hatched", "chain": "ember_dragon" },
+      "gate": {
+        "type": "event",
+        "event": "item:hatched",
+        "chain": "ember_dragon"
+      },
       "effects": [
-        { "spawn": { "chain": "ember_dragon", "tier": 2, "count": 2, "nearChain": "ember_dragon" } }
+        {
+          "spawn": {
+            "chain": "ember_dragon",
+            "tier": 2,
+            "count": 2,
+            "nearChain": "ember_dragon"
+          }
+        }
       ],
       "highlight": [
-        { "chain": "ember_dragon", "nth": 0 },
-        { "chain": "ember_dragon", "nth": 1 },
-        { "chain": "ember_dragon", "nth": 2 }
+        {
+          "chain": "ember_dragon",
+          "nth": 0
+        },
+        {
+          "chain": "ember_dragon",
+          "nth": 1
+        },
+        {
+          "chain": "ember_dragon",
+          "nth": 2
+        }
       ],
       "hand": {
-        "from": { "chain": "ember_dragon", "nth": 2 },
-        "to": { "chain": "ember_dragon", "nth": 0 }
+        "from": {
+          "chain": "ember_dragon",
+          "nth": 2
+        },
+        "to": {
+          "chain": "ember_dragon",
+          "nth": 0
+        }
       },
-      "arrow": { "tile": { "chain": "ember_dragon", "nth": 0 } },
-      "allow": { "drag": ["ember_dragon"] }
+      "allow": {
+        "drag": [
+          "ember_dragon"
+        ]
+      }
     },
     {
       "id": "emerald_tap",
       "speaker": "laurah",
       "text": "The Red Dragon! And look — the Crystal glows! Tap it to claim an Emerald. You already have two — merge all three to forge a Green Egg!",
-      "gate": { "type": "event", "event": "item:harvested", "chain": "emerald" },
+      "gate": {
+        "type": "event",
+        "event": "item:harvested",
+        "chain": "emerald"
+      },
       "effects": [
-        { "spawn": { "chain": "emerald", "tier": 1, "count": 2 } }
+        {
+          "spawn": {
+            "chain": "emerald",
+            "tier": 1,
+            "count": 2
+          }
+        }
       ],
-      "arrow": { "tile": { "chain": "crystal", "nth": 0 } },
-      "allow": { "tapGenerators": true }
+      "arrow": {
+        "tile": {
+          "chain": "crystal",
+          "nth": 0
+        }
+      },
+      "allow": {
+        "tapGenerators": true
+      }
     },
     {
       "id": "emerald_egg_merge",
       "speaker": "laurah",
       "text": "Three Emeralds! Drag them all together — they will forge a Green Egg.",
-      "gate": { "type": "event", "event": "item:merged", "chain": "emerald" },
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "emerald"
+      },
       "highlight": [
-        { "chain": "emerald", "nth": 0, "tier": 1 },
-        { "chain": "emerald", "nth": 1, "tier": 1 },
-        { "chain": "emerald", "nth": 2, "tier": 1 }
+        {
+          "chain": "emerald",
+          "nth": 0,
+          "tier": 1
+        },
+        {
+          "chain": "emerald",
+          "nth": 1,
+          "tier": 1
+        },
+        {
+          "chain": "emerald",
+          "nth": 2,
+          "tier": 1
+        }
       ],
       "hand": {
-        "from": { "chain": "emerald", "nth": 2, "tier": 1 },
-        "to": { "chain": "emerald", "nth": 0, "tier": 1 }
+        "from": {
+          "chain": "emerald",
+          "nth": 2,
+          "tier": 1
+        },
+        "to": {
+          "chain": "emerald",
+          "nth": 0,
+          "tier": 1
+        }
       },
-      "arrow": { "tile": { "chain": "emerald", "nth": 0, "tier": 1 } },
-      "allow": { "drag": ["ember_dragon", "emerald"] }
+      "allow": {
+        "drag": [
+          "ember_dragon",
+          "emerald"
+        ]
+      }
     },
     {
       "id": "green_dragon_hatch",
       "speaker": "laurah",
       "text": "A Green Egg! Two more have appeared. Drag all three together — the Green Dragon stirs inside!",
-      "gate": { "type": "event", "event": "item:hatched", "chain": "emerald" },
+      "gate": {
+        "type": "event",
+        "event": "item:hatched",
+        "chain": "emerald"
+      },
       "effects": [
-        { "spawn": { "chain": "emerald", "tier": 2, "count": 2, "nearChain": "emerald" } }
+        {
+          "spawn": {
+            "chain": "emerald",
+            "tier": 2,
+            "count": 2,
+            "nearChain": "emerald"
+          }
+        }
       ],
       "highlight": [
-        { "chain": "emerald", "nth": 0, "tier": 2 },
-        { "chain": "emerald", "nth": 1, "tier": 2 },
-        { "chain": "emerald", "nth": 2, "tier": 2 }
+        {
+          "chain": "emerald",
+          "nth": 0,
+          "tier": 2
+        },
+        {
+          "chain": "emerald",
+          "nth": 1,
+          "tier": 2
+        },
+        {
+          "chain": "emerald",
+          "nth": 2,
+          "tier": 2
+        }
       ],
       "hand": {
-        "from": { "chain": "emerald", "nth": 2, "tier": 2 },
-        "to": { "chain": "emerald", "nth": 0, "tier": 2 }
+        "from": {
+          "chain": "emerald",
+          "nth": 2,
+          "tier": 2
+        },
+        "to": {
+          "chain": "emerald",
+          "nth": 0,
+          "tier": 2
+        }
       },
-      "arrow": { "tile": { "chain": "emerald", "nth": 0, "tier": 2 } },
-      "allow": { "drag": ["ember_dragon", "emerald"] }
+      "allow": {
+        "drag": [
+          "ember_dragon",
+          "emerald"
+        ]
+      }
     },
     {
       "id": "chest",
       "speaker": "laurah",
       "text": "A Treasure Chest! The isle rewards brave Keepers. Tap it to claim what is inside.",
-      "gate": { "type": "event", "event": "chest:open" },
+      "gate": {
+        "type": "event",
+        "event": "chest:open"
+      },
       "effects": [
-        { "move": { "chain": "emerald", "tier": 3, "to": [9, 6] } },
-        { "spawn": { "chain": "chest", "tier": 1, "count": 1, "at": [7, 2] } }
+        {
+          "move": {
+            "chain": "emerald",
+            "tier": 3,
+            "to": [
+              9,
+              6
+            ]
+          }
+        },
+        {
+          "spawn": {
+            "chain": "chest",
+            "tier": 1,
+            "count": 1,
+            "at": [
+              7,
+              2
+            ]
+          }
+        }
       ],
-      "arrow": { "tile": { "chain": "chest", "nth": 0 } },
-      "allow": { "tapGenerators": true }
+      "arrow": {
+        "tile": {
+          "chain": "chest",
+          "nth": 0
+        }
+      },
+      "allow": {
+        "tapGenerators": true
+      }
     },
     {
       "id": "levelup",
       "speaker": "laurah",
       "text": "Keeper Level 2! The isle stirs — a new stretch of land has woken to the west. Tap to see!",
-      "gate": { "type": "tap" },
+      "gate": {
+        "type": "tap"
+      },
       "effects": [
-        { "grantXp": 10 }
+        {
+          "grantXp": 10
+        }
       ],
       "allow": {}
     },
@@ -128,54 +336,200 @@
       "id": "key_unlock",
       "speaker": "laurah",
       "text": "Your dragons gifted you a Stone Key! See that clouded strip? Tap it to burn the fog away.",
-      "gate": { "type": "event", "event": "region:unlocked" },
+      "gate": {
+        "type": "event",
+        "event": "region:unlocked"
+      },
       "effects": [
-        { "grantKeys": 1 }
+        {
+          "grantKeys": 1
+        }
       ],
-      "hand": { "fogRegion": "level_2_gate" },
-      "arrow": { "fogRegion": "level_2_gate" },
-      "allow": { "fog": true }
+      "arrow": {
+        "fogRegion": "level_2_gate"
+      },
+      "allow": {
+        "fog": true
+      }
+    },
+    {
+      "id": "emberberry_tap",
+      "speaker": "laurah",
+      "text": "A wild Emberberry patch grew in the opened land! It feeds you for FREE — tapping it never costs Warmth. Tap the patch to pick a sprout.",
+      "gate": {
+        "type": "event",
+        "event": "item:harvested",
+        "chain": "strawberry"
+      },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "strawberry",
+            "tier": 3,
+            "count": 1,
+            "nearChain": "lumber"
+          }
+        }
+      ],
+      "arrow": {
+        "tile": {
+          "chain": "strawberry",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "allow": {
+        "tapGenerators": true
+      }
+    },
+    {
+      "id": "emberberry_merge",
+      "speaker": "laurah",
+      "text": "Two more sprouts sprang up beside yours! Merge all three into a bush — the patch regrows forever, so you will never run out of things to merge.",
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "strawberry"
+      },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "strawberry",
+            "tier": 1,
+            "count": 2,
+            "nearChain": "strawberry",
+            "nearTier": 1
+          }
+        }
+      ],
+      "highlight": [
+        {
+          "chain": "strawberry",
+          "nth": 0,
+          "tier": 1
+        },
+        {
+          "chain": "strawberry",
+          "nth": 1,
+          "tier": 1
+        },
+        {
+          "chain": "strawberry",
+          "nth": 2,
+          "tier": 1
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "strawberry",
+          "nth": 2,
+          "tier": 1
+        },
+        "to": {
+          "chain": "strawberry",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "allow": {
+        "drag": [
+          "strawberry"
+        ]
+      }
     },
     {
       "id": "bush_merge",
       "speaker": "laurah",
-      "text": "Three Bushes grew in the opened land! Merge them to raise a House — it earns you coins while you rest. Dragons can Work nearby to speed it up.",
-      "gate": { "type": "event", "event": "item:merged", "chain": "lumber" },
+      "text": "Those Bushes in the opened land can become shelter! Merge the three Bushes to raise a House — it earns coins while you rest.",
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "lumber"
+      },
       "highlight": [
-        { "chain": "lumber", "nth": 0 },
-        { "chain": "lumber", "nth": 1 },
-        { "chain": "lumber", "nth": 2 }
+        {
+          "chain": "lumber",
+          "nth": 0
+        },
+        {
+          "chain": "lumber",
+          "nth": 1
+        },
+        {
+          "chain": "lumber",
+          "nth": 2
+        }
       ],
       "hand": {
-        "from": { "chain": "lumber", "nth": 2 },
-        "to": { "chain": "lumber", "nth": 0 }
+        "from": {
+          "chain": "lumber",
+          "nth": 2
+        },
+        "to": {
+          "chain": "lumber",
+          "nth": 0
+        }
       },
-      "arrow": { "tile": { "chain": "lumber", "nth": 0 } },
-      "allow": { "drag": ["ember_dragon", "emerald", "lumber"], "tapGenerators": true }
+      "allow": {
+        "drag": [
+          "ember_dragon",
+          "emerald",
+          "lumber"
+        ],
+        "tapGenerators": true
+      }
     },
     {
       "id": "dragon_work",
       "speaker": "laurah",
       "text": "Dragons can speed the House! Drag your dragon and drop it directly onto the House tile. Each working dragon doubles the speed — ×2 with one, ×4 with two!",
-      "gate": { "type": "event", "event": "dragon:working" },
+      "gate": {
+        "type": "event",
+        "event": "dragon:working"
+      },
       "highlight": [
-        { "chain": "ember_dragon", "nth": 0, "tier": 3 },
-        { "chain": "lumber", "nth": 0, "tier": 2 }
+        {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        },
+        {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 2
+        }
       ],
       "hand": {
-        "from": { "chain": "ember_dragon", "nth": 0, "tier": 3 },
-        "to": { "chain": "lumber", "nth": 0, "tier": 2 }
+        "from": {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        },
+        "to": {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 2
+        }
       },
-      "arrow": { "tile": { "chain": "ember_dragon", "nth": 0, "tier": 3 } },
-      "allow": { "drag": ["ember_dragon", "emerald"], "dragonWork": true }
+      "allow": {
+        "drag": [
+          "ember_dragon",
+          "emerald"
+        ],
+        "dragonWork": true
+      }
     },
     {
       "id": "dragon_rest",
       "speaker": "laurah",
       "text": "Hard work tires even dragons! After 3 minutes they need rest — watch, your dragon just nodded off and flew home to recover.",
-      "gate": { "type": "tap" },
+      "gate": {
+        "type": "tap"
+      },
       "effects": [
-        { "advanceClock": 185000 }
+        {
+          "advanceClock": 185000
+        }
       ],
       "allow": {}
     },
@@ -183,27 +537,67 @@
       "id": "house_skip",
       "speaker": "laurah",
       "text": "Your House earns coins slowly — but you can rush it! Tap the House, then spend Warmth (⚡) to skip its timer. Watch your Warmth drop!",
-      "gate": { "type": "event", "event": "generator:skipped", "chain": "lumber", "currency": "warmth" },
+      "gate": {
+        "type": "event",
+        "event": "generator:skipped",
+        "chain": "lumber",
+        "currency": "warmth"
+      },
       "effects": [
-        { "setTimer": { "chain": "lumber", "tier": 2, "remainingMs": 600000 } }
+        {
+          "setTimer": {
+            "chain": "lumber",
+            "tier": 2,
+            "remainingMs": 120000
+          }
+        }
       ],
-      "arrow": { "tile": { "chain": "lumber", "nth": 0, "tier": 2 } },
-      "allow": { "tapGenerators": true, "drag": ["ember_dragon", "emerald"] }
+      "arrow": {
+        "tile": {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 2
+        }
+      },
+      "allow": {
+        "tapGenerators": true,
+        "drag": [
+          "ember_dragon",
+          "emerald"
+        ]
+      }
     },
     {
       "id": "buy_energy",
       "speaker": "laurah",
       "text": "Low on Warmth now? Your first Ember Spark is free! Tap the ⚡ + button at the top to open the Emporium and claim it. Just this once!",
-      "gate": { "type": "event", "event": "marketplace:purchased" },
-      "hand": { "ui": "marketplace" },
-      "arrow": { "ui": "marketplace" },
-      "allow": { "marketplace": true }
+      "gate": {
+        "type": "event",
+        "event": "marketplace:purchased"
+      },
+      "arrow": {
+        "ui": "marketplace"
+      },
+      "allow": {
+        "marketplace": true
+      }
+    },
+    {
+      "id": "golden_tease",
+      "speaker": "laurah",
+      "text": "One more thing, Keeper — look west. A GOLDEN egg sleeps on the old altar. It has slept there since the Great Flame was lost… and see, it stirs at your coming. Cindra guards its story.",
+      "gate": {
+        "type": "tap"
+      },
+      "allow": {}
     },
     {
       "id": "free_play",
       "speaker": "laurah",
-      "text": "Emberkeep is yours now, Keeper! Grow your dragons, discover hidden lands — and reach Keeper Level 3 for a grand surprise awaiting you!",
-      "gate": { "type": "tap" },
+      "text": "Emberkeep is yours now, Keeper! Fill Cindra's Ledger — she guards something golden — and reach Keeper Level 3… they say something waits past the southern ash.",
+      "gate": {
+        "type": "tap"
+      },
       "allow": {}
     }
   ]

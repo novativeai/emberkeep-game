@@ -2,6 +2,7 @@ import { DRAGON_REST_MS, DRAGON_WORK_MS, DRAGON_WORK_PER_DRAGON } from '../core/
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
+import type { ChainsData, GeneratorConfig } from '../core/types';
 
 interface Job {
   houseId: number;
@@ -22,7 +23,8 @@ export class DragonJobSystem {
   constructor(
     private state: GameState,
     private bus: EventBus,
-    private clock: GameClock
+    private clock: GameClock,
+    private chains: ChainsData
   ) {
     bus.on('dragon:work', ({ dragonId, houseId }) => this.startWork(dragonId, houseId));
     bus.on('time:advanced', ({ ms }) => this.tick(ms));
@@ -30,8 +32,23 @@ export class DragonJobSystem {
     bus.on('game:reset', () => this.jobs.clear());
   }
 
+  private generatorConfig(chain: string, tier: number): GeneratorConfig | undefined {
+    return this.chains.chains
+      .find((c) => c.id === chain)
+      ?.tiers.find((t) => t.tier === tier)?.generator;
+  }
+
   private startWork(dragonId: number, houseId: number): void {
-    if (!this.state.items.get(dragonId) || !this.state.items.get(houseId)) return;
+    const dragon = this.state.items.get(dragonId);
+    const house = this.state.items.get(houseId);
+    if (!dragon || !house) return;
+    // Only an actual DRAGON tier works — a TAP generator (the base/adult dragon
+    // tiers; the chain's merge pieces — Rubies, Eggs — have no generator) — and
+    // only a PASSIVE generator (House, Big Tree) can be worked.
+    const dragonCfg = this.generatorConfig(dragon.chain, dragon.tier);
+    if (!dragonCfg || dragonCfg.tappable === false) return;
+    const houseCfg = this.generatorConfig(house.chain, house.tier);
+    if (!houseCfg || houseCfg.tappable !== false) return;
     if (this.jobs.get(dragonId)?.state === 'resting') return; // still tired
     this.jobs.set(dragonId, { houseId, state: 'working', sinceMs: this.clock.now() });
     this.bus.emit('dragon:working', { dragonId, houseId });

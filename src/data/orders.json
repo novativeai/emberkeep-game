@@ -4,61 +4,63 @@
       "id": "cindra_brazier",
       "giver": "cindra",
       "title": "Rekindle the Brazier",
-      "blurb": "Twenty Gem Shards, Keeper. My brazier has been cold since the last keeper fled — light it, and I shall give you something truly golden.",
-      "requires": [{ "chain": "flame_gem", "tier": 1, "count": 20 }],
-      "rewards": { "coins": 0, "keys": 0, "xp": 30, "spawn": { "chain": "golden_egg", "tier": 1, "count": 1 } }
-    },
-    {
-      "id": "cindra_two_markets",
-      "giver": "cindra",
-      "title": "Cindra’s Two Markets",
-      "blurb": "I keep two ledgers, Keeper. Sell me twenty gem shards for good gold — or, if your purse is heavy, forty coins buys a Gold Key outright. Your choice.",
-      "requires": [{ "chain": "flame_gem", "tier": 1, "count": 20 }],
-      "rewards": { "coins": 90, "keys": 0, "xp": 20 },
-      "options": [
-        {
-          "label": "Sell",
-          "requires": [{ "chain": "flame_gem", "tier": 1, "count": 20 }],
-          "rewards": { "coins": 90, "keys": 0, "xp": 20 }
-        },
-        {
-          "label": "Buy Key",
-          "costCoins": 40,
-          "rewards": { "coins": 0, "keys": 1, "xp": 10 }
-        }
-      ]
-    },
-    {
-      "id": "cindra_diamond_key",
-      "giver": "cindra",
-      "title": "Three Diamonds for a Key",
-      "blurb": "Bring me three cut diamonds, Keeper — three Flame Gems — and I shall forge you a Gold Key worthy of the deep vaults.",
-      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 3 }],
-      "rewards": { "coins": 0, "keys": 1, "xp": 25 }
+      "blurb": "Six Gem Shards, Keeper. My brazier has been cold since the last keeper fled — light it, and I shall part with something truly golden.",
+      "requires": [{ "chain": "flame_gem", "tier": 1, "count": 6 }],
+      "rewards": { "coins": 25, "keys": 0, "xp": 30, "tease": "🥚 ???" }
     },
     {
       "id": "cindra_hearth",
       "giver": "cindra",
       "title": "Warm the Long Hearth",
-      "blurb": "Your little dragon keeps coughing up shards — splendid. Forge me FOUR Flame Gems and the hall will be warm by supper.",
-      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 4 }],
+      "blurb": "Your little dragon keeps coughing up shards — splendid. Forge me THREE Flame Gems and the hall will be warm by supper.",
+      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 3 }],
       "rewards": { "coins": 75, "keys": 0, "xp": 35 }
     },
     {
       "id": "cindra_centerpiece",
       "giver": "cindra",
-      "title": "A Centerpiece Worth the Name",
+      "title": "The Radiant Centerpiece",
       "blurb": "One Radiant Gem. ONE. Merge three Flame Gems into something that would make the old court gasp.",
       "requires": [{ "chain": "flame_gem", "tier": 3, "count": 1 }],
-      "rewards": { "coins": 110, "keys": 1, "xp": 50 }
+      "rewards": { "coins": 110, "keys": 0, "xp": 50 }
     },
     {
       "id": "cindra_hoard",
       "giver": "cindra",
       "title": "The Keeper's Hoard",
-      "blurb": "Three Radiant Gems, Keeper. A proper hoard for a proper Keep — and proof the Flame is truly back.",
+      "blurb": "An encore, Keeper! Three Radiant Gems — a proper hoard for a proper Keep, and proof the Flame is truly back.",
       "requires": [{ "chain": "flame_gem", "tier": 3, "count": 3 }],
-      "rewards": { "coins": 240, "keys": 1, "xp": 85 }
+      "rewards": { "coins": 240, "keys": 0, "xp": 85 }
+    }
+  ],
+  "repeatable": [
+    {
+      "giver": "cindra",
+      "title": "Shards for the Coffer",
+      "blurb": "The brazier is hungry again. Eight Gem Shards, if your dragons would be so kind.",
+      "requires": [{ "chain": "flame_gem", "tier": 1, "count": 8 }],
+      "rewards": { "coins": 40, "keys": 0, "xp": 20 }
+    },
+    {
+      "giver": "cindra",
+      "title": "Gems for the Gallery",
+      "blurb": "Two Flame Gems for the gallery alcoves. The old court would approve.",
+      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 2 }],
+      "rewards": { "coins": 70, "keys": 0, "xp": 25 }
+    },
+    {
+      "giver": "cindra",
+      "title": "A Ruby Tithe",
+      "blurb": "Five Dragon Rubies. Ask the red one — she hoards them anyway.",
+      "requires": [{ "chain": "ember_dragon", "tier": 1, "count": 5 }],
+      "rewards": { "coins": 55, "keys": 0, "xp": 20 }
+    },
+    {
+      "giver": "cindra",
+      "title": "One More Radiance",
+      "blurb": "Another Radiant Gem, Keeper. The Keep can never be too bright.",
+      "requires": [{ "chain": "flame_gem", "tier": 3, "count": 1 }],
+      "rewards": { "coins": 120, "keys": 0, "xp": 35 }
     }
   ]
 }

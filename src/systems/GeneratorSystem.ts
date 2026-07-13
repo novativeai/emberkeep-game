@@ -1,4 +1,10 @@
-import { GENERATOR_PASSIVE_RETRY_MS, skipEnergyCost, skipWarmthCost } from '../core/Constants';
+import {
+  GENERATOR_PASSIVE_RETRY_MS,
+  OFFLINE_BANK_CYCLES,
+  REWARD_SPAWN_RADIUS,
+  skipEnergyCost,
+  skipWarmthCost
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -15,6 +21,10 @@ import type { BoardItemState, ChainsData, GeneratorConfig, TilePos } from '../co
  * the start, nearly free at the end). All timing reads the virtual GameClock.
  */
 export class GeneratorSystem {
+  /** Gifts banked by the last offline catch-up (state:loaded) — the UI's
+   *  "While you were away" card reads it right after load. */
+  lastOfflineGifts = 0;
+
   constructor(
     private state: GameState,
     private bus: EventBus,
@@ -27,6 +37,34 @@ export class GeneratorSystem {
     bus.on('generator:set_timer', ({ chain, tier, remainingMs }) =>
       this.setTimer(chain, tier, remainingMs)
     );
+    bus.on('state:loaded', ({ offlineMs }) => this.bankOffline(offlineMs));
+  }
+
+  /** Offline harvest: each passive producer pays up to OFFLINE_BANK_CYCLES
+   *  overdue gifts on load — a small waiting harvest, never a flood
+   *  (MECHANICS §4.3: "you return to a small harvest waiting"). */
+  private bankOffline(offlineMs: number): void {
+    this.lastOfflineGifts = 0;
+    if (offlineMs <= 0) return;
+    const now = this.clock.now();
+    for (const item of [...this.state.items.values()]) {
+      if (item.kind !== 'item') continue;
+      const generator = this.generatorConfig(item.chain, item.tier);
+      if (!generator?.passiveMs || !generator.produces) continue;
+      if (item.passiveAt === undefined || now < item.passiveAt) continue;
+      const overdue = Math.min(
+        OFFLINE_BANK_CYCLES,
+        Math.floor((now - item.passiveAt) / generator.passiveMs) + 1
+      );
+      for (let i = 0; i < overdue; i++) {
+        const target: TilePos | undefined = this.dropTileFor(item);
+        if (!target) break; // board full — the live retry loop takes over
+        const output = this.produceItem(generator, target, now);
+        this.lastOfflineGifts++;
+        this.bus.emit('item:produced', { generatorId: item.id, output: this.state.snapshot(output, now) });
+      }
+      item.passiveAt = now + generator.passiveMs;
+    }
   }
 
   /** Tutorial staging: put the first generator of chain+tier into a wait with
@@ -113,12 +151,7 @@ export class GeneratorSystem {
       this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
       return;
     }
-    // Prefer an immediate neighbour; fall back to the nearest free active tile so
-    // out-of-zone fixtures (e.g. the crystal fixture at a non-playable position)
-    // can still drop produce somewhere reachable on the active board.
-    const target =
-      this.state.freeActiveNeighbors(item.col, item.row)[0] ??
-      this.state.freeActiveTilesNear(item.col, item.row)[0];
+    const target = this.dropTileFor(item);
     if (!target) {
       this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'no_space' });
       return;
@@ -128,6 +161,22 @@ export class GeneratorSystem {
     item.readyAt = now + generator.cooldownMs;
     const output = this.produceItem(generator, target, now);
     this.bus.emit('item:harvested', { generatorId: itemId, output: this.state.snapshot(output, now) });
+  }
+
+  /** Where a generator's produce may land: an adjacent tile, else a NEARBY
+   *  free active tile (REWARD_SPAWN_RADIUS — a crowded neighbourhood blocks
+   *  the drop rather than teleporting it across the map). Out-of-zone fixtures
+   *  (the crystal at a non-active cell) keep the unbounded search: their whole
+   *  neighbourhood is non-active, and their produce must reach the board.
+   */
+  private dropTileFor(item: BoardItemState): TilePos | undefined {
+    return (
+      this.state.freeActiveNeighbors(item.col, item.row)[0] ??
+      this.state.freeActiveTilesNear(item.col, item.row, REWARD_SPAWN_RADIUS)[0] ??
+      (!this.state.isTileActive(item.col, item.row)
+        ? this.state.freeActiveTilesNear(item.col, item.row)[0]
+        : undefined)
+    );
   }
 
   /** Every generator with a `passiveMs` pays out when its timer is due — an item
@@ -151,10 +200,8 @@ export class GeneratorSystem {
         continue;
       }
 
-      // Item producer: prefer a neighbour; otherwise the nearest free active tile.
-      const target: TilePos | undefined =
-        this.state.freeActiveNeighbors(item.col, item.row)[0] ??
-        this.state.freeActiveTilesNear(item.col, item.row)[0];
+      // Item producer: nearby tiles only (see dropTileFor).
+      const target: TilePos | undefined = this.dropTileFor(item);
       if (!target) {
         item.passiveAt = now + GENERATOR_PASSIVE_RETRY_MS; // board full — try again soon
         continue;

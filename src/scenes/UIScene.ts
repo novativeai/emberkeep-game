@@ -1,17 +1,26 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
+  ATMOSPHERE,
   ENERGY_REGEN_MS,
+  FINALE,
   GAME_WIDTH,
+  GOLDEN_ALTAR,
+  GOLDEN_TREMBLE_PROGRESS,
+  IS_MOBILE,
   LEVELUP_REWARD,
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
-  SCENES
+  SCENES,
+  UI_SCALE,
+  WELCOME_BACK_MIN_MS
 } from '../core/Constants';
 import { gridToWorld } from '../core/iso';
 import type { ResolvedArrow, ResolvedHand, TilePos, TutorialStepEvent } from '../core/types';
 import { CharacterBubble } from '../entities/CharacterBubble';
+import { BeyondDemoPanel } from '../ui/BeyondDemoPanel';
+import { CookbookPanel } from '../ui/CookbookPanel';
 import { EndScreen } from '../ui/EndScreen';
 import { Hud } from '../ui/Hud';
 import { LedgerPanel } from '../ui/LedgerPanel';
@@ -23,6 +32,8 @@ import { ShopPanel } from '../ui/ShopPanel';
 import { StokeMeter } from '../ui/StokeMeter';
 import { renderScale } from '../core/render-scale';
 import { getMusicMuted, setMusicMuted } from '../audio/musicPref';
+import { CustomUiManager } from '../ui/customUi';
+import { uiRegistry } from '../ui/theme';
 import { Tooltip } from '../ui/Tooltip';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
@@ -30,6 +41,10 @@ const DEPTH_HUD = 10;
 const DEPTH_PANEL = 60;
 const DEPTH_TUTORIAL = 100;
 const DEPTH_DIALOG = 200;
+// On-screen heights (2560-space) for the tutorial pointer/arrow. The real art
+// loads at its native pixel size, so each is scaled to these.
+const HAND_MARKER_H = 172;
+const ARROW_MARKER_H = 148;
 
 /**
  * Runs in parallel above BoardScene: HUD, tooltip, Cindra's Ledger, the
@@ -48,7 +63,17 @@ export class UIScene extends Phaser.Scene {
   private duelButton!: DuelButton;
   private duelPanel!: DuelPanel;
   private dragonGauges!: DragonGauges;
+  private cookbook!: CookbookPanel;
+  private cookbookButton!: Phaser.GameObjects.Container;
+  private cookbookDot!: Phaser.GameObjects.Arc;
   private bubble!: CharacterBubble;
+  /** The Level-3 finale is running — suppress competing banners. */
+  private finaleActive = false;
+  /** One-shot Laurah nudges (per session). */
+  private hintShown = new Set<string>();
+  /** Active recipe mini-tutorial (`chain:from>to`), if one is demonstrating. */
+  private recipeHint: string | null = null;
+  private recipeHintTimer: Phaser.Time.TimerEvent | null = null;
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
   private dialog: Phaser.GameObjects.Container | null = null;
@@ -65,6 +90,15 @@ export class UIScene extends Phaser.Scene {
   private arrowAnchor: (() => { x: number; y: number } | null) | null = null;
   private arrowLift = 128;
   private arrowBob = { v: 0 };
+  private handBob = { v: 0 }; // tap-press offset for the point gesture
+  // Real art loads at native pixel size — markers scale to a fixed screen
+  // height, and every pulse/squash tween works RELATIVE to these bases (an
+  // absolute `scale: 1` would balloon the 480px gauntlet to full size).
+  private handBaseScale = 1;
+  private arrowBaseScale = 1;
+  // Looping marker tween-chains (bounce cycles); destroyed on every step
+  // change — killTweensOf alone doesn't reliably reach chain children.
+  private markerFx: Phaser.Tweens.TweenChain[] = [];
 
   constructor() {
     super(SCENES.ui);
@@ -73,6 +107,8 @@ export class UIScene extends Phaser.Scene {
   create(): void {
     this.ctx = this.registry.get('ctx') as GameContext;
     this.cameras.main.setOrigin(0).setZoom(renderScale.value); // paint the 2560-space UI into the hi-DPI backing
+
+    this.buildVignette(); // warm finishing grade under the HUD, over the board
 
     this.hud = new Hud(this, this.ctx.bus, this.ctx.state, {
       onLedger: () => (this.ledger.isOpen ? this.ledger.requestClose() : this.ledger.open()),
@@ -84,13 +120,13 @@ export class UIScene extends Phaser.Scene {
     this.tooltip = new Tooltip(this, this.ctx.bus, this.ctx.data.chains);
     this.tooltip.setDepth(DEPTH_PANEL - 5);
 
-    this.ledger = new LedgerPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.orders);
+    this.ledger = new LedgerPanel(this, this.ctx.bus, this.ctx.systems.order, this.ctx.systems.tasks, this.ctx.state);
     this.ledger.setDepth(DEPTH_PANEL);
 
-    this.shop = new ShopPanel(this, this.ctx.bus);
+    this.shop = new ShopPanel(this, this.ctx.bus, this.ctx.state);
     this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
 
-    // Milestone "gift" — a round 🎁 button (bottom-right) that unfolds the quest
+    // Milestone "gift" — a round button (bottom-right) that unfolds the quest
     // field to its left when tapped.
     this.milestoneGift = new MilestoneGift(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 344);
     this.milestoneGift.setDepth(DEPTH_HUD);
@@ -110,17 +146,34 @@ export class UIScene extends Phaser.Scene {
     this.dragonGauges = new DragonGauges(this, this.ctx.bus, 176, LIVE_GAME_HEIGHT - 150);
     this.dragonGauges.setDepth(DEPTH_HUD);
 
+    // Cindra's Cookbook — the recipe/discovery panel + its HUD button (main).
+    this.cookbook = new CookbookPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
+    this.cookbook.setDepth(DEPTH_PANEL + 4);
+    this.cookbookButton = this.buildCookbookButton();
+
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
     // cover, over the empty bottom-right margin during tutorial steps.
     this.bubble.setPosition(GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
     this.bubble.setDepth(DEPTH_TUTORIAL);
+    this.bubble.registerUi();
 
     this.hand = this.add.image(0, 0, 'ui_hand').setDepth(DEPTH_TUTORIAL + 2).setVisible(false);
-    const [hx, hy] = this.ctx.data.anchors.byKey['ui_hand'] ?? [0.3, 0.12];
+    // A replaced hand/arrow (UI Builder upload) may carry its own anchor so the
+    // fingertip / arrow tip still lands exactly on the guided target.
+    const [hx, hy] =
+      uiRegistry.replacementAnchor('ui_hand') ?? this.ctx.data.anchors.byKey['ui_hand'] ?? [0.3, 0.12];
     this.hand.setOrigin(hx, hy);
+    // The real gauntlet/arrow art loads at its native pixel size; scale each to a
+    // fixed on-screen height (2560-space) so the markers read like tutorial
+    // pointers regardless of source resolution.
+    this.handBaseScale = HAND_MARKER_H / this.hand.height;
+    this.hand.setScale(this.handBaseScale);
     this.arrow = this.add.image(0, 0, 'ui_arrow').setDepth(DEPTH_TUTORIAL + 1).setVisible(false);
-    this.arrow.setOrigin(0.5, 1);
+    const [ax, ay] = uiRegistry.replacementAnchor('ui_arrow') ?? this.ctx.data.anchors.byKey['ui_arrow'] ?? [0.5, 1];
+    this.arrow.setOrigin(ax, ay);
+    this.arrowBaseScale = ARROW_MARKER_H / this.arrow.height;
+    this.arrow.setScale(this.arrowBaseScale);
 
     // Close the tooltip on taps that land outside it.
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -142,10 +195,14 @@ export class UIScene extends Phaser.Scene {
       // Clean up UI-class bus subscriptions (not tracked in offBus above).
       this.hud.teardown();
       this.ledger.teardown();
+      this.cookbook.teardown();
     });
 
     // If resuming from a completed-tutorial save, key pill is permanently hidden.
     if (this.ctx.state.tutorialDone) this.hud.setKeyVisible(false);
+
+    // Tool-authored components (ui-theme.json `custom`) — part of the real UI.
+    new CustomUiManager(this).buildAll();
 
     // Everything is wired: load the save (or start fresh) and roll the tutorial.
     this.ctx.beginRun();
@@ -165,7 +222,7 @@ export class UIScene extends Phaser.Scene {
         );
       } else if (this.handPoint) {
         const p = this.handPoint();
-        if (p) this.hand.setPosition(p.x, p.y);
+        if (p) this.hand.setPosition(p.x, p.y + this.handBob.v);
       }
     }
     if (this.arrow.visible && this.arrowAnchor) {
@@ -208,13 +265,18 @@ export class UIScene extends Phaser.Scene {
     this.offBus.push(
       bus.on('tutorial:step', (step) => this.onTutorialStep(step)),
       bus.on('ui:ledger_toggled', () => {
+        // applyMarkers() below wipes ALL markers — retire an active recipe
+        // demonstration cleanly rather than leaving its state half-cleared.
+        this.clearRecipeHint();
         if (this.lastStep) this.applyMarkers(this.lastStep);
         this.tooltip.close();
       }),
       bus.on('item:tapped', ({ itemId }) => this.maybeShowTooltip(itemId)),
       bus.on('item:removed', ({ itemId }) => {
         if (this.tooltip.openItemId === itemId) this.tooltip.close();
+        this.refreshRecipeHint();
       }),
+      bus.on('item:moved', () => this.refreshRecipeHint()),
       bus.on('item:merged', (payload) => {
         this.tooltip.close();
         // A fresh Flame Gem flies toward the Ledger (where the magic happens) —
@@ -222,18 +284,68 @@ export class UIScene extends Phaser.Scene {
         if (payload.chain === 'flame_gem' && payload.resultTier === 2) {
           this.flyGemToLedger(payload.at, payload.resultTier);
         }
+        // A merge may have completed a 2→1 pair (2nd Dragon, 2nd House) — let
+        // the pop settle, then offer the recipe demonstration.
+        this.time.delayedCall(700, () => this.checkRecipeHints());
       }),
-      bus.on('gold:collected', ({ at }) => this.flyCoinToGold(at)),
+      bus.on('gold:collected', ({ at, coins }) => this.flyCoinToGold(at, coins ?? 1)),
       bus.on('ui:shop_requested', ({ currency }) => {
         if (!(this.lastStep?.done || (this.lastStep?.allow.marketplace ?? false))) return;
         this.shop.open(currency);
       }),
-      bus.on('order:completed', () => {
+      bus.on('order:completed', ({ orderId, rewards }) => {
         this.time.delayedCall(650, () => {
           if (this.ledger.isOpen && this.lastStep?.gateType === 'tap') this.ledger.requestClose();
         });
+        this.celebrateOrder(orderId, rewards);
       }),
       bus.on('keeper:leveled', ({ level }) => this.celebrateLevelUp(level)),
+      bus.on('tasks:all_complete', () => this.celebrateTasksComplete()),
+      bus.on('energy:changed', ({ current }) => {
+        if (current === 0) this.showHint('zeroWarmth');
+      }),
+      bus.on('economy:changed', () => {
+        // "The egg — look at the egg!" — fires once, when the altar egg exists
+        // and Level 3 is close enough that it has started trembling.
+        const [gained, span] = this.ctx.state.levelProgress;
+        if (
+          this.ctx.state.level === 2 &&
+          gained / span >= GOLDEN_TREMBLE_PROGRESS &&
+          this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId)
+        ) {
+          this.showHint('eggTrembles');
+        }
+      }),
+      bus.on('item:harvest_failed', ({ reason }) => {
+        if (reason === 'no_space') this.showHint('boardFull');
+      }),
+      bus.on('state:loaded', ({ offlineMs, energyRecovered }) => {
+        this.maybeWelcomeBack(offlineMs, energyRecovered);
+        // A returning save may already hold a ready 2→1 pair.
+        this.time.delayedCall(2500, () => this.checkRecipeHints());
+      }),
+      bus.on('tutorial:step', (step) => {
+        // Appears for its tutorial introduction, then permanently post-tutorial.
+        this.cookbookButton.setVisible(step.done || step.allow.cookbook);
+        // Safety net only — the cookbook_close step has the player close the
+        // book themselves; any later step that disallows it just shuts it.
+        if (!step.done && !step.allow.cookbook && this.cookbook.isOpen) {
+          this.cookbook.requestClose();
+        }
+      }),
+      bus.on('cookbook:discovered', ({ chain, fromTier, resultTier }) => {
+        // The demonstrated recipe was performed — retire the guiding hand.
+        if (`${chain}:${fromTier}>${resultTier}` === this.recipeHint) this.clearRecipeHint();
+        if (!this.ctx.state.tutorialDone || this.cookbook.isOpen) return;
+        this.cookbookDot.setVisible(true);
+        this.tweens.add({
+          targets: this.cookbookButton,
+          scale: { from: 1, to: 1.16 },
+          duration: 140,
+          yoyo: true,
+          ease: 'Sine.easeOut'
+        });
+      }),
       bus.on('game:reset', () => {
         this.endScreen?.destroy();
         this.endScreen = null;
@@ -241,6 +353,40 @@ export class UIScene extends Phaser.Scene {
         this.scene.start(SCENES.title);
       })
     );
+  }
+
+  /** Emberkeep Cookbook button — sits directly above the Ledger (quest)
+   *  button; hidden during the tutorial. The lava dot marks new pages. */
+  private buildCookbookButton(): Phaser.GameObjects.Container {
+    // Bottom-right, stacked above the Ledger; magnified + lifted clear of it on mobile.
+    const button = this.add
+      .container(GAME_WIDTH - (IS_MOBILE ? 190 : 156), LIVE_GAME_HEIGHT - (IS_MOBILE ? 560 : 356))
+      .setScale(UI_SCALE)
+      .setDepth(DEPTH_HUD);
+    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.05);
+    const icon = this.textures.exists('ui_icon_cookbook')
+      ? this.add.image(0, -6, 'ui_icon_cookbook').setDisplaySize(100, 100)
+      : this.add.text(0, -8, '📖', { fontSize: '56px' }).setOrigin(0.5);
+    this.cookbookDot = this.add
+      .circle(46, -46, 16, num(PALETTE.lava))
+      .setStrokeStyle(5, num(PALETTE.cream))
+      .setVisible(false);
+    button.add([bg, icon, this.cookbookDot]);
+    button.setSize(134, 134);
+    button.setInteractive({ useHandCursor: true });
+    button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
+    button.on('pointerout', () => button.setScale(UI_SCALE));
+    button.on('pointerup', () => {
+      if (!(this.lastStep?.done ?? this.ctx.state.tutorialDone) && !(this.lastStep?.allow.cookbook ?? false)) return;
+      if (this.cookbook.isOpen) {
+        this.cookbook.requestClose();
+      } else {
+        this.cookbookDot.setVisible(false);
+        this.cookbook.open();
+      }
+    });
+    button.setVisible(this.ctx.state.tutorialDone);
+    return button;
   }
 
   /** Cosmetic: a Flame Gem arcs from the merge cell into the Ledger button and
@@ -280,43 +426,302 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  /** A tapped Gold coin arcs from its board cell up to the Gold gauge, then the
-   *  gauge bumps — smooth appearance + collection juice. */
-  private flyCoinToGold(at: TilePos): void {
+  /** Tapped Gold arcs from its board cell up to the Gold gauge — one coin
+   *  sprite per banked coin (the Pouch sends 3), staggered so each arrival
+   *  lands separately and pulses the gauge on impact. */
+  private flyCoinToGold(at: TilePos, count = 1): void {
     const start = this.cellToScreen(at.col, at.row);
     const end = this.hud.getCoinPos();
-    const coin = this.add
-      .image(start.x, start.y - 30, 'item_coin_1')
-      .setScale(0.16)
-      .setDepth(DEPTH_PANEL + 5);
-    coin.setScale(0.05);
-    this.tweens.add({ targets: coin, scale: 0.16, duration: 160, ease: 'Back.easeOut' });
-    const proxy = { t: 0 };
-    this.tweens.add({
-      targets: proxy,
-      t: 1,
-      duration: 560,
-      delay: 150,
-      ease: 'Sine.easeIn',
-      onUpdate: () => {
-        const t = proxy.t;
-        coin.x = Phaser.Math.Linear(start.x, end.x, t);
-        coin.y = Phaser.Math.Linear(start.y - 30, end.y, t) - Math.sin(Math.PI * t) * 120;
-        coin.rotation = t * Math.PI * 1.5;
-        coin.setScale(0.16 * (1 - 0.45 * t));
-      },
-      onComplete: () => {
-        coin.destroy();
-        this.hud.bumpCoin();
-      }
-    });
+    for (let i = 0; i < count; i++) {
+      const coin = this.add
+        .image(start.x, start.y - 30, 'item_coin_1')
+        .setScale(0.05)
+        .setAlpha(0) // invisible until its turn in the stagger
+        .setDepth(DEPTH_PANEL + 5);
+      this.tweens.add({ targets: coin, scale: 0.16, alpha: 1, duration: 160, delay: i * 220, ease: 'Back.easeOut' });
+      const proxy = { t: 0 };
+      this.tweens.add({
+        targets: proxy,
+        t: 1,
+        duration: 560,
+        delay: 150 + i * 220, // stagger: each coin rises after the previous one
+        ease: 'Sine.easeIn',
+        onUpdate: () => {
+          const t = proxy.t;
+          coin.x = Phaser.Math.Linear(start.x, end.x, t);
+          coin.y = Phaser.Math.Linear(start.y - 30, end.y, t) - Math.sin(Math.PI * t) * 120;
+          coin.rotation = t * Math.PI * 1.5;
+          coin.setScale(0.16 * (1 - 0.45 * t));
+        },
+        onComplete: () => {
+          coin.destroy();
+          this.hud.bumpCoin(); // one gauge pulse PER arriving coin
+        }
+      });
+    }
   }
 
   /** The level-up reward beat: a warm banner — Warmth refilled + Gold. Deferred a
    *  frame: keeper:leveled can fire mid bus-emit (even from an external trigger),
-   *  and allocating Text/particles right then can hit a not-yet-ready canvas. */
+   *  and allocating Text/particles right then can hit a not-yet-ready canvas.
+   *  Level 3 takes the FINALE path instead (no banner — the screen holds while
+   *  the Golden Egg cracks; DEMO-PLAN §THE FINALE). */
   private celebrateLevelUp(level: number): void {
+    if (level >= 3) {
+      this.time.delayedCall(0, () => this.runFinaleUi());
+      return;
+    }
     this.time.delayedCall(0, () => this.buildLevelUpBanner(level));
+  }
+
+  /**
+   * UIScene's half of the Level-3 finale timeline (BoardScene runs the board
+   * half off the same keeper:leveled beat): Cindra speaks — for the first time
+   * in the entire demo — then the Chapter One card.
+   */
+  private runFinaleUi(): void {
+    if (this.finaleActive || this.endScreen) return;
+    this.finaleActive = true;
+    this.clearRecipeHint(); // the finale owns the stage — no competing pointers
+    this.ledger.requestClose();
+    this.shop.requestClose();
+    this.cookbook.requestClose();
+    this.time.delayedCall(FINALE.cindraAtMs, () => {
+      // No egg earned (Order 1 skipped)? Her line reads as PROPHECY — selling
+      // the promise the player hasn't collected yet, never claiming an
+      // awakening that didn't happen.
+      const eggEarned = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
+      this.bubble.say(
+        'cindra',
+        eggEarned ? this.ctx.data.dialogue.finaleCindra : this.ctx.data.dialogue.finaleCindraProphecy,
+        FINALE.cindraHoldMs
+      );
+    });
+    this.time.delayedCall(FINALE.cardAtMs, () => {
+      this.finaleActive = false;
+      if (this.endScreen) return;
+      const showCard = (): void => {
+        if (this.endScreen || !this.scene.isActive()) return;
+        this.endScreen = new EndScreen(this, 'chapter');
+        this.add.existing(this.endScreen);
+        this.endScreen.setDepth(DEPTH_DIALOG + 50);
+        this.endScreen.once(Phaser.GameObjects.Events.DESTROY, () => {
+          this.endScreen = null;
+        });
+      };
+      // "Beyond the demo" is the ending's HEADLINE — it leads, unprompted, so
+      // no session finishes without seeing it; the Chapter One card (its home,
+      // which keeps the reopen button) follows when the player closes it.
+      // Without the trailer art there is nothing to headline — straight to card.
+      if (this.textures.exists('trailer_world_ice') || this.textures.exists('trailer_legend_frost')) {
+        const panel = new BeyondDemoPanel(this);
+        panel.setDepth(DEPTH_DIALOG + 50);
+        panel.once(Phaser.GameObjects.Events.DESTROY, showCard);
+      } else {
+        showCard();
+      }
+    });
+  }
+
+  /** Order completion — the demo's primary reward beat — now celebrates at
+   *  level-up parity: banner + spark burst + a rotating Cindra quote stamped on
+   *  the card (her VOICE stays reserved for the finale). The golden order gets
+   *  its own beats: a dedicated arrival quote, and — delivered after Level 3 —
+   *  Cindra SPEAKS over the late awakening playing out at the altar. */
+  private celebrateOrder(orderId: string, rewards: { coins: number; keys: number; xp?: number }): void {
+    if (this.finaleActive || !this.ctx.state.tutorialDone) return;
+    const golden = orderId === GOLDEN_ALTAR.orderId;
+    this.time.delayedCall(0, () => {
+      const quotes = this.ctx.data.dialogue.orderComplete;
+      const quote = golden
+        ? this.ctx.data.dialogue.goldenArrival
+        : quotes[(this.ctx.state.completedOrderIds.length - 1) % quotes.length] ?? '';
+      const parts: string[] = [];
+      if (rewards.coins) parts.push(`◎ +${rewards.coins} Gold`);
+      if (rewards.xp) parts.push(`✦ +${rewards.xp} XP`);
+      this.buildCelebrationBanner('ORDER COMPLETE', parts.join('    '), quote);
+    });
+    if (golden && this.ctx.state.level >= 3) {
+      // BoardScene's lateGoldenAwakening cracks the egg at ~2.4s — her line
+      // lands right as the Elder rises.
+      this.time.delayedCall(3200, () => {
+        this.bubble.say('cindra', this.ctx.data.dialogue.lateAwakening, 4600);
+      });
+    }
+  }
+
+  private celebrateTasksComplete(): void {
+    this.time.delayedCall(0, () => {
+      this.buildCelebrationBanner('EVERY TASK COMPLETE', '◎ Gold  ⚡ Warmth — a golden thank-you', '');
+      this.bubble.say('cindra', this.ctx.data.dialogue.tasksComplete, 5200);
+    });
+  }
+
+  /** Shared warm banner (order complete / tasks complete) — the level-up
+   *  banner's language, one tier smaller. */
+  private buildCelebrationBanner(title: string, rewardLine: string, quote: string): void {
+    const cx = GAME_WIDTH / 2;
+    const cy = LIVE_GAME_HEIGHT * 0.3;
+    const height = quote ? 236 : 180;
+    const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);
+    const g = this.add.graphics();
+    g.fillStyle(num(PALETTE.night), 0.22);
+    g.fillRoundedRect(-390, -height / 2 + 10, 780, height, 30);
+    g.fillStyle(num(PALETTE.lava), 1);
+    g.fillRoundedRect(-390, -height / 2, 780, height, 30);
+    g.fillStyle(0xfffdf6, 1);
+    g.fillRoundedRect(-378, -height / 2 + 12, 756, height - 24, 24);
+    const ribbon = this.add
+      .text(0, -height / 2 + 58, title, {
+        fontFamily: FONT, fontSize: '48px', fontStyle: 'bold', color: PALETTE.textBrown
+      })
+      .setOrigin(0.5)
+      .setStroke(PALETTE.cream, 5);
+    const sub = this.add
+      .text(0, -height / 2 + 122, rewardLine, {
+        fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: PALETTE.goldShade
+      })
+      .setOrigin(0.5);
+    c.add([g, ribbon, sub]);
+    if (quote) {
+      c.add(
+        this.add
+          .text(0, -height / 2 + 182, quote, {
+            fontFamily: FONT, fontSize: '26px', fontStyle: 'italic', color: '#8A6248',
+            wordWrap: { width: 700 }, align: 'center'
+          })
+          .setOrigin(0.5)
+      );
+    }
+    this.add
+      .particles(cx, cy, 'fx_spark', {
+        speed: { min: 160, max: 420 }, angle: { min: 0, max: 360 }, gravityY: 240,
+        lifespan: { min: 450, max: 800 }, scale: { start: 0.8, end: 0 },
+        alpha: { start: 1, end: 0 }, quantity: 0, emitting: false
+      })
+      .setDepth(DEPTH_DIALOG - 6)
+      .explode(20);
+    this.tweens.add({ targets: c, alpha: 1, scale: { from: 0.84, to: 1 }, duration: 220, ease: 'Back.easeOut' });
+    this.tweens.add({
+      targets: c, alpha: 0, scale: 1.04, delay: 2100, duration: 340, ease: 'Sine.easeIn',
+      onComplete: () => c.destroy()
+    });
+  }
+
+  /** Warm dark vignette hugging the screen edges — the AAA finishing grade.
+   *  Painted once into a small canvas (radial falloff), stretched over the
+   *  viewport UNDER the HUD; linear filtering hides the low source res. */
+  private buildVignette(): void {
+    const KEY = 'fx_vignette';
+    if (!this.textures.exists(KEY)) {
+      const w = 256;
+      const h = 160;
+      const tex = this.textures.createCanvas(KEY, w, h);
+      if (!tex) return;
+      const c = tex.getContext();
+      // Elliptical radial falloff: fully clear across the middle ~70%, easing
+      // into the warm dark corners.
+      c.save();
+      c.translate(w / 2, h / 2);
+      c.scale(1, h / w);
+      const g = c.createRadialGradient(0, 0, w * 0.30, 0, 0, w * 0.62);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(0.72, 'rgba(42,14,18,0.45)');
+      g.addColorStop(1, ATMOSPHERE.vignette.color);
+      c.fillStyle = g;
+      c.fillRect(-w, -w, w * 2, w * 2);
+      c.restore();
+      tex.refresh();
+    }
+    this.add
+      .image(0, 0, KEY)
+      .setOrigin(0)
+      .setDisplaySize(GAME_WIDTH, LIVE_GAME_HEIGHT)
+      .setAlpha(ATMOSPHERE.vignette.alpha)
+      .setDepth(DEPTH_HUD - 1); // over the board render, under every UI element
+  }
+
+  /** One-shot Laurah nudge (post-tutorial guidance without a second tutorial). */
+  private showHint(key: keyof GameContext['data']['dialogue']['hints'], holdMs = 5200): void {
+    if (!this.ctx.state.tutorialDone || this.finaleActive || this.hintShown.has(key)) return;
+    this.hintShown.add(key);
+    this.bubble.say('laurah', this.ctx.data.dialogue.hints[key], holdMs);
+  }
+
+  /**
+   * Contextual recipe mini-tutorials: the moment the board first holds the TWO
+   * pieces of a 2→1 recipe (two Red Dragons → Adult, two Houses → Manor),
+   * Laurah teases the merge and the guiding gauntlet demonstrates the drag
+   * between the actual pieces. Purely presentational — nothing is gated, no
+   * input is blocked; it clears itself on discovery, timeout, or the finale.
+   */
+  private checkRecipeHints(): void {
+    if (!this.ctx.state.tutorialDone || this.finaleActive || this.recipeHint) return;
+    const candidates = [
+      { key: 'twoDragons', recipe: 'ember_dragon:3>4', chain: 'ember_dragon', tier: 3 },
+      { key: 'twoHouses', recipe: 'lumber:2>3', chain: 'lumber', tier: 2 }
+    ] as const;
+    for (const c of candidates) {
+      if (this.hintShown.has(c.key)) continue;
+      if (this.ctx.state.discoveredRecipes.includes(c.recipe)) continue; // already learned
+      const pieces = [...this.ctx.state.items.values()].filter(
+        (i) => i.kind === 'item' && i.chain === c.chain && i.tier === c.tier
+      );
+      if (pieces.length < 2) continue;
+      this.recipeHint = c.recipe;
+      this.showHint(c.key, 6500);
+      // The gauntlet demonstrates the exact drag: piece B onto piece A.
+      this.placeHand({
+        from: { col: pieces[1]!.col, row: pieces[1]!.row },
+        to: { col: pieces[0]!.col, row: pieces[0]!.row }
+      });
+      this.recipeHintTimer?.remove();
+      this.recipeHintTimer = this.time.delayedCall(9500, () => this.clearRecipeHint());
+      return; // one guided beat at a time
+    }
+  }
+
+  /** Stop the recipe demonstration (discovered / timed out / superseded). */
+  private clearRecipeHint(): void {
+    if (!this.recipeHint) return;
+    this.recipeHint = null;
+    this.recipeHintTimer?.remove();
+    this.recipeHintTimer = null;
+    this.clearMarkers();
+  }
+
+  /** The board changed under an active demonstration: re-aim the gauntlet at the
+   *  pair's CURRENT cells, or retire it if the pair no longer exists. */
+  private refreshRecipeHint(): void {
+    if (!this.recipeHint) return;
+    const [chain, tiers] = this.recipeHint.split(':') as [string, string];
+    const fromTier = Number(tiers.split('>')[0]);
+    const pieces = [...this.ctx.state.items.values()].filter(
+      (i) => i.kind === 'item' && i.chain === chain && i.tier === fromTier
+    );
+    if (pieces.length < 2) {
+      this.clearRecipeHint(); // sold/consumed — the discovery handler covers the merge case
+      return;
+    }
+    this.placeHand({
+      from: { col: pieces[1]!.col, row: pieces[1]!.row },
+      to: { col: pieces[0]!.col, row: pieces[0]!.row }
+    });
+  }
+
+  /** "While you were away" — consumes the load payload nothing used to read:
+   *  recovered Warmth + the passive gifts GeneratorSystem banked offline. */
+  private maybeWelcomeBack(offlineMs: number, energyRecovered: number): void {
+    if (offlineMs < WELCOME_BACK_MIN_MS || !this.ctx.state.tutorialDone) return;
+    const gifts = this.ctx.systems.generator.lastOfflineGifts;
+    if (energyRecovered <= 0 && gifts <= 0) return;
+    const parts: string[] = [];
+    if (energyRecovered > 0) parts.push(`⚡ +${energyRecovered} Warmth`);
+    if (gifts > 0) parts.push(`🎁 ${gifts} gift${gifts > 1 ? 's' : ''} from your dragons`);
+    this.time.delayedCall(600, () => {
+      if (this.finaleActive) return;
+      this.buildCelebrationBanner('WHILE YOU WERE AWAY', parts.join('    '), '');
+    });
   }
 
   private buildLevelUpBanner(level: number): void {
@@ -376,16 +781,7 @@ export class UIScene extends Phaser.Scene {
       targets: c, alpha: 0, scale: 1.04, delay: 1500, duration: 360, ease: 'Sine.easeIn',
       onComplete: () => c.destroy()
     });
-    // Level 3 is the demo's milestone — show the end-game popup after the banner fades.
-    if (level >= 3 && !this.endScreen) {
-      this.time.delayedCall(2200, () => {
-        if (!this.endScreen) {
-          this.endScreen = new EndScreen(this, 'level3');
-          this.add.existing(this.endScreen);
-          this.endScreen.setDepth(DEPTH_DIALOG + 50);
-        }
-      });
-    }
+    // (Level 3 never reaches here — celebrateLevelUp routes it to the finale.)
   }
 
   private onTutorialStep(step: TutorialStepEvent): void {
@@ -410,6 +806,12 @@ export class UIScene extends Phaser.Scene {
     const item = this.ctx.state.items.get(itemId);
     if (!item || item.kind !== 'item') return;
     if (item.readyAt !== undefined) return; // generators harvest instead
+    // Story items (Golden Egg/Elder) are unsellable — no tooltip; the board
+    // plays their own tap beat instead.
+    const tier = this.ctx.data.chains.chains
+      .find((c) => c.id === item.chain)
+      ?.tiers.find((t) => t.tier === item.tier);
+    if (tier?.sellable === false) return;
     if (!this.ctx.state.tutorialDone && !(this.lastStep?.allow.sell ?? false)) return;
     const { x, y } = this.cellToScreen(item.col, item.row);
     this.tooltip.openFor(itemId, item.chain, item.tier, x, y - 116);
@@ -440,10 +842,18 @@ export class UIScene extends Phaser.Scene {
   }
 
   private clearMarkers(): void {
+    for (const chain of this.markerFx) chain.destroy();
+    this.markerFx = [];
     this.tweens.killTweensOf(this.hand);
     this.tweens.killTweensOf(this.arrow);
     this.tweens.killTweensOf(this.handProg);
     this.tweens.killTweensOf(this.arrowBob);
+    this.tweens.killTweensOf(this.handBob);
+    // Reset transforms a bounce cycle may have left mid-flight.
+    this.hand.setScale(this.handBaseScale).setAngle(0);
+    this.arrow.setScale(this.arrowBaseScale);
+    this.handBob.v = 0;
+    this.arrowBob.v = 0;
     this.hand.setVisible(false);
     this.arrow.setVisible(false);
     this.handDrag = null;
@@ -451,18 +861,39 @@ export class UIScene extends Phaser.Scene {
     this.arrowAnchor = null;
   }
 
-  private applyMarkers(step: TutorialStepEvent): void {
-    this.clearMarkers();
-    if (step.hand) this.placeHand(step.hand);
-    if (step.arrow) this.placeArrow(step.arrow);
+  /** Register a looping marker tween-chain so clearMarkers() can destroy it.
+   *  (Targets are stamped onto each child tween — the chain type wants them.) */
+  private markerChain(cfg: {
+    targets: object;
+    loop?: number;
+    loopDelay?: number;
+    tweens: Array<Omit<Phaser.Types.Tweens.TweenBuilderConfig, 'targets'>>;
+  }): void {
+    this.markerFx.push(
+      this.tweens.chain({
+        ...cfg,
+        tweens: cfg.tweens.map((t) => ({ ...t, targets: cfg.targets }))
+      })
+    );
   }
 
-  private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' } | { fogRegion: string }): { x: number; y: number } | null {
+  private applyMarkers(step: TutorialStepEvent): void {
+    this.clearMarkers();
+    // The gauntlet demonstrates ACTIONS (drags); the arrow points at static
+    // targets. They are mutually exclusive — a step defining both shows only
+    // the hand (data should define exactly one).
+    if (step.hand) this.placeHand(step.hand);
+    else if (step.arrow) this.placeArrow(step.arrow);
+  }
+
+  private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' } | { fogRegion: string }): { x: number; y: number } | null {
     if ('ui' in ref) {
       // The ⚡+ button until the Emporium opens, then the FREE! card inside it —
       // handPoint/arrowAnchor re-evaluate each frame, so the marker follows live.
-      if (ref.ui === 'marketplace') return this.shop.getFreeButtonPos() ?? { x: 374, y: 88 };
+      if (ref.ui === 'marketplace') return this.shop.getFreeButtonPos() ?? this.hud.getEnergyPlusPos();
       if (ref.ui === 'ledger') return this.hud.getLedgerPos();
+      if (ref.ui === 'cookbook') return { x: this.cookbookButton.x, y: this.cookbookButton.y };
+      if (ref.ui === 'cookbook_close') return this.cookbook.isOpen ? this.cookbook.getClosePos() : null;
       return this.ledger.isOpen ? this.ledger.getDeliverPos() : null;
     }
     const region = this.ctx.data.map.regions.find((r) => r.id === ref.fogRegion);
@@ -485,21 +916,30 @@ export class UIScene extends Phaser.Scene {
       // the camera. (Alpha still fades on the hand itself; that's screen-space.)
       this.handDrag = { from: hand.from, to: hand.to };
       this.hand.setVisible(true);
+      const base = this.handBaseScale;
       const run = (): void => {
         if (!this.hand.visible) return;
         this.handProg.t = 0;
         this.hand.setAlpha(0);
+        // Puppet-style secondary motion: fade in slightly raised, PRESS down on
+        // the item (squash), tilt back while pulling, then a springy settle.
+        this.hand.setScale(base * 1.08).setAngle(-5);
         this.tweens.add({
           targets: this.hand,
           alpha: 1,
-          duration: 200,
+          scale: base,
+          duration: 240,
+          ease: 'Back.easeOut',
           onComplete: () => {
+            this.tweens.add({ targets: this.hand, angle: 4, duration: 950, ease: 'Sine.easeInOut' });
             this.tweens.add({
               targets: this.handProg,
               t: 1,
               duration: 950,
               ease: 'Sine.easeInOut',
               onComplete: () => {
+                // Release: tiny overshoot pop as the item "drops".
+                this.tweens.add({ targets: this.hand, angle: 0, scale: base * 1.05, duration: 200, ease: 'Back.easeOut' });
                 this.tweens.add({
                   targets: this.hand,
                   alpha: 0,
@@ -529,13 +969,29 @@ export class UIScene extends Phaser.Scene {
     this.hand.setVisible(true);
     this.hand.setAlpha(1);
     this.hand.setPosition(target.x, target.y);
-    this.tweens.add({
+    // Tap cycle, relative to the marker's BASE scale (absolute `scale: 1` was
+    // the old painted texture's natural size — it ballooned the real gauntlet
+    // art). Press in with a squash, release with a springy Back overshoot; the
+    // matching handBob dip makes it read as a physical tap, not a zoom.
+    const base = this.handBaseScale;
+    this.handBob.v = 0;
+    this.markerChain({
+      targets: this.handBob,
+      loop: -1,
+      loopDelay: 140,
+      tweens: [
+        { v: 14, duration: 260, ease: 'Quad.easeIn' },
+        { v: 0, duration: 430, ease: 'Back.easeOut' }
+      ]
+    });
+    this.markerChain({
       targets: this.hand,
-      scale: { from: 1, to: 0.88 },
-      duration: 420,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
+      loop: -1,
+      loopDelay: 140,
+      tweens: [
+        { scale: base * 0.9, duration: 260, ease: 'Quad.easeIn' },
+        { scale: base, duration: 430, ease: 'Back.easeOut' }
+      ]
     });
   }
 
@@ -557,14 +1013,34 @@ export class UIScene extends Phaser.Scene {
     this.arrow.setPosition(target.x, target.y - this.arrowLift);
     // Bob via a proxy so update() can re-anchor the arrow to its cell each frame
     // while it bobs (a tween writing arrow.y directly would fight re-projection).
+    // Puppet-style cycle: rise, then DROP toward the target with a tiny impact
+    // squash and a springy Back-eased recovery — subtle, but reads as weight.
     this.arrowBob.v = 0;
-    this.tweens.add({
+    const base = this.arrowBaseScale;
+    this.markerChain({
       targets: this.arrowBob,
-      v: -20,
-      duration: 430,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
+      loop: -1,
+      tweens: [
+        { v: -22, duration: 380, ease: 'Quad.easeOut' }, // rise
+        {
+          v: 0,
+          duration: 300,
+          ease: 'Quad.easeIn', // accelerate down…
+          onComplete: () => {
+            // …impact: brief squash, then spring back to shape.
+            this.tweens.add({
+              targets: this.arrow,
+              scaleX: base * 1.08,
+              scaleY: base * 0.9,
+              duration: 90,
+              yoyo: true,
+              ease: 'Quad.easeOut',
+              onComplete: () => this.arrow.setScale(base)
+            });
+          }
+        },
+        { v: 0, duration: 240 } // settle beat before the next hop
+      ]
     });
   }
 

@@ -15,6 +15,47 @@ const CLIFF_H = 50;
 type Ctx2D = CanvasRenderingContext2D;
 
 /**
+ * Color parameters of the themable ui_* chrome textures with their authored
+ * defaults. The UI Builder tool lists these; ui-theme.json overrides them and
+ * `regenerate()` repaints the texture IN PLACE (same key, same canvas) so
+ * every Image already wearing it updates without a respawn.
+ */
+/**
+ * 9-slice corner insets (TEXTURE pixels — the painters draw at logical×RES=2)
+ * for the stretchable chrome frames: with these, a frame keeps crisp corners
+ * and borders at ANY width×height (the promo-popup case in the UI Builder).
+ */
+export const UI_NINESLICE: Record<string, { l: number; r: number; t: number; b: number }> = {
+  ui_panel: { l: 100, r: 100, t: 90, b: 90 },
+  ui_card: { l: 80, r: 80, t: 80, b: 100 },
+  ui_pill: { l: 52, r: 52, t: 46, b: 46 },
+  ui_slot: { l: 36, r: 36, t: 36, b: 36 },
+  ui_btn_play: { l: 56, r: 56, t: 44, b: 64 },
+  ui_btn_green: { l: 52, r: 52, t: 40, b: 60 },
+  ui_btn_price: { l: 52, r: 52, t: 40, b: 60 },
+  ui_btn_free: { l: 52, r: 52, t: 40, b: 60 },
+  ui_shop_panel: { l: 130, r: 130, t: 120, b: 120 },
+  ui_shop_card: { l: 90, r: 90, t: 90, b: 110 }
+};
+
+export const UI_TEXTURE_PARAMS: Record<string, Record<string, string>> = {
+  ui_btn_play: { highlight: lighten(PALETTE.goldAccent, 0.15), base: PALETTE.gold, edge: PALETTE.goldShade },
+  ui_btn_green: { highlight: lighten(PALETTE.moss, 0.25), base: PALETTE.moss, edge: darken(PALETTE.mossShade, 0.1) },
+  ui_btn_round: { plate: PALETTE.goldShade, face: PALETTE.cream },
+  ui_panel: { border: PALETTE.lava, borderShade: PALETTE.lavaShade, fill: PALETTE.cream },
+  ui_card: { fill: '#FFFDF6', border: '#E8B98F', stitch: PALETTE.goldShade },
+  ui_pill: { fill: PALETTE.plumShade, border: PALETTE.gold },
+  ui_slot: { fill: '#EFE0C8', border: '#D9C2A0' },
+  // Ember Emporium (shop) chrome — trending merge-shop treatment.
+  ui_shop_panel: { rim: PALETTE.lava, rimShade: PALETTE.lavaShade, fill: PALETTE.cream },
+  ui_shop_card: { rim: PALETTE.gold, rimShade: PALETTE.goldShade, fill: '#FFFDF6' },
+  ui_shop_ribbon: { base: PALETTE.gold, edge: PALETTE.goldShade },
+  ui_shop_badge: { base: PALETTE.lava, edge: PALETTE.lavaShade },
+  ui_btn_price: { highlight: lighten(PALETTE.moss, 0.25), base: PALETTE.moss, edge: darken(PALETTE.mossShade, 0.1) },
+  ui_btn_free: { highlight: lighten(PALETTE.goldAccent, 0.2), base: PALETTE.gold, edge: PALETTE.goldShade }
+};
+
+/**
  * Track A art: every placeholder texture is painted at runtime with Canvas2D
  * in the Emberkeep palette — soft pseudo-3D shading (top-cap highlight, core
  * shadow, contact-friendly base) matching the Fairyland references. Real PNGs
@@ -22,11 +63,36 @@ type Ctx2D = CanvasRenderingContext2D;
  * changes needed.
  */
 export class TextureFactory {
+  /** ui-theme.json color overrides for the UI_TEXTURE_PARAMS chrome keys. */
+  private uiColors: Record<string, Record<string, string>> = {};
+  private forceRepaint = false;
+
   constructor(private scene: Phaser.Scene) {}
 
   generateAll(manifest: AssetsManifest): void {
     for (const entry of manifest.images) {
       if (entry.source === 'placeholder') this.generate(entry.key);
+    }
+  }
+
+  /** Install theme color overrides (call BEFORE generateAll, or regenerate after). */
+  setUiColors(colors: Record<string, Record<string, string>>): void {
+    this.uiColors = colors;
+  }
+
+  /** Resolved color param for a themable chrome texture. */
+  private uiColor(key: string, param: string): string {
+    return this.uiColors[key]?.[param] ?? UI_TEXTURE_PARAMS[key]?.[param] ?? '#FF00FF';
+  }
+
+  /** Repaint an existing canvas texture in place with the CURRENT ui colors —
+   *  the key and canvas survive, so every Image wearing it updates live. */
+  regenerate(key: string): void {
+    this.forceRepaint = true;
+    try {
+      this.generate(key);
+    } finally {
+      this.forceRepaint = false;
     }
   }
 
@@ -54,8 +120,6 @@ export class TextureFactory {
       case 'item_sparkweed_3': return this.sparkweed3(key);
       case 'item_ember_dragon_1': return this.egg(key);
       case 'item_golden_egg_1': return this.egg(key);
-      case 'item_ember_dragon_2': return this.dragon(key, false);
-      case 'item_ember_dragon_3': return this.dragon(key, true);
       case 'item_flame_gem_1': return this.gemShard(key);
       case 'item_flame_gem_2': return this.flameGem(key, false);
       case 'item_flame_gem_3': return this.flameGem(key, true);
@@ -64,18 +128,27 @@ export class TextureFactory {
       case 'fx_spark': return this.spark(key);
       case 'fx_glow': return this.glow(key);
       case 'fx_shell': return this.shell(key);
-      case 'ui_hand': return this.hand(key);
-      case 'ui_arrow': return this.arrow(key);
       case 'portrait_pip': return this.portraitPip(key);
       case 'portrait_cindra': return this.portraitCindra(key);
       case 'ui_tile_highlight': return this.tileHighlight(key);
-      case 'ui_btn_play': return this.button(key, 264, 96, lighten(P.goldAccent, 0.15), P.gold, P.goldShade);
-      case 'ui_btn_green': return this.button(key, 210, 76, lighten(P.moss, 0.25), P.moss, darken(P.mossShade, 0.1));
+      case 'ui_btn_play':
+        return this.button(key, 264, 96, this.uiColor(key, 'highlight'), this.uiColor(key, 'base'), this.uiColor(key, 'edge'));
+      case 'ui_btn_green':
+        return this.button(key, 210, 76, this.uiColor(key, 'highlight'), this.uiColor(key, 'base'), this.uiColor(key, 'edge'));
       case 'ui_btn_round': return this.roundButton(key);
       case 'ui_panel': return this.panel(key);
       case 'ui_card': return this.card(key);
       case 'ui_pill': return this.pill(key);
       case 'ui_slot': return this.slot(key);
+      case 'ui_shop_panel': return this.shopPanel(key);
+      case 'ui_shop_card': return this.shopCard(key);
+      case 'ui_shop_ribbon': return this.shopRibbon(key);
+      case 'ui_shop_badge': return this.shopBadge(key);
+      case 'ui_shop_burst': return this.shopBurst(key);
+      case 'ui_btn_price':
+        return this.button(key, 230, 66, this.uiColor(key, 'highlight'), this.uiColor(key, 'base'), this.uiColor(key, 'edge'));
+      case 'ui_btn_free':
+        return this.button(key, 230, 66, this.uiColor(key, 'highlight'), this.uiColor(key, 'base'), this.uiColor(key, 'edge'));
       case 'ui_icon_bolt': return this.iconBolt(key);
       case 'ui_icon_coin': return this.iconCoin(key);
       case 'ui_icon_key': return this.iconKey(key);
@@ -159,7 +232,21 @@ export class TextureFactory {
   }
 
   private paint(key: string, w: number, h: number, draw: (g: Ctx2D) => void): void {
-    if (this.scene.textures.exists(key)) return;
+    if (this.scene.textures.exists(key)) {
+      if (!this.forceRepaint) return;
+      // Live re-theme: clear and redraw the SAME canvas texture in place.
+      const tex = this.scene.textures.get(key);
+      if (!(tex instanceof Phaser.Textures.CanvasTexture)) return;
+      const g = tex.getContext();
+      g.save();
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, tex.width, tex.height);
+      g.scale(RES, RES);
+      draw(g);
+      g.restore();
+      tex.refresh();
+      return;
+    }
     // Paint in logical units, render at RES x for crisp hi-dpi output.
     const tex = this.scene.textures.createCanvas(key, w * RES, h * RES);
     if (!tex) return;
@@ -742,201 +829,6 @@ export class TextureFactory {
     });
   }
 
-  /** The chibi star of the show: hatchling (small, sitting) or whelp (taller, crest). */
-  private dragon(key: string, whelp: boolean): void {
-    this.paint(key, 96, 96, (g) => {
-      const cx = 48;
-      const baseY = 84;
-      const s = whelp ? 1.16 : 1;
-      const bodyY = whelp ? 62 : 66;
-      const headY = whelp ? 32 : 40;
-      const headR = (whelp ? 18.5 : 17.5) * s;
-      this.contactShadow(g, cx, baseY, whelp ? 28 : 25, 8.5);
-
-      const bodyGrad = (x: number, y: number, r: number): CanvasGradient => {
-        const grad = g.createRadialGradient(x - r * 0.42, y - r * 0.5, r * 0.15, x, y, r * 1.12);
-        grad.addColorStop(0, P.lavaHighlight);
-        grad.addColorStop(0.55, P.lava);
-        grad.addColorStop(1, darken(P.lavaShade, 0.08));
-        return grad;
-      };
-      const outline = withAlpha(darken(P.lavaShade, 0.32), 0.8);
-
-      // Tail curl (behind body).
-      g.lineWidth = 7 * s;
-      g.lineCap = 'round';
-      g.strokeStyle = P.lavaShade;
-      g.beginPath();
-      g.moveTo(cx + 12 * s, bodyY + 8);
-      g.quadraticCurveTo(cx + 30 * s, bodyY + 12, cx + 28 * s, bodyY - 4);
-      g.stroke();
-      g.fillStyle = P.gold;
-      this.teardrop(g, cx + 28 * s, bodyY - 4, 11 * s, 4.5 * s, 0.5);
-      g.fill();
-
-      // Wings (behind body): rounded gold triangles.
-      for (const side of [-1, 1]) {
-        g.save();
-        g.translate(cx + side * 16 * s, bodyY - 6);
-        g.rotate(side * (whelp ? 0.85 : 0.55));
-        const wing = g.createLinearGradient(0, -16 * s, 0, 4);
-        wing.addColorStop(0, P.goldAccent);
-        wing.addColorStop(0.6, P.gold);
-        wing.addColorStop(1, P.goldShade);
-        g.fillStyle = wing;
-        g.beginPath();
-        g.moveTo(0, 2);
-        g.quadraticCurveTo(side * 16 * s, -10 * s, side * 6 * s, -(whelp ? 22 : 16) * s);
-        g.quadraticCurveTo(side * 2, -8 * s, 0, 2);
-        g.closePath();
-        g.fill();
-        g.lineWidth = 1.4;
-        g.strokeStyle = withAlpha(P.goldShade, 0.9);
-        g.stroke();
-        g.restore();
-      }
-
-      // Body.
-      g.fillStyle = bodyGrad(cx, bodyY, 17 * s);
-      g.beginPath();
-      g.ellipse(cx, bodyY, 17 * s, (whelp ? 16.5 : 14) * s, 0, 0, Math.PI * 2);
-      g.fill();
-      g.lineWidth = 1.6;
-      g.strokeStyle = outline;
-      g.stroke();
-
-      // Feet stubs.
-      for (const side of [-1, 1]) {
-        g.fillStyle = P.lavaShade;
-        g.beginPath();
-        g.ellipse(cx + side * 9 * s, baseY - 3, 5.5 * s, 4 * s, 0, 0, Math.PI * 2);
-        g.fill();
-      }
-
-      // Belly.
-      const belly = g.createLinearGradient(0, bodyY - 8, 0, baseY);
-      belly.addColorStop(0, P.cream);
-      belly.addColorStop(1, darken(P.cream, 0.14));
-      g.fillStyle = belly;
-      g.beginPath();
-      g.ellipse(cx, bodyY + 4, 10 * s, (whelp ? 11 : 9) * s, 0, 0, Math.PI * 2);
-      g.fill();
-      g.strokeStyle = withAlpha(darken(P.cream, 0.35), 0.6);
-      g.lineWidth = 1.2;
-      for (const dy of [1, 5]) {
-        g.beginPath();
-        g.moveTo(cx - 6 * s, bodyY + 4 + dy);
-        g.quadraticCurveTo(cx, bodyY + 6.5 + dy, cx + 6 * s, bodyY + 4 + dy);
-        g.stroke();
-      }
-
-      // Head.
-      g.fillStyle = bodyGrad(cx, headY, headR);
-      g.beginPath();
-      g.arc(cx, headY, headR, 0, Math.PI * 2);
-      g.fill();
-      g.lineWidth = 1.6;
-      g.strokeStyle = outline;
-      g.stroke();
-
-      // Horns.
-      for (const side of [-1, 1]) {
-        const hx = cx + side * 7.5 * s;
-        const hy = headY - headR + 2;
-        const horn = g.createLinearGradient(hx, hy - 10, hx, hy);
-        horn.addColorStop(0, P.goldAccent);
-        horn.addColorStop(1, P.goldShade);
-        g.fillStyle = horn;
-        g.beginPath();
-        g.moveTo(hx - 3.4 * s, hy + 1);
-        g.quadraticCurveTo(hx + side * 1.5, hy - 10 * s, hx + side * 4.5 * s, hy - 8 * s);
-        g.quadraticCurveTo(hx + side * 3 * s, hy - 2, hx + 3.4 * s, hy + 1.5);
-        g.closePath();
-        g.fill();
-      }
-
-      // Whelp crest: little flame plume between the horns.
-      if (whelp) {
-        const flame = g.createLinearGradient(cx, headY - headR - 14, cx, headY - headR + 2);
-        flame.addColorStop(0, P.goldAccent);
-        flame.addColorStop(1, P.lava);
-        g.fillStyle = flame;
-        this.teardrop(g, cx, headY - headR + 3, 15, 5.5, 0.12);
-        g.fill();
-      }
-
-      // Head gloss.
-      g.fillStyle = 'rgba(255,255,255,0.32)';
-      g.beginPath();
-      g.ellipse(cx - 7 * s, headY - 8 * s, 7 * s, 4.6 * s, -0.35, 0, Math.PI * 2);
-      g.fill();
-
-      // Eyes: big, glossy, amber.
-      const eyeR = (whelp ? 4.6 : 5.2) * s;
-      for (const side of [-1, 1]) {
-        const ex = cx + side * 6.6 * s;
-        const ey = headY - 1;
-        g.fillStyle = '#FFFFFF';
-        g.beginPath();
-        g.ellipse(ex, ey, eyeR, eyeR * 1.3, 0, 0, Math.PI * 2);
-        g.fill();
-        g.lineWidth = 1;
-        g.strokeStyle = withAlpha(P.lavaShade, 0.4);
-        g.stroke();
-        const iris = g.createRadialGradient(ex, ey + 1, 0.5, ex, ey + 1, eyeR * 0.78);
-        iris.addColorStop(0, P.goldAccent);
-        iris.addColorStop(1, P.goldShade);
-        g.fillStyle = iris;
-        g.beginPath();
-        g.arc(ex, ey + 1, eyeR * 0.74, 0, Math.PI * 2);
-        g.fill();
-        g.fillStyle = P.night;
-        g.beginPath();
-        g.arc(ex, ey + 1.4, eyeR * 0.4, 0, Math.PI * 2);
-        g.fill();
-        g.fillStyle = '#FFFFFF';
-        g.beginPath();
-        g.arc(ex - eyeR * 0.28, ey - eyeR * 0.18, eyeR * 0.24, 0, Math.PI * 2);
-        g.fill();
-      }
-
-      // Muzzle, nostrils, smile, fang.
-      g.fillStyle = lighten(P.lava, 0.22);
-      g.beginPath();
-      g.ellipse(cx, headY + 7.5 * s, 6.8 * s, 4.6 * s, 0, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = withAlpha(darken(P.lavaShade, 0.3), 0.9);
-      for (const side of [-1, 1]) {
-        g.beginPath();
-        g.arc(cx + side * 2.4 * s, headY + 6 * s, 0.9, 0, Math.PI * 2);
-        g.fill();
-      }
-      g.lineWidth = 1.6;
-      g.lineCap = 'round';
-      g.strokeStyle = withAlpha(darken(P.lavaShade, 0.35), 0.95);
-      g.beginPath();
-      g.arc(cx, headY + 7 * s, 4.6 * s, Math.PI * 0.2, Math.PI * 0.8);
-      g.stroke();
-      if (whelp) {
-        g.fillStyle = '#FFFFFF';
-        g.beginPath();
-        g.moveTo(cx + 3.4 * s, headY + 10.4 * s);
-        g.lineTo(cx + 5 * s, headY + 10.2 * s);
-        g.lineTo(cx + 4.2 * s, headY + 12.6 * s);
-        g.closePath();
-        g.fill();
-      }
-
-      // Blush.
-      g.fillStyle = withAlpha(P.lavaHighlight, 0.6);
-      for (const side of [-1, 1]) {
-        g.beginPath();
-        g.ellipse(cx + side * 11.5 * s, headY + 5 * s, 3 * s, 2 * s, 0, 0, Math.PI * 2);
-        g.fill();
-      }
-    });
-  }
-
   private gemShard(key: string): void {
     this.paint(key, 96, 96, (g) => {
       this.contactShadow(g, 48, 83, 19, 7);
@@ -1361,96 +1253,6 @@ export class TextureFactory {
 
   /* ------------------------------ ui -------------------------------- */
 
-  private hand(key: string): void {
-    this.paint(key, 68, 78, (g) => {
-      g.lineJoin = 'round';
-      const base = P.cream;
-      const shadeC = darken(P.cream, 0.18);
-      // Pointing glove: index finger up-left, curled fist, gold cuff.
-      g.beginPath();
-      g.moveTo(24, 8); // fingertip
-      g.quadraticCurveTo(31, 4, 33, 12);
-      g.lineTo(36, 34); // finger inner edge down to palm
-      g.quadraticCurveTo(52, 30, 56, 42);
-      g.quadraticCurveTo(60, 56, 48, 64);
-      g.quadraticCurveTo(34, 70, 24, 62);
-      g.quadraticCurveTo(14, 54, 18, 42);
-      g.quadraticCurveTo(20, 36, 18, 30)
-      g.lineTo(16, 14);
-      g.quadraticCurveTo(17, 6, 24, 8);
-      g.closePath();
-      const grad = g.createLinearGradient(10, 6, 56, 70);
-      grad.addColorStop(0, '#FFFFFF');
-      grad.addColorStop(0.55, base);
-      grad.addColorStop(1, shadeC);
-      g.fillStyle = grad;
-      g.fill();
-      g.lineWidth = 3;
-      g.strokeStyle = P.textBrown;
-      g.stroke();
-      // Knuckle creases.
-      g.lineWidth = 1.6;
-      g.strokeStyle = withAlpha(P.textBrown, 0.45);
-      g.beginPath();
-      g.moveTo(36, 40);
-      g.quadraticCurveTo(42, 44, 40, 50);
-      g.moveTo(44, 38);
-      g.quadraticCurveTo(50, 44, 47, 52);
-      g.stroke();
-      // Cuff.
-      this.roundRectPath(g, 26, 60, 28, 13, 6);
-      const cuff = g.createLinearGradient(0, 60, 0, 73);
-      cuff.addColorStop(0, P.goldAccent);
-      cuff.addColorStop(1, P.goldShade);
-      g.fillStyle = cuff;
-      g.fill();
-      g.lineWidth = 2.4;
-      g.strokeStyle = P.textBrown;
-      g.stroke();
-    });
-  }
-
-  private arrow(key: string): void {
-    this.paint(key, 60, 66, (g) => {
-      g.lineJoin = 'round';
-      // Down-pointing chevron with a pseudo-3D base strip.
-      const draw = (inset: number): void => {
-        g.beginPath();
-        g.moveTo(8 + inset, 10 + inset * 0.4);
-        g.lineTo(30, 30 - inset * 0.2);
-        g.lineTo(52 - inset, 10 + inset * 0.4);
-        g.lineTo(52 - inset, 28 - inset * 0.2);
-        g.lineTo(30, 52 - inset);
-        g.lineTo(8 + inset, 28 - inset * 0.2);
-        g.closePath();
-      };
-      g.save();
-      g.translate(0, 4);
-      draw(0);
-      g.fillStyle = darken(P.goldShade, 0.18);
-      g.fill();
-      g.restore();
-      draw(0);
-      const grad = g.createLinearGradient(0, 8, 0, 52);
-      grad.addColorStop(0, P.goldAccent);
-      grad.addColorStop(0.6, P.gold);
-      grad.addColorStop(1, P.goldShade);
-      g.fillStyle = grad;
-      g.fill();
-      g.lineWidth = 3;
-      g.strokeStyle = P.textBrown;
-      g.stroke();
-      // Glint.
-      g.lineWidth = 2.4;
-      g.lineCap = 'round';
-      g.strokeStyle = 'rgba(255,255,255,0.85)';
-      g.beginPath();
-      g.moveTo(14, 15);
-      g.lineTo(27, 27);
-      g.stroke();
-    });
-  }
-
   private tileHighlight(key: string): void {
     const { w, h, cx, cy, rx, ry } = TILE_TEX;
     this.paint(key, w, h, (g) => {
@@ -1496,19 +1298,21 @@ export class TextureFactory {
   }
 
   private roundButton(key: string): void {
+    const plate = this.uiColor(key, 'plate');
+    const faceCol = this.uiColor(key, 'face');
     this.paint(key, 68, 68, (g) => {
       g.beginPath();
       g.arc(34, 38, 29, 0, Math.PI * 2);
-      g.fillStyle = P.goldShade;
+      g.fillStyle = plate;
       g.fill();
       g.lineWidth = 2.6;
-      g.strokeStyle = withAlpha(darken(P.goldShade, 0.35), 0.95);
+      g.strokeStyle = withAlpha(darken(plate, 0.35), 0.95);
       g.stroke();
       g.beginPath();
       g.arc(34, 32, 29, 0, Math.PI * 2);
       const face = g.createLinearGradient(0, 3, 0, 61);
-      face.addColorStop(0, lighten(P.cream, 0.3));
-      face.addColorStop(1, darken(P.cream, 0.12));
+      face.addColorStop(0, lighten(faceCol, 0.3));
+      face.addColorStop(1, darken(faceCol, 0.12));
       g.fillStyle = face;
       g.fill();
       g.stroke();
@@ -1520,6 +1324,9 @@ export class TextureFactory {
   }
 
   private panel(key: string): void {
+    const borderC = this.uiColor(key, 'border');
+    const borderShade = this.uiColor(key, 'borderShade');
+    const fillC = this.uiColor(key, 'fill');
     this.paint(key, 660, 440, (g) => {
       // Soft drop shadow.
       g.shadowColor = 'rgba(36,27,34,0.45)';
@@ -1527,22 +1334,22 @@ export class TextureFactory {
       g.shadowOffsetY = 10;
       this.roundRectPath(g, 14, 10, 632, 412, 30);
       const border = g.createLinearGradient(0, 10, 0, 422);
-      border.addColorStop(0, P.lava);
-      border.addColorStop(1, P.lavaShade);
+      border.addColorStop(0, borderC);
+      border.addColorStop(1, borderShade);
       g.fillStyle = border;
       g.fill();
       g.shadowColor = 'transparent';
       g.shadowBlur = 0;
       g.shadowOffsetY = 0;
       g.lineWidth = 3;
-      g.strokeStyle = withAlpha(darken(P.lavaShade, 0.3), 0.9);
+      g.strokeStyle = withAlpha(darken(borderShade, 0.3), 0.9);
       g.stroke();
       // Cream inner.
       this.roundRectPath(g, 24, 20, 612, 392, 22);
       const inner = g.createLinearGradient(0, 20, 0, 412);
-      inner.addColorStop(0, lighten(P.cream, 0.35));
-      inner.addColorStop(0.12, P.cream);
-      inner.addColorStop(1, darken(P.cream, 0.07));
+      inner.addColorStop(0, lighten(fillC, 0.35));
+      inner.addColorStop(0.12, fillC);
+      inner.addColorStop(1, darken(fillC, 0.07));
       g.fillStyle = inner;
       g.fill();
       g.lineWidth = 2;
@@ -1552,16 +1359,19 @@ export class TextureFactory {
   }
 
   private card(key: string): void {
+    const fillC = this.uiColor(key, 'fill');
+    const borderC = this.uiColor(key, 'border');
+    const stitch = this.uiColor(key, 'stitch');
     this.paint(key, 320, 350, (g) => {
       this.roundRectPath(g, 4, 4, 312, 342, 18);
-      g.fillStyle = '#FFFDF6';
+      g.fillStyle = fillC;
       g.fill();
       g.lineWidth = 3;
-      g.strokeStyle = '#E8B98F';
+      g.strokeStyle = borderC;
       g.stroke();
       // Stitched corners.
       g.lineWidth = 2;
-      g.strokeStyle = withAlpha(P.goldShade, 0.8);
+      g.strokeStyle = withAlpha(stitch, 0.8);
       g.setLineDash([6, 5]);
       this.roundRectPath(g, 12, 12, 296, 326, 13);
       g.stroke();
@@ -1577,12 +1387,14 @@ export class TextureFactory {
   }
 
   private pill(key: string): void {
+    const fillC = this.uiColor(key, 'fill');
+    const borderC = this.uiColor(key, 'border');
     this.paint(key, 176, 52, (g) => {
       this.roundRectPath(g, 2, 2, 172, 48, 24);
-      g.fillStyle = 'rgba(58,43,56,0.88)';
+      g.fillStyle = withAlpha(fillC, 0.88);
       g.fill();
       g.lineWidth = 2.4;
-      g.strokeStyle = withAlpha(P.gold, 0.95);
+      g.strokeStyle = withAlpha(borderC, 0.95);
       g.stroke();
       this.roundRectPath(g, 8, 5, 160, 18, 12);
       g.fillStyle = 'rgba(255,255,255,0.12)';
@@ -1591,16 +1403,18 @@ export class TextureFactory {
   }
 
   private slot(key: string): void {
+    const fillC = this.uiColor(key, 'fill');
+    const borderC = this.uiColor(key, 'border');
     this.paint(key, 72, 72, (g) => {
       this.roundRectPath(g, 3, 3, 66, 66, 15);
       const fill = g.createLinearGradient(0, 3, 0, 69);
-      fill.addColorStop(0, darken('#EFE0C8', 0.08));
-      fill.addColorStop(0.25, '#EFE0C8');
-      fill.addColorStop(1, lighten('#EFE0C8', 0.1));
+      fill.addColorStop(0, darken(fillC, 0.08));
+      fill.addColorStop(0.25, fillC);
+      fill.addColorStop(1, lighten(fillC, 0.1));
       g.fillStyle = fill;
       g.fill();
       g.lineWidth = 2.5;
-      g.strokeStyle = '#D9C2A0';
+      g.strokeStyle = borderC;
       g.stroke();
       // Inner top shadow for the inset look.
       const inset = g.createLinearGradient(0, 4, 0, 22);
@@ -1609,6 +1423,223 @@ export class TextureFactory {
       g.fillStyle = inset;
       this.roundRectPath(g, 5, 5, 62, 20, 12);
       g.fill();
+    });
+  }
+
+  /* ------------------------- Ember Emporium ------------------------- */
+
+  /** The Emporium's big framed board: lava rim with a warm parchment face,
+   *  corner gems and a soft top-light — the anchor of the shop scene. */
+  private shopPanel(key: string): void {
+    const rim = this.uiColor(key, 'rim');
+    const rimShade = this.uiColor(key, 'rimShade');
+    const fill = this.uiColor(key, 'fill');
+    this.paint(key, 1060, 660, (g) => {
+      // Drop shadow.
+      g.shadowColor = 'rgba(20,12,18,0.55)';
+      g.shadowBlur = 30;
+      g.shadowOffsetY = 14;
+      this.roundRectPath(g, 22, 16, 1016, 620, 42);
+      const rimGrad = g.createLinearGradient(0, 16, 0, 636);
+      rimGrad.addColorStop(0, lighten(rim, 0.12));
+      rimGrad.addColorStop(0.5, rim);
+      rimGrad.addColorStop(1, darken(rimShade, 0.08));
+      g.fillStyle = rimGrad;
+      g.fill();
+      g.shadowColor = 'transparent';
+      g.shadowBlur = 0;
+      g.shadowOffsetY = 0;
+      g.lineWidth = 4;
+      g.strokeStyle = withAlpha(darken(rimShade, 0.32), 0.95);
+      g.stroke();
+      // Gold pin-line riding the rim.
+      g.lineWidth = 3;
+      g.strokeStyle = withAlpha(P.goldAccent, 0.85);
+      this.roundRectPath(g, 30, 24, 1000, 604, 36);
+      g.stroke();
+      // Parchment face.
+      this.roundRectPath(g, 44, 38, 972, 576, 28);
+      const face = g.createLinearGradient(0, 38, 0, 614);
+      face.addColorStop(0, lighten(fill, 0.4));
+      face.addColorStop(0.1, fill);
+      face.addColorStop(0.85, darken(fill, 0.05));
+      face.addColorStop(1, darken(fill, 0.12));
+      g.fillStyle = face;
+      g.fill();
+      g.lineWidth = 2;
+      g.strokeStyle = withAlpha(P.goldShade, 0.55);
+      g.stroke();
+      // Soft interior top glow (stage light on the goods).
+      const glow = g.createRadialGradient(530, 120, 40, 530, 180, 460);
+      glow.addColorStop(0, withAlpha('#FFFFFF', 0.5));
+      glow.addColorStop(1, withAlpha('#FFFFFF', 0));
+      g.fillStyle = glow;
+      this.roundRectPath(g, 44, 38, 972, 300, 28);
+      g.fill();
+      // Corner gems.
+      for (const [cx, cy] of [[62, 56], [998, 56], [62, 596], [998, 596]]) {
+        const gem = g.createRadialGradient(cx! - 3, cy! - 3, 1, cx!, cy!, 12);
+        gem.addColorStop(0, P.goldAccent);
+        gem.addColorStop(0.65, P.gold);
+        gem.addColorStop(1, P.goldShade);
+        g.fillStyle = gem;
+        g.save();
+        g.translate(cx!, cy!);
+        g.rotate(Math.PI / 4);
+        g.fillRect(-8, -8, 16, 16);
+        g.lineWidth = 2;
+        g.strokeStyle = withAlpha(darken(P.goldShade, 0.3), 0.9);
+        g.strokeRect(-8, -8, 16, 16);
+        g.restore();
+      }
+    });
+  }
+
+  /** One product card: gold gradient rim, cream face with a gloss cap,
+   *  stitched inline and a warm base shade — reads as a physical token. */
+  private shopCard(key: string): void {
+    const rim = this.uiColor(key, 'rim');
+    const rimShade = this.uiColor(key, 'rimShade');
+    const fill = this.uiColor(key, 'fill');
+    this.paint(key, 210, 310, (g) => {
+      g.shadowColor = 'rgba(20,12,18,0.4)';
+      g.shadowBlur = 12;
+      g.shadowOffsetY = 7;
+      this.roundRectPath(g, 6, 4, 198, 298, 24);
+      const rimGrad = g.createLinearGradient(0, 4, 0, 302);
+      rimGrad.addColorStop(0, lighten(rim, 0.22));
+      rimGrad.addColorStop(0.55, rim);
+      rimGrad.addColorStop(1, darken(rimShade, 0.05));
+      g.fillStyle = rimGrad;
+      g.fill();
+      g.shadowColor = 'transparent';
+      g.shadowBlur = 0;
+      g.shadowOffsetY = 0;
+      g.lineWidth = 2.4;
+      g.strokeStyle = withAlpha(darken(rimShade, 0.3), 0.95);
+      g.stroke();
+      // Face.
+      this.roundRectPath(g, 14, 12, 182, 282, 18);
+      const face = g.createLinearGradient(0, 12, 0, 294);
+      face.addColorStop(0, lighten(fill, 0.35));
+      face.addColorStop(0.12, fill);
+      face.addColorStop(0.8, darken(fill, 0.03));
+      face.addColorStop(1, darken(fill, 0.1));
+      g.fillStyle = face;
+      g.fill();
+      // Gloss cap.
+      const gloss = g.createLinearGradient(0, 12, 0, 96);
+      gloss.addColorStop(0, 'rgba(255,255,255,0.55)');
+      gloss.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gloss;
+      this.roundRectPath(g, 18, 15, 174, 78, 15);
+      g.fill();
+      // Stitched inline.
+      g.lineWidth = 1.6;
+      g.strokeStyle = withAlpha(P.goldShade, 0.7);
+      g.setLineDash([5, 4]);
+      this.roundRectPath(g, 20, 18, 170, 270, 13);
+      g.stroke();
+      g.setLineDash([]);
+      // Bottom warm shade seats the price button.
+      const seat = g.createLinearGradient(0, 220, 0, 294);
+      seat.addColorStop(0, 'rgba(181,96,47,0)');
+      seat.addColorStop(1, 'rgba(181,96,47,0.14)');
+      g.fillStyle = seat;
+      this.roundRectPath(g, 14, 200, 182, 94, 18);
+      g.fill();
+    });
+  }
+
+  /** Amount banner: chevron-notched gold ribbon with a bevel + gloss. */
+  private shopRibbon(key: string): void {
+    const base = this.uiColor(key, 'base');
+    const edge = this.uiColor(key, 'edge');
+    this.paint(key, 210, 52, (g) => {
+      const notch = 14;
+      const path = (): void => {
+        g.beginPath();
+        g.moveTo(2, 4);
+        g.lineTo(208, 4);
+        g.lineTo(208 - notch, 26);
+        g.lineTo(208, 48);
+        g.lineTo(2, 48);
+        g.lineTo(2 + notch, 26);
+        g.closePath();
+      };
+      path();
+      const grad = g.createLinearGradient(0, 4, 0, 48);
+      grad.addColorStop(0, lighten(base, 0.28));
+      grad.addColorStop(0.5, base);
+      grad.addColorStop(1, darken(edge, 0.05));
+      g.fillStyle = grad;
+      g.fill();
+      g.lineWidth = 2.4;
+      g.strokeStyle = withAlpha(darken(edge, 0.32), 0.95);
+      g.stroke();
+      // Gloss band.
+      g.fillStyle = 'rgba(255,255,255,0.32)';
+      g.beginPath();
+      g.moveTo(8, 7);
+      g.lineTo(202, 7);
+      g.lineTo(198, 18);
+      g.lineTo(12, 18);
+      g.closePath();
+      g.fill();
+    });
+  }
+
+  /** "BEST VALUE" sash pill: lava gradient with a cream trim. */
+  private shopBadge(key: string): void {
+    const base = this.uiColor(key, 'base');
+    const edge = this.uiColor(key, 'edge');
+    this.paint(key, 150, 40, (g) => {
+      this.roundRectPath(g, 3, 5, 144, 32, 16);
+      g.fillStyle = darken(edge, 0.1);
+      g.fill();
+      this.roundRectPath(g, 3, 2, 144, 32, 16);
+      const grad = g.createLinearGradient(0, 2, 0, 34);
+      grad.addColorStop(0, lighten(base, 0.2));
+      grad.addColorStop(1, edge);
+      g.fillStyle = grad;
+      g.fill();
+      g.lineWidth = 2.4;
+      g.strokeStyle = withAlpha(P.cream, 0.95);
+      g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.3)';
+      this.roundRectPath(g, 9, 5, 132, 11, 6);
+      g.fill();
+    });
+  }
+
+  /** Radial sunburst seated behind a product icon — glow core + soft rays. */
+  private shopBurst(key: string): void {
+    this.paint(key, 190, 190, (g) => {
+      const c = 95;
+      g.save();
+      g.translate(c, c);
+      for (let i = 0; i < 12; i++) {
+        g.save();
+        g.rotate((i / 12) * Math.PI * 2);
+        const ray = g.createLinearGradient(0, 0, 0, -88);
+        ray.addColorStop(0, withAlpha(P.goldAccent, 0.22));
+        ray.addColorStop(1, withAlpha(P.goldAccent, 0));
+        g.fillStyle = ray;
+        g.beginPath();
+        g.moveTo(0, -12);
+        g.lineTo(-10, -88);
+        g.lineTo(10, -88);
+        g.closePath();
+        g.fill();
+        g.restore();
+      }
+      g.restore();
+      const glow = g.createRadialGradient(c, c, 4, c, c, 78);
+      glow.addColorStop(0, withAlpha('#FFFFFF', 0.65));
+      glow.addColorStop(0.35, withAlpha(P.goldAccent, 0.4));
+      glow.addColorStop(1, withAlpha(P.goldAccent, 0));
+      g.fillStyle = glow;
+      g.fillRect(0, 0, 190, 190);
     });
   }
 

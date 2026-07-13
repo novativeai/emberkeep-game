@@ -25,9 +25,10 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | dragon:work | BoardScene | DragonJobSystem |
 | fog:tapped | BoardScene | UnlockSystem |
 | chest:open | BoardScene | ChestSystem, TutorialDirector (gate) |
-| ui:deliver_requested | LedgerPanel | OrderSystem |
-| ui:sell_requested | Tooltip | EconomySystem |
-| ui:shop_requested | Hud | UIScene |
+| ui:deliver_requested | LedgerPanel (per-card, TWO orders visible) | OrderSystem |
+| ui:sell_requested | Tooltip | EconomySystem (refuses `sellable:false` tiers — golden egg/Elder) |
+| ui:shop_requested | Hud (energy/coins only — keys are never sold) | UIScene |
+| elder:tapped | BoardScene (communing at the GOLDEN ALTAR — the scenic fixture at GOLDEN_ALTAR.cell (-2,2), NOT a board item; egg appears on order `cindra_brazier`, Elder awakens at L3, all derived from save state) | TaskSystem |
 | ui:ledger_toggled | LedgerPanel | AudioManager, TutorialDirector, UIScene |
 | audio:set_music_muted | UIScene | AudioManager |
 | tutorial:advance_requested | CharacterBubble | TutorialDirector, AudioManager |
@@ -54,8 +55,8 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | item:spawned | BoardSystem, ChestSystem | BoardScene, OrderSystem, TutorialDirector, Save |
 | item:moved | BoardSystem, MergeSystem | BoardScene, Save |
 | item:move_bounced | MergeSystem | BoardScene, AudioManager |
-| item:merged | MergeSystem | BoardScene, UIScene, AudioManager, OrderSystem, TutorialDirector (gate), Save |
-| item:hatched | MergeSystem | BoardScene (hatch ceremony), AudioManager, TutorialDirector (gate) |
+| item:merged | MergeSystem | BoardScene, UIScene, AudioManager, OrderSystem, TutorialDirector (gate), TaskSystem, Save |
+| item:hatched | MergeSystem | BoardScene (hatch ceremony), AudioManager, TutorialDirector (gate), TaskSystem |
 | item:harvested | GeneratorSystem | BoardScene, AudioManager, TutorialDirector (gate), Save |
 | item:harvest_failed | GeneratorSystem | BoardScene, AudioManager, Hud |
 | item:produced | GeneratorSystem | BoardScene, AudioManager, OrderSystem |
@@ -69,14 +70,17 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | dragon:rest / dragon:rested | DragonJobSystem | BoardScene |
 | energy:changed | EnergySystem, BoardSystem | Hud, Save |
 | economy:changed | EconomySystem, BoardSystem | Hud, AudioManager, Save |
-| keeper:leveled | EconomySystem | UnlockSystem (level regions lift), RewardSystem, BoardScene (camera fly), UIScene, AudioManager |
-| order:progress | OrderSystem | Hud, LedgerPanel |
-| order:completed | OrderSystem | Hud, LedgerPanel, UIScene, AudioManager, TutorialDirector, Save |
+| keeper:leveled | EconomySystem | UnlockSystem (level regions lift), RewardSystem, BoardScene (camera fly; **level≥3 runs the FINALE sequence instead**), UIScene (banner; **level≥3 → Cindra line + chapter card on the FINALE timeline**), AudioManager |
+| order:progress | OrderSystem (one per VISIBLE order — payload orderId matters) | Hud (dot = ANY deliverable), LedgerPanel |
+| order:completed | OrderSystem | Hud, LedgerPanel, UIScene (celebration banner), AudioManager, TutorialDirector, TaskSystem, Save |
+| tasks:all_complete | TaskSystem (reward already paid) | UIScene (banner + Cindra line), LedgerPanel (Tasks-tab refresh) |
+| cookbook:discovered | MergeSystem (first merge of a chain:fromTier>resultTier; `state.discoveredRecipes`) | UIScene (cookbook-button dot + pulse), CookbookPanel (refresh while open) |
+| ui:cookbook_opened | CookbookPanel.open | TutorialDirector (cookbook_intro gate) |
 | region:unlocked | UnlockSystem | BoardScene (fog lift), AudioManager, OrderSystem, TutorialDirector (gate), Save |
 | region:unlock_failed | UnlockSystem | BoardScene |
 | marketplace:purchased | ShopPanel | TutorialDirector (gate) |
 | tutorial:step | TutorialDirector | BoardScene (allow-list, highlights, camera nudges), UIScene (bubble, hand, arrow), Save |
-| state:loaded | SaveSystem | BoardScene (fullResync), EnergySystem (offline regen), OrderSystem |
+| state:loaded | SaveSystem | BoardScene (fullResync), EnergySystem (offline regen), OrderSystem, GeneratorSystem (banks ≤3 offline passive cycles → `lastOfflineGifts`), UIScene (welcome-back card reads offlineMs/energyRecovered + lastOfflineGifts) |
 | game:reset | GameContext | UIScene, DragonJobSystem |
 | **ORPHANS** (emitted, zero subscribers — safe to consume, don't assume anyone hears them): | | `state:saved`, `order:all_done` |
 
@@ -101,10 +105,12 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   PreloadScene → `TextureFactory.generate`: bespoke case > `item_*`/`decor_*` parcel
   stand-in (counter-scaled vs ITEM_SCALE) > `tile_*` moss tile > magenta (unknown only).
   A key with no case is only safe because of the prefix fallback.
-- **TOUCH LEVEL_XP or any tier `xp` → CHECK** tutorial pacing: whole tutorial ≈54 XP must
-  END at level 1; `levelup` step grants 10 XP; first real level-up fires
-  `keeper:leveled` → zone-2 fog lift + camera fly. Changing xp values moves WHEN a camera
-  animation plays and can fire it mid-tutorial (glide is suppressed only while tutorial runs).
+- **TOUCH LEVEL_XP or any tier `xp` → CHECK** tutorial pacing: the whole tutorial earns
+  EXACTLY 60 XP (26 + 24 hatches + the `levelup` step's 10) and LEVEL_XP[1]=60, so Level 2
+  lands ON the scripted `levelup` beat. LEVEL_XP[2]=220 is the FINALE curve (lands on
+  Order 3's delivery — DEMO-PLAN §Act IV); the array deliberately ENDS at level 3.
+  keeper:leveled(≥3) triggers the finale in BOTH BoardScene and UIScene (shared FINALE
+  timeline in Constants). Camera glide is suppressed while the tutorial runs.
 - **TOUCH world export → RULE** re-run BOTH `scripts/ingest-world.mjs` then
   `scripts/build-gamemap.mjs`. map.json is generated (hand edits clobbered). build-gamemap
   re-anchors tutorial start items by **+1,+4** and carves `level_2_gate` from the dozen
@@ -129,6 +135,20 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   talk `[closed,half,wide,half2]` — `faceAnimations.ts` indexes into it. Consumed
   by BoardScene (`FACES`) + `RigPlayer.attachFace`; `pose.mouth` is recorded by
   rigAnimations' `jaw()`. Visual check: `node tools/facetest.mjs`.
+- **TOUCH UI element structure (Hud pills/buttons, bubble, tooltip, panels) →
+  CHECK** the `uiRegistry.register` calls in those constructors (part names are
+  the UI Builder's layer ids AND the keys inside saved `ui-theme.json` patches —
+  renaming a part orphans saved overrides) and `tools/uibtest.mjs`. ui-theme.json
+  is GENERATED by tools/uibuilder via the dev endpoint `/__uibuilder/theme`
+  (vite.config.ts); empty doc = authored look. Scenes may set depth AFTER
+  registration — the registry only writes depth when overridden. Its `custom`
+  section holds tool-authored components (image/text/rig layers) instantiated
+  by `CustomUiManager` at boot; rig layers reference `characterCatalog` ids +
+  rigAnimations preset keys — renaming presets/characters orphans saved layers.
+- **TOUCH ui_* chrome painters (button/panel/card/pill/slot) → CHECK**
+  `UI_TEXTURE_PARAMS` defaults stay in sync with the painter's actual colors,
+  and `TextureFactory.regenerate` still repaints IN PLACE (CanvasTexture only —
+  never delete/re-add the key, live Images hold the texture object).
 - **TOUCH blink cadence → WHERE** `BlinkScheduler` in `faceAnimations.ts` (NOT the
   presets — a fixed `t`-based blink there makes all dragons blink in unison).
   RigPlayer owns one per rig and injects `pose.eyelid`; ranges `BLINK_GAP_CALM`/

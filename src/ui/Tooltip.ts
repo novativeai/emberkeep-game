@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { num, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { ChainsData } from '../core/types';
+import { uiRegistry } from './theme';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 const WIDTH = 460;
@@ -79,6 +80,13 @@ export class Tooltip extends Phaser.GameObjects.Container {
     this.add([this.bg, this.nameText, ...this.dots, this.sellButton]);
     scene.add.existing(this);
     this.setVisible(false);
+    // Self-positioned: openFor() places it per item and consumes the theme
+    // offset itself, so the registry must not write this container's x/y.
+    uiRegistry.register(scene, 'dialogue.tooltip', 'Item tooltip', 'Dialogue', this, {
+      name: this.nameText,
+      sellLabel: this.sellText,
+      sellBg
+    }, { selfPositioned: true });
   }
 
   openFor(itemId: number, chain: string, tier: number, x: number, y: number): void {
@@ -93,14 +101,20 @@ export class Tooltip extends Phaser.GameObjects.Container {
       dot.setFillStyle(i < tier ? num(PALETTE.gold) : num(PALETTE.cream));
     });
     this.sellText.setText(`Sell +${tierConfig.sell}`);
-    this.setPosition(Phaser.Math.Clamp(x, 280, 2280), Math.max(y - 128, HEIGHT + 28));
+    // Theme offset/scale from the UI Builder ride on top of the computed spot.
+    const off = uiRegistry.offsetOf('dialogue.tooltip');
+    const themeScale = uiRegistry.doc.elements['dialogue.tooltip']?.scale ?? 1;
+    this.setPosition(
+      Phaser.Math.Clamp(x, 280, 2280) + off.dx,
+      Math.max(y - 128, HEIGHT + 28) + off.dy
+    );
     this.setVisible(true);
     this.setAlpha(0);
-    this.setScale(0.85);
+    this.setScale(0.85 * themeScale);
     this.scene.tweens.add({
       targets: this,
       alpha: 1,
-      scale: 1,
+      scale: themeScale,
       duration: 140,
       ease: 'Back.easeOut'
     });

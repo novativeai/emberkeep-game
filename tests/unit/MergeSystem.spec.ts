@@ -193,6 +193,41 @@ describe('MergeSystem', () => {
     }
   });
 
+  it('merges TWO Houses into one Manor (per-tier 2→1 override, Bushes still need 3)', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'lumber', tier: 2, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 2, col: 1, row: 2, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    drag(ctx, [1, 2], [1, 1]); // drop one House onto the other — only two needed
+
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.consumedIds).toHaveLength(2); // the tier-2 override consumes TWO
+    expect(merges[0]!.resultTier).toBe(3);
+    expect(ctx.state.items.size).toBe(1);
+    const manor = [...ctx.state.items.values()][0];
+    expect(manor).toMatchObject({ chain: 'lumber', tier: 3 });
+    expect(manor?.readyAt).toBeDefined(); // the Manor is a passive gold generator
+  });
+
+  it('merges TWO Red Dragons into one Adult Red Dragon (per-tier 2→1 override)', () => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 2, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+    const hatches = capture(ctx.bus, 'item:hatched');
+
+    drag(ctx, [1, 2], [1, 1]); // two dragons meet — the elder rises
+
+    expect(merges).toHaveLength(1);
+    expect(merges[0]!.consumedIds).toHaveLength(2);
+    expect(merges[0]!.resultTier).toBe(4);
+    expect(hatches).toHaveLength(0); // hatchAtTier stays 3 — this is an ascension, not a hatch
+    const adult = [...ctx.state.items.values()][0];
+    expect(adult).toMatchObject({ chain: 'ember_dragon', tier: 4 });
+    expect(adult?.readyAt).toBeDefined(); // the Adult is a faster ruby generator
+  });
+
   it('emerald chain: 3 Emeralds → Green Egg — no item:hatched, no generator', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'emerald', tier: 1, col: 1, row: 1, kind: 'item' });
@@ -272,14 +307,13 @@ describe('MergeSystem', () => {
     const merges = capture(ctx.bus, 'item:merged');
 
     // (3,2) touches NEITHER pair tile (two columns away) — the exact-tile merge
-    // fails. The smart snap picks (2,2): the NEAREST free tile to the drop that
-    // completes an orthogonal trio ((2,2)→(1,2)→(1,1)), and fuses there.
+    // fails. The smart snap finds (2,1), which sits beside both, and fuses there.
     drag(ctx, [5, 5], [3, 2]);
 
     expect(merges).toHaveLength(1);
     expect(merges[0]!.consumedIds).toHaveLength(3);
     expect(ctx.state.items.size).toBe(1);
-    expect(ctx.state.itemAt(2, 2)).toMatchObject({ chain: 'sparkweed', tier: 2 });
+    expect(ctx.state.itemAt(2, 1)).toMatchObject({ chain: 'sparkweed', tier: 2 });
   });
 
   it('does NOT snap-merge when only ONE matching piece sits nearby', () => {
@@ -297,18 +331,48 @@ describe('MergeSystem', () => {
     expect(ctx.state.itemAt(3, 2)?.chain).toBe('sparkweed'); // just moved, no snap
   });
 
-  it('dropping the 3rd piece just OFF a pair (diagonally) still fuses — no dead-centre needed', () => {
+  it('never desyncs state from the announced move when a near-merge cannot fuse', () => {
     const ctx = createTestContext();
+    // Two pieces DIAGONAL to a shared candidate cell (3,3): the old
+    // 8-neighbourhood count saw a completable pair there, snapped the piece in
+    // state, then collectGroup (orthogonal) found nobody — the merge failed and
+    // the emitted item:moved pointed at a tile the item no longer occupied.
     ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 2, row: 2, kind: 'item' });
-    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 3, row: 2, kind: 'item' });
-    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 6, row: 6, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 4, row: 2, kind: 'item' });
+    const dragged = ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 4, kind: 'item' });
     const merges = capture(ctx.bus, 'item:merged');
+    const moves = capture(ctx.bus, 'item:moved');
 
-    // (4,3) sits diagonally off the pair — you didn't land on either piece.
-    drag(ctx, [6, 6], [4, 3]);
+    drag(ctx, [1, 4], [3, 4]);
 
-    expect(merges).toHaveLength(1);
-    expect(merges[0]!.consumedIds).toHaveLength(3);
-    expect(ctx.state.items.size).toBe(1);
+    expect(merges).toHaveLength(0);
+    expect(moves).toHaveLength(1);
+    // state and the announced move must agree — the scene renders the event.
+    const item = ctx.state.items.get(dragged.id)!;
+    expect({ col: item.col, row: item.row }).toEqual(moves[0]!.to);
+    expect(ctx.state.itemIdAt(moves[0]!.to.col, moves[0]!.to.row)).toBe(dragged.id);
+  });
+
+  it('writes a Cookbook page on the FIRST merge of a recipe — and only once', () => {
+    const ctx = createTestContext();
+    const discovered = capture(ctx.bus, 'cookbook:discovered');
+    const setup = (): void => {
+      ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 1, kind: 'item' });
+      ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 2, kind: 'item' });
+      ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 3, row: 3, kind: 'item' });
+    };
+
+    setup();
+    drag(ctx, [3, 3], [1, 3]);
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0]).toMatchObject({ chain: 'sparkweed', fromTier: 1, resultTier: 2 });
+    expect(ctx.state.discoveredRecipes).toEqual(['sparkweed:1>2']);
+
+    // The same recipe again — the page is already written.
+    ctx.state.removeItem(ctx.state.itemAt(1, 3)!.id);
+    setup();
+    drag(ctx, [3, 3], [1, 3]);
+    expect(discovered).toHaveLength(1);
+    expect(ctx.state.discoveredRecipes).toEqual(['sparkweed:1>2']);
   });
 });

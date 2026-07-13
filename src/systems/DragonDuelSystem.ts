@@ -1,4 +1,4 @@
-import { DUEL } from '../core/Constants';
+import { DUEL, GOLDEN_CHAIN } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { ChainsData, DuelDragon, DuelOutcome, DuelThrow } from '../core/types';
@@ -40,7 +40,9 @@ export class DragonDuelSystem {
     chains: ChainsData
   ) {
     this.roster = chains.chains
-      .filter((c) => c.hatchAtTier !== undefined)
+      // The Golden Elder (GOLDEN_CHAIN) hatches for the finale but is a scenic
+      // MacGuffin, not a duelling dragon — keep it out of the roster/unlock gate.
+      .filter((c) => c.hatchAtTier !== undefined && c.id !== GOLDEN_CHAIN)
       .map((c) => {
         const hatchTier = c.hatchAtTier!;
         const tierCfg = c.tiers.find((t) => t.tier === hatchTier);

@@ -2,10 +2,16 @@ import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { OrderConfig, OrderOption, OrdersData } from '../core/types';
 
+/** How many orders the Ledger surfaces at once (MECHANICS §11 says 3–4 in the
+ *  full game; two gives the demo its choose-what-to-chase agency). */
+export const VISIBLE_ORDERS = 2;
+
 /**
- * Cindra's Ledger. The active order is the first one not yet completed.
- * Progress derives from live board counts; delivery consumes matching items
- * and pays out via the economy.
+ * Cindra's Ledger. Up to VISIBLE_ORDERS uncompleted orders are active at once:
+ * first the scripted list, then an endless encore queue synthesised from the
+ * `repeatable` templates (ids `encore_1`, `encore_2`, …) so the Ledger never
+ * dead-ends. Progress derives from live board counts; delivery consumes
+ * matching items and pays out via the economy.
  */
 export class OrderSystem {
   constructor(
@@ -22,8 +28,40 @@ export class OrderSystem {
     bus.on('state:loaded', () => this.announceProgress());
   }
 
+  /** The nth not-yet-completed order: scripted first, then encore templates. */
+  private orderAt(offset: number): OrderConfig | undefined {
+    const remaining = this.orders.orders.filter(
+      (o) => !this.state.completedOrderIds.includes(o.id)
+    );
+    if (offset < remaining.length) return remaining[offset];
+
+    const pool = this.orders.repeatable ?? [];
+    if (pool.length === 0) return undefined;
+    // Walk the encore sequence, skipping ids already delivered (either visible
+    // encore may complete first, so skip by id — not by count).
+    let skip = offset - remaining.length;
+    for (let n = 0; n < this.state.completedOrderIds.length + skip + 1; n++) {
+      const id = `encore_${n + 1}`;
+      if (this.state.completedOrderIds.includes(id)) continue;
+      if (skip === 0) return { ...pool[n % pool.length]!, id };
+      skip--;
+    }
+    return undefined;
+  }
+
+  /** The primary (first) active order — kept for the e2e text render. */
   get activeOrder(): OrderConfig | undefined {
-    return this.orders.orders.find((o) => !this.state.completedOrderIds.includes(o.id));
+    return this.orderAt(0);
+  }
+
+  /** The orders the Ledger shows, in priority order. */
+  get activeOrders(): OrderConfig[] {
+    const out: OrderConfig[] = [];
+    for (let i = 0; i < VISIBLE_ORDERS; i++) {
+      const order = this.orderAt(i);
+      if (order) out.push(order);
+    }
+    return out;
   }
 
   progressFor(order: OrderConfig): { have: number[]; need: number[]; deliverable: boolean } {
@@ -38,10 +76,10 @@ export class OrderSystem {
   }
 
   announceProgress(): void {
-    const order = this.activeOrder;
-    if (!order) return;
-    const { have, need, deliverable } = this.progressFor(order);
-    this.bus.emit('order:progress', { orderId: order.id, have, need, deliverable });
+    for (const order of this.activeOrders) {
+      const { have, need, deliverable } = this.progressFor(order);
+      this.bus.emit('order:progress', { orderId: order.id, have, need, deliverable });
+    }
   }
 
   /** True if this option can be delivered right now (items on the board and/or
@@ -57,8 +95,10 @@ export class OrderSystem {
   }
 
   private deliver(orderId: string, optionIndex?: number): void {
-    const order = this.activeOrder;
-    if (!order || order.id !== orderId) return;
+    // Locate the order among ALL visible ones (main's multi-order Ledger), then
+    // honour nionja's multi-OPTION path when the order defines options.
+    const order = this.activeOrders.find((o) => o.id === orderId);
+    if (!order) return;
 
     // Multi-option order: fulfil the chosen option (items and/or coins) and
     // complete the whole order — the player only ever picks one path.
@@ -129,7 +169,7 @@ export class OrderSystem {
     this.state.completedOrderIds.push(order.id);
     this.bus.emit('order:completed', { orderId: order.id, rewards });
     if (!this.activeOrder) {
-      this.bus.emit('order:all_done', {});
+      this.bus.emit('order:all_done', {}); // only possible with an empty repeatable pool
     } else {
       this.announceProgress();
     }

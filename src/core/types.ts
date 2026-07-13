@@ -63,7 +63,13 @@ export interface ChainTierConfig {
   sell: number;
   /** XP granted when a merge produces this tier. */
   xp: number;
+  /** false = the sell path refuses this tier (story items like the Golden Egg). */
+  sellable?: boolean;
   generator?: GeneratorConfig;
+  /** Per-TIER merge recipe override — takes precedence over the chain-level
+   *  `merge` when merging items of THIS tier (e.g. 2 Houses → 1 Manor while
+   *  Bushes still merge 3 → 1 House). */
+  merge?: ChainMergeOverride;
 }
 
 /** Per-chain merge recipe override (e.g. 5 wood → 1 house). */
@@ -119,7 +125,15 @@ export interface OrderConfig {
   title: string;
   blurb: string;
   requires: OrderRequirement[];
-  rewards: { coins: number; keys: number; xp?: number; spawn?: { chain: string; tier: number; count: number } };
+  rewards: {
+    coins: number;
+    keys: number;
+    xp?: number;
+    spawn?: { chain: string; tier: number; count: number };
+    /** Mystery-reward hint shown verbatim on the order card (e.g. "🥚 ???") —
+     *  for rewards staged OUTSIDE the board, like the Golden Altar egg. */
+    tease?: string;
+  };
   /** When present, the ledger shows one row per option and delivering any one
    *  completes the order. `requires`/`rewards` mirror option 0 for legacy
    *  readers (progress text, tutorial). */
@@ -128,6 +142,58 @@ export interface OrderConfig {
 
 export interface OrdersData {
   orders: OrderConfig[];
+  /** Encore templates cycled forever once the scripted orders are done, so the
+   *  Ledger never dead-ends. Ids are synthesised as `encore_<n>`. */
+  repeatable?: Omit<OrderConfig, 'id'>[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Dialogue + Keeper's Tasks data (src/data/dialogue.json, tasks.json)  */
+/* ------------------------------------------------------------------ */
+
+export interface DialogueData {
+  /** Short Cindra quotes stamped on the order-complete banner (rotating). */
+  orderComplete: string[];
+  /** Golden Egg tap flavor, keyed by XP progress toward the Level-3 finale. */
+  goldenEgg: { early: string[]; mid: string[]; near: string[] };
+  /** Cindra's first (and only pre-encore) spoken line — the finale beat. */
+  finaleCindra: string;
+  /** Finale variant when the Golden Egg was never earned (Order 1 skipped) —
+   *  reads as PROPHECY, pointing the player back to the un-filled promise. */
+  finaleCindraProphecy: string;
+  /** Cindra's banner quote the moment the egg materialises on the altar. */
+  goldenArrival: string;
+  /** Cindra's line when Order 1 completes AFTER Level 3 — the late awakening. */
+  lateAwakening: string;
+  /** One-shot Laurah nudges post-tutorial. */
+  hints: {
+    zeroWarmth: string;
+    boardFull: string;
+    eggTrembles: string;
+    twoDragons: string;
+    twoHouses: string;
+  };
+  /** Cindra's line when all Keeper's Tasks complete. */
+  tasksComplete: string;
+}
+
+export type TaskKind = 'hatches' | 'orders' | 'goldEarned' | 'merges' | 'elderTaps';
+
+export interface TaskConfig {
+  id: string;
+  label: string;
+  kind: TaskKind;
+  target: number;
+  /** The task's subject doesn't exist before these gates (presentation only —
+   *  progress can't move anyway; e.g. the Elder pre-awakening). */
+  lockedUntil?: { order?: string; level?: number };
+  /** Shown in place of the progress bar while locked. */
+  lockedHint?: string;
+}
+
+export interface TasksData {
+  tasks: TaskConfig[];
+  reward: { coins: number; energy: number };
 }
 
 /** A "gift" goal shown by the quest journal: reach `count` of chain+tier on the
@@ -270,7 +336,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'chest:open' | 'dragon:working' | 'marketplace:purchased' | 'generator:skipped'; chain?: string; currency?: 'gold' | 'warmth' }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'chest:open' | 'dragon:working' | 'marketplace:purchased' | 'generator:skipped'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number };
 
 export interface TutorialAllow {
@@ -285,6 +351,8 @@ export interface TutorialAllow {
   dragonWork?: boolean;
   /** Allow tapping the energy ⚡ shop button during tutorial. */
   marketplace?: boolean;
+  /** Allow tapping the Emberkeep Cookbook button during tutorial. */
+  cookbook?: boolean;
 }
 
 /**
@@ -297,12 +365,12 @@ export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: 
 
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
   | { fogRegion: string };
 
 export type TutorialArrowConfig =
   | { tile: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
   | { fogRegion: string };
 
 /**
@@ -311,7 +379,7 @@ export type TutorialArrowConfig =
  * the bush after the hatch, hand over the key before the fog lesson.
  */
 export type TutorialEffect =
-  | { spawn: { chain: string; tier: number; count: number; nearChain?: string; at?: [number, number] } }
+  | { spawn: { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number] } }
   | { retier: { chain: string; fromTier: number; toTier: number } }
   | { grantKeys: number }
   | { grantXp: number }
@@ -384,6 +452,12 @@ export interface SaveDataV1 {
   /** Per-dragon-colour duel level/gauge (optional — pre-duel saves omit it). */
   dragonLevels?: Record<string, { level: number; gauge: number }>;
   tutorial: { index: number; done: boolean };
+  /** Lifetime counters (Keeper's Tasks + chapter-card stats) and one-shot
+   *  flags (`finaleSeen`, `tasksClaimed`) — all numeric for easy versioning. */
+  stats: Record<string, number>;
+  /** First-time merge discoveries for the Emberkeep Cookbook — keys like
+   *  `"ember_dragon:1>2"`. Optional: older saves default to []. */
+  discoveredRecipes?: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -401,9 +475,12 @@ export interface EventMap {
   'dragon:rest': { dragonId: number };
   'dragon:rested': { dragonId: number };
   'ui:ledger_toggled': { open: boolean };
+  /** The Emberkeep Cookbook panel opened/closed (tutorial gates + analytics). */
+  'ui:cookbook_opened': { discovered: number };
+  'ui:cookbook_closed': { discovered: number };
   'ui:deliver_requested': { orderId: string; optionIndex?: number };
   /** A gauge "+" button opened the shop for that currency. */
-  'ui:shop_requested': { currency: 'energy' | 'coins' | 'keys' };
+  'ui:shop_requested': { currency: 'energy' | 'coins' };
   'ui:sell_requested': { itemId: number };
   /** The Emberfont Spark Well was tapped — spend a Spark, draw a vein. */
   'emberfont:tap': Record<string, never>;
@@ -427,7 +504,7 @@ export interface EventMap {
   'economy:spend_keys': { keys: number; reason: string };
   'board:consume_items': { itemIds: number[]; reason: string };
   /** Scripted spawn of `count` items, into free tiles near an item of `nearChain`. */
-  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string };
+  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number] };
   /** Transform one on-board item of `chain`+`fromTier` into `toTier` in place. */
   'board:retier': { chain: string; fromTier: number; toTier: number };
   /** Relocate one on-board item of `chain`+`tier` to a cell (tutorial staging). */
@@ -454,6 +531,9 @@ export interface EventMap {
     xp: number;
   };
   'item:hatched': { item: ItemSnapshot };
+  /** A merge recipe was performed for the FIRST time — the Emberkeep Cookbook
+   *  writes a new page (MergeSystem emits once per chain:fromTier>resultTier). */
+  'cookbook:discovered': { chain: string; fromTier: number; resultTier: number };
   'item:harvested': { generatorId: number; output: ItemSnapshot };
   'item:harvest_failed': { generatorId: number; reason: 'cooldown' | 'energy' | 'no_space' };
   /** A generator passively gifted an item (no tap, no energy). */
@@ -462,8 +542,9 @@ export interface EventMap {
   'generator:reward': { generatorId: number; coins: number; xp: number; energy: number };
   /** A generator's wait was paid off (the skip button) — currency tells which. */
   'generator:skipped': { itemId: number; chain: string; currency: 'gold' | 'warmth' };
-  /** A Gold coin was tapped to bank it — UI flies a coin to the Gold gauge. */
-  'gold:collected': { at: TilePos };
+  /** A Gold coin was tapped to bank it — UI flies coin(s) to the Gold gauge,
+   *  one gauge pulse per arrival (the Pouch sends 3; default 1). */
+  'gold:collected': { at: TilePos; coins?: number };
   'item:removed': { itemId: number; at: TilePos; reason: 'sold' | 'delivered' };
   'item:sold': { itemId: number; coins: number };
   'energy:changed': { current: number; max: number };
@@ -533,6 +614,10 @@ export interface EventMap {
   'region:unlocked': { regionId: string; tiles: TilePos[]; revealed: ItemSnapshot[] };
   'region:unlock_failed': { regionId: string; reason: 'keys' | 'not_unlockable' | 'level' };
   'marketplace:purchased': { energy: number; free: boolean };
+  /** The awakened Golden Elder was tapped (communing) — Keeper's Tasks counts it. */
+  'elder:tapped': { itemId: number };
+  /** Every Keeper's Task reached its target (fired once; reward already paid). */
+  'tasks:all_complete': Record<string, never>;
   'tutorial:step': TutorialStepEvent;
   'state:saved': { at: number };
   'state:loaded': { offlineMs: number; energyRecovered: number };
@@ -541,12 +626,12 @@ export interface EventMap {
 
 export type ResolvedHand =
   | { from: TilePos; to: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
   | { fogRegion: string };
 
 export type ResolvedArrow =
   | { tile: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
   | { fogRegion: string };
 
 export interface TutorialStepEvent {

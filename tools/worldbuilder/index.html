@@ -25,6 +25,7 @@
     border-radius:6px; padding:5px 9px; font:inherit; cursor:pointer; }
   button:hover { border-color:var(--gold); }
   button.tool.active { background:var(--gold); color:#3A2B38; font-weight:bold; }
+  button.toggled { background:var(--gold); color:#3A2B38; font-weight:bold; border-color:var(--gold); }
   button.primary { background:var(--moss); color:#1d3010; font-weight:bold; }
   button.warn { background:var(--lava); color:var(--cream); }
   /* animation tool (top bar) — appears only when a decor is selected */
@@ -110,6 +111,7 @@
     <button id="zoomFit" title="F">Fit</button>
     <button id="gridToggle" title="G — toggle grid">▦ Grid</button>
     <button id="tagToggle" title="T — show/hide cloud level tags">☁# Tags</button>
+    <button id="coordToggle" title="C — show/hide cell coordinates (col,row) — GAME grid (ingest-normalised: NW-most placement = 0,0), so labels match map.json / anchors.json cells exactly; hover badge also shows the raw builder cell">⌗ Coords</button>
     <span class="sep" id="animSep" style="display:none"></span>
     <span id="animTool" style="display:none">
       <span class="lbl">🎬 Animate</span>
@@ -123,7 +125,8 @@
     <button id="newWorld" title="Start a fresh world (clears the auto-saved session)">✦ New</button>
     <button id="loadProject" title="Load a saved .worldproject.json file">Load</button>
     <button id="saveProject" title="Download a .worldproject.json backup file">Save</button>
-    <button class="primary" id="exportWorld" title="World JSON: per-asset calibration (offset/scale/anchor), all placements, embedded PNGs">⬇ Export world.json</button>
+    <label id="embedArtLabel" title="Embed every PNG as base64 in the export (huge file — only needed to hand art to the extract scripts). Off = lean data-only JSON; art still round-trips via Save/Load project." style="display:inline-flex; align-items:center; gap:4px; font-size:11px; cursor:pointer"><input id="embedArt" type="checkbox" style="margin:0" />embed art</label>
+    <button class="primary" id="exportWorld" title="World JSON: per-asset calibration (offset/scale/anchor), all placements, level/fog map, camera keyframes. Lean by default — tick 'embed art' to inline the PNGs.">⬇ Export world.json</button>
     </div>
   </div>
 
@@ -214,6 +217,13 @@ try {
  * point: it tells you the exact nudge each PNG needs to sit right, which
  * drops straight into the game's assets.json / anchors.json.
  *
+ * Two file formats, one structure:
+ *  - Export world.json  — LEAN data-only by default (images map keeps its
+ *    keys but holds nulls; ~tens of KB, LLM/ingest-friendly). Tick 'embed
+ *    art' to inline base64 PNGs (only needed for the extract-* scripts).
+ *  - Save .worldproject.json — always full-fat (every PNG embedded); the
+ *    round-trip/backup format the artist re-loads to keep editing.
+ *
  * Iso projection matches the game (Constants.ts): TILE_W x TILE_H, 2:1.
  *   worldOf(col,row) = ((col-row)*TILE_W/2, (col+row)*TILE_H/2)
  * =================================================================== */
@@ -232,6 +242,7 @@ const S = {
   cam: { x: 0, y: 0, zoom: 0.55 }, // screen offset of world-origin + zoom
   showGrid: true,
   showLevelTags: true,
+  showCoords: false,   // stamp col,row on every visible cell (targeted map edits)
   cameraKeyframes: {}, // level -> { wx, wy, zoom } focal world point + zoom
   gameZoom: { min: 0.2, max: 1.4 }, // in-game wheel-zoom clamp the game enforces
   flying: null,        // active smooth camera transition (raf id)
@@ -341,6 +352,16 @@ function cellOf(sx, sy) {
 }
 const assetById = (id) => S.assets[id];
 const placementById = (id) => S.placements.find((p) => p.id === id);
+// GAME-coordinate origin: scripts/ingest-world.mjs normalises the export so the
+// most-NW occupied cell lands on (0,0) — game (col,row) = builder cell − this
+// origin. Recomputed live from ALL placements (the export carries every
+// category, and ingest takes its min over the full list), so the coordinate
+// overlay always shows the cells the NEXT export will produce in map.json.
+function gameOrigin() {
+  let c = Infinity, r = Infinity;
+  for (const p of S.placements) { if (p.col < c) c = p.col; if (p.row < r) r = p.row; }
+  return c === Infinity ? { c: 0, r: 0 } : { c, r };
+}
 
 /* ----------------------------- canvas ----------------------------- */
 function resize() {
@@ -544,11 +565,62 @@ function render(transient) {
     drawDiamond(o.x, o.y, 'rgba(247,164,55,0.6)', 'rgba(247,164,55,0.08)');
   }
 
+  // cell coordinates — stamped on visible cells in GAME grid space (ingest-
+  // normalised, see gameOrigin) so a label here IS the cell to target in
+  // map.json / anchors.json — no mental +offset. When zoomed out too far for
+  // every label to fit, only every Nth cell is labelled (stride) so the overlay
+  // stays legible; the hover badge below reads out any cell at any zoom.
+  if (S.showCoords) {
+    const O = gameOrigin();
+    const fs = Math.max(9, Math.min(20, S.tileH * 0.22 * S.cam.zoom));
+    ctx.font = `bold ${fs}px Trebuchet MS`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = Math.max(2, fs / 5); ctx.strokeStyle = 'rgba(36,27,34,0.85)';
+    ctx.lineJoin = 'round';
+    // widest label in view vs the screen gap between same-screen-row neighbours
+    // (one apart on the col-row diagonal = one full tile width); same idea
+    // vertically against the half-tile row pitch.
+    const labelW = ctx.measureText(
+      `${-Math.max(Math.abs(minC - O.c), Math.abs(maxC - O.c))},${-Math.max(Math.abs(minR - O.r), Math.abs(maxR - O.r))}`
+    ).width;
+    const stride = Math.max(1,
+      Math.ceil((labelW + 8) / (S.tileW * S.cam.zoom)),
+      Math.ceil((fs + 6) / (S.tileH * S.cam.zoom)));
+    for (let row = minR; row <= maxR; row++) {
+      for (let col = minC; col <= maxC; col++) {
+        const gc = col - O.c, gr = row - O.r;
+        if (stride > 1 && ((gc % stride + stride) % stride || (gr % stride + stride) % stride)) continue;
+        const wc = worldOf(col, row);
+        const s = toScreen(wc.x, wc.y);
+        const label = `${gc},${gr}`;
+        ctx.strokeText(label, s.x, s.y);
+        ctx.fillStyle = (gc === 0 && gr === 0) ? '#F7A437' : 'rgba(255,246,232,0.88)';
+        ctx.fillText(label, s.x, s.y);
+      }
+    }
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+
   // hovered cell marker
   if (S.hover) {
     const wc = worldOf(S.hover.col, S.hover.row);
     const s = toScreen(wc.x, wc.y);
     drawDiamond(s.x, s.y, S.tool === 'erase' ? '#E8503C' : '#7ECB4F', 'rgba(126,203,79,0.12)');
+    if (S.showCoords) {
+      // floating readout above the hovered cell — works at any zoom, even when
+      // the per-cell labels are suppressed for being too small. GAME cell first
+      // (what map.json/anchors.json use), raw builder cell alongside.
+      const O = gameOrigin();
+      const label = `${S.hover.col - O.c}, ${S.hover.row - O.r}  (raw ${S.hover.col}, ${S.hover.row})`;
+      ctx.font = 'bold 13px Trebuchet MS';
+      const w = ctx.measureText(label).width + 12;
+      const hh = S.tileH / 2 * S.cam.zoom;
+      ctx.fillStyle = 'rgba(36,27,34,0.85)';
+      ctx.fillRect(s.x - w / 2, s.y - hh - 24, w, 19);
+      ctx.fillStyle = '#7ECB4F'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, s.x, s.y - hh - 14.5);
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+    }
   }
   // camera keyframe reticles
   for (const [lvl, kf] of Object.entries(S.cameraKeyframes)) {
@@ -1100,6 +1172,14 @@ document.getElementById('tagToggle').onclick = (e) => {
   render();
   say(`Cloud level tags ${S.showLevelTags ? 'shown' : 'hidden'} on the preview (export keeps the level data).`);
 };
+document.getElementById('coordToggle').onclick = (e) => {
+  S.showCoords = !S.showCoords;
+  e.currentTarget.classList.toggle('toggled', S.showCoords);
+  render();
+  say(S.showCoords
+    ? 'Cell coordinates <b>on</b> — every cell shows <b>col,row</b> (the exact cell in map.json / anchors.json). Hover any cell for a readout at any zoom.'
+    : 'Cell coordinates hidden.');
+};
 /* --------------------------- grid projection controls --------------------------- */
 // Tile size (W×H), iso Angle (edge pitch, linked to W/H) and Skew (perspective lean)
 // all drive the same parametric projection. Angle ⇄ height are kept in sync so the
@@ -1156,6 +1236,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'f' || e.key === 'F') fitView();
   if (e.key === 'g' || e.key === 'G') { S.showGrid = !S.showGrid; render(); }
   if (e.key === 't' || e.key === 'T') { document.getElementById('tagToggle').click(); }
+  if (e.key === 'c' || e.key === 'C') { document.getElementById('coordToggle').click(); }
   if (e.code === 'Space' && !S.spaceHeld) { S.spaceHeld = true; e.preventDefault(); stopFly(); updateCursor(); }
   // Arrow keys nudge-pan the view (Shift = coarse). A clear, no-mouse pan.
   const ARROWS = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
@@ -1369,14 +1450,15 @@ function buildDoc(embed) {
     })
     .sort((a, b) => a.level - b.level);
   // merge-item catalogue: every element, with custom art where the artist
-  // dropped it in. `image` is embedded only for replaced slots (keeps it lean).
+  // dropped it in. `image` is embedded only for replaced slots — and only when
+  // embedding at all (lean exports keep the key→file mapping, art stays null).
   const mergeAssets = MERGE_SLOTS.map((def) => {
     const s = S.mergeSlots[def.key] ?? def;
     return {
       key: def.key, label: def.label, chain: def.chain, tier: def.tier,
       custom: !!s.custom,
       file: s.custom ? (s.fileName ?? `${def.key}.png`) : null,
-      image: s.custom ? s.src : null
+      image: embed && s.custom ? s.src : null
     };
   });
   const doc = {
@@ -1387,18 +1469,54 @@ function buildDoc(embed) {
     bounds, backgroundBounds, assets, placements, levels, cameraKeyframes, mergeAssets,
     cameraZoom: { min: +S.gameZoom.min, max: +S.gameZoom.max } // in-game wheel-zoom clamp
   };
+  // The images map ALWAYS keeps its keys so the export structure is stable.
+  // Lean mode (embed=false) writes null instead of base64 — every consumer
+  // (ingest, extract scripts, loadWorldDoc) already treats a missing image as
+  // "skip"; real art round-trips via the .worldproject.json instead.
   // Invisible tiles export a transparent pixel (the card icon is editor-only).
-  if (embed) { doc.images = {}; for (const a of Object.values(S.assets)) { if (a.is3d) continue; doc.images[a.file] = a.invisible ? TRANSPARENT_PX : a.img.src; } }
+  doc.images = {};
+  for (const a of Object.values(S.assets)) {
+    if (a.is3d) continue;
+    doc.images[a.file] = a.invisible ? TRANSPARENT_PX : (embed ? a.img.src : null);
+  }
   return doc;
 }
+// Lean pretty-printer: top-level keys indented, but each record (asset,
+// placement, level entry, image key) on ONE line — same JSON, a fraction of
+// the pretty-printed line noise, and still diff- and human-readable.
+function stringifyLean(doc) {
+  const lines = ['{'];
+  const entries = Object.entries(doc);
+  entries.forEach(([k, v], i) => {
+    const comma = i < entries.length - 1 ? ',' : '';
+    if (Array.isArray(v) && v.length) {
+      lines.push(`  ${JSON.stringify(k)}: [`);
+      v.forEach((el, j) => lines.push(`    ${JSON.stringify(el)}${j < v.length - 1 ? ',' : ''}`));
+      lines.push(`  ]${comma}`);
+    } else if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length && (k === 'levels' || k === 'images')) {
+      const es = Object.entries(v);
+      lines.push(`  ${JSON.stringify(k)}: {`);
+      es.forEach(([kk, vv], j) => lines.push(`    ${JSON.stringify(kk)}: ${JSON.stringify(vv)}${j < es.length - 1 ? ',' : ''}`));
+      lines.push(`  }${comma}`);
+    } else {
+      lines.push(`  ${JSON.stringify(k)}: ${JSON.stringify(v)}${comma}`);
+    }
+  });
+  lines.push('}');
+  return lines.join('\n');
+}
 document.getElementById('exportWorld').onclick = () => {
-  const doc = buildDoc(true);
-  download(`${doc.world}.world.json`, JSON.stringify(doc, null, 2));
+  const embed = document.getElementById('embedArt').checked;
+  const doc = buildDoc(embed);
+  const text = embed ? JSON.stringify(doc, null, 2) : stringifyLean(doc);
+  download(`${doc.world}.world.json`, text);
   const levelKeys = Object.keys(doc.levels);
   const levelSummary = levelKeys.length
     ? ` Levels: ${levelKeys.sort((a, b) => a - b).map((L) => `L${L}×${doc.levels[L].count}`).join(', ')}.`
     : '';
-  say(`Exported <b>${doc.world}.world.json</b> — ${doc.assets.length} assets, ${doc.placements.length} placements, images embedded.${levelSummary} ✔`);
+  const kb = Math.max(1, Math.round(text.length / 1024));
+  const artNote = embed ? 'images embedded' : 'lean (no art — Save carries the PNGs)';
+  say(`Exported <b>${doc.world}.world.json</b> — ${doc.assets.length} assets, ${doc.placements.length} placements, ${artNote}, ${kb} KB.${levelSummary} ✔`);
 };
 document.getElementById('saveProject').onclick = () => {
   const doc = buildDoc(true); doc.format = 'emberkeep-world-project';
@@ -1423,7 +1541,30 @@ function loadWorldDoc(doc, label) {
   }
   const byName = {};
   let remaining = (doc.assets ?? []).length;
+  let skipped = 0;
   if (!remaining) { markReady(); renderAssets(); render(); return; }
+  // Bind placements once EVERY asset has resolved — loaded OR failed. A single
+  // broken/missing image (e.g. the procedural 3D crystal carries no image in
+  // the export) must never deadlock the whole world load.
+  const finishOne = () => {
+    if (--remaining !== 0) return;
+    for (const pl of doc.placements) {
+      const aid = byName[`${pl.category}|${pl.asset}`] ?? byName[`tile|${pl.asset}`] ?? byName[`decotile|${pl.asset}`];
+      if (!aid) continue;
+      const place = { id: uid(), assetId: aid, col: pl.col, row: pl.row, z: pl.z ?? 0 };
+      if (pl.level !== undefined) place.level = pl.level;
+      if (pl.dx || pl.dy) { place.dx = pl.dx; place.dy = pl.dy; }
+      S.placements.push(place);
+    }
+    S.nextZ = Math.max(1, ...S.placements.map((p) => Math.abs(p.z))) + 1;
+    S.selectedAssetId = null;
+    renderAssets(); fitView(); refreshInspector();
+    markReady(); // resume auto-save and persist the loaded project
+    // A lean export (Export with 'embed art' off) has an images map of nulls —
+    // tell the artist the .worldproject.json is the editable-with-art format.
+    const leanDoc = skipped > 0 && doc.images && Object.values(doc.images).every((v) => !v || v.length < 200);
+    say(`Loaded <b>${label ?? doc.world}</b>: ${doc.assets.length} assets, ${doc.placements.length} placements${skipped ? ` (${skipped} asset image${skipped === 1 ? '' : 's'} missing — skipped)` : ''}.${leanDoc ? ' This is a <b>lean export</b> (no art inside) — load the <b>.worldproject.json</b> to edit with art.' : ''}`);
+  };
   doc.assets.forEach((ad) => {
     const img = new Image();
     img.onload = () => {
@@ -1434,23 +1575,12 @@ function loadWorldDoc(doc, label) {
       });
       S.assets[id].name = ad.name; if (ad.invisible) S.assets[id].invisible = true;
       byName[`${ad.category}|${ad.name}`] = id;
-      if (--remaining === 0) {
-        for (const pl of doc.placements) {
-          const aid = byName[`${pl.category}|${pl.asset}`] ?? byName[`tile|${pl.asset}`] ?? byName[`decotile|${pl.asset}`];
-          if (!aid) continue;
-          const place = { id: uid(), assetId: aid, col: pl.col, row: pl.row, z: pl.z ?? 0 };
-          if (pl.level !== undefined) place.level = pl.level;
-          if (pl.dx || pl.dy) { place.dx = pl.dx; place.dy = pl.dy; }
-          S.placements.push(place);
-        }
-        S.nextZ = Math.max(1, ...S.placements.map((p) => Math.abs(p.z))) + 1;
-        S.selectedAssetId = null;
-        renderAssets(); fitView(); refreshInspector();
-        markReady(); // resume auto-save and persist the loaded project
-        say(`Loaded <b>${label ?? doc.world}</b>: ${doc.assets.length} assets, ${doc.placements.length} placements.`);
-      }
+      finishOne();
     };
-    img.src = ad.invisible ? invisibleTileIcon() : (doc.images ?? {})[ad.file];
+    img.onerror = () => { skipped += 1; finishOne(); };
+    const src = ad.invisible ? invisibleTileIcon() : (doc.images ?? {})[ad.file];
+    if (src) img.src = src;
+    else { skipped += 1; setTimeout(finishOne, 0); } // no image in the file (3D/procedural)
   });
 }
 // Fetch the bundled current world (deployed alongside index.html). Returns true
@@ -1560,7 +1690,7 @@ function serializeSession() {
   return {
     v: 1, world: document.getElementById('worldName').value,
     tileW: S.tileW, tileH: S.tileH, gridSkew: S.gridSkew, cam: S.cam,
-    showGrid: S.showGrid, showLevelTags: S.showLevelTags, nextZ: S.nextZ,
+    showGrid: S.showGrid, showLevelTags: S.showLevelTags, showCoords: S.showCoords, nextZ: S.nextZ,
     cameraKeyframes: S.cameraKeyframes, gameZoom: S.gameZoom,
     // 3D crystal placements (the crystal itself rebuilds from code when Three loads)
     crystalPlacements: S.placements.filter((p) => assetById(p.assetId)?.is3d).map((p) => ({ col: p.col, row: p.row, z: p.z, dx: p.dx, dy: p.dy })),
@@ -1626,6 +1756,8 @@ function restoreSession() {
   S.assets = {}; S.placements = []; S.selectedAssetId = null; S.selectedPlacement = null; S.nextId = 1;
   S.tileW = doc.tileW ?? 240; S.tileH = doc.tileH ?? 120; S.gridSkew = doc.gridSkew ?? 0;
   S.showGrid = doc.showGrid ?? true; S.showLevelTags = doc.showLevelTags ?? true;
+  S.showCoords = doc.showCoords ?? false;
+  document.getElementById('coordToggle').classList.toggle('toggled', S.showCoords);
   S.cameraKeyframes = doc.cameraKeyframes ?? {};
   if (doc.gameZoom) S.gameZoom = { min: doc.gameZoom.min ?? 0.2, max: doc.gameZoom.max ?? 1.4 };
   pendingCrystal = doc.crystalPlacements ?? []; // re-attached when Three builds the crystal

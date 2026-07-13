@@ -1,9 +1,11 @@
+import { REWARD_SPAWN_RADIUS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
 import type {
   BoardItemState,
   ChainConfig,
+  ChainMergeOverride,
   ChainsData,
   ItemSnapshot,
   TilePos
@@ -28,6 +30,12 @@ export class MergeSystem {
 
   private chainConfig(chainId: string): ChainConfig | undefined {
     return this.chains.chains.find((c) => c.id === chainId);
+  }
+
+  /** The effective merge recipe when merging items of `seedTier`: a per-TIER
+   *  override wins, else the chain-level override, else undefined (global rule). */
+  private mergeOverrideFor(config: ChainConfig, seedTier: number): ChainMergeOverride | undefined {
+    return config.tiers.find((t) => t.tier === seedTier)?.merge ?? config.merge;
   }
 
   private onDropped({ itemId, from, to }: { itemId: number; from: TilePos; to: TilePos }): void {
@@ -86,9 +94,8 @@ export class MergeSystem {
   private trySnapMerge(item: BoardItemState, to: TilePos): boolean {
     const config = this.chainConfig(item.chain);
     if (!config || !config.tiers.some((t) => t.tier === item.tier + 1)) return false; // max tier
-    const minGroup = config.merge?.group ?? this.chains.mergeRule.minGroup;
-    let best: { col: number; row: number } | null = null;
-    let bestScore = -1;
+    const minGroup = this.mergeOverrideFor(config, item.tier)?.group ?? this.chains.mergeRule.minGroup;
+    let best: { col: number; row: number; size: number } | null = null;
     for (let dc = -1; dc <= 1; dc++) {
       for (let dr = -1; dr <= 1; dr++) {
         if (dc === 0 && dr === 0) continue; // the drop tile itself was already tried
@@ -96,45 +103,54 @@ export class MergeSystem {
         const row = to.row + dr;
         if (!this.state.isTileActive(col, row)) continue;
         const occ = this.state.itemIdAt(col, row);
-        if (occ !== null && occ !== item.id) continue; // candidate must be free
-        const size = this.connectedMatchCount(item, { col, row });
-        if (size < minGroup) continue;
-        const score = size * 100 - (Math.abs(dc) + Math.abs(dr)); // biggest, then nearest
-        if (score > bestScore) {
-          bestScore = score;
-          best = { col, row };
+        if (occ && occ !== item.id) continue; // candidate must be free
+        // Size the ACTUAL orthogonally-connected group the piece would join if
+        // it stood on this candidate — the same flood-fill collectGroup runs.
+        // (A looser count — e.g. 8-neighbourhood — can promise a merge that
+        // then fails, leaving the piece silently moved in state while the
+        // scene renders it on the drop tile: a permanent drag-bounce desync.)
+        const size = this.groupSizeAt(col, row, item);
+        if (size >= minGroup && (!best || size > best.size)) {
+          best = { col, row, size };
         }
       }
     }
     if (!best) return false;
-    this.state.moveItem(item.id, best);
-    return this.performMerge(this.collectGroup(item), best);
+    this.state.moveItem(item.id, { col: best.col, row: best.row });
+    if (this.performMerge(this.collectGroup(item), { col: best.col, row: best.row })) return true;
+    // Safety net (unreachable with the exact flood above): the snap didn't
+    // fuse — put the piece back on the drop tile so state matches the
+    // 'item:moved' the caller emits next.
+    this.state.moveItem(item.id, to);
+    return false;
   }
 
-  /**
-   * Size of the orthogonally-connected same-chain/tier group that WOULD form if
-   * `item` were placed at `at` (counting `at` itself; the piece's own current
-   * tile is excluded so it isn't double-counted). Mirrors collectGroup's walk.
-   */
-  private connectedMatchCount(item: BoardItemState, at: TilePos): number {
-    const key = (c: number, r: number): string => `${c},${r}`;
-    const visited = new Set<string>([key(at.col, at.row)]);
-    const queue: TilePos[] = [at];
-    let count = 1; // the piece we'd place at `at`
+  /** The orthogonally-connected same-chain+tier group size if `item` stood at
+   *  (col,row) — `item`'s current tile is ignored (it would vacate it). */
+  private groupSizeAt(col: number, row: number, item: BoardItemState): number {
+    const visited = new Set<string>([`${col},${row}`]);
+    const queue: TilePos[] = [{ col, row }];
+    let size = 1; // the piece itself, standing on the candidate
     while (queue.length > 0) {
-      const cur = queue.shift()!;
-      for (const p of this.state.neighbors(cur.col, cur.row)) {
-        const k = key(p.col, p.row);
-        if (visited.has(k)) continue;
-        const n = this.state.itemAt(p.col, p.row);
-        if (n && n.id !== item.id && n.kind === 'item' && n.chain === item.chain && n.tier === item.tier) {
-          visited.add(k);
-          count++;
-          queue.push({ col: p.col, row: p.row });
+      const current = queue.shift()!;
+      for (const pos of this.state.neighbors(current.col, current.row)) {
+        const key = `${pos.col},${pos.row}`;
+        if (visited.has(key) || !this.state.isTileActive(pos.col, pos.row)) continue;
+        const nearby = this.state.itemAt(pos.col, pos.row);
+        if (
+          nearby &&
+          nearby.id !== item.id &&
+          nearby.kind === 'item' &&
+          nearby.chain === item.chain &&
+          nearby.tier === item.tier
+        ) {
+          visited.add(key);
+          queue.push(pos);
+          size++;
         }
       }
     }
-    return count;
+    return size;
   }
 
   /** Merge the flood-filled group around `seed`, output at the seed's tile. */
@@ -165,9 +181,10 @@ export class MergeSystem {
     if (!nextTier) return false; // max tier: no merge
 
     const rule = this.chains.mergeRule;
-    // A chain may override the recipe (e.g. lumber: 5 wood → 1 house); otherwise
-    // the global rule applies, with its 5-for-2 bonus.
-    const override = config.merge;
+    // A tier (or the whole chain) may override the recipe — e.g. 2 Houses → 1
+    // Manor while Bushes still merge 3 → 1 House; otherwise the global rule applies
+    // with its 5-for-2 bonus.
+    const override = this.mergeOverrideFor(config, seed.tier);
     const minGroup = override?.group ?? rule.minGroup;
     if (members.length < minGroup) return false;
 
@@ -187,8 +204,9 @@ export class MergeSystem {
     const outputs: ItemSnapshot[] = [];
     const spawnTiles: TilePos[] = [dropPos];
     if (outputCount > 1) {
+      // Bonus outputs land NEAR the merge or not at all (never across the map).
       const extra = this.state
-        .freeActiveTilesNear(dropPos.col, dropPos.row)
+        .freeActiveTilesNear(dropPos.col, dropPos.row, REWARD_SPAWN_RADIUS)
         .filter((p) => !(p.col === dropPos.col && p.row === dropPos.row))
         .slice(0, outputCount - 1);
       spawnTiles.push(...extra);
@@ -217,6 +235,17 @@ export class MergeSystem {
       outputs,
       xp: nextTier.xp * outputs.length
     });
+
+    // First time this recipe is performed → a new Emberkeep Cookbook page.
+    const recipeKey = `${seed.chain}:${seed.tier}>${nextTier.tier}`;
+    if (!this.state.discoveredRecipes.includes(recipeKey)) {
+      this.state.discoveredRecipes.push(recipeKey);
+      this.bus.emit('cookbook:discovered', {
+        chain: seed.chain,
+        fromTier: seed.tier,
+        resultTier: nextTier.tier
+      });
+    }
 
     if (config.hatchAtTier === nextTier.tier) {
       for (const output of outputs) {

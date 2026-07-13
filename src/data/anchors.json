@@ -6,15 +6,15 @@
   "byKey": {
     "item_strawberry_1": [
       0.5,
-      0.88
+      0.71
     ],
     "item_strawberry_2": [
       0.5,
-      0.88
+      0.82
     ],
     "item_strawberry_3": [
       0.5,
-      0.88
+      0.82
     ],
     "item_ember_dragon_1": [
       0.5,
@@ -27,6 +27,10 @@
     "item_golden_egg_1": [
       0.5,
       1.0
+    ],
+    "item_golden_egg_2": [
+      0.5,
+      0.88
     ],
     "icon_key_bronze": [
       0.5,
@@ -121,12 +125,12 @@
       0.5
     ],
     "ui_hand": [
-      0.3,
-      0.12
+      0.05,
+      0.05
     ],
     "ui_arrow": [
-      0.5,
-      1
+      0.52,
+      0.97
     ],
     "portrait_laurah": [
       0.5,
@@ -194,7 +198,11 @@
     ],
     "item_ember_dragon_3": [
       0.5,
-      0.95
+      0.88
+    ],
+    "item_ember_dragon_4": [
+      0.5,
+      0.88
     ],
     "decor_themcristall": [
       0.99,
@@ -212,9 +220,13 @@
       0.5,
       0.9
     ],
+    "item_lumber_3": [
+      0.5,
+      0.9
+    ],
     "item_chest_1": [
       0.5,
-      0.92
+      0.79
     ],
     "item_bigtree_1": [
       0.5,
@@ -252,7 +264,10 @@
       0.5,
       0.62
     ],
-    "item_coin_2": [0.5, 0.62],
+    "item_coin_2": [
+      0.5,
+      0.62
+    ],
     "item_diamond_1": [
       0.5,
       0.66
@@ -264,6 +279,10 @@
     "item_emerald_2": [
       0.5,
       1.0
+    ],
+    "item_emerald_4": [
+      0.5,
+      0.88
     ],
     "item_emerald_3": [
       0.5,

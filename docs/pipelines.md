@@ -91,6 +91,134 @@ cross-file invariants these pipelines participate in.
   `pnpm build && pnpm exec vite preview`) — spawns a live dragon, freezes one
   pose and screenshots base/blink/talk faces; the head must not move or resize.
 
+## UI Builder (tools/uibuilder) — live UI theming
+
+- `tools/uibuilder/index.html` — satellite app for the game's UI: move elements,
+  restyle text (font/size/color/stroke), tint/swap textures per layer, and
+  recolor the generated ui_* chrome (buttons, pills, panels, cards, slots).
+  Layout: center = THE RUNNING GAME embedded in an iframe with `?uiedit=1`
+  (pixel-perfect by construction — it is not a mockup); left rail = elements
+  tree, chrome/icon thumbnails (rendered live from the game's texture manager),
+  Emberkeep palette, font presets; right floating panel = transform, layers
+  (named parts), per-part text/image properties, chrome color styler.
+- Data flow: the tool talks to the game over a `{__uib:true}` postMessage
+  bridge (`src/ui/uiEdit.ts`, active only with `?uiedit=1`): live patches apply
+  instantly through `uiRegistry` (`src/ui/theme.ts` + Phaser-free
+  `themeCore.ts`). **Save** POSTs the pruned doc to the Vite dev endpoint
+  `/__uibuilder/theme` (vite.config.ts), which writes
+  `src/data/ui-theme.json` — GENERATED, never hand-edit. The game BUNDLES that
+  file and applies it at element registration, so saved themes appear in dev,
+  preview and production builds alike. Empty doc ⇒ pixel-identical authored UI.
+- `?uiedit=1` boots `UiEditorScene` INSTEAD of the game — a document window in
+  the Photoshop sense. BoardScene never starts, `ctx.beginRun()` is never
+  called: no save load, no tutorial, no systems activity, no clock consumers.
+  The scene merely CONSTRUCTS the UI components (inert — nothing emits) so they
+  register for staging. Selecting a component shows it ALONE on the blank
+  game-sized canvas; hidden components get sample content. Placement is
+  WYSIWYG for tool-authored components: they sit at their authored x/y —
+  exactly where they appear in-game — and dragging the component body (or
+  arrow-nudging with no layer selected) edits that document position. Built-ins
+  stage display-centered (their in-game spot is code-authored); their dx/dy
+  offsets live in the Transform fields. The only motion on the
+  canvas is component-owned art (rig layers previewing their body/face motion).
+  The tool's "Game preview" button swaps the frame to a SEPARATE, fresh boot of
+  the real game (with the saved theme) — editor and game never share a runtime.
+- DRAG-DROP from the rail: any rail thumbnail (characters, uploads, sequences,
+  chrome frames, icons) is draggable onto the canvas OR onto a LAYER ROW in the
+  right panel (`layer:drop` — precise replace). A `#dropCatcher` overlay covers
+  the iframe during a drag, converts the screen point to game coords (frameWrap
+  transform, ×2 for RES) and posts `canvas:drop`. Routing in uiEdit.ts:
+  · BUILT-IN element staged → the drop replaces the LAYER under the pointer
+    (else the selected layer) and the stage NEVER switches: sequences attach as
+    a `sequence` PART PATCH (animated by PartAnimator, contain-fit to the
+    part's footprint — the bubble portrait becomes the talking Laurah);
+    textures/uploads swap the part texture. Characters get a status note.
+  · custom component staged → drop ON a layer replaces it keeping the slot AND
+    on-screen footprint (explicit w/h carries over; otherwise the new art is
+    contain-fit to the old display size); empty space ADDS at the drop point.
+  · nothing staged → a component is auto-created at the drop point.
+- LAYERS PANEL: rows are drop targets; custom rows DRAG-REORDER (the array is
+  the z hierarchy — customUi.syncZOrder re-stacks the container, incl. async
+  rig loads). Delete/Backspace removes the selected custom layer; on built-in
+  parts it HIDES them (code-authored — the row's ✕/👁 toggles, Reset element
+  restores). Animated parts show a gold ▶; the part editor's "Animate" select
+  attaches/clears a sequence per image part.
+- On the stage you edit LAYERS: click to select one (gold outline), drag it,
+  arrow keys nudge (Shift ×10), Esc steps out. Drags have CENTRING SNAP
+  (SNAP_RANGE in uiEdit.ts): the dragged bounds centre pulls onto the canvas
+  centre lines — and, for custom layers, the component's own axes — showing a
+  pink guide while locked; Alt bypasses. Nudges never snap. Components with self-owned
+  layout declare `selfLaidOutParts` + a `relayout` hook so the registry never
+  fights them — the layout consumes `partOffsetOf()` itself (see
+  CharacterBubble). Numeric layout knobs (`paramsSpec`, e.g. bubble width/text
+  width/min height) appear in the tool's Component section.
+- The preview has a toggleable alignment GRID (checkbox + 32–256 spacing,
+  drawn in game units with gold centre lines).
+- SCALABLE FRAMES: image layers take explicit `w`/`h` (or per-axis
+  `scaleX`/`scaleY`); chrome frames render as 9-SLICE (`UI_NINESLICE` corner
+  insets in TextureFactory) so corners/borders stay crisp at any size — drag
+  the gold corner handles on the stage to resize. "+ Frame/Image" adds a
+  900×700 sliced ui_panel by default (the promo-popup case).
+- PRELOADED (built-in) ANIMATIONS: `src/render/sequenceCatalog.ts` ships Laurah's
+  talk banks (short/mid/long) — always in the Animations rail (★), no upload
+  needed, drag-drop ready. They are FILE-backed (optimized frames under
+  `assets/sprites/laurah/`, downscaled from the 1.4MB/frame AE source), so an
+  `anim` layer referencing one costs NOTHING in the saved theme (frames aren't
+  inlined). Each bank ENDS on one of the two idle poses (the last frame is an
+  idle image, held); `loop:false` by default ⇒ talk plays once then rests on the
+  idle. PreloadScene loads ALL built-ins in the editor (rail) but only the banks
+  a saved component references in the game. `customUi.resolveSequence()` maps a
+  sequence name → frame keys+timing from either `doc.sequences` (upload) or the
+  catalog, and lazy-loads built-in frames on a cache miss.
+- ANIMATION UPLOADS: "⬆ Folder" (Animations rail) ingests a PNG-SEQUENCE
+  character bank — pick the folder of frames + its `frames.json`. The tool reads
+  the JSON for frame order and exact per-frame `durationMs` (falls back to
+  filename sort + 12fps), then posts `sequence:add`; the sequence lands in
+  ui-theme.json's `sequences` (self-contained data-URL frames + timing). A
+  1-frame folder with no JSON is treated as a plain static upload instead.
+  Double-click a sequence to drop an `anim` LAYER onto the selected custom
+  component — it plays LIVE on the canvas (CustomUiManager advances frames on the
+  scene clock honouring each frame's hold; `fps`/`loop`/`w`/`h` are per-layer
+  knobs). PreloadScene loads every sequence frame as its own texture
+  (`sequenceFrameKey`) so exported animations play in dev, preview and prod.
+  NOTE: full-res frames as data URLs are heavy — a 20-frame bank is tens of MB
+  in ui-theme.json.
+- UPLOADS & REPLACEMENT: "⬆ PNG" stores art as a data URL in ui-theme.json's
+  `assets` (fully self-contained). Use it as any image layer's texture, or open
+  a frame/icon's panel → "Replace with upload" to RE-SKIN a generated texture
+  (hand cursor, arrow, icons, buttons…): the game repaints the SAME canvas
+  texture in place (contain-fit) at boot (`applyUiReplacements`, PreloadScene)
+  and live in the editor — same key, same objects, so in-game events can never
+  break. `ui_hand`/`ui_arrow` replacements carry an anchor override (fingertip /
+  tip) consumed by UIScene.
+- Chrome recolors repaint the SAME canvas texture in place
+  (`TextureFactory.regenerate` + `UI_TEXTURE_PARAMS`), so every Image wearing
+  the key updates live — board and UI alike. The Ember Emporium's chrome
+  (`ui_shop_panel/card/ribbon/badge/burst`, `ui_btn_price/free`) is painted the
+  same way and equally themable.
+- Registered elements: `hud.energy/gold/keys/regen/gear/ledger/level`,
+  `dialogue.bubble/tooltip`, `panel.shop/ledger` — components register in their
+  constructors (`uiRegistry.register`) with named parts; self-positioned
+  elements (tooltip) consume `uiRegistry.offsetOf()` in their own layout.
+- **Composer — NEW components**: "＋ New" creates a component authored entirely
+  in the tool and stored in ui-theme.json's `custom` section; the game's
+  `CustomUiManager` (src/ui/customUi.ts) instantiates it at boot in EVERY build,
+  so the exported JSON is the runtime format itself. Layers: `image` (any
+  texture/chrome, tintable), `text` (content + full style), and `rig` — a LIVE
+  animated character from `src/render/characterCatalog.ts` with a BODY motion
+  (idle, hover/low-flight, celebrate, roar, stretch, walk — the shared
+  rigAnimations presets) and a FACE mode (none / blink = ambient scheduler /
+  talk = perpetual mouth loop), plus facing + scale. Characters rail:
+  double-click drops one into the selected component. Layer list supports
+  reorder/delete; drags write the AUTHORED x/y (custom components have no
+  patch/base split — the doc is the single source of truth).
+- Embedding gotcha (fixed in uiEdit): same-origin iframes leak the parent
+  page's mousedowns to window-level listeners — the bridge only accepts pointer
+  events whose target is the game canvas (`isCanvasEvent`).
+- Regression harness: `node tools/uibtest.mjs` (needs `pnpm dev`) — drives the
+  tool UI end-to-end: connect → move/restyle/recolor → save → assert the JSON
+  written → reload → assert persistence.
+
 ## World building pipeline (tools/worldbuilder)
 
 - `tools/worldbuilder/index.html` — standalone browser app (open directly, zero
@@ -104,7 +232,12 @@ cross-file invariants these pipelines participate in.
   export's `assets[].calibration` is that table; drop offsetX/offsetY into placement
   and `anchor` into anchors.json.
 - Export world.json: tile size, bounds, per-asset calibration, all placements
-  (asset/category/col/row/z), embedded PNGs. Save/Load project round-trips everything.
+  (asset/category/col/row/z). LEAN by default — the `images` map keeps its keys
+  but holds nulls (~tens of KB instead of ~30 MB), so ingest/LLM consumers can
+  digest it whole. Tick **embed art** next to Export to inline base64 PNGs (only
+  needed when handing NEW art to `scripts/extract-tiles.mjs`/`extract-decor.mjs`).
+  Save/Load project (.worldproject.json) always embeds everything and remains the
+  edit round-trip format.
 - Presets for the real tile set: grid defaults to 240×120 (the border-grass
   grass-diamond footprint) and the 16 `border-grass/` blocks auto-load on open
   (⤓ Starter assets re-loads them) with per-tile measured anchorY (~0.24 tall edge

@@ -49,12 +49,14 @@ export class BoardSystem {
     tier,
     count,
     nearChain,
+    nearTier,
     at
   }: {
     chain: string;
     tier: number;
     count: number;
     nearChain?: string;
+    nearTier?: number;
     at?: [number, number];
   }): void {
     // An explicit `at` cell wins: drop the blob there (the nearest free active
@@ -65,7 +67,14 @@ export class BoardSystem {
       return;
     }
     const items = [...this.state.items.values()].filter((i) => i.kind === 'item');
-    const anchor = (nearChain && items.find((i) => i.chain === nearChain)) || items[0] || null;
+    // `nearTier` narrows the anchor to a specific tier — e.g. the tutorial's
+    // freshly HARVESTED sprout rather than the patch that produced it, so the
+    // spawned blob grows connected to it and one drag can merge all three.
+    const anchor =
+      (nearChain &&
+        items.find((i) => i.chain === nearChain && (nearTier === undefined || i.tier === nearTier))) ||
+      items[0] ||
+      null;
     let anchorCol = anchor?.col ?? 0;
     let anchorRow = anchor?.row ?? 0;
     if (!anchor) {

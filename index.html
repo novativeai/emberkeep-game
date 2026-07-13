@@ -42,8 +42,14 @@
         top: 5%;
         left: 50%;
         transform: translateX(-50%);
-        height: 58%;
+        /* Constrain BOTH axes with max-* and let the image size itself: it scales
+           proportionally to whichever limit binds (height on wide desktop, width on
+           a narrow portrait phone), so the logo NEVER deforms. A fixed height + a
+           max-width used to fight on portrait — the width clamped while the height
+           stayed pinned, squishing the logo. */
         width: auto;
+        height: auto;
+        max-height: 58%;
         max-width: 92%;
         z-index: 1;
         display: none;
@@ -109,7 +115,7 @@
   </head>
   <body>
     <img class="title-bg" id="title-bg" src="/sprites/ui/title-screen-background.jpg" alt="" />
-    <img class="title-logo" id="title-logo" src="/sprites/ui/title-logo.png" alt="" />
+    <img class="title-logo" id="title-logo" src="/sprites/ui/title-logo.webp" alt="" />
     <div id="game"></div>
     <div class="boot-note" id="boot-note">stoking the ember&hellip;</div>
     <div id="rotate-hint">

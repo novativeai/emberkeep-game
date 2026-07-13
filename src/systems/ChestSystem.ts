@@ -1,4 +1,4 @@
-import { CHEST_GIFTS, CHEST_INTERVAL_MS } from '../core/Constants';
+import { CHEST_GIFTS, CHEST_INTERVAL_MS, REWARD_SPAWN_RADIUS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -33,23 +33,28 @@ export class ChestSystem {
     const now = this.clock.now();
     if (chest.readyAt !== undefined && now < chest.readyAt) return; // gift still cooking
 
-    const gift = this.pick();
+    let gift = this.pick();
+    if (gift.kind === 'item' && this.spawnItems(chest.col, chest.row, gift.chain, gift.tier, gift.count) === 0) {
+      // No room NEAR the chest (REWARD_SPAWN_RADIUS): pay the Gold gift instead
+      // of teleporting pieces across the map or dropping them off-platform.
+      gift = CHEST_GIFTS.find((g) => g.kind === 'coins') ?? gift;
+    }
     if (gift.kind === 'coins') {
       this.bus.emit('economy:add', { coins: gift.amount, reason: 'chest' });
-    } else {
-      this.spawnItems(chest.col, chest.row, gift.chain, gift.tier, gift.count);
     }
     chest.readyAt = now + CHEST_INTERVAL_MS; // recharge; the chest is never consumed
     this.bus.emit('chest:claimed', { chestId: itemId, label: gift.label });
   }
 
-  /** Pop `count` merge pieces onto the free tiles nearest the chest. */
-  private spawnItems(col: number, row: number, chain: string, tier: number, count: number): void {
+  /** Pop `count` merge pieces onto free tiles NEAR the chest; returns how many
+   *  actually landed (0 = neighbourhood full → caller falls back to Gold). */
+  private spawnItems(col: number, row: number, chain: string, tier: number, count: number): number {
     const now = this.clock.now();
-    const cells = this.state.freeActiveTilesNear(col, row).slice(0, count);
+    const cells = this.state.freeActiveTilesNear(col, row, REWARD_SPAWN_RADIUS).slice(0, count);
     for (const cell of cells) {
       const item = this.state.addItem({ chain, tier, col: cell.col, row: cell.row, kind: 'item' });
       this.bus.emit('item:spawned', { item: this.state.snapshot(item, now), cause: 'generator' });
     }
+    return cells.length;
   }
 }

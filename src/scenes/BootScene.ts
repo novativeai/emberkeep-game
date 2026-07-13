@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
 import { SCENES } from '../core/Constants';
+import { uiRegistry } from '../ui/theme';
 
 /**
  * Generates every placeholder texture (Track A) straight into the texture
@@ -16,6 +17,8 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     const ctx = this.registry.get('ctx') as GameContext;
     const factory = new TextureFactory(this);
+    // ui-theme.json chrome colors (UI Builder tool) apply from the first paint.
+    factory.setUiColors(uiRegistry.doc.textures);
     factory.generateAll(ctx.data.assets);
     this.registry.set('textureFactory', factory);
     this.scene.start(SCENES.preload);

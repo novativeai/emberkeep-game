@@ -47,6 +47,33 @@ export const IS_MOBILE: boolean =
   (navigator.maxTouchPoints > 0 || 'ontouchstart' in window);
 
 /**
+ * True on iOS/iPadOS Safari (incl. iPadOS masquerading as Mac + touch). WebKit
+ * caps a tab's renderer-process memory FAR lower than Android Chrome, so the
+ * heaviest GPU paths are trimmed here (skip the second live WebGL context, render
+ * at a leaner backing) to stay under the "A problem repeatedly occurred" crash.
+ */
+export const IS_IOS: boolean =
+  typeof window !== 'undefined' &&
+  (/iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent)));
+
+/**
+ * HUD / popup magnification on mobile portrait. The UI is authored in the fixed
+ * 2560-wide space; on a phone that space FIT-scales to ~15%, so gauges/buttons
+ * render at half the size a thumb needs. Clusters multiply by this (anchored to
+ * their screen corner) and popups fill the portrait width. `1` on desktop — the
+ * landscape layout is untouched. See `panelMobileScale`.
+ */
+export const UI_SCALE: number = IS_MOBILE ? 1.5 : 1;
+
+/** Uniform scale so a centred popup FRAME of `frameWidth` fills ~94% of the
+ *  portrait width. `1` on desktop. Capped so a small frame never balloons. */
+export function panelMobileScale(frameWidth: number): number {
+  if (!IS_MOBILE) return 1;
+  return Math.min(2.2, (GAME_WIDTH * 0.94) / frameWidth);
+}
+
+/**
  * Viewport height in game-space units.
  * On desktop stays at GAME_HEIGHT (1600) — no change (e2e/landscape untouched).
  * On mobile the game is PORTRAIT: GAME_WIDTH (2560) spans the phone's SHORT side
@@ -88,17 +115,23 @@ export const DEPTHS = {
 /** When a dragon's passive gift has nowhere to land, retry this soon (ms). */
 export const GENERATOR_PASSIVE_RETRY_MS = 8000;
 
-/** Warmth spent to instantly clear a generator's cooldown (the "skip" button). */
-export const GENERATOR_SKIP_ENERGY = 3;
+/** Most GOLD a skip can cost — paid when the timer has just started. Skips are
+ *  the demo's PREMIUM gold sink: a full skip should feel like a real spend
+ *  (roughly one order reward / four banked House coins), not pocket change —
+ *  the price still melts away as the timer drains, so patience is always the
+ *  free alternative. (Was 6 — skipping cost barely more than the coin the
+ *  House pays out, an almost-free loop.) */
+export const GENERATOR_SKIP_MAX_ENERGY = 20;
 
-/** Most GOLD a skip can cost — paid when the timer has just started. */
-export const GENERATOR_SKIP_MAX_ENERGY = 9;
+/** Warmth skip premium over the Gold price. Gold is the sink-starved plentiful
+ *  currency, so it is the CHEAP way to skip; Warmth is the session meter and
+ *  must never be the discount option (it was 0.55× — an inverted incentive). */
+export const SKIP_WARMTH_MULTIPLIER = 1.5;
 
 /**
- * Skip a generator's remaining wait. Two ways: GOLD (the default) or ENERGY
- * (cheaper). Both are EXPENSIVE near the start and CHEAPEN as the timer runs
- * down (cost ∝ fraction remaining). Always ≥ 1 while anything remains.
- *   skipEnergyCost = the GOLD price; skipWarmthCost ≈ 0.55× (the cheaper Warmth).
+ * Skip a generator's remaining wait. Two ways: GOLD (the default, cheaper) or
+ * WARMTH (premium). Both are EXPENSIVE near the start and CHEAPEN as the timer
+ * runs down (cost ∝ fraction remaining). Always ≥ 1 while anything remains.
  */
 export function skipEnergyCost(
   remainingMs: number,
@@ -110,16 +143,16 @@ export function skipEnergyCost(
   const frac = Math.min(1, Math.max(0, remainingMs / totalMs));
   return Math.min(maxGold, Math.max(1, Math.ceil(maxGold * frac)));
 }
-/** Warmth (energy) price of a skip — cheaper than the Gold price (e.g. 10 min
- *  ≈ 5 Warmth vs 9 Gold). Scales with the SAME per-generator `maxGold`, so a
- *  dearer skip can't be dodged by paying Warmth. 0 when nothing remains. */
+/** Warmth (energy) price of a skip — dearer than the Gold price (never let the
+ *  session meter be the discount skip). Scales with the SAME per-generator
+ *  `maxGold`, so a dearer skip can't be dodged by switching currency. */
 export function skipWarmthCost(
   remainingMs: number,
   totalMs: number,
   maxGold: number = GENERATOR_SKIP_MAX_ENERGY
 ): number {
   const gold = skipEnergyCost(remainingMs, totalMs, maxGold);
-  return gold <= 0 ? 0 : Math.max(1, Math.round(gold * 0.55));
+  return gold <= 0 ? 0 : Math.max(1, Math.round(gold * SKIP_WARMTH_MULTIPLIER));
 }
 
 /**
@@ -150,29 +183,38 @@ export const DECOR_SCALE: Record<string, number> = {
  * without re-exporting art (e.g. the red dragon egg looks small at native size).
  */
 export const ITEM_SCALE: Record<string, number> = {
-  // Mergeable board PIECES shrunk −40% (×0.6) on request; generators, dragon rig
-  // hosts and the chest fixture keep their sizes.
-  ember_dragon_1: 0.108, // Dragon Ruby (was 0.18)
-  ember_dragon_2: 0.0384, // Red Egg (was 0.064)
-  ember_dragon_3: 1.0, // Red Dragon rig host — unchanged
-  flame_gem_1: 0.09, // Gem Shard (was 0.15)
-  lumber_1: 0.2016, // a log / Bush (was 0.336)
-  lumber_2: 0.9, // House generator — unchanged
-  bigtree_1: 0.31, // Ancient Tree generator — unchanged
-  chest_1: 0.24, // Treasure Chest fixture — unchanged
-  crystal_1: 0.4, // Crystal generator — unchanged
-  emerald_1: 0.15, // Emerald gem (was 0.25)
-  emerald_2: 0.0384, // Green Egg (was 0.064)
-  emerald_3: 1.0, // dragon host — unchanged
-  golden_egg_1: 0.06, // Golden Egg (was 0.10)
-  coin_1: 0.072, // Gold Coin (was 0.12)
-  coin_2: 0.12 // Gold Pouch (was 0.20)
+  // reward/egg.png (396×501) and reward/ruby.png (474×382) are ~2× the old
+  // placeholder art — scale down so a gem reads ~1 tile wide (SVG-sized).
+  // Egg + ruby reduced 70% on request (small speckled egg / small ruby shard).
+  ember_dragon_1: 0.13, // Dragon Ruby — reduced ~28% on request (0.18 → 0.13)
+  ember_dragon_2: 0.064, // Red Egg (red-egg.png 1162×1437) — −20% again on request (0.08 → 0.064)
+  ember_dragon_3: 0.21, // Red Dragon: real baked rig art (1054px) at the live rig's on-board size
+  ember_dragon_4: 0.45, // Adult Red Dragon: baked adult rig (836px) — +50% on request (0.3 → 0.45); must read clearly bigger than the whelp
+  flame_gem_1: 0.12, // the diamond gem — reduced 20% on request (0.15 → 0.12)
+  // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
+  lumber_1: 0.27, // a log (wood.png) — reduced again on request (0.336 → 0.27)
+  lumber_2: 0.72, // the House — reduced 20% on request (0.9 → 0.72)
+  lumber_3: 0.82, // the Manor (manor.png 430×450) — a touch bigger than the House
+  bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
+  chest_1: 0.19, // a treasure chest (chest.png) — reduced again on request (0.24 → 0.19)
+  strawberry_1: 0.65, // emberberry sprout — reduced again on request (0.85 → 0.65)
+  strawberry_2: 0.8, // emberberry bush — reduced on request
+  strawberry_3: 0.78, // the emberberry plant — back UP on request (0.58 → 0.78); t3 should read biggest
+  // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
+  crystal_1: 0.4, // ~1.3 tiles
+  emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
+  emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
+  emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red
+  emerald_4: 0.45, // Adult Emerald Dragon: baked adult rig (836px) — same treatment as the adult red
+  golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
+  coin_1: 0.12, // SMALLER than an egg, per spec
+  coin_2: 0.15  // Gold Pouch — reduced 25% on request (0.20 → 0.15); still bigger than the coin (0.12)
 };
 
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
 export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
-  coin: { coins: 1 },
-  coin_2: { coins: 5 }
+  coin: { coins: 5 }, // Gold Coin — the House drops one each cycle
+  coin_2: { coins: 10 } // Gold Pouch (3 coins merged) — worth the merge
 };
 
 /**
@@ -183,8 +225,9 @@ export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
  */
 export const HIDDEN_CHAINS = new Set<string>(['sparkweed']);
 
-/** A standing treasure chest readies a fresh gift every this-many ms (10 min). */
-export const CHEST_INTERVAL_MS = 600_000;
+/** A standing treasure chest readies a fresh gift every this-many ms (5 min —
+ *  the demo's "something free arrives on a rhythm" beat, DEMO-PLAN §3). */
+export const CHEST_INTERVAL_MS = 300_000;
 
 /**
  * Recurring treasure-chest gifts. The chest is a PERMANENT fixture: every
@@ -193,36 +236,39 @@ export const CHEST_INTERVAL_MS = 600_000;
  * pops that many merge pieces onto free tiles by the chest. (No wood — lumber
  * appears only when its cloud zone clears.) Designers tune it here, not in code.
  */
+/** How far (manhattan tiles) a reward drop may land from its source. Beyond
+ *  this the drop is BLOCKED (harvest fails / chest pays Gold / passive skips)
+ *  — rewards must never teleport across the map or off the platforms. */
+export const REWARD_SPAWN_RADIUS = 3;
+
 export const CHEST_GIFTS: ReadonlyArray<
   | { kind: 'coins'; amount: number; label: string }
   | { kind: 'item'; chain: string; tier: number; count: number; label: string }
 > = [
-  { kind: 'coins', amount: 5, label: '+5 🪙' },
+  { kind: 'coins', amount: 15, label: '+15 🪙' },
   { kind: 'item', chain: 'emerald', tier: 1, count: 3, label: '3 Emeralds!' },
   { kind: 'item', chain: 'ember_dragon', tier: 1, count: 3, label: '3 Rubies!' }
 ];
 
-/** Gold (coins) spent to skip a generator timer — dynamic like the energy cost
- *  was, but paid in Gold now. Expensive at the start, ~1 near the end. */
-export const SKIP_GOLD_MAX = 8;
-
 /** Energy. */
-export const ENERGY_MAX = 20;
+export const ENERGY_MAX = 30;
 /** Warmth a brand-new game starts with — 2 below max, so the tutorial's free
- *  Ember Spark visibly tops the gauge back to full (18/20 → 20/20). */
-export const ENERGY_START = 18;
-export const ENERGY_REGEN_MS = 180_000; // 1 Warmth every 3 minutes
+ *  Ember Spark visibly tops the gauge back toward full. */
+export const ENERGY_START = 28;
+export const ENERGY_REGEN_MS = 60_000; // 1 Warmth every minute (cozy session gate, not a wall)
 export const ENERGY_REGEN_AMOUNT = 1;
 
 /**
  * Cumulative XP to reach each Keeper level (index 0 = level 1 = 0 xp).
- * A smooth quadratic curve (gaps 60 → 80 → 110 → 150 → 190 → 230). The whole
- * scripted tutorial earns ~54 XP, so the FIRST level-up lands a beat AFTER it —
- * which is exactly when the first zone (level 2) wakes and the camera flies to
- * reveal it. Tying the first level-up to that cinematic expansion makes it the
- * payoff moment, while the curve never walls. See `docs/research/xp-pacing.md`.
+ * The scripted tutorial earns exactly 60 XP (26 + 24 hatches + 10 scripted), so
+ * the Level-2 beat lands ON the tutorial's `levelup` step. Level 3 (220) is the
+ * demo's finale and is tuned so it lands on Order 3's delivery (DEMO-PLAN §Act
+ * IV XP ledger: 60 tutorial + O1 30 + merges ~24 + O2 35 + optional hatch ~24
+ * + merges ~34 + O3 50 ≈ 257 — orders pay XP in big chunks, so the level-up
+ * fires on a delivery, the right beat). The array ENDS at 3 on purpose: the
+ * chapter is complete — the XP bar never fills toward nothing.
  */
-export const LEVEL_XP = [0, 60, 140, 250, 400, 590, 820] as const;
+export const LEVEL_XP = [0, 60, 220] as const;
 
 /** Max Warmth grows by this much per Keeper level (level 1 = ENERGY_MAX). */
 export const ENERGY_PER_LEVEL = 3;
@@ -292,6 +338,68 @@ export const DUEL = {
   levelReward: { coinsBase: 20, coinsPerLevel: 10 }
 } as const;
 
+/* ------------------------- the Chapter One finale ------------------------- */
+
+/** The Golden Egg MacGuffin: chain + the tier the finale AWAKENS it into —
+ *  not a hatchling but the legendary Golden Elder, asleep since the Great
+ *  Flame was taken. */
+export const GOLDEN_CHAIN = 'golden_egg';
+export const GOLDEN_ELDER_TIER = 2;
+/** Gold tint worn by the Golden Elder's stand-in art (red-dragon bake) if the
+ *  golden rig fails to load — remove alongside the assets.json swap. */
+export const GOLDEN_TINT = 0xffd84d;
+/** The fogged region the finale glimpses into (the "south terrace" promise). */
+export const FINALE_REGION = 'level_5';
+/** XP progress within level 2 past which the Golden Egg starts trembling. */
+export const GOLDEN_TREMBLE_PROGRESS = 0.8;
+
+/**
+ * The GOLDEN ALTAR — the scenic, NON-playable ledge west of the isle where the
+ * whole golden lore plays out: the egg appears there when Cindra's first order
+ * completes, trembles there as Level 3 nears, AWAKENS into the Golden Elder
+ * there, and the Elder stands there for the encore (communing taps).
+ * Authored in the world builder (`golden-egg.json`: decor `golden-egg` at
+ * world cell (-8,-2) = current-map cell (-2,2) after the +6,+4 normalization);
+ * `calibration` is the builder's measured placement for the egg art. It is a
+ * SCENE FIXTURE, not a board item — never merges, sells, drags, or works.
+ */
+export const GOLDEN_ALTAR = {
+  cell: { col: -2, row: 2 }, // off-grid is fine — gridToWorld is unbounded
+  calibration: { offsetX: 135, offsetY: -137, scale: 0.13, anchor: { x: 0.5, y: 0 } },
+  /** Elder rig display scale at the altar (rig pieces ~550px) — the legendary
+   *  Golden Elder reads bigger than a board dragon (upsized on request). */
+  elderScale: 0.44,
+  /** Completing THIS order makes the egg appear on the altar. */
+  orderId: 'cindra_brazier'
+} as const;
+
+/**
+ * Keeper Level 3 finale choreography (DEMO-PLAN §THE FINALE). One timeline,
+ * shared by BoardScene (hatch → camera fly → fog half-glimpse → return) and
+ * UIScene (Cindra's first line → the chapter card) so the two scenes stay in
+ * step without cross-scene calls. All ms from the keeper:leveled(3) beat.
+ */
+export const FINALE = {
+  hatchAtMs: 900, // camera glides WEST to the Golden Altar…
+  awakenAtMs: 2000, // …where the Golden Egg cracks: the Elder AWAKENS
+  flyAtMs: 3400, // camera glides to the south terrace
+  flyMs: 1600,
+  glimpseAtMs: 5000, // fog parts halfway…
+  glimpseHoldMs: 2400, // …a 2.4s look at the warm light…
+  fogDipAlpha: 0.32, // …then the ash settles back
+  returnAtMs: 8000, // camera returns to the player's zone
+  cindraAtMs: 8600, // Cindra speaks — for the first time in the demo
+  cardAtMs: 12600, // the Chapter One card
+  cindraHoldMs: 5200 // her line stays up until just before the card
+} as const;
+
+/* --------------------------- welcome-back moment -------------------------- */
+
+/** Only show the "While you were away" card after a real absence. */
+export const WELCOME_BACK_MIN_MS = 300_000;
+/** Passive producers bank up to this many overdue cycles while offline — a
+ *  small waiting harvest (never 1, never unlimited; MECHANICS §4.3). */
+export const OFFLINE_BANK_CYCLES = 3;
 /** Item motion & juice timings (ms unless noted). */
 export const TIMINGS = {
   dragReturn: 220,
@@ -337,6 +445,11 @@ export const DRAG = {
   cellHighlightColor: 0xffd27a
 } as const;
 
+/** Pointer forgiveness (game px) around the exact hit point when alpha-testing
+ *  board-item art: near-misses on thin/holey sprites (sprout stems) still land,
+ *  while big transparent corners keep yielding to the item behind. */
+export const HIT_FORGIVENESS_PX = 14;
+
 /**
  * Live rigged dragon on the board (hatchling/whelp). Enters in the rig's original
  * (un-mirrored, facing LEFT) orientation celebrating, then alternates idle/celebrate
@@ -349,6 +462,14 @@ export const DRAGON_ANIM = {
   idleMinMs: 4500,
   idleMaxMs: 6500,
   celebrateChance: 0.15, // P(celebrate) per cycle → ~90% of time spent idle
+  /** ADULT dragons (the tier-4 Red Adult, the Golden Elder) are calm, wise
+   *  elders: the same idle + low-flight repertoire, but rolled far less often,
+   *  held longer, and played slower — a whelp fidgets, an elder breathes. */
+  adultIdleMinMs: 9000,
+  adultIdleMaxMs: 15000,
+  adultCelebrateChance: 0.06,
+  adultCelebrateMs: 2600, // a single unhurried low-flight when it does happen
+  adultSpeed: 0.62, // preset playback rate (breathing/wing-beat cadence)
   fadeInMs: 220,
   hatchlingScale: 0.34,
   whelpScale: 0.46,
@@ -363,7 +484,16 @@ export const DRAGON_ANIM = {
  *  size. The emerald rig renders larger, so it's taken down 40% to match red. */
 export const DRAGON_RIG_SCALE: Record<string, number> = {
   emerald: 0.486, // green dragon −10% again on request (0.54 → 0.486)
-  ember_dragon: 0.448 // red dragon −20% again on request (0.56 → 0.448)
+  ember_dragon: 0.448, // red dragon −20% again on request (0.56 → 0.448)
+  // Adult Red Dragon (tier-4 rig override; adult rig pieces are ~836px wide vs
+  // the whelp's 1054) — sized to read clearly BIGGER than the whelp on-board.
+  // +50% on request (0.62 → 0.93): at 0.62 the adult read SMALLER than the baby.
+  'ember_dragon:4': 0.93,
+  // Adult Emerald Dragon: same rig geometry as the adult red (identical part
+  // canvases/bounds), so it wears the same on-board scale.
+  'emerald:4': 0.93
+  // (The Golden Elder is NOT a board dragon — her altar scale lives in
+  //  GOLDEN_ALTAR.elderScale.)
 };
 
 /**
@@ -396,6 +526,45 @@ export const EMBER_MOTES = {
   lifespanMs: 9000
 } as const;
 
+/**
+ * Ambient world atmosphere — the layered "the isle is alive" pass, near→far:
+ * ember-flies drifting around the player's view, slow ember updrafts off the
+ * lava seams, high mist sliding across the isles, and a warm vignette grade
+ * over everything. Pure presentation: no state, no input, no gameplay timing.
+ */
+export const ATMOSPHERE = {
+  /** Near layer: small orange ember-flies twinkling around the current view.
+   *  MANY tiny sparks (a swarm, not a few bugs) — subtlety comes from the small
+   *  scale and the sine-bell alpha, not from scarcity. */
+  fireflies: {
+    frequency: 320, // ms between spawns (emitter-paced; ~21 alive at a time)
+    lifespanMs: 6800,
+    speedMin: 6,
+    speedMax: 22,
+    scaleMin: 0.18,
+    scaleMax: 0.4,
+    alphaPeak: 0.5, // fades 0 → peak → 0 across the life (slow twinkle)
+    tint: 0xffb03a
+  },
+  /** High mist drifting across the view — a soft depth-haze between the camera
+   *  and the isles (the isles are baked into the backdrop, so "beneath" layers
+   *  are impossible; overhead haze is what reads at this camera angle). */
+  wisps: {
+    count: 3,
+    scale: [3.4, 4.6] as const,
+    alpha: [0.045, 0.075] as const,
+    crossMs: [260000, 420000] as const, // minutes per crossing — barely perceptible
+    bobPx: 40,
+    tint: 0xfff2e2, // sunset-warmed white
+    depth: 48800
+  },
+  /** Finishing grade: warm dark vignette hugging the screen edges (UIScene). */
+  vignette: {
+    alpha: 0.16,
+    color: '#2a0e12'
+  }
+} as const;
+
 /** Save. Bump SAVE_VERSION whenever the map/chains change incompatibly, so old
  *  localStorage saves are discarded on load (Context.beginRun → newGame) instead
  *  of layering stale items onto the new map. v1→v2: map/items reshuffled (red
@@ -405,11 +574,13 @@ export const EMBER_MOTES = {
  *  v3→v4: the chest is now a PERMANENT recurring gift box — wipe saves whose
  *  one-shot chest was already consumed so it comes back. v4→v5: tutorial reworked
  *  (House energy-skip, repositioned dragons/chest) — wipe so deployed players get
- *  the same fresh départ-0 as a local run. v5→v6: the Emberfont (Spark Well)
- *  adds new persisted progress; wipe so its fields seed cleanly from départ-0.
- *  v6→v7: the Dragon Duel adds per-dragon level/gauge state; wipe to seed it. */
+ *  the same fresh départ-0 as a local run. v5→v8: the nionja↔main merge combines
+ *  the Emberfont (Spark Well) + Dragon Duel per-dragon state with the Chapter One
+ *  retune (stats/finale counters, re-curved LEVEL_XP, golden Elder tier) — one
+ *  bump past both lineages (nionja v7, main v6) so every save seeds all the new
+ *  fields cleanly from départ-0. */
 export const SAVE_KEY = 'emberkeep_save';
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 /** Audio master volumes 0..1. */
 export const AUDIO = {
@@ -424,5 +595,6 @@ export const SCENES = {
   preload: 'PreloadScene',
   title: 'TitleScene',
   board: 'BoardScene',
-  ui: 'UIScene'
+  ui: 'UIScene',
+  uiEditor: 'UiEditorScene'
 } as const;

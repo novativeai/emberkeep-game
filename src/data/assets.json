@@ -132,25 +132,31 @@
       "key": "item_ember_dragon_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/merge/rubis-transparent_001.png"
+      "file": "sprites/merge/rubis-transparent_001.webp"
     },
     {
       "key": "item_ember_dragon_2",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/red-egg.png"
+      "file": "sprites/items/red-egg.webp"
     },
     {
       "key": "item_ember_dragon_3",
-      "source": "placeholder",
+      "source": "file",
       "generator": "item",
-      "file": "sprites/characters/dragon/red-dragon/_assembled-board.png"
+      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.webp"
+    },
+    {
+      "key": "item_ember_dragon_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/sprite-adult/red-dragon-adult-baked.webp"
     },
     {
       "key": "item_flame_gem_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/diamond.png"
+      "file": "sprites/items/diamond.webp"
     },
     {
       "key": "item_flame_gem_2",
@@ -174,7 +180,7 @@
       "key": "item_chest_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/chest.png"
+      "file": "sprites/items/chest.webp"
     },
     {
       "key": "item_lumber_2",
@@ -183,16 +189,22 @@
       "file": "sprites/items/house.png"
     },
     {
+      "key": "item_lumber_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/manor.png"
+    },
+    {
       "key": "item_bigtree_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/bigtree.png"
+      "file": "sprites/items/bigtree.webp"
     },
     {
       "key": "item_crystal_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/crystal.png"
+      "file": "sprites/items/crystal.webp"
     },
     {
       "key": "item_coin_1",
@@ -200,12 +212,17 @@
       "generator": "item",
       "file": "sprites/items/coin.png"
     },
-    { "key": "item_coin_2", "source": "file", "generator": "item", "file": "sprites/items/coin.png" },
+    {
+      "key": "item_coin_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/coin_pouch.png"
+    },
     {
       "key": "item_diamond_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/diamond.png"
+      "file": "sprites/items/diamond.webp"
     },
     {
       "key": "decor_nest",
@@ -229,7 +246,7 @@
       "key": "decor_dragon",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.png"
+      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.webp"
     },
     {
       "key": "icon_key_bronze",
@@ -263,15 +280,15 @@
     },
     {
       "key": "ui_hand",
-      "source": "placeholder",
+      "source": "file",
       "generator": "ui",
-      "file": "raw/ai/ui_hand.png"
+      "file": "sprites/pointer/gauntlet-pointer.png"
     },
     {
       "key": "ui_arrow",
-      "source": "placeholder",
+      "source": "file",
       "generator": "ui",
-      "file": "raw/ai/ui_arrow.png"
+      "file": "sprites/items/arrow.png"
     },
     {
       "key": "portrait_laurah",
@@ -281,9 +298,15 @@
     },
     {
       "key": "portrait_cindra",
-      "source": "placeholder",
+      "source": "file",
       "generator": "portrait",
-      "file": "raw/ai/portrait_cindra.png"
+      "file": "sprites/guide-characters/cindra/cindra-bubble-icon.png"
+    },
+    {
+      "key": "portrait_ring",
+      "source": "file",
+      "generator": "portrait",
+      "file": "sprites/guide-characters/laurah-dragonMaster/portrait-ring.png"
     },
     {
       "key": "ui_tile_highlight",
@@ -301,7 +324,7 @@
       "key": "title_logo",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/ui/title-logo.png"
+      "file": "sprites/ui/title-logo.webp"
     },
     {
       "key": "ui_btn_green",
@@ -338,6 +361,41 @@
       "source": "placeholder",
       "generator": "ui",
       "file": "raw/ai/ui_slot.png"
+    },
+    {
+      "key": "ui_shop_panel",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_card",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_ribbon",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_badge",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_burst",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_btn_price",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_btn_free",
+      "source": "placeholder",
+      "generator": "ui"
     },
     {
       "key": "ui_icon_bolt",
@@ -577,13 +635,13 @@
       "key": "tile_architectures-to-delete-bg_002",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/architectures-to-delete-bg_002.png"
+      "file": "sprites/environment/map/flower-tiles/architectures-to-delete-bg_002.webp"
     },
     {
       "key": "tile_hut-houses- transparent_002",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/hut-houses- transparent_002.png"
+      "file": "sprites/environment/map/flower-tiles/hut-houses- transparent_002.webp"
     },
     {
       "key": "tile_tree-1",
@@ -595,7 +653,7 @@
       "key": "tile_tree-3",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/tree-3.png"
+      "file": "sprites/environment/map/flower-tiles/tree-3.webp"
     },
     {
       "key": "tile_tree-2",
@@ -607,25 +665,25 @@
       "key": "tile_tree-4",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/tree-4.png"
+      "file": "sprites/environment/map/flower-tiles/tree-4.webp"
     },
     {
       "key": "tile_hole",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/hole.png"
+      "file": "sprites/environment/map/flower-tiles/hole.webp"
     },
     {
       "key": "tile_sapin",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/sapin.png"
+      "file": "sprites/environment/map/flower-tiles/sapin.webp"
     },
     {
       "key": "decor_themcristall",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/environment/map/decor/themcristall.png"
+      "file": "sprites/environment/map/decor/themcristall.webp"
     },
     {
       "key": "decor_hut_houses_transparent_001",
@@ -637,7 +695,7 @@
       "key": "tile_Tiles-out_016",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/Tiles-out_016.png"
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_016.webp"
     },
     {
       "key": "tile_Tiles-out_017",
@@ -649,7 +707,7 @@
       "key": "tile_Tiles-out_018",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/Tiles-out_018.png"
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_018.webp"
     },
     {
       "key": "tile_Tiles-out_019",
@@ -667,7 +725,7 @@
       "key": "tile_Tiles-out_021",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/Tiles-out_021.png"
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_021.webp"
     },
     {
       "key": "tile_water-tile",
@@ -709,37 +767,139 @@
       "key": "decor_space_rose",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/environment/map/decor/space_rose.png"
+      "file": "sprites/environment/map/decor/space_rose.webp"
     },
     {
       "key": "item_golden_egg_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/golden-egg.png"
+      "file": "sprites/items/golden-egg.webp"
+    },
+    {
+      "key": "item_golden_egg_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.webp"
+    },
+    {
+      "key": "ui_teaser_terrace",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/teaser_terrace.webp"
+    },
+    {
+      "key": "ui_teaser_breed",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/teaser_breed.png"
+    },
+    {
+      "key": "ui_teaser_flame",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/teaser_flame.webp"
+    },
+    {
+      "key": "fx_glimpse_shrine",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/finale/glimpse_shrine.png"
+    },
+    {
+      "key": "fx_glimpse_dragon_a",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/finale/glimpse_dragon_a.png"
+    },
+    {
+      "key": "fx_glimpse_dragon_b",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/finale/glimpse_dragon_b.png"
+    },
+    {
+      "key": "ui_icon_tasks",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/ui/icon_tasks.png"
+    },
+    {
+      "key": "ui_icon_cookbook",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/ui/icon_cookbook.png"
     },
     {
       "key": "item_emerald_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/emerald.png"
+      "file": "sprites/items/emerald.webp"
     },
     {
       "key": "item_emerald_2",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/green-egg.png"
+      "file": "sprites/items/green-egg.webp"
     },
     {
       "key": "item_emerald_3",
-      "source": "placeholder",
+      "source": "file",
       "generator": "item",
-      "file": "sprites/items/emerald-egg.png"
+      "file": "sprites/characters/dragon/emerald-dragon/sprite/emerald-dragon-baked.webp"
+    },
+    {
+      "key": "item_emerald_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/emerald-dragon/sprite-adult/emerald-dragon-adult-baked.webp"
     },
     {
       "key": "background_emberkeep",
       "source": "file",
       "generator": "decor",
       "file": "sprites/background/emberkeep.jpg"
+    },
+    {
+      "key": "trailer_world_ice",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/world_ice.jpg"
+    },
+    {
+      "key": "trailer_world_crystal",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/world_crystal.jpg"
+    },
+    {
+      "key": "trailer_legend_frost",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_frost.png"
+    },
+    {
+      "key": "trailer_legend_crystal",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_crystal.png"
+    },
+    {
+      "key": "trailer_legend_storm",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_storm.png"
+    },
+    {
+      "key": "trailer_legend_tide",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_tide.png"
+    },
+    {
+      "key": "trailer_legend_shadow",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/chapter2/trailer/legend_shadow.png"
     }
   ]
 }

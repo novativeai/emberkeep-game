@@ -1,0 +1,17 @@
+{
+  "tasks": [
+    { "id": "hatch_4", "label": "Hatch 4 dragons", "kind": "hatches", "target": 4 },
+    { "id": "orders_5", "label": "Complete 5 of Cindra's orders", "kind": "orders", "target": 5 },
+    { "id": "gold_500", "label": "Earn 500 gold", "kind": "goldEarned", "target": 500 },
+    { "id": "merges_30", "label": "Merge 30 times", "kind": "merges", "target": 30 },
+    {
+      "id": "elder_10",
+      "label": "Commune with the Golden Elder (tap her 10×)",
+      "kind": "elderTaps",
+      "target": 10,
+      "lockedUntil": { "order": "cindra_brazier", "level": 3 },
+      "lockedHint": "She sleeps — fill Cindra's golden order and reach Level 3"
+    }
+  ],
+  "reward": { "coins": 150, "energy": 5 }
+}
