@@ -183,32 +183,32 @@ export const DECOR_SCALE: Record<string, number> = {
  * without re-exporting art (e.g. the red dragon egg looks small at native size).
  */
 export const ITEM_SCALE: Record<string, number> = {
-  // reward/egg.png (396×501) and reward/ruby.png (474×382) are ~2× the old
-  // placeholder art — scale down so a gem reads ~1 tile wide (SVG-sized).
-  // Egg + ruby reduced 70% on request (small speckled egg / small ruby shard).
-  ember_dragon_1: 0.13, // Dragon Ruby — reduced ~28% on request (0.18 → 0.13)
-  ember_dragon_2: 0.064, // Red Egg (red-egg.png 1162×1437) — −20% again on request (0.08 → 0.064)
-  ember_dragon_3: 0.21, // Red Dragon: real baked rig art (1054px) at the live rig's on-board size
-  ember_dragon_4: 0.45, // Adult Red Dragon: baked adult rig (836px) — +50% on request (0.3 → 0.45); must read clearly bigger than the whelp
-  flame_gem_1: 0.12, // the diamond gem — reduced 20% on request (0.15 → 0.12)
+  // Mergeable board PIECES use nionja's −40% sizing (small speckled eggs, gem
+  // shards, rubies). Generators + dragon rig HOSTS keep main's baked-rig-art
+  // scale (their art differs from nionja's, so nionja's numbers don't apply).
+  ember_dragon_1: 0.108, // Dragon Ruby — nionja −40% piece
+  ember_dragon_2: 0.0384, // Red Egg — nionja −40% piece
+  ember_dragon_3: 0.21, // Red Dragon: baked rig art (1054px) — main's scale
+  ember_dragon_4: 0.45, // Adult Red Dragon: baked adult rig (836px) — main's scale
+  flame_gem_1: 0.09, // Gem Shard — nionja −40% piece
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
-  lumber_1: 0.27, // a log (wood.png) — reduced again on request (0.336 → 0.27)
-  lumber_2: 0.72, // the House — reduced 20% on request (0.9 → 0.72)
-  lumber_3: 0.82, // the Manor (manor.png 430×450) — a touch bigger than the House
-  bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
-  chest_1: 0.19, // a treasure chest (chest.png) — reduced again on request (0.24 → 0.19)
-  strawberry_1: 0.65, // emberberry sprout — reduced again on request (0.85 → 0.65)
-  strawberry_2: 0.8, // emberberry bush — reduced on request
-  strawberry_3: 0.78, // the emberberry plant — back UP on request (0.58 → 0.78); t3 should read biggest
+  lumber_1: 0.2016, // a log / Bush — nionja −40% piece
+  lumber_2: 0.72, // the House generator — main's scale
+  lumber_3: 0.82, // the Manor — main's scale
+  bigtree_1: 0.17, // Ancient Tree generator — main's scale
+  chest_1: 0.19, // Treasure Chest fixture — main's scale
+  strawberry_1: 0.39, // emberberry sprout — −40% merge piece
+  strawberry_2: 0.48, // emberberry bush — −40% merge piece
+  strawberry_3: 0.468, // emberberry plant — −40% merge piece
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
-  crystal_1: 0.4, // ~1.3 tiles
-  emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
-  emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
-  emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red
-  emerald_4: 0.45, // Adult Emerald Dragon: baked adult rig (836px) — same treatment as the adult red
-  golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
-  coin_1: 0.12, // SMALLER than an egg, per spec
-  coin_2: 0.15  // Gold Pouch — reduced 25% on request (0.20 → 0.15); still bigger than the coin (0.12)
+  crystal_1: 0.4, // Crystal generator — main's scale
+  emerald_1: 0.15, // Emerald gem — nionja piece size
+  emerald_2: 0.0384, // Green Egg — nionja −40% piece
+  emerald_3: 0.21, // Green Dragon: baked rig art (1054px) — main's scale
+  emerald_4: 0.45, // Adult Emerald Dragon: baked adult rig (836px) — main's scale
+  golden_egg_1: 0.06, // Golden Egg — nionja −40% piece
+  coin_1: 0.072, // Gold Coin — nionja −40% piece
+  coin_2: 0.12  // Gold Pouch — nionja −40% piece
 };
 
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */

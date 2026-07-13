@@ -7,7 +7,6 @@ import {
   GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_TREMBLE_PROGRESS,
-  IS_MOBILE,
   LEVELUP_REWARD,
   LIVE_GAME_HEIGHT,
   num,
@@ -126,9 +125,10 @@ export class UIScene extends Phaser.Scene {
     this.shop = new ShopPanel(this, this.ctx.bus, this.ctx.state);
     this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
 
-    // Milestone "gift" — a round button (bottom-right) that unfolds the quest
-    // field to its left when tapped.
-    this.milestoneGift = new MilestoneGift(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 344);
+    // Milestone "gift" — a round button on the right edge that unfolds the quest
+    // field to its left. Sits directly ABOVE the Cookbook (gift top / cookbook
+    // bottom, one vertical column).
+    this.milestoneGift = new MilestoneGift(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 470);
     this.milestoneGift.setDepth(DEPTH_HUD);
 
     // The Emberfont "Spark Well" — a round orb parked in the bottom-left corner.
@@ -139,11 +139,12 @@ export class UIScene extends Phaser.Scene {
     // Dragon Duel arena — the modal + a round ✌️ launcher just above the gift.
     this.duelPanel = new DuelPanel(this, this.ctx.bus);
     this.duelPanel.setDepth(DEPTH_PANEL + 20);
-    this.duelButton = new DuelButton(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 466, () => this.duelPanel.open());
+    this.duelButton = new DuelButton(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 610, () => this.duelPanel.open());
     this.duelButton.setDepth(DEPTH_HUD);
 
-    // The two dragons' duel gauges, just above the Keeper level/XP bar.
-    this.dragonGauges = new DragonGauges(this, this.ctx.bus, 176, LIVE_GAME_HEIGHT - 150);
+    // The two dragons' duel gauges, stacked above the Keeper level/XP bar (sized
+    // to match that bar — see DragonGauges).
+    this.dragonGauges = new DragonGauges(this, this.ctx.bus, 176, LIVE_GAME_HEIGHT - 250);
     this.dragonGauges.setDepth(DEPTH_HUD);
 
     // Cindra's Cookbook — the recipe/discovery panel + its HUD button (main).
@@ -358,9 +359,10 @@ export class UIScene extends Phaser.Scene {
   /** Emberkeep Cookbook button — sits directly above the Ledger (quest)
    *  button; hidden during the tutorial. The lava dot marks new pages. */
   private buildCookbookButton(): Phaser.GameObjects.Container {
-    // Bottom-right, stacked above the Ledger; magnified + lifted clear of it on mobile.
+    // Directly BELOW the milestone gift (gift top / cookbook bottom), same
+    // right-edge column; magnified on mobile.
     const button = this.add
-      .container(GAME_WIDTH - (IS_MOBILE ? 190 : 156), LIVE_GAME_HEIGHT - (IS_MOBILE ? 560 : 356))
+      .container(GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 330)
       .setScale(UI_SCALE)
       .setDepth(DEPTH_HUD);
     const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.05);

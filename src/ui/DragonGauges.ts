@@ -4,10 +4,10 @@ import type { EventBus } from '../core/EventBus';
 import type { EventMap } from '../core/types';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
-const SLOT_H = 78; // vertical gap between the two stacked gauges
-const BAR_X = 52;
-const BAR_W = 152;
-const BAR_H = 22;
+const SLOT_H = 120; // vertical gap between the two stacked gauges
+const BAR_X = 84;
+const BAR_W = 400; // matches the Keeper XP bar (440×36) — the gauges read as "big"
+const BAR_H = 34;
 
 interface GaugeSlot {
   root: Phaser.GameObjects.Container;
@@ -35,12 +35,12 @@ export class DragonGauges extends Phaser.GameObjects.Container {
     for (let i = 0; i < 2; i++) {
       const root = scene.add.container(0, -i * SLOT_H);
       const bar = scene.add.graphics();
-      const face = scene.add.image(24, 2, '__DEFAULT').setDisplaySize(48, 48);
+      const face = scene.add.image(42, 4, '__DEFAULT').setDisplaySize(76, 76);
       const lv = scene.add
-        .text(BAR_X + 2, -20, '', { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: PALETTE.goldAccent, stroke: PALETTE.night, strokeThickness: 4 })
+        .text(BAR_X + 2, -26, '', { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: PALETTE.goldAccent, stroke: PALETTE.night, strokeThickness: 5 })
         .setOrigin(0, 0.5);
       const count = scene.add
-        .text(BAR_X + BAR_W / 2, 15, '', { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: PALETTE.cream, stroke: PALETTE.night, strokeThickness: 4 })
+        .text(BAR_X + BAR_W / 2, 21, '', { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: PALETTE.cream, stroke: PALETTE.night, strokeThickness: 5 })
         .setOrigin(0.5);
       root.add([bar, face, lv, count]);
       this.add(root);
@@ -48,7 +48,7 @@ export class DragonGauges extends Phaser.GameObjects.Container {
     }
 
     scene.add.existing(this);
-    this.setScale(1.2); // +20% — the two dragon gauges read a touch bigger
+    this.setScale(1.0); // bars are sized to the XP bar natively now
     this.setVisible(false);
     this.offBus = bus.on('duel:changed', (m) => this.render(m));
   }
@@ -92,7 +92,7 @@ export class DragonGauges extends Phaser.GameObjects.Container {
       }
       slot.root.setVisible(true);
       const faceKey = `duel_face_${d.color}`;
-      if (this.scene.textures.exists(faceKey)) slot.face.setTexture(faceKey).setDisplaySize(48, 48);
+      if (this.scene.textures.exists(faceKey)) slot.face.setTexture(faceKey).setDisplaySize(76, 76);
       slot.lv.setText(`Lv ${d.level}`);
       slot.count.setText(`${d.gauge}/${m.gaugeMax}`);
       this.drawBar(slot.bar, d.gauge, m.gaugeMax);
