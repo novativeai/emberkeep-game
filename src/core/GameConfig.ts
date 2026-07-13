@@ -35,7 +35,18 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   // a hi-DPI iPhone SUPERSAMPLES well past its own screen (need≈0.46), needlessly
   // inflating GPU memory into the WebKit crash zone; 0.5 tracks device pixels.
   const floor = IS_IOS ? 0.5 : IS_MOBILE ? 0.75 : 1;
-  renderScale.value = Phaser.Math.Clamp(Math.round(need * 8) / 8, floor, 1.5);
+  // GPU ceiling: old-device MAX_TEXTURE_SIZE is 4096 — a backing axis past it
+  // gets silently clipped by the driver (the canvas renders partial/blank while
+  // the DOM logo still shows, so the title's Play button "disappears"). The
+  // portrait backing is the tall axis (LIVE_GAME_HEIGHT up to 2.4×2560 = 6144
+  // game-units; ×0.75 floor = 4608 > 4096 on 20:9 phones). Quantised DOWN to
+  // 1/8 so the backing stays integral; desktop (1600-tall) is untouched.
+  const gpuCap = Math.floor(((4096 / Math.max(GAME_WIDTH, LIVE_GAME_HEIGHT)) * 8)) / 8;
+  renderScale.value = Phaser.Math.Clamp(
+    Math.round(need * 8) / 8,
+    Math.min(floor, gpuCap),
+    Math.min(1.5, gpuCap)
+  );
 
   return {
     type: Phaser.AUTO,
