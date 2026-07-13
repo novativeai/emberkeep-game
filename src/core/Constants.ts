@@ -58,6 +58,22 @@ export const IS_IOS: boolean =
     (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent)));
 
 /**
+ * Weak device (low RAM or few CPU cores) — a cheap Android or an old/GPU-less PC.
+ * `deviceMemory` (GB, capped at 8; unset on Safari) and `hardwareConcurrency` are
+ * the only coarse signals a browser exposes; either being low is enough to trip
+ * the aggressive downgrade (leaner backing, no second WebGL context) that keeps
+ * the tab under its GPU-memory budget instead of crashing the page. iOS is always
+ * treated as at-least this constrained. When neither signal is present we assume
+ * capable (desktop/high-end) so we never needlessly degrade a strong machine.
+ */
+export const IS_LOW_END: boolean =
+  IS_IOS ||
+  (typeof navigator !== 'undefined' &&
+    ((typeof (navigator as { deviceMemory?: number }).deviceMemory === 'number' &&
+      (navigator as { deviceMemory?: number }).deviceMemory! <= 4) ||
+      (typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 4)));
+
+/**
  * HUD / popup magnification on mobile portrait. The UI is authored in the fixed
  * 2560-wide space; on a phone that space FIT-scales to ~15%, so gauges/buttons
  * render at half the size a thumb needs. Clusters multiply by this (anchored to

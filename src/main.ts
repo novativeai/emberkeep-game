@@ -79,6 +79,34 @@ const game = new Phaser.Game({
   }
 });
 
+// GPU safety net: a weak or overloaded device can drop the WebGL context. Without
+// preventDefault() the browser permanently kills the canvas — the visible "crash".
+// With it, we pause and reload from the autosave (the player loses nothing) — a
+// graceful recovery instead of a frozen/blank tab. A per-session counter stops a
+// fundamentally-too-weak device from reload-looping: after a few losses we show a
+// static message instead.
+let contextLostHandled = false;
+game.canvas.addEventListener(
+  'webglcontextlost',
+  (e: Event) => {
+    e.preventDefault();
+    if (contextLostHandled) return;
+    contextLostHandled = true;
+    const KEY = 'ek_ctxloss_reloads';
+    const n = Number(window.sessionStorage.getItem(KEY) ?? '0');
+    if (n >= 2) {
+      document.body.insertAdjacentHTML(
+        'beforeend',
+        '<div class="boot-note">Graphics ran out of memory on this device — close other apps/tabs and reload.</div>'
+      );
+      return;
+    }
+    window.sessionStorage.setItem(KEY, String(n + 1));
+    window.setTimeout(() => window.location.reload(), 1200);
+  },
+  false
+);
+
 // WebAudio unlock must come from a user gesture; resume on any pointer.
 if (audio) document.addEventListener('pointerdown', () => audio.unlock());
 

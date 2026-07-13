@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, IS_IOS, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
+import { GAME_WIDTH, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
 import { renderScale } from './render-scale';
 import { BoardScene } from '../scenes/BoardScene';
 import { BootScene } from '../scenes/BootScene';
@@ -28,14 +28,14 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     (dispH * dpr) / LIVE_GAME_HEIGHT
   );
   // Quantise to 1/8 steps (keeps 2560×1600 × R integral) and clamp. Desktop floors
-  // at 1 (crisp 1440p backing, up to ~4K on retina). The portrait mobile canvas is
-  // ~2× taller, so a lower floor keeps the backing off a phone GPU's limit
-  // (~14M px at floor 1) while staying device-crisp. iOS's renderer-process memory
-  // budget is far tighter than Android's, so it floors lower still — at floor 0.75
-  // a hi-DPI iPhone SUPERSAMPLES well past its own screen (need≈0.46), needlessly
-  // inflating GPU memory into the WebKit crash zone; 0.5 tracks device pixels.
-  const floor = IS_IOS ? 0.5 : IS_MOBILE ? 0.75 : 1;
-  renderScale.value = Phaser.Math.Clamp(Math.round(need * 8) / 8, floor, 1.5);
+  // at 1 (crisp 1440p backing, up to ~4K on retina). Capable mobile floors at 0.75.
+  // WEAK devices (IS_LOW_END: cheap Android, iOS, GPU-less/old PC) floor much lower
+  // AND never supersample above device pixels (cap 1) — the framebuffer is the #1
+  // GPU-memory hog, so tracking (or under-cutting) device pixels is what keeps the
+  // tab from the "A problem repeatedly occurred" / blank-screen crash.
+  const floor = IS_LOW_END ? 0.34 : IS_MOBILE ? 0.75 : 1;
+  const cap = IS_LOW_END ? 1 : 1.5;
+  renderScale.value = Phaser.Math.Clamp(Math.round(need * 8) / 8, floor, cap);
 
   return {
     type: Phaser.AUTO,

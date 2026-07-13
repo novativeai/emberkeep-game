@@ -20,7 +20,7 @@ import {
   ITEM_SCALE,
   EMBER_MOTES,
   GAME_WIDTH,
-  IS_IOS,
+  IS_LOW_END,
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
@@ -1212,11 +1212,12 @@ export class BoardScene extends Phaser.Scene {
    * default emerald. WebGL-less contexts keep the PNG (the try/catch falls back).
    */
   private ensureCrystal3D(): void {
-    // iOS Safari's renderer process crashes ("A problem repeatedly occurred") under
-    // the memory of a SECOND live WebGL context plus its per-frame GPU→CPU readback
-    // (drawImage of a WebGL canvas). Skip it there — the static `item_crystal_1` PNG
-    // (loaded in preload) stays as the crystal texture, so the gem still renders 2D.
-    if (IS_IOS) return;
+    // A SECOND live WebGL context plus its per-frame GPU→CPU readback (drawImage of
+    // a WebGL canvas) is what tips a memory-tight device over the edge — iOS Safari
+    // ("A problem repeatedly occurred") and any weak Android/PC alike. Skip it on
+    // every low-end device — the static `item_crystal_1` PNG (loaded in preload)
+    // stays as the crystal texture, so the gem still renders as 2D art.
+    if (IS_LOW_END) return;
     const map = this.ctx.data.map;
     const spec = map.decor3d?.find((d) => d.model3d)?.model3d ?? undefined;
     try {
