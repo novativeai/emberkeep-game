@@ -9,18 +9,9 @@ export const LAURAH_DISC_TEXTURE = 'laurah_disc';
 const IDLE_ONE = 0;
 const IDLE_TWO = 1;
 const FIRST_TALK_FRAME = 2;
-/** Synthesized blink frames appended after the banks (bake script). */
-const BLINK_HALF = 42;
-const BLINK_CLOSED = 43;
-/** half -> closed -> half, then back to the open idle. */
-const BLINK_STEPS: ReadonlyArray<{ frame: number; holdMs: number }> = [
-  { frame: BLINK_HALF, holdMs: 55 },
-  { frame: BLINK_CLOSED, holdMs: 85 },
-  { frame: BLINK_HALF, holdMs: 55 }
-];
-/** Randomized rest between blinks — NEVER a fixed period (house rule: synced
- *  metronome blinks read robotic; see the dragons' BlinkScheduler). */
-const blinkDelay = (): number => 2400 + Math.random() * 2800;
+// NOTE: atlas frames 42/43 are synthesized blink poses (half/closed). The idle
+// blink scheduler was removed for now — the painted lids didn't hold up — but
+// the frames stay baked so a proper blink (real closed-eye art) can return.
 
 interface DiscBank {
   /** Atlas frame indices: talk frames, then the trailing idle rest pose. */
@@ -70,10 +61,6 @@ export class PortraitAnimator {
   private baseScaleX = 1;
   private baseScaleY = 1;
   private breathElapsed = 0;
-  /** ms until the next idle blink starts (only counts down while resting). */
-  private blinkIn = blinkDelay();
-  /** Active blink playback: index into BLINK_STEPS + hold elapsed. */
-  private blink: { step: number; elapsed: number } | null = null;
   /** All layers stay frame- and scale-synced: CharacterBubble renders Laurah
    *  as TWO copies of the same sheet (head slice above the ring, body slice
    *  behind it), so every frame swap and breath tick hits each copy. */
@@ -118,47 +105,13 @@ export class PortraitAnimator {
       elapsed: 0,
       loop: false
     };
-    this.blink = null;
-    this.blinkIn = blinkDelay();
     this.setFrameAll(bank.frames[0]!);
   }
 
   /** Stop talking and settle on the neutral idle pose. */
   rest(): void {
     this.state = null;
-    this.blink = null;
-    this.blinkIn = blinkDelay();
     if (this.onDiscSheet) this.setFrameAll(IDLE_ONE);
-  }
-
-  /** Resting on the open idle (no talk mid-flight) — the only blinkable pose. */
-  private get atRestIdle(): boolean {
-    if (this.state && this.state.idx < this.state.frameKeys.length - 1) return false;
-    return Number(this.imgs[0]!.frame.name) === IDLE_ONE || this.blink !== null;
-  }
-
-  /** Randomized idle blink: half -> closed -> half -> open. Aborted by talk(). */
-  private stepBlink(delta: number): void {
-    if (!this.atRestIdle) return;
-    if (!this.blink) {
-      this.blinkIn -= delta;
-      if (this.blinkIn > 0) return;
-      this.blink = { step: 0, elapsed: 0 };
-      this.setFrameAll(BLINK_STEPS[0]!.frame);
-      return;
-    }
-    this.blink.elapsed += delta;
-    while (this.blink && this.blink.elapsed >= BLINK_STEPS[this.blink.step]!.holdMs) {
-      this.blink.elapsed -= BLINK_STEPS[this.blink.step]!.holdMs;
-      this.blink.step += 1;
-      if (this.blink.step >= BLINK_STEPS.length) {
-        this.blink = null;
-        this.blinkIn = blinkDelay();
-        this.setFrameAll(IDLE_ONE);
-      } else {
-        this.setFrameAll(BLINK_STEPS[this.blink.step]!.frame);
-      }
-    }
   }
 
   private tick(_time: number, delta: number): void {
@@ -167,7 +120,6 @@ export class PortraitAnimator {
       const idx = stepSequence(this.state, delta);
       if (idx !== null) this.setFrameAll(Number(this.state.frameKeys[idx]!));
     }
-    this.stepBlink(delta);
     this.breathElapsed += delta;
     const phase = (this.breathElapsed / BREATH_PERIOD_MS) * Math.PI * 2;
     const breatheY = 1 + Math.sin(phase) * BREATH_AMP_Y;
