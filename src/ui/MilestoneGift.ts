@@ -5,6 +5,7 @@ import type { EventMap } from '../core/types';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 const R = 46; // round gift-button radius
+const GIFT_ICON = 120; // gifts.png display size sitting on the round button
 const PW = 624; // expanded panel width
 const PH = 200;
 const GAP = 16; // panel ↔ button gap
@@ -23,7 +24,7 @@ const CLAIM_H = 96;
 export class MilestoneGift extends Phaser.GameObjects.Container {
   private buttonGlow: Phaser.GameObjects.Graphics;
   private buttonBg: Phaser.GameObjects.Graphics;
-  private buttonEmoji: Phaser.GameObjects.Text;
+  private buttonIcon: Phaser.GameObjects.Image;
   private buttonZone: Phaser.GameObjects.Zone;
   private panel: Phaser.GameObjects.Container;
   private itemIcon: Phaser.GameObjects.Image;
@@ -50,7 +51,7 @@ export class MilestoneGift extends Phaser.GameObjects.Container {
     this.buttonGlow = scene.add.graphics();
     this.buttonBg = scene.add.graphics();
     this.drawButton(false);
-    this.buttonEmoji = scene.add.text(0, 1, '🎁', { fontSize: '44px' }).setOrigin(0.5);
+    this.buttonIcon = scene.add.image(0, 0, 'ui_gift').setDisplaySize(GIFT_ICON, GIFT_ICON);
     this.buttonZone = scene.add.zone(0, 0, R * 2, R * 2).setInteractive({ useHandCursor: true });
     this.buttonZone.on('pointerup', () => this.toggle());
 
@@ -71,7 +72,7 @@ export class MilestoneGift extends Phaser.GameObjects.Container {
 
     // Header tag.
     const tag = scene.add
-      .text(-PW / 2 + 34, -PH / 2 + 24, '🎁 GIFT', {
+      .text(-PW / 2 + 34, -PH / 2 + 24, 'GIFT', {
         fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: PALETTE.lavaShade
       })
       .setOrigin(0, 0);
@@ -110,7 +111,7 @@ export class MilestoneGift extends Phaser.GameObjects.Container {
     this.panel.add([card, tag, slot, this.itemIcon, this.countText, this.coinIcon, this.rewardText, this.claimImg, this.claimLabel, this.claimZone]);
     this.panel.setVisible(false).setAlpha(0);
 
-    this.add([this.panel, this.buttonGlow, this.buttonBg, this.buttonEmoji, this.buttonZone]);
+    this.add([this.panel, this.buttonGlow, this.buttonBg, this.buttonIcon, this.buttonZone]);
     scene.add.existing(this);
 
     this.setVisible(false); // hidden until the first milestone:changed
@@ -148,7 +149,7 @@ export class MilestoneGift extends Phaser.GameObjects.Container {
 
   private toggle(): void {
     this.expanded = !this.expanded;
-    this.scene.tweens.add({ targets: this.buttonEmoji, scaleX: '*=0.8', scaleY: '*=0.8', duration: 110, yoyo: true, ease: 'Sine.easeInOut' });
+    this.scene.tweens.add({ targets: this.buttonIcon, scaleX: '*=0.8', scaleY: '*=0.8', duration: 110, yoyo: true, ease: 'Sine.easeInOut' });
     this.scene.tweens.killTweensOf(this.panel);
     if (this.expanded) {
       this.panel.setVisible(true);

@@ -364,6 +364,12 @@
       "file": "sprites/ui/honeur.png"
     },
     {
+      "key": "ui_gift",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/ui/gifts.png"
+    },
+    {
       "key": "ui_icon_gear",
       "source": "placeholder",
       "generator": "icon",
