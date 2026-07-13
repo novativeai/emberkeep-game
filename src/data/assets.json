@@ -295,6 +295,12 @@
       "file": "sprites/guide-characters/cindra/cindra-bubble-icon.png"
     },
     {
+      "key": "portrait_ring",
+      "source": "file",
+      "generator": "portrait",
+      "file": "sprites/guide-characters/laurah-dragonMaster/portrait-ring.png"
+    },
+    {
       "key": "ui_tile_highlight",
       "source": "placeholder",
       "generator": "ui",

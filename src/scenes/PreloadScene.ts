@@ -68,6 +68,14 @@ export class PreloadScene extends Phaser.Scene {
         this.load.image(entry.key, entry.file as string);
       }
     }
+    // Animated dialogue portrait: every Laurah bank as 300x400 bust cutouts
+    // (top 95% of each frame, natural alpha) in ONE 2100x2400 spritesheet
+    // (scripts/bake-laurah-portrait.py) — idle pair first, then the talk banks
+    // in catalog order. One fetch, one GPU texture.
+    this.load.spritesheet('laurah_disc', 'sprites/laurah/disc-atlas.png', {
+      frameWidth: 300,
+      frameHeight: 400
+    });
     // UI Builder uploads (ui-theme.json `assets`, self-contained data URLs).
     for (const [name, uri] of Object.entries(uiRegistry.doc.assets)) {
       if (!this.textures.exists(uploadKey(name))) this.load.image(uploadKey(name), uri);

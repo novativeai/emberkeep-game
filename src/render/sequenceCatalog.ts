@@ -54,7 +54,9 @@ export const BUILTIN_SEQUENCES: BuiltinSequence[] = [
     dir: 'sprites/laurah/talk_mid',
     count: 15,
     durations: [90, 160, 90, 140, 160, 90, 140, 90, 160, 90, 140, 90, 90, 160, 90],
-    endIdle: IDLE.two,
+    // idle_2 (IDLE.two) has an open, talking mouth — every bank must rest on a
+    // CLOSED mouth, so this ends on idle_1 like the others.
+    endIdle: IDLE.one,
     loop: false
   },
   {
