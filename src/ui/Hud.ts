@@ -30,6 +30,7 @@ export class Hud {
   private levelText: Phaser.GameObjects.Text;
   private xpLabel: Phaser.GameObjects.Text;
   private ledgerDot: Phaser.GameObjects.Arc;
+  private ledgerDotTween!: Phaser.Tweens.Tween;
   private ledgerEnabled = true;
   /** Base scale of the gauge pills (>1 on mobile) — press/refresh tweens are
    *  relative to this so the mobile magnification survives every bump. */
@@ -90,7 +91,9 @@ export class Hud {
       .setStrokeStyle(5, num(PALETTE.cream));
     this.ledgerButton.add(this.ledgerDot);
     this.ledgerDot.setVisible(false);
-    scene.tweens.add({
+    // Pulse only while the dot is shown — an invisible infinite tween still
+    // ticks every frame (battery). refreshLedgerDot pauses/resumes it.
+    this.ledgerDotTween = scene.tweens.add({
       targets: this.ledgerDot,
       scale: 1.3,
       duration: 460,
@@ -98,6 +101,7 @@ export class Hud {
       repeat: -1,
       ease: 'Sine.easeInOut'
     });
+    this.ledgerDotTween.pause();
 
     // Level disc + XP bar — one container so the whole cluster moves as one
     // (children keep their authored absolute coords; the group sits at 0,0).
@@ -201,7 +205,14 @@ export class Hud {
   }
 
   private refreshLedgerDot(): void {
-    this.ledgerDot.setVisible([...this.deliverableByOrder.values()].some(Boolean));
+    const visible = [...this.deliverableByOrder.values()].some(Boolean);
+    this.ledgerDot.setVisible(visible);
+    if (visible && this.ledgerDotTween.isPaused()) {
+      this.ledgerDotTween.resume();
+    } else if (!visible && !this.ledgerDotTween.isPaused()) {
+      this.ledgerDotTween.pause();
+      this.ledgerDot.setScale(1);
+    }
   }
 
   setLedgerEnabled(enabled: boolean): void {

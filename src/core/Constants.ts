@@ -515,6 +515,32 @@ export const ATMOSPHERE = {
   }
 } as const;
 
+/**
+ * Battery governor (PowerGovernor): the loop runs at full rate only while the
+ * player is interacting; an untouched board throttles down in two steps. All
+ * gameplay timing is wall-clock (GameClock.now), so render fps never affects
+ * logic or determinism.
+ *
+ * activeFps is 62, not 60, on purpose: Phaser's fps.limit skips a step when the
+ * accumulated delta is a hair under the limit-rate, so 60 on a 60 Hz display
+ * micro-stutters (~55 real fps). 62 fires every vsync at 60 Hz and halves a
+ * 120 Hz display to 60 — the cap costs nothing on standard screens.
+ */
+export const POWER = {
+  activeFps: 62,
+  idleFps: 30,
+  dozeFps: 15,
+  /** No input/gameplay for this long → idle (30 fps). */
+  idleAfterMs: 10_000,
+  /** …and for this long → doze (15 fps, ambient FX + crystal paused). */
+  dozeAfterMs: 45_000,
+  /** Gameplay bus events hold ACTIVE this long (finale beats hold longer). */
+  eventHoldMs: 10_000,
+  finaleHoldMs: 45_000,
+  /** Crystal3D re-render cadence per state; it PAUSES entirely in doze. */
+  crystalMs: { active: 33, idle: 100 }
+} as const;
+
 /** Save. Bump SAVE_VERSION whenever the map/chains change incompatibly, so old
  *  localStorage saves are discarded on load (Context.beginRun → newGame) instead
  *  of layering stale items onto the new map. v1→v2: map/items reshuffled (red

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, IS_IOS, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
+import { GAME_WIDTH, IS_IOS, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE, POWER } from './Constants';
 import { renderScale } from './render-scale';
 import { BoardScene } from '../scenes/BoardScene';
 import { BootScene } from '../scenes/BootScene';
@@ -62,6 +62,12 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    // Boot WITH a limit so TimeStep binds its limit-aware step: PowerGovernor
+    // retunes the cap live (62 active / 30 idle / 15 doze) to spare batteries.
+    // 62 (not 60) so a 60 Hz display renders every vsync — see POWER.
+    fps: {
+      limit: POWER.activeFps
     },
     render: {
       // antialias = LINEAR texture filtering (smooth when the camera scales sprites

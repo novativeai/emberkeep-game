@@ -24,6 +24,7 @@ import {
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
+  POWER,
   SCENES,
   skipEnergyCost,
   skipWarmthCost,
@@ -34,6 +35,7 @@ import {
   TIMINGS
 } from '../core/Constants';
 import { gridToWorld, setProjection, worldToGrid } from '../core/iso';
+import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
 import { renderScale } from '../core/render-scale';
 import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAllow } from '../core/types';
 import facesJson from '../data/faces.json';
@@ -178,6 +180,12 @@ export class BoardScene extends Phaser.Scene {
    *  Theme-Crystal generator's look) + any authored 3D-decor placement. */
   private crystal3d?: Crystal3D;
   private crystalTex?: Phaser.Textures.CanvasTexture;
+  /** Battery governor (registry; set in main.ts — absent in bare-scene tests). */
+  private power?: PowerGovernor;
+  private crystalLastRender = 0;
+  /** The always-on ambience gated off in doze: 2 updrafts + the firefly swarm. */
+  private ambientEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  private twinkleTimer?: Phaser.Time.TimerEvent;
   /** Ember-fly ambience: the emit zone tracks the camera's worldView. */
   private fireflyZone?: Phaser.Geom.Rectangle;
   /** Golden Egg ambient tremble (starts near the Level-3 threshold). */
@@ -236,6 +244,7 @@ export class BoardScene extends Phaser.Scene {
     this.teaseReturn = null;
     this.finaleRan = false;
     this.finaleStartedMs = 0;
+    this.power = this.registry.get('power') as PowerGovernor | undefined;
     void this.loadDragonRigs(); // lazy + fault-tolerant; ready well before the hatch
 
     this.ensureShadowTexture(); // soft radial shadow used by every object
@@ -259,7 +268,16 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.fadeIn(320, 36, 27, 34);
     this.scene.launch(SCENES.ui);
 
+    // Doze = a still painting: ambient emitters stop (live particles fade out
+    // over their own lifespans) and the sky-twinkle allocator pauses. Any
+    // input or gameplay beat flips the governor back and everything resumes.
+    this.game.events.on(POWER_STATE_EVENT, this.onPowerState, this);
+    this.onPowerState((this.power?.state ?? 'active') as PowerState);
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(POWER_STATE_EVENT, this.onPowerState, this);
+      this.ambientEmitters = [];
+      this.twinkleTimer = undefined;
       this.offBus.forEach((off) => off());
       this.offBus = [];
       for (const ld of this.liveDragons.values()) ld.player.destroy();
@@ -272,6 +290,12 @@ export class BoardScene extends Phaser.Scene {
     });
   }
 
+  private onPowerState(state: PowerState): void {
+    const doze = state === 'doze';
+    for (const emitter of this.ambientEmitters) emitter.emitting = !doze;
+    if (this.twinkleTimer) this.twinkleTimer.paused = doze;
+  }
+
   override update(time: number, delta: number): void {
     for (const sprite of this.itemSprites.values()) sprite.applyBob(time);
     // Ember-flies live wherever the player is looking — track the view.
@@ -280,8 +304,16 @@ export class BoardScene extends Phaser.Scene {
       this.fireflyZone.setTo(v.x, v.y, v.width, v.height);
     }
     if (this.crystal3d && this.crystalTex) {
-      this.crystal3d.update(time); // spin + render the live emerald
-      this.crystalTex.refresh(); // re-upload to the GPU for this frame
+      // The spin is decorative and the render+readback+re-upload is the single
+      // most expensive idle cost — run it on the governor's cadence (paused in
+      // doze). Rotation derives from absolute time, so skipped frames never
+      // desync the motion.
+      const interval = this.power?.crystalIntervalMs() ?? POWER.crystalMs.active;
+      if (time - this.crystalLastRender >= interval) {
+        this.crystalLastRender = time;
+        this.crystal3d.update(time); // spin + render the live emerald
+        this.crystalTex.refresh(); // re-upload to the GPU for this frame
+      }
     }
     this.updateDrag(delta);
     this.updateLiveDragons(delta);
@@ -1039,7 +1071,7 @@ export class BoardScene extends Phaser.Scene {
       .setDepth(DEPTHS.sky + 1);
 
     // Occasional twinkles in the sky.
-    this.time.addEvent({
+    this.twinkleTimer = this.time.addEvent({
       delay: 1700,
       loop: true,
       callback: () => {
@@ -1421,32 +1453,36 @@ export class BoardScene extends Phaser.Scene {
     // authored world (screenY reaches ~5100), not just the start terrace, so
     // every zone the camera frames has updrafts.
     const world = this.cameras.main.getBounds();
-    this.add
-      .particles(0, 0, 'fx_ember', {
-        x: { min: world.x + 80, max: world.right - 80 },
-        y: { min: 1240, max: Math.max(1520, world.bottom - 400) },
-        speedY: { min: EMBER_MOTES.maxSpeedY, max: EMBER_MOTES.minSpeedY },
-        speedX: { min: -EMBER_MOTES.driftX, max: EMBER_MOTES.driftX },
-        lifespan: EMBER_MOTES.lifespanMs,
-        scale: { start: EMBER_MOTES.minScale, end: 0 },
-        alpha: { start: EMBER_MOTES.alpha * 0.8, end: 0 },
-        frequency: 420,
-        blendMode: Phaser.BlendModes.ADD
-      })
-      .setDepth(DEPTHS.cliffs + 1);
-    this.add
-      .particles(0, 0, 'fx_ember', {
-        x: { min: world.x + 60, max: world.right - 60 },
-        y: { min: 1400, max: Math.max(1580, world.bottom - 300) },
-        speedY: { min: -64, max: -36 },
-        speedX: { min: -20, max: 20 },
-        lifespan: EMBER_MOTES.lifespanMs,
-        scale: { start: EMBER_MOTES.maxScale, end: 0 },
-        alpha: { start: EMBER_MOTES.alpha * 0.55, end: 0 },
-        frequency: 900,
-        blendMode: Phaser.BlendModes.ADD
-      })
-      .setDepth(DEPTHS.particles);
+    this.ambientEmitters.push(
+      this.add
+        .particles(0, 0, 'fx_ember', {
+          x: { min: world.x + 80, max: world.right - 80 },
+          y: { min: 1240, max: Math.max(1520, world.bottom - 400) },
+          speedY: { min: EMBER_MOTES.maxSpeedY, max: EMBER_MOTES.minSpeedY },
+          speedX: { min: -EMBER_MOTES.driftX, max: EMBER_MOTES.driftX },
+          lifespan: EMBER_MOTES.lifespanMs,
+          scale: { start: EMBER_MOTES.minScale, end: 0 },
+          alpha: { start: EMBER_MOTES.alpha * 0.8, end: 0 },
+          frequency: 420,
+          blendMode: Phaser.BlendModes.ADD
+        })
+        .setDepth(DEPTHS.cliffs + 1)
+    );
+    this.ambientEmitters.push(
+      this.add
+        .particles(0, 0, 'fx_ember', {
+          x: { min: world.x + 60, max: world.right - 60 },
+          y: { min: 1400, max: Math.max(1580, world.bottom - 300) },
+          speedY: { min: -64, max: -36 },
+          speedX: { min: -20, max: 20 },
+          lifespan: EMBER_MOTES.lifespanMs,
+          scale: { start: EMBER_MOTES.maxScale, end: 0 },
+          alpha: { start: EMBER_MOTES.alpha * 0.55, end: 0 },
+          frequency: 900,
+          blendMode: Phaser.BlendModes.ADD
+        })
+        .setDepth(DEPTHS.particles)
+    );
   }
 
   /* --------------------------- world atmosphere --------------------------- */
@@ -1465,20 +1501,22 @@ export class BoardScene extends Phaser.Scene {
     // --- near: ember-flies. The emit zone is re-centred on worldView in
     // update(), so the flies always live where the player is looking.
     this.fireflyZone = new Phaser.Geom.Rectangle(cam.worldView.x, cam.worldView.y, cam.worldView.width, cam.worldView.height);
-    this.add
-      .particles(0, 0, 'fx_ember', {
-        emitZone: { type: 'random', source: this.fireflyZone, quantity: 1 },
-        lifespan: A.fireflies.lifespanMs,
-        speed: { min: A.fireflies.speedMin, max: A.fireflies.speedMax },
-        angle: { min: 0, max: 360 },
-        scale: { min: A.fireflies.scaleMin, max: A.fireflies.scaleMax },
-        // Sine bell over the life: 0 → peak → 0 — a slow twinkle, never a pop.
-        alpha: { onUpdate: (_p, _k, t) => Math.sin(Math.PI * t) * A.fireflies.alphaPeak },
-        tint: A.fireflies.tint,
-        frequency: A.fireflies.frequency,
-        blendMode: Phaser.BlendModes.ADD
-      })
-      .setDepth(DEPTHS.particles);
+    this.ambientEmitters.push(
+      this.add
+        .particles(0, 0, 'fx_ember', {
+          emitZone: { type: 'random', source: this.fireflyZone, quantity: 1 },
+          lifespan: A.fireflies.lifespanMs,
+          speed: { min: A.fireflies.speedMin, max: A.fireflies.speedMax },
+          angle: { min: 0, max: 360 },
+          scale: { min: A.fireflies.scaleMin, max: A.fireflies.scaleMax },
+          // Sine bell over the life: 0 → peak → 0 — a slow twinkle, never a pop.
+          alpha: { onUpdate: (_p, _k, t) => Math.sin(Math.PI * t) * A.fireflies.alphaPeak },
+          tint: A.fireflies.tint,
+          frequency: A.fireflies.frequency,
+          blendMode: Phaser.BlendModes.ADD
+        })
+        .setDepth(DEPTHS.particles)
+    );
 
     // --- mid-far: low clouds drifting beneath the platforms (altitude!).
     const world = cam.getBounds();

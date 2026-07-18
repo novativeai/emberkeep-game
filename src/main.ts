@@ -3,6 +3,7 @@ import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
 import { GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
 import { createGameConfig } from './core/GameConfig';
+import { PowerGovernor } from './core/PowerGovernor';
 import { gridToWorld } from './core/iso';
 
 interface BoardCellText {
@@ -47,6 +48,7 @@ declare global {
       reset: () => void;
       saveKey: string;
       game: Phaser.Game;
+      power: () => { state: string; fpsLimit: number; renderedFps: number };
     };
     webkitAudioContext?: typeof AudioContext;
   }
@@ -81,6 +83,25 @@ const game = new Phaser.Game({
 
 // WebAudio unlock must come from a user gesture; resume on any pointer.
 if (audio) document.addEventListener('pointerdown', () => audio.unlock());
+
+// Battery governor: throttles the loop (and, via power:state, the ambient FX)
+// whenever the board sits untouched. Scenes read it from the registry.
+const power = new PowerGovernor(game, ctx.bus);
+game.registry.set('power', power);
+
+// Host-page bridge: the EmberGames hub reports when the game's iframe is
+// scrolled out of view — sleep the whole loop (tab-hidden is Phaser built-in).
+window.addEventListener('message', (event: MessageEvent) => {
+  if (event.origin !== window.location.origin) return;
+  const data = event.data as { type?: string; visible?: boolean } | null;
+  if (!data || data.type !== 'embergames:visibility') return;
+  if (data.visible) {
+    game.loop.wake();
+    power.notifyActivity(2000);
+  } else {
+    game.loop.sleep();
+  }
+});
 
 /* ------------------- agent instrumentation (spec §5) ------------------ */
 
@@ -215,5 +236,11 @@ window.__emberkeep = {
     if (!board) return;
     const { x, y } = gridToWorld(col, row);
     board.cameras.main.centerOn(x, y);
-  }
+  },
+  /** Battery-governor diagnostics: current state + real rendered step rate. */
+  power: () => ({
+    state: power.state,
+    fpsLimit: game.loop.fpsLimit,
+    renderedFps: Math.round(power.renderedFps())
+  })
 };
