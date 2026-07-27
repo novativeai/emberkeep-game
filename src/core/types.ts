@@ -70,6 +70,10 @@ export interface ChainTierConfig {
    *  `merge` when merging items of THIS tier (e.g. 2 Houses → 1 Manor while
    *  Bushes still merge 3 → 1 House). */
   merge?: ChainMergeOverride;
+  /** Display scale for this tier's board art. Consulted AFTER Constants'
+   *  ITEM_SCALE (which wins for hand-tuned keys) — this is the data-driven
+   *  path the worldbuilder Merge page writes for uploaded art. */
+  artScale?: number;
 }
 
 /** Per-chain merge recipe override (e.g. 5 wood → 1 house). */

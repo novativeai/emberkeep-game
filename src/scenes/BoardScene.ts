@@ -42,6 +42,8 @@ import facesJson from '../data/faces.json';
 import { BoardItem } from '../entities/BoardItem';
 import { Crystal3D } from '../render/Crystal3D';
 import type { FacesData } from '../render/faceAnimations';
+import { FlipbookFX, RAMP_TEXTURE } from '../render/FlipbookFX';
+import { BEATS, sheetOf, type BeatKey } from '../render/vfxBank';
 import { RigPlayer } from '../render/RigPlayer';
 import type { RigDoc } from '../render/rigTypes';
 import { hopTo, hoverBob, popIn, scalePulse } from '../ui/tweens';
@@ -288,6 +290,14 @@ export class BoardScene extends Phaser.Scene {
       this.crystal3d = undefined;
       this.crystalTex = undefined;
     });
+  }
+
+  /** chains.json per-tier `artScale` — the worldbuilder Merge page's
+   *  data-driven sizing for uploaded art (Constants' ITEM_SCALE wins). */
+  private tierArtScale(chain: string, tier: number): number | undefined {
+    return this.ctx.data.chains.chains
+      .find((c) => c.id === chain)
+      ?.tiers.find((t) => t.tier === tier)?.artScale;
   }
 
   private onPowerState(state: PowerState): void {
@@ -926,6 +936,7 @@ export class BoardScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
       onComplete: () => {
         this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 1, 2.6);
+        this.playBeatFX('elder', p.x, p.y + 40);   // the Elder rises out of gold
         this.shells.explode(12, p.x, p.y + 40);
         this.sparks.explode(40, p.x, p.y + 44);
         this.burst.explode(20, p.x, p.y + 48);
@@ -1929,7 +1940,10 @@ export class BoardScene extends Phaser.Scene {
     const artScale =
       snap.kind === 'decor'
         ? (DECOR_SCALE[snap.chain] ?? 1)
-        : (ITEM_SCALE[`${snap.chain}_${snap.tier}`] ?? ITEM_SCALE[snap.chain] ?? 1);
+        : (ITEM_SCALE[`${snap.chain}_${snap.tier}`] ??
+          ITEM_SCALE[snap.chain] ??
+          this.tierArtScale(snap.chain, snap.tier) ??
+          1);
     sprite.acquire(snap, this.ctx.data.anchors, this.textureFor(snap), artScale);
     // Phaser 3.90: calling setInteractive() on an already-interactive object
     // silently returns without updating hitArea. Mutate sprite.input.hitArea
@@ -2699,6 +2713,7 @@ export class BoardScene extends Phaser.Scene {
       this.burst.explode(16, drop.x, drop.y - 36);
       this.glowFlash(drop.x, drop.y - 28, PALETTE.goldAccent, 0.55, 1.1);
       if (isHatch) return; // item:hatched runs the special ceremony
+      this.playBeatFX('merge', drop.x, drop.y);  // ash puff under the pop-in
       payload.outputs.forEach((output, i) => {
         this.time.delayedCall(60 + i * 90, () => {
           // popIn's Back.easeOut overshoot IS the pop — never stack a second
@@ -2745,6 +2760,7 @@ export class BoardScene extends Phaser.Scene {
     });
     this.time.delayedCall(TIMINGS.hatchShake, () => {      ghost.destroy();
       this.glowFlash(x, y - 52, PALETTE.white, 0.95, 1.7);
+      this.playBeatFX('hatch', x, y);          // fireburst over the shell debris
       this.shells.explode(7, x, y - 52);
       this.sparks.explode(24, x, y - 48);
       this.burst.explode(12, x, y - 44);
@@ -2826,6 +2842,7 @@ export class BoardScene extends Phaser.Scene {
       const chest = this.itemSprites.get(chestId);
       if (!chest || !chest.active) return;
       scalePulse(this, chest, 1.28, 240);
+      this.playBeatFX('chest', chest.x, chest.y);   // gold dust off the lid
       this.burst.explode(12, chest.x, chest.y - 52);
       this.sparks.explode(18, chest.x, chest.y - 52);
       this.glowFlash(chest.x, chest.y - 46, PALETTE.goldAccent, 0.6, 1.15);
@@ -3047,6 +3064,32 @@ export class BoardScene extends Phaser.Scene {
       sy += y;
     }
     return { x: sx / Math.max(1, tiles.length), y: sy / Math.max(1, tiles.length) };
+  }
+
+  /**
+   * Play a bank flipbook for a named beat at a world point.
+   *
+   * Purely additive garnish on top of the particle bursts that were always
+   * there — if the bank was not deployed, or the governor has dozed the scene,
+   * this is a no-op and the beat looks exactly as it did before.
+   *
+   * Sits on DEPTHS.particles (with the bursts) rather than DEPTHS.flash, so the
+   * white glow still reads as the brightest thing in the frame.
+   */
+  private playBeatFX(beat: BeatKey, x: number, y: number): FlipbookFX | undefined {
+    if (this.power?.state === 'doze') return undefined;
+    const spec = BEATS[beat];
+    const sheet = sheetOf(spec.sheet);
+    if (!sheet || !this.textures.exists(`${sheet.key}_pack`) || !this.textures.exists(RAMP_TEXTURE)) {
+      return undefined; // bank not deployed — the particle beat carries it alone
+    }
+    const fx = new FlipbookFX(this, sheet, x, y + spec.dy, () => this.ctx.clock.now(), spec.opts);
+    // Width drives the size; height follows the cell aspect so a tall flame
+    // sheet is never squashed into a square.
+    fx.setDisplaySize(spec.size, (spec.size * sheet.cellH) / sheet.cellW);
+    fx.setDepth(DEPTHS.particles);
+    this.add.existing(fx);
+    return fx;
   }
 
   private glowFlash(x: number, y: number, colorHex: string, peak: number, scale: number): void {

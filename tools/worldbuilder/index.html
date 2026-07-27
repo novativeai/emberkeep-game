@@ -130,7 +130,46 @@
     </div>
   </div>
 
-  <div id="stageWrap"><canvas id="stage"></canvas></div>
+  <style>
+    /* ---------- Merge page (🔮 tab) ---------- */
+    #mergePage { position:absolute; inset:0; display:none; overflow:auto; background:var(--bg, #17121a); padding:14px 16px 40px; z-index:5; }
+    #mergePage .mpHead { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+    #mergePage .mpHead h2 { margin:0 12px 0 0; font-size:16px; }
+    #mergePage .mpRule { color:var(--dim); font-size:12px; margin-right:auto; }
+    .mpChain { border:1px solid var(--line); border-radius:10px; margin-bottom:14px; background:rgba(255,255,255,0.02); }
+    .mpChain > .hd { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); }
+    .mpChain > .hd .nm { font-weight:700; }
+    .mpChain > .hd .id { color:var(--dim); font-size:11px; }
+    .mpChain > .hd .sp { margin-left:auto; display:flex; gap:6px; }
+    .mpRow { display:flex; align-items:center; gap:6px; padding:12px; overflow-x:auto; }
+    .mpEl { width:130px; flex:0 0 auto; border:1px solid var(--line); border-radius:10px; padding:8px; text-align:center; position:relative; background:rgba(0,0,0,0.18); }
+    .mpEl img { width:96px; height:96px; object-fit:contain; background:repeating-conic-gradient(#0003 0 25%, transparent 0 50%) 0 0/16px 16px; border-radius:6px; }
+    .mpEl .tier { position:absolute; top:6px; left:6px; background:var(--line); border-radius:8px; font-size:10px; padding:1px 6px; }
+    .mpEl .gen { position:absolute; top:6px; right:6px; background:#F7A437; color:#241B22; border-radius:8px; font-size:10px; padding:1px 6px; font-weight:700; }
+    .mpEl .nm { font-size:12px; font-weight:600; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .mpEl .meta { font-size:10px; color:var(--dim); min-height:24px; }
+    .mpEl .btns { display:flex; gap:4px; margin-top:5px; }
+    .mpEl .btns button { flex:1; font-size:10px; padding:3px 0; }
+    .mpArrow { flex:0 0 auto; text-align:center; color:var(--dim); font-size:11px; padding:0 2px; }
+    .mpArrow b { display:block; font-size:16px; color:#F7A437; }
+    .mpAddTier { flex:0 0 auto; width:110px; height:150px; border:1px dashed var(--line); border-radius:10px; background:none; color:var(--dim); cursor:pointer; font-size:12px; }
+    .mpAddTier:hover { color:#fff; border-color:#F7A437; }
+    #mergeModal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.55); z-index:60; }
+    #mergeModal .box { width:420px; max-height:88vh; overflow:auto; background:var(--panel, #201a24); border:1px solid var(--line); border-radius:12px; padding:16px; }
+    #mergeModal h3 { margin:0 0 10px; font-size:14px; }
+    #mergeModal label { display:flex; align-items:center; gap:8px; font-size:12px; margin:7px 0; }
+    #mergeModal label span.cap { width:110px; color:var(--dim); flex:0 0 auto; }
+    #mergeModal input[type=text], #mergeModal input[type=number], #mergeModal select { flex:1; min-width:0; background:#141018; color:#eee; border:1px solid var(--line); border-radius:6px; padding:5px 7px; font-size:12px; }
+    #mergeModal .genBox { border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:8px; }
+    #mergeModal .rowBtns { display:flex; gap:8px; margin-top:14px; }
+    #mergeModal .rowBtns button { flex:1; }
+    #mergeModal .artPrev { display:flex; align-items:center; gap:10px; margin:8px 0; }
+    #mergeModal .artPrev img { width:72px; height:72px; object-fit:contain; background:repeating-conic-gradient(#0003 0 25%, transparent 0 50%) 0 0/14px 14px; border-radius:8px; border:1px solid var(--line); }
+  </style>
+  <div id="stageWrap"><canvas id="stage"></canvas>
+    <div id="mergePage"></div>
+    <div id="mergeModal"><div class="box"></div></div>
+  </div>
 
   <div id="side">
     <div id="sideResize" title="Drag to widen the asset panel"></div>
@@ -146,8 +185,11 @@
     <div class="hint" id="catHint">Tiles are the floor — one per cell. Click a card to select, then Paint.</div>
     <div id="uploadRow" style="padding:0 8px 6px"><button id="uploadBtn" style="width:100%">＋ Upload <span id="uploadCat">tile</span> PNGs…</button>
       <input id="fileInput" type="file" accept="image/png,image/webp,image/jpeg" multiple hidden /></div>
-    <div id="mergeActions" style="padding:0 8px 6px; display:none; gap:6px">
-      <button id="resetMerge" style="width:100%" title="Revert every merge slot to its placeholder">↺ Reset all merge art to placeholders</button>
+    <div id="mergeActions" style="padding:0 8px 6px; display:none; flex-direction:column; gap:6px">
+      <button id="mergeApply" style="width:100%" title="POST the merge doc to the game dev server (/__worldbuilder/merge) — writes chains.json + art + wiring">⤒ Apply to game (dev server)</button>
+      <button id="mergeExport" style="width:100%" title="Download a .merge.json for scripts/ingest-merge.mjs">⬇ Export merge.json</button>
+      <button id="mergeImport" style="width:100%" title="Load a previously exported .merge.json">⬆ Import merge.json</button>
+      <button id="mergeReload" style="width:100%" title="Re-fetch chains.json from the dev server (or reset to the bundled snapshot)">↺ Reload from game</button>
     </div>
     <div id="backgroundActions" style="padding:0 8px 6px; display:none; flex-direction:column; gap:6px">
       <button id="fillBackground" style="width:100%" title="Fill the world's bounding box + a 10-tile border with the selected background">⛶ Fill world + 10-tile border</button>
@@ -248,7 +290,7 @@ const S = {
   flying: null,        // active smooth camera transition (raf id)
   drag: null,
   ready: false, // becomes true once the initial load/restore finishes (gates auto-save)
-  mergeSlots: {}, // key -> { key,label,chain,tier,color, src(dataURL), custom }
+  merge: null, // chains.json-shaped doc (+ per-tier _art uploads) — see Merge page
   nextId: 1, nextZ: 1
 };
 const uid = () => S.nextId++;
@@ -259,45 +301,33 @@ const CATEGORIES = ['tile', 'decotile', 'decor', 'blocker', 'background', '3d'];
 const isBackground = (a) => a && a.category === 'background';
 const BG_FILL_MARGIN = 10;
 
-// The full merge-item library: every game element, pre-labelled. Drop your own
-// art onto any slot to replace its placeholder one-by-one (export carries the map).
-const MERGE_SLOTS = [
-  { key: 'sparkweed_1',    label: 'Spark Weed',      chain: 'sparkweed',    tier: 1, color: '#6FBE43' },
-  { key: 'sparkweed_2',    label: 'Ember Bloom',     chain: 'sparkweed',    tier: 2, color: '#9FE06A' },
-  { key: 'sparkweed_3',    label: 'Flame Lily',      chain: 'sparkweed',    tier: 3, color: '#CDEF7E' },
-  { key: 'ember_dragon_1', label: 'Speckled Egg',    chain: 'ember_dragon', tier: 1, color: '#E8A24C' },
-  { key: 'ember_dragon_2', label: 'Ember Hatchling', chain: 'ember_dragon', tier: 2, color: '#F2784B' },
-  { key: 'ember_dragon_3', label: 'Ember Whelp',     chain: 'ember_dragon', tier: 3, color: '#E8503C' },
-  { key: 'flame_gem_1',    label: 'Gem Shard',       chain: 'flame_gem',    tier: 1, color: '#54D6C0' },
-  { key: 'flame_gem_2',    label: 'Flame Gem',       chain: 'flame_gem',    tier: 2, color: '#3FA8D9' },
-  { key: 'flame_gem_3',    label: 'Radiant Gem',     chain: 'flame_gem',    tier: 3, color: '#B07CF0' },
-  { key: 'decor_nest',     label: 'Dragon Nest',     chain: 'nest',         tier: 1, color: '#A6794C' },
-  { key: 'decor_brazier',  label: 'Brazier',         chain: 'brazier',      tier: 1, color: '#F7A437' }
-];
+/* ----------------------- merge data model (🔮 page) ----------------------- */
+// The Merge page edits the REAL game merge config: a chains.json-shaped doc
+// (mergeRule + chains[].tiers[], incl. per-tier `merge` overrides, `generator`
+// and `artScale`) plus uploaded element art. Round-trip:
+//   ⤒ Apply → POST /__worldbuilder/merge on the vite dev server, or
+//   ⬇ Export merge.json → node scripts/ingest-merge.mjs <file>.
+// DEFAULT_CHAINS is a bundled snapshot of src/data/chains.json so the page
+// works offline (↺ Reload pulls the live file when a dev server is up).
+const DEFAULT_CHAINS = {"mergeRule":{"minGroup":3,"fiveBonus":true,"fiveGroup":5,"fiveOutputs":2},"chains":[{"id":"sparkweed","name":"Sparkweed","tiers":[{"tier":1,"id":"sparkweed_1","name":"Spark Weed","sell":1,"xp":0},{"tier":2,"id":"sparkweed_2","name":"Ember Bloom","sell":3,"xp":6},{"tier":3,"id":"sparkweed_3","name":"Flame Lily","sell":8,"xp":14}]},{"id":"strawberry","name":"Emberberry Plants","tiers":[{"tier":1,"id":"strawberry_1","name":"Emberberry Sprout","sell":1,"xp":0},{"tier":2,"id":"strawberry_2","name":"Emberberry Bush","sell":3,"xp":6},{"tier":3,"id":"strawberry_3","name":"Ripe Emberberry Plant","sell":8,"xp":14,"generator":{"produces":{"chain":"strawberry","tier":1},"cooldownMs":20000,"energyCost":0,"passiveMs":240000}}]},{"id":"ember_dragon","name":"Ember Dragons","hatchAtTier":3,"tiers":[{"tier":1,"id":"ember_dragon_1","name":"Dragon Ruby","sell":2,"xp":0},{"tier":2,"id":"ember_dragon_2","name":"Red Egg","sell":10,"xp":0},{"tier":3,"id":"ember_dragon_3","name":"Red Dragon","sell":25,"xp":26,"merge":{"group":2,"outputs":1},"generator":{"produces":{"chain":"ember_dragon","tier":1},"cooldownMs":45000,"energyCost":1,"passiveMs":180000}},{"tier":4,"id":"ember_dragon_4","name":"Adult Red Dragon","sell":60,"xp":40,"generator":{"produces":{"chain":"ember_dragon","tier":1},"cooldownMs":30000,"energyCost":1,"passiveMs":120000}}]},{"id":"flame_gem","name":"Flame Gems","tiers":[{"tier":1,"id":"flame_gem_1","name":"Gem Shard","sell":1,"xp":0},{"tier":2,"id":"flame_gem_2","name":"Flame Gem","sell":5,"xp":8},{"tier":3,"id":"flame_gem_3","name":"Radiant Gem","sell":15,"xp":18}]},{"id":"lumber","name":"Timber","tiers":[{"tier":1,"id":"lumber_1","name":"Bush","sell":1,"xp":0},{"tier":2,"id":"lumber_2","name":"House","sell":0,"xp":0,"merge":{"group":2,"outputs":1},"generator":{"produces":{"chain":"coin","tier":1},"cooldownMs":210000,"energyCost":0,"passiveMs":210000,"tappable":false}},{"tier":3,"id":"lumber_3","name":"Manor","sell":0,"xp":20,"generator":{"produces":{"chain":"coin","tier":2},"cooldownMs":210000,"energyCost":0,"passiveMs":210000,"tappable":false}}]},{"id":"bigtree","name":"Ancient Tree","tiers":[{"tier":1,"id":"bigtree_1","name":"Ancient Tree","sell":0,"xp":0,"generator":{"produces":{"chain":"lumber","tier":1},"cooldownMs":300000,"energyCost":0,"passiveMs":300000,"tappable":false}}]},{"id":"crystal","name":"Theme Crystal","tiers":[{"tier":1,"id":"crystal_1","name":"Theme Crystal","sell":0,"xp":0,"generator":{"produces":{"chain":"emerald","tier":1},"cooldownMs":300000,"energyCost":0,"tappable":true,"skipMaxGold":60}}]},{"id":"coin","name":"Gold","tiers":[{"tier":1,"id":"coin_1","name":"Gold Coin","sell":0,"xp":0},{"tier":2,"id":"coin_2","name":"Gold Pouch","sell":5,"xp":60}]},{"id":"emerald","name":"Emerald Dragons","hatchAtTier":3,"tiers":[{"tier":1,"id":"emerald_1","name":"Emerald","sell":2,"xp":0},{"tier":2,"id":"emerald_2","name":"Green Egg","sell":10,"xp":0},{"tier":3,"id":"emerald_3","name":"Green Dragon","sell":20,"xp":24,"merge":{"group":2,"outputs":1},"generator":{"produces":{"chain":"flame_gem","tier":1},"cooldownMs":45000,"energyCost":1,"passiveMs":180000}},{"tier":4,"id":"emerald_4","name":"Adult Emerald Dragon","sell":50,"xp":36,"generator":{"produces":{"chain":"flame_gem","tier":1},"cooldownMs":30000,"energyCost":1,"passiveMs":120000}}]},{"id":"golden_egg","name":"Golden Dragons","hatchAtTier":2,"tiers":[{"tier":1,"id":"golden_egg_1","name":"Golden Egg","sell":0,"xp":0,"sellable":false},{"tier":2,"id":"golden_egg_2","name":"Golden Elder","sell":0,"xp":0,"sellable":false}]},{"id":"chest","name":"Treasure Chest","tiers":[{"tier":1,"id":"chest_1","name":"Treasure Chest","sell":0,"xp":0}]}]};
+// Where each element's CURRENT in-game art lives (assets.json snapshot) — used
+// for thumbnails when the tool is served from the repo (:8820 or :5173).
+const GAME_ART_FILES = {"item_strawberry_1":"sprites/level1/item_strawberry_1.png","item_strawberry_2":"sprites/level1/item_strawberry_2.png","item_strawberry_3":"sprites/level1/item_strawberry_3.png","item_ember_dragon_1":"sprites/merge/rubis-transparent_001.webp","item_ember_dragon_2":"sprites/items/red-egg.webp","item_ember_dragon_3":"sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.webp","item_ember_dragon_4":"sprites/characters/dragon/red-dragon/sprite-adult/red-dragon-adult-baked.webp","item_flame_gem_1":"sprites/items/diamond.webp","item_lumber_1":"sprites/items/wood.png","item_chest_1":"sprites/items/chest.webp","item_lumber_2":"sprites/items/house.png","item_lumber_3":"sprites/items/manor.png","item_bigtree_1":"sprites/items/bigtree.webp","item_crystal_1":"sprites/items/crystal.webp","item_coin_1":"sprites/items/coin.png","item_coin_2":"sprites/items/coin_pouch.png","item_golden_egg_1":"sprites/items/golden-egg.webp","item_golden_egg_2":"sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.webp","item_emerald_1":"sprites/items/emerald.webp","item_emerald_2":"sprites/items/green-egg.webp","item_emerald_3":"sprites/characters/dragon/emerald-dragon/sprite/emerald-dragon-baked.webp","item_emerald_4":"sprites/characters/dragon/emerald-dragon/sprite-adult/emerald-dragon-adult-baked.webp"};
 
-/** Draw a labelled placeholder swatch for a merge slot (data URL). */
-function mergePlaceholderSrc(slot) {
-  const c = document.createElement('canvas'); c.width = 220; c.height = 220;
-  const g = c.getContext('2d');
-  const cx = 110, cy = 100, r = 78;
-  // diamond-ish gem body in the chain colour
-  const grad = g.createLinearGradient(cx, cy - r, cx, cy + r);
-  grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.18, slot.color); grad.addColorStop(1, shade(slot.color, -0.35));
-  g.fillStyle = grad; g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 4;
-  g.beginPath();
-  g.moveTo(cx, cy - r); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r, cy); g.closePath();
-  g.fill(); g.stroke();
-  // tier pips
-  for (let i = 0; i < slot.tier; i++) {
-    g.fillStyle = '#ffffff'; g.beginPath();
-    g.arc(cx - (slot.tier - 1) * 9 + i * 18, cy, 5.5, 0, 7); g.fill();
-  }
-  // label
-  g.fillStyle = '#241B22'; g.font = 'bold 22px Segoe UI, sans-serif'; g.textAlign = 'center';
-  g.fillText(slot.label, cx, 196);
-  g.fillStyle = 'rgba(36,27,34,0.55)'; g.font = '13px Segoe UI, sans-serif';
-  g.fillText('drop art to replace', cx, 215);
-  return c.toDataURL();
+/** Deep-copy the bundled snapshot into the working doc. */
+function initMergeDoc() {
+  if (!S.merge) S.merge = JSON.parse(JSON.stringify(DEFAULT_CHAINS));
+}
+const mergeKey = (tier) => `item_${tier.id}`;
+const chainHue = (id) => { let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
+/** group/outputs that apply when merging items OF `tier` (input side). */
+function comboRule(chain, tier) {
+  const o = tier.merge ?? chain.merge ?? null;
+  return { group: o?.group ?? S.merge.mergeRule.minGroup, outputs: o?.outputs ?? 1 };
+}
+function fmtMs(ms) {
+  if (ms >= 60000) return `${+(ms / 60000).toFixed(1)}m`;
+  return `${Math.round(ms / 1000)}s`;
 }
 function shade(hex, amt) {
   const n = parseInt(hex.slice(1), 16); let r = n >> 16, gg = (n >> 8) & 255, b = n & 255;
@@ -306,12 +336,33 @@ function shade(hex, amt) {
   return '#' + ((1 << 24) + (r << 16) + (gg << 8) + b).toString(16).slice(1);
 }
 
-/** Seed the merge library with placeholders (keeps any custom art already set). */
-function initMergeSlots() {
-  for (const def of MERGE_SLOTS) {
-    if (S.mergeSlots[def.key]) continue;
-    S.mergeSlots[def.key] = { ...def, src: mergePlaceholderSrc(def), custom: false };
+/** Placeholder swatch for an element without art (data URL). */
+function mergePlaceholderSrc(chainId, tierNo, label) {
+  const c = document.createElement('canvas'); c.width = 200; c.height = 200;
+  const g = c.getContext('2d');
+  const hue = chainHue(chainId);
+  const cx = 100, cy = 92, r = 68;
+  const grad = g.createLinearGradient(cx, cy - r, cx, cy + r);
+  grad.addColorStop(0, `hsl(${hue} 70% 82%)`); grad.addColorStop(1, `hsl(${hue} 60% 38%)`);
+  g.fillStyle = grad; g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 4;
+  g.beginPath();
+  g.moveTo(cx, cy - r); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r, cy); g.closePath();
+  g.fill(); g.stroke();
+  for (let i = 0; i < Math.min(tierNo, 6); i++) {
+    g.fillStyle = '#fff'; g.beginPath();
+    g.arc(cx - (Math.min(tierNo, 6) - 1) * 9 + i * 18, cy, 5, 0, 7); g.fill();
   }
+  g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = 'bold 18px Segoe UI, sans-serif'; g.textAlign = 'center';
+  g.fillText((label ?? '').slice(0, 16), cx, 188);
+  return c.toDataURL();
+}
+
+/** Thumbnail source for a tier element: uploaded art → repo art → placeholder. */
+function mergeThumbSrc(chain, tier) {
+  if (tier._art) return tier._art.dataURL;
+  const file = GAME_ART_FILES[mergeKey(tier)];
+  if (file && location.protocol !== 'file:') return `../../assets/${file}`;
+  return mergePlaceholderSrc(chain.id, tier.tier, tier.name);
 }
 // Both real game tiles AND non-playable ground tiles are "floor": one per cell,
 // centred, drawn at floor depth. Only the export category tells them apart.
@@ -656,9 +707,8 @@ function renderAssets() {
   document.getElementById('blockerCount').textContent = `(${countOf('blocker')})`;
   document.getElementById('backgroundCount').textContent = `(${countOf('background')})`;
   document.getElementById('count3d').textContent = `(${countOf('3d')})`;
-  const customMerge = Object.values(S.mergeSlots).filter((s) => s.custom).length;
-  document.getElementById('mergeCount').textContent = `(${customMerge}/${MERGE_SLOTS.length})`;
-  if (S.category === 'merge') { renderMergeLibrary(); return; }
+  document.getElementById('mergeCount').textContent = `(${totalElements()})`;
+  if (S.category === 'merge') return; // the Merge page renders in #mergePage, not the sidebar grid
   const list = Object.values(S.assets).filter((a) => a.category === S.category);
   for (const a of list) {
     const card = document.createElement('div');
@@ -697,55 +747,323 @@ function selectAsset(id) {
   renderAssets(); refreshInspector(); render();
 }
 
-/* ----------------------- merge asset library ----------------------- */
-// The merge library is NOT painted on the canvas — it's the catalogue of every
-// game element, each replaceable by uploading your own art.
-function renderMergeLibrary() {
-  for (const slot of MERGE_SLOTS) {
-    const s = S.mergeSlots[slot.key];
-    if (!s) continue;
-    const card = document.createElement('div');
-    card.className = 'assetCard' + (s.custom ? ' active' : '');
-    card.title = `${s.label} — ${s.chain} · tier ${s.tier}`;
-    card.innerHTML =
-      `<span class="calib" style="left:5px;right:auto;background:${s.custom ? 'var(--moss)' : 'var(--line)'}">${s.custom ? '✓ custom' : 'placeholder'}</span>` +
-      (s.custom ? `<button class="del" title="revert to placeholder">↺</button>` : '') +
-      `<img src="${s.src}" style="background:repeating-conic-gradient(#0003 0 25%, transparent 0 50%) 0 0/16px 16px" />` +
-      `<div class="nm">${s.label}</div>` +
-      `<button class="replace" style="width:100%;margin-top:4px;font-size:11px;padding:4px">⤒ Replace</button>`;
-    card.querySelector('.replace').onclick = (e) => { e.stopPropagation(); replaceMergeSlot(slot.key); };
-    card.querySelector('img').onclick = () => replaceMergeSlot(slot.key);
-    const del = card.querySelector('.del');
-    if (del) del.onclick = (e) => { e.stopPropagation(); resetMergeSlot(slot.key); };
-    grid.appendChild(card);
-  }
+/* --------------------------- merge page (🔮) --------------------------- */
+// A full-page editor over the canvas: every chain as a combo strip
+// (group× tier N → tier N+1), element upload, combo creation, generator config.
+const mergePage = document.getElementById('mergePage');
+const mergeModal = document.getElementById('mergeModal');
+
+function totalElements() {
+  return S.merge ? S.merge.chains.reduce((n, c) => n + c.tiers.length, 0) : 0;
 }
-function replaceMergeSlot(key) {
+
+function genSummary(chain, tier) {
+  const gen = tier.generator;
+  if (!gen) return '';
+  const parts = [];
+  if (gen.produces) {
+    const target = S.merge.chains.find((c) => c.id === gen.produces.chain);
+    const tName = target?.tiers.find((t) => t.tier === gen.produces.tier)?.name ?? `${gen.produces.chain} T${gen.produces.tier}`;
+    parts.push(`→ ${tName}`);
+  }
+  parts.push(`every ${fmtMs(gen.cooldownMs)}`);
+  if (gen.energyCost) parts.push(`⚡${gen.energyCost}`);
+  if (gen.tappable === false) parts.push('passive');
+  return parts.join(' · ');
+}
+
+function renderMergePage() {
+  initMergeDoc();
+  const rule = S.merge.mergeRule;
+  mergePage.innerHTML =
+    `<div class="mpHead"><h2>🔮 Merge design</h2>` +
+    `<span class="mpRule">rule: ${rule.minGroup}-merge${rule.fiveBonus ? ` · ${rule.fiveGroup}-merge pays ${rule.fiveOutputs}` : ''} — per-combo overrides on each element</span>` +
+    `<button id="mpNewChain">＋ New chain</button></div>`;
+
+  for (const chain of S.merge.chains) {
+    const section = document.createElement('div');
+    section.className = 'mpChain';
+    const hatch = chain.hatchAtTier ? ` · hatches at T${chain.hatchAtTier}` : '';
+    section.innerHTML =
+      `<div class="hd"><span class="nm">${chain.name}</span><span class="id">${chain.id}${hatch}</span>` +
+      `<span class="sp"><button class="delChain" title="Delete this chain">🗑</button></span></div>`;
+    const row = document.createElement('div');
+    row.className = 'mpRow';
+    chain.tiers.forEach((tier, index) => {
+      if (index > 0) {
+        const prev = chain.tiers[index - 1];
+        const { group, outputs } = comboRule(chain, prev);
+        const arrow = document.createElement('div');
+        arrow.className = 'mpArrow';
+        arrow.innerHTML = `×${group}<b>→</b>${outputs > 1 ? `×${outputs}` : ''}`;
+        arrow.title = `${group}× ${prev.name} merge into ${outputs}× ${tier.name}`;
+        row.appendChild(arrow);
+      }
+      row.appendChild(mergeElementCard(chain, tier));
+    });
+    const add = document.createElement('button');
+    add.className = 'mpAddTier';
+    const last = chain.tiers[chain.tiers.length - 1];
+    add.innerHTML = `＋ Add combo<br><small>${last.name} → new T${last.tier + 1}</small>`;
+    add.onclick = () => openElementEditor(chain, null);
+    row.appendChild(add);
+    section.appendChild(row);
+    section.querySelector('.delChain').onclick = () => deleteChain(chain.id);
+    mergePage.appendChild(section);
+  }
+  document.getElementById('mpNewChain').onclick = () => openNewChain();
+}
+
+function mergeElementCard(chain, tier) {
+  const el = document.createElement('div');
+  el.className = 'mpEl';
+  const meta = [`sell ${tier.sell}`, `xp ${tier.xp}`];
+  if (tier.artScale) meta.push(`s${tier.artScale}`);
+  el.innerHTML =
+    `<span class="tier">T${tier.tier}</span>` +
+    (tier.generator ? `<span class="gen" title="${genSummary(chain, tier)}">⚙</span>` : '') +
+    `<img alt="${tier.name}" />` +
+    `<div class="nm" title="${tier.name}">${tier.name}</div>` +
+    `<div class="meta">${meta.join(' · ')}${tier.generator ? `<br>${genSummary(chain, tier)}` : ''}</div>` +
+    `<div class="btns"><button class="edit">✎ Edit</button><button class="art">⤒ Art</button></div>`;
+  const img = el.querySelector('img');
+  img.src = mergeThumbSrc(chain, tier);
+  img.onerror = () => { img.onerror = null; img.src = mergePlaceholderSrc(chain.id, tier.tier, tier.name); };
+  el.querySelector('.edit').onclick = () => openElementEditor(chain, tier);
+  el.querySelector('.art').onclick = () => uploadElementArt(chain, tier);
+  return el;
+}
+
+function uploadElementArt(chain, tier, onDone) {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/png,image/webp';
   input.onchange = () => {
     const f = input.files[0]; if (!f) return;
     const r = new FileReader();
     r.onload = () => {
-      const slot = S.mergeSlots[key];
-      slot.src = r.result; slot.custom = true; slot.fileName = f.name;
-      renderAssets(); scheduleSave();
-      say(`Replaced <b>${slot.label}</b> with <b>${f.name}</b>. (Export carries the mapping.)`);
+      tier._art = { dataURL: r.result, fileName: f.name };
+      renderMergePage(); renderAssets(); scheduleSave();
+      say(`Art for <b>${tier.name}</b> ← <b>${f.name}</b>. Apply/Export to ship it into the game.`);
+      if (onDone) onDone();
     };
     r.readAsDataURL(f);
   };
   input.click();
 }
-function resetMergeSlot(key) {
-  const def = MERGE_SLOTS.find((d) => d.key === key);
-  S.mergeSlots[key] = { ...def, src: mergePlaceholderSrc(def), custom: false };
-  renderAssets(); scheduleSave();
-  say(`Reverted <b>${def.label}</b> to its placeholder.`);
+
+function deleteChain(chainId) {
+  const chain = S.merge.chains.find((c) => c.id === chainId);
+  if (!chain) return;
+  const refs = S.merge.chains.flatMap((c) =>
+    c.tiers.filter((t) => t.generator?.produces?.chain === chainId && c.id !== chainId).map((t) => t.name)
+  );
+  const refNote = refs.length ? `\n\nGenerators pointing at it (${refs.join(', ')}) will lose their output.` : '';
+  if (!confirm(`Delete the whole "${chain.name}" chain (${chain.tiers.length} elements)?${refNote}`)) return;
+  for (const c of S.merge.chains) {
+    for (const t of c.tiers) {
+      if (t.generator?.produces?.chain === chainId) delete t.generator.produces;
+    }
+  }
+  S.merge.chains = S.merge.chains.filter((c) => c.id !== chainId);
+  renderMergePage(); renderAssets(); scheduleSave();
+  say(`Deleted chain <b>${chain.name}</b>.`);
 }
-document.getElementById('resetMerge').onclick = () => {
-  for (const def of MERGE_SLOTS) S.mergeSlots[def.key] = { ...def, src: mergePlaceholderSrc(def), custom: false };
-  renderAssets(); scheduleSave();
-  say('All merge slots reverted to placeholders.');
+
+function openNewChain() {
+  const id = prompt('New chain id (lowercase slug, e.g. "moonberry"):');
+  if (!id) return;
+  if (!/^[a-z][a-z0-9_]*$/.test(id)) { alert('Chain id must be a lowercase slug (a-z, 0-9, _).'); return; }
+  if (S.merge.chains.some((c) => c.id === id)) { alert(`Chain "${id}" already exists.`); return; }
+  const name = prompt('Chain display name:', id[0].toUpperCase() + id.slice(1));
+  if (!name) return;
+  const chain = { id, name, tiers: [] };
+  S.merge.chains.push(chain);
+  openElementEditor(chain, null); // first element = tier 1
+}
+
+/** Element editor modal — edits an existing tier, or appends the next tier
+ *  (tier == null). Covers name/sell/xp/artScale/sellable, the merge-combo
+ *  override for THIS input tier, and the generator config (house-style). */
+function openElementEditor(chain, tier) {
+  initMergeDoc();
+  const isNew = tier == null;
+  const tierNo = isNew ? chain.tiers.length + 1 : tier.tier;
+  const work = isNew
+    ? { tier: tierNo, id: `${chain.id}_${tierNo}`, name: '', sell: 0, xp: 0 }
+    : JSON.parse(JSON.stringify(tier));
+  if (!isNew && tier._art) work._art = tier._art;
+
+  const chainOptions = S.merge.chains
+    .map((c) => c.tiers.map((t) => `<option value="${c.id}:${t.tier}">${c.name} — ${t.name} (T${t.tier})</option>`).join(''))
+    .join('');
+  const gen = work.generator;
+  const prevTier = chain.tiers[tierNo - 2];
+
+  const box = mergeModal.querySelector('.box');
+  box.innerHTML =
+    `<h3>${isNew ? `New element — ${chain.name} tier ${tierNo}` : `Edit — ${work.name} (${work.id})`}</h3>` +
+    (isNew && prevTier ? `<div style="font-size:12px;color:var(--dim);margin-bottom:6px">Creates the combo: <b>${comboRule(chain, prevTier).group}× ${prevTier.name} → ${prevTier.tier + 1 === tierNo ? 'this element' : ''}</b></div>` : '') +
+    `<div class="artPrev"><img id="mmArt" /><button id="mmArtBtn">⤒ Upload art…</button></div>` +
+    `<label><span class="cap">Name</span><input id="mmName" type="text" value="${work.name.replace(/"/g, '&quot;')}" placeholder="Element name" /></label>` +
+    `<label><span class="cap">Sell (coins)</span><input id="mmSell" type="number" min="0" step="1" value="${work.sell}" /></label>` +
+    `<label><span class="cap">XP on merge</span><input id="mmXp" type="number" min="0" step="1" value="${work.xp}" /></label>` +
+    `<label><span class="cap">Art scale</span><input id="mmScale" type="number" min="0.05" max="4" step="0.01" value="${work.artScale ?? ''}" placeholder="auto (1)" /></label>` +
+    `<label><span class="cap">Sellable</span><input id="mmSellable" type="checkbox" ${work.sellable === false ? '' : 'checked'} /></label>` +
+    `<label title="How many of THIS element merge into the next tier (blank = global rule)"><span class="cap">Combo: group</span><input id="mmGroup" type="number" min="2" step="1" value="${work.merge?.group ?? ''}" placeholder="${S.merge.mergeRule.minGroup} (rule)" /></label>` +
+    `<label><span class="cap">Combo: outputs</span><input id="mmOutputs" type="number" min="1" step="1" value="${work.merge?.outputs ?? ''}" placeholder="1" /></label>` +
+    `<div class="genBox">` +
+    `<label><span class="cap"><b>Generator</b></span><input id="mmGen" type="checkbox" ${gen ? 'checked' : ''} /> <span style="color:var(--dim)">this element produces items (like the House)</span></label>` +
+    `<div id="mmGenFields" style="display:${gen ? 'block' : 'none'}">` +
+    `<label><span class="cap">Produces</span><select id="mmProduces">${chainOptions}</select></label>` +
+    `<label><span class="cap">Cooldown (s)</span><input id="mmCooldown" type="number" min="1" step="1" value="${(gen?.cooldownMs ?? 210000) / 1000}" /></label>` +
+    `<label><span class="cap">Energy cost</span><input id="mmEnergy" type="number" min="0" step="1" value="${gen?.energyCost ?? 0}" /></label>` +
+    `<label><span class="cap">Passive (s)</span><input id="mmPassive" type="number" min="0" step="1" value="${gen?.passiveMs ? gen.passiveMs / 1000 : ''}" placeholder="never auto-produces" /></label>` +
+    `<label><span class="cap">Tappable</span><input id="mmTappable" type="checkbox" ${gen?.tappable === false ? '' : 'checked'} /></label>` +
+    `</div></div>` +
+    `<div class="rowBtns">` +
+    (!isNew && tierNo === chain.tiers.length && chain.tiers.length > 1 ? `<button id="mmDelete" style="color:#E8503C">🗑 Delete</button>` : '') +
+    `<button id="mmCancel">Cancel</button><button id="mmSave" style="font-weight:700">${isNew ? '＋ Create' : '✔ Save'}</button></div>`;
+
+  const artImg = box.querySelector('#mmArt');
+  const refreshArt = () => {
+    artImg.src = work._art ? work._art.dataURL : isNew ? mergePlaceholderSrc(chain.id, tierNo, work.name || 'new') : mergeThumbSrc(chain, work);
+    artImg.onerror = () => { artImg.onerror = null; artImg.src = mergePlaceholderSrc(chain.id, tierNo, work.name || '?'); };
+  };
+  refreshArt();
+  box.querySelector('#mmArtBtn').onclick = () => uploadElementArt(chain, work, refreshArt);
+  const genFields = box.querySelector('#mmGenFields');
+  box.querySelector('#mmGen').onchange = (e) => { genFields.style.display = e.target.checked ? 'block' : 'none'; };
+  const producesSel = box.querySelector('#mmProduces');
+  if (gen?.produces) producesSel.value = `${gen.produces.chain}:${gen.produces.tier}`;
+
+  const close = () => { mergeModal.style.display = 'none'; };
+  box.querySelector('#mmCancel').onclick = close;
+  const del = box.querySelector('#mmDelete');
+  if (del) del.onclick = () => {
+    if (!confirm(`Delete "${work.name}" (last tier of ${chain.name})?`)) return;
+    chain.tiers = chain.tiers.filter((t) => t.tier !== tierNo);
+    close(); renderMergePage(); renderAssets(); scheduleSave();
+  };
+  box.querySelector('#mmSave').onclick = () => {
+    const name = box.querySelector('#mmName').value.trim();
+    if (!name) { alert('Give the element a name.'); return; }
+    const next = {
+      tier: tierNo, id: `${chain.id}_${tierNo}`, name,
+      sell: Math.max(0, +box.querySelector('#mmSell').value || 0),
+      xp: Math.max(0, +box.querySelector('#mmXp').value || 0)
+    };
+    if (!box.querySelector('#mmSellable').checked) next.sellable = false;
+    const scale = parseFloat(box.querySelector('#mmScale').value);
+    if (scale > 0) next.artScale = +scale.toFixed(3);
+    const group = parseInt(box.querySelector('#mmGroup').value, 10);
+    const outputs = parseInt(box.querySelector('#mmOutputs').value, 10);
+    if (group >= 2) next.merge = { group, outputs: outputs >= 1 ? outputs : 1 };
+    if (box.querySelector('#mmGen').checked) {
+      const [pc, pt] = producesSel.value.split(':');
+      next.generator = {
+        produces: { chain: pc, tier: +pt },
+        cooldownMs: Math.max(1, +box.querySelector('#mmCooldown').value || 1) * 1000,
+        energyCost: Math.max(0, +box.querySelector('#mmEnergy').value || 0)
+      };
+      const passive = +box.querySelector('#mmPassive').value;
+      if (passive > 0) next.generator.passiveMs = passive * 1000;
+      if (!box.querySelector('#mmTappable').checked) next.generator.tappable = false;
+      if (!isNew && tier.generator?.skipMaxGold) next.generator.skipMaxGold = tier.generator.skipMaxGold;
+    }
+    if (work._art) next._art = work._art;
+    if (isNew) chain.tiers.push(next);
+    else chain.tiers[tierNo - 1] = next;
+    close(); renderMergePage(); renderAssets(); scheduleSave();
+    say(isNew ? `Created <b>${name}</b> (${chain.name} T${tierNo}).` : `Saved <b>${name}</b>.`);
+  };
+  mergeModal.style.display = 'flex';
+}
+mergeModal.onmousedown = (e) => { if (e.target === mergeModal) mergeModal.style.display = 'none'; };
+
+/* ---- merge doc export / apply / import ---- */
+function buildMergeExport() {
+  initMergeDoc();
+  const art = {};
+  const chains = S.merge.chains.map((chain) => ({
+    ...chain,
+    tiers: chain.tiers.map((tier) => {
+      const { _art, ...clean } = tier;
+      if (_art) art[mergeKey(tier)] = { dataURL: _art.dataURL, fileName: _art.fileName };
+      return clean;
+    })
+  }));
+  return { version: 1, kind: 'emberkeep-merge', mergeRule: S.merge.mergeRule, chains, art };
+}
+async function mergeEndpoint(method, body) {
+  const bases = location.protocol === 'file:' ? ['http://localhost:5173'] : ['', 'http://localhost:5173'];
+  let lastErr = null;
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}/__worldbuilder/merge`, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined
+      });
+      if (res.ok || res.status === 400) return res.json();
+      lastErr = new Error(`HTTP ${res.status}`);
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr ?? new Error('dev server unreachable');
+}
+document.getElementById('mergeExport').onclick = () => {
+  const doc = buildMergeExport();
+  download(`${document.getElementById('worldName').value || 'world'}.merge.json`, JSON.stringify(doc, null, 2));
+  say(`Exported <b>merge.json</b> — ${doc.chains.length} chains, ${Object.keys(doc.art).length} art uploads. Apply with <b>node scripts/ingest-merge.mjs</b>.`);
+};
+document.getElementById('mergeApply').onclick = async () => {
+  try {
+    const out = await mergeEndpoint('POST', buildMergeExport());
+    if (out.ok) {
+      const s = out.summary;
+      say(`✔ Applied to the game — ${s.chains} chains / ${s.tiers} elements, ${s.artWritten.length} art files written, ${s.assetsUpserted.length} assets wired.`);
+    } else {
+      say(`⚠ Apply rejected: ${out.error}`);
+    }
+  } catch (e) {
+    say(`⚠ No game dev server reachable (run <b>pnpm dev</b>): ${e.message}`);
+  }
+};
+document.getElementById('mergeImport').onclick = () => {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json,application/json';
+  input.onchange = () => {
+    const f = input.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const doc = JSON.parse(r.result);
+        if (doc.kind !== 'emberkeep-merge' || !Array.isArray(doc.chains)) throw new Error('not a merge.json export');
+        S.merge = { mergeRule: doc.mergeRule, chains: doc.chains };
+        for (const chain of S.merge.chains) {
+          for (const tier of chain.tiers) {
+            const a = doc.art?.[mergeKey(tier)];
+            if (a) tier._art = { dataURL: a.dataURL, fileName: a.fileName };
+          }
+        }
+        renderMergePage(); renderAssets(); scheduleSave();
+        say(`Imported merge doc — ${S.merge.chains.length} chains.`);
+      } catch (e) { alert(`Import failed: ${e.message}`); }
+    };
+    r.readAsText(f);
+  };
+  input.click();
+};
+document.getElementById('mergeReload').onclick = async () => {
+  if (!confirm('Replace the current merge design with the game\'s chains.json? Uploaded art is discarded.')) return;
+  try {
+    const out = await mergeEndpoint('GET');
+    S.merge = { mergeRule: out.chains.mergeRule, chains: out.chains.chains };
+    say('Reloaded the live <b>chains.json</b> from the dev server.');
+  } catch (e) {
+    S.merge = JSON.parse(JSON.stringify(DEFAULT_CHAINS));
+    say('Dev server unreachable — reset to the bundled chains snapshot.');
+  }
+  renderMergePage(); renderAssets(); scheduleSave();
 };
 
 /* --------------------------- tabs / category --------------------------- */
@@ -758,12 +1076,15 @@ function setCategory(cat) {
   document.getElementById('tabBackground').classList.toggle('active', cat === 'background');
   document.getElementById('tab3d').classList.toggle('active', cat === '3d');
   document.getElementById('tabMerge').classList.toggle('active', cat === 'merge');
-  // The merge library + 3D section are catalogues, not upload palettes.
+  // The merge page + 3D section are catalogues, not upload palettes.
   const isMerge = cat === 'merge';
   const isBg = cat === 'background';
   document.getElementById('uploadRow').style.display = (isMerge || cat === '3d') ? 'none' : '';
   document.getElementById('mergeActions').style.display = isMerge ? 'flex' : 'none';
   document.getElementById('backgroundActions').style.display = isBg ? 'flex' : 'none';
+  // Full-page merge editor over the canvas.
+  document.getElementById('mergePage').style.display = isMerge ? 'block' : 'none';
+  if (isMerge) renderMergePage();
   document.getElementById('uploadCat').textContent =
     cat === 'blocker' ? 'cloud' : cat === 'decotile' ? 'ground' : cat;
   document.getElementById('catHint').textContent = {
@@ -772,7 +1093,7 @@ function setCategory(cat) {
     decor: 'Decor sits above tiles — stack multiple, default top-centred.',
     blocker: 'Cloud blockers cover cells and carry a Level tag (set it in the toolbar). Each level’s clouds clear when that level unlocks.',
     background: 'Upload your own tile (sized to a grid cell). Backgrounds sit BELOW the world tiles, one per cell, so the floor superposes over them. Paint cells, or hit ⛶ Fill to flood the whole map + a 10-tile border.',
-    merge: 'The merge-item catalogue — not painted on the map. Click ⤒ Replace (or the art) to swap any slot for your own PNG. Export carries the mapping.',
+    merge: 'The merge DESIGN page — every chain as a combo strip (group× input → output). Upload element art, add combos (＋), configure generators (⚙, like the House), then ⤒ Apply to the game or ⬇ Export for scripts/ingest-merge.mjs.',
     '3d': 'Animated 3D decor (Three.js) — a cell-shaded emerald crystal spinning on itself in the grid’s top-down view. Pick it and paint; every placement spins live. Calibrate scale/anchor like any decor. (Procedural — the export carries a model3d spec.)'
   }[cat];
   // keep selection if it belongs to this category
@@ -1449,24 +1770,16 @@ function buildDoc(embed) {
       };
     })
     .sort((a, b) => a.level - b.level);
-  // merge-item catalogue: every element, with custom art where the artist
-  // dropped it in. `image` is embedded only for replaced slots — and only when
-  // embedding at all (lean exports keep the key→file mapping, art stays null).
-  const mergeAssets = MERGE_SLOTS.map((def) => {
-    const s = S.mergeSlots[def.key] ?? def;
-    return {
-      key: def.key, label: def.label, chain: def.chain, tier: def.tier,
-      custom: !!s.custom,
-      file: s.custom ? (s.fileName ?? `${def.key}.png`) : null,
-      image: embed && s.custom ? s.src : null
-    };
-  });
+  // merge design doc (chains.json-shaped). Lean exports carry the chains but
+  // strip art data URLs (Save/embedded exports keep them for round-tripping).
+  const mergeDoc = buildMergeExport();
+  const merge = embed ? mergeDoc : { ...mergeDoc, art: Object.fromEntries(Object.keys(mergeDoc.art).map((k) => [k, { fileName: mergeDoc.art[k].fileName }])) };
   const doc = {
     format: 'emberkeep-world', version: 1, world,
     // width/height stay first for the existing ingest; skew/angle describe the
     // full parametric projection (angle = edge pitch in degrees, skew = shear).
     tile: { width: S.tileW, height: S.tileH, skew: +(+S.gridSkew || 0).toFixed(2), angle: +gridAngleDeg().toFixed(2) },
-    bounds, backgroundBounds, assets, placements, levels, cameraKeyframes, mergeAssets,
+    bounds, backgroundBounds, assets, placements, levels, cameraKeyframes, merge,
     cameraZoom: { min: +S.gameZoom.min, max: +S.gameZoom.max } // in-game wheel-zoom clamp
   };
   // The images map ALWAYS keeps its keys so the export structure is stable.
@@ -1533,11 +1846,16 @@ function loadWorldDoc(doc, label) {
   S.gridSkew = doc.tile?.skew ?? 0;
   if (doc.cameraZoom) S.gameZoom = { min: doc.cameraZoom.min ?? 0.2, max: doc.cameraZoom.max ?? 1.4 };
   syncGridFields();
-  // merge library: placeholders + any custom art the file carried
-  S.mergeSlots = {}; initMergeSlots();
-  for (const m of doc.mergeAssets ?? []) {
-    const def = MERGE_SLOTS.find((d) => d.key === m.key);
-    if (def && m.custom && m.image) S.mergeSlots[m.key] = { ...def, src: m.image, custom: true, fileName: m.file };
+  // merge design: the doc's chains if carried (new format), else the snapshot.
+  S.merge = null; initMergeDoc();
+  if (doc.merge?.kind === 'emberkeep-merge' && Array.isArray(doc.merge.chains)) {
+    S.merge = { mergeRule: doc.merge.mergeRule, chains: doc.merge.chains };
+    for (const chain of S.merge.chains) {
+      for (const tier of chain.tiers) {
+        const a = doc.merge.art?.[mergeKey(tier)];
+        if (a?.dataURL) tier._art = { dataURL: a.dataURL, fileName: a.fileName };
+      }
+    }
   }
   const byName = {};
   let remaining = (doc.assets ?? []).length;
@@ -1694,10 +2012,8 @@ function serializeSession() {
     cameraKeyframes: S.cameraKeyframes, gameZoom: S.gameZoom,
     // 3D crystal placements (the crystal itself rebuilds from code when Three loads)
     crystalPlacements: S.placements.filter((p) => assetById(p.assetId)?.is3d).map((p) => ({ col: p.col, row: p.row, z: p.z, dx: p.dx, dy: p.dy })),
-    // only custom merge art needs saving — placeholders are regenerated on load.
-    mergeSlots: Object.values(S.mergeSlots)
-      .filter((s) => s.custom)
-      .map((s) => ({ key: s.key, src: s.src, fileName: s.fileName })),
+    // the merge design (chains + uploaded art data URLs) round-trips whole.
+    merge: S.merge ?? undefined,
     assets: list.map((a) => ({
       name: a.name, category: a.category, file: a.file, src: a.img.src,
       offX: a.offX, offY: a.offY, scale: a.scale, anchorX: a.anchorX, anchorY: a.anchorY,
@@ -1762,12 +2078,9 @@ function restoreSession() {
   if (doc.gameZoom) S.gameZoom = { min: doc.gameZoom.min ?? 0.2, max: doc.gameZoom.max ?? 1.4 };
   pendingCrystal = doc.crystalPlacements ?? []; // re-attached when Three builds the crystal
   S.nextZ = doc.nextZ ?? 1;
-  // restore the merge library (placeholders + any saved custom art)
-  S.mergeSlots = {}; initMergeSlots();
-  for (const m of doc.mergeSlots ?? []) {
-    const def = MERGE_SLOTS.find((d) => d.key === m.key);
-    if (def) S.mergeSlots[m.key] = { ...def, src: m.src, custom: true, fileName: m.fileName };
-  }
+  // restore the merge design (whole doc, incl. uploaded art data URLs)
+  S.merge = doc.merge && Array.isArray(doc.merge.chains) ? doc.merge : null;
+  initMergeDoc();
   if (doc.cam) S.cam = doc.cam;
   if (doc.world) document.getElementById('worldName').value = doc.world;
   syncGridFields();
@@ -1808,7 +2121,7 @@ document.getElementById('newWorld').onclick = () => {
   try { localStorage.removeItem(WB_KEY); } catch (e) {}
   S.assets = {}; S.placements = []; S.selectedAssetId = null; S.selectedPlacement = null;
   S.cameraKeyframes = {}; stopFly();
-  S.mergeSlots = {}; initMergeSlots();
+  S.merge = null; initMergeDoc();
   S.nextId = 1; S.nextZ = 1; S.ready = false;
   setCategory('tile'); fitView(); renderCamRows();
   loadStarterTiles();
@@ -1880,7 +2193,7 @@ function initThree3d() { ensureCrystalAsset(); if (S.category === '3d') { render
 if (window.THREE) initThree3d();
 else { window.addEventListener('three-ready', initThree3d); window.addEventListener('three-failed', () => say('The 3D section needs an internet connection (Three.js CDN) — the other tabs work offline.')); }
 
-initMergeSlots(); // the merge library always exists
+initMergeDoc(); // the merge design doc always exists
 setCategory('tile');
 // Reopen the last LOCAL session if one exists; otherwise load the bundled
 // current world (the deployed default) — so anyone arriving fresh sees it —

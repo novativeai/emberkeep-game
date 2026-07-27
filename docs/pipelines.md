@@ -255,12 +255,29 @@ cross-file invariants these pipelines participate in.
   `cameraKeyframes[] = { level, focus:{col,row}, world:{x,y}, zoom }`. Go / ▶ Preview
   tour glide with the same smootherstep + mid-dolly the game plays on level unlock.
   Keyframes persist in the auto-save and draw as on-canvas reticles.
-- **Merge asset library** (🔮 Merge tab): the catalogue of every game element
-  (`MERGE_SLOTS`: the 9 chain tiers + nest + brazier), each pre-labelled with a
-  generated placeholder. NOT painted on the map — ⤒ Replace swaps any slot for your
-  own PNG, ↺ reverts. Custom art persists in the auto-save and exports as
-  `mergeAssets[] = { key, label, chain, tier, custom, file, image }` (image embedded
-  only for replaced slots).
+- **Merge design page** (🔮 Merge tab) — a full-page editor over the canvas that
+  edits the REAL merge config (chains.json-shaped doc; bundled snapshot for
+  offline use). Every chain renders as a combo strip — `group× input → outputs×
+  output` per adjacent tier pair (group/outputs resolve tier.merge → chain.merge
+  → mergeRule, same as MergeSystem) — with each element's current in-game art
+  (thumbnails load from `assets/` when the tool is served from the repo; uploads
+  and placeholders otherwise). Actions: **⤒ Art** uploads element art; **✎ Edit**
+  opens the element editor (name/sell/xp/artScale/sellable, per-tier combo
+  override, and the full generator config — produces chain+tier, cooldown,
+  energy, passive, tappable — any element can be a generator, like the House);
+  **＋ Add combo** appends the next tier (creating the input→output pair);
+  **＋ New chain** starts a fresh chain at tier 1. Ship it with:
+  - **⤒ Apply to game** → POST `/__worldbuilder/merge` on the vite dev server
+    (`pnpm dev`): validates, then writes `src/data/chains.json`, decodes
+    uploaded art into `assets/sprites/items/wb/`, and upserts
+    `assets.json`/`anchors.json` (shared logic: `scripts/apply-merge.mjs`).
+  - **⬇ Export merge.json** → `node scripts/ingest-merge.mjs <file>` does the
+    same offline (`--dry-run` to validate only).
+  Per-tier `artScale` is the data-driven sizing for uploaded art — the engine
+  consults it after Constants' hand-tuned `ITEM_SCALE`
+  (`BoardScene.tierArtScale`). The world export embeds the merge doc under
+  `merge` (art only with **embed art**); `.worldproject.json` and the session
+  auto-save round-trip it whole. Headless test: `node tools/mergetest.mjs`.
 
 ## Authored map pipeline (world-builder export → live game)
 
@@ -284,8 +301,141 @@ cross-file invariants these pipelines participate in.
   isle silhouette = the `playable` set; the border-grass edges ARE the cliffs.
 - XP pacing rationale: `docs/research/xp-pacing.md`.
 
+## FX Studio (tools/fxstudio) — merge FX + VFX textures
+
+- `tools/fxstudio/index.html` — standalone browser app (open the file directly,
+  zero build). Authors the spawn (`appear`) and `merge` FX for every merge
+  element, previews both live, and exports one self-describing `merge-fx.json`.
+  One data-driven engine (`FX_PRESETS` + `EVENTS`) powers the preview AND the
+  export, so what you see is what ships.
+- **Textures** (🧪 toolbar button) — the authoring half of
+  [`vfx-textures.md`](./vfx-textures.md), in four tabs:
+  - *Library* — import pack PNGs, set a flipbook layout (`cols×rows@fps`),
+    export any texture as PNG. First run bakes six starter textures.
+  - *Generate* — 11 generators (glow, spark, star, ring, fBm, marble, smoke,
+    flame, lightning, streak, **and `source`: an imported texture**) feeding a
+    non-destructive technique chain that is the Krita workflow from the guide —
+    multibrush symmetry, polar conversion, wrap-around seamless,
+    duplicate+gaussian glow, morphological dissolve, levels — then a colour ramp.
+  - *Preset* — bind a texture to an FX preset (also reachable from the ⚙ on any
+    preset chip), pick blend / tint / flipbook mode.
+  - *Sources* — the vetted free packs and generators, licence-badged.
+- Pipeline is **mask first, colour last**: `generator → scalar field → technique
+  chain → ramp → RGBA`. That is why one generator serves fire, magic and ice.
+- A preset with `texture` set draws textured quads; with none it falls back to
+  its vector `shape`, so the default look is unchanged until you bind one.
+  Sheets with `frames > 1` play as flipbooks (`life` / `loop` / `random`).
+- **Generated textures persist as their recipe**, not as base64 — a library
+  costs a few KB of localStorage and is re-baked at boot. Only imported PNGs
+  store bytes. `source`-generator textures rebake in dependency order.
+- Export is `merge-fx.json` v2: adds `textures` (metadata + recipe) and
+  `textureImages` (data URLs) next to the existing elements/presets/events.
+  Nothing in the game consumes it yet — it is an authoring artefact.
+- Regression harnesses (need a static server on 8820 from the repo root, e.g.
+  `python3 -m http.server 8820`): `node tools/fxtest.mjs` (elements, events,
+  export), `node tools/fxrigtest.mjs` (rigged-character preview),
+  `node tools/fxtextest.mjs` (texture layer — generators, techniques, flipbooks,
+  persistence, export). They assert against page globals (`ELEMENTS`,
+  `FX_PRESETS`, `S`, `stage`, `TEX`, `buildDoc`, …) — keep those stable.
+
+## Motion-vector flipbooks (the VFX bank's real-time layer)
+
+The bank's flipbooks ship with the two companions a real-time VFX pipeline
+expects, so playback is interpolated rather than a slideshow.
+
+- `python3 scripts/bake-vfx-mv.py [--only KEY] [--report] [--self-test]` writes,
+  per sheet in `assets/vfx-bank/bank.json`:
+  - `<key>_pack.png` — **R** density · **G** emissive · **B** erosion order ·
+    **A** coverage. Carries NO colour.
+  - `<key>_mv.png` — **RG** forward flow (frame i → next), **BA** backward flow
+    (next → i), each `(px / mvScale) * 0.5 + 0.5`. Both live at cell i, so one
+    fetch drives both warps.
+  - Layout + `mvScale` land in `assets/vfx-bank/bank.mv.json`.
+- `python3 scripts/bake-vfx-ramps.py` writes `ramps.png` (8 palette rows × 256)
+  + `ramps.json`. Colour is looked up from density at DRAW time, so one smoke
+  sheet serves ash / ember / toxic / arcane from a uniform instead of four
+  coloured copies.
+- Flow solver is pyramidal Horn-Schunck. Two traps, both guarded by
+  `--self-test` (it recovers known translations and refuses to bake on failure):
+  1. `alpha` is scale-sensitive — it competes with `Ix²+Iy²`, which is ~1e-2 on
+     0..1 imagery. Use ~0.3, **not** the ~6 you would use on 0..255 data; the
+     larger value drives the flow to zero.
+  2. The pyramid must pre-warp A **toward** B (negative flow) before solving the
+     residual. Warping by `+u` pushes away and the error compounds ~2× per level.
+- **Frames are decimated on purpose.** With motion vectors, a quarter of the
+  frames reconstructs better than half of them without — that is where the VRAM
+  saving comes from, not from shrinking cells. Per-sheet limits live in
+  `TUNING`; fast-flickering fire needs more frames than coherent smoke
+  (`fb_flame_small` at 16 frames measured 2.3× better than cross-dissolve, at 32
+  frames **4.3×** for the same bytes).
+- Runtime: `src/render/flipbookShader.ts` (a `SinglePipeline` subclass — a
+  `GameObjects.Shader` **cannot have a blend mode**, and ADD is mandatory for
+  fire) + `src/render/FlipbookFX.ts` (the Game Object) +
+  `src/render/flipbookTiming.ts` (pure frame maths, unit-tested in node).
+  Playback is elapsed-time driven off an injected `now()` — wire it to
+  GameClock — so the power governor can drop to 15fps without slowing effects.
+- Proof/regression: `pnpm dev`, then `node tools/fbtest.mjs [outDir]` renders
+  every sheet twice at the same instant (cross-dissolve vs motion vectors),
+  asserts they differ on-GPU, sweeps a loop for black frames, and checks runtime
+  recolour. `tools/fbtest/index.html` is the page.
+
+### Where they play in the game
+
+`src/render/vfxBank.ts` is the whole placement layer — `SHIPPED` is the VRAM
+budget, `BEATS` is the map from game moment to sheet/size/colour. BoardScene
+calls one helper, `playBeatFX(beat, x, y)`:
+
+| beat | sheet | ramp | size | fires from |
+| --- | --- | --- | --- | --- |
+| `hatch` | `fb_fireburst` | ember | 340 | egg-crack in `hatchSequence` |
+| `elder` | `fb_fireburst` | gold | 520 | `awakenAltarElder` (the finale) |
+| `merge` | `fb_dustburst` | smoke | 190 | `onMerged`, non-hatch merges only |
+| `chest` | `fb_dustburst` | gold | 230 | `onChestClaimed` |
+
+Rules that keep this safe to extend:
+- **Additive, never a replacement.** Each call sits next to the existing
+  `burst`/`sparks`/`shells` explode + `glowFlash`, matched to the same anchor
+  point. Delete the bank and every beat still plays as it always did.
+- **Degrades to nothing.** `playBeatFX` returns early if the textures are absent
+  (the bank is pruned from `dist` except the shipped files) or if the power
+  governor has dozed the scene.
+- **`DEPTHS.particles`, not `DEPTHS.flash`** — the white glow must stay the
+  brightest thing in the frame.
+- Only two sheets ship (~6.8MB VRAM). All nine would be ~19.8MB, which the
+  old-device budget will not wear. Widening `SHIPPED` automatically widens what
+  `pruneDistArt` keeps — it parses that same array.
+- Intensity is tuned against the **dark board**, not the fog: these are ADD
+  blended, so anything over the near-white cloud tiles saturates. `merge` fires
+  on every single merge and is deliberately the faintest of the set.
+- Regression: `pnpm dev`, then `node tools/vfxbeats.mjs [outDir]` fires each beat
+  in the real game and asserts pipeline, blend mode, depth, ramp, self-destroy
+  and doze-suppression. It detects the effect by **pipeline name**, not
+  `constructor.name` — the production bundle mangles class and private-method
+  names, so a name-based check silently passes as "not found".
+- `packed` is a **reserved word in GLSL ES** — do not name a variable that.
+- NOTE: `vite.config.ts` prunes `vfx-bank` wholesale from `dist`. Narrow that
+  entry before shipping any bank texture, `_pack`/`_mv`/`ramps.png` included, or
+  the deploy will 404 them.
+
+## VFX bank (assets/vfx-bank) — 25 game-ready textures
+
+- `node scripts/bake-vfx-bank.mjs --contact` bakes the whole bank from
+  `assets/vfx-bank/bank.json`; `node tools/vfxbanktest.mjs` verifies it (no
+  server needed for either — the baker serves the repo itself).
+- The baker drives the REAL FX Studio engine headless, so bank and tool can
+  never drift. Edit the manifest and re-bake; never hand-edit a baked PNG.
+- Sources are CC0 packs staged in `assets/raw/vfx-sources/` (Kenney, Unity Labs
+  Paris, Screaming Brain) — see `assets/CREDITS.md`. Both that directory and
+  `vfx-bank` are pruned from `dist` by `pruneDistArt` in `vite.config.ts`;
+  **narrow that entry when bank textures get wired into `assets.json`.**
+- Constraints the bank enforces (ADD-safe black borders, native flipbook cell
+  aspect, per-pixel-only sheet grading): `docs/vfx-textures.md` §4b.
+
 ## Art sourcing
 
 - Screaming Brain (CC0) PNGs use magenta colour-keying with NO alpha channel —
   de-key to RGBA before wiring into assets.json (see `assets/raw/screamingbrain`).
 - Every file added under `assets/raw/` gets a line in `assets/CREDITS.md`.
+- VFX/particle textures have their own rules (ADD-blend authoring, the 4096px
+  ceiling, flipbooks vs the power governor) — see
+  [`vfx-textures.md`](./vfx-textures.md).
