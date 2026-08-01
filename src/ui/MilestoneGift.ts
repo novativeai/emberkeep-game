@@ -50,7 +50,7 @@ export class MilestoneGift extends Phaser.GameObjects.Container {
     // ---- round gift button (collapsed face — ledger lava+cream palette) ----
     this.buttonGlow = scene.add.graphics();
     this.buttonBg = scene.add.graphics();
-    this.drawButton(false);
+    this.drawButton();
     this.buttonIcon = scene.add.image(0, 0, 'ui_gift').setDisplaySize(GIFT_ICON, GIFT_ICON);
     this.buttonZone = scene.add.zone(0, 0, R * 2, R * 2).setInteractive({ useHandCursor: true });
     this.buttonZone.on('pointerup', () => this.toggle());
@@ -118,15 +118,11 @@ export class MilestoneGift extends Phaser.GameObjects.Container {
     this.offBus = bus.on('milestone:changed', (m) => this.render(m));
   }
 
-  private drawButton(ready: boolean): void {
-    const g = this.buttonBg;
-    g.clear();
-    g.fillStyle(num(PALETTE.lavaShade), 1);
-    g.fillCircle(0, 4, R);
-    g.fillStyle(num(ready ? PALETTE.gold : PALETTE.lava), 1);
-    g.fillCircle(0, 0, R);
-    g.lineStyle(6, num(PALETTE.cream), 0.95); // cream rim, like the ledger lozenges
-    g.strokeCircle(0, 0, R);
+  private drawButton(): void {
+    // No disc behind the gift: the gifts.png box is self-contained art, so a
+    // filled circle only pokes out around it as a coloured "shadow". Keep the
+    // graphics empty — the ready state is shown by buttonGlow's gold pulse.
+    this.buttonBg.clear();
   }
 
   private render(m: EventMap['milestone:changed']): void {
@@ -143,7 +139,7 @@ export class MilestoneGift extends Phaser.GameObjects.Container {
     this.claimImg.setDisplaySize(CLAIM_W, CLAIM_H);
     this.claimImg.setAlpha(m.ready ? 1 : 0.5);
     this.claimLabel.setAlpha(m.ready ? 1 : 0.6);
-    this.drawButton(m.ready);
+    this.drawButton();
     this.setReadyGlow(m.ready);
   }
 
