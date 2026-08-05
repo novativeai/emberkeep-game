@@ -124,6 +124,7 @@ export class TextureFactory {
       case 'item_flame_gem_2': return this.flameGem(key, false);
       case 'item_flame_gem_3': return this.flameGem(key, true);
       case 'decor_nest': return this.nest(key);
+      case 'item_dew_basin_1': return this.dewBasin(key);
       case 'fx_ember': return this.ember(key);
       case 'fx_spark': return this.spark(key);
       case 'fx_glow': return this.glow(key);
@@ -1036,6 +1037,90 @@ export class TextureFactory {
       g.moveTo(cx + 28, cy + 10);
       g.lineTo(cx + 40, cy + 15);
       g.stroke();
+    });
+  }
+
+  /**
+   * The Dew Basin — a carved stone bowl holding a still pool that only fills at
+   * night (chains.json `phases:["night"]`). Painted cool (teal water, pale rim
+   * light) so it reads as the one NIGHT fixture on a warm ember board.
+   */
+  private dewBasin(key: string): void {
+    // Real basin art ships now, so this only paints when that file fails to load —
+    // and BoardScene multiplies it by ITEM_SCALE, which is tuned to the PHOTO's
+    // 372px. Counter-size the canvas (as genericItem does) so the stand-in still
+    // lands at the basin's size instead of shrinking to a pebble.
+    const s = 1 / Math.min(1, Math.max(0.125, ITEM_SCALE.dew_basin_1 ?? 1));
+    this.paint(key, Math.round(120 * s), Math.round(104 * s), (g) => {
+      g.scale(s, s);
+      const cx = 60;
+      const rimY = 46;
+      this.contactShadow(g, cx, 90, 40, 11);
+      // Pedestal: a tapered stone foot under the bowl.
+      const foot = g.createLinearGradient(0, 70, 0, 92);
+      foot.addColorStop(0, P.ash);
+      foot.addColorStop(1, darken(P.ashShade, 0.28));
+      g.fillStyle = foot;
+      g.beginPath();
+      g.moveTo(cx - 26, 66);
+      g.lineTo(cx + 26, 66);
+      g.lineTo(cx + 19, 88);
+      g.lineTo(cx - 19, 88);
+      g.closePath();
+      g.fill();
+      g.lineWidth = 1.6;
+      g.strokeStyle = withAlpha(darken(P.ashShade, 0.4), 0.85);
+      g.stroke();
+      // Bowl body.
+      const bowl = g.createLinearGradient(0, rimY, 0, 76);
+      bowl.addColorStop(0, lighten(P.ash, 0.16));
+      bowl.addColorStop(0.55, P.ash);
+      bowl.addColorStop(1, darken(P.ashShade, 0.22));
+      g.fillStyle = bowl;
+      g.beginPath();
+      g.moveTo(cx - 44, rimY);
+      g.quadraticCurveTo(cx, 88, cx + 44, rimY);
+      g.quadraticCurveTo(cx, rimY + 22, cx - 44, rimY);
+      g.closePath();
+      g.fill();
+      g.lineWidth = 2;
+      g.strokeStyle = withAlpha(darken(P.ashShade, 0.45), 0.9);
+      g.stroke();
+      // The dew pool — a still teal disc sunk into the rim.
+      const pool = g.createLinearGradient(0, rimY - 10, 0, rimY + 14);
+      pool.addColorStop(0, lighten(P.teal, 0.3));
+      pool.addColorStop(0.6, P.teal);
+      pool.addColorStop(1, P.tealDeep);
+      g.fillStyle = pool;
+      g.beginPath();
+      g.ellipse(cx, rimY + 1, 41, 12, 0, 0, Math.PI * 2);
+      g.fill();
+      // Moon glint + a ripple ring on the water.
+      g.fillStyle = withAlpha(P.cream, 0.55);
+      g.beginPath();
+      g.ellipse(cx - 13, rimY - 3, 12, 4, -0.18, 0, Math.PI * 2);
+      g.fill();
+      g.lineWidth = 1.4;
+      g.strokeStyle = withAlpha(P.cream, 0.35);
+      g.beginPath();
+      g.ellipse(cx + 10, rimY + 4, 14, 4.5, 0, 0, Math.PI * 2);
+      g.stroke();
+      // Rim catchlight — the pale night edge that sells the stone.
+      g.lineWidth = 3;
+      g.strokeStyle = withAlpha(lighten(P.ash, 0.5), 0.9);
+      g.beginPath();
+      g.ellipse(cx, rimY, 44, 13, 0, Math.PI * 1.02, Math.PI * 1.98);
+      g.stroke();
+      // Two dew drops gathering on the outside of the bowl.
+      g.fillStyle = withAlpha(lighten(P.teal, 0.35), 0.85);
+      for (const [dx, dy, r] of [
+        [-30, 64, 3.4],
+        [26, 70, 2.6]
+      ] as [number, number, number][]) {
+        g.beginPath();
+        g.ellipse(cx + dx, dy, r, r * 1.35, 0, 0, Math.PI * 2);
+        g.fill();
+      }
     });
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ENERGY_MAX, GENERATOR_SKIP_MAX_ENERGY, skipEnergyCost } from '../../src/core/Constants';
+import { ENERGY_MAX } from '../../src/core/Constants';
 import { capture, createTestContext } from './helpers';
 
 describe('dragon passive generation (the standing advantage)', () => {
@@ -47,61 +47,6 @@ describe('dragon passive generation (the standing advantage)', () => {
     ctx.clock.advance(300_000);
     ctx.bus.emit('time:advanced', { ms: 300_000 });
     expect(produced).toHaveLength(0);
-  });
-});
-
-describe('skip cooldown for Warmth', () => {
-  it('clears a cooling generator and spends Warmth', () => {
-    const ctx = createTestContext();
-    const gen = ctx.state.addItem({
-      chain: 'ember_dragon',
-      tier: 3,
-      col: 2,
-      row: 2,
-      kind: 'item',
-      readyAt: ctx.clock.now()
-    });
-    ctx.bus.emit('item:tapped', { itemId: gen.id }); // harvest → cooldown
-    expect(gen.readyAt!).toBeGreaterThan(ctx.clock.now());
-    ctx.state.coins = 20; // skip is paid in GOLD now
-    // Freshly cooled = full time left (remaining == total) → the skip costs the
-    // MAX, whatever the dragon's tuned cooldown happens to be.
-    const remaining = gen.readyAt! - ctx.clock.now();
-    const fullCost = skipEnergyCost(remaining, remaining);
-    expect(fullCost).toBe(GENERATOR_SKIP_MAX_ENERGY);
-
-    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
-
-    expect(gen.readyAt!).toBeLessThanOrEqual(ctx.clock.now()); // ready now
-    expect(ctx.state.coins).toBe(20 - fullCost);
-  });
-
-  it('cheapens the skip as the timer nears completion (dynamic price)', () => {
-    expect(skipEnergyCost(10_000, 10_000)).toBe(GENERATOR_SKIP_MAX_ENERGY); // just started: dear
-    expect(skipEnergyCost(500, 10_000)).toBe(1); // almost done: cheap
-    expect(skipEnergyCost(5_000, 10_000)).toBeLessThan(GENERATOR_SKIP_MAX_ENERGY);
-    expect(skipEnergyCost(0, 10_000)).toBe(0); // nothing left
-  });
-
-  it('refuses to skip without enough Warmth (and keeps the cooldown)', () => {
-    const ctx = createTestContext();
-    const gen = ctx.state.addItem({
-      chain: 'ember_dragon',
-      tier: 3,
-      col: 2,
-      row: 2,
-      kind: 'item',
-      readyAt: ctx.clock.now()
-    });
-    ctx.bus.emit('item:tapped', { itemId: gen.id }); // cooling
-    const cooldownEnds = gen.readyAt!;
-    ctx.state.coins = GENERATOR_SKIP_MAX_ENERGY - 1; // not enough GOLD for a fresh skip
-    const fails = capture(ctx.bus, 'item:harvest_failed');
-
-    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
-
-    expect(gen.readyAt!).toBe(cooldownEnds); // unchanged
-    expect(fails.some((f) => f.reason === 'energy')).toBe(true);
   });
 });
 

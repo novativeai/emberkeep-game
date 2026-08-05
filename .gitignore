@@ -1,6 +1,11 @@
 node_modules/
 dist/
 test-results/
+# Parallel verify lanes (`pnpm verify:lane`) build to dist-<id> and write their
+# traces to test-results-<id>, so several agents can verify one checkout at once
+# without reading each other's build. Generated output — never committed.
+dist-*/
+test-results-*/
 playwright-report/
 .playwright-mcp/
 .vercel/

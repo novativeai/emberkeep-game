@@ -22,6 +22,14 @@ export interface BoardItemState {
 
 export type RegionStatus = 'active' | 'unlockable' | 'locked';
 
+/**
+ * The four-phase day (8 min each, a 32-min round — DAY_CYCLE in Constants).
+ * Deliberately NOT a simulated calendar: four coarse phases is all the design
+ * needs (time-of-day food preferences, the night-only Dew Basin). The ring is
+ * derived from `GameClock.now()`, so `window.advanceTime(ms)` steps it.
+ */
+export type DayPhase = 'morning' | 'day' | 'dusk' | 'night';
+
 export type SpawnCause = 'init' | 'merge' | 'generator' | 'unlock' | 'load';
 
 export interface ItemSnapshot {
@@ -49,11 +57,12 @@ export interface GeneratorConfig {
    *  — free, no tap, no energy. The standing advantage of owning a dragon. */
   passiveMs?: number;
   /** Tap-to-harvest? Passive-only generators (house, big tree) set false: they
-   *  auto-produce on their passive timer; a tap only offers the energy skip. */
+   *  auto-produce on their passive timer; a tap does not harvest them. */
   tappable?: boolean;
-  /** Most GOLD the "buy now" skip can cost on THIS generator (the Crystal's
-   *  emeralds are dear). Falls back to GENERATOR_SKIP_MAX_ENERGY when unset. */
-  skipMaxGold?: number;
+  /** Time-of-day gate: this generator only produces during these day phases (the
+   *  Dew Basin fills only at `["night"]`). Absent = produces around the clock.
+   *  An overdue timer simply HOLDS until the phase comes round again. */
+  phases?: DayPhase[];
 }
 
 export interface ChainTierConfig {
@@ -83,6 +92,14 @@ export interface ChainMergeOverride {
 export interface ChainConfig {
   id: string;
   name: string;
+  /**
+   * The world this chain BELONGS to (an editor map name — 'borealis'). Absent =
+   * the primary isle, which is every chain that shipped before worlds existed.
+   * It is a declaration, not a gate: the merge rules do not read it. Its job is
+   * to say whose art has to be resident when you stand in that world, so a cold
+   * world's icons stay off the boot preload (see WORLD_CHAIN_ART / lazyTextures).
+   */
+  world?: string;
   /** Tier whose creation counts as a hatch (dragon chains). */
   hatchAtTier?: number;
   /** Overrides the global mergeRule for this chain (e.g. lumber: 5 → 1). */
@@ -237,6 +254,23 @@ export interface DuelDragon {
   gauge: number;
 }
 
+/** A quest definition (src/data/quests.json). `kind` drives the completed colour:
+ *  main = gold, sub = platinum. `image` (optional) = a texture key shown on the card. */
+export interface QuestDef {
+  id: string;
+  kind: 'main' | 'sub';
+  title: string;
+  image?: string;
+}
+export interface QuestsData {
+  feedTargetLevel: number;
+  quests: QuestDef[];
+}
+/** A quest's live state broadcast to the HUD (`quest:changed`). */
+export interface QuestState extends QuestDef {
+  done: boolean;
+}
+
 export interface MapItemPlacement {
   chain: string;
   tier: number;
@@ -336,7 +370,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'chest:open' | 'dragon:working' | 'marketplace:purchased' | 'generator:skipped'; chain?: string; currency?: 'gold' | 'warmth' }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'chest:open' | 'dragon:working' | 'marketplace:purchased'; chain?: string }
   | { type: 'count'; chain: string; tier: number; count: number };
 
 export interface TutorialAllow {
@@ -392,6 +426,8 @@ export interface TutorialStepConfig {
   id: string;
   speaker: 'cindra' | 'laurah';
   text: string;
+  /** Short imperative title shown in the Tasks-list checklist (event steps only). */
+  task?: string;
   gate: TutorialGate;
   highlight?: TileRef[];
   hand?: TutorialHandConfig;
@@ -404,6 +440,10 @@ export interface TutorialStepConfig {
 export interface TutorialData {
   steps: TutorialStepConfig[];
 }
+
+/** worldId -> that world's script. A world absent from the map simply has no
+ *  tutorial, which is every world but borealis today. */
+export type WorldTutorials = Record<string, TutorialData>;
 
 export interface AssetEntry {
   key: string;
@@ -449,9 +489,26 @@ export interface SaveDataV1 {
     surgeUntil: number;
     veinIndex: number;
   };
-  /** Per-dragon-colour duel level/gauge (optional — pre-duel saves omit it). */
-  dragonLevels?: Record<string, { level: number; gauge: number }>;
+  /** Per-dragon-colour duel level/gauge (optional — pre-duel saves omit it).
+   *  `fedAt` = GameClock time of the last feed, drives the tap-menu hunger gauge. */
+  dragonLevels?: Record<string, { level: number; gauge: number; fedAt?: number }>;
+  /** Emberberry bushes banked in the dragon's larder (absent on pre-larder saves). */
+  berryStock?: number;
+  /** LEGACY (pre per-world boards): item id -> owning world name. Everything lived on
+   *  one board and this only said what to show. Still read on load, to split an old
+   *  save's pieces onto the right world's board; never written any more. */
+  itemWorlds?: Record<string, string>;
+  /** Every world's own board. The top-level `items`/`nextItemId` mirror the primary
+   *  world so an older build still reads this save. */
+  worlds?: Record<string, { items: BoardItemState[]; nextItemId: number }>;
+  /** The world the player was in. A reload puts them back where they left off. */
+  activeWorld?: string;
+  /** Worlds already seeded once (sprouts, Dew Basin, their own dragon). Without it a
+   *  reload re-seeds the lair and the fixtures come back doubled. */
   tutorial: { index: number; done: boolean };
+  /** Progress through the OTHER worlds' tutorials (borealis), keyed by world id.
+   *  The primary world keeps `tutorial` above, so an older save reads unchanged. */
+  worldTutorials?: Record<string, { index: number; done: boolean }>;
   /** Lifetime counters (Keeper's Tasks + chapter-card stats) and one-shot
    *  flags (`finaleSeen`, `tasksClaimed`) — all numeric for easy versioning. */
   stats: Record<string, number>;
@@ -468,7 +525,6 @@ export interface EventMap {
   /* -- input intents (scenes/UI emit, systems handle) -- */
   'drag:dropped': { itemId: number; from: TilePos; to: TilePos };
   'item:tapped': { itemId: number };
-  'generator:skip': { itemId: number; currency: 'gold' | 'warmth' };
   /* -- dragon jobs -- */
   'dragon:work': { dragonId: number; houseId: number };
   'dragon:working': { dragonId: number; houseId: number };
@@ -494,7 +550,13 @@ export interface EventMap {
   'fog:tapped': { regionId: string };
   'tutorial:advance_requested': { stepId: string };
   'game:reset_requested': Record<string, never>;
+  /** Settings → open the in-game Map Editor (dev level tool). */
+  'editor:open': Record<string, never>;
   'time:advanced': { ms: number };
+  /** The day rolled into a new phase (morning → day → dusk → night → morning).
+   *  DayCycleSystem emits it; the board grades its sky off it. `startedAt`/`endsAt`
+   *  are absolute GameClock times, so a UI can count the phase down. */
+  'day:phase': { phase: DayPhase; index: number; startedAt: number; endsAt: number };
 
   /* -- cross-system commands (systems handle, synchronously) -- */
   'energy:spend': { amount: number; reason: string };
@@ -509,6 +571,9 @@ export interface EventMap {
   'board:retier': { chain: string; fromTier: number; toTier: number };
   /** Relocate one on-board item of `chain`+`tier` to a cell (tutorial staging). */
   'board:move': { chain: string; tier: number; to: [number, number] };
+  /** Re-seat pieces standing on cells the live world no longer offers (a world's
+   *  playable cells are re-derived on every entry — see BoardSystem.reconcile). */
+  'board:reconcile': Record<string, never>;
   /** Force a generator's tap-cooldown to `remainingMs` left (tutorial staging). */
   'generator:set_timer': { chain: string; tier: number; remainingMs: number };
 
@@ -535,13 +600,16 @@ export interface EventMap {
    *  writes a new page (MergeSystem emits once per chain:fromTier>resultTier). */
   'cookbook:discovered': { chain: string; fromTier: number; resultTier: number };
   'item:harvested': { generatorId: number; output: ItemSnapshot };
-  'item:harvest_failed': { generatorId: number; reason: 'cooldown' | 'energy' | 'no_space' };
+  'item:harvest_failed': {
+    generatorId: number;
+    reason: 'cooldown' | 'energy' | 'no_space' | 'phase';
+    /** Set with reason 'phase': the phase this generator waits for (the Dew Basin's night). */
+    requiresPhase?: DayPhase;
+  };
   /** A generator passively gifted an item (no tap, no energy). */
   'item:produced': { generatorId: number; output: ItemSnapshot };
   /** A reward generator (the house) paid out currency/energy on its timer. */
   'generator:reward': { generatorId: number; coins: number; xp: number; energy: number };
-  /** A generator's wait was paid off (the skip button) — currency tells which. */
-  'generator:skipped': { itemId: number; chain: string; currency: 'gold' | 'warmth' };
   /** A Gold coin was tapped to bank it — UI flies coin(s) to the Gold gauge,
    *  one gauge pulse per arrival (the Pouch sends 3; default 1). */
   'gold:collected': { at: TilePos; coins?: number };
@@ -550,6 +618,45 @@ export interface EventMap {
   'energy:changed': { current: number; max: number };
   'economy:changed': { coins: number; keys: number; xp: number; level: number };
   'keeper:leveled': { level: number; from: number };
+  /** The "ruby" was assembled for the first time — the WorldTeleportSystem asks for
+   *  the Demon dragon to teleport and the game to switch worlds. Handled by
+   *  BoardScene (the cinematic) which then emits `world:switch`. */
+  'world:teleport': { toWorld: string; dragonChain: string; at: TilePos };
+  /** The Golden Egg BURST (the finale awakening) — the WorldTeleportSystem uses this
+   *  to teleport the Golden dragon into the borealis world (if it exists). */
+  'golden:awakened': Record<string, never>;
+  /** Switch the live game to another editor world (backdrop + its playable cells +
+   *  decor). Emitted by BoardScene mid-cinematic; handled by MapEditor. */
+  'world:switch': { toWorld: string };
+  /** A world switch ACTUALLY happened (the target world exists). Emitted by MapEditor
+   *  after `switchToWorld` succeeds — lets the UI show a "return" button and the
+   *  tutorial stand down. Never fires when the target world is absent (e2e/prod). */
+  'world:switched': { toWorld: string };
+  /** Return the live game to the primary world ("Level 1"). Emitted by the return
+   *  button; handled by MapEditor. */
+  'world:return': Record<string, never>;
+  /** The player asked to FEED a dragon (the "Feed" button on its tap menu). */
+  'dragon:feed': { chain: string };
+  /** A dragon was fed: a berry consumed, its level raised. */
+  'dragon:fed': { chain: string; level: number };
+  /** A feed attempt failed (no berries, no gold, or the wrong hour — 'phase'). */
+  'dragon:feed_failed': { chain: string; reason: string; requiresPhase?: DayPhase };
+  /** The player asked to BUY one leaf for Gold (the sprout's "via des achats" path). */
+  'dragon:buy_food': { chain: string };
+  /** A leaf was bought (Gold spent, one berry added to the larder). */
+  'dragon:food_bought': { chain: string };
+  /** The player TAPPED an Emberberry bush to bank it in the dragon's larder. */
+  'dragon:store_food': { itemId: number };
+  /** The larder changed. `at` is the cell the berry came from, so the UI can fly it
+   *  to the gauge the way collected Gold flies to the purse; absent for a purchase. */
+  'dragon:stock_changed': { stock: number; gained: number; at?: TilePos };
+  /** Make Cindra/Laurah say a one-off line in the character bubble (used by the
+   *  Level-3 lair "how to merge berries" coach). */
+  'character:say': { speaker: 'cindra' | 'laurah'; text: string; holdMs?: number };
+  /** Quest progress broadcast to the HUD (main + side quests, each with a done flag). */
+  'quest:changed': { quests: QuestState[] };
+  /** Force-complete a quest by id (intent from any system). */
+  'quest:complete': { id: string };
   'energy:refill': { reason: string };
   'order:progress': { orderId: string; have: number[]; need: number[]; deliverable: boolean };
   'order:completed': { orderId: string; rewards: { coins: number; keys: number; xp?: number } };
@@ -619,8 +726,17 @@ export interface EventMap {
   /** Every Keeper's Task reached its target (fired once; reward already paid). */
   'tasks:all_complete': Record<string, never>;
   'tutorial:step': TutorialStepEvent;
+  /** The whole tutorial checklist just FINISHED (natural completion only — NOT a
+   *  reload of an already-done save). Drives the end-of-tutorial world teleport. */
+  /** `world` = the world whose script finished (omitted = the primary isle, which
+   *  is what the lair teleport waits for). */
+  'tutorial:done': { world?: string };
   'state:saved': { at: number };
   'state:loaded': { offlineMs: number; energyRecovered: number };
+  /** Fired once after beginRun finishes (load OR new game) — the board is live and
+   *  state is settled (post-hydrate). The Map Editor re-applies its saved zones +
+   *  assets here so they persist across a reload on BOTH paths. */
+  'game:started': Record<string, never>;
   'game:reset': Record<string, never>;
 }
 

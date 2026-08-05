@@ -1,10 +1,9 @@
 import {
   GENERATOR_PASSIVE_RETRY_MS,
   OFFLINE_BANK_CYCLES,
-  REWARD_SPAWN_RADIUS,
-  skipEnergyCost,
-  skipWarmthCost
+  REWARD_SPAWN_RADIUS
 } from '../core/Constants';
+import { phaseAllows } from '../core/dayCycle';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -15,10 +14,9 @@ import type { BoardItemState, ChainsData, GeneratorConfig, TilePos } from '../co
  *   • TAP generators (dragons): tap a ready one → spend energy, drop produce on a
  *     free neighbour, start a cooldown. Also gift one produce passively.
  *   • PASSIVE generators (big tree, house — `tappable:false`): never tap-harvest;
- *     they auto-produce every `passiveMs` (item, or a coins/xp/energy reward), and
- *     a tap only offers the energy SKIP.
- * The skip costs energy proportional to the time still remaining (expensive at
- * the start, nearly free at the end). All timing reads the virtual GameClock.
+ *     they auto-produce every `passiveMs` (item, or a coins/xp/energy reward).
+ *     Their wait is simply waited out — the countdown pill says how long.
+ * All timing reads the virtual GameClock.
  */
 export class GeneratorSystem {
   /** Gifts banked by the last offline catch-up (state:loaded) — the UI's
@@ -32,7 +30,6 @@ export class GeneratorSystem {
     private chains: ChainsData
   ) {
     bus.on('item:tapped', ({ itemId }) => this.onTapped(itemId));
-    bus.on('generator:skip', ({ itemId, currency }) => this.onSkip(itemId, currency));
     bus.on('time:advanced', () => this.tickPassive());
     bus.on('generator:set_timer', ({ chain, tier, remainingMs }) =>
       this.setTimer(chain, tier, remainingMs)
@@ -51,6 +48,9 @@ export class GeneratorSystem {
       if (item.kind !== 'item') continue;
       const generator = this.generatorConfig(item.chain, item.tier);
       if (!generator?.passiveMs || !generator.produces) continue;
+      // Phase-gated producers only pay the waiting harvest if you return DURING
+      // their hour — the dew is there when you come back at night, not at noon.
+      if (!this.phaseOpen(generator)) continue;
       if (item.passiveAt === undefined || now < item.passiveAt) continue;
       const overdue = Math.min(
         OFFLINE_BANK_CYCLES,
@@ -68,8 +68,8 @@ export class GeneratorSystem {
   }
 
   /** Tutorial staging: put the first generator of chain+tier into a wait with
-   *  `remainingMs` left, so a scripted step can offer an affordable skip. Passive
-   *  generators (house, big tree) wait on passiveAt; tap generators on readyAt. */
+   *  `remainingMs` left, so a scripted step can land on a timer of known length.
+   *  Passive generators (house, big tree) wait on passiveAt; tap ones on readyAt. */
   private setTimer(chain: string, tier: number, remainingMs: number): void {
     const item = [...this.state.items.values()].find(
       (i) => i.kind === 'item' && i.chain === chain && i.tier === tier
@@ -86,53 +86,11 @@ export class GeneratorSystem {
       ?.tiers.find((t) => t.tier === tier)?.generator;
   }
 
-  /** The timer a tap should offer to skip: a live tap-cooldown, else a live
-   *  passive wait. Returns null when nothing is pending. */
-  private activeTimer(
-    item: BoardItemState,
-    cfg: GeneratorConfig,
-    now: number
-  ): { at: number; total: number; kind: 'ready' | 'passive' } | null {
-    if (item.readyAt !== undefined && now < item.readyAt) {
-      return { at: item.readyAt, total: cfg.cooldownMs, kind: 'ready' };
-    }
-    if (cfg.passiveMs && item.passiveAt !== undefined && now < item.passiveAt) {
-      return { at: item.passiveAt, total: cfg.passiveMs, kind: 'passive' };
-    }
-    return null;
-  }
-
-  /** Spend Warmth to clear a generator's remaining wait. The cost scales with the
-   *  fraction of time still left (see skipEnergyCost). */
-  private onSkip(itemId: number, currency: 'gold' | 'warmth'): void {
-    const item = this.state.items.get(itemId);
-    if (!item || item.kind !== 'item') return;
-    const cfg = this.generatorConfig(item.chain, item.tier);
-    if (!cfg) return;
-    const now = this.clock.now();
-    const timer = this.activeTimer(item, cfg, now);
-    if (!timer) return; // already ready
-
-    // Two ways to skip: GOLD (default) or WARMTH (cheaper). Both expensive at the
-    // start, ~1 near the end.
-    if (currency === 'warmth') {
-      const cost = skipWarmthCost(timer.at - now, timer.total, cfg.skipMaxGold);
-      if (this.state.energyCurrent < cost) {
-        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
-        return;
-      }
-      this.bus.emit('energy:spend', { amount: cost, reason: 'skip_cooldown' });
-    } else {
-      const cost = skipEnergyCost(timer.at - now, timer.total, cfg.skipMaxGold);
-      if (this.state.coins < cost) {
-        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
-        return;
-      }
-      this.bus.emit('economy:add', { coins: -cost, reason: 'skip_cooldown' });
-    }
-    if (timer.kind === 'ready') item.readyAt = now;
-    else item.passiveAt = now; // next passive tick fires immediately
-    this.bus.emit('generator:skipped', { itemId, chain: item.chain, currency });
+  /** Time-of-day gate (`generator.phases`): the Dew Basin only fills at night.
+   *  A gated generator whose timer came due off-hours simply HOLDS — the wait is
+   *  never re-armed, so it pays out the moment its phase comes round again. */
+  private phaseOpen(cfg: GeneratorConfig): boolean {
+    return phaseAllows(cfg.phases, this.clock.now());
   }
 
   private onTapped(itemId: number): void {
@@ -140,7 +98,15 @@ export class GeneratorSystem {
     if (!item || item.kind !== 'item') return;
     const generator = this.generatorConfig(item.chain, item.tier);
     if (!generator) return; // not a generator; tooltip handling lives in UI
-    if (generator.tappable === false) return; // passive-only: tap only skips (board-side)
+    if (generator.tappable === false) return; // passive-only: it pays out on its own timer
+    if (!this.phaseOpen(generator)) {
+      this.bus.emit('item:harvest_failed', {
+        generatorId: itemId,
+        reason: 'phase',
+        requiresPhase: generator.phases![0]
+      });
+      return;
+    }
 
     const now = this.clock.now();
     if (item.readyAt !== undefined && now < item.readyAt) {
@@ -193,6 +159,8 @@ export class GeneratorSystem {
         continue;
       }
       if (now < item.passiveAt) continue;
+
+      if (!this.phaseOpen(generator)) continue; // off-hours: hold the due timer, pay at its phase
 
       if (generator.reward) {
         item.passiveAt = now + generator.passiveMs;

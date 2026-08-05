@@ -221,6 +221,17 @@ export class BoardItem extends Phaser.GameObjects.Container {
   }
 
   /**
+   * Recolour the art while it stands in for missing final art (the Golden Elder
+   * borrows the red dragon's bake — see STANDIN_TINT). Applied after `acquire`,
+   * which clears every tint; the cooling tint still owns generators, and this
+   * chain has none.
+   */
+  setStandInTint(tint: number | undefined): void {
+    if (tint === undefined) this.sprite.clearTint();
+    else this.sprite.setTint(tint);
+  }
+
+  /**
    * Hide the placeholder art while a live RigPlayer stands in for it, WITHOUT
    * touching the container's alpha — `setAlpha(0)`/`setVisible(false)` clear the
    * render flag, which makes Phaser skip the object in hit-tests (so taps and

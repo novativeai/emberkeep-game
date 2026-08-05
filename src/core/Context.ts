@@ -1,5 +1,6 @@
 import { BoardSystem } from '../systems/BoardSystem';
 import { ChestSystem } from '../systems/ChestSystem';
+import { DayCycleSystem } from '../systems/DayCycleSystem';
 import { DragonDuelSystem } from '../systems/DragonDuelSystem';
 import { DragonJobSystem } from '../systems/DragonJobSystem';
 import { EconomySystem } from '../systems/EconomySystem';
@@ -14,6 +15,9 @@ import { SaveSystem, type StorageLike } from '../systems/SaveSystem';
 import { TaskSystem } from '../systems/TaskSystem';
 import { TutorialDirector } from '../systems/TutorialDirector';
 import { UnlockSystem } from '../systems/UnlockSystem';
+import { WorldTeleportSystem } from '../systems/WorldTeleportSystem';
+import { QuestSystem } from '../systems/QuestSystem';
+import { DragonFeedSystem } from '../systems/DragonFeedSystem';
 import { EventBus } from './EventBus';
 import { GameClock } from './GameClock';
 import { GameState } from './GameState';
@@ -26,8 +30,10 @@ import type {
   MapData,
   MilestonesData,
   OrdersData,
+  QuestsData,
   TasksData,
-  TutorialData
+  TutorialData,
+  WorldTutorials
 } from './types';
 import anchorsJson from '../data/anchors.json';
 import assetsJson from '../data/assets.json';
@@ -37,8 +43,10 @@ import emberfontJson from '../data/emberfont.json';
 import mapJson from '../data/map.json';
 import milestonesJson from '../data/milestones.json';
 import ordersJson from '../data/orders.json';
+import questsJson from '../data/quests.json';
 import tasksJson from '../data/tasks.json';
 import tutorialJson from '../data/tutorial.json';
+import tutorialBorealisJson from '../data/tutorial-borealis.json';
 
 export interface GameData {
   chains: ChainsData;
@@ -47,10 +55,14 @@ export interface GameData {
   emberfont: EmberfontData;
   map: MapData;
   tutorial: TutorialData;
+  /** The tutorials the OTHER worlds own, keyed by editor-map name (borealis).
+   *  The isle's stays `tutorial` above — nothing that reads it has to change. */
+  worldTutorials: WorldTutorials;
   assets: AssetsManifest;
   anchors: AnchorsData;
   dialogue: DialogueData;
   tasks: TasksData;
+  quests: QuestsData;
 }
 
 export interface GameSystems {
@@ -68,6 +80,10 @@ export interface GameSystems {
   chest: ChestSystem;
   unlock: UnlockSystem;
   tasks: TaskSystem;
+  worldTeleport: WorldTeleportSystem;
+  quest: QuestSystem;
+  feed: DragonFeedSystem;
+  day: DayCycleSystem;
   save: SaveSystem;
   tutorial: TutorialDirector;
 }
@@ -93,10 +109,12 @@ export class GameContext {
       emberfont: emberfontJson as unknown as EmberfontData,
       map: mapJson as unknown as MapData,
       tutorial: tutorialJson as unknown as TutorialData,
+      worldTutorials: { borealis: tutorialBorealisJson as unknown as TutorialData },
       assets: assetsJson as unknown as AssetsManifest,
       anchors: anchorsJson as unknown as AnchorsData,
       dialogue: dialogueJson as unknown as DialogueData,
       tasks: tasksJson as unknown as TasksData,
+      quests: questsJson as unknown as QuestsData,
       ...overrides
     };
     this.state = new GameState(this.data.map);
@@ -116,8 +134,24 @@ export class GameContext {
       chest: new ChestSystem(this.state, this.bus, this.clock),
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains, this.data.map),
       tasks: new TaskSystem(this.state, this.bus, this.data.tasks),
+      worldTeleport: new WorldTeleportSystem(this.bus),
+      quest: new QuestSystem(
+        this.state,
+        this.bus,
+        this.data.quests,
+        this.data.tutorial,
+        this.data.worldTutorials
+      ),
+      feed: new DragonFeedSystem(this.state, this.bus, this.clock, this.data.chains),
+      day: new DayCycleSystem(this.bus, this.clock),
       save,
-      tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial)
+      tutorial: new TutorialDirector(
+        this.state,
+        this.bus,
+        this.clock,
+        this.data.tutorial,
+        this.data.worldTutorials
+      )
     };
     this.bus.on('game:reset_requested', () => this.resetGame());
   }
@@ -129,10 +163,18 @@ export class GameContext {
     const loaded = this.systems.save.load();
     if (!loaded) {
       this.systems.save.suspend(() => this.systems.board.newGame());
-      this.systems.save.save();
+      // Only write the fresh game when there was NOTHING stored. If bytes exist that
+      // we could not read, saving here would stamp a brand-new game over the player's
+      // progress and make a transient read failure permanent — which is exactly how a
+      // level-3 game came back as level 1. SaveSystem has set the unreadable copy
+      // aside; the first real action will save normally from here.
+      if (!this.systems.save.hasRawSave()) this.systems.save.save();
       this.systems.order.announceProgress();
     }
     this.systems.tutorial.begin();
+    // Board is live and state is settled (post load/newGame) — the Map Editor
+    // re-applies its saved playable zones + placed assets off this beat.
+    this.bus.emit('game:started', {});
   }
 
   hasSave(): boolean {

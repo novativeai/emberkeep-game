@@ -52,34 +52,38 @@ export class MergeSystem {
       return;
     }
 
-    const sameTile = to.col === from.col && to.row === from.row;
-    if (sameTile || !this.state.isTileActive(to.col, to.row)) {
+    if (to.col === from.col && to.row === from.row) {
       this.bus.emit('item:move_bounced', { itemId, at: from });
       return;
     }
 
-    const targetItem = this.state.itemAt(to.col, to.row);
-
-    // Fairyland-style: dropping the piece directly ON a matching item makes it
-    // join that cluster — merge if together they reach the threshold, else
-    // bounce home (you can't stack on an occupied tile otherwise).
-    if (targetItem && targetItem.id !== itemId) {
-      const matches =
-        targetItem.kind === 'item' &&
-        targetItem.chain === item.chain &&
-        targetItem.tier === item.tier;
-      if (matches && this.tryMergeOnto(item, targetItem, to)) return;
-      this.bus.emit('item:move_bounced', { itemId, at: from });
-      return;
+    // Drop onto an ACTIVE tile — the direct cases first.
+    if (this.state.isTileActive(to.col, to.row)) {
+      const targetItem = this.state.itemAt(to.col, to.row);
+      if (targetItem && targetItem.id !== itemId) {
+        // Dropped directly ON a matching item: merge if together they reach the
+        // threshold. If not, DON'T bounce yet — fall through to the forgiving magnet.
+        const matches =
+          targetItem.kind === 'item' &&
+          targetItem.chain === item.chain &&
+          targetItem.tier === item.tier;
+        if (matches && this.tryMergeOnto(item, targetItem, to)) return;
+      } else {
+        // Free active tile: move there, then merge the connected group / snap-merge.
+        this.state.moveItem(itemId, to);
+        if (this.tryMergeAt(item)) return;
+        if (this.trySnapMerge(item, to)) return;
+        this.bus.emit('item:moved', { itemId, from, to });
+        return;
+      }
     }
 
-    // Dropping on a FREE tile: move there, then merge the connected group.
-    this.state.moveItem(itemId, to);
-    if (this.tryMergeAt(item)) return;
-    // Smart "near enough" merge: dropping NEXT TO a mergeable cluster (not dead
-    // on it) snaps the piece onto the completing tile and fuses.
+    // FORGIVING MERGE — dropped on dead terrain, OR onto a cluster that didn't
+    // complete: SNAP onto a nearby free active cell that COMPLETES a merge (drag
+    // toward the piece in front → it fuses). No completing cell → bounce home
+    // (dropping on fog / a locked rim / a non-matching stack must still bounce).
     if (this.trySnapMerge(item, to)) return;
-    this.bus.emit('item:moved', { itemId, from, to });
+    this.bus.emit('item:move_bounced', { itemId, at: from });
   }
 
   /**

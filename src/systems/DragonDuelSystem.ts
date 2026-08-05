@@ -58,6 +58,7 @@ export class DragonDuelSystem {
     bus.on('item:merged', () => this.announce());
     bus.on('item:removed', () => this.announce());
     bus.on('keeper:leveled', () => this.announce());
+    bus.on('dragon:fed', () => this.announce()); // feeding raised a dragon's level → refresh the gauges
     bus.on('state:loaded', () => this.announce());
     bus.on('energy:changed', () => { if (this.isUnlocked()) this.announce(); });
     bus.on('game:reset', () => {

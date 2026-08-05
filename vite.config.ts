@@ -1,6 +1,132 @@
-import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
+
+/**
+ * Dev-only 3D-asset store for the in-game Map Editor. The browser can't write to
+ * disk, so imported models live in the repo's `asset3d/` folder via this endpoint
+ * (auto-created), and the editor loads them straight off disk — no localStorage
+ * size limit (so big GLBs never "disappear"), and a real folder the dev can manage.
+ *   GET  /asset3d/<name>       → serve the model file
+ *   GET  /__asset3d/list       → { files: [...] } (glb/gltf/obj/fbx only)
+ *   POST /__asset3d/save       → { name, data(base64) } → writes asset3d/<name>
+ *   POST /__asset3d/delete     → { name } → removes asset3d/<name>
+ */
+/**
+ * Dev-only store for the Map Editor's DEFAULT design (allocations with unlock
+ * levels + placed-asset metadata). Written to `asset3d/editor-map.json` so the
+ * edited map is the game's baked-in default — it survives a browser cookie/
+ * localStorage wipe (unlike per-browser storage).
+ *   GET  /__editor/map → the JSON ({} if none)
+ *   POST /__editor/map → validate + write it
+ */
+const editorMapStore = (): Plugin => ({
+  name: 'emberkeep-editor-map',
+  configureServer(server: ViteDevServer) {
+    const dir = path.resolve(__dirname, 'asset3d');
+    const file = path.join(dir, 'editor-map.json');
+    server.middlewares.use('/__editor/map', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === 'GET') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(existsSync(file) ? readFileSync(file, 'utf8') : '{}');
+        return;
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          try {
+            const doc = JSON.parse(body) as { allocations?: unknown; assets?: unknown };
+            if (typeof doc !== 'object' || doc === null) throw new Error('not an object');
+            mkdirSync(dir, { recursive: true });
+            writeFileSync(file, JSON.stringify(doc, null, 2) + '\n');
+            res.setHeader('Content-Type', 'application/json');
+            res.end('{"ok":true}');
+          } catch (e) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: String(e) }));
+          }
+        });
+        return;
+      }
+      res.statusCode = 405;
+      res.end();
+    });
+  }
+});
+
+const asset3dStore = (): Plugin => ({
+  name: 'emberkeep-asset3d',
+  configureServer(server: ViteDevServer) {
+    const dir = path.resolve(__dirname, 'asset3d');
+    const EXT = /\.(glb|gltf|obj|fbx|png|jpg|jpeg|webp)$/i; // 3D models AND 2D images
+    const safe = (name: string): string => path.basename(name || ''); // no path traversal
+
+    server.middlewares.use('/asset3d', (req, res, next) => {
+      const name = safe(decodeURIComponent((req.url ?? '').split('?')[0].replace(/^\/+/, '')));
+      const p = path.join(dir, name);
+      if (req.method === 'GET' && name && EXT.test(name) && existsSync(p) && statSync(p).isFile()) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.end(readFileSync(p));
+        return;
+      }
+      next();
+    });
+
+    server.middlewares.use('/__asset3d', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      const url = (req.url ?? '').split('?')[0];
+      if (req.method === 'GET' && url === '/list') {
+        const files = existsSync(dir) ? readdirSync(dir).filter((f) => EXT.test(f)) : [];
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ files }));
+        return;
+      }
+      if (req.method === 'POST' && (url === '/save' || url === '/delete')) {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          try {
+            const { name, data } = JSON.parse(body) as { name: string; data?: string };
+            const fn = safe(name);
+            if (!fn || !EXT.test(fn)) throw new Error('bad file name');
+            const p = path.join(dir, fn);
+            if (url === '/save') {
+              mkdirSync(dir, { recursive: true });
+              writeFileSync(p, Buffer.from(data ?? '', 'base64'));
+            } else if (existsSync(p)) {
+              rmSync(p);
+            }
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, url: `/asset3d/${fn}` }));
+          } catch (e) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: String(e) }));
+          }
+        });
+        return;
+      }
+      res.statusCode = 405;
+      res.end();
+    });
+  }
+});
 
 /**
  * Dev-only endpoint for the UI Builder satellite tool (tools/uibuilder):
@@ -66,9 +192,12 @@ const pruneDistArt = (): Plugin => ({
   name: 'emberkeep-prune-dist-art',
   apply: 'build',
   closeBundle() {
-    const dist = path.resolve(__dirname, 'dist');
+    // The SAME directory the build wrote to — hardcoding 'dist' meant an
+    // EMBERKEEP_DIST run shipped the 91MB of source art it is meant to strip.
+    const dist = path.resolve(__dirname, process.env.EMBERKEEP_DIST ?? 'dist');
     if (!existsSync(dist)) return;
     const SOURCE_ONLY = [
+      'raw/emb10', // EMB-10 board drop: untouched sources + the trimmed-but-unwired producers
       'raw/ai', // placeholder sources — TextureFactory paints these at runtime
       'raw/screamingbrain/Overworld - Large',
       'position-reference',
@@ -117,17 +246,23 @@ const pruneDistArt = (): Plugin => ({
 export default defineConfig({
   base: './',
   publicDir: 'assets',
-  plugins: [uiThemeEndpoint(), pruneDistArt()],
+  plugins: [uiThemeEndpoint(), asset3dStore(), editorMapStore(), pruneDistArt()],
   server: {
     port: 5173,
     strictPort: false
   },
   preview: {
-    port: 4173,
+    // Overridable so two verifies can run side by side. Several agents share this
+    // checkout; with ONE port and ONE dist, the second `vite preview` reuses the
+    // first (playwright's reuseExistingServer) and each run's browser reads the
+    // OTHER run's build. That is invisible: every failure lands somewhere else,
+    // in code neither side touched. Set EMBERKEEP_PREVIEW_PORT + EMBERKEEP_DIST
+    // to the same values in both, and the runs stop crossing.
+    port: Number(process.env.EMBERKEEP_PREVIEW_PORT ?? 4173),
     strictPort: true
   },
   build: {
-    outDir: 'dist',
+    outDir: process.env.EMBERKEEP_DIST ?? 'dist',
     assetsInlineLimit: 0,
     chunkSizeWarningLimit: 1600
   }

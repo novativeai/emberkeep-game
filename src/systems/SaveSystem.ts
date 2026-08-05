@@ -5,6 +5,12 @@ import type { GameState } from '../core/GameState';
 import type { SaveDataV1 } from '../core/types';
 import { computeRegen } from './EnergySystem';
 
+/** Last save that hydrated cleanly. `peek` falls back to it when the main slot is
+ *  unreadable, so one bad read can no longer cost the player their game. */
+const BACKUP_KEY = `${SAVE_KEY}_backup`;
+/** A save we failed to hydrate, set aside instead of deleted — recoverable by hand. */
+const BROKEN_KEY = `${SAVE_KEY}_broken`;
+
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -70,19 +76,39 @@ export class SaveSystem {
     return this.peek() !== null;
   }
 
+  /** True when SOMETHING is stored, readable or not — the difference between "new
+   *  player" and "this player has progress we failed to read". */
+  hasRawSave(): boolean {
+    return this.storage.getItem(SAVE_KEY) !== null || this.storage.getItem(BACKUP_KEY) !== null;
+  }
+
+  /**
+   * The MAIN slot only. There is deliberately no fallback to an older copy: silently
+   * resurrecting a previous save is worse than starting fresh, because the player
+   * cannot tell which game they are in. The backup is kept on disk for a human to
+   * restore by hand, never loaded behind your back.
+   */
   peek(): SaveDataV1 | null {
-    const raw = this.storage.getItem(SAVE_KEY);
+    return this.parse(this.storage.getItem(SAVE_KEY));
+  }
+
+  private parse(raw: string | null): SaveDataV1 | null {
     if (!raw) return null;
     try {
-      const parsed: unknown = JSON.parse(raw);
-      if (
+      const parsed = JSON.parse(raw) as Partial<SaveDataV1> & { version?: unknown };
+      const v = parsed.version;
+      // Accept THIS version OR any EARLIER one — `hydrate` fills newer fields with
+      // defaults, so a SAVE_VERSION bump no longer WIPES the player's progress (the
+      // old bug: a mismatched version was discarded → full newGame reset). Only a
+      // save from a NEWER/unknown build, or one missing the core fields, is refused.
+      const ok =
         typeof parsed === 'object' &&
         parsed !== null &&
-        (parsed as { version?: unknown }).version === SAVE_VERSION
-      ) {
-        return parsed as SaveDataV1;
-      }
-      return null;
+        typeof v === 'number' &&
+        v <= SAVE_VERSION &&
+        Array.isArray(parsed.items) &&
+        parsed.energy != null;
+      return ok ? (parsed as SaveDataV1) : null;
     } catch {
       return null;
     }
@@ -96,9 +122,24 @@ export class SaveSystem {
     const offlineMs = Math.max(0, now - data.savedAt);
     const max = energyMaxForLevel(levelForXp(data.xp ?? 0));
     const regen = computeRegen(data.energy.current, data.energy.lastRegenAt, now, max);
-    this.suspend(() => {
-      this.state.hydrate(data);
-    });
+    try {
+      this.suspend(() => {
+        this.state.hydrate(data);
+      });
+    } catch (e) {
+      // A save we could not read is NOT a save to throw away. It used to be deleted
+      // here, and Context.beginRun then wrote a brand-new game straight over it — one
+      // bad read and weeks of play were gone with no way back. Now it is set aside
+      // under a separate key: the boot can still start fresh, and the bytes survive.
+      console.warn('[SaveSystem] could not hydrate save — kept a copy under', BROKEN_KEY, e);
+      const raw = this.storage.getItem(SAVE_KEY);
+      if (raw) this.storage.setItem(BROKEN_KEY, raw);
+      return false;
+    }
+    // This exact save loaded cleanly — keep it as the last known good one. If the
+    // main slot is ever unreadable, `peek` falls back to this instead of to nothing.
+    const raw = this.storage.getItem(SAVE_KEY);
+    if (raw) this.storage.setItem(BACKUP_KEY, raw);
     this.bus.emit('state:loaded', { offlineMs, energyRecovered: regen.recovered });
     this.save();
     return true;
@@ -106,5 +147,6 @@ export class SaveSystem {
 
   clear(): void {
     this.storage.removeItem(SAVE_KEY);
+    this.storage.removeItem(BACKUP_KEY);
   }
 }

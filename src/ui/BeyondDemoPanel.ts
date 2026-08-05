@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, WORLD_TELEPORTS } from '../core/Constants';
+import { editorStore } from '../editor/editorStore';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
 const PANEL_W = 2240;
@@ -12,8 +13,15 @@ const PANEL_H = 1400;
  * Every visual degrades cleanly if its texture is missing (fresh clones).
  */
 export class BeyondDemoPanel extends Phaser.GameObjects.Container {
+  /** Stable lookup name — the e2e waits for THIS to appear rather than sleeping
+   *  through the finale (class names are minified in the production build, so a
+   *  constructor-name probe would not survive it). Part of the instrumentation
+   *  contract; keep it when refactoring. */
+  static readonly NAME = 'beyond-demo-panel';
+
   constructor(scene: Phaser.Scene) {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    this.setName(BeyondDemoPanel.NAME);
 
     const dim = scene.add
       .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, 0x06050a, 0.82)
@@ -64,8 +72,18 @@ export class BeyondDemoPanel extends Phaser.GameObjects.Container {
         })
         .setOrigin(0.5)
     );
-    this.worldCard(scene, -545, top + 490, 'trailer_world_ice', 'ICE WORLD', 'The Frozen Reaches');
-    this.worldCard(scene, 545, top + 490, 'trailer_world_crystal', 'CRYSTAL WORLD', 'The Crystal Depths');
+    // Each card enters an actual editor world when one exists (roothold / borealis) —
+    // "je dois pouvoir switcher dans le monde quand je clique". The card is a real
+    // portal only if its target map is present.
+    // The target is matched to the art the card SHOWS, not to the order of the
+    // WORLD_TELEPORTS array: borealis IS the aurora/ice world and roothold is the
+    // crystal-lit root lair. Indexing the array positionally sent the ICE card to
+    // roothold and hid borealis behind CRYSTAL — the player tapped ice and landed
+    // in the lava lair.
+    const worldByName = (name: string): string | undefined =>
+      WORLD_TELEPORTS.find((w) => w.toWorld === name)?.toWorld;
+    this.worldCard(scene, -545, top + 490, 'trailer_world_ice', 'ICE WORLD', 'The Frozen Reaches', worldByName('borealis'));
+    this.worldCard(scene, 545, top + 490, 'trailer_world_crystal', 'CRYSTAL WORLD', 'The Crystal Depths', worldByName('roothold'));
 
     // ---- Section: 5 legendary dragons. ----
     this.add(
@@ -133,16 +151,29 @@ export class BeyondDemoPanel extends Phaser.GameObjects.Container {
     y: number,
     key: string,
     title: string,
-    subtitle: string
+    subtitle: string,
+    worldName?: string
   ): void {
     const W = 1010;
     const H = 430;
+    // A real portal when its target editor world exists — tap to travel there.
+    const portal = !!worldName && !!editorStore.mapByName(worldName);
     const frame = scene.add.graphics();
     frame.fillStyle(num(PALETTE.night), 1);
     frame.fillRoundedRect(x - W / 2, y - H / 2, W, H, 28);
     frame.lineStyle(5, num(PALETTE.gold), 0.9);
     frame.strokeRoundedRect(x - W / 2, y - H / 2, W, H, 28);
     this.add(frame);
+    if (portal) {
+      // A generous, centred hit rect over the card; a tap enters the world + closes.
+      frame.setInteractive(new Phaser.Geom.Rectangle(x - W / 2, y - H / 2, W, H), Phaser.Geom.Rectangle.Contains);
+      frame.on('pointerover', () => this.scene.game.canvas && (this.scene.game.canvas.style.cursor = 'pointer'));
+      frame.on('pointerout', () => this.scene.game.canvas && (this.scene.game.canvas.style.cursor = 'default'));
+      frame.on('pointerup', () => {
+        scene.events.emit('beyond:pick_world', worldName); // UIScene → world:switch
+        this.close();
+      });
+    }
 
     if (scene.textures.exists(key)) {
       const img = scene.add.image(this.x + x, this.y + y, key);
@@ -179,6 +210,20 @@ export class BeyondDemoPanel extends Phaser.GameObjects.Container {
         .setOrigin(0.5)
         .setAlpha(0.85)
     );
+    // "▶ ENTER" pill (top-right) marks a card you can actually travel into.
+    if (portal) {
+      const bx = x + W / 2 - 96;
+      const by = y - H / 2 + 40;
+      const pill = scene.add.graphics();
+      pill.fillStyle(num(PALETTE.goldShade), 0.95);
+      pill.fillRoundedRect(bx - 78, by - 26, 156, 52, 26);
+      this.add(pill);
+      this.add(
+        scene.add
+          .text(bx, by, '▶ ENTER', { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: PALETTE.cream })
+          .setOrigin(0.5)
+      );
+    }
   }
 
   private close(): void {

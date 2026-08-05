@@ -63,6 +63,7 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | item:removed | BoardSystem | BoardScene, UIScene, OrderSystem, TutorialDirector, DragonJobSystem (job cancel), Save |
 | item:sold | EconomySystem | BoardScene, AudioManager |
 | generator:reward | GeneratorSystem | BoardScene |
+| day:phase | DayCycleSystem (crossing detected off the `time:advanced` heartbeat; re-announced on `game:started`) | BoardScene (sky grade cross-fade) — GeneratorSystem/DragonFeedSystem do NOT listen: they read the phase from the clock at decision time |
 | generator:skipped | GeneratorSystem | TutorialDirector (gate) |
 | gold:collected | BoardScene | UIScene |
 | chest:claimed | ChestSystem | BoardScene |
@@ -97,10 +98,39 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   Constants (tuned to source pixel size), anchors.json origin, and the hand-derived hit
   rects in `BoardScene.acquireSprite` (crystal/chest/lumber-2/bigtree rects encode
   `displayW/H = px × scale`, origin-shifted by +76). Compiles fine, taps break silently.
+- **TOUCH `editorStore.latticeFor` or `iso.projectIn/unprojectIn` → RUN**
+  `node scripts/audit-grids.mjs` (it replicates both files and reports, per world,
+  how many hand-drawn cells the game actually gets) and `tests/unit/Lattice.spec.ts`.
+  A lattice is pitch AND phase: at the right pitch but the wrong origin, two drawn
+  cells round to one game cell and one of them can never hold a piece — silently, in
+  a dev world no e2e can reach (the `/__editor/map` route is dev-server middleware).
+  The primary world must keep the AUTHORED lattice whatever a fit scores: map.json's
+  regions, the tutorial's spawn cells and the camera's focal cells are expressed in it.
+- **TOUCH a chain's `world` field → CHECK** `worldChains.ts` derives BOTH the boot-preload
+  skip (`isLazyScreenArt` → `isWorldItemArt`) and the on-arrival load
+  (`BoardScene.onEnterWorld` → `ensureTextures(worldItemKeys(toWorld))`) from it. Name a
+  world nobody switches to and that chain's art is never resident: every piece of it
+  renders the parcel stand-in, silently, only in that world. `worldChains.ts` must stay
+  Phaser-free — the preloader, the board AND the node tests all read it.
+- **TOUCH the world tutorials (`tutorial-borealis.json`, `GameData.worldTutorials`) →
+  CHECK** three readers of the SAME map: `TutorialDirector` (runs the live world's
+  script against `state.tutorialIndexFor/DoneFor`), `QuestSystem` (shows that world's
+  `task` titles as sub-quests) and the save (`worldTutorials`, additive — an old save
+  simply starts a world's script from the top). The isle keeps `tutorialIndex` /
+  `tutorialDone` at the top level; nothing that reads those had to change, and nothing
+  new should move them. `tutorial:done` now carries `{ world }` — WorldTeleportSystem
+  fires the lair teleport ONLY for the primary isle, or finishing borealis' arrival
+  lesson would read as "the Keeper is ready to leave home".
 - **TOUCH tutorial.json hint refs → RULE** always pin `tier` when a chain has multiple
   tiers on the board at that step. `resolveTileRef` filters chain-only otherwise and sorts
   by col+row — whatever randomness (CHEST_GIFTS roll, generator drops) is standing there
   wins. *Bug precedent: dragon_work hand pointed at a ruby.*
+- **TOUCH DAY_CYCLE (phase count/order/length) → CHECK** `generator.phases` values in
+  chains.json (the Dew Basin's `["night"]`), `DRAGON_FEED_PHASE` (the Emerald's dusk),
+  `DAY_CYCLE.grade`/`label` (one entry per phase — a missing key = an un-graded hour),
+  and tests/unit/DayCycle.spec.ts. The phase is `floor(GameClock.now() / phaseMs) % 4`:
+  world-anchored, never persisted, never `Date.now()` — so `advanceTime` must keep
+  stepping it. *Adding a 5th phase means every `Record<DayPhase, …>` above grows.*
 - **TOUCH assets.json `source` / file paths → CHECK** the loaderror ladder in
   PreloadScene → `TextureFactory.generate`: bespoke case > `item_*`/`decor_*` parcel
   stand-in (counter-scaled vs ITEM_SCALE) > `tile_*` moss tile > magenta (unknown only).

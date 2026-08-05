@@ -16,10 +16,10 @@ describe("TaskSystem (Keeper's Tasks — the encore checklist)", () => {
     expect(ctx.state.stat('elderTaps')).toBe(1);
   });
 
-  it('negative coin adds (skip costs) never count as gold earned', () => {
+  it('negative coin adds (a purchase) never count as gold earned', () => {
     const ctx = createTestContext();
     ctx.state.coins = 50;
-    ctx.bus.emit('economy:add', { coins: -9, reason: 'skip_cooldown' });
+    ctx.bus.emit('economy:add', { coins: -9, reason: 'buy_food' });
     expect(ctx.state.stat('goldEarned')).toBe(0);
   });
 

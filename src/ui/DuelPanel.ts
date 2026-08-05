@@ -197,7 +197,9 @@ export class DuelPanel extends Phaser.GameObjects.Container {
       bg.fillRoundedRect(-140, -140, 280, 280, 26);
       bg.lineStyle(6, num(PALETTE.gold), 0.9);
       bg.strokeRoundedRect(-140, -140, 280, 280, 26);
-      const img = scene.add.image(0, -18, 'duel_rock_red').setDisplaySize(190, 190);
+      // '__DEFAULT' placeholder — the real throw art is lazy-loaded (off boot) and
+      // set in showChoices() once the duel opens; choiceRoot stays hidden until then.
+      const img = scene.add.image(0, -18, '__DEFAULT').setDisplaySize(190, 190);
       const label = scene.add.text(0, 108, MOVE_LABELS[i]!, { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: PALETTE.textBrown }).setOrigin(0.5);
       const zone = scene.add.zone(0, 0, 280, 280).setInteractive({ useHandCursor: true });
       const move = MOVES[i]!;

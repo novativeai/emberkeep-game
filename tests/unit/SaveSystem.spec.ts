@@ -92,3 +92,49 @@ describe('SaveSystem', () => {
     expect(ctx.running).toBe(false);
   });
 });
+
+/**
+ * A save we cannot read is not a save to throw away. This used to be the most
+ * destructive path in the game: `load()` deleted the unreadable save and
+ * `Context.beginRun` immediately wrote a brand-new game over it, so one bad read
+ * turned weeks of play into a level-1 board with no way back.
+ */
+describe('SaveSystem — never lose a game to a bad read', () => {
+  it('keeps a copy of the last good save on disk, but never loads it behind your back', () => {
+    const storage = new MemoryStorage();
+    const ctx1 = createTestContext(storage);
+    ctx1.state.xp = 250;
+    ctx1.state.coins = 1537;
+    ctx1.systems.save.save();
+    expect(ctx1.systems.save.load()).toBe(true);
+    expect(storage.getItem(`${SAVE_KEY}_backup`)).not.toBeNull(); // recoverable by hand
+
+    // A corrupt main slot does NOT silently resurrect the copy: being quietly put
+    // back into an older game is worse than being told the save is unreadable.
+    storage.setItem(SAVE_KEY, '{ this is not json');
+    const ctx2 = createTestContext(storage);
+    expect(ctx2.systems.save.load()).toBe(false);
+    expect(ctx2.systems.save.hasRawSave()).toBe(true); // …and the boot still won't overwrite
+  });
+
+  it('sets an unreadable save aside instead of deleting it', () => {
+    const storage = new MemoryStorage();
+    const ctx = createTestContext(storage);
+    // Valid shape, so it gets past `peek`, but hydrate chokes on the item list.
+    storage.setItem(
+      SAVE_KEY,
+      JSON.stringify({ version: 1, savedAt: 0, items: [null], energy: { current: 1, lastRegenAt: 0 } })
+    );
+    ctx.systems.save.load();
+    expect(storage.getItem(SAVE_KEY)).not.toBeNull(); // NOT deleted
+    expect(storage.getItem(`${SAVE_KEY}_broken`)).not.toBeNull(); // set aside, recoverable
+  });
+
+  it('reports raw bytes present, so the boot never overwrites them with a new game', () => {
+    const storage = new MemoryStorage();
+    const ctx = createTestContext(storage);
+    expect(ctx.systems.save.hasRawSave()).toBe(false); // a true new player
+    storage.setItem(SAVE_KEY, '{ corrupt');
+    expect(ctx.systems.save.hasRawSave()).toBe(true); // progress exists, unreadable
+  });
+});

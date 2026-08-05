@@ -21,6 +21,7 @@ export class BoardSystem {
     bus.on('board:spawn', (p) => this.spawnReward(p));
     bus.on('board:retier', (p) => this.retier(p));
     bus.on('board:move', (p) => this.moveReward(p));
+    bus.on('board:reconcile', () => this.reconcile());
   }
 
   /** Scripted relocation (tutorial): slide one item of `chain`+`tier` to `to`
@@ -40,6 +41,34 @@ export class BoardSystem {
     const from = { col: item.col, row: item.row };
     this.state.moveItem(item.id, { col, row });
     this.bus.emit('item:moved', { itemId: item.id, from, to: { col, row } });
+  }
+
+  /**
+   * Walk every piece standing on ground the live world does not offer back onto
+   * ground it does.
+   *
+   * A world's playable cells are RE-DERIVED each time you enter it: the editor's
+   * hand-drawn grids, folded through that world's own cell lattice. Change the
+   * lattice — or simply redraw a grid — and the same (col,row) names a different
+   * place, so pieces already saved on that board are left standing on ground that
+   * no longer exists. They are not lost, they are stranded: invisible, or sitting
+   * where nothing can reach them. This is the repair, and it is idempotent — a
+   * board whose pieces are all on offered cells is untouched.
+   */
+  private reconcile(): void {
+    // ONLY in a world that draws every cell it has. The authored isle deliberately
+    // stands fixtures OFF its playable zone — the Theme Crystal is a landmark on a
+    // non-active cell — and walking those onto the nearest tile is not a repair, it
+    // is vandalism: the crystal drifted off its ledge on every trip home.
+    if (!this.state.worldAuthorsItsCells) return;
+    for (const item of [...this.state.items.values()]) {
+      if (this.state.isTileActive(item.col, item.row)) continue;
+      const free = this.state.freeActiveTilesNear(item.col, item.row)[0];
+      if (!free) continue; // nowhere to stand it — leave it put rather than stack it
+      const from = { col: item.col, row: item.row };
+      this.state.moveItem(item.id, free);
+      this.bus.emit('item:moved', { itemId: item.id, from, to: { col: free.col, row: free.row } });
+    }
   }
 
   /** Scripted reward spawn (tutorial): drop `count` items into free tiles near

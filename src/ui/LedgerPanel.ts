@@ -5,6 +5,7 @@ import type { GameState } from '../core/GameState';
 import type { OrderConfig } from '../core/types';
 import type { OrderSystem } from '../systems/OrderSystem';
 import type { TaskSystem } from '../systems/TaskSystem';
+import { editorStore } from '../editor/editorStore';
 import { uiRegistry } from './theme';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
@@ -69,6 +70,11 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private ordersTab: TabHandle;
   private tasksTab: TabHandle;
   private taskRows: TaskRow[] = [];
+  private tasksFooter!: Phaser.GameObjects.Text;
+  /** The Level-3 lair "how to feed the dragon" checklist — shown in the Tasks page
+   *  INSTEAD of the base tasks while you're in a switched world (the lair). */
+  private lairGuide!: Phaser.GameObjects.Container;
+  private lairSteps: { check: Phaser.GameObjects.Text; label: Phaser.GameObjects.Text; done: () => boolean }[] = [];
 
   constructor(
     scene: Phaser.Scene,
@@ -154,7 +160,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     );
     // The checklist counts merges/hatches/orders/gold/elder-taps — refresh the
     // Tasks page (and its tab counter) whenever any of those move while open.
-    for (const event of ['item:merged', 'item:hatched', 'order:completed', 'elder:tapped', 'economy:changed', 'tasks:all_complete'] as const) {
+    for (const event of ['item:merged', 'item:hatched', 'order:completed', 'elder:tapped', 'economy:changed', 'tasks:all_complete', 'dragon:fed', 'item:spawned', 'item:removed', 'world:switched', 'world:return'] as const) {
       this.offBus.push(bus.on(event, () => this.isOpen && this.refreshTasks()));
     }
   }
@@ -232,7 +238,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       this.taskRows.push({ label, count, barBg, fill, check, hint });
     });
 
-    const footer = scene.add
+    this.tasksFooter = scene.add
       .text(0, 348, `Finish all ${this.taskSystem.tasks.length} → a golden reward from Cindra`, {
         fontFamily: FONT,
         fontSize: '28px',
@@ -240,7 +246,56 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
         color: PALETTE.goldShade
       })
       .setOrigin(0.5);
-    this.tasksPage.add(footer);
+    this.tasksPage.add(this.tasksFooter);
+    this.buildLairGuide(scene);
+  }
+
+  /** The lair's how-to checklist (shown only in the lair) — the "tutorial in the
+   *  tasks list": merge/harvest berries, then feed the Red Dragon. Steps tick off
+   *  from live state, so it doubles as guidance + progress. */
+  private buildLairGuide(scene: Phaser.Scene): void {
+    this.lairGuide = scene.add.container(0, 0).setVisible(false);
+    const title = scene.add
+      .text(0, -300, '🐉  The Lair — feed the Red Dragon', {
+        fontFamily: FONT,
+        fontSize: '34px',
+        fontStyle: 'bold',
+        color: PALETTE.goldShade
+      })
+      .setOrigin(0.5);
+    this.lairGuide.add(title);
+    const steps: { label: string; done: () => boolean }[] = [
+      { label: 'Merge Emberberries into a ripe bush, then tap it to harvest.', done: () => this.berryCount() > 0 },
+      { label: 'Tap the Red Dragon and press “Feed” to raise its level.', done: () => this.gameState.dragonStat('ember_dragon').level >= 2 }
+    ];
+    steps.forEach((s, i) => {
+      const y = -170 + i * 132;
+      const check = scene.add
+        .text(-548, y, '○', { fontFamily: FONT, fontSize: '46px', fontStyle: 'bold', color: PALETTE.textBrown })
+        .setOrigin(0, 0.5);
+      const label = scene.add
+        .text(-476, y, s.label, { fontFamily: FONT, fontSize: '31px', fontStyle: 'bold', color: PALETTE.textBrown, wordWrap: { width: 980 } })
+        .setOrigin(0, 0.5);
+      this.lairGuide.add([check, label]);
+      this.lairSteps.push({ check, label, done: s.done });
+    });
+    const foot = scene.add
+      .text(0, 300, '🍓 comes from the Emberberry bushes you grew.', {
+        fontFamily: FONT,
+        fontSize: '26px',
+        fontStyle: 'italic',
+        color: '#8A6248'
+      })
+      .setOrigin(0.5);
+    this.lairGuide.add(foot);
+    this.tasksPage.add(this.lairGuide);
+  }
+
+  /** Emberberry (strawberry) items on the board — the feed supply. */
+  private berryCount(): number {
+    let n = 0;
+    for (let t = 1; t <= 3; t++) n += this.gameState.countItems('strawberry', t);
+    return n;
   }
 
   /** One order card: portrait, title, requirement slot, reward line, Deliver. */
@@ -347,10 +402,18 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     }
   }
 
+  /** The Tasks tab is normally post-tutorial only — but in the dev's custom world
+   *  (baseHidden) the tutorial IS the Tasks checklist, so it's available throughout. */
+  private tasksAvailable(): boolean {
+    return this.gameState.tutorialDone || editorStore.baseHidden;
+  }
+
   open(tab: LedgerTab = 'orders'): void {
     if (this.isOpen) return;
     this.isOpen = true;
-    this.activeTab = this.gameState.tutorialDone ? tab : 'orders';
+    this.activeTab = this.tasksAvailable() ? tab : 'orders';
+    // In tasks-only mode during the tutorial, open straight on the checklist.
+    if (editorStore.baseHidden && !this.gameState.tutorialDone) this.activeTab = 'tasks';
     this.refresh();
     this.refreshTasks();
     this.layoutTabs();
@@ -379,7 +442,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   }
 
   private switchTab(tab: LedgerTab): void {
-    if (tab === this.activeTab || (tab === 'tasks' && !this.gameState.tutorialDone)) return;
+    if (tab === this.activeTab || (tab === 'tasks' && !this.tasksAvailable())) return;
     this.activeTab = tab;
     if (tab === 'tasks') this.refreshTasks();
     else this.refresh();
@@ -394,7 +457,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
    *  tab only exists post-tutorial; before that the Orders lozenge sits alone,
    *  centred, exactly like the tutorial's original Ledger title. */
   private layoutTabs(): void {
-    const twoTabs = this.gameState.tutorialDone;
+    const twoTabs = this.tasksAvailable();
     this.tasksTab.root.setVisible(twoTabs);
     this.ordersTab.root.x = twoTabs ? -270 : 0;
     this.tasksTab.root.x = 270;
@@ -453,6 +516,30 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
 
   /** Repaint the checklist rows AND the tab's live done-counter. */
   private refreshTasks(): void {
+    // In the Level-3 lair, the Tasks page shows the lair how-to checklist instead of
+    // the base Keeper's Tasks (gated on a real world switch — no effect in the base game).
+    const inLair = editorStore.activeWorldId !== null;
+    this.lairGuide.setVisible(inLair);
+    this.tasksFooter.setVisible(!inLair);
+    if (inLair) {
+      let d = 0;
+      for (const s of this.lairSteps) {
+        const ok = s.done();
+        if (ok) d += 1;
+        s.check.setText(ok ? '✓' : '○').setColor(ok ? PALETTE.mossShade : PALETTE.textBrown);
+        s.label.setAlpha(ok ? 0.62 : 1);
+      }
+      for (const row of this.taskRows) {
+        row.label.setVisible(false);
+        row.barBg.setVisible(false);
+        row.count.setVisible(false);
+        row.check.setVisible(false);
+        row.hint.setVisible(false);
+        row.fill.clear();
+      }
+      this.tasksTab.label.setText(`The Lair  ${d}/${this.lairSteps.length}`);
+      return;
+    }
     const rowTop = -236;
     const rowGap = 118;
     const barX = 160;

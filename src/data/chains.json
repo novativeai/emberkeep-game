@@ -31,7 +31,7 @@
             "produces": { "chain": "strawberry", "tier": 1 },
             "cooldownMs": 20000,
             "energyCost": 0,
-            "passiveMs": 240000
+            "passiveMs": 600000
           }
         }
       ]
@@ -157,8 +157,7 @@
             "produces": { "chain": "emerald", "tier": 1 },
             "cooldownMs": 300000,
             "energyCost": 0,
-            "tappable": true,
-            "skipMaxGold": 60
+            "tappable": true
           }
         }
       ]
@@ -221,6 +220,95 @@
       "name": "Treasure Chest",
       "tiers": [
         { "tier": 1, "id": "chest_1", "name": "Treasure Chest", "sell": 0, "xp": 0 }
+      ]
+    },
+    {
+      "id": "driftwood",
+      "name": "Rimewood",
+      "world": "borealis",
+      "tiers": [
+        { "tier": 1, "id": "driftwood_1", "name": "Frozen Plank", "sell": 1, "xp": 0 },
+        { "tier": 2, "id": "driftwood_2", "name": "Bound Bundle", "sell": 3, "xp": 4 },
+        {
+          "tier": 3,
+          "id": "driftwood_3",
+          "name": "Kindled Pile",
+          "sell": 0,
+          "xp": 10,
+          "sellable": false,
+          "generator": {
+            "produces": { "chain": "tarknot", "tier": 1 },
+            "cooldownMs": 90000,
+            "energyCost": 0,
+            "tappable": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "tarknot",
+      "name": "Tarknot",
+      "world": "borealis",
+      "tiers": [
+        { "tier": 1, "id": "tarknot_1", "name": "Pitch Stone", "sell": 2, "xp": 0 },
+        { "tier": 2, "id": "tarknot_2", "name": "Pressed Tarknot", "sell": 6, "xp": 6 },
+        { "tier": 3, "id": "tarknot_3", "name": "Burning Heart", "sell": 16, "xp": 14 }
+      ]
+    },
+    {
+      "id": "rimebloom",
+      "name": "Rimebloom",
+      "world": "borealis",
+      "tiers": [
+        { "tier": 1, "id": "rimebloom_1", "name": "Frost Star", "sell": 1, "xp": 0 },
+        { "tier": 2, "id": "rimebloom_2", "name": "Rime Cluster", "sell": 3, "xp": 6 },
+        {
+          "tier": 3,
+          "id": "rimebloom_3",
+          "name": "Rimebloom",
+          "sell": 0,
+          "xp": 14,
+          "sellable": false,
+          "generator": {
+            "produces": { "chain": "rimebloom", "tier": 1 },
+            "cooldownMs": 120000,
+            "energyCost": 0,
+            "passiveMs": 600000,
+            "tappable": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "frostsilk",
+      "name": "Frostsilk",
+      "world": "borealis",
+      "tiers": [
+        { "tier": 1, "id": "frostsilk_1", "name": "Silk Spool", "sell": 2, "xp": 0 },
+        { "tier": 2, "id": "frostsilk_2", "name": "Frostsilk Skein", "sell": 6, "xp": 6 },
+        { "tier": 3, "id": "frostsilk_3", "name": "Loaded Spindle", "sell": 18, "xp": 14 }
+      ]
+    },
+    {
+      "id": "dew_basin",
+      "name": "Dew Basin",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "dew_basin_1",
+          "name": "Dew Basin",
+          "sell": 0,
+          "xp": 0,
+          "sellable": false,
+          "generator": {
+            "produces": { "chain": "strawberry", "tier": 1 },
+            "cooldownMs": 240000,
+            "energyCost": 0,
+            "passiveMs": 240000,
+            "tappable": false,
+            "phases": ["night"]
+          }
+        }
       ]
     }
   ]

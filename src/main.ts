@@ -1,9 +1,13 @@
+import '@fortawesome/fontawesome-free/css/all.min.css';
 import Phaser from 'phaser';
 import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
 import { GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
 import { createGameConfig } from './core/GameConfig';
+import { MapEditor } from './editor/mapEditor';
 import { gridToWorld } from './core/iso';
+import { msUntilPhase } from './core/dayCycle';
+import type { DayPhase } from './core/types';
 
 interface BoardCellText {
   chain?: string;
@@ -18,6 +22,8 @@ interface RenderedGame {
   fps: number;
   tutorial: { step: string; index: number; total: number; done: boolean };
   energy: { current: number; max: number };
+  /** The four-phase day (morning · day · dusk · night, 8 min each). */
+  day: { phase: DayPhase; index: number; remainingMs: number };
   coins: number;
   keys: number;
   xp: number;
@@ -44,6 +50,8 @@ declare global {
       itemToPage: (col: number, row: number) => { x: number; y: number };
       centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
+      /** Jump the virtual clock to the next `phase` of the four-phase day. */
+      advanceToPhase: (phase: DayPhase) => { now: number; offset: number; phase: DayPhase };
       reset: () => void;
       saveKey: string;
       game: Phaser.Game;
@@ -78,6 +86,9 @@ const game = new Phaser.Game({
     }
   }
 });
+
+// In-game Map Editor (dev level tool) — opened from Settings via `editor:open`.
+new MapEditor(game, ctx);
 
 // GPU safety net: a weak or overloaded device can drop the WebGL context. Without
 // preventDefault() the browser permanently kills the canvas — the visible "crash".
@@ -172,6 +183,11 @@ window.render_game_to_text = (): RenderedGame => {
       done: state.tutorialDone
     },
     energy: { current: state.energyCurrent, max: state.energyMax },
+    day: {
+      phase: ctx.systems.day.phase,
+      index: ctx.systems.day.index,
+      remainingMs: ctx.systems.day.remainingMs
+    },
     coins: state.coins,
     keys: state.keys,
     xp: state.xp,
@@ -217,6 +233,12 @@ window.__emberkeep = {
   // Test/diagnostic: award XP so a level-up (and its camera fly) can be driven
   // deterministically without grinding merges.
   grantXp: (xp: number) => ctx.bus.emit('economy:add', { xp, reason: 'debug:grantXp' }),
+  // Test/diagnostic: fast-forward to a day phase (0 ms when already in it), so a
+  // night-only producer or a dusk-only feed can be driven without waiting 8 min.
+  advanceToPhase: (phase: DayPhase) => {
+    const { now, offset } = window.advanceTime(msUntilPhase(ctx.clock.now(), phase));
+    return { now, offset, phase: ctx.systems.day.phase };
+  },
   // Dev/diagnostic: wipe the save and hard-reload, so a fresh newGame() runs and
   // any change to startingItems/startingDecor (e.g. the L1 dragon) shows again.
   // A loaded save otherwise masks new-game seeding.

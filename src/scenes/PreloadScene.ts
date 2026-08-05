@@ -4,6 +4,7 @@ import type { GameContext } from '../core/Context';
 import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
 import { BUILTIN_SEQUENCES, builtinSequence, builtinSequenceFiles, type BuiltinSequence } from '../render/sequenceCatalog';
+import { isLazyScreenArt } from '../core/lazyTextures';
 import { applyUiReplacements, sequenceFrameKey, uiRegistry, uploadKey } from '../ui/theme';
 import type { UiThemeDoc } from '../ui/themeCore';
 
@@ -44,6 +45,20 @@ export class PreloadScene extends Phaser.Scene {
     const factory = this.registry.get('textureFactory') as TextureFactory;
 
     const fileEntries = ctx.data.assets.images.filter((e) => e.source === 'file' && e.file);
+
+    // Art the shipped map / code actually reference. Everything else in the huge
+    // tile_/decor_ banks is UNPLACED weight (the current 13×12 map uses only the
+    // `invisible` tile + no decor → ~29 MB of GPU textures never drawn), so we skip
+    // uploading it. Rebuilt from the map each boot, so a re-exported world that DOES
+    // place a tile/decor loads it automatically — nothing to hand-maintain.
+    const map = ctx.data.map;
+    const neededArt = new Set<string>(['tile_ash', 'tile_ash_alt']); // TextureFactory generators
+    for (const v of Object.values(map.tilesByCell ?? {})) neededArt.add(`tile_${v}`);
+    for (const d of map.mapDecor ?? []) neededArt.add(`decor_${d.name}`);
+    for (const d of map.startingDecor ?? []) neededArt.add(`decor_${d.decor}`);
+    for (const r of map.regions ?? []) for (const d of r.decor ?? []) neededArt.add(`decor_${d.decor}`);
+    const isUnplacedArt = (key: string): boolean => /^(tile_|decor_)/.test(key) && !neededArt.has(key);
+
     if (fileEntries.length > 0) {
       const barBg = this.add
         .rectangle(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
@@ -65,6 +80,13 @@ export class PreloadScene extends Phaser.Scene {
         factory.generate(file.key);
       });
       for (const entry of fileEntries) {
+        if (isUnplacedArt(entry.key)) continue; // unplaced tile/decor bank — skip the upload
+        // `title_logo` is uploaded but never drawn in Phaser — the visible title
+        // logo is a DOM <img id="title-logo"> (index.html). Skip the dead 6 MB texture.
+        if (entry.key === 'title_logo') continue;
+        // Rare-screen art (finale trailers/teasers, duel throws, level-up emblem) is
+        // loaded on demand (ensureTextures) when its screen shows — keep it off boot.
+        if (isLazyScreenArt(entry.key)) continue;
         this.load.image(entry.key, entry.file as string);
       }
     }

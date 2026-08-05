@@ -1,0 +1,11 @@
+{
+  "feedTargetLevel": 2,
+  "quests": [
+    {
+      "id": "teleport_lair",
+      "kind": "main",
+      "title": "Teleport into the Lair (roothold)",
+      "image": "duel_face_red"
+    }
+  ]
+}

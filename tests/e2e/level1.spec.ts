@@ -33,7 +33,11 @@ interface GameText {
   inventory: Record<string, number>;
 }
 
-const shot = (name: string): string => `tests/e2e/shots/${name}.png`;
+// Overridable so two verifies in one checkout keep their own screenshots — the
+// other run's would otherwise overwrite yours mid-flight, leaving nothing to read
+// when a failure needs explaining. See the note in vite.config.ts.
+const SHOTS = process.env.EMBERKEEP_E2E_SHOTS ?? 'tests/e2e/shots';
+const shot = (name: string): string => `${SHOTS}/${name}.png`;
 
 async function gameText(page: Page): Promise<GameText> {
   return page.evaluate(() => window.render_game_to_text() as unknown as GameText);
@@ -375,49 +379,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
 
     // ---------- Dragon rest: tap bubble to advance ----------
     await tapBubble(page);
-    await waitStep(page, 'house_skip');
-
-    // ---------- House skip: spend Warmth to rush the House's timer ----------
-    // (the step's setTimer effect already put the House on an affordable cooldown)
-    const energyBeforeSkip = (await gameText(page)).energy.current;
-    // Tap the House's ROOF (real UI) — a point ~90 game-px above its tile centre,
-    // whose world CELL belongs to the neighbour behind. The art-bounds hit zone
-    // must still route the tap to the House. (Regression: tile-yield hit areas
-    // sent this tap to the item behind — the player paid the WRONG generator's
-    // Warmth skip and the house_skip gate never advanced.)
-    const houseCells = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 2);
-    expect(houseCells.length).toBeGreaterThanOrEqual(1);
-    const housePage = await gridToPage(page, houseCells[0]![0], houseCells[0]![1]);
-    await page.mouse.click(housePage.x, housePage.y - 45); // roof pixels (CSS = game ÷2)
-    await page.waitForTimeout(450);
-    await page.screenshot({ path: shot('14b-house-skip') });
-    const skipTarget = await page.evaluate(() => {
-      const scene = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
-        skipForId: number;
-      };
-      const ctx = window.__emberkeep.game.registry.get('ctx') as {
-        state: { items: Map<number, { id: number; chain: string; tier: number }> };
-      };
-      const item = ctx.state.items.get(scene.skipForId);
-      return item ? `${item.chain}:${item.tier}` : 'none';
-    });
-    expect(skipTarget).toBe('lumber:2'); // the roof tap raised the HOUSE's popup
-    // Pay with Warmth via the popup's real ⚡ button (game offset +150,+100 → CSS ÷2).
-    await page.mouse.click(housePage.x + 75, housePage.y + 50);
-    await page.waitForTimeout(500);
-    if ((await gameText(page)).tutorial.step !== 'buy_energy') {
-      // Flake fallback (software rendering): perform the skip via a direct emit.
-      await page.evaluate(() => {
-        const ctx = window.__emberkeep.game.registry.get('ctx') as {
-          state: { items: Map<number, { id: number; chain: string; tier: number }> };
-          bus: { emit: (event: string, payload: unknown) => void };
-        };
-        const house = [...ctx.state.items.values()].find((i) => i.chain === 'lumber' && i.tier === 2);
-        if (house) ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'warmth' });
-      });
-    }
     await waitStep(page, 'buy_energy');
-    expect((await gameText(page)).energy.current).toBeLessThan(energyBeforeSkip); // Warmth dropped
     await page.screenshot({ path: shot('15-buy-energy') });
 
     // ---------- Buy energy: the REAL UI path — ⚡+ opens the Emporium, claim FREE ----------
@@ -473,18 +435,25 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       );
       if (!dragon) return null;
       const sprite = board.itemSprites.get(dragon.id);
+      // The nearest free playable cell, searched OUTWARD — not just the four
+      // neighbours. By the end of the tutorial the dragons have been gifting
+      // rubies and diamonds for minutes of virtual clock, and they land on the
+      // free cells around their parent: the green dragon is regularly walled in
+      // on all four sides. That is the board working, not a bug, and the drag
+      // this covers works to any free cell — so requiring an ADJACENT one made
+      // the test fail on the state of the neighbourhood rather than on the
+      // behaviour it exists to protect.
       let free: [number, number] | null = null;
-      for (const [dc, dr] of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1]
-      ]) {
-        const c = dragon.col + dc!;
-        const r = dragon.row + dr!;
-        if (board.ctx.state.isTileActive(c, r) && board.ctx.state.itemIdAt(c, r) === null) {
-          free = [c, r];
-          break;
+      for (let ring = 1; ring <= 4 && !free; ring++) {
+        for (let dc = -ring; dc <= ring && !free; dc++) {
+          for (let dr = -ring; dr <= ring && !free; dr++) {
+            if (Math.max(Math.abs(dc), Math.abs(dr)) !== ring) continue; // ring edge only
+            const c = dragon.col + dc;
+            const r = dragon.row + dr;
+            if (board.ctx.state.isTileActive(c, r) && board.ctx.state.itemIdAt(c, r) === null) {
+              free = [c, r];
+            }
+          }
         }
       }
       return {
@@ -496,7 +465,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(greenSync).not.toBeNull();
     expect(greenSync!.sprite).toEqual(greenSync!.state); // scene renders what state holds
     expect(greenSync!.free).not.toBeNull();
-    // And the REAL gesture: drag the green dragon one tile — it must MOVE.
+    // And the REAL gesture: drag the green dragon to that free cell — it must MOVE.
     const gd: [number, number] = [greenSync!.state.col, greenSync!.state.row];
     await page.evaluate(([c, r]) => window.__emberkeep.centerCell(c as number, r as number), gd);
     await page.waitForTimeout(400);
@@ -513,27 +482,37 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // Tutorial ends at exactly 60 XP; Level 3 sits at 220 (the finale curve).
     await page.evaluate(() => window.__emberkeep.grantXp(160));
     await expect.poll(async () => (await gameText(page)).level, { timeout: 8_000 }).toBe(3);
-    // The finale choreography runs ~12.6s (hatch → glimpse → Cindra → card).
-    await page.waitForTimeout(13_500);
+    // The finale choreography runs ~12.6s on Phaser's TIMER clock, which is not the
+    // wall clock. `scene.time.now` does track real time, but TimerEvents advance by
+    // the frame DELTA, and Phaser clamps that delta (fps.min) so a stalled tab can
+    // never jump. Under SwiftShader this canvas renders at 1-2 fps — CLAUDE.md says
+    // outright that software rendering cannot push 2560×1600 — so the clamp starves
+    // the timers: measured on this box, a delayedCall(5000) had still not fired after
+    // 60 SECONDS. The finale is not late, it is running in near-freeze-frame.
+    //
+    // So: wait for the roadmap to actually appear, never for a duration. The budget
+    // below is generous on purpose and can still be short if the machine is loaded
+    // (two agents running e2e at once halves the frame rate again) — the e2e wants a
+    // quiet box, and its own port/dist (see CLAUDE.md).
+    const roadmapUp = async (): Promise<boolean> =>
+      page.evaluate(() => {
+        const ui = window.__emberkeep.game.scene.getScene('UIScene');
+        return !!ui.children.getByName('beyond-demo-panel');
+      });
+    const cardUp = async (): Promise<boolean> =>
+      page.evaluate(() => {
+        const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+          endScreen: unknown;
+        };
+        return !!ui.endScreen;
+      });
     // The "Beyond the demo" roadmap LEADS, unprompted — the ending's highlight,
     // every session must see it. The Chapter One card waits underneath.
-    const uiBefore = await page.evaluate(() => {
-      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
-        endScreen: unknown;
-      };
-      return { cardShown: !!ui.endScreen };
-    });
-    expect(uiBefore.cardShown).toBe(false); // the roadmap holds the stage first
+    await expect.poll(roadmapUp, { timeout: 150_000 }).toBe(true);
+    expect(await cardUp()).toBe(false); // the roadmap holds the stage first
     await page.screenshot({ path: shot('18-beyond-demo') });
     await page.mouse.click(40, 400); // tap the dim outside the panel → close
-    await page.waitForTimeout(600);
-    const uiAfter = await page.evaluate(() => {
-      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
-        endScreen: unknown;
-      };
-      return { cardShown: !!ui.endScreen };
-    });
-    expect(uiAfter.cardShown).toBe(true); // …then the Chapter One card follows
+    await expect.poll(cardUp, { timeout: 30_000 }).toBe(true); // …then the card follows
     await page.screenshot({ path: shot('18-level3-end') });
 
     // ---------- Save / reload restores mid-game state ----------
@@ -549,9 +528,9 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(after.keys).toBe(before.keys);
     expect(after.xp).toBe(before.xp);
     // Compare the persisted board WITHOUT the clock-derived `ready` flag: a
-    // generator skipped to ready (now <= readyAt) can read as cooling after the
-    // virtual clock resets on reload — harmless, and never happens on a real
-    // wall-clock. Item chains/tiers/positions still round-trip exactly.
+    // generator whose timer came due can read as cooling after the virtual clock
+    // resets on reload — harmless, and never happens on a real wall-clock. Item
+    // chains/tiers/positions still round-trip exactly.
     const layout = (b: (Cell | null)[][]): unknown =>
       b.map((row) => row.map((c) => (c ? { chain: c.chain, tier: c.tier, decor: c.decor } : null)));
     expect(layout(after.board)).toEqual(layout(before.board));

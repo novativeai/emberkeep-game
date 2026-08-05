@@ -17,7 +17,12 @@ import { UIScene } from '../scenes/UIScene';
  * equals the config width/height, hence we scale those.
  */
 export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
-  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  // Cap the device-pixel-ratio: a 3×-DPR phone otherwise backs the framebuffer at
+  // full device pixels (the #1 GPU-memory + fill-rate hog). Weak devices cap at 2,
+  // others at 3 — oversampling a 3× panel down to 2×-equivalent is invisible (the
+  // fixed 2560 space already downsamples heavily) but reclaims a lot of framebuffer.
+  const rawDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  const dpr = Math.min(rawDpr, IS_LOW_END ? 2 : 3);
   // On mobile the game is PORTRAIT: width = the phone's SHORT side, height = long,
   // regardless of how the device is currently held.
   const dispW = IS_MOBILE ? Math.min(window.innerWidth, window.innerHeight) : window.innerWidth;

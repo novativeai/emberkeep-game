@@ -183,6 +183,12 @@
       "file": "sprites/items/chest.webp"
     },
     {
+      "key": "item_dew_basin_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/dew_basin_3.webp"
+    },
+    {
       "key": "item_lumber_2",
       "source": "file",
       "generator": "item",
@@ -223,6 +229,78 @@
       "source": "file",
       "generator": "item",
       "file": "sprites/items/diamond.webp"
+    },
+    {
+      "key": "item_driftwood_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/driftwood_1.webp"
+    },
+    {
+      "key": "item_driftwood_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/driftwood_2.webp"
+    },
+    {
+      "key": "item_driftwood_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/driftwood_3.webp"
+    },
+    {
+      "key": "item_tarknot_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/tarknot_1.webp"
+    },
+    {
+      "key": "item_tarknot_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/tarknot_2.webp"
+    },
+    {
+      "key": "item_tarknot_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/tarknot_3.webp"
+    },
+    {
+      "key": "item_rimebloom_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/rimebloom_1.webp"
+    },
+    {
+      "key": "item_rimebloom_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/rimebloom_2.webp"
+    },
+    {
+      "key": "item_rimebloom_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/rimebloom_3.webp"
+    },
+    {
+      "key": "item_frostsilk_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/frostsilk_1.webp"
+    },
+    {
+      "key": "item_frostsilk_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/frostsilk_2.webp"
+    },
+    {
+      "key": "item_frostsilk_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/frostsilk_3.webp"
     },
     {
       "key": "decor_nest",

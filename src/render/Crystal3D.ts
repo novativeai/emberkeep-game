@@ -41,6 +41,7 @@ export class Crystal3D {
   private readonly group: THREE.Group;
   private readonly ctx2d: CanvasRenderingContext2D;
   private readonly spinRadPerMs: number;
+  private readonly ramp: THREE.DataTexture;
 
   // Default to the crystal PNG's dimensions (803×902) so the live texture is a
   // drop-in for `item_crystal_1` — the existing anchor/scale calibration carries
@@ -53,8 +54,12 @@ export class Crystal3D {
     this.spinRadPerMs = (spinDeg * Math.PI / 180) / 1000;
 
     // WebGL renderer → its own offscreen canvas (kept readable so we can blit it
-    // into the 2D bridge every frame).
-    this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+    // into the 2D bridge every frame). preserveDrawingBuffer is NOT needed — the
+    // drawImage() readback runs synchronously in the same update() turn while the
+    // backbuffer is still valid — and keeping it on pins an extra buffer resident,
+    // so it stays off (this context only ever runs on desktop now; phones use the
+    // static PNG — see BoardScene.ensureCrystal3D).
+    this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: false });
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(width, height, false);
 
@@ -66,6 +71,7 @@ export class Crystal3D {
     const ramp = new THREE.DataTexture(band, steps, 1, THREE.RedFormat);
     ramp.minFilter = ramp.magFilter = THREE.NearestFilter;
     ramp.needsUpdate = true;
+    this.ramp = ramp;
 
     // faceted gem — a stretched octahedron reads as a crystal.
     const geo = new THREE.OctahedronGeometry(1, 0);
@@ -122,6 +128,18 @@ export class Crystal3D {
   }
 
   dispose(): void {
+    // Free the geometry + materials (shared by gem & outline) and the toon ramp —
+    // renderer.dispose() alone leaks these on teardown.
+    this.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.geometry?.dispose?.();
+        const mat = m.material;
+        if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+        else (mat as THREE.Material | undefined)?.dispose?.();
+      }
+    });
+    this.ramp.dispose();
     this.renderer.dispose();
   }
 }

@@ -20,6 +20,7 @@
     },
     {
       "id": "ruby_merge",
+      "task": "Merge 3 Dragon Rubies into a Red Egg",
       "speaker": "laurah",
       "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch a Red Egg.",
       "gate": {
@@ -72,6 +73,7 @@
     },
     {
       "id": "cookbook_intro",
+      "task": "Open the Cookbook",
       "speaker": "laurah",
       "text": "Your first recipe! Every merge you discover is inscribed in the Emberkeep Cookbook. Tap the book to see your first page.",
       "gate": {
@@ -87,6 +89,7 @@
     },
     {
       "id": "cookbook_close",
+      "task": "Close the Cookbook",
       "speaker": "laurah",
       "text": "The Dragon Ruby recipe — your first page! Tap the ✕ to close the book, and let us wake that egg.",
       "gate": {
@@ -102,6 +105,7 @@
     },
     {
       "id": "dragon_hatch",
+      "task": "Hatch the Red Dragon",
       "speaker": "laurah",
       "text": "A Red Egg! Two more have appeared. Drag all three together — the Red Dragon stirs inside!",
       "gate": {
@@ -151,6 +155,7 @@
     },
     {
       "id": "emerald_tap",
+      "task": "Tap the Crystal for an Emerald",
       "speaker": "laurah",
       "text": "The Red Dragon! And look — the Crystal glows! Tap it to claim an Emerald. You already have two — merge all three to forge a Green Egg!",
       "gate": {
@@ -179,6 +184,7 @@
     },
     {
       "id": "emerald_egg_merge",
+      "task": "Merge 3 Emeralds into a Green Egg",
       "speaker": "laurah",
       "text": "Three Emeralds! Drag them all together — they will forge a Green Egg.",
       "gate": {
@@ -224,6 +230,7 @@
     },
     {
       "id": "green_dragon_hatch",
+      "task": "Make the Green Dragon appear",
       "speaker": "laurah",
       "text": "A Green Egg! Two more have appeared. Drag all three together — the Green Dragon stirs inside!",
       "gate": {
@@ -279,6 +286,7 @@
     },
     {
       "id": "chest",
+      "task": "Open the Treasure Chest",
       "speaker": "laurah",
       "text": "A Treasure Chest! The isle rewards brave Keepers. Tap it to claim what is inside.",
       "gate": {
@@ -334,6 +342,7 @@
     },
     {
       "id": "key_unlock",
+      "task": "Burn the fog with a Stone Key",
       "speaker": "laurah",
       "text": "Your dragons gifted you a Stone Key! See that clouded strip? Tap it to burn the fog away.",
       "gate": {
@@ -354,6 +363,7 @@
     },
     {
       "id": "emberberry_tap",
+      "task": "Pick an Emberberry sprout",
       "speaker": "laurah",
       "text": "A wild Emberberry patch grew in the opened land! It feeds you for FREE — tapping it never costs Warmth. Tap the patch to pick a sprout.",
       "gate": {
@@ -384,6 +394,7 @@
     },
     {
       "id": "emberberry_merge",
+      "task": "Merge 3 sprouts into an Emberberry Bush",
       "speaker": "laurah",
       "text": "Two more sprouts sprang up beside yours! Merge all three into a bush — the patch regrows forever, so you will never run out of things to merge.",
       "gate": {
@@ -439,6 +450,7 @@
     },
     {
       "id": "bush_merge",
+      "task": "Merge 3 Bushes into a House",
       "speaker": "laurah",
       "text": "Those Bushes in the opened land can become shelter! Merge the three Bushes to raise a House — it earns coins while you rest.",
       "gate": {
@@ -481,6 +493,7 @@
     },
     {
       "id": "dragon_work",
+      "task": "Set a dragon to work the House",
       "speaker": "laurah",
       "text": "Dragons can speed the House! Drag your dragon and drop it directly onto the House tile. Each working dragon doubles the speed — ×2 with one, ×4 with two!",
       "gate": {
@@ -499,6 +512,13 @@
           "tier": 2
         }
       ],
+      "allow": {
+        "drag": [
+          "ember_dragon",
+          "emerald"
+        ],
+        "dragonWork": true
+      },
       "hand": {
         "from": {
           "chain": "ember_dragon",
@@ -510,13 +530,6 @@
           "nth": 0,
           "tier": 2
         }
-      },
-      "allow": {
-        "drag": [
-          "ember_dragon",
-          "emerald"
-        ],
-        "dragonWork": true
       }
     },
     {
@@ -534,43 +547,10 @@
       "allow": {}
     },
     {
-      "id": "house_skip",
-      "speaker": "laurah",
-      "text": "Your House earns coins slowly — but you can rush it! Tap the House, then spend Warmth (⚡) to skip its timer. Watch your Warmth drop!",
-      "gate": {
-        "type": "event",
-        "event": "generator:skipped",
-        "chain": "lumber",
-        "currency": "warmth"
-      },
-      "effects": [
-        {
-          "setTimer": {
-            "chain": "lumber",
-            "tier": 2,
-            "remainingMs": 120000
-          }
-        }
-      ],
-      "arrow": {
-        "tile": {
-          "chain": "lumber",
-          "nth": 0,
-          "tier": 2
-        }
-      },
-      "allow": {
-        "tapGenerators": true,
-        "drag": [
-          "ember_dragon",
-          "emerald"
-        ]
-      }
-    },
-    {
       "id": "buy_energy",
+      "task": "Claim your free Ember Spark",
       "speaker": "laurah",
-      "text": "Low on Warmth now? Your first Ember Spark is free! Tap the ⚡ + button at the top to open the Emporium and claim it. Just this once!",
+      "text": "Warmth (⚡) is what the keep runs on, and yours is burning low. Your first Ember Spark is free! Tap the ⚡ + button at the top to open the Emporium and claim it. Just this once!",
       "gate": {
         "type": "event",
         "event": "marketplace:purchased"
