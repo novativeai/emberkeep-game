@@ -231,6 +231,11 @@
       "file": "sprites/items/diamond.webp"
     },
     {
+      "key": "fx_snow",
+      "source": "placeholder",
+      "generator": "fx"
+    },
+    {
       "key": "item_driftwood_1",
       "source": "file",
       "generator": "item",

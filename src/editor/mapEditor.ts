@@ -20,6 +20,9 @@ export class MapEditor {
   private boardEditor?: BoardEditor;
   private dom: EditorDom;
   private mapsRestored = false;
+  /** The world restore has run (via `ctx.worldPreparer`), so the `game:started`
+   *  fallback must stand down rather than restore a second time. */
+  private prepared = false;
   /** Resolves once the on-disk default (asset3d/editor-map.json) has been loaded
    *  and mirrored into the store. `game:started` awaits this so the FIRST restore
    *  always uses the authoritative disk data — no race with a stale localStorage
@@ -54,7 +57,18 @@ export class MapEditor {
     // Await the disk default FIRST so there is exactly ONE restore, driven by the
     // authoritative on-disk data — never a concurrent second restore off a stale
     // localStorage snapshot that could win the race and paint the wrong assets.
-    ctx.bus.on('game:started', () => void this.onGameStarted());
+    //
+    // It runs as `beginRun`'s world PREPARER: the save is hydrated, then this is
+    // awaited, and only then is anything announced — so the playable zones, the
+    // backdrop and above all the cell LATTICE are live before a single system reads a
+    // coordinate. Everything the game saves is (col,row); this project is what those
+    // numbers mean.
+    ctx.worldPreparer = (activeWorld) => this.onGameStarted(activeWorld);
+    // Fallback for a boot where nothing wired the preparer, so the restore can never
+    // be skipped outright. `prepared` stops it from doubling up on the normal path.
+    ctx.bus.on('game:started', () => {
+      if (!this.prepared) void this.onGameStarted(this.ctx.state.activeWorld);
+    });
     // A teleport (BoardScene, mid-cinematic) asks to switch the live game world.
     ctx.bus.on('world:switch', ({ toWorld }) => void this.switchToWorld(toWorld));
     // The return button asks to go back to the primary world (Level 1).
@@ -63,7 +77,8 @@ export class MapEditor {
 
   /** The single boot/reload restore: wait for the on-disk default to load, then
    *  re-apply World 1's zones + assets exactly once. */
-  private async onGameStarted(): Promise<void> {
+  private async onGameStarted(live: string): Promise<void> {
+    this.prepared = true;
     await this.diskReady;
     await this.restoreToGame();
     await this.applyActiveBackdrop();
@@ -72,8 +87,13 @@ export class MapEditor {
     // back pointing at the primary map. So the lair's pieces were drawn on the
     // isle's backdrop, on the isle's cells, at the isle's pitch. Re-enter the world
     // the save is standing in, through the one path that sets all three.
-    const live = this.ctx.state.activeWorld;
     if (live !== PRIMARY_WORLD && editorStore.mapByName(live)) await this.switchToWorld(live);
+    // The isle gets the same check every other world gets: `board:reconcile` records
+    // the units its coordinates are written in, and re-projects them if a build ever
+    // ships a different authored tile. Its stranded-piece repair is gated on
+    // `worldAuthorsItsCells`, which the isle never sets — so the Theme Crystal, a
+    // landmark parked off the playable zone on purpose, is left exactly where it is.
+    else this.ctx.bus.emit('board:reconcile', {});
   }
 
   /** Draw the ACTIVE world's map as the GAME's backdrop: the authored one for
@@ -166,6 +186,13 @@ export class MapEditor {
     scene.applyEditorState(
       assets.filter((a) => scene.textures.exists(a.textureKey)).map((a) => this.assetPayload(a, id))
     );
+    // Home, with the authored lattice and the isle's own cells both back in place —
+    // the one moment on this path where a reconcile can read the truth. BoardScene
+    // deliberately does NOT emit one from its own `world:return` handler: that runs
+    // synchronously, a tick before `applyBaseToGame` above lowers the lair's
+    // "I draw all my own ground" flag, and the repair then walked the isle's
+    // out-of-zone fixtures onto the nearest tile on every single trip home.
+    this.ctx.bus.emit('board:reconcile', {});
   }
 
   private boardScene(): Phaser.Scene | undefined {

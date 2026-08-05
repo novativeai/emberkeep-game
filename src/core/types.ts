@@ -467,6 +467,18 @@ export interface AnchorsData {
 /* Save schema                                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * A cell lattice, as stored in a save — structurally the `Lattice` of `iso.ts`
+ * (declared here rather than imported so the save schema owns no module cycle).
+ */
+export interface SavedLattice {
+  halfW: number;
+  halfH: number;
+  skewK: number;
+  originX: number;
+  originY: number;
+}
+
 export interface SaveDataV1 {
   version: number;
   savedAt: number;
@@ -498,13 +510,23 @@ export interface SaveDataV1 {
    *  one board and this only said what to show. Still read on load, to split an old
    *  save's pieces onto the right world's board; never written any more. */
   itemWorlds?: Record<string, string>;
-  /** Every world's own board. The top-level `items`/`nextItemId` mirror the primary
-   *  world so an older build still reads this save. */
-  worlds?: Record<string, { items: BoardItemState[]; nextItemId: number }>;
+  /**
+   * Every world's own board. The top-level `items`/`nextItemId` mirror the primary
+   * world so an older build still reads this save.
+   *
+   * `lattice` is the CELL LATTICE those (col,row) were written in — the unit of the
+   * coordinates, saved alongside them. A world's playable cells are re-derived at
+   * every boot from hand-drawn grids that live outside this file, so without it a
+   * redrawn grid (or a shipped update) silently changes what every saved coordinate
+   * MEANS. With it, the change is detected and the pieces are re-projected exactly.
+   * Absent on pre-lattice saves: the live lattice is then adopted as-is.
+   */
+  worlds?: Record<
+    string,
+    { items: BoardItemState[]; nextItemId: number; lattice?: SavedLattice }
+  >;
   /** The world the player was in. A reload puts them back where they left off. */
   activeWorld?: string;
-  /** Worlds already seeded once (sprouts, Dew Basin, their own dragon). Without it a
-   *  reload re-seeds the lair and the fixtures come back doubled. */
   tutorial: { index: number; done: boolean };
   /** Progress through the OTHER worlds' tutorials (borealis), keyed by world id.
    *  The primary world keeps `tutorial` above, so an older save reads unchanged. */

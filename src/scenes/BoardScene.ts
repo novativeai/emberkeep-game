@@ -39,6 +39,7 @@ import {
   type WorldTeleportConfig
 } from '../core/Constants';
 import { gridToWorld, setProjection, worldToGrid } from '../core/iso';
+import { goldenAwakened, goldenPromiseKept } from '../core/goldenPromise';
 import { PRIMARY_WORLD } from '../core/GameState';
 import { ensureTextures } from '../core/lazyTextures';
 import { worldItemKeys } from '../core/worldChains';
@@ -685,7 +686,7 @@ export class BoardScene extends Phaser.Scene {
       // exist there (so the egg would only ever wobble, never hatch). In `baseHidden`
       // the finale itself (reaching Level 3, e.g. by feeding) IS the promise, and the
       // burst opens borealis (`golden:awakened`).
-      if (this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId) || editorStore.baseHidden) {
+      if (goldenPromiseKept(this.ctx.state, editorStore.baseHidden)) {
         this.awakenAltarElder();
       } else if (this.altarEgg) {
         // Prophecy variant: she stirs but does NOT wake — the un-filled order
@@ -833,8 +834,12 @@ export class BoardScene extends Phaser.Scene {
    *  delivered AND Level 3 is reached, the awakened Elder stands there
    *  instead. Idempotent — safe on load, resync and rig-arrival. */
   private syncGoldenAltar(): void {
-    const delivered = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
-    const awake = delivered && this.ctx.state.level >= 3;
+    // A RECORDED fact, not a formula re-run against a world that may have changed
+    // under it. This asked only about Cindra's order — an order that cannot be
+    // delivered on a custom map, where the finale wakes her through `baseHidden`
+    // instead. So every reload decided she had never risen and grew the egg back on
+    // her empty ledge, while she stood in borealis. See core/goldenPromise.
+    const awake = goldenAwakened(this.ctx.state, editorStore.baseHidden);
     // She stands in ONE place. The altar is empty exactly when borealis' board holds
     // her — a fact, read from that world's own board, not a flag I have to keep in
     // step. (It was a flag: cleared only by a world switch, so a finale played after
@@ -2867,8 +2872,12 @@ export class BoardScene extends Phaser.Scene {
     return cfg && editorStore.mapByName(worldName) ? cfg : null;
   }
 
-  /** Does the LIVE world's own board already hold a dragon of this chain? */
-  private hasWorldDragon(_worldName: string, chain: string): boolean {
+  /** Does the LIVE world's own board already hold a piece of this chain? Every piece
+   *  of a lair's furniture answers for ITSELF — "are you here?" — because a saved
+   *  "already seeded" flag could not: it outlived the pieces it promised (they were
+   *  on a shared board the day worlds got boards of their own) and a flagged, empty
+   *  lair stayed empty for ever. */
+  private worldHolds(chain: string): boolean {
     for (const i of this.ctx.state.items.values()) if (i.chain === chain) return true;
     return false;
   }
@@ -2887,39 +2896,30 @@ export class BoardScene extends Phaser.Scene {
         this.fogHidden.push(puff);
       }
     }
-    // Every piece of the lair's furniture answers for ITSELF — "are you here?". A
-    // saved "already seeded" flag could not: it outlived
-    // the pieces it promised (they were on a shared board the day worlds got boards
-    // of their own) and a flagged, empty lair stayed empty for ever.
-    //
     // The garden is never bare when you walk in. I tried tying the sprouts to the
     // basin instead — "the basin refills them at night, so an empty garden is the
     // mechanic" — and it left the lair with nothing to merge for a whole night phase,
     // which is not a mechanic, it is a dead room. Re-seeding costs an exploit worth
     // five sprouts a round trip (~5 gold, less than one House coin); the merging is
     // where the value is, and that is the point of coming here.
-    const holds = (chain: string): boolean => {
-      for (const i of this.ctx.state.items.values()) if (i.chain === chain) return true;
-      return false;
-    };
     // THE DRAGON FIRST. She is the lair, and everything else grows around her — so
     // she takes the middle of the ground, not the first cell a scan happens to reach.
     // Seeding from the scan origin put her and her whole garden in the far corner of
     // a world the camera never turned to look at: seeded, saved, and invisible. That
     // is the "there are no berries in the lair" bug, and it was never about berries.
-    if (cfg.dragonOwned && cfg.dragonTier && !this.hasWorldDragon(toWorld, cfg.dragonChain)) {
+    if (cfg.dragonOwned && cfg.dragonTier && !this.worldHolds(cfg.dragonChain)) {
       const spot = this.lairAnchor();
       const at: [number, number] = spot ? [spot.col, spot.row] : [0, 0];
       this.ctx.bus.emit('board:spawn', { chain: cfg.dragonChain, tier: cfg.dragonTier, count: 1, at });
     }
     // …then her garden, NEXT TO HER — `nearChain` grows a connected blob, so the
     // sprouts land adjacent and one drag merges them.
-    if (cfg.seedChain && !holds(cfg.seedChain)) {
+    if (cfg.seedChain && !this.worldHolds(cfg.seedChain)) {
       this.ctx.bus.emit('board:spawn', { chain: cfg.seedChain, tier: 1, count: 5, nearChain: cfg.dragonChain });
     }
     // The Dew Basin — the night fixture: it waters one Emberberry per cycle, but ONLY
     // during the `night` phase (chains.json), so the lair earns a visit after dark.
-    if (cfg.basinChain && !holds(cfg.basinChain)) {
+    if (cfg.basinChain && !this.worldHolds(cfg.basinChain)) {
       this.ctx.bus.emit('board:spawn', { chain: cfg.basinChain, tier: 1, count: 1, nearChain: cfg.dragonChain });
     }
     // And ARRIVE there. A teleport that drops the camera wherever it was standing in
@@ -3625,10 +3625,16 @@ export class BoardScene extends Phaser.Scene {
         this.fog.delete(key);
       }
     }
-    // Re-frame the camera on the loaded Keeper level (no glide).
-    const frame = this.frameForLevel(this.ctx.state.level);
-    this.cameras.main.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);
-    this.cameras.main.centerOn(frame.x, frame.y);
+    // Re-frame the camera on the loaded Keeper level (no glide) — but only on the
+    // ISLE. A save standing in a sub-world has already been framed by its own arrival
+    // (enterLair glides to the dragon), and `frameForLevel` is an nb2 world point:
+    // under that world's lattice the same numbers are somewhere else entirely, so
+    // honouring it here would snap the camera off the lair the instant you loaded it.
+    if (this.gameplayWorldId === PRIMARY_WORLD) {
+      const frame = this.frameForLevel(this.ctx.state.level);
+      this.cameras.main.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);
+      this.cameras.main.centerOn(frame.x, frame.y);
+    }
     this.refreshKeyBadges();
     this.syncGoldenAltar();
   }

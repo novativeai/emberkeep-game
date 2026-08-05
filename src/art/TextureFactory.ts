@@ -126,6 +126,7 @@ export class TextureFactory {
       case 'decor_nest': return this.nest(key);
       case 'item_dew_basin_1': return this.dewBasin(key);
       case 'fx_ember': return this.ember(key);
+      case 'fx_snow': return this.snowflake(key);
       case 'fx_spark': return this.spark(key);
       case 'fx_glow': return this.glow(key);
       case 'fx_shell': return this.shell(key);
@@ -1135,6 +1136,45 @@ export class TextureFactory {
       grad.addColorStop(1, withAlpha(P.lava, 0));
       g.fillStyle = grad;
       g.fillRect(0, 0, 18, 18);
+    });
+  }
+
+  /**
+   * Borealis' snow. ONE texture for the whole snowfall: the emitter varies its scale
+   * from a distant speck to a near flake, so it has to read at both ends — a soft
+   * halo (which is all a far flake ever is) around six branches that only resolve
+   * when a big one drifts past the camera. Drawn white and tinted by the emitter,
+   * never coloured here.
+   */
+  private snowflake(key: string): void {
+    this.paint(key, 20, 20, (g) => {
+      const c = 10;
+      // The halo: what a 0.25-scale flake actually looks like on screen.
+      const halo = g.createRadialGradient(c, c, 0.5, c, c, 9);
+      halo.addColorStop(0, 'rgba(255,255,255,0.95)');
+      halo.addColorStop(0.35, 'rgba(255,255,255,0.42)');
+      halo.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = halo;
+      g.fillRect(0, 0, 20, 20);
+      // Six branches with a fork near the tip — the classic dendrite, at the smallest
+      // size that survives the canvas. Round caps so nothing reads as a cross.
+      g.save();
+      g.translate(c, c);
+      g.strokeStyle = 'rgba(255,255,255,0.92)';
+      g.lineWidth = 1.15;
+      g.lineCap = 'round';
+      for (let i = 0; i < 6; i++) {
+        g.rotate(Math.PI / 3);
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.lineTo(0, -8);
+        g.moveTo(0, -5.2);
+        g.lineTo(2.4, -7.4);
+        g.moveTo(0, -5.2);
+        g.lineTo(-2.4, -7.4);
+        g.stroke();
+      }
+      g.restore();
     });
   }
 

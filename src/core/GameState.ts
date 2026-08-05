@@ -1,10 +1,12 @@
 import { EMBERFONT, ENERGY_START, energyMaxForLevel, LEVEL_XP } from './Constants';
+import { projectIn, unprojectIn } from './iso';
 import type {
   BoardItemState,
   ItemKind,
   ItemSnapshot,
   MapData,
   RegionStatus,
+  SavedLattice,
   SaveDataV1,
   TilePos
 } from './types';
@@ -29,9 +31,24 @@ interface WorldBoard {
    *  the board to ANY cell (incl. negative) without reindexing. */
   occupancy: Map<string, number>;
   nextItemId: number;
+  /** The cell lattice this board's (col,row) were last written in — the UNIT of its
+   *  coordinates. See `relattice`. Absent until the world is first entered. */
+  lattice?: SavedLattice;
 }
 
 const emptyBoard = (): WorldBoard => ({ items: new Map(), occupancy: new Map(), nextItemId: 1 });
+
+/** Same lattice? Floats, so compared with a hair of tolerance rather than `===`. */
+export function sameLattice(a: SavedLattice, b: SavedLattice): boolean {
+  const near = (x: number, y: number): boolean => Math.abs(x - y) < 1e-6;
+  return (
+    near(a.halfW, b.halfW) &&
+    near(a.halfH, b.halfH) &&
+    near(a.skewK, b.skewK) &&
+    near(a.originX, b.originX) &&
+    near(a.originY, b.originY)
+  );
+}
 
 /**
  * The single source of truth for game state. Only systems mutate it; scenes
@@ -231,6 +248,10 @@ export class GameState {
         const b = ensure(id);
         for (const item of w.items ?? []) put(b, item);
         settleIds(b, w.nextItemId);
+        // The unit its coordinates were written in. Undefined on a pre-lattice save:
+        // the world then adopts whatever lattice it is next entered under, which is
+        // the old (silent) behaviour — but only ever once.
+        b.lattice = w.lattice;
       }
     } else {
       // Legacy: one board, split by the old ownership map.
@@ -292,7 +313,11 @@ export class GameState {
       worlds: Object.fromEntries(
         [...this.boards.entries()].map(([id, b]) => [
           id,
-          { items: [...b.items.values()].map((i) => ({ ...i })), nextItemId: b.nextItemId }
+          {
+            items: [...b.items.values()].map((i) => ({ ...i })),
+            nextItemId: b.nextItemId,
+            ...(b.lattice ? { lattice: { ...b.lattice } } : {})
+          }
         ])
       ),
       activeWorld: this.world,
@@ -456,6 +481,77 @@ export class GameState {
   /** True when the live world draws every playable cell itself. */
   get worldAuthorsItsCells(): boolean {
     return this.cellsFullyAuthored;
+  }
+
+  /* ---------------- the lattice a board's coordinates are written in ---------------- */
+
+  /** The lattice `worldId`'s (col,row) are written in, if it has ever been entered. */
+  worldLattice(worldId: string): SavedLattice | undefined {
+    return this.boards.get(worldId)?.lattice;
+  }
+
+  /** Record the lattice the LIVE board's coordinates are now written in. */
+  setWorldLattice(lattice: SavedLattice): void {
+    this.board().lattice = { ...lattice };
+  }
+
+  /**
+   * Re-read the live board's pieces under a NEW cell lattice.
+   *
+   * A saved (col,row) means nothing without the lattice it was written in — and a
+   * world's lattice is re-derived at every boot from hand-drawn grids that live
+   * outside the save. Redraw a grid, or ship an update that moves one, and the same
+   * numbers name different ground: pieces stand on cells that no longer exist, and
+   * the nearest-free-cell repair below shuffles them into a heap.
+   *
+   * This is not a repair. Each cell's world point is computed under the OLD lattice
+   * and read back as a cell under the NEW one — a change of units, exact both ways.
+   * Only a genuinely coarser lattice can fold two old cells into one; the loser of
+   * that collision settles on the nearest empty cell.
+   *
+   * @returns one entry per piece that actually changed cell.
+   */
+  relattice(
+    from: SavedLattice,
+    to: SavedLattice
+  ): { id: number; from: TilePos; to: TilePos }[] {
+    const b = this.board();
+    // Compute every destination against the OLD board, then re-lay the whole
+    // occupancy map: a piecemeal walk would collide with cells it is about to vacate.
+    const plan = [...b.items.values()].map((item) => {
+      const p = projectIn(from, item.col, item.row);
+      return { item, was: { col: item.col, row: item.row }, want: unprojectIn(to, p.x, p.y) };
+    });
+    b.occupancy.clear();
+    const moved: { id: number; from: TilePos; to: TilePos }[] = [];
+    for (const { item, was, want } of plan) {
+      let { col, row } = want;
+      if (b.occupancy.has(tileKey(col, row))) {
+        const free = this.nearestEmpty(b, col, row);
+        if (free) ({ col, row } = free);
+      }
+      this.expandBoardTo(col, row);
+      item.col = col;
+      item.row = row;
+      b.occupancy.set(tileKey(col, row), item.id);
+      if (was.col !== col || was.row !== row) moved.push({ id: item.id, from: was, to: { col, row } });
+    }
+    return moved;
+  }
+
+  /** Nearest cell holding nothing, spiralling out by Manhattan rings. Used only to
+   *  settle a re-projection collision, so the search stays deliberately short. */
+  private nearestEmpty(b: WorldBoard, col: number, row: number): TilePos | null {
+    for (let d = 1; d <= 16; d++) {
+      for (let dc = -d; dc <= d; dc++) {
+        const dr = d - Math.abs(dc);
+        for (const r of dr === 0 ? [row] : [row - dr, row + dr]) {
+          const c = col + dc;
+          if (!b.occupancy.has(tileKey(c, r))) return { col: c, row: r };
+        }
+      }
+    }
+    return null;
   }
 
   /** Does ANOTHER world's board hold a piece of this chain? The only cross-world

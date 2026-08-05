@@ -156,11 +156,32 @@ export class GameContext {
     this.bus.on('game:reset_requested', () => this.resetGame());
   }
 
-  /** Called once the gameplay scenes are subscribed: load the save or start fresh. */
-  beginRun(): void {
+  /**
+   * Restores the GROUND the save's coordinates stand on — the live world's playable
+   * cells, its backdrop and its cell lattice. Set by the Map Editor, which owns all
+   * three; absent in the node tests and in the shipped game with no editor project,
+   * where the authored world is the only world and is already live.
+   */
+  worldPreparer?: (activeWorld: string) => Promise<void>;
+
+  /**
+   * Called once the gameplay scenes are subscribed: load the save or start fresh.
+   *
+   * The order below is the fix for a whole class of "everything is scrambled when I
+   * reopen, and a refresh puts it right" bugs. It used to announce the loaded save
+   * immediately and let the Map Editor restore the world afterwards, asynchronously —
+   * leaving a window, a second long on a cold load, in which the game was live and
+   * autosaving with one world's pieces standing on another world's cells at another
+   * world's pitch. A refresh only looked like a cure: it made the window short and
+   * gave the offline harvest nothing to bank.
+   */
+  async beginRun(): Promise<void> {
     if (this.running) return;
     this.running = true;
-    const loaded = this.systems.save.load();
+    // 1 — put the board in place, silently. Both branches go through GameState.reset,
+    //     which clears the editor's cell overrides — so both must come BEFORE the
+    //     world is restored, or the restore is thrown away the moment it lands.
+    const loaded = this.systems.save.hydrateOnly();
     if (!loaded) {
       this.systems.save.suspend(() => this.systems.board.newGame());
       // Only write the fresh game when there was NOTHING stored. If bytes exist that
@@ -169,11 +190,19 @@ export class GameContext {
       // level-3 game came back as level 1. SaveSystem has set the unreadable copy
       // aside; the first real action will save normally from here.
       if (!this.systems.save.hasRawSave()) this.systems.save.save();
-      this.systems.order.announceProgress();
     }
+    // 2 — restore the world those coordinates are written in, and WAIT for it. The
+    //     save knows which world the player was standing in; only after this do its
+    //     cells, its lattice and its backdrop mean anything.
+    await this.worldPreparer?.(this.state.activeWorld);
+    // 3 — now announce. Every catch-up (offline gifts, regen, the day cycle) runs
+    //     against a board that is finally itself.
+    if (loaded) this.systems.save.announceLoaded();
+    else this.systems.order.announceProgress();
     this.systems.tutorial.begin();
-    // Board is live and state is settled (post load/newGame) — the Map Editor
-    // re-applies its saved playable zones + placed assets off this beat.
+    // Board is live and state is settled (post load/newGame). The Map Editor has
+    // already restored the world via `worldPreparer`; this beat remains for everyone
+    // else, and is its fallback when no preparer is wired.
     this.bus.emit('game:started', {});
   }
 

@@ -3,10 +3,10 @@ import { ENERGY_REGEN_MS, ENERGY_START, SAVE_KEY } from '../../src/core/Constant
 import { capture, createTestContext, drag, MemoryStorage } from './helpers';
 
 describe('SaveSystem', () => {
-  it('round-trips full mid-game state through storage', () => {
+  it('round-trips full mid-game state through storage', async () => {
     const storage = new MemoryStorage();
     const ctx1 = createTestContext(storage);
-    ctx1.beginRun(); // fresh board from map.json
+    await ctx1.beginRun(); // fresh board from map.json
 
     // Play a little: merge the tutorial weeds, spend some energy.
     drag(ctx1, [3, 4], [1, 4]);
@@ -30,10 +30,10 @@ describe('SaveSystem', () => {
     expect(ctx2.state.nextItemId).toBe(ctx1.state.nextItemId);
   });
 
-  it('applies offline energy regen on load', () => {
+  it('applies offline energy regen on load', async () => {
     const storage = new MemoryStorage();
     const ctx1 = createTestContext(storage);
-    ctx1.beginRun();
+    await ctx1.beginRun();
     ctx1.bus.emit('energy:spend', { amount: 5, reason: 'test' });
     ctx1.systems.save.save();
 
@@ -46,10 +46,10 @@ describe('SaveSystem', () => {
     expect(ctx2.state.energyCurrent).toBe(ENERGY_START - 5 + 3);
   });
 
-  it('autosaves on mutations (merge updates storage without an explicit save)', () => {
+  it('autosaves on mutations (merge updates storage without an explicit save)', async () => {
     const storage = new MemoryStorage();
     const ctx = createTestContext(storage);
-    ctx.beginRun();
+    await ctx.beginRun();
     const before = storage.getItem(SAVE_KEY);
 
     drag(ctx, [3, 4], [1, 4]);
@@ -76,10 +76,10 @@ describe('SaveSystem', () => {
     expect(ctx.systems.save.load()).toBe(false);
   });
 
-  it('reset clears the save and rewinds state', () => {
+  it('reset clears the save and rewinds state', async () => {
     const storage = new MemoryStorage();
     const ctx = createTestContext(storage);
-    ctx.beginRun();
+    await ctx.beginRun();
     ctx.bus.emit('economy:add', { coins: 99, reason: 'test' });
     const resets = capture(ctx.bus, 'game:reset');
 

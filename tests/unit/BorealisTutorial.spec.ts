@@ -5,7 +5,7 @@ import assetsJson from '../../src/data/assets.json';
 import chainsJson from '../../src/data/chains.json';
 import borealisJson from '../../src/data/tutorial-borealis.json';
 import { isWorldItemArt, worldItemKeys } from '../../src/core/worldChains';
-import { ITEM_SCALE } from '../../src/core/Constants';
+import { ITEM_SCALE, WORLD_TELEPORTS, WORLD_WEATHER } from '../../src/core/Constants';
 import { latticeFor, type GridDef } from '../../src/editor/editorStore';
 import { PRIMARY_WORLD } from '../../src/core/GameState';
 import type { AssetsManifest, ChainsData, TutorialData } from '../../src/core/types';
@@ -97,6 +97,18 @@ describe('Borealis chains', () => {
     }
   });
 
+  it('only gives weather to a world the player can actually reach', () => {
+    // Weather is keyed by editor-map NAME. A typo here is silent — the world simply
+    // never snows — so pin every key to a real teleport target.
+    const reachable = new Set(WORLD_TELEPORTS.map((w) => w.toWorld));
+    for (const world of Object.keys(WORLD_WEATHER)) {
+      expect(reachable.has(world), `${world} has weather but nothing travels there`).toBe(true);
+    }
+    expect(WORLD_WEATHER.borealis).toBe('snow');
+    // The isle is warm: giving it weather would put snow over the whole demo.
+    expect(WORLD_WEATHER[PRIMARY_WORLD]).toBeUndefined();
+  });
+
   it('keeps that art off the boot preload and hands it to the world instead', () => {
     const keys = worldItemKeys('borealis');
     expect(keys).toHaveLength(12);
@@ -129,9 +141,9 @@ describe('Borealis chains', () => {
 });
 
 describe('per-world tutorial', () => {
-  it('begins the borealis script on arrival and leaves the isle behind', () => {
+  it('begins the borealis script on arrival and leaves the isle behind', async () => {
     const ctx = createTestContext();
-    ctx.beginRun();
+    await ctx.beginRun();
     const steps = capture(ctx.bus, 'tutorial:step');
 
     enterWorld(ctx, 'borealis');
@@ -144,7 +156,7 @@ describe('per-world tutorial', () => {
     expect(ctx.systems.tutorial.isDone()).toBe(false);
   });
 
-  it('advances borealis progress without touching the isle, and survives a reload', () => {
+  it('advances borealis progress without touching the isle, and survives a reload', async () => {
     const storage = new (class {
       private v = new Map<string, string>();
       getItem = (k: string): string | null => this.v.get(k) ?? null;
@@ -152,7 +164,7 @@ describe('per-world tutorial', () => {
       removeItem = (k: string): void => void this.v.delete(k);
     })();
     const ctx = createTestContext(storage);
-    ctx.beginRun();
+    await ctx.beginRun();
     enterWorld(ctx, 'borealis');
     tapThrough(ctx, 'borealis_arrival');
 
@@ -165,7 +177,7 @@ describe('per-world tutorial', () => {
     // would leave the north permanently untaught.
     const next = createTestContext(storage);
     const resumed = capture(next.bus, 'tutorial:step');
-    next.beginRun();
+    await next.beginRun();
     expect(next.state.tutorialIndexFor('borealis')).toBe(1);
     expect(next.state.tutorialDoneFor('borealis')).toBe(false);
     expect(next.state.activeWorld).toBe('borealis');
@@ -189,9 +201,9 @@ describe('per-world tutorial', () => {
     expect(teleports).toHaveLength(1);
   });
 
-  it('shows the live world’s checklist in the quest panel', () => {
+  it('shows the live world’s checklist in the quest panel', async () => {
     const ctx = createTestContext();
-    ctx.beginRun();
+    await ctx.beginRun();
     const quests = capture(ctx.bus, 'quest:changed');
 
     enterWorld(ctx, 'borealis');

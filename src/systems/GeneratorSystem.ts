@@ -139,8 +139,14 @@ export class GeneratorSystem {
     return (
       this.state.freeActiveNeighbors(item.col, item.row)[0] ??
       this.state.freeActiveTilesNear(item.col, item.row, REWARD_SPAWN_RADIUS)[0] ??
+      // A generator standing on ground the world no longer offers still pays out, but
+      // WITHIN REACH. Unbounded, this branch was a teleporter: it only ever asked
+      // "am I on a live cell?", and on a board whose cells had not been restored yet
+      // every generator answered no — so each offline gift was flung to the far side
+      // of the map and autosaved there. The boot now waits for the world (Context
+      // .beginRun), and this can no longer turn a bad moment into a scattered board.
       (!this.state.isTileActive(item.col, item.row)
-        ? this.state.freeActiveTilesNear(item.col, item.row)[0]
+        ? this.state.freeActiveTilesNear(item.col, item.row, REWARD_SPAWN_RADIUS * 2)[0]
         : undefined)
     );
   }

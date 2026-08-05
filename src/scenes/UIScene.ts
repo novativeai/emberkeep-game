@@ -18,9 +18,11 @@ import {
   UI_SCALE,
   WELCOME_BACK_MIN_MS,
   WORLD_TELEPORT,
-  WORLD_TELEPORT_BOREALIS
+  WORLD_TELEPORT_BOREALIS,
+  WORLD_WEATHER
 } from '../core/Constants';
 import { editorStore } from '../editor/editorStore';
+import { goldenPromiseKept } from '../core/goldenPromise';
 import { gridToWorld } from '../core/iso';
 import { ensureTextures } from '../core/lazyTextures';
 import type { ResolvedArrow, ResolvedHand, TilePos, TutorialStepEvent } from '../core/types';
@@ -28,6 +30,7 @@ import { CharacterBubble } from '../entities/CharacterBubble';
 import { BeyondDemoPanel } from '../ui/BeyondDemoPanel';
 import { CookbookPanel } from '../ui/CookbookPanel';
 import { QuestPanel } from '../ui/QuestPanel';
+import { Snowfall } from '../render/Snowfall';
 import { EndScreen } from '../ui/EndScreen';
 import { Hud } from '../ui/Hud';
 import { LedgerPanel } from '../ui/LedgerPanel';
@@ -44,6 +47,9 @@ import { uiRegistry } from '../ui/theme';
 import { Tooltip } from '../ui/Tooltip';
 
 const FONT = 'Trebuchet MS, Verdana, sans-serif';
+/** Ambient weather sits above the whole board (UIScene renders after BoardScene)
+ *  and below every HUD element — snow must never fall in front of a button. */
+const DEPTH_WEATHER = 5;
 const DEPTH_HUD = 10;
 const DEPTH_PANEL = 60;
 const DEPTH_TUTORIAL = 100;
@@ -73,6 +79,7 @@ export class UIScene extends Phaser.Scene {
   private cookbook!: CookbookPanel;
   private cookbookButton!: Phaser.GameObjects.Container;
   private returnButton?: Phaser.GameObjects.Container; // "⟵ Niveau 1" — only after a world switch
+  private weather?: Snowfall; // borealis' snow — built on first arrival, never before
   private questPanel!: QuestPanel; // objective tracker (top-right)
   private lairPreview?: Phaser.GameObjects.Container; // roothold thumbnail (travel back to the lair)
   private borealisPreview?: Phaser.GameObjects.Container; // borealis thumbnail (travel back to the aurora world)
@@ -196,6 +203,20 @@ export class UIScene extends Phaser.Scene {
     this.ctx.bus.on('world:switched', () => this.returnButton?.setVisible(true));
     this.ctx.bus.on('world:return', () => this.returnButton?.setVisible(false));
 
+    // Ambient weather (borealis' snow). Behind every HUD element, in front of the
+    // whole board — UIScene renders above BoardScene, so DEPTH_WEATHER only has to
+    // beat nothing here and stay under the HUD. It follows the world you are in, and
+    // a save reopened in the north brings it back (state:loaded, after hydrate).
+    this.weather = new Snowfall(this, DEPTH_WEATHER);
+    const weatherFor = (world: string): void => {
+      if (WORLD_WEATHER[world] === 'snow') this.weather?.start();
+      else this.weather?.stop();
+    };
+    this.ctx.bus.on('world:switched', ({ toWorld }) => weatherFor(toWorld));
+    this.ctx.bus.on('world:return', () => this.weather?.stop());
+    this.ctx.bus.on('state:loaded', () => weatherFor(this.ctx.state.activeWorld));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.weather?.destroy());
+
     // The objective tracker (top-right): main + side quest cards. Populate it now.
     this.questPanel = new QuestPanel(this, this.ctx.bus).setDepth(DEPTH_HUD + 4);
     this.ctx.systems.quest.announce();
@@ -298,7 +319,10 @@ export class UIScene extends Phaser.Scene {
     new CustomUiManager(this).buildAll();
 
     // Everything is wired: load the save (or start fresh) and roll the tutorial.
-    this.ctx.beginRun();
+    // Async — it restores the world the save is standing in (cells + lattice) before
+    // announcing anything. Nothing here waits on it: the scenes are already built and
+    // every one of them reacts to `state:loaded` when it lands.
+    void this.ctx.beginRun();
   }
 
   override update(_time: number, delta: number): void {
@@ -557,9 +581,7 @@ export class UIScene extends Phaser.Scene {
     // Unlocked by delivering Cindra's golden order — OR, in a custom world (where that
     // order isn't reachable), by hitting Level 3 (the finale that bursts the egg). Both
     // are SAVED, so the preview survives a reload.
-    const unlocked =
-      this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId) ||
-      (editorStore.baseHidden && this.ctx.state.level >= 3);
+    const unlocked = goldenPromiseKept(this.ctx.state, editorStore.baseHidden);
     const show = unlocked && !editorStore.activeWorldId && !!editorStore.mapByName(WORLD_TELEPORT_BOREALIS.toWorld);
     if (show) this.refreshWorldPreview(WORLD_TELEPORT_BOREALIS.toWorld, this.borealisPreviewImg);
     this.borealisPreview?.setVisible(show);

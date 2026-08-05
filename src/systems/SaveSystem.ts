@@ -30,6 +30,13 @@ export class SaveSystem {
     'item:merged',
     'item:harvested',
     'item:removed',
+    // A generator's gift. It announces itself as `item:produced` and NOTHING else —
+    // every other spawn on the board goes out as `item:spawned` — so a passive
+    // harvest lived in memory until some unrelated action happened to save. Close the
+    // tab first and the gifts were simply gone: three of them vanished across a
+    // reload in the e2e, and "I leave the site and things are missing" is exactly how
+    // it reads from the outside.
+    'item:produced',
     'energy:changed',
     'economy:changed',
     'order:completed',
@@ -39,10 +46,16 @@ export class SaveSystem {
     // subscriber), so a surge ignited by a merge needs its own save trigger.
     'emberfont:surge',
     // Dragon-duel gauge/level changes (energy spend already saves the set start).
-    'duel:match'
+    'duel:match',
+    // The Golden Elder rising is a MOMENT with no board consequence of its own —
+    // nothing else here would write the stat that records it, and the altar reads
+    // that stat on the next boot to know she is gone.
+    'golden:awakened'
   ] as const;
 
   private suspended = false;
+  /** A hydrated save waiting to be announced (see `hydrateOnly`). */
+  private pending: { offlineMs: number; energyRecovered: number } | null = null;
 
   constructor(
     private state: GameState,
@@ -114,8 +127,27 @@ export class SaveSystem {
     }
   }
 
-  /** @returns true when a valid save was hydrated. */
+  /** @returns true when a valid save was hydrated AND announced. */
   load(): boolean {
+    if (!this.hydrateOnly()) return false;
+    this.announceLoaded();
+    return true;
+  }
+
+  /**
+   * Read the save into state WITHOUT announcing it.
+   *
+   * Every system's catch-up hangs off `state:loaded` — offline gifts, energy regen,
+   * the day cycle — and they all read the BOARD. But a board's cells and its lattice
+   * are restored asynchronously, from the editor project, AFTER this. Announcing here
+   * meant the offline harvest ran against whatever ground happened to be loaded:
+   * reopening inside the lair, every one of its generators read as standing on
+   * nothing, and each gift was flung across the isle and autosaved there. Hence the
+   * split — hydrate now, announce once the ground under the coordinates is real.
+   *
+   * @returns true when a valid save was hydrated.
+   */
+  hydrateOnly(): boolean {
     const data = this.peek();
     if (!data) return false;
     const now = this.clock.now();
@@ -140,9 +172,18 @@ export class SaveSystem {
     // main slot is ever unreadable, `peek` falls back to this instead of to nothing.
     const raw = this.storage.getItem(SAVE_KEY);
     if (raw) this.storage.setItem(BACKUP_KEY, raw);
-    this.bus.emit('state:loaded', { offlineMs, energyRecovered: regen.recovered });
-    this.save();
+    this.pending = { offlineMs, energyRecovered: regen.recovered };
     return true;
+  }
+
+  /** Announce a save hydrated by `hydrateOnly`. No-op when nothing is pending, so
+   *  calling it twice cannot replay an offline harvest. */
+  announceLoaded(): void {
+    const pending = this.pending;
+    this.pending = null;
+    if (!pending) return;
+    this.bus.emit('state:loaded', pending);
+    this.save();
   }
 
   clear(): void {

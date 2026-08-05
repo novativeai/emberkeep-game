@@ -1,6 +1,7 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
-import type { GameState } from '../core/GameState';
+import { sameLattice, type GameState } from '../core/GameState';
+import { getLattice } from '../core/iso';
 import type { ChainsData, GeneratorConfig, MapData, SpawnCause } from '../core/types';
 
 /**
@@ -44,22 +45,43 @@ export class BoardSystem {
   }
 
   /**
-   * Walk every piece standing on ground the live world does not offer back onto
-   * ground it does.
+   * Settle the live world's board against the ground it actually offers. Two passes,
+   * and the order is the whole point.
    *
    * A world's playable cells are RE-DERIVED each time you enter it: the editor's
-   * hand-drawn grids, folded through that world's own cell lattice. Change the
-   * lattice — or simply redraw a grid — and the same (col,row) names a different
-   * place, so pieces already saved on that board are left standing on ground that
-   * no longer exists. They are not lost, they are stranded: invisible, or sitting
-   * where nothing can reach them. This is the repair, and it is idempotent — a
-   * board whose pieces are all on offered cells is untouched.
+   * hand-drawn grids, folded through that world's own cell lattice. Both live
+   * OUTSIDE the save. So a redrawn grid — or a shipped update that moves one — leaves
+   * every saved (col,row) naming different ground. That is a change of UNITS, and it
+   * has an exact answer (`relattice`). Only what is stranded after that conversion is
+   * a genuine repair, and repair is a guess: nearest free cell. Guessing first, which
+   * is all this used to do, turns a solvable unit change into a heap.
+   *
+   * Idempotent: a board already in its own units, with every piece on offered ground,
+   * comes out untouched.
    */
   private reconcile(): void {
-    // ONLY in a world that draws every cell it has. The authored isle deliberately
-    // stands fixtures OFF its playable zone — the Theme Crystal is a landmark on a
-    // non-active cell — and walking those onto the nearest tile is not a repair, it
-    // is vandalism: the crystal drifted off its ledge on every trip home.
+    // 1 — units. The lattice is recorded per world, so this fires exactly once per
+    // change and never on the trips where nothing moved.
+    const live = getLattice();
+    const written = this.state.worldLattice(this.state.activeWorld);
+    if (written && !sameLattice(written, live)) {
+      const moved = this.state.relattice(written, live);
+      if (moved.length > 0) {
+        console.info(
+          `[board] ${this.state.activeWorld}: ${moved.length} pièce(s) reprojetée(s) — ` +
+            `la lattice du monde a changé depuis la sauvegarde.`
+        );
+      }
+      // Announce them: the scene re-seats each sprite, and SaveSystem writes the
+      // board back in its new units, so the conversion happens once and for all.
+      for (const m of moved) this.bus.emit('item:moved', { itemId: m.id, from: m.from, to: m.to });
+    }
+    this.state.setWorldLattice(live);
+
+    // 2 — repair. ONLY in a world that draws every cell it has. The authored isle
+    // deliberately stands fixtures OFF its playable zone — the Theme Crystal is a
+    // landmark on a non-active cell — and walking those onto the nearest tile is not
+    // a repair, it is vandalism: the crystal drifted off its ledge on every trip home.
     if (!this.state.worldAuthorsItsCells) return;
     for (const item of [...this.state.items.values()]) {
       if (this.state.isTileActive(item.col, item.row)) continue;

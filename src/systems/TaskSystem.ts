@@ -1,5 +1,6 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
+import { GOLDEN_AWAKENED_STAT } from '../core/goldenPromise';
 import type { TaskConfig, TasksData } from '../core/types';
 
 /**
@@ -23,6 +24,15 @@ export class TaskSystem {
     });
     bus.on('item:sold', ({ coins }) => this.bump('goldEarned', coins));
     bus.on('elder:tapped', () => this.bump('elderTaps', 1));
+    // The Golden Elder rising is a MOMENT — an animation, over in three seconds —
+    // and the altar has to know it happened on every boot from here on. Recorded
+    // once, as a fact. It used to be re-derived from the world's own rules, and on a
+    // custom map those rules gave the opposite answer, so the egg grew back on her
+    // empty ledge at every reload (see core/goldenPromise). Flag, not a counter:
+    // she can only rise once.
+    bus.on('golden:awakened', () => {
+      if (this.state.stat(GOLDEN_AWAKENED_STAT) === 0) this.bump(GOLDEN_AWAKENED_STAT, 1);
+    });
   }
 
   /** Progress toward one task, clamped to its target. */

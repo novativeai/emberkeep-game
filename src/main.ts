@@ -7,6 +7,8 @@ import { createGameConfig } from './core/GameConfig';
 import { MapEditor } from './editor/mapEditor';
 import { gridToWorld } from './core/iso';
 import { msUntilPhase } from './core/dayCycle';
+import { printSaveAudit, type SaveAudit } from './core/saveAudit';
+import { editorStore } from './editor/editorStore';
 import type { DayPhase } from './core/types';
 
 interface BoardCellText {
@@ -52,6 +54,9 @@ declare global {
       grantXp: (xp: number) => void;
       /** Jump the virtual clock to the next `phase` of the four-phase day. */
       advanceToPhase: (phase: DayPhase) => { now: number; offset: number; phase: DayPhase };
+      /** Save-integrity report: every world's board measured against the ground it
+       *  actually offers. Prints a table and returns the raw findings. */
+      audit: () => SaveAudit;
       reset: () => void;
       saveKey: string;
       game: Phaser.Game;
@@ -239,6 +244,10 @@ window.__emberkeep = {
     const { now, offset } = window.advanceTime(msUntilPhase(ctx.clock.now(), phase));
     return { now, offset, phase: ctx.systems.day.phase };
   },
+  // Save integrity, on demand: every world's board measured against the ground it
+  // actually offers, plus the cross-world facts that no single world can check —
+  // chiefly "the Golden dragon stands in exactly one place". See core/saveAudit.
+  audit: () => printSaveAudit(ctx.state, editorStore.baseHidden),
   // Dev/diagnostic: wipe the save and hard-reload, so a fresh newGame() runs and
   // any change to startingItems/startingDecor (e.g. the L1 dragon) shows again.
   // A loaded save otherwise masks new-game seeding.

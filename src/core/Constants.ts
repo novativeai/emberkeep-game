@@ -295,6 +295,44 @@ export const ITEM_SCALE: Record<string, number> = {
   frostsilk_3: 0.269 * BOREALIS_ART // Loaded Spindle (520px)
 };
 
+/**
+ * Ambient WEATHER, per world. A world absent from here has none, which is every
+ * world but borealis — the isle is warm and the lair is underground.
+ *
+ * It is drawn by UIScene, not the board: UIScene owns a fixed 2560×1600 camera, so
+ * the fall stays vertical and screen-filling whatever the board camera is doing
+ * (zoom, level glide, a drag pushing the view). Weather belongs to the window you
+ * look through, not to the ground.
+ */
+export const WORLD_WEATHER: Record<string, 'snow'> = {
+  borealis: 'snow'
+};
+
+/**
+ * Borealis' snowfall. `flakes` is how many are alive at once — the emitter derives
+ * its own frequency from it and the lifespan, so this is the ONE number to move for
+ * "more snow" / "less snow", and the only one that costs anything.
+ *
+ * Sizes span 0.3 → 1.05 on purpose: the small, slow, faint ones read as distance and
+ * do most of the work, while a handful of big ones crossing the frame sell the
+ * parallax. Everything falls with a constant lateral wind, so the whole field drifts
+ * as one weather rather than as independent dots.
+ */
+export const SNOWFALL = {
+  flakes: 110,
+  /** Phones get a third of it — same look, a third of the overdraw. */
+  mobileFactor: 0.35,
+  speedY: { min: 90, max: 230 },
+  /** The wind. Negative = leftward, matching the isle's light coming upper-left. */
+  speedX: { min: -70, max: -18 },
+  scale: { min: 0.3, max: 1.05 },
+  alpha: { min: 0.32, max: 0.85 },
+  /** Long enough for the slowest flake to cross 1600px and leave the frame. */
+  lifespanMs: { min: 7000, max: 15000 },
+  /** A cold blue-white — pure white reads as UI, not as weather. */
+  tint: 0xeaf6ff
+} as const;
+
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
 export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
   coin: { coins: 5 }, // Gold Coin — the House drops one each cycle
