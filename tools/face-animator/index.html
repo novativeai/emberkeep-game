@@ -708,8 +708,8 @@ function goStep(n) {
 function loadDefault() {
   const img = new Image(); img.crossOrigin='anonymous';
   img.onload  = ()=> setBaseImage(img,'guide-character-bubble-icon.png');
-  img.onerror = ()=> alert('Default sprite not found at ../../assets/sprites/eleanor/portrait.png\nPlease upload manually.');
-  img.src = '../../assets/sprites/eleanor/portrait.png';
+  img.onerror = ()=> alert('Default sprite not found at ../../assets/sprites/eleanor/portrait.webp\nPlease upload manually.');
+  img.src = '../../assets/sprites/eleanor/portrait.webp';
 }
 function loadSpriteFile(input) {
   const f=input.files[0]; if(!f) return;

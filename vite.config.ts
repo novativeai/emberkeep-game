@@ -755,22 +755,22 @@ const copyRuntimeArt = (): Plugin => ({
       'sprites/background/emberkeep.jpg', //  background_emberkeep points at emberkeep-nb2.webp
       'sprites/background/hatchery.webp', //  worlds.json-only; not a zone, so nothing can load it
       'sprites/background/runevault.webp', // ditto
-      'sprites/environment/full-water-bg.png',
+      'sprites/environment/full-water-bg',
       'sprites/environment/level-blocker', //  superseded by sprites/environment/blockers/
-      'sprites/environment/blockers/cloud/cloud-cropped.png', // cloud_tile is the shipped one
+      'sprites/environment/blockers/cloud/cloud-cropped', // cloud_tile is the shipped one
       'sprites/environment/map/grass-tiles', // tile pack: no cell in any world places one
       'sprites/bg-tile',
       'sprites/level1',
       'sprites/rewards',
-      'sprites/merge/rubis-transparent_002.png',
-      'sprites/merge/rubis-transparent_004.png',
-      'sprites/ui/icon_store.png', //  the shipped Store icon is the .webp
-      'sprites/items/black-egg.png',
-      'sprites/items/emerald-egg.png',
-      'sprites/items/key.png', //  icon_key_bronze / ui_icon_key use key-icon.png
-      'sprites/items/stone.png',
-      'sprites/characters/dragon/golden-dragon/golden-egg.png', // items/golden-egg.webp ships
-      'sprites/characters/dragon/golden-dragon/golden-egg-sunset.png',
+      'sprites/merge/rubis-transparent_002',
+      'sprites/merge/rubis-transparent_004',
+      'sprites/ui/icon_store', //  the shipped Store icon is the one in sprites/ui/store/
+      'sprites/items/black-egg',
+      'sprites/items/emerald-egg',
+      'sprites/items/key', //  icon_key_bronze / ui_icon_key use key-icon
+      'sprites/items/stone',
+      'sprites/characters/dragon/golden-dragon/golden-egg', // items/golden-egg.webp ships
+      'sprites/characters/dragon/golden-dragon/golden-egg-sunset',
       'map', //  World Builder project files — the game reads src/data/map.json
       'atlases' //  empty scaffold
     ];
@@ -796,18 +796,20 @@ const copyRuntimeArt = (): Plugin => ({
      */
     const SOURCE_ONLY_PATTERNS: RegExp[] = [
       /\.rigproject\.json$/,
-      /^sprites\/characters\/dragon\/[^/]+\/rig[^/]*\/.+\.(png|jpg)$/,
-      /^sprites\/characters\/dragon\/[^/]+\/sprite[^/]*\/.+\.(png|jpg)$/,
+      /^sprites\/characters\/dragon\/[^/]+\/rig[^/]*\/.+\.(png|jpg|webp)$/,
+      // …and the same for the sprite folders, EXCEPT the baked board art
+      // (`*-baked.webp`), which is what assets.json names for a skin.
+      /^sprites\/characters\/dragon\/[^/]+\/sprite[^/]*\/(?!.*-baked\.webp$).+\.(png|jpg|webp)$/,
       /^sprites\/(eleanor|selyna)\/(talk_|blink\/|eyelids\/|expressions\/|visemes\/)/,
-      /^sprites\/(eleanor|selyna)\/(rest|portrait|disc-atlas)\.png$/,
-      /^sprites\/(eleanor|selyna)-merge\/portrait\.png$/,
+      /^sprites\/(eleanor|selyna)\/(rest|portrait|disc-atlas)\.(png|webp)$/,
+      /^sprites\/(eleanor|selyna)-merge\/portrait\.(png|webp)$/,
       /^sprites\/(eleanor|selyna)\/(world-standee|visemes)\.(webp|json)$/, // pre-bake stills
       /^sprites\/items\/wood\.(png|webp)$/, //  superseded by the lumber chain icons
       /(^|\/)(frames|catalog|manifest)\.json$/,
-      /(^|\/)preview\.png$/,
+      /(^|\/)preview\.(png|webp)$/,
       /(^|\/)README[^/]*\.(txt|md)$/,
       /(^|\/)\.DS_Store$/,
-      /-raw\.png$/ //  trailer/legend generation masters beside their sized copies
+      /-raw\.(png|webp)$/ //  trailer/legend generation masters beside their sized copies
     ];
     /**
      * A speaker with a DISC ATLAS ships the atlas, not the frames it was baked
@@ -888,7 +890,13 @@ const copyRuntimeArt = (): Plugin => ({
       const rel = path.relative(publicDir, from).split(path.sep).join('/');
       if (!rel) return true; // the publicDir itself
       const isDir = statSync(from).isDirectory();
-      if (SOURCE_ONLY.some((s) => rel === s || rel.startsWith(`${s}/`))) return false;
+      // An entry matches a path, a directory prefix, or a path with its
+      // extension taken off — so naming a file names the ART, not the container
+      // it happens to be in today. `optimize-art.py --project` re-encodes a PNG
+      // master to WebP and deletes the PNG; an extension-pinned rule would have
+      // silently stopped matching and let the file back into the deploy.
+      const stem = rel.replace(/\.[A-Za-z0-9]+$/, '');
+      if (SOURCE_ONLY.some((s) => rel === s || stem === s || rel.startsWith(`${s}/`))) return false;
       if (!isDir && SOURCE_ONLY_PATTERNS.some((re) => re.test(rel))) return false;
       if (!isDir && rel.endsWith('.rig.json') && !rigKeep.has(rel)) return false;
       if (!isDir && bakedIntoAtlas(rel)) return false;

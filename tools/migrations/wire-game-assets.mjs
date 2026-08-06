@@ -22,22 +22,22 @@ assets = assets.replace(
       "key": "grass_16",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-16.png"
+      "file": "sprites/environment/map/border-grass/border-grass-16.webp"
     },
 `,
   ''
 );
 assets = assets.replace(
-  `      "file": "sprites/environment/blockers/cloud/cloud-tile.png"
+  `      "file": "sprites/environment/blockers/cloud/cloud-tile.webp"
     }
   ]`,
-  `      "file": "sprites/environment/blockers/cloud/cloud-tile.png"
+  `      "file": "sprites/environment/blockers/cloud/cloud-tile.webp"
     },
     {
       "key": "bg_water",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/bg-tile/water-tile.png"
+      "file": "sprites/bg-tile/water-tile.webp"
     }
   ]`
 );

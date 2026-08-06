@@ -13,7 +13,7 @@ await page.evaluate(async () => {
   S.showGrid = true;
   setCategory('background');
   const img = new Image();
-  await new Promise((res) => { img.onload = res; img.onerror = res; img.src = '/assets/sprites/bg-tile/water-tile.png'; });
+  await new Promise((res) => { img.onload = res; img.onerror = res; img.src = '/assets/sprites/bg-tile/water-tile.webp'; });
   const id = makeAsset(img, 'water-tile.png', 'background');
   S.assets[id].anchorY = 0.25;     // sit the diamond top on the cell for the comparison
   S.selectedAssetId = id;

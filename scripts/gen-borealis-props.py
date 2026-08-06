@@ -136,13 +136,13 @@ ITEM_STYLE = (
 
 # key -> (original file, target WxH, subject line)
 ITEMS = {
-    'strawberry_1': ('assets/sprites/level1/item_strawberry_1.png', '240x240',
+    'strawberry_1': ('assets/sprites/level1/item_strawberry_1.webp', '240x240',
                      'A tiny frostberry sprout: two small frosted leaves on a '
                      'pale stem, carrying two glowing pale-cyan berries.'),
-    'strawberry_2': ('assets/sprites/level1/item_strawberry_2.png', '240x240',
+    'strawberry_2': ('assets/sprites/level1/item_strawberry_2.webp', '240x240',
                      'A low snow-dusted berry bush studded with glowing '
                      'ice-blue berries.'),
-    'strawberry_3': ('assets/sprites/level1/item_strawberry_3.png', '240x240',
+    'strawberry_3': ('assets/sprites/level1/item_strawberry_3.webp', '240x240',
                      'A full snow-laden berry bush heavy with glowing '
                      'pale-cyan frostberries.'),
     'ember_dragon_1': ('assets/sprites/merge/rubis-transparent_001.webp', '474x382',
@@ -158,15 +158,15 @@ ITEMS = {
                     'A brilliant-cut gem of clear ice, pale blue-white with '
                     'aurora-teal refractions in its facets and a hard white '
                     'sparkle at one corner.'),
-    'lumber_1': ('assets/sprites/items/wood.png', '273x240',
+    'lumber_1': ('assets/sprites/items/wood.webp', '273x240',
                  'A cut log lying on its side, its bark rimed with frost, a '
                  'cap of snow along its upper length and pale ice glazing the '
                  'circular cut face with its growth rings.'),
-    'lumber_2': ('assets/sprites/items/house.png', '361x380',
+    'lumber_2': ('assets/sprites/items/house.webp', '361x380',
                  'A cosy cottage with a steep snow-laden roof, dark timber '
                  'framing, pale glacial stone walls and warm golden lamplight '
                  'in its arched windows; icicles along the eaves.'),
-    'lumber_3': ('assets/sprites/items/manor.png', '430x450',
+    'lumber_3': ('assets/sprites/items/manor.webp', '430x450',
                  'A larger two-storey manor under deep snow: steep snow-heavy '
                  'roofs, timber framing, pale glacial stone, warm golden light '
                  'in every window, icicles along the eaves.'),
@@ -177,11 +177,11 @@ ITEMS = {
     'crystal_1': ('assets/sprites/items/crystal.webp', '803x902',
                   'A rocky outcrop crowned with a cluster of faceted pale-cyan '
                   'ice crystals with glowing cores, snow packed over the rock.'),
-    'coin_1': ('assets/sprites/items/coin.png', '432x357',
+    'coin_1': ('assets/sprites/items/coin.webp', '432x357',
                'A thick gold coin seen at a slight angle, its raised rim and '
                'face stamp catching a cool blue rim light, a delicate rime of '
                'frost creeping around its edge. The gold stays gold.'),
-    'coin_2': ('assets/sprites/items/coin_pouch.png', '460x540',
+    'coin_2': ('assets/sprites/items/coin_pouch.webp', '460x540',
                'A drawstring pouch spilling gold coins from its mouth, the '
                'leather frost-dusted and stiff with cold, the gold still warm '
                'against the blue light.'),
