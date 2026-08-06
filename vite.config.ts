@@ -838,7 +838,9 @@ const copyRuntimeArt = (): Plugin => ({
       throw new Error('[copy-runtime-art] could not read ANIMATED_SPEAKERS — did PortraitAnimator move?');
     const bakedIntoAtlas = (rel: string): boolean =>
       atlasSpeakers.some((who) => rel.startsWith(`sprites/${who}-merge/`)) &&
-      !rel.endsWith('/disc-atlas.png');
+      // The atlas itself is the one file the folder exists to ship — as WebP
+      // (lossless, 58% smaller) with the PNG master beside it for the baker.
+      !/\/disc-atlas\.(png|webp)$/.test(rel);
 
     // Rigs: keep ONLY the ones a scene can actually ask for. Each rig json
     // carries its own layer art as data URIs, so an unreferenced one is ~1.2 MB
@@ -937,6 +939,27 @@ const copyRuntimeArt = (): Plugin => ({
         return keep;
       }
     });
+    // Ship data JSON minified. parse→stringify is structurally lossless, and the
+    // sources stay pretty on disk (the rig editor and git diffs read them). The
+    // saving is honest but small — the rig JSONs' bulk is base64 layer art, not
+    // whitespace. In DIST only, after the copy, so nothing upstream ever sees a
+    // minified file.
+    let jsonSaved = 0;
+    for (const entry of readdirSync(dist, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+      const file = path.join(entry.parentPath, entry.name);
+      try {
+        const raw = readFileSync(file, 'utf8');
+        const min = JSON.stringify(JSON.parse(raw));
+        if (min.length < raw.length) {
+          writeFileSync(file, min);
+          jsonSaved += raw.length - min.length;
+        }
+      } catch {
+        // Not JSON after all (or unreadable) — ship it untouched.
+      }
+    }
+    console.log(`[copy-runtime-art] minified shipped JSON: ${(jsonSaved / 1048576).toFixed(1)}MB saved`);
 
     const missing = [...bankKeep].filter((k) => !existsSync(path.join(dist, 'vfx-bank', k)));
     if (missing.length) {

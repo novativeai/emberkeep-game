@@ -17,7 +17,9 @@ actually smaller, is left alone.
 WHAT IT DOES NOT TOUCH, on purpose:
   · `vfx-bank/**` — those sheets are DATA (channel-packed frames + motion
     vectors read by a shader), not pictures. They stay byte-identical.
-  · `disc-atlas.png` — measured at ~1% for a 4.5 MB file; the churn is not worth it.
+  · `disc-atlas.png` — the masters keep a hand-converted lossless .webp sibling
+    (58% smaller — the old '~1%' note here was mismeasured); the build ships the
+    sibling and the baker regenerates both.
   · `raw/**` — the generation workspace never ships (vite.config.ts).
 
 THE PAIRING RULE THIS RIDES ON: the build already drops a `sprites/**.png` when
@@ -45,7 +47,7 @@ PROJECT = "--project" in sys.argv
 
 SKIP = (
     re.compile(r"^vfx-bank/"),          # shader data, not pictures
-    re.compile(r"disc-atlas\.png$"),    # ~1% for 4.5 MB, and PreloadScene names the .png
+    re.compile(r"disc-atlas\.png$"),    # its lossless .webp sibling is authored beside it
     re.compile(r"^raw/"),               # generation workspace: never ships, never tracked
 )
 

@@ -83,7 +83,7 @@ for (const [who, face] of Object.entries(readJson('src/data/faces.json'))) {
 //    `-merge` suffix: the un-suffixed `sprites/<who>/` folder is the bake INPUT.
 const speakers = read('src/entities/PortraitAnimator.ts').match(/ANIMATED_SPEAKERS\s*=\s*\[([^\]]*)\]/)?.[1] ?? '';
 for (const [, who] of speakers.matchAll(/'([^']+)'/g)) {
-  ref(`sprites/${who}-merge/disc-atlas.png`, 'PreloadScene:disc');
+  ref(`sprites/${who}-merge/disc-atlas.webp`, 'PreloadScene:disc');
 }
 
 // 6. World standees — PreloadScene, `sprites/${id}/world-${bank}.webp` for every

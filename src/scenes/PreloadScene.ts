@@ -110,7 +110,7 @@ export class PreloadScene extends Phaser.Scene {
     // Phaser derives the frame count from the image size, so a bigger atlas
     // needs no change here (scripts/bake-portrait-disc.py sizes the grid).
     for (const who of ANIMATED_SPEAKERS) {
-      this.load.spritesheet(discTextureFor(who), `sprites/${who}-merge/disc-atlas.png`, {
+      this.load.spritesheet(discTextureFor(who), `sprites/${who}-merge/disc-atlas.webp`, {
         frameWidth: 270,
         frameHeight: 360
       });

@@ -134,6 +134,10 @@ def bake(name: str) -> None:
 
     out = os.path.join(base, 'disc-atlas.png')
     atlas.save(out)
+    # The SHIPPED file. The build serves the lossless-WebP sibling (58% smaller,
+    # pixel-identical) and drops the PNG master from dist — so a rebake that
+    # left the sibling stale would keep serving yesterday's faces.
+    atlas.save(os.path.join(base, 'disc-atlas.webp'), 'WEBP', lossless=True, quality=100, method=6)
     spans, at = [], 2
     for folder, count in cfg['banks']:
         spans.append(f'{at}..{at + count - 1} {folder}')
