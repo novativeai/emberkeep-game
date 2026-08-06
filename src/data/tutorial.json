@@ -1387,11 +1387,7 @@
         "event": "generator:produce_set"
       },
       "arrow": {
-        "tile": {
-          "chain": "lumber",
-          "nth": 0,
-          "tier": 3
-        }
+        "ui": "commission"
       },
       "highlight": [
         {

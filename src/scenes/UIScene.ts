@@ -1314,7 +1314,7 @@ export class UIScene extends Phaser.Scene {
 
   private uiTarget(
     ref:
-      | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' }
+      | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
       | { fogRegion: string }
       | { character: string }
   ): { x: number; y: number; height?: number } | null {
@@ -1356,6 +1356,16 @@ export class UIScene extends Phaser.Scene {
       // the satchel button until the bag is open, then the Give plate inside the
       // chosen slot's chooser.
       if (ref.ui === 'bag_give') return this.bag.getGivePos() ?? this.hud.getBagPos();
+      if (ref.ui === 'commission') {
+        // Panel up → the piece to pick, then its confirm. Panel shut → the
+        // House itself, found live so the arrow survives the House moving.
+        const inPanel = this.commission.getMarkerPos();
+        if (inPanel) return inPanel;
+        const house = [...this.ctx.state.items.values()].find(
+          (i) => i.kind === 'item' && i.chain === 'lumber' && i.tier === 3
+        );
+        return house ? this.cellToScreen(house.col, house.row) : null;
+      }
       return this.ledger.isOpen ? this.ledger.getDeliverPos() : null;
     }
     const region = this.ctx.state.map.regions.find((r) => r.id === ref.fogRegion);

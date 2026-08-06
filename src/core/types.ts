@@ -782,12 +782,12 @@ export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: 
 
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string };
 
 export type TutorialArrowConfig =
   | { tile: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string }
   /** A world character by id. NEVER point at one with a literal `tile` — where
    *  she stands is authored in the World Builder (`characters.json` anchor +
@@ -1350,12 +1350,12 @@ export interface EventMap {
 
 export type ResolvedHand =
   | { from: TilePos; to: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string };
 
 export type ResolvedArrow =
   | { tile: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string }
   /** Stays an id through the payload, exactly like `ui`: the UI re-reads her
    *  position every frame, so she can move (World Builder, or a future walk)

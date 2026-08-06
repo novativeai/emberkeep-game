@@ -185,6 +185,24 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     return this.forItemId;
   }
 
+  /**
+   * Where the commission lesson's arrow should point once THIS PANEL is up.
+   *
+   * The step's own target is the House — right until the chooser covers it,
+   * at which point an arrow still aimed at the board points at the panel's
+   * dead middle and reads as "tap nothing". Same walk-them-through shape as
+   * the satchel: the piece to pick first (slots are index-for-index with
+   * `state.bag`), then the confirm popover once one is chosen. Null while
+   * shut, so the caller falls back to the House.
+   */
+  getMarkerPos(): { x: number; y: number } | null {
+    if (!this.isOpen) return null;
+    const target = this.chooser ?? (this.gameState.bag.length ? this.slots[0] : null);
+    if (!target) return null;
+    const m = target.getWorldTransformMatrix();
+    return { x: m.tx, y: m.ty };
+  }
+
   openFor(itemId: number): void {
     this.forItemId = itemId;
     this.isOpen = true;

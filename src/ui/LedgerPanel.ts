@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
 import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import { discTextureFor } from '../entities/PortraitAnimator';
 import type { GameState } from '../core/GameState';
 import type { OrderConfig } from '../core/types';
 import type { OrderSystem } from '../systems/OrderSystem';
@@ -385,7 +386,14 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     back.fillStyle(MOSS_LIGHT, 1);
     back.fillCircle(0, MEDALLION_Y - RING_HOLE_R * 0.085, RING_HOLE_R * 0.915);
 
-    const portrait = scene.add.image(0, MEDALLION_Y, 'portrait_eleanor');
+    // Her face comes from the DISC ATLAS the bubble already animates — frame 0
+    // is the rest bust. 'portrait_eleanor' died when the cast art moved to the
+    // atlases: nothing loads that key any more, so the medallion was showing
+    // Phaser's missing-texture mark in a gold ring.
+    const discKey = discTextureFor('eleanor');
+    const portrait = scene.textures.exists(discKey)
+      ? scene.add.image(0, MEDALLION_Y, discKey, 0)
+      : scene.add.image(0, MEDALLION_Y, 'portrait_ring'); // never the green mark
     const window = RING_MASK_R * 2;
     if (portrait.height > portrait.width * 1.15) {
       // Bust art: size by HEIGHT and hang it from the window's top, so the
