@@ -1,1 +1,2107 @@
-{"format": "emberkeep-world-project", "version": 1, "world": "dragon-land", "tile": {"width": 420, "height": 242, "skew": 0, "angle": 29.95}, "bounds": {"minCol": -6, "maxCol": 6, "minRow": -4, "maxRow": 7}, "backgroundBounds": {"minCol": 0, "maxCol": 0, "minRow": 0, "maxRow": 0}, "assets": [{"id": 1, "name": "border-grass-1", "category": "tile", "file": "border-grass-1.png", "width": 281, "height": 267, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 2, "name": "border-grass-1", "category": "decotile", "file": "border-grass-1.png", "width": 281, "height": 267, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 3, "name": "border-grass-2", "category": "tile", "file": "border-grass-2.png", "width": 281, "height": 274, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 4, "name": "border-grass-2", "category": "decotile", "file": "border-grass-2.png", "width": 281, "height": 274, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 5, "name": "border-grass-3", "category": "tile", "file": "border-grass-3.png", "width": 281, "height": 283, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 6, "name": "border-grass-3", "category": "decotile", "file": "border-grass-3.png", "width": 281, "height": 283, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 7, "name": "border-grass-5", "category": "tile", "file": "border-grass-5.png", "width": 281, "height": 280, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 8, "name": "border-grass-5", "category": "decotile", "file": "border-grass-5.png", "width": 281, "height": 280, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 9, "name": "border-grass-4", "category": "tile", "file": "border-grass-4.png", "width": 281, "height": 281, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 10, "name": "border-grass-4", "category": "decotile", "file": "border-grass-4.png", "width": 281, "height": 281, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 11, "name": "border-grass-6", "category": "decotile", "file": "border-grass-6.png", "width": 281, "height": 275, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 12, "name": "border-grass-6", "category": "tile", "file": "border-grass-6.png", "width": 281, "height": 275, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 13, "name": "border-grass-7", "category": "decotile", "file": "border-grass-7.png", "width": 281, "height": 267, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 14, "name": "border-grass-7", "category": "tile", "file": "border-grass-7.png", "width": 281, "height": 267, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 15, "name": "border-grass-8", "category": "tile", "file": "border-grass-8.png", "width": 281, "height": 276, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 16, "name": "border-grass-8", "category": "decotile", "file": "border-grass-8.png", "width": 281, "height": 276, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 17, "name": "border-grass-9", "category": "decotile", "file": "border-grass-9.png", "width": 281, "height": 281, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 18, "name": "border-grass-9", "category": "tile", "file": "border-grass-9.png", "width": 281, "height": 281, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 19, "name": "border-grass-10", "category": "tile", "file": "border-grass-10.png", "width": 281, "height": 284, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 20, "name": "border-grass-10", "category": "decotile", "file": "border-grass-10.png", "width": 281, "height": 284, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 21, "name": "border-grass-11", "category": "decotile", "file": "border-grass-11.png", "width": 281, "height": 278, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 22, "name": "border-grass-11", "category": "tile", "file": "border-grass-11.png", "width": 281, "height": 278, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 23, "name": "border-grass-12", "category": "decotile", "file": "border-grass-12.png", "width": 281, "height": 282, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 24, "name": "border-grass-12", "category": "tile", "file": "border-grass-12.png", "width": 281, "height": 282, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 25, "name": "border-grass-13", "category": "tile", "file": "border-grass-13.png", "width": 281, "height": 273, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 26, "name": "border-grass-13", "category": "decotile", "file": "border-grass-13.png", "width": 281, "height": 273, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 27, "name": "border-grass-14", "category": "decotile", "file": "border-grass-14.png", "width": 281, "height": 285, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 28, "name": "border-grass-14", "category": "tile", "file": "border-grass-14.png", "width": 281, "height": 285, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 29, "name": "border-grass-15", "category": "decotile", "file": "border-grass-15.png", "width": 281, "height": 287, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 30, "name": "border-grass-15", "category": "tile", "file": "border-grass-15.png", "width": 281, "height": 287, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.854, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 31, "name": "border-grass-16", "category": "tile", "file": "border-grass-16.png", "width": 442, "height": 443, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 32, "name": "border-grass-16", "category": "decotile", "file": "border-grass-16.png", "width": 442, "height": 443, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 33, "name": "border-grass-17", "category": "tile", "file": "border-grass-17.png", "width": 438, "height": 438, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 34, "name": "border-grass-17", "category": "decotile", "file": "border-grass-17.png", "width": 438, "height": 438, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 35, "name": "border-grass-18", "category": "tile", "file": "border-grass-18.png", "width": 445, "height": 440, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 36, "name": "border-grass-18", "category": "decotile", "file": "border-grass-18.png", "width": 445, "height": 440, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 37, "name": "border-grass-19", "category": "decotile", "file": "border-grass-19.png", "width": 442, "height": 435, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 38, "name": "border-grass-19", "category": "tile", "file": "border-grass-19.png", "width": 442, "height": 435, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 39, "name": "border-grass-20", "category": "tile", "file": "border-grass-20.png", "width": 440, "height": 435, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 40, "name": "border-grass-20", "category": "decotile", "file": "border-grass-20.png", "width": 440, "height": 435, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 41, "name": "border-grass-21", "category": "decotile", "file": "border-grass-21.png", "width": 431, "height": 435, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 42, "name": "border-grass-21", "category": "tile", "file": "border-grass-21.png", "width": 431, "height": 435, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.545, "anchor": {"x": 0.5, "y": 0.34}}}, {"id": 43, "name": "cloud-tile", "category": "blocker", "file": "cloud-tile.png", "width": 256, "height": 174, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 2.35, "anchor": {"x": 0.5, "y": 0.62}}}, {"id": 44, "name": "invisible", "category": "tile", "file": "invisible.png", "width": 220, "height": 170, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 1, "anchor": {"x": 0.5, "y": 0.5}}, "invisible": true}, {"id": 45, "name": "Emerald Crystal", "category": "3d", "file": "emerald-crystal", "width": 560, "height": 560, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 0.5, "anchor": {"x": 0.5, "y": 0.72}}, "is3d": true, "model3d": {"shape": "emerald", "color": "#2ad673", "material": "toon-cel", "outline": "#07331b", "spinDegPerSec": 50, "camera": "iso-top", "steps": 4}}, {"id": 47, "name": "emberkeep", "category": "background", "file": "emberkeep.png", "width": 5220, "height": 3264, "calibration": {"offsetX": 0, "offsetY": 0, "scale": 1, "anchor": {"x": 0.5, "y": 0.5}}}], "placements": [{"asset": "cloud-tile", "category": "blocker", "col": -6, "row": -4, "z": 16, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -6, "row": -4, "z": 67, "level": 4}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": -3, "z": 10, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": -3, "z": 60, "level": 4}, {"asset": "invisible", "category": "tile", "col": -5, "row": -2, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": -2, "z": 3, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": -2, "z": 61, "level": 4}, {"asset": "invisible", "category": "tile", "col": -4, "row": -2, "z": 0}, {"asset": "invisible", "category": "tile", "col": -5, "row": -1, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": -1, "z": 4, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": -2, "z": 5, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": -2, "z": 17, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": -2, "z": 59, "level": 4}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": -1, "z": 62, "level": 4}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": -1, "z": 63, "level": 4}, {"asset": "invisible", "category": "tile", "col": -2, "row": -3, "z": 0}, {"asset": "invisible", "category": "tile", "col": -3, "row": -2, "z": 0}, {"asset": "invisible", "category": "tile", "col": -4, "row": -1, "z": 0}, {"asset": "invisible", "category": "tile", "col": -5, "row": 0, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": 0, "z": 2, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": -1, "z": 6, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -3, "row": -2, "z": 14, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": -1, "z": 18, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -3, "row": -2, "z": 53, "level": 4}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": -1, "z": 58, "level": 4}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": 0, "z": 64, "level": 4}, {"asset": "invisible", "category": "tile", "col": -1, "row": -3, "z": 0}, {"asset": "invisible", "category": "tile", "col": -2, "row": -2, "z": 0}, {"asset": "invisible", "category": "tile", "col": -3, "row": -1, "z": 0}, {"asset": "invisible", "category": "tile", "col": -4, "row": 0, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": 1, "z": 1, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": 0, "z": 7, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -3, "row": -1, "z": 13, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": 0, "z": 19, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": -2, "z": 30, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": -3, "z": 36, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": -3, "z": 47, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": -2, "z": 52, "level": 3}, {"asset": "cloud-tile", "category": "blocker", "col": -3, "row": -1, "z": 54, "level": 4}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": 0, "z": 57, "level": 4}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": 1, "z": 65, "level": 4}, {"asset": "invisible", "category": "tile", "col": -1, "row": -2, "z": 0}, {"asset": "invisible", "category": "tile", "col": -2, "row": -1, "z": 0}, {"asset": "invisible", "category": "tile", "col": -3, "row": 0, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": 1, "z": 8, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": 2, "z": 11, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -3, "row": 0, "z": 12, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": 1, "z": 20, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": -1, "z": 25, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": -1, "z": 29, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": -2, "z": 37, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": -2, "z": 46, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": -1, "z": 51, "level": 3}, {"asset": "cloud-tile", "category": "blocker", "col": -3, "row": 0, "z": 55, "level": 4}, {"asset": "cloud-tile", "category": "blocker", "col": -4, "row": 1, "z": 56, "level": 4}, {"asset": "cloud-tile", "category": "blocker", "col": -5, "row": 2, "z": 66, "level": 4}, {"asset": "invisible", "category": "tile", "col": 0, "row": -2, "z": 0}, {"asset": "invisible", "category": "tile", "col": -2, "row": 0, "z": 0}, {"asset": "invisible", "category": "tile", "col": -1, "row": -1, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 0, "z": 24, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 0, "z": 28, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": 0, "row": -2, "z": 35, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": -1, "z": 38, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": -1, "z": 45, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 0, "z": 50, "level": 3}, {"asset": "invisible", "category": "tile", "col": 1, "row": -2, "z": 0}, {"asset": "invisible", "category": "tile", "col": -2, "row": 1, "z": 0}, {"asset": "invisible", "category": "tile", "col": 0, "row": -1, "z": 0}, {"asset": "invisible", "category": "tile", "col": -1, "row": 0, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 1, "z": 23, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 1, "z": 27, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": 0, "row": -1, "z": 34, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": 0, "z": 39, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": 0, "z": 42, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 1, "z": 49, "level": 3}, {"asset": "emberkeep", "category": "background", "col": 0, "row": 0, "z": 0, "dx": 80, "dy": -163}, {"asset": "invisible", "category": "tile", "col": 1, "row": -1, "z": 0}, {"asset": "invisible", "category": "tile", "col": -2, "row": 2, "z": 0}, {"asset": "invisible", "category": "tile", "col": 0, "row": 0, "z": 0}, {"asset": "invisible", "category": "tile", "col": -1, "row": 1, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 2, "z": 22, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 2, "z": 26, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": 0, "row": 0, "z": 33, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": 1, "z": 40, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": 1, "z": 43, "level": 2}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 2, "z": 48, "level": 3}, {"asset": "invisible", "category": "tile", "col": 2, "row": -1, "z": 0}, {"asset": "invisible", "category": "tile", "col": -1, "row": 2, "z": 0}, {"asset": "invisible", "category": "tile", "col": 1, "row": 0, "z": 0}, {"asset": "invisible", "category": "tile", "col": 0, "row": 1, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": 0, "row": 1, "z": 32, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": 2, "z": 41, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -1, "row": 2, "z": 44, "level": 2}, {"asset": "invisible", "category": "tile", "col": 2, "row": 0, "z": 0}, {"asset": "invisible", "category": "tile", "col": 1, "row": 1, "z": 0}, {"asset": "invisible", "category": "tile", "col": 0, "row": 2, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": 0, "row": 2, "z": 31, "level": 1}, {"asset": "invisible", "category": "tile", "col": 3, "row": 0, "z": 0}, {"asset": "invisible", "category": "tile", "col": 0, "row": 3, "z": 0}, {"asset": "invisible", "category": "tile", "col": 1, "row": 2, "z": 0}, {"asset": "invisible", "category": "tile", "col": 2, "row": 1, "z": 0}, {"asset": "invisible", "category": "tile", "col": 1, "row": 3, "z": 0}, {"asset": "invisible", "category": "tile", "col": 2, "row": 2, "z": 0}, {"asset": "invisible", "category": "tile", "col": 3, "row": 1, "z": 0}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 6, "z": 15, "level": 1}, {"asset": "cloud-tile", "category": "blocker", "col": -2, "row": 6, "z": 68, "level": 5}, {"asset": "invisible", "category": "tile", "col": 2, "row": 3, "z": 0}, {"asset": "invisible", "category": "tile", "col": 3, "row": 2, "z": 0}, {"asset": "invisible", "category": "tile", "col": 3, "row": 3, "z": 0}, {"asset": "invisible", "category": "tile", "col": 5, "row": 3, "z": 0}, {"asset": "invisible", "category": "tile", "col": 6, "row": 3, "z": 0}, {"asset": "invisible", "category": "tile", "col": 5, "row": 4, "z": 0}, {"asset": "Emerald Crystal", "category": "3d", "col": 2, "row": 7, "z": 69, "dx": -64, "dy": -28}, {"asset": "invisible", "category": "tile", "col": 6, "row": 4, "z": 0}], "levels": {"1": {"count": 31, "cells": [{"col": -5, "row": 1}, {"col": -5, "row": 0}, {"col": -5, "row": -2}, {"col": -5, "row": -1}, {"col": -4, "row": -2}, {"col": -4, "row": -1}, {"col": -4, "row": 0}, {"col": -4, "row": 1}, {"col": -5, "row": -3}, {"col": -5, "row": 2}, {"col": -3, "row": 0}, {"col": -3, "row": -1}, {"col": -3, "row": -2}, {"col": -2, "row": 6}, {"col": -6, "row": -4}, {"col": -2, "row": 2}, {"col": -2, "row": 1}, {"col": -2, "row": 0}, {"col": -2, "row": -1}, {"col": -2, "row": -2}, {"col": 0, "row": 2}, {"col": 0, "row": 1}, {"col": 0, "row": 0}, {"col": 0, "row": -1}, {"col": 0, "row": -2}, {"col": -1, "row": -3}, {"col": -1, "row": -2}, {"col": -1, "row": -1}, {"col": -1, "row": 0}, {"col": -1, "row": 1}, {"col": -1, "row": 2}]}, "2": {"count": 14, "cells": [{"col": -4, "row": -2}, {"col": -4, "row": -1}, {"col": -4, "row": 0}, {"col": -4, "row": 1}, {"col": -2, "row": 2}, {"col": -2, "row": 1}, {"col": -2, "row": 0}, {"col": -2, "row": -1}, {"col": -1, "row": 0}, {"col": -1, "row": 1}, {"col": -1, "row": 2}, {"col": -1, "row": -1}, {"col": -1, "row": -2}, {"col": -1, "row": -3}]}, "3": {"count": 5, "cells": [{"col": -2, "row": 2}, {"col": -2, "row": 1}, {"col": -2, "row": 0}, {"col": -2, "row": -1}, {"col": -2, "row": -2}]}, "4": {"count": 15, "cells": [{"col": -3, "row": -2}, {"col": -3, "row": -1}, {"col": -3, "row": 0}, {"col": -4, "row": 1}, {"col": -4, "row": 0}, {"col": -4, "row": -1}, {"col": -4, "row": -2}, {"col": -5, "row": -3}, {"col": -5, "row": -2}, {"col": -5, "row": -1}, {"col": -5, "row": 0}, {"col": -5, "row": 1}, {"col": -5, "row": 2}, {"col": -6, "row": -4}]}, "5": {"count": 1, "cells": [{"col": -2, "row": 6}]}}, "cameraKeyframes": [], "mergeAssets": [{"key": "sparkweed_1", "label": "Spark Weed", "chain": "sparkweed", "tier": 1, "custom": false, "file": null, "image": null}, {"key": "sparkweed_2", "label": "Ember Bloom", "chain": "sparkweed", "tier": 2, "custom": false, "file": null, "image": null}, {"key": "sparkweed_3", "label": "Flame Lily", "chain": "sparkweed", "tier": 3, "custom": false, "file": null, "image": null}, {"key": "ember_dragon_1", "label": "Speckled Egg", "chain": "ember_dragon", "tier": 1, "custom": false, "file": null, "image": null}, {"key": "ember_dragon_2", "label": "Ember Hatchling", "chain": "ember_dragon", "tier": 2, "custom": false, "file": null, "image": null}, {"key": "ember_dragon_3", "label": "Ember Whelp", "chain": "ember_dragon", "tier": 3, "custom": false, "file": null, "image": null}, {"key": "flame_gem_1", "label": "Gem Shard", "chain": "flame_gem", "tier": 1, "custom": false, "file": null, "image": null}, {"key": "flame_gem_2", "label": "Flame Gem", "chain": "flame_gem", "tier": 2, "custom": false, "file": null, "image": null}, {"key": "flame_gem_3", "label": "Radiant Gem", "chain": "flame_gem", "tier": 3, "custom": false, "file": null, "image": null}, {"key": "decor_nest", "label": "Dragon Nest", "chain": "nest", "tier": 1, "custom": false, "file": null, "image": null}, {"key": "decor_brazier", "label": "Brazier", "chain": "brazier", "tier": 1, "custom": false, "file": null, "image": null}], "cameraZoom": {"min": 0.2, "max": 1.4}, "images": {"border-grass-1.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_001.png", "border-grass-2.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_002.png", "border-grass-3.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_003.png", "border-grass-5.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_005.png", "border-grass-4.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_004.png", "border-grass-6.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_006.png", "border-grass-7.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_007.png", "border-grass-8.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_008.png", "border-grass-9.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_009.png", "border-grass-10.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_010.png", "border-grass-11.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_011.png", "border-grass-12.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_012.png", "border-grass-13.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_013.png", "border-grass-14.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_014.png", "border-grass-15.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_015.png", "border-grass-16.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_016.png", "border-grass-17.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_017.png", "border-grass-18.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_018.png", "border-grass-19.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_019.png", "border-grass-20.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_020.png", "border-grass-21.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_021.png", "cloud-tile.png": "http://localhost:8080/assets/sprites/environment/level-blocker/cloud/cloud-tile.png", "invisible.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAAqADAAQAAAABAAAAAgAAAADtGLyqAAAAC0lEQVQIHWNgQAcAABIAAYAUyswAAAAASUVORK5CYII=", "emberkeep.png": "emberkeep.jpg"}}
+{
+  "format": "emberkeep-world-project",
+  "version": 1,
+  "world": "dragon-land",
+  "tile": {
+    "width": 420,
+    "height": 242,
+    "skew": 0,
+    "angle": 29.95
+  },
+  "bounds": {
+    "minCol": -6,
+    "maxCol": 6,
+    "minRow": -4,
+    "maxRow": 7
+  },
+  "backgroundBounds": {
+    "minCol": 0,
+    "maxCol": 0,
+    "minRow": 0,
+    "maxRow": 0
+  },
+  "assets": [
+    {
+      "id": 1,
+      "name": "border-grass-1",
+      "category": "tile",
+      "file": "border-grass-1.png",
+      "width": 281,
+      "height": 267,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 2,
+      "name": "border-grass-1",
+      "category": "decotile",
+      "file": "border-grass-1.png",
+      "width": 281,
+      "height": 267,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 3,
+      "name": "border-grass-2",
+      "category": "tile",
+      "file": "border-grass-2.png",
+      "width": 281,
+      "height": 274,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 4,
+      "name": "border-grass-2",
+      "category": "decotile",
+      "file": "border-grass-2.png",
+      "width": 281,
+      "height": 274,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 5,
+      "name": "border-grass-3",
+      "category": "tile",
+      "file": "border-grass-3.png",
+      "width": 281,
+      "height": 283,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 6,
+      "name": "border-grass-3",
+      "category": "decotile",
+      "file": "border-grass-3.png",
+      "width": 281,
+      "height": 283,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 7,
+      "name": "border-grass-5",
+      "category": "tile",
+      "file": "border-grass-5.png",
+      "width": 281,
+      "height": 280,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 8,
+      "name": "border-grass-5",
+      "category": "decotile",
+      "file": "border-grass-5.png",
+      "width": 281,
+      "height": 280,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 9,
+      "name": "border-grass-4",
+      "category": "tile",
+      "file": "border-grass-4.png",
+      "width": 281,
+      "height": 281,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 10,
+      "name": "border-grass-4",
+      "category": "decotile",
+      "file": "border-grass-4.png",
+      "width": 281,
+      "height": 281,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 11,
+      "name": "border-grass-6",
+      "category": "decotile",
+      "file": "border-grass-6.png",
+      "width": 281,
+      "height": 275,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 12,
+      "name": "border-grass-6",
+      "category": "tile",
+      "file": "border-grass-6.png",
+      "width": 281,
+      "height": 275,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 13,
+      "name": "border-grass-7",
+      "category": "decotile",
+      "file": "border-grass-7.png",
+      "width": 281,
+      "height": 267,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 14,
+      "name": "border-grass-7",
+      "category": "tile",
+      "file": "border-grass-7.png",
+      "width": 281,
+      "height": 267,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 15,
+      "name": "border-grass-8",
+      "category": "tile",
+      "file": "border-grass-8.png",
+      "width": 281,
+      "height": 276,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 16,
+      "name": "border-grass-8",
+      "category": "decotile",
+      "file": "border-grass-8.png",
+      "width": 281,
+      "height": 276,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 17,
+      "name": "border-grass-9",
+      "category": "decotile",
+      "file": "border-grass-9.png",
+      "width": 281,
+      "height": 281,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 18,
+      "name": "border-grass-9",
+      "category": "tile",
+      "file": "border-grass-9.png",
+      "width": 281,
+      "height": 281,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 19,
+      "name": "border-grass-10",
+      "category": "tile",
+      "file": "border-grass-10.png",
+      "width": 281,
+      "height": 284,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 20,
+      "name": "border-grass-10",
+      "category": "decotile",
+      "file": "border-grass-10.png",
+      "width": 281,
+      "height": 284,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 21,
+      "name": "border-grass-11",
+      "category": "decotile",
+      "file": "border-grass-11.png",
+      "width": 281,
+      "height": 278,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 22,
+      "name": "border-grass-11",
+      "category": "tile",
+      "file": "border-grass-11.png",
+      "width": 281,
+      "height": 278,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 23,
+      "name": "border-grass-12",
+      "category": "decotile",
+      "file": "border-grass-12.png",
+      "width": 281,
+      "height": 282,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 24,
+      "name": "border-grass-12",
+      "category": "tile",
+      "file": "border-grass-12.png",
+      "width": 281,
+      "height": 282,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 25,
+      "name": "border-grass-13",
+      "category": "tile",
+      "file": "border-grass-13.png",
+      "width": 281,
+      "height": 273,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 26,
+      "name": "border-grass-13",
+      "category": "decotile",
+      "file": "border-grass-13.png",
+      "width": 281,
+      "height": 273,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 27,
+      "name": "border-grass-14",
+      "category": "decotile",
+      "file": "border-grass-14.png",
+      "width": 281,
+      "height": 285,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 28,
+      "name": "border-grass-14",
+      "category": "tile",
+      "file": "border-grass-14.png",
+      "width": 281,
+      "height": 285,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 29,
+      "name": "border-grass-15",
+      "category": "decotile",
+      "file": "border-grass-15.png",
+      "width": 281,
+      "height": 287,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 30,
+      "name": "border-grass-15",
+      "category": "tile",
+      "file": "border-grass-15.png",
+      "width": 281,
+      "height": 287,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.854,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 31,
+      "name": "border-grass-16",
+      "category": "tile",
+      "file": "border-grass-16.png",
+      "width": 442,
+      "height": 443,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 32,
+      "name": "border-grass-16",
+      "category": "decotile",
+      "file": "border-grass-16.png",
+      "width": 442,
+      "height": 443,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 33,
+      "name": "border-grass-17",
+      "category": "tile",
+      "file": "border-grass-17.png",
+      "width": 438,
+      "height": 438,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 34,
+      "name": "border-grass-17",
+      "category": "decotile",
+      "file": "border-grass-17.png",
+      "width": 438,
+      "height": 438,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 35,
+      "name": "border-grass-18",
+      "category": "tile",
+      "file": "border-grass-18.png",
+      "width": 445,
+      "height": 440,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 36,
+      "name": "border-grass-18",
+      "category": "decotile",
+      "file": "border-grass-18.png",
+      "width": 445,
+      "height": 440,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 37,
+      "name": "border-grass-19",
+      "category": "decotile",
+      "file": "border-grass-19.png",
+      "width": 442,
+      "height": 435,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 38,
+      "name": "border-grass-19",
+      "category": "tile",
+      "file": "border-grass-19.png",
+      "width": 442,
+      "height": 435,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 39,
+      "name": "border-grass-20",
+      "category": "tile",
+      "file": "border-grass-20.png",
+      "width": 440,
+      "height": 435,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 40,
+      "name": "border-grass-20",
+      "category": "decotile",
+      "file": "border-grass-20.png",
+      "width": 440,
+      "height": 435,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 41,
+      "name": "border-grass-21",
+      "category": "decotile",
+      "file": "border-grass-21.png",
+      "width": 431,
+      "height": 435,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 42,
+      "name": "border-grass-21",
+      "category": "tile",
+      "file": "border-grass-21.png",
+      "width": 431,
+      "height": 435,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.545,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.34
+        }
+      }
+    },
+    {
+      "id": 43,
+      "name": "cloud-tile",
+      "category": "blocker",
+      "file": "cloud-tile.png",
+      "width": 256,
+      "height": 174,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 2.35,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.62
+        }
+      }
+    },
+    {
+      "id": 44,
+      "name": "invisible",
+      "category": "tile",
+      "file": "invisible.png",
+      "width": 220,
+      "height": 170,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 1,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "invisible": true
+    },
+    {
+      "id": 45,
+      "name": "Emerald Crystal",
+      "category": "3d",
+      "file": "emerald-crystal",
+      "width": 560,
+      "height": 560,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 0.5,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.72
+        }
+      },
+      "is3d": true,
+      "model3d": {
+        "shape": "emerald",
+        "color": "#2ad673",
+        "material": "toon-cel",
+        "outline": "#07331b",
+        "spinDegPerSec": 50,
+        "camera": "iso-top",
+        "steps": 4
+      }
+    },
+    {
+      "id": 47,
+      "name": "emberkeep",
+      "category": "background",
+      "file": "emberkeep-nb2.webp",
+      "width": 2610,
+      "height": 1632,
+      "calibration": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "scale": 2,
+        "anchor": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      }
+    }
+  ],
+  "placements": [
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -6,
+      "row": -4,
+      "z": 16,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -6,
+      "row": -4,
+      "z": 67,
+      "level": 4
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": -3,
+      "z": 10,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": -3,
+      "z": 60,
+      "level": 4
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -5,
+      "row": -2,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": -2,
+      "z": 3,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": -2,
+      "z": 61,
+      "level": 4
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -4,
+      "row": -2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -5,
+      "row": -1,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": -1,
+      "z": 4,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": -2,
+      "z": 5,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": -2,
+      "z": 17,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": -2,
+      "z": 59,
+      "level": 4
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": -1,
+      "z": 62,
+      "level": 4
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": -1,
+      "z": 63,
+      "level": 4
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -2,
+      "row": -3,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -3,
+      "row": -2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -4,
+      "row": -1,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -5,
+      "row": 0,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": 0,
+      "z": 2,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": -1,
+      "z": 6,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -3,
+      "row": -2,
+      "z": 14,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": -1,
+      "z": 18,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -3,
+      "row": -2,
+      "z": 53,
+      "level": 4
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": -1,
+      "z": 58,
+      "level": 4
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": 0,
+      "z": 64,
+      "level": 4
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -1,
+      "row": -3,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -2,
+      "row": -2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -3,
+      "row": -1,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -4,
+      "row": 0,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": 1,
+      "z": 1,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": 0,
+      "z": 7,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -3,
+      "row": -1,
+      "z": 13,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": 0,
+      "z": 19,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": -2,
+      "z": 30,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": -3,
+      "z": 36,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": -3,
+      "z": 47,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": -2,
+      "z": 52,
+      "level": 3
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -3,
+      "row": -1,
+      "z": 54,
+      "level": 4
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": 0,
+      "z": 57,
+      "level": 4
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": 1,
+      "z": 65,
+      "level": 4
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -1,
+      "row": -2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -2,
+      "row": -1,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -3,
+      "row": 0,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": 1,
+      "z": 8,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": 2,
+      "z": 11,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -3,
+      "row": 0,
+      "z": 12,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": 1,
+      "z": 20,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": -1,
+      "z": 25,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": -1,
+      "z": 29,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": -2,
+      "z": 37,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": -2,
+      "z": 46,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": -1,
+      "z": 51,
+      "level": 3
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -3,
+      "row": 0,
+      "z": 55,
+      "level": 4
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -4,
+      "row": 1,
+      "z": 56,
+      "level": 4
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -5,
+      "row": 2,
+      "z": 66,
+      "level": 4
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 0,
+      "row": -2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -2,
+      "row": 0,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -1,
+      "row": -1,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 0,
+      "z": 24,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 0,
+      "z": 28,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": 0,
+      "row": -2,
+      "z": 35,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": -1,
+      "z": 38,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": -1,
+      "z": 45,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 0,
+      "z": 50,
+      "level": 3
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 1,
+      "row": -2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -2,
+      "row": 1,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 0,
+      "row": -1,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -1,
+      "row": 0,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 1,
+      "z": 23,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 1,
+      "z": 27,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": 0,
+      "row": -1,
+      "z": 34,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": 0,
+      "z": 39,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": 0,
+      "z": 42,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 1,
+      "z": 49,
+      "level": 3
+    },
+    {
+      "asset": "emberkeep",
+      "category": "background",
+      "col": 0,
+      "row": 0,
+      "z": 0,
+      "dx": 80,
+      "dy": -163
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 1,
+      "row": -1,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -2,
+      "row": 2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 0,
+      "row": 0,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -1,
+      "row": 1,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 2,
+      "z": 22,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 2,
+      "z": 26,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": 0,
+      "row": 0,
+      "z": 33,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": 1,
+      "z": 40,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": 1,
+      "z": 43,
+      "level": 2
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 2,
+      "z": 48,
+      "level": 3
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 2,
+      "row": -1,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": -1,
+      "row": 2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 1,
+      "row": 0,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 0,
+      "row": 1,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": 0,
+      "row": 1,
+      "z": 32,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": 2,
+      "z": 41,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -1,
+      "row": 2,
+      "z": 44,
+      "level": 2
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 2,
+      "row": 0,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 1,
+      "row": 1,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 0,
+      "row": 2,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": 0,
+      "row": 2,
+      "z": 31,
+      "level": 1
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 3,
+      "row": 0,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 0,
+      "row": 3,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 1,
+      "row": 2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 2,
+      "row": 1,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 1,
+      "row": 3,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 2,
+      "row": 2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 3,
+      "row": 1,
+      "z": 0
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 6,
+      "z": 15,
+      "level": 1
+    },
+    {
+      "asset": "cloud-tile",
+      "category": "blocker",
+      "col": -2,
+      "row": 6,
+      "z": 68,
+      "level": 5
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 2,
+      "row": 3,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 3,
+      "row": 2,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 3,
+      "row": 3,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 5,
+      "row": 3,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 6,
+      "row": 3,
+      "z": 0
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 5,
+      "row": 4,
+      "z": 0
+    },
+    {
+      "asset": "Emerald Crystal",
+      "category": "3d",
+      "col": 2,
+      "row": 7,
+      "z": 69,
+      "dx": -64,
+      "dy": -28
+    },
+    {
+      "asset": "invisible",
+      "category": "tile",
+      "col": 6,
+      "row": 4,
+      "z": 0
+    }
+  ],
+  "levels": {
+    "1": {
+      "count": 31,
+      "cells": [
+        {
+          "col": -5,
+          "row": 1
+        },
+        {
+          "col": -5,
+          "row": 0
+        },
+        {
+          "col": -5,
+          "row": -2
+        },
+        {
+          "col": -5,
+          "row": -1
+        },
+        {
+          "col": -4,
+          "row": -2
+        },
+        {
+          "col": -4,
+          "row": -1
+        },
+        {
+          "col": -4,
+          "row": 0
+        },
+        {
+          "col": -4,
+          "row": 1
+        },
+        {
+          "col": -5,
+          "row": -3
+        },
+        {
+          "col": -5,
+          "row": 2
+        },
+        {
+          "col": -3,
+          "row": 0
+        },
+        {
+          "col": -3,
+          "row": -1
+        },
+        {
+          "col": -3,
+          "row": -2
+        },
+        {
+          "col": -2,
+          "row": 6
+        },
+        {
+          "col": -6,
+          "row": -4
+        },
+        {
+          "col": -2,
+          "row": 2
+        },
+        {
+          "col": -2,
+          "row": 1
+        },
+        {
+          "col": -2,
+          "row": 0
+        },
+        {
+          "col": -2,
+          "row": -1
+        },
+        {
+          "col": -2,
+          "row": -2
+        },
+        {
+          "col": 0,
+          "row": 2
+        },
+        {
+          "col": 0,
+          "row": 1
+        },
+        {
+          "col": 0,
+          "row": 0
+        },
+        {
+          "col": 0,
+          "row": -1
+        },
+        {
+          "col": 0,
+          "row": -2
+        },
+        {
+          "col": -1,
+          "row": -3
+        },
+        {
+          "col": -1,
+          "row": -2
+        },
+        {
+          "col": -1,
+          "row": -1
+        },
+        {
+          "col": -1,
+          "row": 0
+        },
+        {
+          "col": -1,
+          "row": 1
+        },
+        {
+          "col": -1,
+          "row": 2
+        }
+      ]
+    },
+    "2": {
+      "count": 14,
+      "cells": [
+        {
+          "col": -4,
+          "row": -2
+        },
+        {
+          "col": -4,
+          "row": -1
+        },
+        {
+          "col": -4,
+          "row": 0
+        },
+        {
+          "col": -4,
+          "row": 1
+        },
+        {
+          "col": -2,
+          "row": 2
+        },
+        {
+          "col": -2,
+          "row": 1
+        },
+        {
+          "col": -2,
+          "row": 0
+        },
+        {
+          "col": -2,
+          "row": -1
+        },
+        {
+          "col": -1,
+          "row": 0
+        },
+        {
+          "col": -1,
+          "row": 1
+        },
+        {
+          "col": -1,
+          "row": 2
+        },
+        {
+          "col": -1,
+          "row": -1
+        },
+        {
+          "col": -1,
+          "row": -2
+        },
+        {
+          "col": -1,
+          "row": -3
+        }
+      ]
+    },
+    "3": {
+      "count": 5,
+      "cells": [
+        {
+          "col": -2,
+          "row": 2
+        },
+        {
+          "col": -2,
+          "row": 1
+        },
+        {
+          "col": -2,
+          "row": 0
+        },
+        {
+          "col": -2,
+          "row": -1
+        },
+        {
+          "col": -2,
+          "row": -2
+        }
+      ]
+    },
+    "4": {
+      "count": 15,
+      "cells": [
+        {
+          "col": -3,
+          "row": -2
+        },
+        {
+          "col": -3,
+          "row": -1
+        },
+        {
+          "col": -3,
+          "row": 0
+        },
+        {
+          "col": -4,
+          "row": 1
+        },
+        {
+          "col": -4,
+          "row": 0
+        },
+        {
+          "col": -4,
+          "row": -1
+        },
+        {
+          "col": -4,
+          "row": -2
+        },
+        {
+          "col": -5,
+          "row": -3
+        },
+        {
+          "col": -5,
+          "row": -2
+        },
+        {
+          "col": -5,
+          "row": -1
+        },
+        {
+          "col": -5,
+          "row": 0
+        },
+        {
+          "col": -5,
+          "row": 1
+        },
+        {
+          "col": -5,
+          "row": 2
+        },
+        {
+          "col": -6,
+          "row": -4
+        }
+      ]
+    },
+    "5": {
+      "count": 1,
+      "cells": [
+        {
+          "col": -2,
+          "row": 6
+        }
+      ]
+    }
+  },
+  "cameraKeyframes": [],
+  "mergeAssets": [
+    {
+      "key": "sparkweed_1",
+      "label": "Spark Weed",
+      "chain": "sparkweed",
+      "tier": 1,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "sparkweed_2",
+      "label": "Ember Bloom",
+      "chain": "sparkweed",
+      "tier": 2,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "sparkweed_3",
+      "label": "Flame Lily",
+      "chain": "sparkweed",
+      "tier": 3,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "ember_dragon_1",
+      "label": "Speckled Egg",
+      "chain": "ember_dragon",
+      "tier": 1,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "ember_dragon_2",
+      "label": "Ember Hatchling",
+      "chain": "ember_dragon",
+      "tier": 2,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "ember_dragon_3",
+      "label": "Ember Whelp",
+      "chain": "ember_dragon",
+      "tier": 3,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "flame_gem_1",
+      "label": "Gem Shard",
+      "chain": "flame_gem",
+      "tier": 1,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "flame_gem_2",
+      "label": "Flame Gem",
+      "chain": "flame_gem",
+      "tier": 2,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "flame_gem_3",
+      "label": "Radiant Gem",
+      "chain": "flame_gem",
+      "tier": 3,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "decor_nest",
+      "label": "Dragon Nest",
+      "chain": "nest",
+      "tier": 1,
+      "custom": false,
+      "file": null,
+      "image": null
+    },
+    {
+      "key": "decor_brazier",
+      "label": "Brazier",
+      "chain": "brazier",
+      "tier": 1,
+      "custom": false,
+      "file": null,
+      "image": null
+    }
+  ],
+  "cameraZoom": {
+    "min": 0.2,
+    "max": 1.4
+  },
+  "images": {
+    "border-grass-1.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_001.png",
+    "border-grass-2.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_002.png",
+    "border-grass-3.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_003.png",
+    "border-grass-5.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_005.png",
+    "border-grass-4.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_004.png",
+    "border-grass-6.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_006.png",
+    "border-grass-7.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_007.png",
+    "border-grass-8.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_008.png",
+    "border-grass-9.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_009.png",
+    "border-grass-10.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_010.png",
+    "border-grass-11.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_011.png",
+    "border-grass-12.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_012.png",
+    "border-grass-13.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_013.png",
+    "border-grass-14.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_014.png",
+    "border-grass-15.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_015.png",
+    "border-grass-16.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_016.png",
+    "border-grass-17.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_017.png",
+    "border-grass-18.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_018.png",
+    "border-grass-19.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_019.png",
+    "border-grass-20.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_020.png",
+    "border-grass-21.png": "http://localhost:8080/assets/sprites/environment/map/grass-tiles/Tiles-out_021.png",
+    "cloud-tile.png": "http://localhost:8080/assets/sprites/environment/level-blocker/cloud/cloud-tile.png",
+    "invisible.png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAAqADAAQAAAABAAAAAgAAAADtGLyqAAAAC0lEQVQIHWNgQAcAABIAAYAUyswAAAAASUVORK5CYII=",
+    "emberkeep-nb2.webp": "emberkeep-nb2.webp"
+  }
+}

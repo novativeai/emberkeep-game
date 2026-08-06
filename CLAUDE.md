@@ -127,6 +127,14 @@ silently drops `checklist` writes, so everything goes in `notes`.
   swaps in via `src/data/assets.json` (`source:"file"`) + `anchors.json`. Load
   failures fall back: bespoke generator → parcel/tile stand-in → magenta (unknown
   keys only). SFX are WebAudio-synthesised in `AudioManager` (bus subscriber only).
+- WHAT SHIPS IS DERIVED, NOT LISTED. `assets/` is the art WORKSPACE; the deploy is
+  a filtered copy (vite.config.ts `copyRuntimeArt`). `raw/` is default-deny, rigs
+  come from the catalog's own urls, VFX from `SHIPPED`, and a speaker with a disc
+  atlas ships the atlas rather than the frames it was baked from. `pnpm audit:art`
+  resolves every path the runtime can ask for and reports what ships unreferenced
+  (and what is referenced but missing) — run it after any art or loader change.
+  A `.png` with a `.webp` sibling never ships, so a reference and its
+  re-encode move TOGETHER: `pnpm optimize:art` does both (lossless, pixel-verified).
 - XP (`LEVEL_XP = [0, 60, 220]`) is tuned so the tutorial's EXACT 60 XP lands
   Level 2 on the scripted `levelup` beat (wakes zone 2). Level 3 (220) is the
   cap and opens `level_5`'s land; it FIRES nothing. The array deliberately ends

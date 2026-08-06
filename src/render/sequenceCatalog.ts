@@ -23,6 +23,10 @@ export interface BuiltinSequence {
   label: string;
   /** publicDir-relative folder of the talk frames (indexed 0.png, 1.png, …). */
   dir: string;
+  /** Frame extension in that folder. Banks re-encoded to lossless WebP by
+   *  `scripts/optimize-art.py` say so here; the build drops a `.png` once its
+   *  `.webp` sibling exists, so this is what keeps the two in step. */
+  ext?: 'png' | 'webp';
   /** Talk frame count (idle frame is appended after these). */
   count: number;
   /** Per-frame hold (ms) for the talk frames, from the source frames.json. */
@@ -134,18 +138,20 @@ export const BUILTIN_SEQUENCES: BuiltinSequence[] = [
     key: 'golden_elder_blink',
     label: 'Golden Elder · Blink',
     dir: 'sprites/golden-elder/blink',
+    ext: 'webp',
     count: 4,
     durations: [2600, 45, 70, 55],
-    endIdle: 'sprites/golden-elder/rest.png',
+    endIdle: 'sprites/golden-elder/rest.webp',
     loop: true
   },
   {
     key: 'golden_elder_talk',
     label: 'Golden Elder · Speaking',
     dir: 'sprites/golden-elder/talk',
+    ext: 'webp',
     count: 4,
     durations: [110, 90, 130, 90],
-    endIdle: 'sprites/golden-elder/rest.png',
+    endIdle: 'sprites/golden-elder/rest.webp',
     loop: true
   }
 ];
@@ -157,7 +163,7 @@ export const isBuiltinSequence = (key: string): boolean => BY_KEY.has(key);
 
 /** Ordered publicDir-relative file paths: talk frames, then the idle pose. */
 export function builtinSequenceFiles(seq: BuiltinSequence): string[] {
-  const files = Array.from({ length: seq.count }, (_, i) => `${seq.dir}/${i}.png`);
+  const files = Array.from({ length: seq.count }, (_, i) => `${seq.dir}/${i}.${seq.ext ?? 'png'}`);
   files.push(seq.endIdle);
   return files;
 }

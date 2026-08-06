@@ -104,9 +104,17 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
     expect(moods.at(-1)).toMatchObject({ mood: 'asleep' });
 
-    atPhase(ctx, 0); // morning of the next day
-    tick(ctx, 0);
-    expect(ctx.systems.dragonLife.moodOf(dragon.id)).not.toBe('asleep');
+    // Morning: it wakes. Bounded loop rather than a single tick, because an
+    // ambient nap can legitimately follow the night and this test is about the
+    // NIGHT ending, not about the nap never happening.
+    atPhase(ctx, 0);
+    let woke = false;
+    for (let i = 0; i < 60 && !woke; i++) {
+      tick(ctx, DRAGON_NAP_CYCLE_MS / 60);
+      ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+      if (ctx.systems.dragonLife.moodOf(dragon.id) === 'awake') woke = true;
+    }
+    expect(woke).toBe(true);
   });
 
   it('a dragon nobody fed is HUNGRY, and hunger outranks sleep', () => {
@@ -114,8 +122,11 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     const dragon = dragonAt(ctx, 1, 1);
 
     // Grace first: a hatchling that roars the instant it lands reads as a bug.
+    // Asserted as "not hungry yet" rather than "awake": the clock is seeded from
+    // real time, so an unpinned moment can legitimately be night or a nap, and a
+    // test that demanded `awake` here would fail depending on the hour it ran.
     tick(ctx, 0);
-    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).not.toBe('hungry');
 
     tick(ctx, DRAGON_HUNGER_GRACE_MS + 1000);
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('hungry');

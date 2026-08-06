@@ -206,6 +206,13 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   (the record feeding writes and the gauge draws) and sleep is `phaseAt`'s `night`.
   Adding a private clock for either is how the roar and the gauge start disagreeing.
   (4) Wandering is off for the whole tutorial: the board is the script's stage.
+- **TOUCH anything that reads `phaseAt` or a nap window → RULE for TESTS**
+  `GameClock.now()` is `Date.now() + offset`, so the ABSOLUTE clock differs on every
+  run and with it the day phase and every nap offset. A test asserting a dragon's mood
+  must PIN the phase first (advance to a known phase start) or claim only what it
+  means — `not.toBe('hungry')` rather than `toBe('awake')`. A test that demands `awake`
+  at an unpinned moment passes or fails depending on the hour it runs at, which is the
+  worst kind of flake to trace.
 - **TOUCH the sleep paths → RULE** there are THREE ways to be asleep and they must
   all look like ONE thing (same curled painting, same breath): sleeping off a
   `DragonJobSystem` rest, the day clock's `night`, and an ambient nap. Order in

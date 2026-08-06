@@ -749,8 +749,107 @@ const copyRuntimeArt = (): Plugin => ({
       // Same rule for the merge-style bubble art: the game loads the downscaled
       // `sprites/<who>-merge/` copies and the baked disc atlas, never these
       // full-resolution frame exports (211 MB, no reference anywhere in src).
-      'sprites/characters-merge'
+      'sprites/characters-merge',
+      // Superseded / never-referenced art, each verified against the reference
+      // graph (`node scripts/audit-art.mjs`) rather than by eye:
+      'sprites/background/emberkeep.jpg', //  background_emberkeep points at emberkeep-nb2.webp
+      'sprites/background/hatchery.webp', //  worlds.json-only; not a zone, so nothing can load it
+      'sprites/background/runevault.webp', // ditto
+      'sprites/environment/full-water-bg.png',
+      'sprites/environment/level-blocker', //  superseded by sprites/environment/blockers/
+      'sprites/environment/blockers/cloud/cloud-cropped.png', // cloud_tile is the shipped one
+      'sprites/environment/map/grass-tiles', // tile pack: no cell in any world places one
+      'sprites/bg-tile',
+      'sprites/level1',
+      'sprites/rewards',
+      'sprites/merge/rubis-transparent_002.png',
+      'sprites/merge/rubis-transparent_004.png',
+      'sprites/ui/icon_store.png', //  the shipped Store icon is the .webp
+      'sprites/items/black-egg.png',
+      'sprites/items/emerald-egg.png',
+      'sprites/items/key.png', //  icon_key_bronze / ui_icon_key use key-icon.png
+      'sprites/items/stone.png',
+      'sprites/characters/dragon/golden-dragon/golden-egg.png', // items/golden-egg.webp ships
+      'sprites/characters/dragon/golden-dragon/golden-egg-sunset.png',
+      'map', //  World Builder project files — the game reads src/data/map.json
+      'atlases' //  empty scaffold
     ];
+    /**
+     * The same rule, as PATTERNS, for what recurs per character and per dragon.
+     *
+     * These are the categories a new breed or a re-bake creates more of every
+     * time, so naming instances would go stale by the next art run:
+     *
+     *  · `.rigproject.json` — the rigger's project file beside its export. It is
+     *    the same 1.2 MB of base64 as the `.rig.json` the game loads, twice over.
+     *  · rig / sprite PART images — a rig carries its layers INSIDE the json as
+     *    data URIs (RigPlayer reads `rig.images`), and a board skin ships as the
+     *    baked `*-baked.webp` that assets.json names. The loose part PNGs beside
+     *    them are what the rigger consumed, not what the game fetches.
+     *  · the guides' bake INPUTS — `sprites/<who>/{talk_*,blink,eyelids,
+     *    expressions,visemes,rest,portrait,disc-atlas}`. What the bubble loads is
+     *    `sprites/<who>-merge/disc-atlas.png`; what the board loads is
+     *    `world-idle/-cast.webp`, and those two stay.
+     *  · authoring sidecars — `frames.json` (superseded at runtime by the
+     *    calibrated src/data/faces.json), Sprite Studio's `catalog.json`, tile
+     *    `manifest.json`/`preview.png`, README notes, and .DS_Store.
+     */
+    const SOURCE_ONLY_PATTERNS: RegExp[] = [
+      /\.rigproject\.json$/,
+      /^sprites\/characters\/dragon\/[^/]+\/rig[^/]*\/.+\.(png|jpg)$/,
+      /^sprites\/characters\/dragon\/[^/]+\/sprite[^/]*\/.+\.(png|jpg)$/,
+      /^sprites\/(eleanor|selyna)\/(talk_|blink\/|eyelids\/|expressions\/|visemes\/)/,
+      /^sprites\/(eleanor|selyna)\/(rest|portrait|disc-atlas)\.png$/,
+      /^sprites\/(eleanor|selyna)-merge\/portrait\.png$/,
+      /^sprites\/(eleanor|selyna)\/(world-standee|visemes)\.(webp|json)$/, // pre-bake stills
+      /^sprites\/items\/wood\.(png|webp)$/, //  superseded by the lumber chain icons
+      /(^|\/)(frames|catalog|manifest)\.json$/,
+      /(^|\/)preview\.png$/,
+      /(^|\/)README[^/]*\.(txt|md)$/,
+      /(^|\/)\.DS_Store$/,
+      /-raw\.png$/ //  trailer/legend generation masters beside their sized copies
+    ];
+    /**
+     * A speaker with a DISC ATLAS ships the atlas, not the frames it was baked
+     * from — they are the same pixels twice (35 MB of the second copy).
+     *
+     * `sprites/<who>-merge/{talk_*,blink,rest.png}` is what
+     * `scripts/bake-portrait-disc.py` consumed; the bubble draws
+     * `disc-atlas.png` and nothing else (CharacterBubble → discTextureFor).
+     * The loose frames have exactly one consumer left — the UI Builder's
+     * Animations rail, which is a dev tool served straight out of `assets/` by
+     * `pnpm dev`, and `referencedBuiltins` already means the game itself fetches
+     * a bank only when a saved ui-theme component names one.
+     *
+     * Derived from ANIMATED_SPEAKERS, so a speaker who has no atlas — the Golden
+     * Elder, whose banks EMB-24 is about to drive — keeps her frames.
+     */
+    const atlasSpeakers = (
+      readFileSync(path.resolve(__dirname, 'src/entities/PortraitAnimator.ts'), 'utf8').match(
+        /ANIMATED_SPEAKERS\s*=\s*\[([^\]]*)\]/
+      )?.[1] ?? ''
+    )
+      .split(',')
+      .map((s) => s.trim().replace(/^'|'$/g, ''))
+      .filter(Boolean);
+    if (atlasSpeakers.length === 0)
+      throw new Error('[copy-runtime-art] could not read ANIMATED_SPEAKERS — did PortraitAnimator move?');
+    const bakedIntoAtlas = (rel: string): boolean =>
+      atlasSpeakers.some((who) => rel.startsWith(`sprites/${who}-merge/`)) &&
+      !rel.endsWith('/disc-atlas.png');
+
+    // Rigs: keep ONLY the ones a scene can actually ask for. Each rig json
+    // carries its own layer art as data URIs, so an unreferenced one is ~1.2 MB
+    // of art for a dragon nothing can spawn — and the skin rigs are exactly
+    // that: a worn skin swaps the BAKED `skin_<id>_<tier>` texture (BoardScene),
+    // it does not load a second rig. Derived from the two files that name rig
+    // urls, so a newly registered rig ships the moment it is registered.
+    const rigKeep = new Set<string>();
+    for (const file of ['src/render/characterCatalog.ts', 'src/scenes/BoardScene.ts']) {
+      const src = readFileSync(path.resolve(__dirname, file), 'utf8');
+      for (const [, url] of src.matchAll(/'(sprites\/[^']*\.rig\.json)'/g)) rigKeep.add(url);
+    }
+    if (rigKeep.size === 0) throw new Error('[copy-runtime-art] no rig urls found — did the catalog move?');
     // VFX bank: keep ONLY what the runtime loads — the ramp LUT plus the
     // `_pack`/`_mv` pair for each shipped sheet. The graded colour sheets are
     // the bake INPUT, the other flipbooks are unshipped, and the manifests are
@@ -790,6 +889,9 @@ const copyRuntimeArt = (): Plugin => ({
       if (!rel) return true; // the publicDir itself
       const isDir = statSync(from).isDirectory();
       if (SOURCE_ONLY.some((s) => rel === s || rel.startsWith(`${s}/`))) return false;
+      if (!isDir && SOURCE_ONLY_PATTERNS.some((re) => re.test(rel))) return false;
+      if (!isDir && rel.endsWith('.rig.json') && !rigKeep.has(rel)) return false;
+      if (!isDir && bakedIntoAtlas(rel)) return false;
       // Default-deny the workspace: `raw` itself ships (it has kept children),
       // anything under it must be on — or an ancestor of — RAW_SHIPPED.
       if (rel === 'raw' || rel.startsWith('raw/')) {

@@ -18,7 +18,7 @@
  * Run after adding/regenerating head-animation sets:
  *   node scripts/calibrate-faces.mjs
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
 import path from 'node:path';
@@ -382,8 +382,15 @@ for (const [character, spec] of Object.entries(CHARACTERS)) {
       textureScale: +scale.toFixed(5),
       originX: +(pivotRef.x / ref.width).toFixed(5),
       originY: +(pivotRef.y / ref.height).toFixed(5),
+      // Calibration reads the PNG masters, but what SHIPS is the lossless WebP
+      // sibling once `scripts/optimize-art.py` has made one (the build drops a
+      // .png whose .webp exists). So the runtime path is the sibling when it is
+      // there — otherwise a re-calibration would quietly point faces.json back at
+      // files the deploy no longer carries, and every dragon would stop blinking.
       frames: setSpec.files.map((file, i) => ({
-        file,
+        file: existsSync(path.join(dir, file.replace(/\.png$/, '.webp')))
+          ? file.replace(/\.png$/, '.webp')
+          : file,
         durationMs: framesMeta.frames[i].durationMs
       }))
     };
