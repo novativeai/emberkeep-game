@@ -254,7 +254,13 @@ export const ITEM_SCALE: Record<string, number> = {
   lumber_3: 0.82, // the Manor — main's scale
   bigtree_1: 0.17, // Ancient Tree generator — main's scale
   chest_1: 0.19, // Treasure Chest fixture — main's scale
-  strawberry_1: 0.39, // emberberry sprout — −40% merge piece
+  // The sprout art is 42% content and 58% empty frame (bush 60%, plant 83%), so the
+  // −40% retune left it DRAWING 20×23 px on screen while the bush drew 35 — a speck
+  // on the lair's pale stone, and the reason five of them beside the dragon read as
+  // an empty room. 0.55 brings the drawn shoot to ~28 px: still the smallest of the
+  // three, now visible. Measured, not guessed — the frame sizes are all 240px, only
+  // the opaque box differs.
+  strawberry_1: 0.55, // emberberry sprout
   strawberry_2: 0.48, // emberberry bush — −40% merge piece
   strawberry_3: 0.468, // emberberry plant — −40% merge piece
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
@@ -362,6 +368,16 @@ export const CHEST_INTERVAL_MS = 300_000;
  *  this the drop is BLOCKED (harvest fails / chest pays Gold / passive skips)
  *  — rewards must never teleport across the map or off the platforms. */
 export const REWARD_SPAWN_RADIUS = 3;
+
+/** How far (manhattan tiles) a sub-world's furniture may stand from its dragon
+ *  before `board:gather` walks it back. Generous on purpose: a piece the player
+ *  moved on purpose stays put; only a garden left at the far rim is collected. */
+export const LAIR_GATHER_RADIUS = 5;
+/** Per-world one-shot: this world's furniture has been gathered once (stat key
+ *  prefix + world id). It is a REPAIR of layouts seeded before the anchor rule,
+ *  not a rule of the room — running it every visit would undo the player's own
+ *  arrangement. */
+export const LAIR_GATHERED_STAT = 'lairGathered:';
 
 export const CHEST_GIFTS: ReadonlyArray<
   | { kind: 'coins'; amount: number; label: string }

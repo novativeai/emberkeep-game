@@ -2922,13 +2922,21 @@ export class BoardScene extends Phaser.Scene {
     if (cfg.basinChain && !this.worldHolds(cfg.basinChain)) {
       this.ctx.bus.emit('board:spawn', { chain: cfg.basinChain, tier: 1, count: 1, nearChain: cfg.dragonChain });
     }
-    // And ARRIVE there. A teleport that drops the camera wherever it was standing in
-    // the world you left shows you a stretch of empty lair and calls it broken.
-    const home = [...this.ctx.state.items.values()].find((i) => i.chain === cfg.dragonChain) ?? this.lairAnchor();
-    if (home) {
-      const w = gridToWorld(home.col, home.row);
-      this.glideToWorld(w.x, w.y, 700);
+    // A lair seeded BEFORE the anchor rule kept its garden at the world's far rim,
+    // and the re-seed guard above — correctly — refuses to plant a second one. So
+    // collect it, once, around the middle of the floor. Nothing to do in a lair that
+    // was seeded properly; everything to do in one that was not.
+    const anchor = this.lairAnchor();
+    if (anchor) {
+      const chains = [cfg.dragonChain, cfg.seedChain, cfg.basinChain].filter(
+        (c): c is string => typeof c === 'string'
+      );
+      this.ctx.bus.emit('board:gather', { around: [anchor.col, anchor.row], chains });
     }
+    // And ARRIVE looking at it. A teleport that drops the camera wherever it was
+    // standing in the world you left shows you a stretch of empty lair and calls it
+    // broken — and so does one that frames the dragon while her garden sits off-screen.
+    this.frameLairContent(anchor);
     this.setAltarVisible(false); // the Golden Altar is nb2's scenery, not the lair's
   }
 
@@ -3004,9 +3012,16 @@ export class BoardScene extends Phaser.Scene {
     this.setAltarVisible(true);
     this.syncGoldenAltar(); // re-seat it on the authored lattice, in its authored state
     // Come home to the isle, not to whatever world point the lair left the camera on
-    // — the same point means somewhere else entirely under the authored lattice.
+    // — the same point means somewhere else entirely under the authored lattice. The
+    // ZOOM comes home too: the lair pulls back to hold its garden, and without this
+    // that pull-back followed you onto the isle.
     const frame = this.frameForLevel(this.ctx.state.level);
-    this.glideToWorld(frame.x, frame.y, 700);
+    this.glideToWorld(
+      frame.x,
+      frame.y,
+      700,
+      Math.max(frame.zoom, this.minZoom) * renderScale.value
+    );
   }
 
   /**
@@ -3698,9 +3713,11 @@ export class BoardScene extends Phaser.Scene {
   /* ----------------------------- helpers ---------------------------- */
 
   /** Smooth tween to any world position (keeps current zoom). */
-  private glideToWorld(worldX: number, worldY: number, duration = 900): void {
+  /** Glide the camera to a world point. `zoom` (already ×renderScale) rides along
+   *  when given — omit it to keep the current one. */
+  private glideToWorld(worldX: number, worldY: number, duration = 900, zoom?: number): void {
     const cam = this.cameras.main;
-    const from = { x: cam.midPoint.x, y: cam.midPoint.y };
+    const from = { x: cam.midPoint.x, y: cam.midPoint.y, zoom: cam.zoom };
     this.flyTween?.stop();
     const proxy = { t: 0 };
     this.flyTween = this.tweens.add({
@@ -3710,9 +3727,41 @@ export class BoardScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
       onUpdate: () => {
         const s = smootherstep(proxy.t);
+        if (zoom !== undefined) cam.setZoom(Phaser.Math.Linear(from.zoom, zoom, s));
         cam.centerOn(Phaser.Math.Linear(from.x, worldX, s), Phaser.Math.Linear(from.y, worldY, s));
       }
     });
+  }
+
+  /**
+   * Arrive looking at the WHOLE lair, not at one dragon.
+   *
+   * Gliding to the dragon alone was still a bet: her garden can sit a few cells off,
+   * and at the isle's zoom a 20-pixel sprout on pale stone at the edge of frame is
+   * indistinguishable from an empty room — which is exactly how five of them read.
+   * So frame what the world actually holds. Pull BACK as far as needed to hold it
+   * all; never push IN past the gameplay zoom, or a two-piece lair would slam to a
+   * close-up.
+   */
+  private frameLairContent(fallback: TilePos | null): void {
+    const pts = [...this.ctx.state.items.values()].map((i) => gridToWorld(i.col, i.row));
+    if (pts.length === 0) {
+      if (!fallback) return;
+      const w = gridToWorld(fallback.col, fallback.row);
+      this.glideToWorld(w.x, w.y, 700);
+      return;
+    }
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    // A tile of margin sideways, two of height: the art stands well above its cell.
+    const minX = Math.min(...xs) - TILE_W;
+    const maxX = Math.max(...xs) + TILE_W;
+    const minY = Math.min(...ys) - TILE_H * 2;
+    const maxY = Math.max(...ys) + TILE_H * 2;
+    const cam = this.cameras.main;
+    const fit = Math.min(cam.width / Math.max(1, maxX - minX), cam.height / Math.max(1, maxY - minY));
+    const zoom = Phaser.Math.Clamp(Math.min(fit, cam.zoom), this.minZoom * renderScale.value, cam.zoom);
+    this.glideToWorld((minX + maxX) / 2, (minY + maxY) / 2, 700, zoom);
   }
 
   /** Glide the camera to centre a region (e.g. the key-fog gate the tutorial

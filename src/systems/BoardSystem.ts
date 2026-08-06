@@ -1,3 +1,4 @@
+import { LAIR_GATHER_RADIUS, LAIR_GATHERED_STAT } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import { sameLattice, type GameState } from '../core/GameState';
@@ -23,6 +24,47 @@ export class BoardSystem {
     bus.on('board:retier', (p) => this.retier(p));
     bus.on('board:move', (p) => this.moveReward(p));
     bus.on('board:reconcile', () => this.reconcile());
+    bus.on('board:gather', (p) => this.gather(p));
+  }
+
+  /**
+   * Bring a world's furniture back around one point — ONCE per world.
+   *
+   * A lair used to be seeded from the board-scan origin, which after a trip to
+   * borealis reaches column −21: the dragon, her five sprouts and the Dew Basin were
+   * planted at the world's far rim, saved there, and never once looked at. The seeding
+   * itself is fixed — it grows from the middle of the floor now — but that only helps
+   * a lair seeded for the FIRST time. A board that already holds its garden is not
+   * re-seeded (rightly: the guard is what stops the fixtures doubling), so the badly
+   * placed one stayed badly placed for ever. This is the repair for those.
+   *
+   * ONE-SHOT, recorded per world. It is a migration, not a rule of the room: run every
+   * visit and it would undo whatever arrangement the player made. And `radius` is
+   * generous, so a piece deliberately carried off is left alone — only a garden at the
+   * rim is collected.
+   */
+  private gather({ around, chains }: { around: [number, number]; chains: string[] }): void {
+    const flag = `${LAIR_GATHERED_STAT}${this.state.activeWorld}`;
+    if (this.state.stat(flag) > 0) return;
+    this.state.addStat(flag, 1);
+    const [ac, ar] = around;
+    const wanted = new Set(chains);
+    const strays = [...this.state.items.values()]
+      .filter((i) => wanted.has(i.chain))
+      .filter((i) => Math.abs(i.col - ac) + Math.abs(i.row - ar) > LAIR_GATHER_RADIUS)
+      .sort((a, b) => a.id - b.id); // the dragon first (lowest id) — she takes the middle
+    if (strays.length === 0) return;
+    // A CONNECTED blob, so the garden comes back as a garden: adjacent sprouts, one
+    // drag to merge them. Their own cells are far away and occupied, so they cannot
+    // be handed back to themselves.
+    const cells = this.freeBlobNear(ac, ar, strays.length);
+    for (let i = 0; i < strays.length && i < cells.length; i++) {
+      const item = strays[i]!;
+      const to = cells[i]!;
+      const from = { col: item.col, row: item.row };
+      this.state.moveItem(item.id, to);
+      this.bus.emit('item:moved', { itemId: item.id, from, to: { col: to.col, row: to.row } });
+    }
   }
 
   /** Scripted relocation (tutorial): slide one item of `chain`+`tier` to `to`

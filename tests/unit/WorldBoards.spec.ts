@@ -175,6 +175,51 @@ describe('per-world boards', () => {
     expect(ctx.state.worldHolds('roothold', 'golden_egg')).toBe(false);
   });
 
+  it('collects a garden left at the far rim — once, then never again', () => {
+    const ctx = createTestContext();
+    ctx.state.setActiveWorld('roothold');
+    // A 4×4 floor the lair actually offers…
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) ctx.state.setEditorTileOverride(c, r, 1);
+    // …and the far rim it was seeded on, before the anchor rule.
+    for (const [c, r] of [[20, 20], [21, 20], [22, 20], [20, 21]] as const) {
+      ctx.state.expandBoardTo(c, r);
+      ctx.state.setEditorTileOverride(c, r, 1);
+    }
+    ctx.state.setCellsFullyAuthored(true);
+    const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 20, row: 20, kind: 'item' });
+    const garden = ([[21, 20], [22, 20], [20, 21]] as const).map(([col, row]) =>
+      ctx.state.addItem({ chain: 'strawberry', tier: 1, col, row, kind: 'item' })
+    );
+
+    ctx.bus.emit('board:gather', { around: [1, 1], chains: ['ember_dragon', 'strawberry'] });
+
+    const live = [dragon, ...garden].map((p) => ctx.state.items.get(p.id)!);
+    for (const i of live) {
+      expect(Math.abs(i.col - 1) + Math.abs(i.row - 1)).toBeLessThanOrEqual(4); // home, around her
+      expect(ctx.state.isTileActive(i.col, i.row)).toBe(true);
+    }
+    expect(new Set(live.map((i) => `${i.col},${i.row}`)).size).toBe(4); // nothing stacked
+    expect(ctx.state.items.get(dragon.id)).toMatchObject({ col: 1, row: 1 }); // she takes the middle
+
+    // ONE-SHOT: the player drags a sprout off on purpose — it stays where they put it.
+    const moved = ctx.state.items.get(garden[0]!.id)!;
+    ctx.state.moveItem(moved.id, { col: 22, row: 20 });
+    ctx.bus.emit('board:gather', { around: [1, 1], chains: ['ember_dragon', 'strawberry'] });
+    expect(ctx.state.items.get(moved.id)).toMatchObject({ col: 22, row: 20 });
+  });
+
+  it('leaves a lair that was seeded properly untouched', () => {
+    const ctx = createTestContext();
+    ctx.state.setActiveWorld('roothold');
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) ctx.state.setEditorTileOverride(c, r, 1);
+    ctx.state.setCellsFullyAuthored(true);
+    const planted = ([[1, 1], [2, 1], [1, 2]] as const).map(([col, row]) =>
+      ctx.state.addItem({ chain: 'strawberry', tier: 1, col, row, kind: 'item' })
+    );
+    ctx.bus.emit('board:gather', { around: [1, 1], chains: ['strawberry'] });
+    for (const p of planted) expect(ctx.state.items.get(p.id)).toMatchObject({ col: p.col, row: p.row });
+  });
+
   it('ids never collide across worlds after a reload', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 1, kind: 'item' });

@@ -596,6 +596,9 @@ export interface EventMap {
   /** Re-seat pieces standing on cells the live world no longer offers (a world's
    *  playable cells are re-derived on every entry — see BoardSystem.reconcile). */
   'board:reconcile': Record<string, never>;
+  /** Bring a world's furniture back around a point — once per world. See
+   *  BoardSystem.gather: it repairs lairs that were seeded before the anchor rule. */
+  'board:gather': { around: [number, number]; chains: string[] };
   /** Force a generator's tap-cooldown to `remainingMs` left (tutorial staging). */
   'generator:set_timer': { chain: string; tier: number; remainingMs: number };
 

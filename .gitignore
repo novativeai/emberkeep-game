@@ -6,6 +6,9 @@ test-results/
 # without reading each other's build. Generated output — never committed.
 dist-*/
 test-results-*/
+# …and their screenshots. `tests/e2e/shots/` is the authored reference set; a lane
+# writes shots-<id>/ beside it, and those are one run's artefacts, not the repo's.
+tests/e2e/shots-*/
 playwright-report/
 .playwright-mcp/
 .vercel/
