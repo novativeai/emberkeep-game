@@ -272,11 +272,6 @@
               "chain": "ember_dragon",
               "tier": 3,
               "count": 1
-            },
-            {
-              "chain": "emerald",
-              "tier": 3,
-              "count": 1
             }
           ]
         },
@@ -324,7 +319,7 @@
       "id": "the_emerald_brood",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Raise the Emerald Brood",
+      "title": "Raise the Ember Brood",
       "rewards": {
         "coins": 150,
         "spawn": {
@@ -336,10 +331,10 @@
       "steps": [
         {
           "id": "brood_eggs",
-          "label": "Make 4 Green Eggs",
+          "label": "Make 4 Red Eggs",
           "goal": {
             "kind": "have",
-            "chain": "emerald",
+            "chain": "ember_dragon",
             "tier": 2,
             "count": 4
           }

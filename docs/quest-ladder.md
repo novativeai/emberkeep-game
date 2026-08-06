@@ -49,7 +49,7 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 | 7 | **Light the Long Gallery** | — | Make 4 Flame Gems |
 | 8 | **Fill the Larder** | — | Make 2 Emberberry Preserves |
 | 9 | **The Keeper's Tasks** | — | the five `tasks.json` entries, by reference |
-| 10 🥚 | **Raise the Emerald Brood** | — | Make 4 Green Eggs |
+| 10 🥚 | **Raise the Ember Brood** | — | Make 4 Red Eggs |
 | 11 | **Wake the Ashdrake** | — | Merge 3 Ashdrake Eggs into the Ashdrake |
 | 12 | *(the live order's title)* | the encore | Deliver 8 × Gem Shard to Eleanor |
 
@@ -380,7 +380,7 @@ dragon, and the audit says so in those words.
 | --- | --- | --- |
 | Egg 1 | 2. Warm the Long Hearth | 2. Open Selyna's Keep |
 | Egg 2 | 6. Raise the Roofs | 6. What She Will Take |
-| Egg 3 | 10. Raise the Emerald Brood | 10. Spin the Light-Fast Spindles |
+| Egg 3 | 10. Raise the Ember Brood | 10. Spin the Light-Fast Spindles |
 | Hatch | 11. Wake the Ashdrake | 11. Wake the Rimewyrm |
 
 Both dragons come out **FINITE 1** in the audit, which is the correct and

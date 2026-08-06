@@ -267,13 +267,6 @@
       "gate": {
         "type": "tap"
       },
-      "arrow": {
-        "tile": {
-          "chain": "ember_dragon",
-          "nth": 0,
-          "tier": 3
-        }
-      },
       "highlight": [
         {
           "chain": "ember_dragon",
@@ -308,13 +301,6 @@
       "text": "{dragon}. …Yes. That will do. Sixty years I have not said a dragon's name out loud, and I find I am not ready for how it feels.",
       "gate": {
         "type": "tap"
-      },
-      "arrow": {
-        "tile": {
-          "chain": "ember_dragon",
-          "nth": 0,
-          "tier": 3
-        }
       },
       "highlight": [
         {
@@ -848,7 +834,7 @@
     {
       "id": "tree_grain",
       "speaker": "eleanor",
-      "text": "That Ancient Tree was old when I was small. Every tenth log it drops has a Fir Grain caught in the bark. Three have fallen already — there, in the roots.",
+      "text": "Look at what came out with the planks. Every tenth log the isle gives up has a Fir Grain caught in the bark — a tree that never got planted. Three of them, there by your House.",
       "gate": {
         "type": "tap"
       },
@@ -858,18 +844,11 @@
             "chain": "firgrain",
             "tier": 1,
             "count": 3,
-            "nearChain": "bigtree",
-            "nearTier": 1
+            "nearChain": "lumber",
+            "nearTier": 3
           }
         }
       ],
-      "arrow": {
-        "tile": {
-          "chain": "bigtree",
-          "nth": 0,
-          "tier": 1
-        }
-      },
       "highlight": [
         {
           "chain": "firgrain",
@@ -1038,13 +1017,6 @@
       "gate": {
         "type": "tap"
       },
-      "arrow": {
-        "tile": {
-          "chain": "moonwater",
-          "nth": 0,
-          "tier": 1
-        }
-      },
       "highlight": [
         {
           "chain": "moonwater",
@@ -1165,7 +1137,7 @@
     {
       "id": "resin_find",
       "speaker": "eleanor",
-      "text": "Let her sleep. While she does — look low on the old trunk. Resin. It weeps out where the heat got into the bark and sets hard as amber. Three beads of it.",
+      "text": "Let her sleep. While she does — look low on your Fir's trunk. Resin. It weeps out where the heat got into the bark and sets hard as amber. Three beads of it.",
       "gate": {
         "type": "tap"
       },
@@ -1175,18 +1147,11 @@
             "chain": "resin",
             "tier": 1,
             "count": 3,
-            "nearChain": "bigtree",
-            "nearTier": 1
+            "nearChain": "firgrain",
+            "nearTier": 3
           }
         }
       ],
-      "arrow": {
-        "tile": {
-          "chain": "resin",
-          "nth": 0,
-          "tier": 1
-        }
-      },
       "highlight": [
         {
           "chain": "resin",
@@ -1306,61 +1271,21 @@
       }
     },
     {
-      "id": "cake_pocket",
-      "speaker": "eleanor",
-      "text": "Every dragon has one thing it would cross the isle for, and for {dragon} it is resin. Pocket the Hearth Cake.",
-      "gate": {
-        "type": "event",
-        "event": "bag:stored",
-        "chain": "resin"
-      },
-      "arrow": {
-        "tile": {
-          "chain": "resin",
-          "nth": 0,
-          "tier": 3
-        }
-      },
-      "highlight": [
-        {
-          "chain": "resin",
-          "nth": 0,
-          "tier": 3
-        }
-      ],
-      "allow": {
-        "bag": true
-      }
-    },
-    {
-      "id": "cake_give",
-      "speaker": "eleanor",
-      "text": "Open the satchel, tap the Cake, and choose Give. It is her favourite — she has not had one in her life.",
-      "gate": {
-        "type": "event",
-        "event": "bag:give_armed",
-        "chain": "resin"
-      },
-      "arrow": {
-        "ui": "bag_give"
-      },
-      "allow": {
-        "bag": true,
-        "give": true,
-        "feed": true
-      }
-    },
-    {
       "id": "feed_dragon",
       "speaker": "eleanor",
-      "text": "Now tap {dragon}. I have watched a Red cross an isle for less than a Hearth Cake.",
+      "text": "Every dragon has one thing it would cross the isle for, and for {dragon} it is resin. Drag the Hearth Cake to her — straight off the board, no satchel.",
       "gate": {
         "type": "event",
         "event": "dragon:fed",
         "chain": "resin"
       },
-      "arrow": {
-        "tile": {
+      "hand": {
+        "from": {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 3
+        },
+        "to": {
           "chain": "ember_dragon",
           "nth": 0,
           "tier": 3
@@ -1368,14 +1293,20 @@
       },
       "highlight": [
         {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 3
+        },
+        {
           "chain": "ember_dragon",
           "nth": 0,
           "tier": 3
         }
       ],
       "allow": {
-        "bag": true,
-        "give": true,
+        "drag": [
+          "resin"
+        ],
         "feed": true
       }
     },
@@ -1385,13 +1316,6 @@
       "text": "Look at her. Resin is a Red's one favourite, and a favourite moves her twice as far in a day as anything else you could have given her.",
       "gate": {
         "type": "tap"
-      },
-      "arrow": {
-        "tile": {
-          "chain": "ember_dragon",
-          "nth": 0,
-          "tier": 3
-        }
       },
       "highlight": [
         {
@@ -1410,9 +1334,6 @@
       "text": "Under your quest list — that's {dragon}. Five hearts for how far she trusts you, and a line for what she is still owed today. Tap her to read it. Tap me for mine.",
       "gate": {
         "type": "tap"
-      },
-      "arrow": {
-        "ui": "status"
       },
       "allow": {
         "feed": true
@@ -1433,8 +1354,8 @@
             "chain": "resin",
             "tier": 1,
             "count": 1,
-            "nearChain": "bigtree",
-            "nearTier": 1
+            "nearChain": "firgrain",
+            "nearTier": 3
           }
         }
       ],

@@ -44,7 +44,10 @@ before-bubble-camera.png
 # and the raw/ai placeholders were committed before this rule and stay tracked.
 assets/raw/
 
-# loose working files at the repo root (masks, base64 scratch)
+# loose working files at the repo root (masks, base64 scratch, screenshot dumps
+# from a shell whose $SCRATCH never expanded)
+/$SCRATCH/
+/bevel-*-test.png
 /stage1.txt
 /emberkeep-mask.png
 /emberkeep-mask*

@@ -45,11 +45,15 @@ level-up** (suppressed during the tutorial); UIScene has its own fixed camera.
 | --- | --- | --- |
 | `level_1` | open at start | the starting zone (Theme Crystal at 8,11 — sheds Quartz) |
 | `level_2_gate` | `{keys:1, level:2}` | 3 Cut Wood (the timber plot) |
-| `level_2` | `{level:2}` | the Ancient Tree |
+| `level_2` | `{level:2}` | Cinder Vein ×2, Moonwater ×2 (no tree — see below) |
 | `level_5` | `{level:3}` | the south terrace — opens at the cap (its demo-era `level:99` is gone) |
 
 Ash-fog clouds cover every locked region; each fogged cell is authored (the
-build script asserts it).
+build script asserts it). The isle authors NO tree: `bigtree_1` used to sit at
+(4,4) in `level_2` and was removed, because a free Ancient Tree made the fir
+loop the tutorial teaches (Grain → Small Fir → **Fir Tree**) a lesson with no
+stake. The only tree in Chapter One is the one the player grows, and it is
+where all renewable timber comes from.
 
 > **Note — the key is a one-shot tutorial prop.** The *only* key in the game is
 > granted by the tutorial's `key_unlock` step (`effects: [{grantKeys: 1}]`), and
@@ -64,7 +68,7 @@ build script asserts it).
 | Chain | T1 | T2 | T3 | T4 |
 | --- | --- | --- | --- | --- |
 | `ember_dragon` | Dragon Ruby | Red Egg | **Red Dragon** ⚙ (hatch) | **Adult Red Dragon** ⚙ |
-| `emerald` | Emerald | Green Egg | **Green Dragon** ⚙ (hatch) | **Adult Emerald Dragon** ⚙ |
+| `emerald` | Emerald | Green Egg | **Green Dragon** ⚙ (hatch) | **Adult Emerald Dragon** ⚙ — *dropped: nothing produces an Emerald any more, so the Cookbook drops its rows on its own* |
 | `quartz` | Quartz Pebble | Cut Crystal | Crystal Ball | — |
 | `flame_gem` | Gem Shard | Flame Gem | Radiant Gem | — |
 | `strawberry` | Emberberry Sprout | Emberberry Bush | **Ripe Plant** ⚙ | — |
@@ -72,7 +76,7 @@ build script asserts it).
 | `lumber` | Cut Wood | Plank Set | **House** ⚙ | **Manor** ⚙ |
 | `coin` | Gold Coin | Gold Pouch | — | — |
 | `golden_egg` | Golden Egg | **Golden Elder** | — | — |
-| `bigtree` · `crystal` · `chest` | single-tier fixtures ⚙ | | | |
+| `crystal` · `chest` | single-tier fixtures ⚙ | | | |
 
 ⚙ = generator. `sparkweed` (Spark Weed → Ember Bloom → Flame Lily) still exists
 in `chains.json` as the unit tests' generic merge chain but is listed in
@@ -95,7 +99,7 @@ in `chains.json` as the unit tests' generic merge chain but is listed in
   produce on a free tile within `REWARD_SPAWN_RADIUS` (3) → cooldown
   (Red/Green Dragon 45 s, Adults 30 s). They ALSO gift passively
   (180 s / 120 s) with no tap and no Warmth.
-- **Passive generators** (`tappable:false` — House, Manor, Ancient Tree) and the
+- **Passive generators** (`tappable:false` — House, Manor, Fir Tree) and the
   free tap producers (Ripe Emberberry → an Emberberry, `energyCost: 0` / 20 s,
   and one Emberberry Sprout per **12** berries — its `generator.bonus`, the only
   way back to a second patch — Theme Crystal → a **Quartz Pebble** every
@@ -107,7 +111,11 @@ in `chains.json` as the unit tests' generic merge chain but is listed in
 - **Dragon Jobs**: send a dragon to a House and it works `DRAGON_WORK_MS` (3 min)
   advancing every timer at 2× per worker, then rests `DRAGON_REST_MS` (5 min).
 - **Treasure Chest**: a permanent fixture that readies a gift every
-  `CHEST_INTERVAL_MS` (5 min) — 15 Gold, 3 Emeralds, or 3 Rubies.
+  `CHEST_INTERVAL_MS` (5 min) — 15 Gold, 3 Rubies, or **one piece of anything
+  this world makes** (the `anyItem` wildcard, rolled at open time from
+  `chestWildcardChains`; it replaced the Emeralds when the green chain was
+  dropped). Never a legendary egg — the Directive forbids it and the audit
+  checks the roster, not just the written lines.
 - **Warmth**: max **30** (+3 per Keeper level), start 28, **+1 / 60 s**,
   offline catch-up on load, banking up to `OFFLINE_BANK_CYCLES` (3) passive
   cycles for the "While you were away" card.

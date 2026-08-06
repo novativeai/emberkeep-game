@@ -27,6 +27,7 @@ Re-run after regenerating a character's banks with Sprite Studio.
 """
 import math
 import os
+import re
 import sys
 
 from PIL import Image
@@ -80,22 +81,35 @@ CHARACTERS = {
 }
 
 
+def frame_path(*parts: str) -> str:
+    """
+    The bank frames are LOSSLESS WebP now (scripts/optimize-art.py): same pixels,
+    a third fewer bytes, and the .png master is gone. The bank layout is still
+    written here in .png terms because that is how the art is authored and how
+    posesheet.py emits it, so resolve to whichever sibling is actually on disk.
+    PIL opens either without knowing the difference.
+    """
+    path = os.path.join(*parts)
+    alt = re.sub(r'\.png$', '.webp', path)
+    return alt if not os.path.exists(path) and os.path.exists(alt) else path
+
+
 def bake(name: str) -> None:
     cfg = CHARACTERS[name]
     base = os.path.join(ROOT, cfg['dir'])
-    rest = Image.open(os.path.join(base, cfg['rest'])).convert('RGBA')
+    rest = Image.open(frame_path(base, cfg['rest'])).convert('RGBA')
     src_w, src_h = rest.size
     crop_h = round(src_h * BOTTOM_KEEP)
 
     frames = [rest, rest]
     for folder, count in cfg['banks']:
         for i in range(count):
-            frames.append(Image.open(os.path.join(base, folder, f'{i}.png')).convert('RGBA'))
+            frames.append(Image.open(frame_path(base, folder, f'{i}.png')).convert('RGBA'))
     expr_dir = cfg.get('expressions')
     expr_names = []
     if expr_dir:
         for face in EXPRESSIONS:
-            path = os.path.join(base, expr_dir, f'{face}.png')
+            path = frame_path(base, expr_dir, f'{face}.png')
             if not os.path.exists(path):
                 raise SystemExit(f'{name}: expression art is all-or-nothing, {face}.png is missing')
             frames.append(Image.open(path).convert('RGBA'))

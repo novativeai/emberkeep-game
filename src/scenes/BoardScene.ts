@@ -43,6 +43,7 @@ import {
   PRODUCE_BADGE_R,
   REVEAL_HOLD_BACK_MAX_MS,
   STANDEE_SHADOW_DX,
+  STANDEE_SHADOW_DY,
   STANDEE_SHADOW_SQUASH,
   STANDEE_SHADOW_WIDTH,
   TAP_MAX_DISTANCE_PX,
@@ -862,14 +863,17 @@ export class BoardScene extends Phaser.Scene {
     if (mood === 'asleep') {
       const sleepKey = `sleep_${ld.host.chain}_${ld.host.tier}`;
       if (this.textures.exists(sleepKey)) {
-        // The rig steps aside and the painting takes the tile. `setArtTexture`
-        // re-reads the anchor and re-fits the ground shadow, so a curled
-        // silhouette does not keep a standing dragon's footprint.
+        // The rig steps aside and the painting takes the tile — but the rig's
+        // GROUND SHADOW stays exactly where it was. The curled art's anchor is
+        // its own alpha-bbox floor line (anchors.json), so its belly lands on
+        // the tile origin, which is the same line `syncDragon` puts that shadow
+        // on: the dragon lies down ON its shadow rather than hovering over a
+        // second one the item would otherwise light beneath itself.
         ld.player.container.setVisible(false);
-        ld.shadow.setVisible(false);
         ld.host.setArtTexture(sleepKey, this.ctx.data.anchors);
         ld.host.setArtScale(ITEM_SCALE[sleepKey] ?? DRAGON_SLEEP_SCALE);
         ld.host.setArtVisible(true);
+        ld.host.setGroundShadowVisible(false);
         // A still frame reads as a dead sprite, so the painting BREATHES.
         // Phase is hashed off the item id — two dragons asleep side by side
         // must not inhale together.
@@ -1710,7 +1714,8 @@ export class BoardScene extends Phaser.Scene {
         (bank ? bank.body.width * standeeScale : sprite.displayWidth) * STANDEE_SHADOW_WIDTH,
         DEPTHS.itemBase + y - 1,
         STANDEE_SHADOW_SQUASH,
-        STANDEE_SHADOW_DX
+        STANDEE_SHADOW_DX,
+        STANDEE_SHADOW_DY
       );
       // Her hit area is her LOWER BODY, never her full frame. A standee is ~2
       // tiles tall, so its bounding box reaches over the cells behind her and
@@ -2649,7 +2654,9 @@ export class BoardScene extends Phaser.Scene {
     // let it come back to idle on its own, rather than pinning an animation the
     // state machine will fight over.
     const ld = this.liveDragons.get(target.itemId);
-    if (ld && !ld.busy) {
+    if (ld?.mood === 'asleep') {
+      this.stirSleeper(ld); // fed in her sleep — the painting answers, not the rig
+    } else if (ld && !ld.busy) {
       ld.player.play('hover');
       ld.player.playFace(1); // a chirp for the meal
       ld.mode = 'hover';
@@ -2942,23 +2949,26 @@ export class BoardScene extends Phaser.Scene {
    *  dragon). Squashed into an ellipse; sits on the cell ground so a bouncing
    *  sprite lifts off it.
    *
-   *  `squash` (height as a fraction of the final width) and `dx` (a horizontal
-   *  nudge in fractions of that width) exist for the standees: a person's
-   *  contact patch spreads sideways under her feet without getting deeper, and
-   *  her weight is not over the point she is anchored on. Everything else takes
-   *  the defaults. */
+   *  `squash` (height as a fraction of the final width), `dx` (a horizontal
+   *  nudge in fractions of that width) and `dy` (a vertical one in fractions of
+   *  the resulting HEIGHT) exist for the standees: a person's contact patch
+   *  spreads sideways under her feet without getting deeper, her weight is not
+   *  over the point she is anchored on, and her anchor is her soles rather than
+   *  the middle of the patch. Everything else takes the defaults. */
   private addGroundShadow(
     x: number,
     y: number,
     displayWidth: number,
     depth: number,
     squash = 0.42,
-    dx = 0
+    dx = 0,
+    dy = 0
   ): Phaser.GameObjects.Image {
     const w = Math.max(70, displayWidth * 0.95);
+    const h = w * squash;
     return this.add
-      .image(x + w * dx, y, 'fx_shadow')
-      .setDisplaySize(w, w * squash)
+      .image(x + w * dx, y + h * dy, 'fx_shadow')
+      .setDisplaySize(w, h)
       .setDepth(depth);
   }
 
@@ -4227,9 +4237,46 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /** Nudge a live rigged dragon into one celebration cycle (e.g. on a gift). */
+  /**
+   * A sleeping dragon still gifts — and the gift has to look like it came from
+   * an animal rather than out of the air.
+   *
+   * While she sleeps the RIG IS HIDDEN: the curled painting stands in for it
+   * (applyDragonMood), so the celebrate animation was playing into an invisible
+   * puppet and the shard simply appeared beside a motionless dragon. Worse, it
+   * left `mode`/`remainMs` claiming 'hover' while she was asleep, a state waking
+   * up then had to unpick.
+   *
+   * So the sleeper reacts on the thing that is actually on screen: she rocks
+   * once and her 💤 puffs. She is NOT woken — DragonLifeSystem owns the mood,
+   * and giving something in your sleep is not a reason to get up.
+   */
+  private stirSleeper(ld: LiveDragon): void {
+    this.tweens.add({
+      targets: ld.host,
+      angle: { from: 0, to: -3.5 },
+      duration: 200,
+      yoyo: true,
+      ease: 'Sine.easeInOut'
+    });
+    if (ld.zzz) {
+      this.tweens.add({
+        targets: ld.zzz,
+        scale: { from: 1, to: 1.5 },
+        duration: 230,
+        yoyo: true,
+        ease: 'Sine.easeOut'
+      });
+    }
+  }
+
   private celebrateDragon(itemId: number): void {
     const ld = this.liveDragons.get(itemId);
     if (!ld) return;
+    if (ld.mood === 'asleep') {
+      this.stirSleeper(ld);
+      return;
+    }
     ld.mode = 'hover';
     ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
     ld.player.play('hover');

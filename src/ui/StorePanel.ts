@@ -9,8 +9,10 @@ import {
   RARITY
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import type { GameContext } from '../core/Context';
 import type { GameState } from '../core/GameState';
 import type { StoreData, StoreItem, StoreRarity, StoreSection } from '../core/types';
+import { ensureTextures } from '../core/lazyTextures';
 import { addScrim, makeFoilPlate, PLATE_INSET, runSheen } from './foil';
 import { uiRegistry } from './theme';
 
@@ -29,6 +31,17 @@ const COL_GAP = 476;
  */
 const GRID_MID = 180;
 const ROW_GAP = 490;
+/**
+ * The grid's visible height. The tab row sits at -430 and the frame's inner
+ * floor is +660, so the shelf owns -300..+660 — 960 units, exactly two rows.
+ * A section with more than `COLS * 2` items therefore SCROLLS: Decorations
+ * carries thirteen, which is four rows, and before this they simply drew
+ * straight through the bottom of the frame and out onto the board.
+ */
+const VIEW_H = 960;
+/** Past this much drag the gesture is a scroll, and the card under the finger
+ *  must not also be bought. */
+const DRAG_SLOP = 12;
 
 /**
  * The showcase card. Its height IS the whole grid — both rows and the gap
@@ -62,6 +75,16 @@ export class StorePanel extends Phaser.GameObjects.Container {
   private tabsRow: Phaser.GameObjects.Container;
   /** Named `shelf`, not `body`: GameObject.body is Phaser's physics slot. */
   private shelf: Phaser.GameObjects.Container;
+  /** Clipped window the shelf scrolls inside. */
+  private viewport: Phaser.GameObjects.Container;
+  private shelfMask: Phaser.GameObjects.Graphics;
+  private scrollY = 0;
+  private maxScroll = 0;
+  private dragFrom: number | null = null;
+  private dragScrollFrom = 0;
+  /** True once a pointer has travelled past DRAG_SLOP — consumed by the buy
+   *  handler so a scroll that ends over a card does not also buy it. */
+  private dragged = false;
   private sectionBlurb: Phaser.GameObjects.Text;
   private sections: StoreSection[];
   private activeIndex = 0;
@@ -79,7 +102,8 @@ export class StorePanel extends Phaser.GameObjects.Container {
     scene: Phaser.Scene,
     private bus: EventBus,
     private gameState: GameState,
-    data: StoreData
+    data: StoreData,
+    private ctx: GameContext
   ) {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
     this.sections = data.sections;
@@ -122,9 +146,15 @@ export class StorePanel extends Phaser.GameObjects.Container {
     close.on('pointerup', () => this.requestClose());
 
     this.tabsRow = scene.add.container(0, -430);
-    this.shelf = scene.add.container(0, GRID_MID);
+    this.viewport = scene.add.container(0, GRID_MID);
+    this.shelf = scene.add.container(0, 0);
+    this.viewport.add(this.shelf);
+    // Geometry masks live in WORLD space, so this is re-seated from the
+    // container's own world transform whenever the panel moves or scales.
+    this.shelfMask = scene.make.graphics();
+    this.shelf.setMask(this.shelfMask.createGeometryMask());
 
-    this.add([this.dim, frame, this.titleBg, this.titleText, this.sectionBlurb, close, this.tabsRow, this.shelf]);
+    this.add([this.dim, frame, this.titleBg, this.titleText, this.sectionBlurb, close, this.tabsRow, this.viewport]);
     scene.add.existing(this);
     this.setVisible(false);
     this.drawBanner(this.titleText.width + 200);
@@ -136,27 +166,56 @@ export class StorePanel extends Phaser.GameObjects.Container {
     this.offBus.push(
       bus.on('store:purchase_failed', ({ itemId, reason }) => this.refuse(itemId, reason))
     );
+    // Scene-level input rather than an interactive Zone over the shelf: a Zone
+    // big enough to catch the drag would sit on top of every card and swallow
+    // the taps that buy them. The handlers gate on `isOpen` instead.
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
+    scene.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
+    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp, this);
+
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       for (const off of this.offBus) off();
       this.offBus = [];
       this.stopSheens();
+      scene.input.off(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
+      scene.input.off(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
+      scene.input.off(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
+      scene.input.off(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
+      scene.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp, this);
+      this.shelfMask.destroy();
     });
 
     uiRegistry.register(scene, 'panel.store', "Keeper's Store panel", 'Panels', this, {
       frame,
       title: this.titleText,
       tabs: this.tabsRow,
-      cards: this.shelf
+      cards: this.viewport
     });
   }
 
   open(): void {
+    // The shelf's own art is NOT at boot. PreloadScene skips every `decor_` key
+    // the live map does not use (they are pure GPU cost until a screen shows
+    // them), and the Store is the one screen that shows the rest — so its cards
+    // came up empty. `lazyTextures` exists for exactly this: fetch on the way
+    // in, then rebuild so the cards pick the textures up.
+    ensureTextures(this.scene, this.ctx, this.artKeys(), () => {
+      if (this.isOpen) this.buildBody();
+    });
     this.buildTabs();
     this.buildBody();
     this.isOpen = true;
     this.setVisible(true).setAlpha(0).setScale(this.baseScale * 0.92);
+    this.seatMask();
     this.scene.tweens.add({
-      targets: this, alpha: 1, scale: this.baseScale, duration: 200, ease: 'Back.easeOut'
+      targets: this,
+      alpha: 1,
+      scale: this.baseScale,
+      duration: 200,
+      ease: 'Back.easeOut',
+      onUpdate: () => this.seatMask()
     });
     this.bus.emit('ui:store_toggled', { open: true });
   }
@@ -174,6 +233,11 @@ export class StorePanel extends Phaser.GameObjects.Container {
       ease: 'Sine.easeIn',
       onComplete: () => this.setVisible(false)
     });
+  }
+
+  /** Every texture the shelf can draw, across all sections. */
+  private artKeys(): string[] {
+    return this.sections.flatMap((section) => section.items.map((item) => item.art));
   }
 
   private refresh(): void {
@@ -300,7 +364,15 @@ export class StorePanel extends Phaser.GameObjects.Container {
 
     const blockMidX = hero ? left + HERO_W + HERO_GAP + blockW / 2 : 0;
     const rows = Math.ceil(rest.length / cols);
-    const startY = -((rows - 1) * ROW_GAP) / 2;
+    // Short sections stay optically centred; a section that overflows starts at
+    // the top of the window instead, because a centred overflow hides its first
+    // row as well as its last.
+    const contentH = (rows - 1) * ROW_GAP + CARD_H;
+    const startY =
+      contentH <= VIEW_H
+        ? -((rows - 1) * ROW_GAP) / 2
+        : -VIEW_H / 2 + CARD_H / 2;
+    this.maxScroll = Math.max(0, contentH - VIEW_H);
     rest.forEach((item, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
@@ -312,7 +384,61 @@ export class StorePanel extends Phaser.GameObjects.Container {
         item
       );
     });
+    this.setScroll(0);
+    this.seatMask();
   }
+
+  /* ------------------------------- scrolling ------------------------------ */
+
+  private setScroll(y: number): void {
+    this.scrollY = Phaser.Math.Clamp(y, 0, this.maxScroll);
+    this.shelf.setY(-this.scrollY);
+  }
+
+  /**
+   * Re-seat the clip rect. A geometry mask is drawn in WORLD space, so it has
+   * to be rebuilt from the viewport's live world transform — the panel is
+   * centred, scaled by `panelMobileScale`, and scaled again by its own
+   * open/close tween, and a mask left in local units clips the wrong band on
+   * every one of those.
+   */
+  private seatMask(): void {
+    const m = this.viewport.getWorldTransformMatrix();
+    const h = VIEW_H * m.scaleY;
+    const w = GAME_WIDTH * m.scaleX; // wider than the frame — only Y clips here
+    this.shelfMask.clear();
+    this.shelfMask.fillStyle(0xffffff, 1);
+    this.shelfMask.fillRect(m.tx - w / 2, m.ty - h / 2, w, h);
+  }
+
+  /** Wheel and drag both scroll; neither may reach the board behind the panel. */
+  private onWheel = (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number): void => {
+    if (!this.isOpen || this.maxScroll <= 0) return;
+    this.setScroll(this.scrollY + dy);
+  };
+
+  private onPointerDown = (p: Phaser.Input.Pointer): void => {
+    if (!this.isOpen) return;
+    this.dragFrom = p.y;
+    this.dragScrollFrom = this.scrollY;
+    this.dragged = false;
+  };
+
+  private onPointerMove = (p: Phaser.Input.Pointer): void => {
+    if (this.dragFrom === null || this.maxScroll <= 0) return;
+    const dy = p.y - this.dragFrom;
+    if (Math.abs(dy) > DRAG_SLOP) this.dragged = true;
+    // Pointer units are screen pixels; the shelf lives in the scaled panel.
+    const scale = this.viewport.getWorldTransformMatrix().scaleY || 1;
+    this.setScroll(this.dragScrollFrom - dy / scale);
+  };
+
+  private onPointerUp = (): void => {
+    this.dragFrom = null;
+    // Cleared a frame later so the buy handler, which fires on this same
+    // pointerup, still sees that the gesture was a drag.
+    this.scene.time.delayedCall(0, () => (this.dragged = false));
+  };
 
   private place(card: Phaser.GameObjects.Container, item: StoreItem): void {
     this.shelf.add(card);
@@ -404,6 +530,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
     btnImg.on('pointerout', () => btn.setScale(1));
     btnImg.on('pointerup', () => {
       btn.setScale(1);
+      if (this.dragged) return; // the player was scrolling the shelf, not buying
       if (skinAction) this.bus.emit('ui:store_equip_requested', { itemId: item.id });
       else this.bus.emit('ui:store_buy_requested', { itemId: item.id });
     });

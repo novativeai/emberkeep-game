@@ -841,10 +841,6 @@
   },
   "startClearing": [
     [
-      4,
-      1
-    ],
-    [
       7,
       2
     ],
@@ -1122,6 +1118,10 @@
       "level": 1,
       "status": "unlockable",
       "cells": [
+        [
+          4,
+          1
+        ],
         [
           0,
           0

@@ -13,10 +13,6 @@
       "status": "active",
       "tiles": [
         [
-          4,
-          1
-        ],
-        [
           7,
           2
         ],
@@ -200,14 +196,6 @@
       ],
       "contents": [
         {
-          "chain": "bigtree",
-          "tier": 1,
-          "at": [
-            4,
-            4
-          ]
-        },
-        {
           "chain": "cinder_vein",
           "tier": 1,
           "at": [
@@ -248,6 +236,10 @@
         "level": 3
       },
       "tiles": [
+        [
+          4,
+          1
+        ],
         [
           1,
           2

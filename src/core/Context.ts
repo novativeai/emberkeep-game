@@ -153,7 +153,7 @@ export class GameContext {
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       reward: new RewardSystem(this.bus),
       reveal: new RevealSystem(this.state, this.bus),
-      chest: new ChestSystem(this.state, this.bus, this.clock),
+      chest: new ChestSystem(this.state, this.bus, this.clock, this.data.chains),
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains),
       tasks,
       quests,

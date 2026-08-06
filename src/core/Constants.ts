@@ -287,11 +287,20 @@ export const ITEM_SCALE: Record<string, number> = {
   lumber_3: 0.72, // the House — reduced 20% on request (0.9 → 0.72)
   lumber_4: 0.82, // the Manor (manor.png 430×450) — a touch bigger than the House
   // Curled sleep paintings (their own pose, their own resolution). Each scale
-  // reproduces the STANDING dragon's on-board footprint — a whelp rig is 666px
-  // at whelpScale 0.46 ≈ 306 units — so a dragon lying down occupies the tile
-  // the same way it did standing up.
-  sleep_ember_dragon_3: 0.256, // curled whelp, alpha bbox 1193 → 306 units
-  sleep_ember_dragon_4: 0.262, // curled adult, 1602 → 420 units
+  // reproduces the on-board width of the LIVE RIG the painting stands in for,
+  // so the dragon that lies down is the same animal that was standing there.
+  //
+  // Derive it from the rig, never from a tile: the rig's own art is the baked
+  // sheet (`item_ember_dragon_*`, which IS the rig at native resolution), and it
+  // renders at `DRAGON_ANIM.whelpScale × DRAGON_RIG_SCALE[chain(:tier)]`.
+  //   whelp  776px bbox × (0.46 × 0.448) = 160 units → 160 / 1193 = 0.134
+  //   adult  809px bbox × (0.46 × 0.93)  = 346 units → 346 / 1602 = 0.216
+  // These were 0.256 / 0.262, from a first pass that read the 666 in
+  // `addGroundShadow(…, 666 * scale, …)` as the rig's width and dropped
+  // DRAGON_RIG_SCALE — which put the sleeping whelp at 306 units, nearly twice
+  // the dragon it replaced. 666 is a SHADOW width. The rig art is 776/809.
+  sleep_ember_dragon_3: 0.134, // curled whelp, alpha bbox 1193 → 160 units
+  sleep_ember_dragon_4: 0.216, // curled adult, 1602 → 346 units
   bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
   // The Fir loop — what the Ancient Tree drops as it is worked, and what that
   // grows back into. Sized so the three steps READ as growth at a glance:
@@ -829,6 +838,15 @@ export const STANDEE_SHADOW_SQUASH = 0.34;
  *  her arm out to one side, so the box's centre sits right of the feet actually
  *  bearing her weight. Small on purpose — past ~0.1 she reads as detached. */
 export const STANDEE_SHADOW_DX = -0.05;
+/** And its vertical nudge, in fractions of its own HEIGHT — negative is UP.
+ *  The shadow is centred on her anchor, and the bake puts that anchor at the
+ *  BOTTOM of her body box (her soles), so a centred ellipse spends half its
+ *  height BELOW the lowest pixel of her — reading as a puddle she hovers over
+ *  rather than the patch she stands on. Lifting it tucks most of the ellipse
+ *  back under her feet while leaving enough below to still read as ground.
+ *  Fractions of height, not width like `DX`, because that is what it moves
+ *  against: the nudge holds its meaning if the squash is ever retuned. */
+export const STANDEE_SHADOW_DY = -0.3;
 
 /* ---------------- The day clock (merge-chains.md §3) ----------------
  * Four coarse phases, 8 minutes each — a full day is 32 minutes of real time.
@@ -989,8 +1007,15 @@ export const DRAGON_WANDER_ARC = 175;
 export const SLEEP_BREATH = {
   periodMs: 3400,
   amount: 0.035,
-  /** How far the body drifts up at the top of the breath, in game units. */
-  lift: 4
+  /**
+   * How far the body drifts up at the top of the breath, in game units — **0,
+   * and it should stay 0.** The curled art is anchored on its own belly line
+   * (anchors.json), so `amount` already lifts the ribcage while the belly stays
+   * planted, which is what breathing on the ground looks like. Any lift here
+   * moves the whole animal off its shadow instead, and a dragon that leaves the
+   * floor once every 3.4 s is not asleep, it is hovering.
+   */
+  lift: 0
 } as const;
 
 /** A dragon naps of its own accord: a window this long, once per cycle, with
@@ -1036,8 +1061,10 @@ export const CHEST_INTERVAL_MS = 300_000;
  * Recurring treasure-chest gifts. The chest is a PERMANENT fixture: every
  * CHEST_INTERVAL_MS a gift is ready; claiming it grants ONE of these at random,
  * then the chest recharges (it never disappears). `coins` is currency; `item`
- * pops that many merge pieces onto free tiles by the chest. (No wood — lumber
- * appears only when its cloud zone clears.) Designers tune it here, not in code.
+ * pops that many merge pieces onto free tiles by the chest; `anyItem` rolls a
+ * single tier-1 piece from whatever this world actually makes
+ * (`chestWildcardChains`). (No wood — lumber appears only when its cloud zone
+ * clears.) Designers tune it here, not in code.
  */
 /** How far (manhattan tiles) a reward drop may land from its source. Beyond
  *  this the drop is BLOCKED (harvest fails / chest pays Gold / passive skips)
@@ -1046,13 +1073,52 @@ export const REWARD_SPAWN_RADIUS = 3;
 
 export type ChestGift =
   | { kind: 'coins'; amount: number; label: string }
-  | { kind: 'item'; chain: string; tier: number; count: number; label: string };
+  | { kind: 'item'; chain: string; tier: number; count: number; label: string }
+  /** One tier-1 piece, of a chain rolled from THIS world at open time. */
+  | { kind: 'anyItem'; label: string };
 
 export const CHEST_GIFTS: ReadonlyArray<ChestGift> = [
   { kind: 'coins', amount: 15, label: '+15' }, // the scene draws the coin art beside it
-  { kind: 'item', chain: 'emerald', tier: 1, count: 3, label: '3 Emeralds!' },
+  // Was `3 × emerald` — the green dragon is dropped, and the chest was the last
+  // thing on the board still handing its chain out. Replaced by the wildcard
+  // rather than by another fixed chain: a named third gift would just be a
+  // second Ruby drop with a different sprite, and the chest's job is to be the
+  // one place the isle surprises you.
+  { kind: 'anyItem', label: 'A find!' },
   { kind: 'item', chain: 'ember_dragon', tier: 1, count: 3, label: '3 Rubies!' }
 ];
+
+/** Never rolled by the `anyItem` wildcard, whatever world it opens in. */
+export const CHEST_WILDCARD_NEVER = new Set<string>([
+  'coin', // currency, and the chest already has a Gold face
+  'golden_egg', // the finale's, placed by the altar and by nothing else
+  'emerald' // the dropped green-dragon chain — the whole point of the change
+]);
+
+/**
+ * What the wildcard may roll in `worldId`: a real MERGE chain of this world.
+ *
+ * Four filters, each load-bearing. Not withheld from this world
+ * (`chainHiddenIn` — a chest must never leak the next chapter's roster or the
+ * north's onto the isle). Not `legendary`: the Egg Directive above says *no
+ * producer ever makes an egg, not a chest*, and a random table is exactly the
+ * hole that rule exists to close. More than one tier, so the drop is something
+ * the player can DO something with rather than a lone fixture. And a tier 1,
+ * because the wildcard always pays the bottom of a ladder — a chest that
+ * occasionally handed out a tier-3 would outrank every generator on the board.
+ */
+export function chestWildcardChains<
+  T extends { id: string; world?: string; legendary?: boolean; tiers: ReadonlyArray<{ tier: number }> }
+>(chains: readonly T[], worldId: string): T[] {
+  return chains.filter(
+    (c) =>
+      !chainHiddenIn(c, worldId) &&
+      !c.legendary &&
+      !CHEST_WILDCARD_NEVER.has(c.id) &&
+      c.tiers.length > 1 &&
+      c.tiers.some((t) => t.tier === 1)
+  );
+}
 
 /**
  * A chest pays in the currency of the world it stands in.

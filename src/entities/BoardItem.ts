@@ -291,6 +291,18 @@ export class BoardItem extends Phaser.GameObjects.Container {
     }
   }
 
+  /**
+   * Show the art but NOT its own ground shadow.
+   *
+   * One caller: a sleeping dragon. The curled painting replaces a rig that was
+   * already casting a shadow of its own, in its own place — so the painting
+   * keeps standing on THAT shadow instead of lighting a second one underneath
+   * itself. Two shadows for one animal is the tell that the pose was swapped.
+   */
+  setGroundShadowVisible(visible: boolean): void {
+    this.groundShadow.setVisible(visible);
+  }
+
   liftForDrag(): void {
     this.bobPaused = true;
     this.setDepth(DEPTHS.dragged);

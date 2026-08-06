@@ -143,14 +143,14 @@ new chain is a data edit, never a code change. Each tier has `name`, `sell`
 | Chain | Tier 1 | Tier 2 | Tier 3 | Tier 4 | Role |
 | --- | --- | --- | --- | --- | --- |
 | `ember_dragon` | Dragon Ruby | Red Egg | **Red Dragon** ⚙ | **Adult Red** ⚙ | dragons — dig Gem Shards |
-| `emerald` | Emerald | Green Egg | **Green Dragon** ⚙ | **Adult Emerald** ⚙ | dragons — dig Gem Shards |
+| `emerald` | Emerald | Green Egg | **Green Dragon** ⚙ | **Adult Emerald** ⚙ | *dropped in Chapter One — no producer left* |
 | `flame_gem` | Gem Shard | Flame Gem | Radiant Gem | — | order goods |
 | `strawberry` | Emberberry Sprout | Emberberry Bush | **Ripe Plant** ⚙ | — | the free-producer floor — it drops `emberberry`, and a Sprout per 12 |
 | `emberberry` | Emberberry | Basket | Preserve | — | the free food ladder (dragon fuel later) |
 | `lumber` | Cut Wood | Plank Set | **House** ⚙ | **Manor** ⚙ | the Gold loop |
 | `coin` | Gold Coin | Gold Pouch | — | — | tap-to-collect currency |
 | `golden_egg` | Golden Egg | **Golden Elder** | — | — | the finale MacGuffin |
-| `bigtree` · `crystal` · `chest` | single-tier fixtures ⚙ | | | | seeded producers |
+| `crystal` · `chest` | single-tier fixtures ⚙ | | | | seeded producers |
 
 ⚙ = generator tier. Both dragon chains hatch at tier 3 and pair-merge (2 → 1)
 into their Adult. `sparkweed` still exists in `chains.json` as the unit tests'
@@ -211,7 +211,9 @@ Warmth.** Shipped free producers (all `energyCost: 0`):
   **bonus** Emberberry Sprout every 12 yields (`generator.bonus`): nine sprouts
   is a second patch, so the food chain seeds its own expansion.
 - **House / Manor** — a Gold Coin / Gold Pouch every 210 s (`tappable: false`).
-- **Ancient Tree** — a Cut Wood every 300 s. **Theme Crystal** — an Emerald every 300 s.
+- **Fir Tree** — a Cut Wood every 300 s, plus a Fir Grain every 10th (the loop
+  closes on itself). The isle authors no tree; this one is grown. **Theme
+  Crystal** — an Emerald every 300 s.
 - **Treasure Chest** — a random gift every `CHEST_INTERVAL_MS` (300 s), forever.
 - They keep producing **offline**, banking up to `OFFLINE_BANK_CYCLES` (**3**)
   overdue cycles per producer, which the "While you were away" card reports on

@@ -251,12 +251,54 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   for the same tap. (5) `produces` rides `{...item}` into the save, so it persists with
   no `SAVE_VERSION` bump — but changing the FIELD NAME orphans every commissioned House
   in every existing save.
-- **TOUCH `generator.bonus` on the Ancient Tree / Fir Tree → CHECK** the loop closes:
-  `bigtree_1` and `firgrain_3` carry the SAME produce and the SAME bonus on purpose, so
-  a grown tree is indistinguishable in play from the authored one. Change one and change
-  both, or the tree the player grew is quietly worse than the one they were given.
-  `TimberLoop.spec` and `pnpm quests --all` both check it (the audit proves the whole
-  wood → grain → sapling → tree loop RENEWABLE).
+- **TOUCH a sleeping dragon's ITEM_SCALE → DERIVE IT FROM THE RIG, not from a tile.**
+  The curled painting stands in for a live `RigPlayer`, and the rig renders at
+  `DRAGON_ANIM.whelpScale × DRAGON_RIG_SCALE[chain(:tier)]` over its baked sheet
+  (`item_ember_dragon_*` IS the rig at native resolution) — so the target is
+  `bakedAlphaBboxWidth × thatProduct`, divided by the sleep art's own bbox width. The
+  first pass read the `666` in `addGroundShadow(…, 666 * scale, …)` as the rig's width
+  and dropped `DRAGON_RIG_SCALE` entirely, which put the sleeping whelp at 306 units
+  against a 160-unit dragon. **666 is a shadow width.** Get the rig art's number.
+- **TOUCH the sleep anchor, `SLEEP_BREATH.lift`, or who owns the shadow while a dragon
+  sleeps → CHECK it still lies ON the floor.** Three things cooperate and any one of
+  them lifts it off: the sleep anchor in `anchors.json` is the art's own alpha-bbox
+  BOTTOM (0.9932 / 0.9942, not a guessed 0.97), so the belly lands on the tile origin;
+  `applyDragonMood` keeps the RIG's ground shadow (`ld.shadow`, already on that origin
+  via `syncDragon`) and hides the item's own (`setGroundShadowVisible(false)`), so there
+  is one shadow and the dragon is on it; and `SLEEP_BREATH.lift` is **0** because
+  `amount` alone raises the ribcage off a planted belly. A non-zero lift moves the whole
+  animal, which reads as hovering, not breathing.
+- **TOUCH `CHEST_GIFTS` → CHECK what the audit loses.** The chest is a permanent renewable
+  SOURCE in `availability.ts`, so deleting a gift can strand a quest that had no other
+  supply: dropping the Emeralds is what made `the_emerald_brood` and `hatch_4`'s Green
+  Dragon UNREACHABLE, and both had to be retargeted onto `ember_dragon`. The `anyItem`
+  wildcard is deliberately NOT counted as a source (it names no chain, so nothing can
+  rely on it), and `chestWildcardChains` is the only thing standing between a random
+  table and the Legendary Egg Directive — `pnpm quests` asserts the roster itself, not
+  just the written gift lines. `the_emerald_brood` KEEPS its id though its title and goal
+  are now the Ember Brood: a renamed quest id re-opens the quest in every existing save.
+- **TOUCH `generator.bonus` on the Fir Tree → CHECK** the loop closes. `firgrain_3` is
+  now the ONLY tree the isle has: `bigtree_1` was removed from `level_2`'s contents
+  because a free Ancient Tree made the fir loop the tutorial teaches pointless. The chain
+  and its art stay (it is a single-tier fixture, so it was never a Cookbook row), but
+  nothing places one, and lumber's renewability rests entirely on the tree the player
+  grows at `fir_grow`. `TimberLoop.spec` and `pnpm quests --all` both check it — the
+  audit proves the whole wood → grain → sapling → tree loop RENEWABLE, and if that
+  bonus breaks, timber goes FINITE for the whole chapter rather than merely slower.
+- **TOUCH a tutorial `spawn`'s `nearChain` → CHECK the anchor exists BY THAT STEP.**
+  `BoardSystem.spawn` falls back to "near any item, else the origin" when the anchor is
+  missing, so a broken anchor does not throw — the pieces just land somewhere the line
+  is not pointing at, and the `arrow`/`highlight` that names the same piece silently
+  draws nothing. `tree_grain` anchors on `lumber:3` (the House raised one beat earlier);
+  `resin_find` and `resin_pocket` anchor on `firgrain:3`, which is why neither may be
+  reordered before `fir_grow`.
+- **TOUCH a region's `tiles` in map.json → CHECK the screen-space picture, not the list.**
+  Fog is per REGION (`BoardScene.buildFog` skips `active` ones), so a playable cell left
+  in `level_1` while its neighbours sit in a locked region renders as a bare grass diamond
+  punched through the cloud bank. Cell (4,1) was exactly that hole at the north tip and is
+  now `level_5`. Plot `(col-row, col+row)` before believing a region reads as one mass —
+  a grid-order tile list gives no hint of it. Keep `src/data/world-map.json`
+  (`startClearing` / `fogRegions[].cells`) in step, or the next ingest re-opens the hole.
 - **TOUCH a `gift` step's chain/tier/count, or `REGARD_QUEST_POINTS`/
   `REGARD_POINTS_PER_HEART` → CHECK** `RegardSystem.spec`, which asserts BOTH that the
   gauge still fills in 15–20 quests and that no authored `regard` goal or

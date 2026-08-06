@@ -179,7 +179,7 @@ export class UIScene extends Phaser.Scene {
     this.shop = new ShopPanel(this, this.ctx.bus, this.ctx.state);
     this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
 
-    this.store = new StorePanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.store);
+    this.store = new StorePanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.store, this.ctx);
     this.store.setDepth(DEPTH_PANEL + 7);
 
     this.cookbook = new CookbookPanel(this, this.ctx.bus, this.ctx.state, {

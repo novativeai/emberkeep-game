@@ -1,6 +1,7 @@
 import {
   chainHiddenIn,
   chestGiftsIn,
+  chestWildcardChains,
   LEGENDARY_EGG_COUNT,
   LEGENDARY_EGG_GAP_MAX,
   LEGENDARY_EGG_GAP_MIN,
@@ -265,6 +266,11 @@ export function solveAvailability(world: WorldModel, data: AuditData): Availabil
   //      stands. The table is per world — a northern chest pays northern goods.
   if ((world.board.get(pieceKey('chest', 1)) ?? 0) > 0) {
     for (const gift of chestGiftsIn(data.worldId)) {
+      // `anyItem` is skipped ON PURPOSE. It rolls one chain out of the whole
+      // world roster, so no particular piece is promised by it — crediting every
+      // eligible chain here would let a subquest look satisfiable off a drop the
+      // player might never see. A wildcard is flavour; the audit only counts
+      // sources a player can rely on.
       if (gift.kind !== 'item') continue;
       add(pieceKey(gift.chain, gift.tier), gift.count, {
         kind: 'chest',
@@ -998,6 +1004,14 @@ export function auditLegendaryArc(data: AuditData): Finding[] {
   }
   for (const gift of chestGiftsIn(data.worldId)) {
     if (gift.kind === 'item' && isEgg(gift)) wild.push('a chest pays it');
+    // …and the wildcard is checked as a ROSTER, not as a written line: it names
+    // no chain, so the only way it could pay an egg is by the eligibility filter
+    // letting a legendary through. Assert that here rather than trusting the
+    // filter, because this is the rule the Directive exists to protect.
+    if (gift.kind === 'anyItem') {
+      const rolls = chestWildcardChains(data.chains.chains, data.worldId);
+      if (rolls.some((c) => c.id === legendary.id)) wild.push("a chest's wildcard can roll it");
+    }
   }
   for (const order of [...data.orders.orders, ...(data.orders.repeatable ?? [])]) {
     if (isEgg(order.rewards.spawn)) wild.push(`order '${order.title}' pays it`);

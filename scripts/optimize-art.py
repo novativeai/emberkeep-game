@@ -3,7 +3,9 @@
 LOSSLESS re-encode of the shipped PNGs to WebP, with the references moved with them.
 
     python3 scripts/optimize-art.py --dry-run     # what it would do
-    python3 scripts/optimize-art.py               # convert + rewrite references
+    python3 scripts/optimize-art.py               # the SHIPPED art (dist), + references
+    python3 scripts/optimize-art.py --project     # every tracked PNG under assets/,
+                                                  # and the .png master goes away
 
 WHY WEBP AND NOT A SMALLER PNG: these are hand-painted RGBA sprites, and
 `cwebp -lossless` gives 30-46% on them where a PNG re-crush gives ~5%. Nothing
@@ -39,23 +41,46 @@ ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "assets"
 DIST = ROOT / "dist"
 DRY = "--dry-run" in sys.argv
-
-# Only files that actually ship are worth converting, and `dist` is the list of
-# those — built by the filter in vite.config.ts. Run `pnpm build` first.
-if not (DIST / "index.html").exists():
-    sys.exit("[optimize-art] no dist/ — run `pnpm build` first")
+PROJECT = "--project" in sys.argv
 
 SKIP = (
     re.compile(r"^vfx-bank/"),          # shader data, not pictures
-    re.compile(r"disc-atlas\.png$"),    # ~1% for 4.5 MB
-    re.compile(r"^raw/"),               # never ships
+    re.compile(r"disc-atlas\.png$"),    # ~1% for 4.5 MB, and PreloadScene names the .png
+    re.compile(r"^raw/"),               # generation workspace: never ships, never tracked
 )
 
 
 def shipped_pngs() -> list[str]:
+    """The PNGs the deploy carries — `dist` is that list, built by the filter."""
+    if not (DIST / "index.html").exists():
+        sys.exit("[optimize-art] no dist/ — run `pnpm build` first")
     out = []
     for abs_path in DIST.rglob("*.png"):
         rel = abs_path.relative_to(DIST).as_posix()
+        if any(rx.search(rel) for rx in SKIP):
+            continue
+        if (ASSETS / rel).exists():
+            out.append(rel)
+    return sorted(out)
+
+
+def project_pngs() -> list[str]:
+    """
+    Every PNG the REPOSITORY carries under assets/ — the workspace as well as the
+    deploy, because a bake input is a PNG somebody has to clone too.
+
+    Tracked files only: `assets/raw` is 3.9 GB of local generation output that is
+    git-ignored and never shipped, and re-encoding someone's masters in place is
+    not this script's business.
+    """
+    listed = subprocess.run(
+        ["git", "ls-files", "-z", "assets"], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.split("\0")
+    out = []
+    for tracked in listed:
+        if not tracked.endswith(".png"):
+            continue
+        rel = tracked[len("assets/"):]
         if any(rx.search(rel) for rx in SKIP):
             continue
         if (ASSETS / rel).exists():
@@ -75,7 +100,15 @@ def convert(rel: str) -> tuple[int, int] | None:
     png = ASSETS / rel
     webp = png.with_suffix(".webp")
     if webp.exists():
-        return None  # already paired — the build is already shipping the webp
+        # Already paired. In --project mode the master has served its purpose:
+        # the WebP holds the same pixels, so carrying both is carrying the art
+        # twice. Verify that claim before acting on it.
+        if PROJECT and not DRY and identical(png, webp):
+            before = png.stat().st_size
+            png.unlink()
+            dropped.append(rel)
+            return (before, 0)
+        return None
     before = png.stat().st_size
     if DRY:
         return (before, before)  # size unknown without encoding; caller reports count only
@@ -87,22 +120,28 @@ def convert(rel: str) -> tuple[int, int] | None:
     if after >= before or not identical(png, webp):
         webp.unlink(missing_ok=True)
         return None
+    if PROJECT:
+        png.unlink()  # pixel-identical and smaller: the WebP IS the master now
+        dropped.append(rel)
     return (before, after)
 
 
 converted: list[str] = []
+dropped: list[str] = []
 saved = 0
 total_before = 0
-for rel in shipped_pngs():
+for rel in project_pngs() if PROJECT else shipped_pngs():
     res = convert(rel)
     if not res:
         continue
     before, after = res
-    converted.append(rel)
+    if rel not in dropped or after:
+        converted.append(rel)
     total_before += before
     saved += before - after
 
-print(f"[optimize-art] converted {len(converted)} PNG → lossless WebP")
+print(f"[optimize-art] converted {len(converted)} PNG → lossless WebP"
+      + (f", dropped {len(dropped)} superseded master(s)" if PROJECT else ""))
 print(f"               {total_before / 1048576:.1f} MB → {(total_before - saved) / 1048576:.1f} MB "
       f"({saved / 1048576:.1f} MB saved)")
 
@@ -174,8 +213,15 @@ seq_path.write_text(seq)
 print(f"               sequenceCatalog.ts: {flipped} bank(s) flipped to webp")
 
 if unresolved:
-    print(f"\n[optimize-art] {len(unresolved)} converted file(s) had NO reference to move —")
-    print("               the build will now drop the .png and nothing asks for the .webp:")
-    for rel in sorted(unresolved):
-        print(f"                 {rel}")
-    sys.exit(1)
+    # In --project mode most conversions ARE workspace art (bake inputs, masters,
+    # generation references) and having no runtime reference is the normal case.
+    # In the shipped pass it is a defect: the build drops the .png and nothing
+    # would ask for the .webp, so the art would fall back to a placeholder.
+    if PROJECT:
+        print(f"               {len(unresolved)} workspace file(s) with no runtime reference (expected)")
+    else:
+        print(f"\n[optimize-art] {len(unresolved)} converted file(s) had NO reference to move —")
+        print("               the build will now drop the .png and nothing asks for the .webp:")
+        for rel in sorted(unresolved):
+            print(f"                 {rel}")
+        sys.exit(1)

@@ -59,72 +59,80 @@ export const BUILTIN_SEQUENCES: BuiltinSequence[] = [
     key: 'eleanor_talk_short',
     label: 'Eleanor · Talk · short line',
     dir: 'sprites/eleanor-merge/talk_short',
+    ext: 'webp',
     count: 5,
     durations: [90, 160, 140, 90, 160],
-    endIdle: 'sprites/eleanor-merge/rest.png',
+    endIdle: 'sprites/eleanor-merge/rest.webp',
     loop: false
   },
   {
     key: 'eleanor_talk_mid',
     label: 'Eleanor · Talk · medium line',
     dir: 'sprites/eleanor-merge/talk_mid',
+    ext: 'webp',
     count: 15,
     durations: [90, 160, 90, 140, 160, 90, 140, 90, 160, 90, 140, 90, 90, 160, 90],
-    endIdle: 'sprites/eleanor-merge/rest.png',
+    endIdle: 'sprites/eleanor-merge/rest.webp',
     loop: false
   },
   {
     key: 'eleanor_talk_long',
     label: 'Eleanor · Talk · long line',
     dir: 'sprites/eleanor-merge/talk_long',
+    ext: 'webp',
     count: 20,
     durations: [90, 160, 90, 140, 160, 90, 140, 90, 160, 90, 160, 90, 140, 160, 90, 140, 90, 160, 90, 90],
-    endIdle: 'sprites/eleanor-merge/rest.png',
+    endIdle: 'sprites/eleanor-merge/rest.webp',
     loop: false
   },
   {
     key: 'eleanor_blink',
     label: 'Eleanor · Blink',
     dir: 'sprites/eleanor-merge/blink',
+    ext: 'webp',
     count: 4,
     durations: [2600, 45, 70, 55],
-    endIdle: 'sprites/eleanor-merge/rest.png',
+    endIdle: 'sprites/eleanor-merge/rest.webp',
     loop: true
   },
   {
     key: 'selyna_talk_short',
     label: 'Selyna · Talk · short line',
     dir: 'sprites/selyna-merge/talk_short',
+    ext: 'webp',
     count: 5,
     durations: [90, 160, 140, 90, 160],
-    endIdle: 'sprites/selyna-merge/rest.png',
+    endIdle: 'sprites/selyna-merge/rest.webp',
     loop: false
   },
   {
     key: 'selyna_talk_mid',
     label: 'Selyna · Talk · medium line',
     dir: 'sprites/selyna-merge/talk_mid',
+    ext: 'webp',
     count: 15,
     durations: [90, 160, 90, 140, 160, 90, 140, 90, 160, 90, 140, 90, 90, 160, 90],
-    endIdle: 'sprites/selyna-merge/rest.png',
+    endIdle: 'sprites/selyna-merge/rest.webp',
     loop: false
   },
   {
     key: 'selyna_talk_long',
     label: 'Selyna · Talk · long line',
     dir: 'sprites/selyna-merge/talk_long',
+    ext: 'webp',
     count: 20,
     durations: [90, 160, 90, 140, 160, 90, 140, 90, 160, 90, 160, 90, 140, 160, 90, 140, 90, 160, 90, 90],
-    endIdle: 'sprites/selyna-merge/rest.png',
+    endIdle: 'sprites/selyna-merge/rest.webp',
     loop: false
   },
   {
     key: 'selyna_blink',
     label: 'Selyna · Blink',
     dir: 'sprites/selyna-merge/blink',
+    ext: 'webp',
     count: 4,
     durations: [2600, 45, 70, 55],
-    endIdle: 'sprites/selyna-merge/rest.png',
+    endIdle: 'sprites/selyna-merge/rest.webp',
     loop: true
   },
   // The Golden Elder. Unlike Eleanor and Selyna, her talk bank is NOT a

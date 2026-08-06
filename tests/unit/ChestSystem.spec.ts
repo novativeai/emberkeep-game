@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CHEST_INTERVAL_MS } from '../../src/core/Constants';
+import { CHEST_INTERVAL_MS, chainHiddenIn, chestWildcardChains } from '../../src/core/Constants';
 import { capture, createTestContext } from './helpers';
 
 describe('ChestSystem (standing gift box)', () => {
@@ -20,17 +20,40 @@ describe('ChestSystem (standing gift box)', () => {
     expect(chest.readyAt).toBeLessThanOrEqual(ctx.clock.now() + CHEST_INTERVAL_MS);
   });
 
-  it('pops 3 Emeralds (random → emerald) without consuming the chest', () => {
+  it('pops ONE piece of this world (random → the wildcard), and never an Emerald', () => {
     const ctx = createTestContext();
-    vi.spyOn(Math, 'random').mockReturnValue(0.5); // index 1 → emerald
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // index 1 → the wildcard
     const chest = ctx.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
     const spawned = capture(ctx.bus, 'item:spawned');
 
     ctx.bus.emit('chest:open', { itemId: chest.id });
 
-    const gems = spawned.filter((s) => s.item.chain === 'emerald' && s.item.tier === 1);
-    expect(gems).toHaveLength(3);
+    expect(spawned).toHaveLength(1); // ONE piece, not a handful
+    expect(spawned[0]!.item.tier).toBe(1); // always the bottom of a ladder
+    expect(spawned[0]!.item.chain).not.toBe('emerald');
     expect(ctx.state.items.get(chest.id)).toBeDefined();
+  });
+
+  it('the wildcard roster is only real, live, non-legendary merge chains', () => {
+    const ctx = createTestContext();
+    const pool = chestWildcardChains(ctx.data.chains.chains, ctx.state.worldId);
+    expect(pool.length).toBeGreaterThan(0);
+    for (const chain of pool) {
+      // Withheld rosters stay withheld — a chest is not a way around the
+      // chapter gate or the world gate.
+      expect(chainHiddenIn(chain, ctx.state.worldId)).toBe(false);
+      // The Legendary Egg Directive: no producer ever pays an egg, chest least
+      // of all. This is the assertion that keeps a random table from becoming
+      // the hole in that rule.
+      expect(chain.legendary ?? false).toBe(false);
+      // A fixture (one tier) is not a merge element; a wildcard that dropped one
+      // would hand the player a piece with nothing to do.
+      expect(chain.tiers.length).toBeGreaterThan(1);
+      expect(chain.tiers.some((t) => t.tier === 1)).toBe(true);
+    }
+    for (const id of ['emerald', 'coin', 'golden_egg']) {
+      expect(pool.some((c) => c.id === id)).toBe(false);
+    }
   });
 
   it('pops 3 Rubies (random → ember_dragon)', () => {
