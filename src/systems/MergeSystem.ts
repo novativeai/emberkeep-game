@@ -7,6 +7,7 @@ import type {
   ChainConfig,
   ChainMergeOverride,
   ChainsData,
+  DragonCare,
   ItemSnapshot,
   TilePos
 } from '../core/types';
@@ -193,6 +194,16 @@ export class MergeSystem {
     const consumedIds = consumed.map((i) => i.id);
     const consumedAt = consumed.map((i) => ({ col: i.col, row: i.row }));
 
+    // Two Red Dragons becoming an Adult is ONE dragon growing up, so the care
+    // record survives the merge at the best of what went in. A player who has
+    // been feeding a dragon every day must never be punished for merging it —
+    // and its trust is a record of what they did, exactly like Regard's.
+    const inherited = this.bestCare(consumed);
+    // And her NAME. Without this the merge that grows a named dragon would read
+    // as the player losing her and being handed a stranger — the one way a board
+    // dragon could break the naming law (types.ts, BoardItemState.dragonName).
+    const inheritedName = consumed.find((i) => i.dragonName)?.dragonName;
+
     for (const member of consumed) {
       this.state.removeItem(member.id);
     }
@@ -216,7 +227,9 @@ export class MergeSystem {
         col: tile.col,
         row: tile.row,
         kind: 'item',
-        ...(generator ? { readyAt: this.clock.now() } : {})
+        ...(generator ? { readyAt: this.clock.now() } : {}),
+        ...(inherited ? { care: { ...inherited } } : {}),
+        ...(inheritedName ? { dragonName: inheritedName } : {})
       });
       outputs.push(this.state.snapshot(created, this.clock.now()));
     }
@@ -250,6 +263,28 @@ export class MergeSystem {
       }
     }
     return true;
+  }
+
+  /**
+   * The care record the merge's output inherits: the most-trusted of the dragons
+   * that went in, and the fullest belly among the records that share its trust.
+   * Undefined when nothing consumed was ever fed, so a plain merge writes no
+   * field at all and the save stays exactly as small as it was.
+   */
+  private bestCare(consumed: BoardItemState[]): DragonCare | undefined {
+    let best: DragonCare | undefined;
+    for (const member of consumed) {
+      const care = member.care;
+      if (!care) continue;
+      if (
+        !best ||
+        care.trust > best.trust ||
+        (care.trust === best.trust && care.day >= best.day && care.meals > best.meals)
+      ) {
+        best = care;
+      }
+    }
+    return best;
   }
 
   /** BFS from the seed so consumed members are nearest-first (seed included first). */

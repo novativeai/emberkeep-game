@@ -1,0 +1,30 @@
+{
+  "characters": [
+    {
+      "id": "eleanor",
+      "speaker": "eleanor",
+      "world": "emberkeep",
+      "anchor": [
+        8,
+        0
+      ],
+      "action": "give_back",
+      "cooldownMs": 900000,
+      "dx": -196,
+      "dy": -591
+    },
+    {
+      "id": "selyna",
+      "speaker": "selyna",
+      "world": "borealis",
+      "anchor": [
+        85,
+        0
+      ],
+      "action": "give_back",
+      "cooldownMs": 900000,
+      "dx": -108,
+      "dy": -152
+    }
+  ]
+}

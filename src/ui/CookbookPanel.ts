@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
+import { FONT } from '../art/design';
+import { chainHiddenIn, GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
+import { reachableRecipeKeys, type AuditData } from '../core/availability';
 import type { ChainsData } from '../core/types';
 import { uiRegistry } from './theme';
 
-const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
 /** One merge recipe the book can hold: N× (chain, fromTier) → (chain, toTier). */
 interface Recipe {
@@ -63,9 +64,10 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     scene: Phaser.Scene,
     private bus: EventBus,
     private gameState: GameState,
-    chains: ChainsData
+    data: AuditData
   ) {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    const chains = data.chains;
 
     const dim = scene.add
       .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
@@ -86,7 +88,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.add(lozenge);
     const title = scene.add
       .text(0, -384, 'Emberkeep Cookbook', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '48px',
         fontStyle: 'bold',
         color: PALETTE.textBrown
@@ -98,7 +100,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.add(
       scene.add
         .text(0, -302, 'Every merge you discover is inscribed here', {
-          fontFamily: FONT,
+          fontFamily: FONT.ui,
           fontSize: '26px',
           fontStyle: 'italic',
           color: '#8A6248'
@@ -117,7 +119,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     const closeButton = scene.add.container(592, -392);
     const closeBg = scene.add.circle(0, 0, 42, num(PALETTE.lava)).setStrokeStyle(6, num(PALETTE.cream));
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: PALETTE.cream })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: PALETTE.goldAccent })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
     closeButton.setSize(96, 96);
@@ -128,7 +130,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // ---- Recipe rows: every mergeable tier pair, chains.json order. Two
     // columns split evenly; with more than 6 rows per column the gap squeezes
     // so the last row never collides with the counter line below. ----
-    const recipes = this.enumerateRecipes(chains);
+    const recipes = this.enumerateRecipes(chains, reachableRecipeKeys(data));
     const half = Math.ceil(recipes.length / 2);
     // Crowded book: shrink the gap to spread rows across the page, and shrink
     // each ROW by the same ratio so chips/captions can never overlap.
@@ -142,10 +144,10 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
 
     this.counter = scene.add
       .text(0, 384, '', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '28px',
         fontStyle: 'bold',
-        color: PALETTE.goldShade
+        color: PALETTE.goldAccent
       })
       .setOrigin(0.5);
     this.add(this.counter);
@@ -161,15 +163,29 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.offBus.push(bus.on('cookbook:discovered', () => this.isOpen && this.refresh()));
   }
 
-  /** All merge recipes the game holds: chain tiers with a next tier. The
-   *  Golden chain is lore (altar fixture, never board-merged) — skipped. */
-  private enumerateRecipes(chains: ChainsData): Recipe[] {
+  /**
+   * The recipes this book is allowed to promise: chain tiers with a next tier,
+   * minus the Golden chain (lore — an altar fixture, never board-merged), minus
+   * every chain withheld from this world, and minus any pair this chapter
+   * cannot actually produce.
+   *
+   * A row the player can never fill sits as a permanent "· · ·" and caps
+   * `n / N` below its own total, which reads as a bug rather than as content
+   * not yet reached. `chainHiddenIn` covers a whole chain — wrong chapter
+   * (HIDDEN_CHAINS) or wrong world (chains.json `world`); `discoverable`
+   * (availability.reachableRecipeKeys) covers the partial ones — the two
+   * Cracked Stones that are a prop rather than a chain, and Moonwater's third
+   * tier, whose Dew Basin belongs to a later chapter. The book counts what is
+   * reachable, and now it computes that instead of assuming it.
+   */
+  private enumerateRecipes(chains: ChainsData, discoverable: Set<string>): Recipe[] {
     const out: Recipe[] = [];
     for (const chain of chains.chains) {
-      if (chain.id === 'golden_egg') continue;
+      if (chain.id === 'golden_egg' || chainHiddenIn(chain, this.gameState.worldId)) continue;
       for (const tier of chain.tiers) {
         const next = chain.tiers.find((t) => t.tier === tier.tier + 1);
         if (!next) continue;
+        if (!discoverable.has(`${chain.id}:${tier.tier}>${next.tier}`)) continue;
         // Per-TIER recipe override first (2 Houses → Manor, 2 Dragons → Adult),
         // then the chain-level one, then the global rule.
         const count = tier.merge?.group ?? chain.merge?.group ?? chains.mergeRule.minGroup;
@@ -217,7 +233,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     const mkMark = (cx: number): Phaser.GameObjects.Text => {
       const mark = scene.add
         .text(cx, -8, '?', {
-          fontFamily: FONT,
+          fontFamily: FONT.ui,
           fontSize: '44px',
           fontStyle: 'bold',
           color: PALETTE.goldAccent
@@ -234,7 +250,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // "Dragon Ruby → Red Egg". Rows never collide vertically this way.
     const caption = scene.add
       .text((CHIP_FROM_X + CHIP_TO_X) / 2, 14, '', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '18px',
         fontStyle: 'bold',
         color: PALETTE.textBrown
@@ -251,7 +267,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     badgeBg.strokeRoundedRect(-27, -15, 54, 30, 15);
     const badgeText = scene.add
       .text(0, -1, `×${recipe.count}`, {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '22px',
         fontStyle: 'bold',
         color: PALETTE.textBrown

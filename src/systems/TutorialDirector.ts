@@ -8,6 +8,7 @@ import type {
   TilePos,
   TutorialAllow,
   TutorialData,
+  TutorialEffect,
   TutorialStepConfig,
   TutorialStepEvent
 } from '../core/types';
@@ -21,7 +22,13 @@ const ALLOW_NOTHING: Required<TutorialAllow> = {
   sell: false,
   dragonWork: false,
   marketplace: false,
-  cookbook: false
+  cookbook: false,
+  bag: false,
+  character: false,
+  feed: false,
+  commission: false,
+  status: false,
+  give: false
 };
 
 const ALLOW_EVERYTHING: Required<TutorialAllow> = {
@@ -33,7 +40,13 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
   sell: true,
   dragonWork: true,
   marketplace: true,
-  cookbook: true
+  cookbook: true,
+  bag: true,
+  character: true,
+  feed: true,
+  commission: true,
+  status: true,
+  give: true
 };
 
 /**
@@ -61,8 +74,32 @@ export class TutorialDirector {
       this.checkCountGate();
     });
     bus.on('item:harvested', ({ output }) => this.onGateEvent('item:harvested', output.chain));
+    bus.on('bag:stored', ({ chain }) => this.onGateEvent('bag:stored', chain));
+    bus.on('item:sold', () => this.onGateEvent('item:sold'));
+    bus.on('character:action_used', ({ characterId }) =>
+      this.onGateEvent('character:action_used', characterId)
+    );
     bus.on('chest:open', () => this.onGateEvent('chest:open'));
     bus.on('dragon:working', () => this.onGateEvent('dragon:working'));
+    // The feeding lesson gates on the CHAIN eaten, so "give it the Hearth Cake"
+    // cannot be satisfied by handing it a Moss Tuft that happened to be nearby.
+    bus.on('dragon:fed', ({ chain }) => this.onGateEvent('dragon:fed', chain));
+    bus.on('dragon:named', ({ chain }) => this.onGateEvent('dragon:named', chain));
+    // GIVE is two beats, so it has two gates. The first is choosing it in the
+    // satchel — the piece is held out but not yet handed to anybody...
+    bus.on('bag:give_armed', ({ chain }) => this.onGateEvent('bag:give_armed', chain));
+    // ...and the second is the delivery, gated on the CHAIN she accepted, so
+    // "hand her the Crystal Ball" cannot be met with something else she wants.
+    bus.on('regard:gift_accepted', ({ chain }) => this.onGateEvent('regard:gift_accepted', chain));
+    // Tapping a character is the whole verb for reading her — the beat that
+    // teaches the status readout gates on it.
+    bus.on('ui:character_tapped', ({ characterId }) =>
+      this.onGateEvent('ui:character_tapped', characterId)
+    );
+    // The House's commission: the gate is the choice being MADE, not the panel
+    // being opened — a player who opens the chooser and closes it again has not
+    // learned the lesson, and the House is still undecided.
+    bus.on('generator:produce_set', ({ chain }) => this.onGateEvent('generator:produce_set', chain));
     bus.on('generator:skipped', ({ chain, currency }) =>
       this.onGateEvent('generator:skipped', chain, currency)
     );
@@ -96,7 +133,32 @@ export class TutorialDirector {
       return;
     }
     this.emitStep();
+    this.replayPrompts(this.currentStep);
     this.checkCountGate();
+  }
+
+  /**
+   * Re-run the effects of the resumed step that ASK the player something.
+   *
+   * Most effects are grants — a spawn, some XP, a key — and their results are in
+   * the save, which is why `advance()` runs them once and `begin()` does not.
+   * Two are not grants. `nameDragon` opens a prompt, and `wantGift` stages a
+   * want that is deliberately never persisted; neither leaves anything behind
+   * for a reload to find. A step gated on answering a prompt that no longer
+   * exists is a dead save, so those two are re-applied on resume.
+   *
+   * Both are idempotent by construction: `nameDragon` looks for a dragon with no
+   * name yet, and `wantGift` overwrites the single scripted want.
+   */
+  private replayPrompts(step: TutorialStepConfig | undefined): void {
+    for (const effect of step?.effects ?? []) {
+      if (!('nameDragon' in effect) && !('wantGift' in effect)) continue;
+      try {
+        this.applyEffect(effect);
+      } catch (err) {
+        console.error(`[tutorial] prompt replay failed on step '${step?.id}'`, effect, err);
+      }
+    }
   }
 
   isDone(): boolean {
@@ -137,9 +199,32 @@ export class TutorialDirector {
     }
   }
 
-  /** Run a step's scripted reward beats via bus commands (spawn / ripen / key / xp). */
+  /**
+   * Run a step's scripted reward beats via bus commands (spawn / ripen / key / xp).
+   *
+   * Each effect is ISOLATED. The bus is synchronous and does not catch, so a
+   * throwing subscriber used to unwind all the way out of `advance()` — which
+   * had already incremented `tutorialIndex` but had not yet emitted the new
+   * step. The result was the worst possible failure: the director silently on
+   * step N+1, the bubble still showing step N, and every further tap sending a
+   * stepId that no longer matched. A hard lock with nothing on screen to say so.
+   *
+   * An effect that fails now costs its own reward and nothing else, and says so
+   * in the console. The step still emits, so the player is never stranded by a
+   * view that threw.
+   */
   private applyEffects(step: TutorialStepConfig | undefined): void {
     for (const effect of step?.effects ?? []) {
+      try {
+        this.applyEffect(effect);
+      } catch (err) {
+        console.error(`[tutorial] effect failed on step '${step?.id}'`, effect, err);
+      }
+    }
+  }
+
+  private applyEffect(effect: TutorialEffect): void {
+    {
       if ('spawn' in effect) {
         this.bus.emit('board:spawn', effect.spawn);
       } else if ('retier' in effect) {
@@ -157,6 +242,17 @@ export class TutorialDirector {
         this.bus.emit('board:move', effect.move);
       } else if ('setTimer' in effect) {
         this.bus.emit('generator:set_timer', effect.setTimer);
+      } else if ('wantGift' in effect) {
+        this.bus.emit('tutorial:want_gift', effect.wantGift);
+      } else if ('nameDragon' in effect) {
+        const { chain, tier } = effect.nameDragon;
+        const dragon = [...this.state.items.values()].find(
+          (i) => i.kind === 'item' && i.chain === chain && i.tier === tier && !i.dragonName
+        );
+        // No silent refusal: this step's gate IS the answer to the prompt, so a
+        // beat that asks nobody is a stuck save, and it must say so.
+        if (dragon) this.bus.emit('ui:name_dragon_requested', { itemId: dragon.id });
+        else console.error(`[tutorial] nameDragon found no unnamed ${chain} at tier ${tier}`);
       }
     }
   }
@@ -173,7 +269,7 @@ export class TutorialDirector {
       index: this.data.steps.length,
       total: this.data.steps.length,
       done: true,
-      speaker: 'laurah',
+      speaker: 'eleanor',
       text: '',
       gateType: 'tap',
       highlight: [],

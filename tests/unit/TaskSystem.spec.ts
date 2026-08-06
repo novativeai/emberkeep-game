@@ -8,7 +8,7 @@ describe("TaskSystem (Keeper's Tasks — the encore checklist)", () => {
       item: { id: 1, chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' }
     });
     ctx.bus.emit('economy:add', { coins: 40, reason: 'test' });
-    ctx.bus.emit('item:sold', { itemId: 9, coins: 5 });
+    ctx.bus.emit('item:sold', { chain: 'cinder_vein', tier: 1, coins: 5 });
     ctx.bus.emit('elder:tapped', { itemId: 3 });
 
     expect(ctx.state.stat('hatches')).toBe(1);
@@ -26,6 +26,7 @@ describe("TaskSystem (Keeper's Tasks — the encore checklist)", () => {
   it('pays the reward bundle exactly ONCE when every task completes', () => {
     const ctx = createTestContext();
     const done = capture(ctx.bus, 'tasks:all_complete');
+    const paid = capture(ctx.bus, 'economy:add');
     const item = { id: 1, chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' as const };
 
     // Drive every counter past its target.
@@ -43,7 +44,13 @@ describe("TaskSystem (Keeper's Tasks — the encore checklist)", () => {
 
     expect(done).toHaveLength(1);
     expect(ctx.state.stat('tasksClaimed')).toBe(1);
-    expect(ctx.state.coins).toBe(coinsAtComplete + 150); // the golden bundle
+    // The golden bundle, measured on its OWN payout rather than on the wallet:
+    // finishing every task also finishes the `keepers_tasks` QUEST, and that
+    // pays its own reward into the same purse in the same frame.
+    const bundle = paid.filter((p) => p.reason === 'tasks:complete');
+    expect(bundle).toHaveLength(1);
+    expect(bundle[0]!.coins).toBe(150);
+    expect(ctx.state.coins).toBeGreaterThanOrEqual(coinsAtComplete + 150);
 
     // More activity never re-fires the reward.
     ctx.bus.emit('elder:tapped', { itemId: 2 });
@@ -54,10 +61,10 @@ describe("TaskSystem (Keeper's Tasks — the encore checklist)", () => {
   it('the Elder task reads locked until her order is delivered AND Level 3', () => {
     const ctx = createTestContext();
     const elderTask = ctx.systems.tasks.tasks.find((t) => t.kind === 'elderTaps')!;
-    expect(elderTask.lockedUntil).toEqual({ order: 'cindra_brazier', level: 3 });
+    expect(elderTask.lockedUntil).toEqual({ order: 'eleanor_brazier', level: 3 });
 
     expect(ctx.systems.tasks.isLocked(elderTask)).toBe(true);
-    ctx.state.completedOrderIds.push('cindra_brazier');
+    ctx.state.completedOrderIds.push('eleanor_brazier');
     expect(ctx.systems.tasks.isLocked(elderTask)).toBe(true); // still below Level 3
     ctx.state.xp = 220; // LEVEL_XP[2] — Keeper Level 3
     expect(ctx.systems.tasks.isLocked(elderTask)).toBe(false);

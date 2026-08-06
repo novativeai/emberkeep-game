@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "presets": {
+    "snowfall": {
+      "label": "Snowfall — the standing weather of a cold world",
+      "note": "Five depth planes, far to near. The far plane is a slow haze of 2px dots; the near plane is a handful of big soft out-of-focus flakes crossing the screen in three seconds. Everything between is graded on every axis at once — size, speed, focus, flutter, and how hard the wind pushes it.",
+      "tint": "#F2F8FF",
+      "intensity": 1.0,
+      "windScale": 0.035,
+      "planes": [
+        { "grid": 46, "radius": 0.055, "fall": 0.055, "drift": 0.004, "coverage": 0.35, "brightness": 0.30, "softness": 0.30, "sway": 0.010, "swayHz": 0.09, "tumble": 0.35, "stretch": 1.05, "windGain": 0.35 },
+        { "grid": 34, "radius": 0.075, "fall": 0.085, "drift": 0.006, "coverage": 0.35, "brightness": 0.42, "softness": 0.35, "sway": 0.016, "swayHz": 0.13, "tumble": 0.40, "stretch": 1.10, "windGain": 0.55 },
+        { "grid": 24, "radius": 0.100, "fall": 0.125, "drift": 0.008, "coverage": 0.32, "brightness": 0.55, "softness": 0.45, "sway": 0.024, "swayHz": 0.17, "tumble": 0.45, "stretch": 1.20, "windGain": 0.80 },
+        { "grid": 15, "radius": 0.130, "fall": 0.190, "drift": 0.011, "coverage": 0.30, "brightness": 0.48, "softness": 0.62, "sway": 0.034, "swayHz": 0.21, "tumble": 0.50, "stretch": 1.45, "windGain": 1.10 },
+        { "grid": 8.5, "radius": 0.150, "fall": 0.300, "drift": 0.015, "coverage": 0.26, "brightness": 0.30, "softness": 0.90, "sway": 0.100, "swayHz": 0.26, "tumble": 0.35, "stretch": 1.80, "windGain": 1.50 }
+      ]
+    },
+    "flurry": {
+      "label": "Flurry — a few flakes, weather that is only just happening",
+      "note": "A third of the snowfall's flakes and slower. For a scene that wants cold in the air without the sky filling up: the near plane stays, because one big soft flake crossing the lens is what tells the player it is snowing at all.",
+      "tint": "#EEF6FF",
+      "intensity": 0.9,
+      "windScale": 0.02,
+      "planes": [
+        { "grid": 46, "radius": 0.055, "fall": 0.040, "drift": 0.003, "coverage": 0.12, "brightness": 0.28, "softness": 0.30, "sway": 0.008, "swayHz": 0.07, "tumble": 0.30, "stretch": 1.02, "windGain": 0.25 },
+        { "grid": 34, "radius": 0.075, "fall": 0.062, "drift": 0.004, "coverage": 0.11, "brightness": 0.38, "softness": 0.35, "sway": 0.013, "swayHz": 0.10, "tumble": 0.35, "stretch": 1.05, "windGain": 0.40 },
+        { "grid": 24, "radius": 0.100, "fall": 0.090, "drift": 0.006, "coverage": 0.10, "brightness": 0.50, "softness": 0.45, "sway": 0.020, "swayHz": 0.13, "tumble": 0.40, "stretch": 1.12, "windGain": 0.60 },
+        { "grid": 15, "radius": 0.130, "fall": 0.135, "drift": 0.008, "coverage": 0.09, "brightness": 0.44, "softness": 0.62, "sway": 0.028, "swayHz": 0.17, "tumble": 0.45, "stretch": 1.30, "windGain": 0.85 },
+        { "grid": 8.5, "radius": 0.150, "fall": 0.210, "drift": 0.011, "coverage": 0.08, "brightness": 0.28, "softness": 0.90, "sway": 0.075, "swayHz": 0.21, "tumble": 0.32, "stretch": 1.55, "windGain": 1.20 }
+      ]
+    },
+    "blizzard": {
+      "label": "Blizzard — driven snow, the sky closing in",
+      "note": "Denser, faster, and far more elongated: at this speed a flake IS a streak, and the near planes lean hard on the shared world wind so a gust throws the whole field sideways at once — the same gust that leans the braziers' smoke.",
+      "tint": "#F6FAFF",
+      "intensity": 1.15,
+      "windScale": 0.07,
+      "planes": [
+        { "grid": 46, "radius": 0.058, "fall": 0.110, "drift": 0.010, "coverage": 0.55, "brightness": 0.34, "softness": 0.32, "sway": 0.012, "swayHz": 0.13, "tumble": 0.40, "stretch": 1.15, "windGain": 0.55 },
+        { "grid": 34, "radius": 0.078, "fall": 0.170, "drift": 0.015, "coverage": 0.52, "brightness": 0.48, "softness": 0.38, "sway": 0.020, "swayHz": 0.18, "tumble": 0.45, "stretch": 1.30, "windGain": 0.80 },
+        { "grid": 24, "radius": 0.104, "fall": 0.250, "drift": 0.021, "coverage": 0.48, "brightness": 0.62, "softness": 0.48, "sway": 0.030, "swayHz": 0.24, "tumble": 0.50, "stretch": 1.55, "windGain": 1.15 },
+        { "grid": 15, "radius": 0.134, "fall": 0.380, "drift": 0.030, "coverage": 0.42, "brightness": 0.54, "softness": 0.66, "sway": 0.042, "swayHz": 0.30, "tumble": 0.55, "stretch": 1.95, "windGain": 1.55 },
+        { "grid": 8.5, "radius": 0.152, "fall": 0.600, "drift": 0.042, "coverage": 0.36, "brightness": 0.34, "softness": 0.92, "sway": 0.110, "swayHz": 0.38, "tumble": 0.40, "stretch": 2.20, "windGain": 2.10 }
+      ]
+    }
+  }
+}

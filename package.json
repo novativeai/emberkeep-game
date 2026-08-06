@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "verify": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run e2e",
+    "quests": "tsx scripts/quest-audit.ts",
     "placeholders": "tsx scripts/gen-placeholders.ts",
     "probe": "tsx scripts/probe-image.ts",
     "bake:dragon": "node scripts/bake-dragon.mjs",

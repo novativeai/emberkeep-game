@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { FONT } from '../art/design';
 import { UI_NINESLICE } from '../art/TextureFactory';
 import { CHARACTER_FACES, faceTextureKeyFor, loadCharacterRig } from '../render/characterCatalog';
 import { RigPlayer } from '../render/RigPlayer';
@@ -7,7 +8,6 @@ import { uiRegistry } from './theme';
 import type { CustomLayer } from './themeCore';
 import { hexToNum } from './themeCore';
 
-const FONT = 'Trebuchet MS, Verdana, sans-serif';
 const DEFAULT_DEPTH = 40; // above the HUD (10), below modal panels (60)
 
 interface LiveRigLayer {
@@ -46,7 +46,7 @@ interface LiveComponent {
 export class CustomUiManager {
   private live = new Map<string, LiveComponent>();
   /** Animates `sequence` part patches on BUILT-IN elements (e.g. the bubble
-   *  portrait replaced by a Laurah talk bank) — shares this scene's tick. */
+   *  portrait replaced by a talk bank) — shares this scene's tick. */
   readonly partAnimator: PartAnimator;
 
   constructor(private scene: Phaser.Scene) {
@@ -153,7 +153,7 @@ export class CustomUiManager {
       const st = layer.style ?? {};
       const txt = this.scene.add
         .text(layer.x, layer.y, layer.text ?? '', {
-          fontFamily: st.fontFamily ?? FONT,
+          fontFamily: st.fontFamily ?? FONT.ui,
           fontSize: `${st.fontSize ?? 40}px`,
           fontStyle: st.fontStyle ?? 'bold',
           color: st.color ?? '#FFF6E8',

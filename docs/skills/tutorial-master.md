@@ -175,15 +175,17 @@ Zone 2 focal is stored in `cameraKeyframes` in `map.json`.
 
 | Chain | Tiers | Role | hatchAtTier |
 |-------|-------|------|-------------|
-| `ember_dragon` | 1 Dragon Ruby → 2 Ember Hatchling → 3 Ember Whelp | Fire dragon family; T2/T3 produce flame_gem | 2 |
-| `emerald` | 1 Emerald → 2 Emerald Hatchling → 3 Emerald Whelp | Green dragon family; T2/T3 produce flame_gem | 2 |
-| `flame_gem` | 1 Gem Shard → 2 Flame Gem → 3 Radiant Gem | Merge-chain currency; feeds order board | — |
-| `lumber` | 1 Bush → 2 House | Bush merges 3→1 House; House passively earns coins | — |
-| `crystal` | 1 Theme Crystal | startingItem at [8,11] (decor3d position); tappable (30 s cooldown) → produces emerald_1 on nearest free active tile | — |
-| `chest` | 1 Treasure Chest | Tap to open → coins / energy / wood fan, then consumed | — |
-| `bigtree` | 1 Ancient Tree | Passive lumber_1 producer (10 min); lives in level_2 at [1,2] | — |
-| `sparkweed` | 1-3 | Merge filler; no longer in starting content | — |
-| `strawberry` | 1-3 | Merge-then-harvest plant | — |
+| `ember_dragon` | 1 Dragon Ruby → 2 Red Egg → 3 Red Dragon → 4 Adult Red Dragon | Fire dragons; T3/T4 tap-produce **ember_dragon_1 (rubies)** + passive gifts. **T3 pair-merges (2→1)** into the Adult | **3** |
+| `emerald` | 1 Emerald → 2 Green Egg → 3 Green Dragon → 4 Adult Emerald Dragon | Green dragons; T3/T4 produce **flame_gem_1**. **T3 pair-merges (2→1)** | **3** |
+| `flame_gem` | 1 Gem Shard → 2 Flame Gem → 3 Radiant Gem | Merge-chain currency; feeds the order board | — |
+| `lumber` | 1 Bush → 2 House → 3 Manor | Bush merges 3→1 House; **House pair-merges 2→1 Manor**. House/Manor passively drop coin_1 / coin_2 every 210 s (not tappable) | — |
+| `coin` | 1 Gold Coin → 2 Gold Pouch | Tap to collect (+5 / +10 Gold, `COLLECTIBLE_REWARD`); Pouch grants 60 XP on merge | — |
+| `crystal` | 1 Theme Crystal | startingItem at [8,11] (decor3d position); tappable, **300 s** cooldown → emerald_1; `skipMaxGold: 60` | — |
+| `chest` | 1 Treasure Chest | **Permanent fixture** — recharges every 5 min (`CHEST_INTERVAL_MS`); a gift is 15 Gold / 3 Emeralds / 3 Rubies (`CHEST_GIFTS`). Never consumed, never drops wood | — |
+| `bigtree` | 1 Ancient Tree | Passive lumber_1 producer (**300 s**); lives in level_2 at [4,4] | — |
+| `strawberry` | 1 Sprout → 2 Bush → 3 Ripe Plant | T3 is the **free** producer (20 s, `energyCost: 0`) — the zero-Warmth floor | — |
+| `golden_egg` | 1 Golden Egg → 2 Golden Elder | Finale MacGuffin; unsellable, awakened by the scripted `FINALE`, never by a player merge | 2 |
+| `sparkweed` | 1-3 | Unit-test chain only — in `HIDDEN_CHAINS`, never spawns live | — |
 | `coin` | 1 Gold Coin | Currency collectible; tapping banks it | — |
 
 ### Emerald notes

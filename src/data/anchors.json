@@ -6,15 +6,15 @@
   "byKey": {
     "item_strawberry_1": [
       0.5,
-      0.71
+      0.92
     ],
     "item_strawberry_2": [
       0.5,
-      0.82
+      0.9
     ],
     "item_strawberry_3": [
       0.5,
-      0.82
+      0.9
     ],
     "item_ember_dragon_1": [
       0.5,
@@ -132,7 +132,7 @@
       0.52,
       0.97
     ],
-    "portrait_laurah": [
+    "portrait_eleanor": [
       0.5,
       0.5
     ],
@@ -140,7 +140,7 @@
       0.5,
       0.5
     ],
-    "portrait_cindra": [
+    "portrait_golden_elder": [
       0.5,
       0.5
     ],
@@ -218,7 +218,7 @@
     ],
     "item_lumber_2": [
       0.5,
-      0.9
+      0.92
     ],
     "item_lumber_3": [
       0.5,
@@ -287,6 +287,58 @@
     "item_emerald_3": [
       0.5,
       0.9
+    ],
+    "item_lumber_4": [
+      0.5,
+      0.9
+    ],
+    "skin_frost_3": [
+      0.5,
+      0.88
+    ],
+    "skin_frost_4": [
+      0.5,
+      0.88
+    ],
+    "skin_storm_3": [
+      0.5,
+      0.88
+    ],
+    "skin_storm_4": [
+      0.5,
+      0.88
+    ],
+    "skin_moonwhisker_3": [
+      0.5,
+      0.9
+    ],
+    "skin_moonwhisker_4": [
+      0.5,
+      0.88
+    ],
+    "skin_ashglass_3": [
+      0.5,
+      0.88
+    ],
+    "skin_ashglass_4": [
+      0.5,
+      0.88
+    ],
+    "skin_porcelain_3": [
+      0.5,
+      0.9
+    ],
+    "skin_porcelain_4": [
+      0.5,
+      0.88
+    ],
+    "sleep_ember_dragon_3": [
+      0.5,
+      0.97
+    ],
+    "sleep_ember_dragon_4": [
+      0.5,
+      0.97
     ]
   }
 }

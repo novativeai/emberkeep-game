@@ -1,0 +1,443 @@
+@import 'tailwindcss';
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Emberkeep development board — design tokens.
+   Dark, high-contrast, one accent that follows the active developer.
+   Shapes are rounded rectangles throughout: this is a project tool first.
+   ─────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  --color-void: #070c13;
+  --color-night: #0c141e;
+  --color-panel: #111c28;
+  --color-line: #22323f;
+  --color-cream: #eef2f6;
+  --color-parchment: #c3cdd7;
+  --color-muted: #8695a3;
+  --color-gold: #e8b964;
+  --color-aura: #4fc3f7;
+  --color-lava: #ff6a3d;
+  --color-verdant: #5fd39a;
+  --color-warn: #ffcb5c;
+
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+}
+
+:root {
+  --accent: #4fc3f7;
+  --accent-soft: #a5e4ff;
+  --accent-deep: #12557e;
+  --accent-glow: rgba(79, 195, 247, 0.4);
+  --line: rgba(255, 255, 255, 0.09);
+  --radius: 10px;
+}
+
+[data-user='onja'] {
+  --accent: #ff6a3d;
+  --accent-soft: #ffb08a;
+  --accent-deep: #8e2e15;
+  --accent-glow: rgba(255, 106, 61, 0.4);
+}
+
+* {
+  min-width: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-void);
+  color: var(--color-cream);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent-deep);
+  color: #fff;
+}
+
+@layer components {
+
+/* ── Type ─────────────────────────────────────────────────────────────── */
+
+.t-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.t-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Panels ───────────────────────────────────────────────────────────── */
+
+.panel {
+  position: relative;
+  border-radius: var(--radius);
+  background: rgba(17, 28, 40, 0.9);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+}
+
+.panel-accent {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  color: var(--color-parchment);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #061019;
+  font-weight: 600;
+}
+
+.btn-accent:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft);
+  color: #061019;
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(255, 106, 61, 0.16);
+  border-color: rgba(255, 106, 61, 0.55);
+  color: #ffb8a4;
+}
+
+/* ── Inputs ───────────────────────────────────────────────────────────── */
+
+.field {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(6, 12, 19, 0.72);
+  border: 1px solid var(--line);
+  color: var(--color-cream);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.field::placeholder {
+  color: #5f6c7a;
+}
+
+select.field {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 24px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-muted) 50%),
+    linear-gradient(135deg, var(--color-muted) 50%, transparent 50%);
+  background-position: right 11px center, right 6px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+select.field option {
+  background: #0c141e;
+  color: var(--color-cream);
+}
+
+textarea.field {
+  resize: vertical;
+  line-height: 1.55;
+}
+
+/* ── Task card (graph node) ───────────────────────────────────────────── */
+
+.node {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #16242f 0%, #0e1822 100%);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.14s ease, border-color 0.14s, box-shadow 0.14s;
+}
+
+.node:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.node-selected {
+  border-color: var(--node-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--node-accent) 55%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* The owner stripe down the left edge. */
+.node-stripe {
+  width: 5px;
+  flex: 0 0 5px;
+  background: var(--node-accent);
+}
+
+.node-done {
+  opacity: 0.62;
+}
+
+.node-done .node-title {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  color: var(--color-muted);
+}
+
+.node-critical {
+  border-color: rgba(255, 138, 92, 0.55);
+}
+
+/* ── Dependency links ─────────────────────────────────────────────────── */
+
+.link-flow {
+  stroke-dasharray: 3 6;
+  animation: link-march 1.6s linear infinite;
+}
+
+@keyframes link-march {
+  to {
+    stroke-dashoffset: -9;
+  }
+}
+
+/* ── Motion ───────────────────────────────────────────────────────────── */
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes ember-rise {
+  from {
+    transform: translate3d(0, 12vh, 0) scale(0.8);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.7;
+  }
+  to {
+    transform: translate3d(22px, -108vh, 0) scale(1.1);
+    opacity: 0;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel-in {
+  animation: panel-in 0.18s ease-out both;
+}
+
+/* ── The orb above Selyna's hand ──────────────────────────────────────── */
+
+@keyframes orb-bob {
+  0%,
+  100% {
+    transform: translateY(-4px);
+  }
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+.orb-float {
+  animation: orb-bob 5.5s ease-in-out infinite;
+}
+
+/* Two veils drifting against each other read as smoke rather than a halo. */
+@keyframes orb-drift {
+  0% {
+    transform: rotate(0deg) scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    opacity: 0.75;
+  }
+}
+
+.orb-smoke {
+  animation: orb-drift 15s linear infinite;
+}
+
+.orb-smoke-slow {
+  animation: orb-drift 23s linear infinite reverse;
+}
+
+/* The strike-through sweep used when a task is marked done. */
+@keyframes strike-sweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────── */
+
+.scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+}
+
+.scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── Misc ─────────────────────────────────────────────────────────────── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--color-parchment);
+  white-space: nowrap;
+}
+
+.rule {
+  height: 1px;
+  background: var(--line);
+}
+
+.meter {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.meter > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+}

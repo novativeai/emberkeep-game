@@ -1,4 +1,4 @@
-import { AUDIO } from '../core/Constants';
+import { AUDIO, REVEAL } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { getMusicMuted, setMusicMuted } from './musicPref';
 
@@ -31,6 +31,11 @@ export class AudioManager {
     bus.on('audio:set_music_muted', ({ muted }) => this.applyMusicMuted(muted));
     bus.on('item:merged', ({ resultTier }) => this.popMerge(resultTier));
     bus.on('item:hatched', () => this.hatchChime());
+    // The roar is timed to the reveal card's overshoot, not to the event that
+    // opened it — REVEAL.roarAtMs is the one place that beat is decided.
+    bus.on('dragon:revealed', () =>
+      window.setTimeout(() => this.dragonRoar(), REVEAL.roarAtMs)
+    );
     bus.on('item:harvested', () => this.harvestTick());
     bus.on('item:produced', () => this.giftChime());
     bus.on('item:sold', () => this.coinBlip());
@@ -211,6 +216,93 @@ export class AudioManager {
   private fogWhoosh(): void {
     this.noiseSweep(0.75, 260, 1500, 0.16);
     this.tone(180, 0.5, { type: 'sine', gain: 0.06, slideTo: 320, delay: 0.1, release: 0.4 });
+  }
+
+  /**
+   * The reveal ROAR — the one big sound in the game.
+   *
+   * SYNTHESISED, like every other effect here, and that is the licence answer
+   * as well as the house style: nothing is downloaded, so there is no CC-BY
+   * attribution to carry, no sample-pack terms to honour and nothing to prune
+   * from `dist`. It is also ~40 lines against a ~200 KB file the player would
+   * wait on before the card could open.
+   *
+   * A roar is three things stacked, none of which is a musical note:
+   *   1. a GROWL — two detuned saw oscillators an octave apart, swept DOWN in
+   *      pitch through a low-pass that opens and closes with them. The detune
+   *      is what stops it reading as a synth bass.
+   *   2. a RASP — the same pitch again through a hard-clipping shaper, mixed
+   *      low. This is the animal in it: the harmonics a throat adds.
+   *   3. BREATH — filtered noise swept from a roar's bright open to its dark
+   *      close, plus a short bright burst on the attack.
+   * A slow tremolo across the whole thing gives it the ragged lungs.
+   */
+  private dragonRoar(): void {
+    if (!this.actx || !this.sfx) return;
+    const t0 = this.actx.currentTime + 0.02;
+    const dur = 1.35;
+    const out = this.actx.createGain();
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(1, t0 + 0.05); // fast, but not a click
+    out.gain.setValueAtTime(1, t0 + dur * 0.55);
+    out.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+    out.connect(this.sfx);
+
+    // Lungs: a 7 Hz wobble on the whole voice, deep enough to hear as ragged.
+    const trem = this.actx.createGain();
+    trem.gain.value = 1;
+    const lfo = this.actx.createOscillator();
+    const lfoGain = this.actx.createGain();
+    lfo.frequency.setValueAtTime(6.5, t0);
+    lfo.frequency.linearRampToValueAtTime(11, t0 + dur);
+    lfoGain.gain.value = 0.16;
+    lfo.connect(lfoGain).connect(trem.gain);
+    trem.connect(out);
+    lfo.start(t0);
+    lfo.stop(t0 + dur);
+
+    // The throat: a low-pass that opens on the attack and shuts as it dies.
+    const throat = this.actx.createBiquadFilter();
+    throat.type = 'lowpass';
+    throat.Q.value = 6;
+    throat.frequency.setValueAtTime(240, t0);
+    throat.frequency.exponentialRampToValueAtTime(1900, t0 + 0.16);
+    throat.frequency.exponentialRampToValueAtTime(260, t0 + dur);
+    throat.connect(trem);
+
+    // 1 + 2. Growl and rasp, off the same falling pitch.
+    const shaper = this.actx.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < curve.length; i++) {
+      const x = (i / (curve.length - 1)) * 2 - 1;
+      curve[i] = Math.tanh(x * 4.5); // soft clip — grit, not fuzz
+    }
+    shaper.curve = curve;
+    const raspGain = this.actx.createGain();
+    raspGain.gain.value = 0.26;
+    shaper.connect(raspGain).connect(throat);
+    for (const [base, detune, level] of [[62, -9, 0.5], [62, 11, 0.5], [124, 4, 0.3]] as const) {
+      const osc = this.actx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.detune.setValueAtTime(detune, t0);
+      // Up hard on the attack, then a long fall — the shape of a shout.
+      osc.frequency.setValueAtTime(base * 1.55, t0);
+      osc.frequency.exponentialRampToValueAtTime(base * 1.9, t0 + 0.1);
+      osc.frequency.exponentialRampToValueAtTime(base * 0.72, t0 + dur);
+      const g = this.actx.createGain();
+      g.gain.value = level;
+      osc.connect(g);
+      g.connect(throat);
+      g.connect(shaper);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.05);
+    }
+
+    // 3. Breath over the top, and a bright crack on the attack.
+    this.noiseSweep(dur * 0.9, 1800, 320, 0.075);
+    this.noiseSweep(0.16, 5200, 1400, 0.05);
+    // A sub thump so it lands in the chest on a device with any low end.
+    this.tone(48, 0.5, { type: 'sine', gain: 0.22, slideTo: 30, release: 0.5 });
   }
 
   private deny(freq: number, gain: number): void {

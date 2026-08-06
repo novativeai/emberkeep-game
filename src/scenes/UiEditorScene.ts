@@ -31,12 +31,19 @@ export class UiEditorScene extends Phaser.Scene {
 
     // Real components, inert: no system ever emits, so their bus handlers
     // never fire. Depths mirror UIScene so stacking reads faithfully.
-    const hud = new Hud(this, ctx.bus, ctx.state, { onLedger: () => {}, onGear: () => {} });
+    const hud = new Hud(this, ctx.bus, ctx.state, {
+      onLedger: () => {},
+      onGear: () => {},
+      onBag: () => {},
+      onStore: () => {}
+    });
     hud.ledgerButton.setDepth(10);
+    hud.bagButton.setDepth(10);
+    hud.storeButton.setDepth(10);
     hud.gearButton.setDepth(10);
     hud.setRegenText('2:59'); // sample content for the countdown label
 
-    const tooltip = new Tooltip(this, ctx.bus, ctx.data.chains);
+    const tooltip = new Tooltip(this, ctx.data.chains);
     tooltip.setDepth(55);
 
     const ledger = new LedgerPanel(this, ctx.bus, ctx.systems.order, ctx.systems.tasks, ctx.state);

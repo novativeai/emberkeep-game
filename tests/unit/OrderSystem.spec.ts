@@ -17,9 +17,9 @@ describe('OrderSystem', () => {
 
     // 3 gem shards — progress but not yet deliverable
     spawnGemShards(ctx, 3);
-    const brazier = progress.filter((p) => p.orderId === 'cindra_brazier').at(-1);
+    const brazier = progress.filter((p) => p.orderId === 'eleanor_brazier').at(-1);
     expect(brazier).toMatchObject({
-      orderId: 'cindra_brazier',
+      orderId: 'eleanor_brazier',
       have: [3],
       need: [6],
       deliverable: false
@@ -31,14 +31,14 @@ describe('OrderSystem', () => {
       const row = Math.floor(i / 5) + 1;
       ctx.systems.board.spawn('flame_gem', 1, col, row, 'init');
     }
-    const done = progress.filter((p) => p.orderId === 'cindra_brazier').at(-1);
+    const done = progress.filter((p) => p.orderId === 'eleanor_brazier').at(-1);
     expect(done).toMatchObject({ have: [6], deliverable: true });
   });
 
   it('surfaces TWO orders at once (choose what to chase)', () => {
     const ctx = createTestContext();
     const visible = ctx.systems.order.activeOrders;
-    expect(visible.map((o) => o.id)).toEqual(['cindra_brazier', 'cindra_hearth']);
+    expect(visible.map((o) => o.id)).toEqual(['eleanor_brazier', 'eleanor_hearth']);
   });
 
   it('delivery consumes the required items; the golden egg is an ALTAR event, not a board spawn', () => {
@@ -49,7 +49,7 @@ describe('OrderSystem', () => {
     const removed = capture(ctx.bus, 'item:removed');
     const spawned = capture(ctx.bus, 'board:spawn');
 
-    ctx.bus.emit('ui:deliver_requested', { orderId: 'cindra_brazier' });
+    ctx.bus.emit('ui:deliver_requested', { orderId: 'eleanor_brazier' });
 
     expect(completed).toHaveLength(1);
     expect(completed[0]!.rewards).toMatchObject({ coins: 25, keys: 0, xp: 30, tease: '🥚 ???' });
@@ -62,20 +62,20 @@ describe('OrderSystem', () => {
     // from completedOrderIds) — nothing is spawned onto the merge board.
     expect(spawned).toHaveLength(0);
     expect(ctx.state.countItems('golden_egg', 1)).toBe(0);
-    expect(ctx.state.completedOrderIds).toContain('cindra_brazier');
-    expect(ctx.systems.order.activeOrder?.id).toBe('cindra_hearth');
+    expect(ctx.state.completedOrderIds).toContain('eleanor_brazier');
+    expect(ctx.systems.order.activeOrder?.id).toBe('eleanor_hearth');
   });
 
   it('either visible order can be delivered first', () => {
     const ctx = createTestContext();
     // Fill the SECOND order (3× flame_gem t2) while the first stays open.
     for (let i = 0; i < 3; i++) ctx.systems.board.spawn('flame_gem', 2, i + 1, 1, 'init');
-    ctx.bus.emit('ui:deliver_requested', { orderId: 'cindra_hearth' });
-    expect(ctx.state.completedOrderIds).toEqual(['cindra_hearth']);
+    ctx.bus.emit('ui:deliver_requested', { orderId: 'eleanor_hearth' });
+    expect(ctx.state.completedOrderIds).toEqual(['eleanor_hearth']);
     // The first order remains active; the third slides into view.
     expect(ctx.systems.order.activeOrders.map((o) => o.id)).toEqual([
-      'cindra_brazier',
-      'cindra_centerpiece'
+      'eleanor_brazier',
+      'eleanor_centerpiece'
     ]);
   });
 
@@ -84,7 +84,7 @@ describe('OrderSystem', () => {
     spawnGemShards(ctx, 2); // only 2 of the 6 required
     const completed = capture(ctx.bus, 'order:completed');
 
-    ctx.bus.emit('ui:deliver_requested', { orderId: 'cindra_brazier' });
+    ctx.bus.emit('ui:deliver_requested', { orderId: 'eleanor_brazier' });
 
     expect(completed).toHaveLength(0);
     expect(ctx.state.coins).toBe(0);
@@ -93,19 +93,19 @@ describe('OrderSystem', () => {
 
   it('the order queue advances: completing one surfaces the next', () => {
     const ctx = createTestContext();
-    expect(ctx.systems.order.activeOrder?.id).toBe('cindra_brazier');
+    expect(ctx.systems.order.activeOrder?.id).toBe('eleanor_brazier');
 
     spawnGemShards(ctx, 6);
-    ctx.bus.emit('ui:deliver_requested', { orderId: 'cindra_brazier' });
+    ctx.bus.emit('ui:deliver_requested', { orderId: 'eleanor_brazier' });
 
-    expect(ctx.state.completedOrderIds).toContain('cindra_brazier');
-    expect(ctx.systems.order.activeOrder?.id).toBe('cindra_hearth');
+    expect(ctx.state.completedOrderIds).toContain('eleanor_brazier');
+    expect(ctx.systems.order.activeOrder?.id).toBe('eleanor_hearth');
   });
 
   it('NEVER dead-ends: encore orders generate after the scripted list', () => {
     const ctx = createTestContext();
     // Complete all four scripted orders directly (state-level shortcut).
-    for (const o of ['cindra_brazier', 'cindra_hearth', 'cindra_centerpiece', 'cindra_hoard']) {
+    for (const o of ['eleanor_brazier', 'eleanor_hearth', 'eleanor_centerpiece', 'eleanor_hoard']) {
       ctx.state.completedOrderIds.push(o);
     }
     const encore = ctx.systems.order.activeOrders;
@@ -121,7 +121,7 @@ describe('OrderSystem', () => {
 
   it('encore ids skip completed ones even out of order', () => {
     const ctx = createTestContext();
-    for (const o of ['cindra_brazier', 'cindra_hearth', 'cindra_centerpiece', 'cindra_hoard']) {
+    for (const o of ['eleanor_brazier', 'eleanor_hearth', 'eleanor_centerpiece', 'eleanor_hoard']) {
       ctx.state.completedOrderIds.push(o);
     }
     // Deliver the SECOND visible encore first (encore_2 = 2× flame_gem t2).

@@ -1,0 +1,33 @@
+{
+  "fps": 18,
+  "blendFrames": false,
+  "width": 338,
+  "height": 471,
+  "frameCount": 4,
+  "frames": [
+    {
+      "index": 0,
+      "file": "storm-dragon-adult-roar_talk_00000.png",
+      "durationMs": 267,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "storm-dragon-adult-roar_talk_00001.png",
+      "durationMs": 267,
+      "blend": false
+    },
+    {
+      "index": 2,
+      "file": "storm-dragon-adult-roar_talk_00002.png",
+      "durationMs": 267,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "storm-dragon-adult-roar_talk_00003.png",
+      "durationMs": 267,
+      "blend": false
+    }
+  ]
+}

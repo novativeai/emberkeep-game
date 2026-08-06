@@ -89,6 +89,77 @@
     padding:5px 14px; color:var(--dim); white-space:nowrap; overflow:hidden; }
   #status b { color:var(--gold2); }
   input[type=file] { display:none; }
+
+  /* ---------------- texture modal (library / generate / sources) -------- */
+  #modal { position:fixed; inset:0; background:rgba(12,8,14,.72); display:none; z-index:50; }
+  #modal.open { display:flex; align-items:center; justify-content:center; }
+  #mwin { width:min(1120px,94vw); height:min(760px,92vh); background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
+  #mhead { display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--line); }
+  #mhead .ttl { color:var(--gold); font-weight:bold; }
+  #mtabs { display:flex; gap:6px; }
+  #mbody { flex:1; overflow:hidden; display:none; }
+  #mbody.on { display:flex; }
+  .pane { display:none; flex:1; overflow-y:auto; padding:12px; }
+  .pane.on { display:block; }
+  .pane h4 { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--gold); margin:12px 0 6px; }
+  .pane h4:first-child { margin-top:0; }
+  .pane p.note { color:var(--dim); font-size:11px; margin-bottom:8px; }
+
+  /* library grid */
+  #texgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(124px,1fr)); gap:9px; }
+  .texcard { background:var(--panel2); border:2px solid var(--line); border-radius:9px; padding:6px; cursor:pointer; }
+  .texcard:hover { border-color:var(--gold); }
+  .texcard.sel { border-color:var(--gold2); background:#3d2c40; }
+  .texcard canvas, .texcard img { width:100%; height:104px; object-fit:contain; display:block; border-radius:6px;
+    background:#0d0910; }
+  .texcard.checker canvas, .texcard.checker img {
+    background:repeating-conic-gradient(#3a2f3f 0% 25%, #463a4c 0% 50%) 0 0/12px 12px; }
+  .texcard .nm { font-size:11px; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .texcard .sub { font-size:9px; color:var(--dim); }
+  .texcard .row { display:flex; gap:4px; margin-top:5px; }
+  .texcard .row button { flex:1; padding:2px 4px; font-size:10px; }
+
+  /* generator lab */
+  #lab { display:grid; grid-template-columns:300px 1fr; gap:14px; height:100%; }
+  #labctl { overflow-y:auto; padding-right:4px; }
+  #labview { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  #labcanvas { width:340px; height:340px; border-radius:10px; border:1px solid var(--line); background:#000; }
+  #labcanvas.checker { background:repeating-conic-gradient(#3a2f3f 0% 25%, #463a4c 0% 50%) 0 0/16px 16px; }
+  .lrow { display:flex; align-items:center; gap:7px; margin-bottom:5px; font-size:11px; }
+  .lrow label { flex:none; width:92px; color:var(--dim); }
+  .lrow input[type=range] { flex:1; accent-color:var(--gold); min-width:0; }
+  .lrow .val { flex:none; width:38px; text-align:right; color:var(--gold2); font-size:10px; }
+  .lrow select, .lrow input[type=text], .lrow input[type=number] {
+    flex:1; background:var(--panel2); color:var(--cream); border:1px solid var(--line);
+    border-radius:6px; padding:4px 6px; font:inherit; font-size:11px; min-width:0; }
+  .lgroup { border:1px solid var(--line); border-radius:9px; padding:8px; margin-bottom:9px; background:#241c29; }
+  .lgroup > .hd { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+  .lgroup > .hd .t { font-weight:bold; font-size:11px; color:var(--gold2); flex:1; }
+  .lgroup > .hd input[type=checkbox] { accent-color:var(--moss); }
+  .lgroup.off > .body { display:none; }
+  .tech { color:var(--purple); font-size:9px; font-style:italic; }
+
+  /* sources */
+  .srcrow { display:flex; align-items:center; gap:9px; padding:7px 9px; background:var(--panel2);
+    border:1px solid var(--line); border-radius:8px; margin-bottom:6px; }
+  .srcrow .nm { flex:1; font-size:12px; }
+  .srcrow .nm small { display:block; color:var(--dim); font-size:10px; }
+  .badge { flex:none; font-size:9px; padding:2px 7px; border-radius:20px; font-weight:bold; }
+  .badge.ok { background:#2c4a1e; color:#b6e88a; }
+  .badge.warn { background:#4a3a1e; color:#e8cf8a; }
+  .badge.tool { background:#26384a; color:#8ac9e8; }
+
+  /* preset inspector */
+  #inspGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; }
+  .tpick { background:var(--panel2); border:2px solid var(--line); border-radius:8px; padding:4px; cursor:pointer; text-align:center; }
+  .tpick:hover { border-color:var(--gold); }
+  .tpick.on { border-color:var(--gold2); background:#3d2c40; }
+  .tpick canvas { width:100%; height:60px; display:block; border-radius:5px; background:#0d0910; }
+  .tpick .nm { font-size:9px; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fxchip .gear { position:absolute; top:2px; left:4px; font-size:11px; opacity:.55; }
+  .fxchip .gear:hover { opacity:1; }
+  .fxchip .tex { position:absolute; bottom:22px; left:4px; font-size:9px; color:var(--teal); }
 </style>
 </head>
 <body>
@@ -99,6 +170,8 @@
     <span class="spacer"></span>
     <button id="replayTop" title="Replay the current event">▶ Replay</button>
     <button id="loopBtn" class="on" title="Auto-loop the preview">⟲ Loop</button>
+    <span class="sep"></span>
+    <button id="texBtn" title="Texture library, generator and sources">🧪 Textures</button>
     <span class="sep"></span>
     <button id="saveBtn" title="Download a .fxproject backup">Save</button>
     <button id="loadBtn" title="Load a .fxproject backup">Load</button>
@@ -143,9 +216,95 @@
 
   <div id="status">Pick an element, choose Appear or Merge, then toggle FX presets. Everything previews live.</div>
 
+  <!-- ============ texture modal: library · generate · sources · preset ===== -->
+  <div id="modal">
+    <div id="mwin">
+      <div id="mhead">
+        <span class="ttl">🧪 Textures for VFX</span>
+        <span class="sep"></span>
+        <div id="mtabs">
+          <button data-pane="library" class="on">🗂 Library</button>
+          <button data-pane="generate">✎ Generate</button>
+          <button data-pane="preset">⚙ Preset</button>
+          <button data-pane="sources">🌐 Sources</button>
+        </div>
+        <span class="spacer"></span>
+        <button id="mclose">✕ Close</button>
+      </div>
+      <div id="mbody" class="on">
+        <!-- ---------------- library ---------------- -->
+        <div class="pane on" id="paneLibrary">
+          <h4>Texture library</h4>
+          <p class="note">
+            Textures drive the particle look — a preset with no texture falls back to its vector shape.
+            Import PNGs from the packs on the <b>Sources</b> tab, or bake your own on <b>Generate</b>.
+            Author additive (ADD-blend) textures <b>on black</b>; alpha-blend ones want honest alpha.
+          </p>
+          <div class="lrow" style="margin-bottom:10px">
+            <button id="importTex">⤒ Import PNG(s)…</button>
+            <button id="newTex">✎ New from generator</button>
+            <button id="checkerBtn" title="Toggle the preview background between black (ADD-correct) and alpha checker">◧ Alpha checker</button>
+            <span class="spacer"></span>
+            <button id="clearTex" title="Remove every texture from the library">🗑 Clear all</button>
+          </div>
+          <div id="texgrid"></div>
+        </div>
+
+        <!-- ---------------- generate ---------------- -->
+        <div class="pane" id="paneGenerate">
+          <div id="lab">
+            <div id="labctl"></div>
+            <div id="labview">
+              <canvas id="labcanvas" width="256" height="256"></canvas>
+              <div class="lrow" style="justify-content:center">
+                <button id="labChecker">◧ Alpha checker</button>
+                <button id="labReseed">🎲 Reseed</button>
+                <button id="labPng">⬇ PNG</button>
+                <button class="primary" id="labSave">＋ Add to library</button>
+              </div>
+              <div style="color:var(--dim);font-size:11px;max-width:360px;text-align:center" id="labHint"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ---------------- preset inspector ---------------- -->
+        <div class="pane" id="panePreset">
+          <h4>Preset — <span id="inspName" style="color:var(--gold2)">—</span></h4>
+          <p class="note">Give this preset a texture and it renders textured quads instead of the built-in
+            vector shape. Sheets (cols×rows &gt; 1) play as flipbooks.</p>
+          <div class="lrow"><label>Blend</label>
+            <select id="inspBlend"><option value="add">add (lighter — glows)</option><option value="normal">normal (alpha)</option></select>
+          </div>
+          <div class="lrow"><label>Tint</label>
+            <select id="inspColor">
+              <option value="element">element — tint to the element colour</option>
+              <option value="warm">warm — preset palette</option>
+              <option value="fixed">fixed — preset palette</option>
+              <option value="rainbow">rainbow</option>
+              <option value="texture">texture — use the texture's own colours</option>
+            </select>
+          </div>
+          <div class="lrow"><label>Flipbook</label>
+            <select id="inspFrame">
+              <option value="life">life — one pass over the particle's lifetime</option>
+              <option value="loop">loop — cycle at the sheet's fps</option>
+              <option value="random">random — one fixed frame per particle</option>
+            </select>
+          </div>
+          <h4>Texture</h4>
+          <div id="inspGrid"></div>
+        </div>
+
+        <!-- ---------------- sources ---------------- -->
+        <div class="pane" id="paneSources"></div>
+      </div>
+    </div>
+  </div>
+
   <input type="file" id="fileSprite" accept="image/png,image/webp" />
   <input type="file" id="fileProject" accept="application/json" />
   <input type="file" id="fileRig" webkitdirectory directory />
+  <input type="file" id="fileTex" accept="image/png,image/webp" multiple />
 
 <script>
 'use strict';
@@ -225,7 +384,10 @@ const FX_PARAM_SPEC = {
   fadeIn:'fraction of life ramping alpha 0→1', fadeOut:'fraction of life ramping alpha 1→0',
   blend:'add | normal', spawnR:'px random spawn radius from origin', alpha:'master opacity',
   expandTo:'ring final radius px', ringWidth:'ring stroke px at birth', peakR:'glow peak radius px',
-  wander:'sine drift px/s amplitude', swirl:'rad/s tangential rotation', blink:'flicker alpha'
+  wander:'sine drift px/s amplitude', swirl:'rad/s tangential rotation', blink:'flicker alpha',
+  texture:'id into `textures` (null = draw the vector `shape` instead). Drawn as a quad of 2*size px, rotated by the particle spin.',
+  frameMode:'flipbook advance for a multi-frame texture — life (one pass over the particle lifetime) | loop (cycle at the sheet fps) | random (one fixed frame per particle)',
+  colorMode_texture:'colorMode "texture" keeps the texture\'s own colours (no tint); every other mode multiplies the texture by the picked colour'
 };
 
 // The structural element motion for each event (fixed; the FX layer on top).
@@ -247,6 +409,7 @@ const EVENTS = {
 const FX_KEY = 'emberkeep-fxstudio-v1';
 const S = {
   config: {},          // key -> { sprite:dataURL|null, appear:[fxKeys], merge:[fxKeys] }
+  textures: {},        // id  -> { id, name, src, cols, rows, fps, recipe|null }
   selKey: ELEMENTS[0].key,
   selEvent: 'appear',
   mergeCount: 3,
@@ -284,6 +447,529 @@ function pickColor(p, elColor) {
   return elColor;
 }
 
+/* =====================================================================
+ * TEXTURE MODULE — see docs/vfx-textures.md
+ *
+ * Pipeline, mirroring how VFX textures are actually authored:
+ *     generator → scalar field (0..1 mask) → technique chain → colour ramp → RGBA
+ *
+ * The mask is authored first and coloured LAST, which is why one generator can
+ * serve fire, magic and ice. The technique chain is the Krita workflow from
+ * LeLu's guide, made non-destructive: multibrush symmetry, polar conversion,
+ * wrap-around seamless, duplicate+gaussian glow, and the morphological
+ * dissolve he uses for lava/fire edges.
+ * =================================================================== */
+
+/* --------- value noise (tileable: integer lattice wraps on `period`) ---- */
+function hash2(ix, iy, seed) {
+  let h = (Math.imul(ix, 73856093) ^ Math.imul(iy, 19349663) ^ Math.imul(seed, 83492791)) | 0;
+  h = Math.imul(h ^ (h >>> 15), 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 3266489917);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function vnoise(x, y, period, seed) {
+  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const P = Math.max(1, Math.round(period)), w = (v) => ((v % P) + P) % P;
+  const wx0 = w(x0), wx1 = w(x0 + 1), wy0 = w(y0), wy1 = w(y0 + 1);
+  return lerp(lerp(hash2(wx0, wy0, seed), hash2(wx1, wy0, seed), sx),
+              lerp(hash2(wx0, wy1, seed), hash2(wx1, wy1, seed), sx), sy);
+}
+// Fractal sum. u,v are 0..1 across the texture, so it stays seamless.
+function fbm2(u, v, period, seed, octaves, gain) {
+  let sum = 0, amp = 1, norm = 0, p = period;
+  for (let i = 0; i < octaves; i++) {
+    sum += amp * vnoise(u * p, v * p, p, seed + i * 1013);
+    norm += amp; amp *= gain; p *= 2;
+  }
+  return norm ? sum / norm : 0;
+}
+
+/* ----------------------------- field helpers -------------------------- */
+const smoothstep = (e0, e1, x) => { const t = clamp01((x - e0) / (e1 - e0 || 1e-6)); return t * t * (3 - 2 * t); };
+function fieldFromCanvas(n, drawFn) {
+  // Rasterise with the 2D API and read luminance×alpha back as the mask.
+  // Lets the geometric generators (star, ring, bolt) reuse canvas drawing.
+  const c = document.createElement('canvas'); c.width = c.height = n;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, n, n);
+  drawFn(g, n);
+  const d = g.getImageData(0, 0, n, n).data, f = new Float32Array(n * n);
+  for (let i = 0, j = 0; i < f.length; i++, j += 4) {
+    f[i] = ((d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114) / 255) * (d[j + 3] / 255);
+  }
+  return f;
+}
+// Separable box blur ×3 ≈ gaussian. `wrap` keeps seamless textures seamless.
+function blurField(f, n, radius, wrap) {
+  if (radius < 0.5) return f;
+  let src = f, dst = new Float32Array(n * n);
+  const r = Math.max(1, Math.round(radius));
+  for (let pass = 0; pass < 3; pass++) {
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {           // horizontal
+      let s = 0, cnt = 0;
+      for (let k = -r; k <= r; k++) {
+        let xx = x + k;
+        if (wrap) xx = ((xx % n) + n) % n; else if (xx < 0 || xx >= n) continue;
+        s += src[y * n + xx]; cnt++;
+      }
+      dst[y * n + x] = s / (cnt || 1);
+    }
+    [src, dst] = [dst, src];
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {           // vertical
+      let s = 0, cnt = 0;
+      for (let k = -r; k <= r; k++) {
+        let yy = y + k;
+        if (wrap) yy = ((yy % n) + n) % n; else if (yy < 0 || yy >= n) continue;
+        s += src[yy * n + x]; cnt++;
+      }
+      dst[y * n + x] = s / (cnt || 1);
+    }
+    [src, dst] = [dst, src];
+  }
+  return src;
+}
+function sampleField(f, n, x, y) {   // bilinear, clamped
+  const cx = Math.max(0, Math.min(n - 1.001, x)), cy = Math.max(0, Math.min(n - 1.001, y));
+  const x0 = Math.floor(cx), y0 = Math.floor(cy), fx = cx - x0, fy = cy - y0;
+  const x1 = Math.min(n - 1, x0 + 1), y1 = Math.min(n - 1, y0 + 1);
+  return lerp(lerp(f[y0 * n + x0], f[y0 * n + x1], fx), lerp(f[y1 * n + x0], f[y1 * n + x1], fx), fy);
+}
+
+/* ----------------------------- generators ----------------------------- */
+// Each returns a Float32Array(n*n) mask in 0..1. Params are plain numbers so a
+// generated texture is fully described by {type, params} and can be re-baked.
+const GENERATORS = {
+  // The guide's actual thesis: don't author the common textures, SOURCE them —
+  // then process. This generator takes an imported pack texture as the input
+  // field so the whole technique chain (symmetry, polar, seamless, glow,
+  // dissolve, levels, ramp) runs on downloaded art, not just on maths.
+  source: { label: 'From library texture', tech: 'process an imported pack texture through the chain',
+    params: {},
+    make(n, p) {
+      const img = TEX[p.srcTex];
+      if (!img) return new Float32Array(n * n);
+      return fieldFromCanvas(n, (g) => g.drawImage(img, 0, 0, n, n));
+    } },
+  glow: { label: 'Soft Glow', tech: 'the classic soft particle — falloff only',
+    params: { falloff: [2.2, 0.4, 8, 0.1], core: [0.12, 0, 0.8, 0.01] },
+    make(n, p) {
+      const f = new Float32Array(n * n), c = (n - 1) / 2;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const r = Math.hypot(x - c, y - c) / c;
+        f[y * n + x] = r >= 1 ? 0 : (r < p.core ? 1 : Math.pow(1 - (r - p.core) / (1 - p.core), p.falloff));
+      }
+      return f;
+    } },
+  spark: { label: 'Spark / Flare', tech: 'anisotropic star flare — the 4-point sparkle',
+    params: { arms: [4, 2, 12, 1], sharpness: [26, 2, 90, 1], falloff: [2.6, 0.4, 8, 0.1], core: [0.05, 0, 0.4, 0.01] },
+    make(n, p) {
+      const f = new Float32Array(n * n), c = (n - 1) / 2;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const dx = x - c, dy = y - c, r = Math.hypot(dx, dy) / c;
+        if (r >= 1) continue;
+        const th = Math.atan2(dy, dx);
+        const lobe = Math.pow(Math.abs(Math.cos(th * p.arms / 2)), p.sharpness);
+        const rad = Math.pow(1 - r, p.falloff);
+        f[y * n + x] = clamp01(rad * lobe + Math.pow(1 - r, 14) + (r < p.core ? 1 : 0));
+      }
+      return f;
+    } },
+  star: { label: 'Star', tech: 'polygon star — Krita curve+symmetry, in one shot',
+    params: { points: [5, 3, 12, 1], inner: [0.45, 0.1, 0.9, 0.01], soft: [1, 0, 12, 0.5] },
+    make(n, p) {
+      const f = fieldFromCanvas(n, (g) => {
+        const c = n / 2, R = n * 0.46, pts = Math.round(p.points);
+        g.fillStyle = '#fff'; g.beginPath();
+        for (let i = 0; i < pts * 2; i++) {
+          const rr = i % 2 ? R * p.inner : R, a = -Math.PI / 2 + i * Math.PI / pts;
+          g[i ? 'lineTo' : 'moveTo'](c + Math.cos(a) * rr, c + Math.sin(a) * rr);
+        }
+        g.closePath(); g.fill();
+      });
+      return blurField(f, n, p.soft, false);
+    } },
+  ring: { label: 'Ring / Shockwave', tech: 'annulus for expanding rings',
+    params: { radius: [0.38, 0.05, 0.49, 0.01], width: [0.07, 0.005, 0.3, 0.005], soft: [3, 0, 24, 0.5] },
+    make(n, p) {
+      const f = new Float32Array(n * n), c = (n - 1) / 2;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const r = Math.hypot(x - c, y - c) / n;
+        f[y * n + x] = 1 - smoothstep(0, p.width, Math.abs(r - p.radius));
+      }
+      return blurField(f, n, p.soft, false);
+    } },
+  fbm: { label: 'Noise (fBm)', tech: 'the workhorse — seamless fractal noise',
+    params: { scale: [5, 1, 32, 1], octaves: [5, 1, 8, 1], gain: [0.5, 0.2, 0.8, 0.01], contrast: [1, 0.2, 4, 0.05] },
+    make(n, p) {
+      const f = new Float32Array(n * n), oct = Math.round(p.octaves), sc = Math.round(p.scale);
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const v = fbm2(x / n, y / n, sc, p.seed | 0, oct, p.gain);
+        f[y * n + x] = clamp01(0.5 + (v - 0.5) * p.contrast);
+      }
+      return f;
+    } },
+  marble: { label: 'Marble / Turbulence', tech: 'the marble-noise + turbulence combo',
+    params: { scale: [4, 1, 24, 1], bands: [4, 1, 20, 0.5], turb: [1.1, 0, 4, 0.05], octaves: [5, 1, 8, 1] },
+    make(n, p) {
+      const f = new Float32Array(n * n), oct = Math.round(p.octaves), sc = Math.round(p.scale);
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const t = fbm2(x / n, y / n, sc, p.seed | 0, oct, 0.5);
+        f[y * n + x] = Math.abs(Math.sin((x / n * p.bands + t * p.turb) * Math.PI * 2));
+      }
+      return f;
+    } },
+  smoke: { label: 'Smoke Puff', tech: 'fBm masked by a radial falloff',
+    params: { scale: [4, 1, 20, 1], octaves: [5, 1, 8, 1], density: [1.25, 0.2, 3, 0.05], edge: [1.9, 0.4, 6, 0.1] },
+    make(n, p) {
+      const f = new Float32Array(n * n), c = (n - 1) / 2, oct = Math.round(p.octaves), sc = Math.round(p.scale);
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const r = Math.hypot(x - c, y - c) / c;
+        if (r >= 1) continue;
+        const v = fbm2(x / n, y / n, sc, p.seed | 0, oct, 0.55);
+        f[y * n + x] = clamp01(v * p.density * Math.pow(1 - r, p.edge));
+      }
+      return f;
+    } },
+  flame: { label: 'Flame', tech: 'vertical ramp × turbulence, narrowing with height',
+    params: { scale: [5, 1, 20, 1], turb: [0.42, 0, 1.2, 0.01], taper: [1.5, 0.2, 5, 0.1], octaves: [5, 1, 8, 1] },
+    make(n, p) {
+      const f = new Float32Array(n * n), oct = Math.round(p.octaves), sc = Math.round(p.scale);
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const u = x / n, v = y / n, h = 1 - v;                       // h: 0 at top, 1 at base
+        const warp = (fbm2(u, v * 0.6, sc, p.seed | 0, oct, 0.55) - 0.5) * p.turb * (1 - h);
+        const width = Math.pow(h, 1 / p.taper) * 0.42 + 0.02;
+        const dx = Math.abs(u - 0.5 + warp);
+        f[y * n + x] = clamp01((1 - smoothstep(width * 0.45, width, dx)) * Math.pow(h, 0.55));
+      }
+      return f;
+    } },
+  lightning: { label: 'Lightning Bolt', tech: 'midpoint displacement + the duplicate-blur glow',
+    params: { jitter: [0.19, 0.02, 0.5, 0.01], depth: [6, 2, 9, 1], thickness: [2.2, 0.5, 10, 0.1], branches: [2, 0, 6, 1] },
+    make(n, p) {
+      return fieldFromCanvas(n, (g) => {
+        const rnd = (() => { let s = (p.seed | 0) || 1; return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296; })();
+        const bolt = (x0, y0, x1, y1, d, amp) => {
+          if (d <= 0) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); return; }
+          const mx = (x0 + x1) / 2 + (rnd() - 0.5) * amp, my = (y0 + y1) / 2 + (rnd() - 0.5) * amp * 0.35;
+          bolt(x0, y0, mx, my, d - 1, amp * 0.55); bolt(mx, my, x1, y1, d - 1, amp * 0.55);
+          if (d === Math.round(p.depth) - 1) for (let b = 0; b < Math.round(p.branches); b++) {
+            if (rnd() > 0.6) bolt(mx, my, mx + (rnd() - 0.5) * n * 0.3, my + rnd() * n * 0.22, 2, amp * 0.5);
+          }
+        };
+        g.strokeStyle = '#fff'; g.lineWidth = p.thickness; g.lineCap = 'round';
+        bolt(n * 0.5, n * 0.04, n * 0.5, n * 0.96, Math.round(p.depth), n * p.jitter);
+      });
+    } },
+  streak: { label: 'Motion Streak', tech: 'anisotropic smear — the blending-brush look',
+    params: { length: [0.42, 0.05, 0.5, 0.01], thickness: [0.05, 0.005, 0.3, 0.005], grain: [0.35, 0, 1, 0.01], scale: [8, 1, 24, 1] },
+    make(n, p) {
+      const f = new Float32Array(n * n), c = (n - 1) / 2, sc = Math.round(p.scale);
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const dx = (x - c) / n, dy = (y - c) / n;
+        const along = 1 - smoothstep(p.length * 0.35, p.length, Math.abs(dx));
+        const across = 1 - smoothstep(p.thickness * 0.3, p.thickness, Math.abs(dy));
+        const gr = 1 - p.grain + p.grain * fbm2(x / n, y / n, sc, p.seed | 0, 4, 0.5);
+        f[y * n + x] = clamp01(along * across * gr);
+      }
+      return f;
+    } }
+};
+
+/* ------------------------- technique chain ---------------------------- */
+// The Krita workflow, non-destructive and in a fixed, sensible order.
+const TECHNIQUES = {
+  // Krita's multibrush: fold the disc into N wedges (snowflake also mirrors).
+  symmetry(f, n, o) {
+    if (!o.on) return f;
+    const out = new Float32Array(n * n), c = (n - 1) / 2, axes = Math.max(2, Math.round(o.axes));
+    const wedge = Math.PI * 2 / axes;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const dx = x - c, dy = y - c, r = Math.hypot(dx, dy);
+      let th = Math.atan2(dy, dx);
+      let k = ((th % wedge) + wedge) % wedge;
+      if (o.snowflake && k > wedge / 2) k = wedge - k;              // mirror inside the wedge
+      out[y * n + x] = sampleField(f, n, c + Math.cos(k) * r, c + Math.sin(k) * r);
+    }
+    return out;
+  },
+  // Polar conversion — turns a linear/noise field into a radial or tunnel one.
+  polar(f, n, o) {
+    if (!o.on) return f;
+    const out = new Float32Array(n * n), c = (n - 1) / 2;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const dx = x - c, dy = y - c, r = Math.hypot(dx, dy) / c;
+      if (r > 1) continue;
+      let th = Math.atan2(dy, dx) / (Math.PI * 2); th -= Math.floor(th);
+      const rr = o.invert ? 1 - r : r;
+      out[y * n + x] = sampleField(f, n, th * (n - 1), rr * (n - 1));
+    }
+    return out;
+  },
+  // Krita wrap-around mode: offset by half and cross-blend so the seam dies.
+  seamless(f, n, o) {
+    if (!o.on) return f;
+    const out = new Float32Array(n * n), h = n / 2, fe = Math.max(1, o.feather * n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const sx = (x + h) % n, sy = (y + h) % n;
+      const wx = smoothstep(0, fe, Math.min(x, n - 1 - x)), wy = smoothstep(0, fe, Math.min(y, n - 1 - y));
+      const w = Math.min(wx, wy);
+      out[y * n + x] = lerp(f[sy * n + sx], f[y * n + x], w);
+    }
+    return out;
+  },
+  // Duplicate the layer, gaussian-blur it, add it back. Stack for intensity.
+  glowBlur(f, n, o) {
+    if (!o.on) return f;
+    const out = Float32Array.from(f);
+    let acc = f;
+    for (let i = 0; i < Math.round(o.passes); i++) {
+      acc = blurField(acc, n, o.radius * (i + 1), !!o.wrap);
+      for (let k = 0; k < out.length; k++) out[k] = clamp01(out[k] + acc[k] * o.strength);
+    }
+    return out;
+  },
+  // Morphological dissolve — eat the edges with noise. The lava/fire trick.
+  dissolve(f, n, o) {
+    if (!o.on) return f;
+    const out = new Float32Array(n * n), sc = Math.round(o.scale);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const m = fbm2(x / n, y / n, sc, (o.seed | 0) + 77, 4, 0.55);
+      out[y * n + x] = f[y * n + x] * smoothstep(o.amount - o.soft, o.amount + o.soft, m);
+    }
+    return out;
+  },
+  levels(f, n, o) {
+    if (!o.on) return f;
+    const out = new Float32Array(n * n);
+    for (let i = 0; i < f.length; i++) {
+      let v = clamp01((f[i] - o.black) / Math.max(1e-4, o.white - o.black));
+      out[i] = clamp01(Math.pow(v, 1 / Math.max(0.05, o.gamma)));
+    }
+    return out;
+  },
+  // ADD safety. Under Phaser.BlendModes.ADD the RGB is added irrespective of
+  // alpha, so ANY non-black pixel touching the texture border draws a glowing
+  // rectangle around the particle. Force the outer band to zero. Runs LAST so
+  // nothing downstream can lift the edge back up.
+  //   shape 'square' — fade in from all four edges (default; safe for any art)
+  //   shape 'radial' — fade outside a centred disc (rounder, for radial FX)
+  edgeFade(f, n, o) {
+    if (!o.on) return f;
+    const out = new Float32Array(n * n);
+    const band = Math.max(1, (o.width ?? 0.06) * n), c = (n - 1) / 2;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      let k;
+      if (o.shape === 'radial') {
+        const r = Math.hypot(x - c, y - c) / c;
+        k = 1 - smoothstep(1 - (o.width ?? 0.06) * 2, 1, r);
+      } else {
+        const d = Math.min(x, y, n - 1 - x, n - 1 - y);
+        k = smoothstep(0, band, d);
+      }
+      out[y * n + x] = f[y * n + x] * k;
+    }
+    return out;
+  }
+};
+
+/* ----------------------------- colour ramps --------------------------- */
+// Colour LAST. `alpha:'field'` is the particle-texture default (RGB = ramp,
+// A = mask) — correct under both ADD and alpha blending.
+// Stops are the real src/core/Constants.ts PALETTE so anything baked here drops
+// straight into the game's colour language.
+//   lava #E8503C · gold #F7A437 · goldAccent #FFD84D · cream #FFF6E8
+//   ash #8E8A93 · moss #7ECB4F · teal #3FA8D9 · plum #4A3845 · night #241B22
+const RAMPS = {
+  white:  ['#000000', '#8a8a8a', '#ffffff'],
+  ember:  ['#000000', '#8c2418', '#E8503C', '#F7A437', '#FFD84D', '#FFF6E8'],
+  lava:   ['#000000', '#3A0D06', '#C73A2E', '#E8503C', '#FF8A66', '#FFD84D'],
+  gold:   ['#000000', '#5A3A0B', '#D9821F', '#F7A437', '#FFD84D', '#FFF6E8'],
+  ash:    ['#000000', '#241B22', '#6E6A75', '#8E8A93', '#C9C5CE', '#FFF6E8'],
+  sparkweed: ['#000000', '#1d3a10', '#5FA63D', '#7ECB4F', '#CDEF7E', '#FFF6E8'],
+  gem:    ['#000000', '#123a5a', '#2E7FA6', '#3FA8D9', '#9BE3FF', '#FFF6E8'],
+  radiant:['#000000', '#31145c', '#6A5468', '#B07CF0', '#E3C6FF', '#FFFFFF'],
+  cream:  ['#000000', '#6b5a48', '#B5602F', '#F7A437', '#FFF6E8', '#FFFFFF'],
+  // legacy generic ramps — kept so older recipes keep resolving
+  ice:    ['#000000', '#123a5a', '#3FA8D9', '#9BE3FF', '#FFFFFF'],
+  toxic:  ['#000000', '#1d3a10', '#6FBE43', '#CDEF7E', '#FFFFFF'],
+  magic:  ['#000000', '#31145c', '#B07CF0', '#E3C6FF', '#FFFFFF'],
+  smoke:  ['#000000', '#3b3438', '#8a8079', '#cdbfb8', '#ffffff']
+};
+function rampLookup(name, t) {
+  const stops = RAMPS[name] || RAMPS.white;
+  const s = clamp01(t) * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(s)), fr = s - i;
+  const a = parseInt(stops[i].slice(1), 16), b = parseInt(stops[i + 1].slice(1), 16);
+  return [Math.round(lerp((a >> 16) & 255, (b >> 16) & 255, fr)),
+          Math.round(lerp((a >> 8) & 255, (b >> 8) & 255, fr)),
+          Math.round(lerp(a & 255, b & 255, fr))];
+}
+
+/* ----------------------------- bake ----------------------------------- */
+// A recipe is everything needed to reproduce the texture:
+//   { size, gen, params, tech, ramp, alpha }
+function defaultRecipe(type) {
+  const g = GENERATORS[type] || GENERATORS.glow;
+  const params = { seed: 1337 };
+  for (const k in g.params) params[k] = g.params[k][0];
+  return {
+    size: 256, gen: type, params,
+    tech: {
+      symmetry: { on: false, axes: 6, snowflake: true },
+      polar:    { on: false, invert: false },
+      seamless: { on: false, feather: 0.18 },
+      glowBlur: { on: false, radius: 3, passes: 2, strength: 0.55, wrap: false },
+      dissolve: { on: false, amount: 0.42, soft: 0.16, scale: 6, seed: 1337 },
+      levels:   { on: false, black: 0, white: 1, gamma: 1 },
+      edgeFade: { on: false, width: 0.06, shape: 'square' }
+    },
+    ramp: 'ember', alpha: 'field'
+  };
+}
+function bakeRecipe(rec) {
+  const n = rec.size, gen = GENERATORS[rec.gen] || GENERATORS.glow;
+  const p = { ...rec.params, seed: rec.params.seed | 0 };
+  let f = gen.make(n, p);
+  f = TECHNIQUES.symmetry(f, n, rec.tech.symmetry);
+  f = TECHNIQUES.polar(f, n, rec.tech.polar);
+  f = TECHNIQUES.seamless(f, n, rec.tech.seamless);
+  f = TECHNIQUES.glowBlur(f, n, rec.tech.glowBlur);
+  f = TECHNIQUES.dissolve(f, n, { ...rec.tech.dissolve, seed: rec.tech.dissolve.seed ?? p.seed });
+  f = TECHNIQUES.levels(f, n, rec.tech.levels);
+  f = TECHNIQUES.edgeFade(f, n, rec.tech.edgeFade || { on: false });
+
+  const c = document.createElement('canvas'); c.width = c.height = n;
+  const g = c.getContext('2d'), img = g.createImageData(n, n), d = img.data;
+  for (let i = 0, j = 0; i < f.length; i++, j += 4) {
+    const v = clamp01(f[i]), rgb = rampLookup(rec.ramp, v);
+    d[j] = rgb[0]; d[j + 1] = rgb[1]; d[j + 2] = rgb[2];
+    d[j + 3] = rec.alpha === 'opaque' ? 255 : Math.round(v * 255);
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
+/* ------------------------ flipbook sheet grading ---------------------- */
+// Grading a SHEET is not the same job as baking a single texture: every
+// spatial operator in the technique chain (blur, dissolve, symmetry, polar,
+// seamless) reads neighbouring pixels and would bleed across cell borders,
+// smearing frame N into frame N+1. So sheets get a strictly PER-PIXEL chain —
+// mask extraction → levels → ramp — which is exactly what is needed to bring a
+// greyscale/lit source sheet into the Emberkeep palette.
+//
+//   maskFrom 'alpha' — density lives in the alpha channel (Unity smoke/fire)
+//            'luma'  — no usable alpha (RGB sources); use luminance
+//            'both'  — alpha for shape, luminance for internal detail
+function bakeSheet(img, o) {
+  const cols = Math.max(1, o.cols || 1), rows = Math.max(1, o.rows || 1);
+  // Cells are NOT necessarily square — Unity's 16x4 and 20x4 sheets carry tall
+  // cells. Default to the source's native cell size so a flame never gets
+  // squeezed into a square; only override deliberately.
+  const cellW = Math.max(1, Math.round(o.cellW || o.cell || img.width / cols));
+  const cellH = Math.max(1, Math.round(o.cellH || o.cell || img.height / rows));
+  const w = cols * cellW, h = rows * cellH;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.clearRect(0, 0, w, h);
+  // Resample cell-by-cell from the source grid so a non-integer scale can never
+  // drag a neighbouring frame's pixels into this one.
+  const sw = img.width / cols, sh = img.height / rows;
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+    g.drawImage(img, q * sw, r * sh, sw, sh, q * cellW, r * cellH, cellW, cellH);
+  }
+  const id = g.getImageData(0, 0, w, h), d = id.data;
+  const lv = o.levels && o.levels.on ? o.levels : null;
+  const mode = o.maskFrom || 'alpha';
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3] / 255;
+    const luma = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
+    let m = mode === 'luma' ? luma : mode === 'both' ? a * (0.35 + 0.65 * luma) : a;
+    if (lv) {
+      m = clamp01((m - lv.black) / Math.max(1e-4, lv.white - lv.black));
+      m = clamp01(Math.pow(m, 1 / Math.max(0.05, lv.gamma)));
+    }
+    m = clamp01(m * (o.gain ?? 1));
+    const rgb = rampLookup(o.ramp || 'white', m);
+    d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2];
+    d[i + 3] = Math.round(m * 255);
+  }
+  g.putImageData(id, 0, 0);
+  return c;
+}
+
+/* ----------------------------- library -------------------------------- */
+// A texture record: { id, name, src, cols, rows, fps, recipe|null }
+// `recipe` present  → generated, re-bakeable from the recipe alone (tiny to persist).
+// `recipe` null     → imported PNG, only the data URL can reproduce it.
+const TEX = {};          // id -> HTMLImageElement (decoded, ready to draw)
+let texSeq = 1;
+const texById = (id) => S.textures[id] || null;
+function texFrames(t) { return Math.max(1, (t.cols || 1) * (t.rows || 1)); }
+function loadTexture(rec, cb) {
+  const img = new Image();
+  img.onload = () => { TEX[rec.id] = img; cb && cb(true); };
+  img.onerror = () => { cb && cb(false); };
+  img.src = rec.src;
+}
+function addTexture(name, src, extra) {
+  const id = 'tex_' + (texSeq++) + '_' + Math.random().toString(36).slice(2, 6);
+  const rec = { id, name, src, cols: 1, rows: 1, fps: 24, recipe: null, ...(extra || {}) };
+  S.textures[id] = rec;
+  loadTexture(rec, () => { renderTexGrid(); renderFXGrid(); save(); });
+  return rec;
+}
+function removeTexture(id) {
+  delete S.textures[id]; delete TEX[id];
+  for (const p of FX_PRESETS) if (p.texture === id) p.texture = null;   // unbind
+  renderTexGrid(); renderFXGrid(); renderInspector(); save();
+}
+
+/* ------------------- tinting + flipbook frame drawing ----------------- */
+// Particles tint their texture. Pre-tint into a cache (per texture+colour)
+// rather than compositing per particle per frame.
+const TINT = new Map();
+const TINT_MAX = 160;
+function quantHex(col) {
+  // Rainbow picks a random hue per particle, which would give the cache an
+  // unbounded key space — snap it. `pickColor` emits hsl() there, hex elsewhere.
+  if (col[0] !== '#') {
+    const m = /hsl\(\s*([\d.]+)/.exec(col);
+    return m ? `hsl(${Math.round(+m[1] / 15) * 15 % 360},85%,62%)` : col;
+  }
+  const n = parseInt(col.slice(1), 16);
+  const q = (v) => (Math.round(v / 24) * 24) & 255;
+  return '#' + ((1 << 24) + (q((n >> 16) & 255) << 16) + (q((n >> 8) & 255) << 8) + q(n & 255)).toString(16).slice(1);
+}
+function tintedTexture(id, hex) {
+  const img = TEX[id]; if (!img) return null;
+  const key = id + '|' + hex;
+  let c = TINT.get(key);
+  if (c) return c;
+  if (TINT.size > TINT_MAX) TINT.clear();
+  c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  g.globalCompositeOperation = 'multiply';                 // keep luminance detail
+  g.fillStyle = hex; g.fillRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'destination-in';           // restore the alpha mask
+  g.drawImage(img, 0, 0);
+  TINT.set(key, c);
+  return c;
+}
+// Resolve which sheet cell a particle shows this frame.
+function frameRect(t, img, mode, lifeFrac, clock, idx) {
+  const cols = Math.max(1, t.cols || 1), rows = Math.max(1, t.rows || 1), total = cols * rows;
+  let i = 0;
+  if (total > 1) {
+    if (mode === 'loop') i = Math.floor(clock * (t.fps || 24)) % total;
+    else if (mode === 'random') i = idx % total;
+    else i = Math.min(total - 1, Math.floor(clamp01(lifeFrac) * total));   // 'life'
+  }
+  const fw = img.width / cols, fh = img.height / rows;
+  return [(i % cols) * fw, Math.floor(i / cols) * fh, fw, fh];
+}
+
 /* ------------------ placeholder sprite (matches the world builder) ----- */
 function placeholderSprite(el) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 256;
@@ -309,15 +995,16 @@ function loadSprite(key, src, cb) {
 class Effect {
   constructor(preset, ox, oy, color) {
     this.p = preset; this.ox = ox; this.oy = oy; this.color = color; this.t = 0; this.parts = [];
-    if (preset.kind === 'particles') for (let i = 0; i < preset.count; i++) this.parts.push(this.spawn());
+    if (preset.kind === 'particles') for (let i = 0; i < preset.count; i++) this.parts.push(this.spawn(i));
   }
-  spawn() {
+  spawn(idx) {
     const p = this.p, ang = rand(p.angle[0], p.angle[1]) * Math.PI / 180, spd = rand(p.speed[0], p.speed[1]);
     const sr = (p.spawnR || 0) * Math.random(), sa = Math.random() * Math.PI * 2;
     return { x: this.ox + Math.cos(sa) * sr, y: this.oy + Math.sin(sa) * sr,
       vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, size: rand(p.size[0], p.size[1]),
       rot: Math.random() * Math.PI * 2, vrot: rand(p.spin[0], p.spin[1]) * Math.PI / 180,
-      life: 0, maxLife: rand(p.life[0], p.life[1]), color: pickColor(p, this.color), wob: Math.random() * 6.28 };
+      life: 0, maxLife: rand(p.life[0], p.life[1]), color: pickColor(p, this.color),
+      wob: Math.random() * 6.28, idx: idx | 0 };
   }
   update(dt) {
     this.t += dt; const p = this.p;
@@ -344,11 +1031,28 @@ class Effect {
     if (p.blend === 'add') g.globalCompositeOperation = 'lighter';
     if (p.kind === 'ring') this.drawRing(g);
     else if (p.kind === 'glow') this.drawGlow(g);
-    else for (const q of this.parts) {
-      const a = this.alphaOf(q.life / q.maxLife) * (p.blink ? 0.55 + 0.45 * Math.sin(q.life * 22 + q.wob) : 1);
-      if (a <= 0.01) continue;
-      g.globalAlpha = a; g.fillStyle = q.color;
-      g.save(); g.translate(q.x, q.y); g.rotate(q.rot); drawShape(g, p.shape, q.size); g.restore();
+    else {
+      // A preset with a bound texture draws textured quads (flipbook-aware);
+      // otherwise it falls back to the built-in vector shape.
+      const trec = p.texture ? texById(p.texture) : null;
+      const timg = trec ? TEX[p.texture] : null;
+      for (const q of this.parts) {
+        const a = this.alphaOf(q.life / q.maxLife) * (p.blink ? 0.55 + 0.45 * Math.sin(q.life * 22 + q.wob) : 1);
+        if (a <= 0.01) continue;
+        g.globalAlpha = a;
+        g.save(); g.translate(q.x, q.y); g.rotate(q.rot);
+        if (timg) {
+          // Exact tint for the bounded palettes; only rainbow needs quantising
+          // to keep the cache from exploding.
+          const hex = p.colorMode === 'rainbow' ? quantHex(q.color) : q.color;
+          const src = p.colorMode === 'texture' ? timg : (tintedTexture(p.texture, hex) || timg);
+          const [sx, sy, sw, sh] = frameRect(trec, timg, p.frameMode || 'life', q.life / q.maxLife, this.t, q.idx);
+          g.drawImage(src, sx, sy, sw, sh, -q.size, -q.size, q.size * 2, q.size * 2);
+        } else {
+          g.fillStyle = q.color; drawShape(g, p.shape, q.size);
+        }
+        g.restore();
+      }
     }
     g.restore();
   }
@@ -620,8 +1324,15 @@ function renderFXGrid() {
   for (const p of FX_PRESETS) {
     const chip = document.createElement('div');
     chip.className = 'fxchip' + (sel.includes(p.key) ? ' on' : ''); chip.dataset.fx = p.key;
-    chip.innerHTML = `<span class="tick">✔</span><canvas></canvas><div class="nm" title="${p.label}">${p.label}</div>`;
-    chip.onclick = () => toggleFX(p.key);
+    const t = p.texture ? texById(p.texture) : null;
+    chip.innerHTML = `<span class="tick">✔</span><span class="gear" title="Preset settings — texture, blend, flipbook">⚙</span>`
+      + `<canvas></canvas>`
+      + (t ? `<span class="tex" title="Texture: ${t.name}">🧪${texFrames(t) > 1 ? texFrames(t) + 'f' : ''}</span>` : '')
+      + `<div class="nm" title="${p.label}">${p.label}</div>`;
+    chip.onclick = (e) => {
+      if (e.target.classList.contains('gear')) { e.stopPropagation(); openModal('preset', p.key); return; }
+      toggleFX(p.key);
+    };
     fxgrid.appendChild(chip);
   }
   buildMinis();
@@ -656,6 +1367,379 @@ function toggleFX(key) {
   say(`<b>${elById(S.selKey).label}</b> ${S.selEvent} FX: ${arr.length ? arr.join(', ') : 'none'}.`);
 }
 const say = (h) => { document.getElementById('status').innerHTML = h; };
+
+/* =====================================================================
+ * TEXTURE UI — library · generator lab · preset inspector · sources
+ * =================================================================== */
+let inspKey = FX_PRESETS[0].key;   // preset being inspected
+let texChecker = false;            // preview background: black (ADD) vs alpha checker
+let labSel = null;                 // texture id being re-edited in the lab (null = new)
+
+/* ------------------------------ modal shell --------------------------- */
+function openModal(pane, presetKey) {
+  if (presetKey) inspKey = presetKey;
+  document.getElementById('modal').classList.add('open');
+  showPane(pane || 'library');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function showPane(name) {
+  for (const b of document.querySelectorAll('#mtabs button')) b.classList.toggle('on', b.dataset.pane === name);
+  for (const p of document.querySelectorAll('.pane')) p.classList.toggle('on', p.id === 'pane' + name[0].toUpperCase() + name.slice(1));
+  if (name === 'library') renderTexGrid();
+  if (name === 'generate') renderLab();
+  if (name === 'preset') renderInspector();
+  if (name === 'sources') renderSources();
+}
+document.getElementById('texBtn').onclick = () => openModal('library');
+document.getElementById('mclose').onclick = closeModal;
+document.getElementById('modal').onclick = (e) => { if (e.target.id === 'modal') closeModal(); };
+for (const b of document.querySelectorAll('#mtabs button')) b.onclick = () => showPane(b.dataset.pane);
+addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+/* ------------------------------ library ------------------------------- */
+function renderTexGrid() {
+  const grid = document.getElementById('texgrid'); grid.innerHTML = '';
+  const list = Object.values(S.textures);
+  if (!list.length) {
+    grid.innerHTML = '<div style="color:var(--dim);font-size:12px;grid-column:1/-1;padding:18px 0">'
+      + 'Library is empty. <b>Generate</b> bakes one from scratch; <b>Import</b> pulls in a PNG from any pack '
+      + 'on the <b>Sources</b> tab.</div>';
+    return;
+  }
+  for (const t of list) {
+    const card = document.createElement('div');
+    card.className = 'texcard' + (texChecker ? ' checker' : '');
+    const frames = texFrames(t);
+    card.innerHTML = `<img src="${t.src}" alt="${t.name}" />`
+      + `<div class="nm" title="${t.name}">${t.name}</div>`
+      + `<div class="sub">${t.recipe ? GENERATORS[t.recipe.gen]?.label ?? 'generated' : 'imported'}`
+      + `${frames > 1 ? ` · ${t.cols}×${t.rows} sheet · ${t.fps}fps` : ''}</div>`
+      + `<div class="row">`
+      + (t.recipe ? `<button data-a="edit">✎ Edit</button>` : `<button data-a="sheet">▦ Sheet</button>`)
+      + `<button data-a="png">⬇</button><button data-a="del">🗑</button></div>`;
+    card.querySelector('[data-a="del"]').onclick = (e) => {
+      e.stopPropagation();
+      if (confirm(`Remove "${t.name}" from the library? Any preset using it falls back to its vector shape.`)) removeTexture(t.id);
+    };
+    card.querySelector('[data-a="png"]').onclick = (e) => { e.stopPropagation(); downloadDataUrl(t.name.replace(/\s+/g, '-') + '.png', t.src); };
+    const edit = card.querySelector('[data-a="edit"]');
+    if (edit) edit.onclick = (e) => { e.stopPropagation(); labSel = t.id; labRecipe = JSON.parse(JSON.stringify(t.recipe)); showPane('generate'); };
+    const sheet = card.querySelector('[data-a="sheet"]');
+    if (sheet) sheet.onclick = (e) => {
+      e.stopPropagation();
+      const spec = prompt(`Flipbook layout for "${t.name}" as cols×rows[@fps] — e.g. 8x8@30. Use 1x1 for a single frame.`,
+        `${t.cols}x${t.rows}@${t.fps}`);
+      if (!spec) return;
+      const m = /^\s*(\d+)\s*[x×]\s*(\d+)\s*(?:@\s*(\d+))?\s*$/.exec(spec);
+      if (!m) { say('Could not read that layout — expected something like <b>8x8@30</b>.'); return; }
+      t.cols = Math.max(1, +m[1]); t.rows = Math.max(1, +m[2]); t.fps = Math.max(1, +(m[3] || 24));
+      renderTexGrid(); renderFXGrid(); save();
+      say(`<b>${t.name}</b> → ${t.cols}×${t.rows} sheet (${texFrames(t)} frames) at ${t.fps}fps.`);
+    };
+    card.onclick = () => { openModal('preset'); };
+    grid.appendChild(card);
+  }
+}
+function downloadDataUrl(name, url) {
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+}
+document.getElementById('importTex').onclick = () => document.getElementById('fileTex').click();
+document.getElementById('fileTex').onchange = (e) => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  let done = 0;
+  for (const f of files) {
+    const r = new FileReader();
+    r.onload = () => {
+      addTexture(f.name.replace(/\.(png|webp)$/i, ''), r.result);
+      if (++done === files.length) say(`Imported <b>${files.length}</b> texture(s). Set a sheet layout on any flipbook, then bind it to a preset with ⚙.`);
+    };
+    r.readAsDataURL(f);
+  }
+};
+document.getElementById('newTex').onclick = () => { labSel = null; labRecipe = defaultRecipe('glow'); showPane('generate'); };
+document.getElementById('checkerBtn').onclick = () => { texChecker = !texChecker; renderTexGrid(); };
+document.getElementById('clearTex').onclick = () => {
+  if (!Object.keys(S.textures).length) return;
+  if (!confirm('Remove every texture from the library?')) return;
+  for (const id of Object.keys(S.textures)) removeTexture(id);
+  say('Texture library cleared.');
+};
+
+/* ------------------------------ generator lab ------------------------- */
+let labRecipe = defaultRecipe('glow');
+function renderLab() {
+  const ctl = document.getElementById('labctl');
+  const g = GENERATORS[labRecipe.gen];
+  const rows = [];
+  rows.push(`<div class="lgroup"><div class="hd"><span class="t">Generator</span></div><div class="body">
+    <div class="lrow"><label>Type</label><select id="genType">${Object.keys(GENERATORS)
+      .map((k) => `<option value="${k}"${k === labRecipe.gen ? ' selected' : ''}>${GENERATORS[k].label}</option>`).join('')}</select></div>
+    <div class="tech" style="margin:-2px 0 6px 0">${g.tech}</div>
+    ${labRecipe.gen === 'source' ? sourceRow() : ''}
+    ${Object.keys(g.params).map((k) => sliderRow('p:' + k, k, labRecipe.params[k], g.params[k])).join('')}
+    <div class="lrow"><label>Size</label><select id="genSize">${[64, 128, 256, 512]
+      .map((s) => `<option value="${s}"${s === labRecipe.size ? ' selected' : ''}>${s}×${s}</option>`).join('')}</select></div>
+  </div></div>`);
+
+  const T = labRecipe.tech;
+  rows.push(techGroup('symmetry', 'Multibrush symmetry', 'Krita multibrush — fold the disc into N mirrored wedges', T.symmetry, [
+    ['axes', 'Axes', T.symmetry.axes, [6, 2, 16, 1]],
+    ['snowflake', 'Snowflake', T.symmetry.snowflake, 'bool']
+  ]));
+  rows.push(techGroup('polar', 'Polar conversion', 'wrap a linear/noise field around the centre', T.polar, [
+    ['invert', 'Invert radius', T.polar.invert, 'bool']
+  ]));
+  rows.push(techGroup('seamless', 'Wrap-around (seamless)', 'Krita wrap mode — offset by half and cross-blend the seam', T.seamless, [
+    ['feather', 'Feather', T.seamless.feather, [0.18, 0.02, 0.5, 0.01]]
+  ]));
+  rows.push(techGroup('glowBlur', 'Duplicate + blur glow', 'his glow trick: duplicate the layer, gaussian-blur, add back', T.glowBlur, [
+    ['radius', 'Radius', T.glowBlur.radius, [3, 1, 24, 0.5]],
+    ['passes', 'Stack', T.glowBlur.passes, [2, 1, 4, 1]],
+    ['strength', 'Strength', T.glowBlur.strength, [0.55, 0.05, 1.5, 0.05]],
+    ['wrap', 'Tile-safe', T.glowBlur.wrap, 'bool']
+  ]));
+  rows.push(techGroup('dissolve', 'Morphological dissolve', 'his lava/fire trick — eat the edges with noise', T.dissolve, [
+    ['amount', 'Amount', T.dissolve.amount, [0.42, 0, 1, 0.01]],
+    ['soft', 'Softness', T.dissolve.soft, [0.16, 0.01, 0.5, 0.01]],
+    ['scale', 'Noise scale', T.dissolve.scale, [6, 1, 24, 1]]
+  ]));
+  rows.push(techGroup('edgeFade', 'Edge fade (ADD safety)', 'force the border to black — an ADD texture with a lit edge draws a glowing box', T.edgeFade || { on: false, width: 0.06, shape: 'square' }, [
+    ['width', 'Band', (T.edgeFade || {}).width ?? 0.06, [0.06, 0.01, 0.3, 0.005]]
+  ]));
+  rows.push(techGroup('levels', 'Levels', 'black/white points + gamma', T.levels, [
+    ['black', 'Black', T.levels.black, [0, 0, 0.9, 0.01]],
+    ['white', 'White', T.levels.white, [1, 0.1, 1, 0.01]],
+    ['gamma', 'Gamma', T.levels.gamma, [1, 0.2, 3, 0.05]]
+  ]));
+
+  rows.push(`<div class="lgroup"><div class="hd"><span class="t">Colour (applied last)</span></div><div class="body">
+    <div class="lrow"><label>Ramp</label><select id="genRamp">${Object.keys(RAMPS)
+      .map((k) => `<option value="${k}"${k === labRecipe.ramp ? ' selected' : ''}>${k}</option>`).join('')}</select></div>
+    <div class="lrow"><label>Alpha</label><select id="genAlpha">
+      <option value="field"${labRecipe.alpha === 'field' ? ' selected' : ''}>from mask (particle default)</option>
+      <option value="opaque"${labRecipe.alpha === 'opaque' ? ' selected' : ''}>opaque (tiling/ADD-on-black)</option>
+    </select></div>
+    <div class="lrow"><label>Name</label><input type="text" id="genName" value="${labSel && S.textures[labSel] ? S.textures[labSel].name : g.label}" /></div>
+  </div></div>`);
+  ctl.innerHTML = rows.join('');
+
+  // wiring
+  document.getElementById('genType').onchange = (e) => {
+    const keep = labRecipe.tech, seed = labRecipe.params.seed, size = labRecipe.size, ramp = labRecipe.ramp, alpha = labRecipe.alpha;
+    labRecipe = defaultRecipe(e.target.value);
+    labRecipe.tech = keep; labRecipe.params.seed = seed; labRecipe.size = size; labRecipe.ramp = ramp; labRecipe.alpha = alpha;
+    renderLab();
+  };
+  const srcSel = document.getElementById('genSrcTex');
+  if (srcSel) srcSel.onchange = (e) => { labRecipe.params.srcTex = e.target.value; bakeLab(); };
+  document.getElementById('genSize').onchange = (e) => { labRecipe.size = +e.target.value; bakeLab(); };
+  document.getElementById('genRamp').onchange = (e) => { labRecipe.ramp = e.target.value; bakeLab(); };
+  document.getElementById('genAlpha').onchange = (e) => { labRecipe.alpha = e.target.value; bakeLab(); };
+  for (const inp of ctl.querySelectorAll('[data-bind]')) {
+    const path = inp.dataset.bind;
+    const apply = () => {
+      const v = inp.type === 'checkbox' ? inp.checked : +inp.value;
+      setPath(labRecipe, path, v);
+      const lbl = inp.parentElement.querySelector('.val'); if (lbl) lbl.textContent = fmtNum(v);
+      bakeLab();
+    };
+    inp.oninput = apply; inp.onchange = apply;
+  }
+  for (const cb of ctl.querySelectorAll('[data-tech]')) {
+    cb.onchange = () => {
+      labRecipe.tech[cb.dataset.tech].on = cb.checked;
+      cb.closest('.lgroup').classList.toggle('off', !cb.checked);
+      bakeLab();
+    };
+  }
+  bakeLab();
+}
+// Input picker for the `source` generator — every library texture except the
+// one currently being edited (which would feed on itself).
+function sourceRow() {
+  const opts = Object.values(S.textures).filter((t) => t.id !== labSel);
+  if (!opts.length) {
+    return `<div class="tech" style="color:var(--gold2)">No other textures in the library yet — import a PNG on the
+      <b>Library</b> tab first, then process it here.</div>`;
+  }
+  if (!labRecipe.params.srcTex || !S.textures[labRecipe.params.srcTex] || labRecipe.params.srcTex === labSel) {
+    labRecipe.params.srcTex = opts[0].id;
+  }
+  return `<div class="lrow"><label>Input</label><select id="genSrcTex">${opts
+    .map((t) => `<option value="${t.id}"${t.id === labRecipe.params.srcTex ? ' selected' : ''}>${t.name}</option>`).join('')}</select></div>`;
+}
+const fmtNum = (v) => (typeof v === 'boolean' ? (v ? 'on' : 'off') : (Math.abs(v) >= 100 || Number.isInteger(v) ? String(v) : v.toFixed(2)));
+function sliderRow(bind, label, value, spec) {
+  const [, min, max, step] = spec;
+  return `<div class="lrow"><label title="${label}">${label}</label>
+    <input type="range" data-bind="${bind}" min="${min}" max="${max}" step="${step}" value="${value}" />
+    <span class="val">${fmtNum(value)}</span></div>`;
+}
+function techGroup(key, title, tech, state, fields) {
+  const body = fields.map(([k, label, val, spec]) => spec === 'bool'
+    ? `<div class="lrow"><label>${label}</label><input type="checkbox" data-bind="t:${key}.${k}" ${val ? 'checked' : ''} style="accent-color:var(--gold)" /><span class="val"></span></div>`
+    : sliderRow(`t:${key}.${k}`, label, val, spec)).join('');
+  return `<div class="lgroup${state.on ? '' : ' off'}">
+    <div class="hd"><input type="checkbox" data-tech="${key}" ${state.on ? 'checked' : ''} />
+    <span class="t">${title}</span></div>
+    <div class="body"><div class="tech" style="margin-bottom:6px">${tech}</div>${body}</div></div>`;
+}
+function setPath(rec, path, v) {
+  if (path.startsWith('p:')) { rec.params[path.slice(2)] = v; return; }
+  const [, rest] = path.split('t:'); const [grp, key] = rest.split('.');
+  rec.tech[grp][key] = v;
+}
+let labCanvasCache = null, labPending = false;
+// A full six-technique chain costs ~190ms at 256² (~1s at 512²), and a slider
+// drag fires input events far faster than that. Coalesce to one bake per frame
+// so dragging stays responsive instead of queueing a bake per event.
+function bakeLab() {
+  if (labPending) return;
+  labPending = true;
+  requestAnimationFrame(() => { labPending = false; bakeLabNow(); });
+}
+function bakeLabNow() {
+  labCanvasCache = bakeRecipe(labRecipe);
+  const view = document.getElementById('labcanvas'), g = view.getContext('2d');
+  view.width = view.height = labRecipe.size;
+  g.clearRect(0, 0, view.width, view.height);
+  g.drawImage(labCanvasCache, 0, 0);
+  view.classList.toggle('checker', texChecker);
+  document.getElementById('labHint').innerHTML =
+    `${labRecipe.size}×${labRecipe.size} · ramp <b>${labRecipe.ramp}</b> · `
+    + (labRecipe.alpha === 'field' ? 'alpha from mask' : 'opaque')
+    + `<br><span class="tech">Preview background is ${texChecker ? 'the alpha checker' : 'black — how an ADD-blended particle actually reads'}.</span>`;
+}
+document.getElementById('labChecker').onclick = () => { texChecker = !texChecker; bakeLab(); };
+document.getElementById('labReseed').onclick = () => {
+  labRecipe.params.seed = (Math.random() * 1e9) | 0;
+  labRecipe.tech.dissolve.seed = labRecipe.params.seed;
+  bakeLab();
+};
+document.getElementById('labPng').onclick = () => {
+  bakeLabNow();                              // never export a stale frame
+  if (!labCanvasCache) return;
+  downloadDataUrl((document.getElementById('genName').value || 'texture').replace(/\s+/g, '-') + '.png', labCanvasCache.toDataURL());
+};
+document.getElementById('labSave').onclick = () => {
+  bakeLabNow();                              // never store a stale frame
+  if (!labCanvasCache) return;
+  const name = document.getElementById('genName').value || GENERATORS[labRecipe.gen].label;
+  const src = labCanvasCache.toDataURL();
+  const recipe = JSON.parse(JSON.stringify(labRecipe));
+  if (labSel && S.textures[labSel]) {
+    const t = S.textures[labSel];
+    t.name = name; t.src = src; t.recipe = recipe;
+    TINT.clear();
+    loadTexture(t, () => { renderTexGrid(); renderFXGrid(); save(); });
+    say(`Updated <b>${name}</b>.`);
+  } else {
+    const t = addTexture(name, src, { recipe });
+    labSel = t.id;
+    say(`Baked <b>${name}</b> into the library. Bind it to a preset with the ⚙ on its chip.`);
+  }
+  showPane('library');
+};
+
+/* ------------------------------ preset inspector ---------------------- */
+function renderInspector() {
+  const p = presetByKey(inspKey); if (!p) return;
+  document.getElementById('inspName').textContent = p.label;
+  document.getElementById('inspBlend').value = p.blend;
+  document.getElementById('inspColor').value = p.colorMode;
+  document.getElementById('inspFrame').value = p.frameMode || 'life';
+  const grid = document.getElementById('inspGrid');
+  const textured = p.kind === 'particles';
+  grid.innerHTML = '';
+  if (!textured) {
+    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--dim);font-size:12px">`
+      + `<b>${p.label}</b> is a <b>${p.kind}</b> effect — it is drawn procedurally (expanding ring / pulsing glow), `
+      + `so it takes no texture. Textures apply to <b>particles</b> presets.</div>`;
+    return;
+  }
+  const mk = (id, name, drawFn) => {
+    const d = document.createElement('div');
+    d.className = 'tpick' + ((p.texture || null) === id ? ' on' : '');
+    d.innerHTML = `<canvas width="120" height="80"></canvas><div class="nm">${name}</div>`;
+    drawFn(d.querySelector('canvas'));
+    d.onclick = () => {
+      p.texture = id;
+      renderFXGrid(); renderInspector(); restartStage(); save();
+      say(`<b>${p.label}</b> → ${id ? 'texture <b>' + texById(id).name + '</b>' : 'vector shape <b>' + p.shape + '</b>'}.`);
+    };
+    grid.appendChild(d);
+  };
+  // "none" = the built-in vector shape
+  mk(null, 'none · ' + p.shape, (c) => {
+    const g = c.getContext('2d');
+    g.fillStyle = '#0d0910'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#FFD84D'; g.save(); g.translate(c.width / 2, c.height / 2); drawShape(g, p.shape, 22); g.restore();
+  });
+  for (const t of Object.values(S.textures)) {
+    mk(t.id, t.name + (texFrames(t) > 1 ? ` (${texFrames(t)}f)` : ''), (c) => {
+      const g = c.getContext('2d'), img = TEX[t.id];
+      g.fillStyle = '#0d0910'; g.fillRect(0, 0, c.width, c.height);
+      if (!img) return;
+      const fr = frameRect(t, img, 'life', 0.5, 0, 0);
+      const s = Math.min(c.width / fr[2], c.height / fr[3]);
+      g.drawImage(img, fr[0], fr[1], fr[2], fr[3], (c.width - fr[2] * s) / 2, (c.height - fr[3] * s) / 2, fr[2] * s, fr[3] * s);
+    });
+  }
+}
+document.getElementById('inspBlend').onchange = (e) => { presetByKey(inspKey).blend = e.target.value; restartStage(); save(); };
+document.getElementById('inspColor').onchange = (e) => { presetByKey(inspKey).colorMode = e.target.value; restartStage(); save(); };
+document.getElementById('inspFrame').onchange = (e) => { presetByKey(inspKey).frameMode = e.target.value; restartStage(); save(); };
+
+/* ------------------------------ sources ------------------------------- */
+// Straight out of docs/vfx-textures.md. [verified] = license read off the page;
+// [db-tagged] = tag from Simon Schreibt's database, NOT re-verified.
+const SOURCES = [
+  { grp: 'Generators — make one now, no install' },
+  { n: 'Effect Texture Maker', s: 'presets for spark/sun/perlin/lightning/fire · polar · tiling · animated export', u: 'https://mebiusbox.github.io/contents/EffectTextureMaker/', b: 'tool', t: 'db-tagged CC0' },
+  { n: 'Fateloom VFX texture generator', s: 'clouds and noise', u: 'https://vfxtexturegenerator.fateloom.io/', b: 'tool', t: 'db-tagged free' },
+  { n: 'Noise Generator (Bubblebird)', s: 'marble noise + turbulence', u: 'https://noisegen.bubblebirdstudio.com/', b: 'tool', t: 'db-tagged free' },
+  { n: 'Texture Generator Online', s: 'general noise', u: 'http://cpetry.github.io/TextureGenerator-Online/', b: 'tool', t: 'db-tagged free' },
+  { n: 'Flame Painter Online', s: 'painted flame/abstract', u: 'https://www.escapemotions.com/experiments/flame/', b: 'tool', t: 'db-tagged free' },
+
+  { grp: 'Free packs — drop-in' },
+  { n: "LeLu's Free Textures Pack 1", s: 'a variety of VFX textures — the pack from the guide', u: 'https://leluvfx.gumroad.com/l/freeTextures', b: 'ok', t: 'verified $0 · no credit required' },
+  { n: 'Luos Free Noise Textures V1', s: '68 textures — 6 merged, 22 gradients, 28 normal maps', u: 'https://luos.gumroad.com/l/FreeNoise', b: 'ok', t: 'verified — any project, commercial or not' },
+  { n: 'Luos Free Noise Textures V2', s: 'hand-drawn noise', u: 'https://luos.gumroad.com/l/bouSt', b: 'ok', t: 'verified free' },
+  { n: 'Unity free VFX flipbooks', s: 'fire · explosion · smoke image sequences — the flipbook source', u: 'https://blog.unity.com/technology/free-vfx-image-sequences-flipbooks', b: 'warn', t: 'db-tagged free/CC0' },
+  { n: 'Kenney Smoke Particles', s: 'white puff set, already vetted in asset-sourcing.md', u: 'https://www.kenney.nl/assets/smoke-particles', b: 'ok', t: 'CC0' },
+  { n: 'Unity Particle Pack', s: 'fire · lightning · splash · plasma', u: 'https://assetstore.unity.com/packages/essentials/tutorial-projects/unity-particle-pack-127325', b: 'warn', t: 'db-tagged free' },
+  { n: '1MAFX fire + noise', s: 'fire, flame, noise', u: 'https://1mafx.gumroad.com/', b: 'warn', t: 'db-tagged free' },
+  { n: 'Tiling Painterly Textures Vol. 2', s: 'stylized brush/stroke tiles', u: 'https://jakebenbow.gumroad.com/l/JB_TilingPainterlyTextures_Vol2', b: 'warn', t: 'db-tagged free/CC0' },
+
+  { grp: 'Photo/footage for photobashed decals (CC0 tier)' },
+  { n: 'Pexels · VFX', s: 'smoke, dust, fire, sparkles, water', u: 'https://www.pexels.com/de-de/suche/vfx/', b: 'ok', t: 'CC0' },
+  { n: 'Unsplash · splash', s: 'water, drops, foam, fire, lightning', u: 'https://unsplash.com/s/photos/splash', b: 'warn', t: 'Unsplash license' },
+  { n: 'ActionVFX free collection', s: 'fire, dust, lightning, sparkles video', u: 'https://www.actionvfx.com/collections/free-vfx/category', b: 'warn', t: 'check per-asset terms' },
+
+  { grp: 'Reference' },
+  { n: 'Textures for VFX Database (263 entries)', s: "Simon Schreibt's full database — tutorials, packs, generators, brushes", u: 'https://simonschreibt.notion.site/Textures-for-VFX-Database-2c72eccccfa84a0eae927d778ad746cc', b: 'tool', t: 'reference' },
+  { n: 'GDC — How (not) to create Textures for VFX', s: 'the talk this all comes from', u: 'https://gdc2022.simonschreibt.de', b: 'tool', t: 'reference' },
+  { n: 'VFX Texture Creation: The ULTIMATE guide (LeLu)', s: 'the video — Krita workflow at 07:56', u: 'https://www.youtube.com/watch?v=dMthnzpR-eU', b: 'tool', t: 'reference' },
+  { n: 'GDQuest free Krita brushes', s: 'brush pack for game artists', u: 'https://github.com/GDQuest/krita-free-brushes', b: 'tool', t: 'reference' }
+];
+function renderSources() {
+  const pane = document.getElementById('paneSources');
+  if (pane.dataset.built) return;
+  const parts = [`<p class="note">Curated from <b>docs/vfx-textures.md</b>. <span class="badge ok">verified</span> means the
+    licence was read off the source page; <span class="badge warn">db-tagged</span> came from Simon's database and is
+    <b>not</b> re-verified — confirm before shipping. Every file that lands in the repo needs a line in
+    <b>assets/CREDITS.md</b>.</p>`];
+  for (const s of SOURCES) {
+    if (s.grp) { parts.push(`<h4>${s.grp}</h4>`); continue; }
+    parts.push(`<div class="srcrow"><span class="nm">${s.n}<small>${s.s}</small></span>`
+      + `<span class="badge ${s.b}">${s.t}</span>`
+      + `<button data-u="${s.u}">Open ↗</button></div>`);
+  }
+  pane.innerHTML = parts.join('');
+  for (const b of pane.querySelectorAll('button[data-u]')) b.onclick = () => window.open(b.dataset.u, '_blank', 'noopener');
+  pane.dataset.built = '1';
+}
 
 /* ----------------------------- toolbar wiring ------------------------- */
 document.getElementById('replay').onclick = () => restartStage();
@@ -697,7 +1781,31 @@ document.getElementById('removeRig').onclick = () => {
 };
 
 /* ----------------------------- persistence ---------------------------- */
-function save() { try { localStorage.setItem(FX_KEY, JSON.stringify({ v: 1, config: S.config, selKey: S.selKey, selEvent: S.selEvent, mergeCount: S.mergeCount })); } catch (e) {} }
+// Generated textures persist as their RECIPE (a few hundred bytes, re-baked at
+// boot); only imported PNGs need the data URL. That keeps a texture library
+// inside the localStorage quota instead of blowing it on base64.
+function texPersist(withBlobs) {
+  const out = {};
+  for (const t of Object.values(S.textures)) {
+    const rec = { id: t.id, name: t.name, cols: t.cols, rows: t.rows, fps: t.fps, recipe: t.recipe || null };
+    if (!t.recipe && withBlobs) rec.src = t.src;
+    out[t.id] = rec;
+  }
+  return out;
+}
+function presetPersist() {
+  const o = {};
+  for (const p of FX_PRESETS) o[p.key] = { texture: p.texture ?? null, frameMode: p.frameMode ?? 'life', blend: p.blend, colorMode: p.colorMode };
+  return o;
+}
+function save() {
+  const base = { v: 2, config: S.config, selKey: S.selKey, selEvent: S.selEvent, mergeCount: S.mergeCount, presets: presetPersist() };
+  try { localStorage.setItem(FX_KEY, JSON.stringify({ ...base, textures: texPersist(true) })); return; } catch (e) {}
+  try {
+    localStorage.setItem(FX_KEY, JSON.stringify({ ...base, textures: texPersist(false) }));
+    say('Storage is full — generated textures still persist (as recipes), but <b>imported</b> PNGs will not survive a reload. Use <b>Save</b> for a durable project file.');
+  } catch (e) {}
+}
 function restore() {
   let raw; try { raw = localStorage.getItem(FX_KEY); } catch (e) { return false; }
   if (!raw) return false; let d; try { d = JSON.parse(raw); } catch (e) { return false; }
@@ -707,6 +1815,17 @@ function restore() {
     appear: Array.isArray(d.config[e.key].appear) ? d.config[e.key].appear : ['sparkle_burst'],
     merge: Array.isArray(d.config[e.key].merge) ? d.config[e.key].merge : ['shock_ring', 'star_pop'] };
   S.selKey = d.selKey ?? S.selKey; S.selEvent = d.selEvent ?? 'appear'; S.mergeCount = d.mergeCount ?? 3;
+  S.textures = {};
+  for (const t of Object.values(d.textures || {})) {
+    S.textures[t.id] = { id: t.id, name: t.name || 'texture', src: t.src || null,
+      cols: t.cols || 1, rows: t.rows || 1, fps: t.fps || 24, recipe: t.recipe || null };
+  }
+  for (const p of FX_PRESETS) {
+    const o = (d.presets || {})[p.key]; if (!o) continue;
+    p.texture = o.texture ?? null; p.frameMode = o.frameMode ?? 'life';
+    if (o.blend) p.blend = o.blend;
+    if (o.colorMode) p.colorMode = o.colorMode;
+  }
   return true;
 }
 
@@ -722,10 +1841,23 @@ function buildDoc() {
       rig: rigged ? { character: RIG[e.key].character } : null,  // resolve the rig from game assets; plays idle
       fx: { appear: cfg.appear.slice(), merge: cfg.merge.slice() } };
   });
+  // Textures referenced by any preset ship alongside, keyed by id. `frames`>1
+  // means the image is a flipbook sheet laid out cols×rows, read left→right,
+  // top→bottom.
+  const textures = {}, textureImages = {};
+  for (const t of Object.values(S.textures)) {
+    const file = t.id + '.png';
+    textures[t.id] = { id: t.id, name: t.name, file, cols: t.cols || 1, rows: t.rows || 1,
+      frames: texFrames(t), fps: t.fps || 24,
+      source: t.recipe ? 'generated' : 'imported',
+      recipe: t.recipe || null };
+    textureImages[file] = t.src;
+  }
   return {
-    format: 'emberkeep-merge-fx', version: 1,
-    note: 'FX + spawn/merge animation for every merge element. Under each element draw `shadow`. Replay events[ev].sprite (the structural motion) and fire each element.fx[ev] preset (from fxPresets) at the element centre. If element.rig is set, render that character (idle) instead of the sprite. All values resolved — see fxParamSpec.',
+    format: 'emberkeep-merge-fx', version: 2,
+    note: 'FX + spawn/merge animation for every merge element. Under each element draw `shadow`. Replay events[ev].sprite (the structural motion) and fire each element.fx[ev] preset (from fxPresets) at the element centre. If element.rig is set, render that character (idle) instead of the sprite. A preset with `texture` set draws that texture (from `textures`, image bytes in `textureImages`) instead of its vector `shape`; if the texture has frames>1 it is a flipbook sheet advanced per `frameMode`. All values resolved — see fxParamSpec.',
     mergeRule: { minGroup: EVENTS.merge.minGroup },
+    textures, textureImages,
     // soft ground shadow drawn under EVERY merge element (radial-gradient opacity + blur).
     shadow: { type: 'radialGradient', color: SHADOW.color, opacity: SHADOW.opacity,
       radiusXFactor: SHADOW.radiusXFactor, aspect: SHADOW.aspect, blurPx: SHADOW.blurPx, yOffsetFactor: SHADOW.yOffsetFactor,
@@ -759,7 +1891,23 @@ function applyDoc(doc) {
     S.config[el.key].merge = el.fx?.merge?.slice() ?? [];
     S.config[el.key].sprite = el.sprite?.custom ? (doc.images?.[el.sprite.file] ?? null) : null;
   }
-  bootSprites(() => { renderCatalogue(); refreshPanel(); restartStage(); save(); say(`Loaded project — ${(doc.elements ?? []).length} elements.`); });
+  // textures travel with the project (images inline), so a loaded project is
+  // self-contained — recipes included, so generated ones stay re-editable.
+  S.textures = {}; TINT.clear();
+  for (const t of Object.values(doc.textures ?? {})) {
+    S.textures[t.id] = { id: t.id, name: t.name || 'texture', src: doc.textureImages?.[t.file] ?? null,
+      cols: t.cols || 1, rows: t.rows || 1, fps: t.fps || 24, recipe: t.recipe || null };
+  }
+  for (const p of FX_PRESETS) {
+    const src = (doc.fxPresets ?? []).find((q) => q.key === p.key);
+    if (!src) continue;
+    p.texture = src.texture ?? null; p.frameMode = src.frameMode ?? 'life';
+    if (src.blend) p.blend = src.blend;
+    if (src.colorMode) p.colorMode = src.colorMode;
+  }
+  bootTextures(() => { renderTexGrid(); renderFXGrid(); });
+  bootSprites(() => { renderCatalogue(); refreshPanel(); restartStage(); save();
+    say(`Loaded project — ${(doc.elements ?? []).length} elements, ${Object.keys(S.textures).length} texture(s).`); });
 }
 
 /* ----------------------------- boot ----------------------------------- */
@@ -770,9 +1918,69 @@ function bootSprites(done) {
     loadSprite(e.key, src, () => { if (--pending === 0) done(); });
   }
 }
+// Presets predate textures — give every one the new fields so export and the
+// inspector never see `undefined`.
+function normalizePresets() {
+  for (const p of FX_PRESETS) { if (p.texture === undefined) p.texture = null; if (p.frameMode === undefined) p.frameMode = 'life'; }
+}
+// Re-bake generated textures from their recipes, then decode everything.
+// Records that can reproduce neither (imported, blob lost to a full quota) are
+// dropped and any preset bound to them falls back to its vector shape.
+function bootTextures(done) {
+  // Pass 0: recipes that stand alone.
+  for (const t of Object.values(S.textures)) {
+    if (!t.src && t.recipe && t.recipe.gen !== 'source') {
+      try { t.src = bakeRecipe(t.recipe).toDataURL(); } catch (e) { t.src = null; }
+    }
+  }
+  // A `source` recipe reads another texture, so it can only bake once its input
+  // is decoded — resolve in passes so derived textures survive a reload.
+  const decode = (pass) => {
+    const pend = Object.values(S.textures).filter((t) => t.src && !TEX[t.id]);
+    let n = pend.length;
+    if (!n) return settle(pass);
+    for (const t of pend) loadTexture(t, () => { if (--n === 0) settle(pass); });
+  };
+  const settle = (pass) => {
+    let baked = 0;
+    if (pass < 4) for (const t of Object.values(S.textures)) {
+      if (!t.src && t.recipe && t.recipe.gen === 'source' && TEX[t.recipe.params?.srcTex]) {
+        try { t.src = bakeRecipe(t.recipe).toDataURL(); baked++; } catch (e) {}
+      }
+    }
+    if (baked) return decode(pass + 1);
+    for (const t of Object.values(S.textures)) if (!t.src) delete S.textures[t.id];
+    for (const p of FX_PRESETS) if (p.texture && !S.textures[p.texture]) p.texture = null;
+    done();
+  };
+  decode(0);
+}
+// First run: bake a starter set so the library demonstrates the pipeline.
+// Deliberately NOT bound to any preset — the default look is unchanged until
+// you bind one with the ⚙ on a chip.
+function seedTextures() {
+  const seeds = [
+    ['Soft Glow', 'glow', 'ember', (r) => { r.tech.glowBlur = { on: true, radius: 4, passes: 2, strength: 0.35, wrap: false }; }],
+    ['Spark Flare', 'spark', 'ember', (r) => { r.params.arms = 4; r.params.sharpness = 30; }],
+    ['Smoke Puff', 'smoke', 'smoke', (r) => { r.tech.dissolve = { on: true, amount: 0.3, soft: 0.22, scale: 5, seed: 4242 }; }],
+    ['Flame', 'flame', 'lava', (r) => { r.tech.dissolve = { on: true, amount: 0.36, soft: 0.2, scale: 8, seed: 99 }; }],
+    ['Ember Noise', 'fbm', 'ember', (r) => { r.tech.seamless = { on: true, feather: 0.2 }; r.alpha = 'opaque'; }],
+    ['Magic Circle', 'marble', 'magic', (r) => { r.tech.symmetry = { on: true, axes: 8, snowflake: true }; r.tech.polar = { on: true, invert: false }; }]
+  ];
+  for (const [name, gen, ramp, tweak] of seeds) {
+    const rec = defaultRecipe(gen); rec.ramp = ramp; rec.size = 256; tweak(rec);
+    try { addTexture(name, bakeRecipe(rec).toDataURL(), { recipe: rec }); } catch (e) {}
+  }
+}
 function init() {
-  if (!restore()) S.config = defaultConfig();
+  normalizePresets();
+  const had = restore();
+  if (!had) { S.config = defaultConfig(); S.textures = {}; }
   resizeStage();
+  bootTextures(() => {
+    if (!had) seedTextures();
+    renderTexGrid(); renderFXGrid();
+  });
   bootSprites(() => { renderCatalogue(); refreshPanel(); restartStage(); });
   stage.last = performance.now(); requestAnimationFrame(tick);
 }

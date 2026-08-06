@@ -1,0 +1,55 @@
+{
+  "preset": "blink",
+  "name": "Blink (3-state)",
+  "description": "Open \u2192 half \u2192 closed \u2192 half \u2192 open on a natural cadence (fast close, brief hold, slightly slower open, ~2.6s open between blinks). Crossfades blend the three drawings.",
+  "slots": [
+    {
+      "id": "open",
+      "label": "Open",
+      "instruction": "Eyes/face fully open \u2014 the neutral idle pose."
+    },
+    {
+      "id": "half",
+      "label": "Half-open",
+      "instruction": "Eyelids roughly halfway \u2014 the in-between pose."
+    },
+    {
+      "id": "closed",
+      "label": "Closed",
+      "instruction": "Eyes fully closed."
+    }
+  ],
+  "steps": [
+    {
+      "frameId": "open",
+      "durationMs": 2600,
+      "blendMs": 30,
+      "file": "selyna_open.png"
+    },
+    {
+      "frameId": "half",
+      "durationMs": 45,
+      "blendMs": 30,
+      "file": "selyna_half.png"
+    },
+    {
+      "frameId": "closed",
+      "durationMs": 70,
+      "blendMs": 25,
+      "file": "selyna_closed.png"
+    },
+    {
+      "frameId": "half",
+      "durationMs": 55,
+      "blendMs": 30,
+      "file": "selyna_half.png"
+    }
+  ],
+  "blended": false,
+  "totalMs": 2770,
+  "cell": [
+    1101,
+    1536
+  ],
+  "source": "edit of selyna_X-rest.png"
+}

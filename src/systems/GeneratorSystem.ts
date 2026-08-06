@@ -8,7 +8,13 @@ import {
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
-import type { BoardItemState, ChainsData, GeneratorConfig, TilePos } from '../core/types';
+import type {
+  BoardItemState,
+  ChainsData,
+  ChainTierConfig,
+  GeneratorConfig,
+  TilePos
+} from '../core/types';
 
 /**
  * Generators come in two flavours:
@@ -25,6 +31,18 @@ export class GeneratorSystem {
    *  "While you were away" card reads it right after load. */
   lastOfflineGifts = 0;
 
+  /**
+   * Is a scripted tutorial step on screen right now?
+   *
+   * Learned from the bus rather than read off `state.tutorialDone`, and the
+   * difference is not cosmetic: `tutorialDone` is false both mid-script AND in
+   * any bare context that never ran a tutorial at all — every unit test, and any
+   * future harness that seeds a board directly. Gating on the flag would have
+   * silenced generators for all of them. A live step is the fact this actually
+   * cares about, and it is the same signal the scenes gate on.
+   */
+  private tutorialActive = false;
+
   constructor(
     private state: GameState,
     private bus: EventBus,
@@ -38,6 +56,62 @@ export class GeneratorSystem {
       this.setTimer(chain, tier, remainingMs)
     );
     bus.on('state:loaded', ({ offlineMs }) => this.bankOffline(offlineMs));
+    bus.on('ui:produce_choice_requested', ({ itemId, chain, tier }) =>
+      this.commission(itemId, chain, tier)
+    );
+    bus.on('tutorial:step', ({ done }) => {
+      this.tutorialActive = !done;
+    });
+  }
+
+  /** Is this generator commissionable and still undecided — i.e. is the chooser
+   *  the right answer to a tap on it? The board asks before it opens a panel. */
+  awaitingChoice(item: BoardItemState): boolean {
+    if (item.kind !== 'item' || item.produces) return false;
+    return this.tierConfig(item.chain, item.tier)?.chooseProduce === true;
+  }
+
+  /** What a generator actually makes: its own commission if it has one, else
+   *  whatever its tier makes by default. ONE resolver, so the passive tick, the
+   *  offline catch-up and a tap can never disagree about a House's output. */
+  private producesOf(
+    item: BoardItemState,
+    generator: GeneratorConfig
+  ): { chain: string; tier: number } | undefined {
+    return item.produces ?? generator.produces;
+  }
+
+  /**
+   * Dedicate a commissioned generator to one piece, for good.
+   *
+   * Write-once by design: a House the player can re-point is a menu, and the
+   * whole shape of the feature is that a second output costs a second House.
+   * The Bag is the roster — only a piece the player is actually holding can be
+   * commissioned, which is also what stops a chooser from promising an output
+   * this chapter cannot supply.
+   */
+  private commission(itemId: number, chain: string, tier: number): void {
+    const item = this.state.items.get(itemId);
+    if (!item || item.kind !== 'item') return;
+    if (this.tierConfig(item.chain, item.tier)?.chooseProduce !== true) {
+      this.bus.emit('generator:produce_refused', { itemId, reason: 'not_commissionable' });
+      return;
+    }
+    if (item.produces) {
+      this.bus.emit('generator:produce_refused', { itemId, reason: 'already_set' });
+      return;
+    }
+    if (!this.state.bag.some((s) => s.chain === chain && s.tier === tier && s.count > 0)) {
+      this.bus.emit('generator:produce_refused', { itemId, reason: 'not_in_bag' });
+      return;
+    }
+    item.produces = { chain, tier };
+    // Its first commissioned yield starts NOW rather than finishing the cycle it
+    // began as a coin press — the commission is the moment the House becomes
+    // what the player asked for, and a leftover Gold drop would undercut it.
+    const generator = this.generatorConfig(item.chain, item.tier);
+    if (generator?.passiveMs) item.passiveAt = this.clock.now() + generator.passiveMs;
+    this.bus.emit('generator:produce_set', { itemId, chain, tier });
   }
 
   /** Offline harvest: each passive producer pays up to OFFLINE_BANK_CYCLES
@@ -50,7 +124,8 @@ export class GeneratorSystem {
     for (const item of [...this.state.items.values()]) {
       if (item.kind !== 'item') continue;
       const generator = this.generatorConfig(item.chain, item.tier);
-      if (!generator?.passiveMs || !generator.produces) continue;
+      const produces = generator && this.producesOf(item, generator);
+      if (!generator?.passiveMs || !produces) continue;
       if (item.passiveAt === undefined || now < item.passiveAt) continue;
       const overdue = Math.min(
         OFFLINE_BANK_CYCLES,
@@ -59,9 +134,10 @@ export class GeneratorSystem {
       for (let i = 0; i < overdue; i++) {
         const target: TilePos | undefined = this.dropTileFor(item);
         if (!target) break; // board full — the live retry loop takes over
-        const output = this.produceItem(generator, target, now);
+        const output = this.produceItem(produces, target, now);
         this.lastOfflineGifts++;
         this.bus.emit('item:produced', { generatorId: item.id, output: this.state.snapshot(output, now) });
+        this.payBonus(item, generator, now);
       }
       item.passiveAt = now + generator.passiveMs;
     }
@@ -80,10 +156,12 @@ export class GeneratorSystem {
     else item.readyAt = at;
   }
 
+  private tierConfig(chain: string, tier: number): ChainTierConfig | undefined {
+    return this.chains.chains.find((c) => c.id === chain)?.tiers.find((t) => t.tier === tier);
+  }
+
   private generatorConfig(chain: string, tier: number): GeneratorConfig | undefined {
-    return this.chains.chains
-      .find((c) => c.id === chain)
-      ?.tiers.find((t) => t.tier === tier)?.generator;
+    return this.tierConfig(chain, tier)?.generator;
   }
 
   /** The timer a tap should offer to skip: a live tap-cooldown, else a live
@@ -104,7 +182,7 @@ export class GeneratorSystem {
 
   /** Spend Warmth to clear a generator's remaining wait. The cost scales with the
    *  fraction of time still left (see skipEnergyCost). */
-  private onSkip(itemId: number, currency: 'gold' | 'warmth'): void {
+  private onSkip(itemId: number, currency: 'gold' | 'warmth' | 'gift'): void {
     const item = this.state.items.get(itemId);
     if (!item || item.kind !== 'item') return;
     const cfg = this.generatorConfig(item.chain, item.tier);
@@ -115,6 +193,14 @@ export class GeneratorSystem {
 
     // Two ways to skip: GOLD (default) or WARMTH (cheaper). Both expensive at the
     // start, ~1 near the end.
+    // A character's help costs the player nothing — the cooldown already paid
+    // for it, and WorldCharacterSystem has already spent that.
+    if (currency === 'gift') {
+      if (timer.kind === 'ready') item.readyAt = now;
+      else item.passiveAt = now;
+      this.bus.emit('generator:skipped', { itemId, chain: item.chain, currency });
+      return;
+    }
     if (currency === 'warmth') {
       const cost = skipWarmthCost(timer.at - now, timer.total, cfg.skipMaxGold);
       if (this.state.energyCurrent < cost) {
@@ -159,8 +245,9 @@ export class GeneratorSystem {
 
     this.bus.emit('energy:spend', { amount: generator.energyCost, reason: 'harvest' });
     item.readyAt = now + generator.cooldownMs;
-    const output = this.produceItem(generator, target, now);
+    const output = this.produceItem(this.producesOf(item, generator)!, target, now);
     this.bus.emit('item:harvested', { generatorId: itemId, output: this.state.snapshot(output, now) });
+    this.payBonus(item, generator, now);
   }
 
   /** Where a generator's produce may land: an adjacent tile, else a NEARBY
@@ -189,6 +276,25 @@ export class GeneratorSystem {
       const generator = this.generatorConfig(item.chain, item.tier);
       if (!generator?.passiveMs) continue;
       if (item.passiveAt === undefined) {
+        // NOTHING VOLUNTEERS WHILE THE TUTORIAL IS RUNNING.
+        //
+        // The scripted opening is a queue of one idea at a time, and every piece
+        // on the board during it should be the piece the current beat is about.
+        // Passive producers do not know that: the Ancient Tree drops a log every
+        // five minutes, the Red Dragon a Gem Shard every three, the House its
+        // yield every three and a half. By the middle of the script the board
+        // carried a drift of items no beat had introduced — bad teaching on its
+        // own, and also what starves the scripted spawns of room, because a
+        // congested neighbourhood is exactly when a lesson's own three pieces
+        // cannot find three connected tiles and land scattered instead.
+        //
+        // Leaving `passiveAt` UNSET is what holds them, rather than an early
+        // return, and the difference matters: a generator the script staged
+        // itself — `setTimer` for `house_skip`, or the payout owed after a skip —
+        // has an explicit `passiveAt` and still fires on time. Only the ones
+        // nobody asked for stay quiet. They arm on the first tick after handover,
+        // so the player also never walks into a pile of overdue gifts.
+        if (this.tutorialActive) continue;
         item.passiveAt = now + generator.passiveMs; // arm on first sight
         continue;
       }
@@ -207,9 +313,31 @@ export class GeneratorSystem {
         continue;
       }
       item.passiveAt = now + generator.passiveMs; // one gift per tick even if overdue
-      const output = this.produceItem(generator, target, now);
+      const output = this.produceItem(this.producesOf(item, generator)!, target, now);
       this.bus.emit('item:produced', { generatorId: item.id, output: this.state.snapshot(output, now) });
+      this.payBonus(item, generator, now);
     }
+  }
+
+  /**
+   * Count one production and, once `bonus.every` have banked, drop the bonus
+   * piece too — a SECOND, rarer yield from the same generator (the Emberberry
+   * patch's sprout). The counter is decremented, never zeroed, so a board with
+   * no free tile defers the drop to the next yield instead of swallowing it.
+   */
+  private payBonus(item: BoardItemState, generator: GeneratorConfig, now: number): void {
+    const bonus = generator.bonus;
+    if (!bonus) return;
+    item.yields = (item.yields ?? 0) + 1;
+    if (item.yields < bonus.every) return;
+    const target = this.dropTileFor(item);
+    if (!target) return; // no room — try again on the next yield
+    item.yields -= bonus.every;
+    const output = this.produceItem(bonus.produces, target, now);
+    this.bus.emit('item:produced', {
+      generatorId: item.id,
+      output: this.state.snapshot(output, now)
+    });
   }
 
   /** Pay a reward generator's coins/xp/energy (the house). */
@@ -223,9 +351,12 @@ export class GeneratorSystem {
     this.bus.emit('generator:reward', { generatorId: item.id, coins, xp, energy });
   }
 
-  /** Spawn the configured produce on `target`, arming it if it's itself a generator. */
-  private produceItem(generator: GeneratorConfig, target: TilePos, now: number): BoardItemState {
-    const produces = generator.produces!;
+  /** Spawn `produces` on `target`, arming it if it's itself a generator. */
+  private produceItem(
+    produces: { chain: string; tier: number },
+    target: TilePos,
+    now: number
+  ): BoardItemState {
     const producedGenerator = this.generatorConfig(produces.chain, produces.tier);
     return this.state.addItem({
       chain: produces.chain,

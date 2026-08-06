@@ -26,9 +26,24 @@ if (doc.format !== 'emberkeep-world') {
 const calibByKey = {};
 for (const a of doc.assets) calibByKey[`${a.category}|${a.name}`] = a.calibration;
 
-// Normalisation: shift so the most-NW occupied cell is (0,0).
+// Normalisation: shift so the most-NW occupied cell of the WORLD is (0,0).
+//
+// Characters do NOT define the extent — the world is its ground, scenery and
+// clouds, and a character is a passenger standing on it. Counting her in meant
+// that placing her NW of everything else (a terrace above the tile grid, which
+// is where a keeper naturally stands) made her the origin: she then normalised
+// to her own minimum, landing on 0 however far out she really was, and shifted
+// every other cell in the map by the same amount. Her cell is allowed to be
+// negative — nothing indexes the grid by it, the renderer only projects it.
+// `tools/worldbuilder/index.html` (`gameOrigin`) makes the same exclusion, and
+// the two must agree or ⤒ Apply and ⬇ Export stop meaning the same thing.
+const worldPlacements = doc.placements.filter((p) => p.category !== 'character');
+if (!worldPlacements.length) {
+  console.error(`${inPath} places no world content (only characters) — nothing to normalise against.`);
+  process.exit(1);
+}
 let minC = Infinity, minR = Infinity, maxC = -Infinity, maxR = -Infinity;
-for (const p of doc.placements) {
+for (const p of worldPlacements) {
   minC = Math.min(minC, p.col); minR = Math.min(minR, p.row);
   maxC = Math.max(maxC, p.col); maxR = Math.max(maxR, p.row);
 }
@@ -42,8 +57,13 @@ const invisibleCells = new Set(); // playable cells with no tile art (background
 const backgrounds = [];           // category 'background' — a layer painted BELOW the floor
 const decor3d = [];               // category '3d' — procedural Three.js decor (the emerald crystal)
 
+const characters = [];             // category 'character' — the named cast standing ON the map
+
 // which asset names are the editor's "invisible" tile (playable, no exported art)
 const invisibleAssets = new Set((doc.assets ?? []).filter((a) => a.invisible).map((a) => a.name));
+// asset name -> the character id / world the builder tagged it with
+const characterByAsset = {};
+for (const a of doc.assets ?? []) if (a.characterId) characterByAsset[a.name] = a;
 // per-asset 3D model spec + free-offset carry from the export
 const model3dByAsset = {}; for (const a of doc.assets ?? []) if (a.is3d) model3dByAsset[a.name] = a.model3d;
 
@@ -56,6 +76,17 @@ for (const p of doc.placements) {
   else if (p.category === 'decor') decorStack.push({ name: p.asset, col, row, z: p.z ?? 0, ...off });
   else if (p.category === 'background') backgrounds.push({ name: p.asset, col, row, z: p.z ?? 0, ...off });
   else if (p.category === '3d') decor3d.push({ name: p.asset, col, row, z: p.z ?? 0, model3d: model3dByAsset[p.asset] ?? null, ...off });
+  else if (p.category === 'character') {
+    // A named character is a POSITION, not scenery: no z, one entry per id, but
+    // she does carry decor's free dx/dy so she can stand between the lattice's
+    // cells. `scripts/apply-characters.mjs` turns these into the `anchor` (+
+    // `dx`/`dy`) fields of src/data/characters.json.
+    const meta = characterByAsset[p.asset];
+    const id = meta?.characterId ?? p.asset;
+    const at = characters.find((c) => c.id === id);
+    if (at) Object.assign(at, { col, row, dx: p.dx | 0, dy: p.dy | 0 });
+    else characters.push({ id, world: meta?.characterWorld, col, row, dx: p.dx | 0, dy: p.dy | 0 });
+  }
   else if (p.category === 'blocker') {
     const lvl = p.level ?? 1;
     fogLevelAt.set(key, Math.min(fogLevelAt.get(key) ?? Infinity, lvl));
@@ -129,6 +160,7 @@ const out = {
   invisible: [...invisibleCells].map(cell), // [col,row] cells with no tile art (bg shows through)
   backgrounds,            // { name, col, row, z, dx?, dy? } — layer painted BELOW the floor
   decor3d,                // { name, col, row, z, model3d, dx?, dy? } — procedural 3D decor
+  characters,             // { id, world, col, row } — where the named cast stand (see apply-characters.mjs)
   // the background's cell extent (normalised) — the game clamps its camera here.
   backgroundBounds: doc.backgroundBounds ? {
     minCol: doc.backgroundBounds.minCol - minC, maxCol: doc.backgroundBounds.maxCol - minC,
@@ -149,6 +181,11 @@ console.log(`Ingested ${inPath} → ${outPath}`);
 console.log(`  grid: ${out.cols} × ${out.rows} (normalised from cols ${minC}..${maxC}, rows ${minR}..${maxR})`);
 console.log(`  playable tiles: ${tiles.length}  ·  decorative: ${deco.length}  ·  decor scenery: ${decorStack.length}`);
 for (const d of decorStack) console.log(`    decor ${d.name} @ (${d.col},${d.row}) z${d.z}`);
+for (const c of characters) {
+  const off = c.dx || c.dy ? ` + ${c.dx},${c.dy}` : '';
+  console.log(`  character ${c.id} @ (${c.col},${c.row})${off}`);
+}
+if (characters.length) console.log('  → run `node scripts/apply-characters.mjs` to move them in characters.json');
 for (const z of playZones) console.log(`  play zone L${z.level}: ${z.cells.length} playable tiles unlock`);
 for (const r of regions) console.log(`  fog ${r.id}: ${r.cells.length} cells (unlock at level ${r.level})`);
 console.log(`  camera keyframes: ${cameraKeyframes.map((k) => `L${k.level}@(${k.focus?.col},${k.focus?.row})z${k.zoom}`).join(', ')}`);

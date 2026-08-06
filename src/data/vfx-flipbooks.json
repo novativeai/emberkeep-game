@@ -1,0 +1,88 @@
+{
+  "_generated": "scripts/bake-vfx-mv.py \u2014 DO NOT EDIT. Mirrors assets/vfx-bank/bank.mv.json.",
+  "base": "vfx-bank/",
+  "ramps": "vfx-bank/ramps.png",
+  "sheets": {
+    "fb_cloud": {
+      "cols": 4,
+      "rows": 4,
+      "frames": 16,
+      "cellW": 128,
+      "cellH": 128,
+      "mvScale": 2.5964,
+      "loop": true
+    },
+    "fb_dustburst": {
+      "cols": 4,
+      "rows": 3,
+      "frames": 12,
+      "cellW": 192,
+      "cellH": 192,
+      "mvScale": 10.4998,
+      "loop": false
+    },
+    "fb_fireball": {
+      "cols": 4,
+      "rows": 4,
+      "frames": 16,
+      "cellW": 128,
+      "cellH": 128,
+      "mvScale": 7.3631,
+      "loop": false
+    },
+    "fb_fireburst": {
+      "cols": 4,
+      "rows": 3,
+      "frames": 12,
+      "cellW": 192,
+      "cellH": 192,
+      "mvScale": 5.39,
+      "loop": false
+    },
+    "fb_flame": {
+      "cols": 8,
+      "rows": 4,
+      "frames": 32,
+      "cellW": 64,
+      "cellH": 128,
+      "mvScale": 3.4811,
+      "loop": true
+    },
+    "fb_flame_small": {
+      "cols": 8,
+      "rows": 4,
+      "frames": 32,
+      "cellW": 64,
+      "cellH": 128,
+      "mvScale": 13.9271,
+      "loop": true
+    },
+    "fb_smoke_puff": {
+      "cols": 4,
+      "rows": 4,
+      "frames": 16,
+      "cellW": 128,
+      "cellH": 128,
+      "mvScale": 5.1235,
+      "loop": true
+    },
+    "fb_smoke_wispy": {
+      "cols": 4,
+      "rows": 4,
+      "frames": 16,
+      "cellW": 128,
+      "cellH": 128,
+      "mvScale": 6.2019,
+      "loop": true
+    },
+    "fb_wisp": {
+      "cols": 5,
+      "rows": 4,
+      "frames": 20,
+      "cellW": 51,
+      "cellH": 128,
+      "mvScale": 4.5247,
+      "loop": true
+    }
+  }
+}

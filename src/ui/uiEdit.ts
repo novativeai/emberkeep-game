@@ -49,8 +49,8 @@ const ICON_KEYS = [
   'ui_icon_gear',
   'ui_icon_scroll',
   'ui_btn_round',
-  'portrait_laurah',
-  'portrait_cindra'
+  'portrait_eleanor',
+  'portrait_golden_elder'
 ];
 
 export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void {
@@ -737,7 +737,7 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
       })).filter((i) => i.thumb),
       uploads: Object.keys(uiRegistry.doc.assets).map((name) => ({ name, thumb: thumb(uploadKey(name)) })),
       sequences: [
-        // Preloaded (built-in) Laurah banks first — always present, no upload.
+        // Preloaded (built-in) character banks first — always present, no upload.
         ...BUILTIN_SEQUENCES.map((s) => ({
           name: s.key,
           label: s.label,
@@ -789,7 +789,7 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
           facing: 'left'
         };
       case 'sequence':
-        // Built-in Laurah banks end on an idle; default loop:false so they play
+        // Built-in banks end on an idle; default loop:false so they play
         // through once and rest there. The payload carries the sequence default.
         return { kind: 'anim', name: '', x: 0, y: 0, scale: 1, sequence: payload.name, loop: payload.loop !== false };
       case 'upload':

@@ -1,26 +1,167 @@
 {
   "steps": [
     {
-      "id": "lore_1",
-      "speaker": "laurah",
-      "text": "Long ago, Emberkeep blazed with dragon fire. Then the cold came... and the dragons slept.",
+      "id": "arrival_miss",
+      "speaker": "eleanor",
+      "text": "You're not where I meant to put you.",
       "gate": {
         "type": "tap"
       },
       "allow": {}
     },
     {
-      "id": "lore_2",
-      "speaker": "laurah",
-      "text": "I am Laurah, Dragon Master of the ancient flame. And you, Keeper, are the one who will wake them.",
+      "id": "arrival_place",
+      "speaker": "eleanor",
+      "text": "This is Emberkeep. I aimed for the hall — the spell was clean, I've cast it a hundred times. Something set you down here instead.",
       "gate": {
         "type": "tap"
       },
       "allow": {}
+    },
+    {
+      "id": "arrival_ash",
+      "speaker": "eleanor",
+      "text": "Mind your footing. That grey isn't soil. Fires die slowly, from the edges in — this one went out all at once, everywhere, in a single night.",
+      "gate": {
+        "type": "tap"
+      },
+      "allow": {}
+    },
+    {
+      "id": "arrival_slip",
+      "speaker": "eleanor",
+      "text": "You'll want to know what did that. So did I, once. I read every account there is. I crossed half the world for the rest. I was—",
+      "gate": {
+        "type": "tap"
+      },
+      "allow": {}
+    },
+    {
+      "id": "arrival_hold",
+      "speaker": "eleanor",
+      "text": "…Later. You'll hear it better when you're not standing in it.",
+      "gate": {
+        "type": "tap"
+      },
+      "allow": {}
+    },
+    {
+      "id": "arrival_why",
+      "speaker": "eleanor",
+      "text": "And why you: when you landed, the ash under your hands went warm. It hasn't done that for anyone in sixty years. I watched it happen and I still don't believe it.",
+      "gate": {
+        "type": "tap"
+      },
+      "allow": {}
+    },
+    {
+      "id": "arrival_ask",
+      "speaker": "eleanor",
+      "text": "So I'll ask instead of explaining. Bring this place back — the warmth, the green, and whatever's still asleep beneath the ash. I can't wake any of it. You can, Keeper.",
+      "gate": {
+        "type": "tap"
+      },
+      "allow": {}
+    },
+    {
+      "id": "ash_green",
+      "speaker": "eleanor",
+      "text": "…Look down. The grey is going green where your hands were. Ash Moss — the isle's first answer. Three tufts make a bundle; drag them together.",
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "ashmoss"
+      },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "ashmoss",
+            "tier": 1,
+            "count": 3,
+            "at": [
+              7,
+              5
+            ]
+          }
+        }
+      ],
+      "highlight": [
+        {
+          "chain": "ashmoss",
+          "nth": 0,
+          "tier": 1
+        },
+        {
+          "chain": "ashmoss",
+          "nth": 1,
+          "tier": 1
+        },
+        {
+          "chain": "ashmoss",
+          "nth": 2,
+          "tier": 1
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "ashmoss",
+          "nth": 2,
+          "tier": 1
+        },
+        "to": {
+          "chain": "ashmoss",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "allow": {
+        "drag": [
+          "ashmoss"
+        ]
+      }
+    },
+    {
+      "id": "arrival_answered",
+      "speaker": "eleanor",
+      "text": "…It answered you. Sixty years I've stood outside this place, and it answers you in the first minute. …Good. Again.",
+      "gate": {
+        "type": "tap"
+      },
+      "allow": {}
+    },
+    {
+      "id": "cookbook_intro",
+      "speaker": "eleanor",
+      "text": "Your first recipe! Every merge you discover is inscribed in the Emberkeep Cookbook. Tap the book to see your first page.",
+      "gate": {
+        "type": "event",
+        "event": "ui:cookbook_opened"
+      },
+      "arrow": {
+        "ui": "cookbook"
+      },
+      "allow": {
+        "cookbook": true
+      }
+    },
+    {
+      "id": "cookbook_close",
+      "speaker": "eleanor",
+      "text": "The Moss Bundle — your first page, and the book keeps every recipe you find. Tap the ✕ to close it, and let us wake that egg.",
+      "gate": {
+        "type": "event",
+        "event": "ui:cookbook_closed"
+      },
+      "arrow": {
+        "ui": "cookbook_close"
+      },
+      "allow": {
+        "cookbook": true
+      }
     },
     {
       "id": "ruby_merge",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch a Red Egg.",
       "gate": {
         "type": "event",
@@ -71,38 +212,8 @@
       }
     },
     {
-      "id": "cookbook_intro",
-      "speaker": "laurah",
-      "text": "Your first recipe! Every merge you discover is inscribed in the Emberkeep Cookbook. Tap the book to see your first page.",
-      "gate": {
-        "type": "event",
-        "event": "ui:cookbook_opened"
-      },
-      "arrow": {
-        "ui": "cookbook"
-      },
-      "allow": {
-        "cookbook": true
-      }
-    },
-    {
-      "id": "cookbook_close",
-      "speaker": "laurah",
-      "text": "The Dragon Ruby recipe — your first page! Tap the ✕ to close the book, and let us wake that egg.",
-      "gate": {
-        "type": "event",
-        "event": "ui:cookbook_closed"
-      },
-      "arrow": {
-        "ui": "cookbook_close"
-      },
-      "allow": {
-        "cookbook": true
-      }
-    },
-    {
       "id": "dragon_hatch",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "A Red Egg! Two more have appeared. Drag all three together — the Red Dragon stirs inside!",
       "gate": {
         "type": "event",
@@ -150,18 +261,132 @@
       }
     },
     {
-      "id": "emerald_tap",
-      "speaker": "laurah",
-      "text": "The Red Dragon! And look — the Crystal glows! Tap it to claim an Emerald. You already have two — merge all three to forge a Green Egg!",
+      "id": "name_intro",
+      "speaker": "eleanor",
+      "text": "Look at her. She has picked you out of everything on this isle and she is waiting. Give her a name, Keeper. I'll not have her called 'the dragon'.",
+      "gate": {
+        "type": "tap"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "highlight": [
+        {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {}
+    },
+    {
+      "id": "name_choose",
+      "speaker": "eleanor",
+      "text": "Go on. Whatever you settle on, she will answer to it for the rest of her life.",
+      "gate": {
+        "type": "event",
+        "event": "dragon:named",
+        "chain": "ember_dragon"
+      },
+      "effects": [
+        {
+          "nameDragon": {
+            "chain": "ember_dragon",
+            "tier": 3
+          }
+        }
+      ],
+      "allow": {}
+    },
+    {
+      "id": "name_said",
+      "speaker": "eleanor",
+      "text": "{dragon}. …Yes. That will do. Sixty years I have not said a dragon's name out loud, and I find I am not ready for how it feels.",
+      "gate": {
+        "type": "tap"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "highlight": [
+        {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {}
+    },
+    {
+      "id": "moss_feed",
+      "speaker": "eleanor",
+      "text": "She came out of that shell starving, and greens are what a Red cools on. Your moss has cured into a bale — drag it onto {dragon}.",
+      "gate": {
+        "type": "event",
+        "event": "dragon:fed",
+        "chain": "ashmoss"
+      },
+      "effects": [
+        {
+          "retier": {
+            "chain": "ashmoss",
+            "fromTier": 2,
+            "toTier": 3
+          }
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "ashmoss",
+          "nth": 0,
+          "tier": 3
+        },
+        "to": {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "highlight": [
+        {
+          "chain": "ashmoss",
+          "nth": 0,
+          "tier": 3
+        },
+        {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {
+        "drag": [
+          "ashmoss"
+        ],
+        "feed": true
+      }
+    },
+    {
+      "id": "crystal_tap",
+      "speaker": "eleanor",
+      "text": "That Crystal is mine, Keeper — the one thing of my own I brought here. It sheds Quartz as it turns. Tap it and take a pebble; two more shook loose already.",
       "gate": {
         "type": "event",
         "event": "item:harvested",
-        "chain": "emerald"
+        "chain": "quartz"
       },
       "effects": [
         {
           "spawn": {
-            "chain": "emerald",
+            "chain": "quartz",
             "tier": 1,
             "count": 2
           }
@@ -178,124 +403,202 @@
       }
     },
     {
-      "id": "emerald_egg_merge",
-      "speaker": "laurah",
-      "text": "Three Emeralds! Drag them all together — they will forge a Green Egg.",
+      "id": "quartz_merge",
+      "speaker": "eleanor",
+      "text": "Three pebbles press into a Cut Crystal. Quartz is what my work is MADE of — no dragon will touch it, and no dragon should. Leave that chain to me.",
       "gate": {
         "type": "event",
         "event": "item:merged",
-        "chain": "emerald"
+        "chain": "quartz"
       },
       "highlight": [
         {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 0,
           "tier": 1
         },
         {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 1,
           "tier": 1
         },
         {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 2,
           "tier": 1
         }
       ],
       "hand": {
         "from": {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 2,
           "tier": 1
         },
         "to": {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 0,
           "tier": 1
         }
       },
       "allow": {
         "drag": [
-          "ember_dragon",
-          "emerald"
+          "quartz"
         ]
       }
     },
     {
-      "id": "green_dragon_hatch",
-      "speaker": "laurah",
-      "text": "A Green Egg! Two more have appeared. Drag all three together — the Green Dragon stirs inside!",
+      "id": "quartz_ball",
+      "speaker": "eleanor",
+      "text": "Two more, cut and waiting. Three of those make a Crystal Ball, and through one of those I can see past this isle. That is why I will keep asking you for them.",
       "gate": {
         "type": "event",
-        "event": "item:hatched",
-        "chain": "emerald"
+        "event": "item:merged",
+        "chain": "quartz"
       },
       "effects": [
         {
           "spawn": {
-            "chain": "emerald",
+            "chain": "quartz",
             "tier": 2,
             "count": 2,
-            "nearChain": "emerald"
+            "nearChain": "quartz",
+            "nearTier": 2
           }
         }
       ],
       "highlight": [
         {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 0,
           "tier": 2
         },
         {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 1,
           "tier": 2
         },
         {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 2,
           "tier": 2
         }
       ],
       "hand": {
         "from": {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 2,
           "tier": 2
         },
         "to": {
-          "chain": "emerald",
+          "chain": "quartz",
           "nth": 0,
           "tier": 2
         }
       },
       "allow": {
         "drag": [
-          "ember_dragon",
-          "emerald"
+          "quartz"
         ]
       }
     },
     {
+      "id": "ball_pocket",
+      "speaker": "eleanor",
+      "text": "Before you hand me anything — that is not a thing to carry loose. Tap the Crystal Ball. Your satchel takes it, and the board stays clear for what merges.",
+      "gate": {
+        "type": "event",
+        "event": "bag:stored",
+        "chain": "quartz"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "quartz",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "highlight": [
+        {
+          "chain": "quartz",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {
+        "bag": true
+      }
+    },
+    {
+      "id": "ball_give",
+      "speaker": "eleanor",
+      "text": "Now open the satchel and tap it. Three things a pocketed piece can be: Drop puts it back, Sell turns it to gold, Give hands it to somebody. Give.",
+      "gate": {
+        "type": "event",
+        "event": "bag:give_armed",
+        "chain": "quartz"
+      },
+      "arrow": {
+        "ui": "bag_give"
+      },
+      "allow": {
+        "bag": true,
+        "give": true
+      }
+    },
+    {
+      "id": "eleanor_gift",
+      "speaker": "eleanor",
+      "text": "Good. Now tap me, and it is mine.",
+      "gate": {
+        "type": "event",
+        "event": "regard:gift_accepted",
+        "chain": "quartz"
+      },
+      "effects": [
+        {
+          "wantGift": {
+            "characterId": "eleanor",
+            "chain": "quartz",
+            "tier": 3,
+            "count": 1,
+            "points": 12
+          }
+        }
+      ],
+      "arrow": {
+        "character": "eleanor"
+      },
+      "allow": {
+        "character": true,
+        "bag": true,
+        "give": true
+      }
+    },
+    {
+      "id": "eleanor_hearts",
+      "speaker": "eleanor",
+      "text": "Thank you. Now tap me once more — those hearts are me, and how far I have come round to you. They only move for things you actually do.",
+      "gate": {
+        "type": "event",
+        "event": "ui:character_tapped"
+      },
+      "arrow": {
+        "character": "eleanor"
+      },
+      "allow": {
+        "character": true,
+        "status": true
+      }
+    },
+    {
       "id": "chest",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "A Treasure Chest! The isle rewards brave Keepers. Tap it to claim what is inside.",
       "gate": {
         "type": "event",
         "event": "chest:open"
       },
       "effects": [
-        {
-          "move": {
-            "chain": "emerald",
-            "tier": 3,
-            "to": [
-              9,
-              6
-            ]
-          }
-        },
         {
           "spawn": {
             "chain": "chest",
@@ -320,21 +623,21 @@
     },
     {
       "id": "levelup",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Keeper Level 2! The isle stirs — a new stretch of land has woken to the west. Tap to see!",
       "gate": {
         "type": "tap"
       },
       "effects": [
         {
-          "grantXp": 10
+          "grantXp": 5
         }
       ],
       "allow": {}
     },
     {
       "id": "key_unlock",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Your dragons gifted you a Stone Key! See that clouded strip? Tap it to burn the fog away.",
       "gate": {
         "type": "event",
@@ -354,12 +657,12 @@
     },
     {
       "id": "emberberry_tap",
-      "speaker": "laurah",
-      "text": "A wild Emberberry patch grew in the opened land! It feeds you for FREE — tapping it never costs Warmth. Tap the patch to pick a sprout.",
+      "speaker": "eleanor",
+      "text": "A wild Emberberry patch grew in the opened land! It feeds you for FREE — tapping it never costs Warmth. Tap the patch to pick a berry.",
       "gate": {
         "type": "event",
         "event": "item:harvested",
-        "chain": "strawberry"
+        "chain": "emberberry"
       },
       "effects": [
         {
@@ -384,63 +687,63 @@
     },
     {
       "id": "emberberry_merge",
-      "speaker": "laurah",
-      "text": "Two more sprouts sprang up beside yours! Merge all three into a bush — the patch regrows forever, so you will never run out of things to merge.",
+      "speaker": "eleanor",
+      "text": "Two more berries dropped beside yours — merge all three into a basket. The patch regrows forever, and now and then it throws you a sprout; nine of those grow a second patch.",
       "gate": {
         "type": "event",
         "event": "item:merged",
-        "chain": "strawberry"
+        "chain": "emberberry"
       },
       "effects": [
         {
           "spawn": {
-            "chain": "strawberry",
+            "chain": "emberberry",
             "tier": 1,
             "count": 2,
-            "nearChain": "strawberry",
+            "nearChain": "emberberry",
             "nearTier": 1
           }
         }
       ],
       "highlight": [
         {
-          "chain": "strawberry",
+          "chain": "emberberry",
           "nth": 0,
           "tier": 1
         },
         {
-          "chain": "strawberry",
+          "chain": "emberberry",
           "nth": 1,
           "tier": 1
         },
         {
-          "chain": "strawberry",
+          "chain": "emberberry",
           "nth": 2,
           "tier": 1
         }
       ],
       "hand": {
         "from": {
-          "chain": "strawberry",
+          "chain": "emberberry",
           "nth": 2,
           "tier": 1
         },
         "to": {
-          "chain": "strawberry",
+          "chain": "emberberry",
           "nth": 0,
           "tier": 1
         }
       },
       "allow": {
         "drag": [
-          "strawberry"
+          "emberberry"
         ]
       }
     },
     {
-      "id": "bush_merge",
-      "speaker": "laurah",
-      "text": "Those Bushes in the opened land can become shelter! Merge the three Bushes to raise a House — it earns coins while you rest.",
+      "id": "wood_merge",
+      "speaker": "eleanor",
+      "text": "Cut Wood, where the fog lifted — the isle still gives timber. Nobody builds out of raw logs, though. Merge the three piles into a Set of Planks.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -449,25 +752,30 @@
       "highlight": [
         {
           "chain": "lumber",
-          "nth": 0
+          "nth": 0,
+          "tier": 1
         },
         {
           "chain": "lumber",
-          "nth": 1
+          "nth": 1,
+          "tier": 1
         },
         {
           "chain": "lumber",
-          "nth": 2
+          "nth": 2,
+          "tier": 1
         }
       ],
       "hand": {
         "from": {
           "chain": "lumber",
-          "nth": 2
+          "nth": 2,
+          "tier": 1
         },
         "to": {
           "chain": "lumber",
-          "nth": 0
+          "nth": 0,
+          "tier": 1
         }
       },
       "allow": {
@@ -480,8 +788,329 @@
       }
     },
     {
+      "id": "plank_merge",
+      "speaker": "eleanor",
+      "text": "Planks! Two more sets were milled while you worked. Merge all three and raise a House — it earns coins while you rest.",
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "lumber"
+      },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "lumber",
+            "tier": 2,
+            "count": 2,
+            "nearChain": "lumber",
+            "nearTier": 2
+          }
+        }
+      ],
+      "highlight": [
+        {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 2
+        },
+        {
+          "chain": "lumber",
+          "nth": 1,
+          "tier": 2
+        },
+        {
+          "chain": "lumber",
+          "nth": 2,
+          "tier": 2
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "lumber",
+          "nth": 2,
+          "tier": 2
+        },
+        "to": {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 2
+        }
+      },
+      "allow": {
+        "drag": [
+          "ember_dragon",
+          "emerald",
+          "lumber"
+        ],
+        "tapGenerators": true
+      }
+    },
+    {
+      "id": "tree_grain",
+      "speaker": "eleanor",
+      "text": "That Ancient Tree was old when I was small. Every tenth log it drops has a Fir Grain caught in the bark. Three have fallen already — there, in the roots.",
+      "gate": {
+        "type": "tap"
+      },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "firgrain",
+            "tier": 1,
+            "count": 3,
+            "nearChain": "bigtree",
+            "nearTier": 1
+          }
+        }
+      ],
+      "arrow": {
+        "tile": {
+          "chain": "bigtree",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "highlight": [
+        {
+          "chain": "firgrain",
+          "nth": 0,
+          "tier": 1
+        },
+        {
+          "chain": "firgrain",
+          "nth": 1,
+          "tier": 1
+        },
+        {
+          "chain": "firgrain",
+          "nth": 2,
+          "tier": 1
+        }
+      ],
+      "allow": {}
+    },
+    {
+      "id": "grain_merge",
+      "speaker": "eleanor",
+      "text": "A Grain is a tree that hasn't decided yet. Put the three together and let it decide.",
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "firgrain"
+      },
+      "highlight": [
+        {
+          "chain": "firgrain",
+          "nth": 0,
+          "tier": 1
+        },
+        {
+          "chain": "firgrain",
+          "nth": 1,
+          "tier": 1
+        },
+        {
+          "chain": "firgrain",
+          "nth": 2,
+          "tier": 1
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "firgrain",
+          "nth": 2,
+          "tier": 1
+        },
+        "to": {
+          "chain": "firgrain",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "allow": {
+        "drag": [
+          "firgrain"
+        ]
+      }
+    },
+    {
+      "id": "fir_grow",
+      "speaker": "eleanor",
+      "text": "A Small Fir — and two more came up where the ash thinned. Merge three and you'll have a grown tree of your own. Everything here can be made to give again.",
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "firgrain"
+      },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "firgrain",
+            "tier": 2,
+            "count": 2,
+            "nearChain": "firgrain",
+            "nearTier": 2
+          }
+        }
+      ],
+      "highlight": [
+        {
+          "chain": "firgrain",
+          "nth": 0,
+          "tier": 2
+        },
+        {
+          "chain": "firgrain",
+          "nth": 1,
+          "tier": 2
+        },
+        {
+          "chain": "firgrain",
+          "nth": 2,
+          "tier": 2
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "firgrain",
+          "nth": 2,
+          "tier": 2
+        },
+        "to": {
+          "chain": "firgrain",
+          "nth": 0,
+          "tier": 2
+        }
+      },
+      "allow": {
+        "drag": [
+          "firgrain"
+        ]
+      }
+    },
+    {
+      "id": "pocket_it",
+      "speaker": "eleanor",
+      "text": "That Cracked Stone will never merge — two of a kind and nothing to make. Pocket it; I will show you the other thing a satchel is for.",
+      "gate": {
+        "type": "event",
+        "event": "bag:stored",
+        "chain": "cinder_vein"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "cinder_vein",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "highlight": [
+        {
+          "chain": "cinder_vein",
+          "nth": 0,
+          "tier": 1
+        }
+      ],
+      "allow": {
+        "bag": true
+      }
+    },
+    {
+      "id": "sell_it",
+      "speaker": "eleanor",
+      "text": "A pocketed stone is a choice, Keeper. Open your satchel and tap it — Drop sets it back down, Sell turns it to gold. Gold buys Warmth, and hurries what keeps you waiting.",
+      "gate": {
+        "type": "event",
+        "event": "item:sold"
+      },
+      "arrow": {
+        "ui": "bag"
+      },
+      "allow": {
+        "bag": true,
+        "sell": true
+      }
+    },
+    {
+      "id": "isle_materials",
+      "speaker": "eleanor",
+      "text": "Emberkeep grows more than berries. Those Dew Drops on the west ledge are Moonwater, Keeper — mine, and I will want them one day.",
+      "gate": {
+        "type": "tap"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "moonwater",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "highlight": [
+        {
+          "chain": "moonwater",
+          "nth": 0,
+          "tier": 1
+        },
+        {
+          "chain": "moonwater",
+          "nth": 1,
+          "tier": 1
+        },
+        {
+          "chain": "moonwater",
+          "nth": 2,
+          "tier": 1
+        }
+      ],
+      "allow": {}
+    },
+    {
+      "id": "moonwater_merge",
+      "speaker": "eleanor",
+      "text": "Go on — gather the three Dew Drops into one Dew Vial. Drag them together, the same as the rubies.",
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "moonwater"
+      },
+      "highlight": [
+        {
+          "chain": "moonwater",
+          "nth": 0,
+          "tier": 1
+        },
+        {
+          "chain": "moonwater",
+          "nth": 1,
+          "tier": 1
+        },
+        {
+          "chain": "moonwater",
+          "nth": 2,
+          "tier": 1
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "moonwater",
+          "nth": 2,
+          "tier": 1
+        },
+        "to": {
+          "chain": "moonwater",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "allow": {
+        "drag": [
+          "moonwater"
+        ]
+      }
+    },
+    {
       "id": "dragon_work",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Dragons can speed the House! Drag your dragon and drop it directly onto the House tile. Each working dragon doubles the speed — ×2 with one, ×4 with two!",
       "gate": {
         "type": "event",
@@ -496,7 +1125,7 @@
         {
           "chain": "lumber",
           "nth": 0,
-          "tier": 2
+          "tier": 3
         }
       ],
       "hand": {
@@ -508,7 +1137,7 @@
         "to": {
           "chain": "lumber",
           "nth": 0,
-          "tier": 2
+          "tier": 3
         }
       },
       "allow": {
@@ -521,7 +1150,7 @@
     },
     {
       "id": "dragon_rest",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Hard work tires even dragons! After 3 minutes they need rest — watch, your dragon just nodded off and flew home to recover.",
       "gate": {
         "type": "tap"
@@ -534,9 +1163,333 @@
       "allow": {}
     },
     {
+      "id": "resin_find",
+      "speaker": "eleanor",
+      "text": "Let her sleep. While she does — look low on the old trunk. Resin. It weeps out where the heat got into the bark and sets hard as amber. Three beads of it.",
+      "gate": {
+        "type": "tap"
+      },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "resin",
+            "tier": 1,
+            "count": 3,
+            "nearChain": "bigtree",
+            "nearTier": 1
+          }
+        }
+      ],
+      "arrow": {
+        "tile": {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "highlight": [
+        {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 1
+        },
+        {
+          "chain": "resin",
+          "nth": 1,
+          "tier": 1
+        },
+        {
+          "chain": "resin",
+          "nth": 2,
+          "tier": 1
+        }
+      ],
+      "allow": {}
+    },
+    {
+      "id": "resin_merge",
+      "speaker": "eleanor",
+      "text": "Work them together while they're still soft enough to take it.",
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "resin"
+      },
+      "highlight": [
+        {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 1
+        },
+        {
+          "chain": "resin",
+          "nth": 1,
+          "tier": 1
+        },
+        {
+          "chain": "resin",
+          "nth": 2,
+          "tier": 1
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "resin",
+          "nth": 2,
+          "tier": 1
+        },
+        "to": {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "allow": {
+        "drag": [
+          "resin"
+        ]
+      }
+    },
+    {
+      "id": "hearth_cake",
+      "speaker": "eleanor",
+      "text": "A Lump. Two more set hard overnight — press three of them together and you have a Hearth Cake, which is the thing I was actually steering you towards.",
+      "gate": {
+        "type": "event",
+        "event": "item:merged",
+        "chain": "resin"
+      },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "resin",
+            "tier": 2,
+            "count": 2,
+            "nearChain": "resin",
+            "nearTier": 2
+          }
+        }
+      ],
+      "highlight": [
+        {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 2
+        },
+        {
+          "chain": "resin",
+          "nth": 1,
+          "tier": 2
+        },
+        {
+          "chain": "resin",
+          "nth": 2,
+          "tier": 2
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "resin",
+          "nth": 2,
+          "tier": 2
+        },
+        "to": {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 2
+        }
+      },
+      "allow": {
+        "drag": [
+          "resin"
+        ]
+      }
+    },
+    {
+      "id": "cake_pocket",
+      "speaker": "eleanor",
+      "text": "Every dragon has one thing it would cross the isle for, and for {dragon} it is resin. Pocket the Hearth Cake.",
+      "gate": {
+        "type": "event",
+        "event": "bag:stored",
+        "chain": "resin"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "highlight": [
+        {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {
+        "bag": true
+      }
+    },
+    {
+      "id": "cake_give",
+      "speaker": "eleanor",
+      "text": "Open the satchel, tap the Cake, and choose Give. It is her favourite — she has not had one in her life.",
+      "gate": {
+        "type": "event",
+        "event": "bag:give_armed",
+        "chain": "resin"
+      },
+      "arrow": {
+        "ui": "bag_give"
+      },
+      "allow": {
+        "bag": true,
+        "give": true,
+        "feed": true
+      }
+    },
+    {
+      "id": "feed_dragon",
+      "speaker": "eleanor",
+      "text": "Now tap {dragon}. I have watched a Red cross an isle for less than a Hearth Cake.",
+      "gate": {
+        "type": "event",
+        "event": "dragon:fed",
+        "chain": "resin"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "highlight": [
+        {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {
+        "bag": true,
+        "give": true,
+        "feed": true
+      }
+    },
+    {
+      "id": "cake_loved",
+      "speaker": "eleanor",
+      "text": "Look at her. Resin is a Red's one favourite, and a favourite moves her twice as far in a day as anything else you could have given her.",
+      "gate": {
+        "type": "tap"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "highlight": [
+        {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {
+        "feed": true
+      }
+    },
+    {
+      "id": "dragon_status",
+      "speaker": "eleanor",
+      "text": "Under your quest list — that's {dragon}. Five hearts for how far she trusts you, and a line for what she is still owed today. Tap her to read it. Tap me for mine.",
+      "gate": {
+        "type": "tap"
+      },
+      "arrow": {
+        "ui": "status"
+      },
+      "allow": {
+        "feed": true
+      }
+    },
+    {
+      "id": "resin_pocket",
+      "speaker": "eleanor",
+      "text": "One thing before your resin runs out — and it will. A bead rolled clear when you worked the others. Tap it into your satchel.",
+      "gate": {
+        "type": "event",
+        "event": "bag:stored",
+        "chain": "resin"
+      },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "resin",
+            "tier": 1,
+            "count": 1,
+            "nearChain": "bigtree",
+            "nearTier": 1
+          }
+        }
+      ],
+      "arrow": {
+        "tile": {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 1
+        }
+      },
+      "highlight": [
+        {
+          "chain": "resin",
+          "nth": 0,
+          "tier": 1
+        }
+      ],
+      "allow": {
+        "bag": true,
+        "feed": true
+      }
+    },
+    {
+      "id": "house_commission",
+      "speaker": "eleanor",
+      "text": "Your House mints coin because nobody told it otherwise. Tap it, pick from your satchel, and it makes that forever. Take the Resin Bead. A second thing needs a second House.",
+      "gate": {
+        "type": "event",
+        "event": "generator:produce_set"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "highlight": [
+        {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {
+        "commission": true,
+        "tapGenerators": true,
+        "bag": true,
+        "feed": true
+      }
+    },
+    {
       "id": "house_skip",
-      "speaker": "laurah",
-      "text": "Your House earns coins slowly — but you can rush it! Tap the House, then spend Warmth (⚡) to skip its timer. Watch your Warmth drop!",
+      "speaker": "eleanor",
+      "text": "Even a House with its orders keeps you waiting. Tap it, then spend Warmth (⚡) to skip the wait — and watch your Warmth drop for it.",
       "gate": {
         "type": "event",
         "event": "generator:skipped",
@@ -547,7 +1500,7 @@
         {
           "setTimer": {
             "chain": "lumber",
-            "tier": 2,
+            "tier": 3,
             "remainingMs": 120000
           }
         }
@@ -556,7 +1509,7 @@
         "tile": {
           "chain": "lumber",
           "nth": 0,
-          "tier": 2
+          "tier": 3
         }
       },
       "allow": {
@@ -568,9 +1521,40 @@
       }
     },
     {
+      "id": "eleanor_helps",
+      "speaker": "eleanor",
+      "text": "I can't wake anything on this isle — that is your hands, not mine. But I can stand over a slow thing and hurry it. Tap me, then tap the House.",
+      "gate": {
+        "type": "event",
+        "event": "character:action_used"
+      },
+      "effects": [
+        {
+          "setTimer": {
+            "chain": "lumber",
+            "tier": 3,
+            "remainingMs": 150000
+          }
+        }
+      ],
+      "arrow": {
+        "character": "eleanor"
+      },
+      "highlight": [
+        {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {
+        "character": true
+      }
+    },
+    {
       "id": "buy_energy",
-      "speaker": "laurah",
-      "text": "Low on Warmth now? Your first Ember Spark is free! Tap the ⚡ + button at the top to open the Emporium and claim it. Just this once!",
+      "speaker": "eleanor",
+      "text": "Low on Warmth? It creeps back on its own, a little each minute — but your first Ember Spark is free. Tap the ⚡ + to open the Emporium and claim it.",
       "gate": {
         "type": "event",
         "event": "marketplace:purchased"
@@ -583,9 +1567,82 @@
       }
     },
     {
+      "id": "gem_harvest",
+      "speaker": "eleanor",
+      "text": "{dragon} hoards fire and coughs the excess back up. Tap her and take a Gem Shard — a dragon's tap costs one Warmth.",
+      "gate": {
+        "type": "event",
+        "event": "item:harvested",
+        "chain": "flame_gem"
+      },
+      "effects": [
+        {
+          "setTimer": {
+            "chain": "ember_dragon",
+            "tier": 3,
+            "remainingMs": 0
+          }
+        },
+        {
+          "spawn": {
+            "chain": "flame_gem",
+            "tier": 1,
+            "count": 5,
+            "nearChain": "ember_dragon",
+            "nearTier": 3
+          }
+        }
+      ],
+      "arrow": {
+        "tile": {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "allow": {
+        "tapGenerators": true,
+        "dragonWork": true,
+        "drag": [
+          "ember_dragon"
+        ]
+      }
+    },
+    {
+      "id": "ledger_open",
+      "speaker": "eleanor",
+      "text": "Shards enough — and that is precisely what my Ledger has been asking for since before you landed. Open it.",
+      "gate": {
+        "type": "event",
+        "event": "ui:ledger_opened"
+      },
+      "arrow": {
+        "ui": "ledger"
+      },
+      "allow": {
+        "ledger": true
+      }
+    },
+    {
+      "id": "ledger_deliver",
+      "speaker": "eleanor",
+      "text": "Rekindle the Brazier. Press Deliver and the shards are mine — I pay in gold, in standing, and in something I have kept far too long.",
+      "gate": {
+        "type": "event",
+        "event": "order:completed"
+      },
+      "arrow": {
+        "ui": "deliver"
+      },
+      "allow": {
+        "ledger": true,
+        "deliver": true
+      }
+    },
+    {
       "id": "golden_tease",
-      "speaker": "laurah",
-      "text": "One more thing, Keeper — look west. A GOLDEN egg sleeps on the old altar. It has slept there since the Great Flame was lost… and see, it stirs at your coming. Cindra guards its story.",
+      "speaker": "eleanor",
+      "text": "This is what I kept. Look west — a GOLDEN egg on the old altar, asleep since the Great Flame went out. See how it stirs at your coming. I know its story. Not yet.",
       "gate": {
         "type": "tap"
       },
@@ -593,8 +1650,8 @@
     },
     {
       "id": "free_play",
-      "speaker": "laurah",
-      "text": "Emberkeep is yours now, Keeper! Fill Cindra's Ledger — she guards something golden — and reach Keeper Level 3… they say something waits past the southern ash.",
+      "speaker": "eleanor",
+      "text": "Emberkeep is yours now, Keeper. Keep my Ledger full and reach Keeper Level 3 — and that egg on the altar will have waited long enough.",
       "gate": {
         "type": "tap"
       },

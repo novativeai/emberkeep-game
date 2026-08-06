@@ -1,4 +1,4 @@
-import { HIDDEN_CHAINS } from '../core/Constants';
+import { chainHiddenIn } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -17,11 +17,20 @@ export class UnlockSystem {
     private state: GameState,
     private bus: EventBus,
     private clock: GameClock,
-    private chains: ChainsData,
-    private map: MapData
+    private chains: ChainsData
   ) {
     bus.on('fog:tapped', ({ regionId }) => this.tryKeyUnlock(regionId));
     bus.on('keeper:leveled', ({ level }) => this.unlockForLevel(level));
+    bus.on('region:reveal', ({ regionId }) => {
+      const region = this.map.regions.find((r) => r.id === regionId);
+      if (region) this.reveal(region);
+    });
+  }
+
+  /** The ACTIVE world's map. Regions belong to the world the board is
+   *  showing — an unlock on Borealis must find Borealis's regions. */
+  private get map(): MapData {
+    return this.state.map;
   }
 
   private tryKeyUnlock(regionId: string): void {
@@ -67,10 +76,12 @@ export class UnlockSystem {
     const now = this.clock.now();
     const revealed: ItemSnapshot[] = [];
     for (const placement of region.contents ?? []) {
-      if (HIDDEN_CHAINS.has(placement.chain)) continue; // never reveal the flower chain
-      const generator = this.chains.chains
-        .find((c) => c.id === placement.chain)
-        ?.tiers.find((t) => t.tier === placement.tier)?.generator;
+      const config = this.chains.chains.find((c) => c.id === placement.chain);
+      // Withheld either because it is a later chapter's chain or because it
+      // belongs to another world — a region in the north may seed frozen goods,
+      // and the same region data must not seed them here.
+      if (chainHiddenIn(config ?? { id: placement.chain }, this.state.worldId)) continue;
+      const generator = config?.tiers.find((t) => t.tier === placement.tier)?.generator;
       const item = this.state.addItem({
         chain: placement.chain,
         tier: placement.tier,

@@ -1,13 +1,23 @@
+import { BagSystem } from '../systems/BagSystem';
+import { StoreSystem } from '../systems/StoreSystem';
 import { BoardSystem } from '../systems/BoardSystem';
 import { ChestSystem } from '../systems/ChestSystem';
 import { DragonJobSystem } from '../systems/DragonJobSystem';
+import { DragonLifeSystem } from '../systems/DragonLifeSystem';
+import { DragonSystem } from '../systems/DragonSystem';
 import { EconomySystem } from '../systems/EconomySystem';
 import { EnergySystem } from '../systems/EnergySystem';
 import { GeneratorSystem } from '../systems/GeneratorSystem';
 import { MergeSystem } from '../systems/MergeSystem';
 import { OrderSystem } from '../systems/OrderSystem';
+import { QuestSystem } from '../systems/QuestSystem';
+import { RegardSystem } from '../systems/RegardSystem';
+import { RevealSystem } from '../systems/RevealSystem';
 import { RewardSystem } from '../systems/RewardSystem';
 import { SaveSystem, type StorageLike } from '../systems/SaveSystem';
+import { StorySystem } from '../systems/StorySystem';
+import { WorldCharacterSystem } from '../systems/WorldCharacterSystem';
+import { WorldSystem } from '../systems/WorldSystem';
 import { TaskSystem } from '../systems/TaskSystem';
 import { TutorialDirector } from '../systems/TutorialDirector';
 import { UnlockSystem } from '../systems/UnlockSystem';
@@ -18,18 +28,24 @@ import type {
   AnchorsData,
   AssetsManifest,
   ChainsData,
+  CharactersData,
   DialogueData,
   MapData,
   OrdersData,
+  QuestsData,
+  StoreData,
   TasksData,
   TutorialData
 } from './types';
 import anchorsJson from '../data/anchors.json';
 import assetsJson from '../data/assets.json';
 import chainsJson from '../data/chains.json';
+import charactersJson from '../data/characters.json';
 import dialogueJson from '../data/dialogue.json';
 import mapJson from '../data/map.json';
 import ordersJson from '../data/orders.json';
+import questsJson from '../data/quests.json';
+import storeJson from '../data/store.json';
 import tasksJson from '../data/tasks.json';
 import tutorialJson from '../data/tutorial.json';
 
@@ -42,6 +58,9 @@ export interface GameData {
   anchors: AnchorsData;
   dialogue: DialogueData;
   tasks: TasksData;
+  characters: CharactersData;
+  store: StoreData;
+  quests: QuestsData;
 }
 
 export interface GameSystems {
@@ -53,9 +72,19 @@ export interface GameSystems {
   order: OrderSystem;
   economy: EconomySystem;
   reward: RewardSystem;
+  reveal: RevealSystem;
   chest: ChestSystem;
   unlock: UnlockSystem;
   tasks: TaskSystem;
+  quests: QuestSystem;
+  regard: RegardSystem;
+  bag: BagSystem;
+  store: StoreSystem;
+  story: StorySystem;
+  characters: WorldCharacterSystem;
+  worlds: WorldSystem;
+  dragons: DragonSystem;
+  dragonLife: DragonLifeSystem;
   save: SaveSystem;
   tutorial: TutorialDirector;
 }
@@ -82,23 +111,66 @@ export class GameContext {
       assets: assetsJson as unknown as AssetsManifest,
       anchors: anchorsJson as unknown as AnchorsData,
       dialogue: dialogueJson as unknown as DialogueData,
+      characters: charactersJson as unknown as CharactersData,
       tasks: tasksJson as unknown as TasksData,
+      store: storeJson as unknown as StoreData,
+      quests: questsJson as unknown as QuestsData,
       ...overrides
     };
     this.state = new GameState(this.data.map);
     const save = new SaveSystem(this.state, this.bus, this.clock, storage);
+    // The quest ladder READS these two (their getters only, never a command into
+    // them), so the encore queue and the Keeper's Tasks each keep exactly one
+    // definition. They are hoisted out of the literal for that reason alone.
+    const order = new OrderSystem(this.state, this.bus, this.data.orders);
+    const tasks = new TaskSystem(this.state, this.bus, this.data.tasks);
+    // Hoisted for the same reason: RegardSystem READS the ladder (which gift a
+    // person is currently asking for is a quest step, never a second want-list),
+    // so the ladder has to exist before it. The dependency runs one way only —
+    // QuestSystem reads Regard's points straight off `state.stats` — and that is
+    // what keeps the pair acyclic.
+    const quests = new QuestSystem(
+      this.state,
+      this.bus,
+      this.data.quests,
+      this.data.chains,
+      order,
+      tasks
+    );
+    // Hoisted so DragonLifeSystem can READ them. Ambient life decides what a
+    // dragon is doing by asking the systems that already know — its care record
+    // (DragonSystem) and whether it is out working (DragonJobSystem) — rather
+    // than keeping a second hunger clock of its own.
+    const jobs = new DragonJobSystem(this.state, this.bus, this.clock, this.data.chains);
+    const dragons = new DragonSystem(this.state, this.bus, this.clock, this.data.chains);
     this.systems = {
-      board: new BoardSystem(this.state, this.bus, this.clock, this.data.chains, this.data.map),
+      board: new BoardSystem(this.state, this.bus, this.clock, this.data.chains),
       merge: new MergeSystem(this.state, this.bus, this.clock, this.data.chains),
       energy: new EnergySystem(this.state, this.bus, this.clock),
       generator: new GeneratorSystem(this.state, this.bus, this.clock, this.data.chains),
-      jobs: new DragonJobSystem(this.state, this.bus, this.clock, this.data.chains),
-      order: new OrderSystem(this.state, this.bus, this.data.orders),
+      jobs,
+      order,
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       reward: new RewardSystem(this.bus),
+      reveal: new RevealSystem(this.state, this.bus),
       chest: new ChestSystem(this.state, this.bus, this.clock),
-      unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains, this.data.map),
-      tasks: new TaskSystem(this.state, this.bus, this.data.tasks),
+      unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains),
+      tasks,
+      quests,
+      regard: new RegardSystem(this.state, this.bus, this.data.characters, quests),
+      bag: new BagSystem(this.state, this.bus),
+      store: new StoreSystem(this.state, this.bus, this.data.store),
+      story: new StorySystem(this.state, this.bus, this.data.dialogue),
+      characters: new WorldCharacterSystem(
+        this.state,
+        this.bus,
+        this.clock,
+        this.data.characters,
+        this.data.chains
+      ),
+      dragons,
+      dragonLife: new DragonLifeSystem(this.state, this.bus, this.clock, dragons, jobs),
+      worlds: new WorldSystem(this.state, this.bus),
       save,
       tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial)
     };

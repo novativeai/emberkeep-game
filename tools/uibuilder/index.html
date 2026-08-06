@@ -681,7 +681,7 @@ function partEditor(part, pp) {
     html += field('Tint', `<div class="pair"><input id="q_tint" type="color" value="${pp.tint || '#ffffff'}"><button id="q_tintClear" class="ghost" style="flex:1">clear</button></div>`);
     html += field('Texture', `<input id="q_tex" type="text" placeholder="${part.textureKey || ''}" value="${pp.texture || ''}" title="double-click a frame/icon on the left to fill">`);
     // Play a PNG sequence ON this layer (contain-fit to its footprint) — e.g.
-    // the bubble portrait becoming a Laurah talk bank.
+    // the bubble portrait becoming a character talk bank.
     const seqOpts = (inv ? inv.sequences || [] : []).map((s) => `<option value="${s.name}" ${pp.sequence===s.name?'selected':''}>${s.builtin?'★ ':'▶ '}${s.label||s.name} · ${s.frameCount}f</option>`).join('');
     html += field('Animate', `<select id="q_seq"><option value="">— static image —</option>${seqOpts}</select>`);
     if (pp.sequence) {

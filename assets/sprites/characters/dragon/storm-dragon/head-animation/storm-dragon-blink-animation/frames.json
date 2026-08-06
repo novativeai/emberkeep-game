@@ -1,0 +1,33 @@
+{
+  "fps": 7,
+  "blendFrames": false,
+  "width": 774,
+  "height": 774,
+  "frameCount": 4,
+  "frames": [
+    {
+      "index": 0,
+      "file": "storm-dragon-eyes-open.png",
+      "durationMs": 2600,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "storm-dragon-eyes-halfOpen.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 2,
+      "file": "storm-dragon-eyes-closed.png",
+      "durationMs": 70,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "storm-dragon-eyes-halfOpen2.png",
+      "durationMs": 55,
+      "blend": false
+    }
+  ]
+}

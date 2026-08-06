@@ -10,17 +10,19 @@ import {
   DRAG,
   DRAGON_ANIM,
   DRAGON_RIG_SCALE,
+  EMBER_MOTES,
   FINALE,
+  FINALE_ENDS_MS,
   FINALE_REGION,
+  GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_CHAIN,
+  GOLDEN_ELDER_TIER,
   GOLDEN_TINT,
   GOLDEN_TREMBLE_PROGRESS,
-  GOLDEN_ELDER_TIER,
-  ITEM_SCALE,
-  EMBER_MOTES,
-  GAME_WIDTH,
   IS_IOS,
+  ITEM_SCALE,
+  LEVEL_XP,
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
@@ -28,13 +30,33 @@ import {
   SCENES,
   skipEnergyCost,
   skipWarmthCost,
+  STANDEE_BANKS,
+  STANDEE_BREATH,
+  STANDEE_SCALE_TRIM,
+  DRAGON_ROAR_EVERY_MS,
+  DRAGON_ROAR_MS,
+  DRAGON_SLEEP_SCALE,
+  DRAGON_WAKE_MS,
+  DRAGON_WANDER_ARC,
+  DRAGON_WANDER_FLIGHT_MS,
+  PRODUCE_BADGE_LIFT,
+  PRODUCE_BADGE_R,
+  REVEAL_HOLD_BACK_MAX_MS,
+  STANDEE_SHADOW_DX,
+  STANDEE_SHADOW_SQUASH,
+  STANDEE_SHADOW_WIDTH,
   TAP_MAX_DISTANCE_PX,
   TAP_MAX_MS,
   TILE_H,
   TILE_W,
-  TIMINGS
+  TIMINGS,
+  WORLD_ID
 } from '../core/Constants';
-import { gridToWorld, setProjection, worldToGrid } from '../core/iso';
+import { FONT as FONT_FAMILIES } from '../art/design';
+import { gridToWorld, worldToGrid } from '../core/iso';
+import { ensureTextures } from '../core/lazyTextures';
+import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
+import { artScaleAt, setActiveWorld } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
 import { renderScale } from '../core/render-scale';
 import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAllow } from '../core/types';
@@ -43,10 +65,21 @@ import { BoardItem } from '../entities/BoardItem';
 import { Crystal3D } from '../render/Crystal3D';
 import type { FacesData } from '../render/faceAnimations';
 import { FlipbookFX, RAMP_TEXTURE } from '../render/FlipbookFX';
+import { EMITTER_PRESETS } from '../render/fx/emitterAssets';
+import { resolvePlacement } from '../render/fx/emitterPlacements';
+import { FxDirector } from '../render/fx/FxDirector';
+import { AuroraFX, type AuroraPresetFile } from '../render/fx/AuroraFX';
+import { SnowFX, type SnowPresetFile } from '../render/fx/SnowFX';
+import type { WeatherFile } from '../render/fx/weatherConfig';
+import auroraJson from '../data/aurora.json';
+import snowJson from '../data/snow.json';
+import weatherJson from '../data/weather.json';
+import emittersJson from '../data/emitters.json';
 import { BEATS, sheetOf, type BeatKey } from '../render/vfxBank';
 import { RigPlayer } from '../render/RigPlayer';
 import type { RigDoc } from '../render/rigTypes';
 import { hopTo, hoverBob, popIn, scalePulse } from '../ui/tweens';
+import { isDragonFood } from '../systems/DragonSystem';
 
 /** A featured live-rigged dragon overlaying its (invisible) interactive host. */
 interface LiveDragon {
@@ -58,6 +91,14 @@ interface LiveDragon {
   busy: boolean; // flying out to work a plant — pause idle rolls + further taps
   /** Calm ADULT cadence: rare, unhurried low-flights and long idles. */
   calm: boolean;
+  /** Ambient mood (DragonLifeSystem owns it; this is the last one rendered).
+   *  While `asleep` the rig is hidden and the curled sleep art stands in, so
+   *  the idle/hover roll is suspended — a sleeping dragon must not fidget. */
+  mood: 'awake' | 'hungry' | 'asleep';
+  /** Clock ms until the next hungry roar; only counts down while `hungry`. */
+  roarInMs: number;
+  /** The floating 💤, while it sleeps. */
+  zzz?: Phaser.GameObjects.Text;
 }
 
 /** Where the camera sits to frame a given Keeper level (world centre + zoom). */
@@ -89,8 +130,18 @@ const rigKeyFor = (chain: string, tier: number): string =>
   DRAGON_RIGS[`${chain}:${tier}`] !== undefined ? `${chain}:${tier}` : chain;
 
 /** ADULT dragons animate as calm elders (see DRAGON_ANIM.adult*): the Red
- *  Adult and the Golden Elder — whelps keep the lively cadence. */
-const CALM_DRAGONS = new Set(['dragon-red-adult', 'dragon-emerald-adult', 'dragon-golden']);
+ *  Adult and the Golden Elder — whelps keep the lively cadence. Keyed by rig
+ *  CHARACTER, so a breed lands here when it is rigged rather than when it is
+ *  finally given a chain — an adult that reads as a whelp is the kind of thing
+ *  nobody notices until the animal is already on the board. */
+const CALM_DRAGONS = new Set([
+  'dragon-red-adult',
+  'dragon-emerald-adult',
+  'dragon-golden',
+  'dragon-frost-adult',
+  'dragon-storm-adult',
+  'dragon-moonwhisker-adult'
+]);
 /** Canonical character id for a rig exported with the tool's default name —
  *  MUST match characterCatalog ids and the faces.json keys (calibrate-faces). */
 const DRAGON_RIG_NAMES: Record<string, string> = {
@@ -106,10 +157,19 @@ const faceTextureKey =
   (setKey: string, frameIndex: number): string =>
     `face:${character}:${setKey}:${frameIndex}`;
 
-const FONT = 'Trebuchet MS, Verdana, sans-serif';
+const FONT = FONT_FAMILIES.ui;
+
+/** A sprite's authored resting scale. World standees render well under 1, so
+ *  every pulse/tween must be relative to this rather than to a literal 1. */
+const baseScaleOf = (sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Image): number =>
+  (sprite.getData('baseScale') as number | undefined) ?? 1;
 
 const NO_ALLOW: Required<TutorialAllow> = {
   drag: [],
+  feed: false,
+  commission: false,
+  status: false,
+  give: false,
   tapGenerators: false,
   ledger: false,
   deliver: false,
@@ -117,7 +177,9 @@ const NO_ALLOW: Required<TutorialAllow> = {
   sell: false,
   dragonWork: false,
   marketplace: false,
-  cookbook: false
+  cookbook: false,
+  bag: false,
+  character: false
 };
 
 /**
@@ -152,11 +214,54 @@ export class BoardScene extends Phaser.Scene {
   private eggAura?: Phaser.GameObjects.Image;
   /** Styled "Zzz" fatigue badge (Container) over a resting dragon. */
   private restBadges = new Map<number, Phaser.GameObjects.Container>();
+  /** A commissioned House wears what it makes. Without it a locked choice is
+   *  invisible — two Houses look identical and the player has no way to tell
+   *  which one is the Gem Shard press. Keyed by item id. */
+  private produceBadges = new Map<number, Phaser.GameObjects.Container>();
   /** One floating key badge per key-locked region, so it reads as "needs a key". */
   private keyBadges = new Map<string, Phaser.GameObjects.Image>();
   private highlights: Phaser.GameObjects.Image[] = [];
   private allow: Required<TutorialAllow> = { ...NO_ALLOW };
   private tutorialDone = false;
+  /** World-character standees, by character id. Not BoardItems — never pooled,
+   *  never in `state.items`. */
+  private characterSprites = new Map<string, Phaser.GameObjects.Sprite>();
+  /** Her five hearts, floating over her. On the PERSON, never in a menu: the
+   *  relationship belongs to her, and a gauge tucked behind a panel button is a
+   *  gauge nobody watches move. Keyed by character id. */
+  /** Standees currently breathing, with the phase that keeps them out of step.
+   *  A sprite joins only once its landing settle is done (both write scaleY). */
+  private breathing: { sprite: Phaser.GameObjects.Sprite; phase: number }[] = [];
+  /** The armed recipient waiting for a board target, if any. Eleanor's help, a
+   *  Cold Nest offering and feeding a dragon are one gesture — tap the
+   *  recipient, then tap the thing — so they share one slot and can never both
+   *  claim the same tap. */
+  private armed: { kind: 'character' | 'nest' | 'companion'; id: string; col?: number; row?: number } | null = null;
+  private armedTween: Phaser.Tweens.Tween | null = null;
+  /** Who the status readout is pointed at. Separate from `armed` on purpose —
+   *  see `selectSubject`. A dragon's id is its board item id as a string. */
+  private selected: { kind: 'character' | 'dragon'; id: string } | null = null;
+  /**
+   * A piece taken out of the satchel and held out, waiting for a recipient.
+   *
+   * The bag's GIVE verb arms this and closes itself; the next tap on a person or
+   * a dragon delivers it. Held on the SCENE rather than in GameState because it
+   * is a gesture in progress, not a fact about the world — a reload mid-gesture
+   * should find the piece still in the bag, which it does.
+   */
+  private pendingGive: { chain: string; tier: number } | null = null;
+  /**
+   * Did anything on the board claim the tap in progress?
+   *
+   * Set by the handlers Phaser itself dispatches to, which is the only
+   * trustworthy answer to "was this tap on something" — see the pointer-up
+   * handler in `wireCameraNav` for what went wrong when this was a hit test.
+   */
+  private tapClaimed = false;
+  /** The breathing tweens on every valid recipient while a give is armed. */
+  private giveTweens: Phaser.Tweens.Tween[] = [];
+  /** Companion standees, by companion id. Named dragons are never BoardItems. */
+  private companionSprites = new Map<string, Phaser.GameObjects.Image>();
   private tutorialStepId = ''; // current tutorial step id (drives in-board hints)
   private dragFrom: TilePos | null = null;
   /** Live drag: the lifted sprite eases toward this pointer-tracked target. */
@@ -190,6 +295,10 @@ export class BoardScene extends Phaser.Scene {
   private twinkleTimer?: Phaser.Time.TimerEvent;
   /** Ember-fly ambience: the emit zone tracks the camera's worldView. */
   private fireflyZone?: Phaser.Geom.Rectangle;
+  /** Authored world FX emitters (src/data/emitters.json) + their orchestrator. */
+  private fx?: FxDirector;
+  private aurora?: AuroraFX;
+  private snow?: SnowFX;
   /** Golden Egg ambient tremble (starts near the Level-3 threshold). */
   private goldenTremble?: Phaser.Tweens.Tween;
   /** The Golden Altar (scenic non-playable ledge, west of the isle) — the
@@ -214,7 +323,11 @@ export class BoardScene extends Phaser.Scene {
 
   create(): void {
     this.ctx = this.registry.get('ctx') as GameContext;
-    setProjection(this.ctx.data.map.tile); // adopt the world's authored grid perspective
+    // Point the ambient `gridToWorld`/`worldToGrid` at the world being shown, so
+    // every call site below projects through the ZONE that owns each address.
+    // GameState already does this on construction and on each switch; the scene
+    // re-asserts it because the scene is what draws the result.
+    setActiveWorld(this.ctx.state.world);
     this.itemSprites.clear();
     this.pool = [];
     this.tiles.clear();
@@ -225,7 +338,16 @@ export class BoardScene extends Phaser.Scene {
     this.dragonMenu = undefined;
     this.dragonMenuForId = 0;
     this.restBadges.clear();
+    this.produceBadges.clear();
+    this.breathing = []; // last run's standees died with it — never carry the refs
+    // Same reason, and it matters the moment TWO worlds have standees: travel
+    // rebuilds the scene, so without this the map keeps the departed world's
+    // character pointing at a destroyed sprite — and `characterMarkerPoint` /
+    // `playStandeeCast` would answer for someone who is not on this map.
+    this.characterSprites.clear();
     this.highlights = [];
+    this.pendingGive = null;
+    this.giveTweens = [];
     this.allow = { ...NO_ALLOW };
     this.tutorialDone = this.ctx.state.tutorialDone;
     this.liveDragons.clear();
@@ -256,9 +378,19 @@ export class BoardScene extends Phaser.Scene {
     this.buildGround();
     this.buildMapDecor();
     this.buildMapDecor3d(); // authored Three.js 3D-decor placements
+    this.buildWorldCharacters(); // Eleanor & co, standing in the world
+    this.buildWorldEmitters(); // authored fire / smoke, burning in the world
+    this.buildWeather(); // this world's sky and its weather (data-driven)
+    this.buildCompanions(); // named dragons, from any loaded save
+    this.ctx.bus.on('companion:named', () => this.buildCompanions());
+    this.ctx.bus.on('companion:grew', () => this.rebuildCompanions());
+    // She answered — raise the scepter. The system has already done the work;
+    // this is the only place the player SEES her do it.
+    this.ctx.bus.on('character:action_used', ({ characterId }) => this.playStandeeCast(characterId));
     this.buildFog();
     this.buildSouthPromise();
     this.buildKeyBadges();
+    this.spawnExistingItems(); // before the camera frames — travel arrives on a populated board
     this.syncGoldenAltar();
     this.buildEmitters();
     this.buildDragCell();
@@ -268,7 +400,14 @@ export class BoardScene extends Phaser.Scene {
     this.buildAtmosphere(); // after setupCamera — layers place off the live worldView
 
     this.cameras.main.fadeIn(320, 36, 27, 34);
-    this.scene.launch(SCENES.ui);
+    // ONLY if it is not already up. World travel restarts THIS scene, and
+    // `launch` on a running scene shuts it down and boots it again — so an
+    // unconditional call tore UIScene down on every journey. That wiped its
+    // clock (every pending delayed beat died with it, including the arrival
+    // dialogue the destination world plays) and destroyed the travelling
+    // curtain, whose whole job is to be the one thing on screen that spans the
+    // switch. UIScene must OUTLIVE the board it is drawn over.
+    if (!this.scene.isActive(SCENES.ui)) this.scene.launch(SCENES.ui);
 
     // Doze = a still painting: ambient emitters stop (live particles fade out
     // over their own lifespans) and the sky-twinkle allocator pauses. Any
@@ -289,7 +428,21 @@ export class BoardScene extends Phaser.Scene {
       this.crystal3d?.dispose();
       this.crystal3d = undefined;
       this.crystalTex = undefined;
+      this.fx?.destroy();
+      this.fx = undefined;
+      this.aurora?.destroy();
+      this.aurora = undefined;
+      this.snow?.destroy();
+      this.snow = undefined;
     });
+
+    // The board this world needs is now built and holding its own textures, so
+    // nothing still points at the worlds we are not on: give their video memory
+    // back. Done here rather than on the travel event so it self-corrects from
+    // any route — travel, a scene restart, or Title → Play after a reset.
+    releaseAwayWorldArt(this.textures, this.ctx);
+    // Travel is finished the moment the new board exists; the veil comes down.
+    this.ctx.bus.emit('world:ready', { world: this.ctx.state.worldId });
   }
 
   /** chains.json per-tier `artScale` — the worldbuilder Merge page's
@@ -304,10 +457,101 @@ export class BoardScene extends Phaser.Scene {
     const doze = state === 'doze';
     for (const emitter of this.ambientEmitters) emitter.emitting = !doze;
     if (this.twinkleTimer) this.twinkleTimer.paused = doze;
+    // The FX director takes the state itself: it caps quality in two steps
+    // (active → high, idle → medium, doze → off) rather than the single on/off
+    // the older ambient emitters have.
+    this.fx?.setPowerState(state);
+    // The sky FREEZES on doze (a still aurora is just a painting) but the snow
+    // FADES OUT — flakes stopped in mid-air read as a broken game. Each effect
+    // owns that difference; this only hands the state over.
+    this.aurora?.setPowerState(state);
+    this.snow?.setPowerState(state);
+  }
+
+  /**
+   * This world's sky and weather, from `src/data/weather.json`.
+   *
+   * Both effects are single full-screen shader quads at `scrollFactor 0`, so
+   * they cost nothing to place and nothing to keep in step with the camera.
+   * A world with no entry builds neither and pays nothing — which is every
+   * world but Borealis today.
+   */
+  private buildWeather(): void {
+    const spec = (weatherJson as WeatherFile).worlds?.[this.ctx.state.worldId];
+    if (!spec) return;
+    const now = (): number => this.ctx.clock.now();
+    const state = (this.power?.state ?? 'active') as PowerState;
+
+    const aurora = spec.aurora ? (auroraJson as unknown as AuroraPresetFile).presets[spec.aurora] : undefined;
+    if (aurora) {
+      this.aurora = new AuroraFX(this, aurora, {
+        now,
+        width: GAME_WIDTH,
+        height: LIVE_GAME_HEIGHT * (spec.auroraBand ?? 0.5),
+        depth: DEPTHS.skyFx
+      });
+      this.aurora.setPowerState(state);
+    }
+
+    const snow = spec.snow ? (snowJson as unknown as SnowPresetFile).presets[spec.snow] : undefined;
+    if (snow) {
+      this.snow = new SnowFX(this, snow, {
+        now,
+        width: GAME_WIDTH,
+        height: LIVE_GAME_HEIGHT,
+        depth: DEPTHS.weather
+      });
+      this.snow.setPowerState(state);
+    }
+  }
+
+  /**
+   * Place the authored world emitters (src/data/emitters.json, written by the
+   * World Builder's 🔥 FX tab).
+   *
+   * Depth comes from where the emitter is DRAWN, not from its cell — the same
+   * rule world characters follow, and for the same reason: a free nudge can
+   * carry it a whole tile out, and sorting it by a cell it no longer stands on
+   * is how a brazier ends up burning through the rock in front of it.
+   */
+  private buildWorldEmitters(): void {
+    const placements = (emittersJson as { emitters?: unknown }).emitters;
+    if (!Array.isArray(placements) || !placements.length) return;
+    this.fx = new FxDirector(this, EMITTER_PRESETS, { now: () => this.ctx.clock.now() });
+    const ratio = TILE_W / (this.ctx.state.map.tile?.width ?? TILE_W);
+    for (const raw of placements) {
+      const e = resolvePlacement(raw as Parameters<typeof resolvePlacement>[0]);
+      if (e.world !== this.ctx.state.worldId) continue; // authored for another world
+      const cell = gridToWorld(e.anchor[0], e.anchor[1]);
+      const x = cell.x + e.dx * ratio;
+      const y = cell.y + e.dy * ratio;
+      this.fx.spawn(e.preset, x, y, {
+        depth: DEPTHS.itemBase + y,
+        scale: e.scale,
+        alpha: e.alpha,
+        seed: e.seed,
+        ramp: e.ramp ?? undefined,
+        widthScale: e.widthScale,
+        heightScale: e.heightScale,
+        tiltDeg: e.tiltDeg,
+        flipX: e.flipX,
+        groundRotDeg: e.groundRotDeg,
+        rate: e.rate,
+        windInfluence: e.windInfluence
+      });
+    }
+    this.fx.setPowerState((this.power?.state ?? 'active') as PowerState);
   }
 
   override update(time: number, delta: number): void {
     for (const sprite of this.itemSprites.values()) sprite.applyBob(time);
+    // Standee breath. Absolute-time driven, so the power governor's dropped
+    // frames slow it down without ever desyncing it.
+    for (const b of this.breathing) {
+      if (!b.sprite.active) continue;
+      const t = (time / STANDEE_BREATH.periodMs) * Math.PI * 2 + b.phase;
+      b.sprite.scaleY = b.sprite.scaleX * (1 + STANDEE_BREATH.amount * Math.sin(t));
+    }
     // Ember-flies live wherever the player is looking — track the view.
     if (this.fireflyZone) {
       const v = this.cameras.main.worldView;
@@ -325,6 +569,14 @@ export class BoardScene extends Phaser.Scene {
         this.crystalTex.refresh(); // re-upload to the GPU for this frame
       }
     }
+    // One pass for every authored emitter: cull, rank by distance from the view
+    // centre, allocate quality, sample the wind field per position.
+    this.fx?.update();
+    // Both are cheap no-ops when this world has no weather. The aurora usually
+    // returns after comparing two numbers (it re-renders 20×/s, not 60); the
+    // snow writes four uniforms and does no per-flake work at all.
+    this.aurora?.update();
+    this.snow?.update();
     this.updateDrag(delta);
     this.updateLiveDragons(delta);
     if (this.altarElder) {
@@ -345,7 +597,8 @@ export class BoardScene extends Phaser.Scene {
     this.coolAccum += delta;
     if (this.coolAccum >= 240) {
       this.coolAccum = 0;
-      if (this.dragonMenu) this.refreshDragonMenu(); // live rest/ruby countdown
+      if (this.dragonMenu) this.refreshDragonMenu(); // live rest/drop countdown
+      this.syncProduceBadges();
       for (const [id, badge] of this.restBadges) {
         const sp = this.itemSprites.get(id);
         const rest = this.ctx.systems.jobs.restRemaining(id);
@@ -475,7 +728,7 @@ export class BoardScene extends Phaser.Scene {
     const calm = CALM_DRAGONS.has(rig.character);
     const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, {
       scale,
-      speed: calm ? DRAGON_ANIM.adultSpeed : 1
+      speed: calm ? DRAGON_ANIM.adultSpeed : DRAGON_ANIM.whelpSpeed
     });
     const face = FACES[rig.character];
     if (face) player.attachFace(this, face, faceTextureKey(rig.character));
@@ -491,7 +744,9 @@ export class BoardScene extends Phaser.Scene {
       mode: intro ? 'hover' : 'idle',
       remainMs: intro ? DRAGON_ANIM.introCelebrateMs : this.idleSpanMs(calm),
       busy: false,
-      calm
+      calm,
+      mood: 'awake',
+      roarInMs: DRAGON_ROAR_EVERY_MS
     };
     this.liveDragons.set(host.itemId, ld);
     this.syncDragon(ld);
@@ -529,6 +784,21 @@ export class BoardScene extends Phaser.Scene {
       this.syncDragon(ld);
       ld.player.update(delta);
       if (ld.busy) continue; // flying/working: hold its current animation
+      // A sleeping dragon does not fidget: the rig is hidden behind the curled
+      // sleep art, so rolling idle/hover under it would animate nothing and
+      // wake it the instant the mood lifted mid-burst.
+      if (ld.mood === 'asleep') continue;
+      // Hungry: a roar every DRAGON_ROAR_EVERY_MS, and nothing else changes.
+      // It is a mood, not a state machine — the dragon carries on producing,
+      // working and idling exactly as it always did.
+      if (ld.mood === 'hungry') {
+        ld.roarInMs -= delta;
+        if (ld.roarInMs <= 0) {
+          ld.roarInMs = DRAGON_ROAR_EVERY_MS;
+          this.roarOnce(ld);
+          continue;
+        }
+      }
       ld.remainMs -= delta;
       if (ld.remainMs > 0) continue;
       // Roll the next segment: mostly idle (~90% of the time), the rest a burst.
@@ -549,9 +819,161 @@ export class BoardScene extends Phaser.Scene {
   private removeDragonRig(itemId: number): void {
     const ld = this.liveDragons.get(itemId);
     if (!ld) return;
+    ld.zzz?.destroy();
     ld.player.destroy();
     ld.shadow.destroy();
     this.liveDragons.delete(itemId);
+  }
+
+  /* ------------------------- ambient life ---------------------------- */
+
+  /** One hungry roar: the rig rears back, the face opens, and a puff of smoke
+   *  leaves the nostrils. Purely a mood — nothing in the economy hears it. */
+  private roarOnce(ld: LiveDragon): void {
+    ld.player.play('roar');
+    ld.player.playFace(2); // wide mouth for the length of the bellow
+    ld.mode = 'idle';
+    ld.remainMs = DRAGON_ROAR_MS;
+    this.time.delayedCall(DRAGON_ROAR_MS, () => {
+      if (this.liveDragons.get(ld.host.itemId) === ld && ld.mood !== 'asleep') {
+        ld.player.play('idle');
+      }
+    });
+    this.sparks.explode(5, ld.host.x, ld.host.y - 90);
+    this.floatText(ld.host.x, ld.host.y - 170, 'Hungry!', PALETTE.lavaHighlight);
+  }
+
+  /**
+   * The mood changed. Sleep is the only one that swaps what is DRAWN: the rig is
+   * a standing puppet and cannot curl up, so the curled sleeping painting stands
+   * in for it and the rig hides behind it.
+   *
+   * A breed with no sleep art simply dims and shows the 💤 — the behaviour is
+   * the same for every dragon, only the red one has its portrait for it.
+   */
+  private applyDragonMood(itemId: number, mood: 'awake' | 'hungry' | 'asleep'): void {
+    const ld = this.liveDragons.get(itemId);
+    if (!ld) return;
+    const was = ld.mood;
+    ld.mood = mood;
+    if (mood === 'hungry') ld.roarInMs = 0; // say so at once, then on the cadence
+    if (was === mood) return;
+
+    if (mood === 'asleep') {
+      const sleepKey = `sleep_${ld.host.chain}_${ld.host.tier}`;
+      if (this.textures.exists(sleepKey)) {
+        // The rig steps aside and the painting takes the tile. `setArtTexture`
+        // re-reads the anchor and re-fits the ground shadow, so a curled
+        // silhouette does not keep a standing dragon's footprint.
+        ld.player.container.setVisible(false);
+        ld.shadow.setVisible(false);
+        ld.host.setArtTexture(sleepKey, this.ctx.data.anchors);
+        ld.host.setArtScale(ITEM_SCALE[sleepKey] ?? DRAGON_SLEEP_SCALE);
+        ld.host.setArtVisible(true);
+        // A still frame reads as a dead sprite, so the painting BREATHES.
+        // Phase is hashed off the item id — two dragons asleep side by side
+        // must not inhale together.
+        ld.host.setSleepBreath(true, ((ld.host.itemId * 2654435761) >>> 0) % 1000 / 1000 * Math.PI * 2);
+      } else {
+        ld.player.container.setAlpha(0.65);
+      }
+      // A dragon sleeping off a SHIFT already wears the rest badge, and that
+      // badge is a 💤 with the countdown on it. A second 💤 beside it reads as
+      // a bug rather than as emphasis.
+      const resting = this.ctx.systems.jobs.restRemaining(itemId) > 0;
+      ld.zzz?.destroy();
+      ld.zzz = undefined;
+      if (!resting) {
+        ld.zzz = this.add
+          .text(ld.host.x, ld.host.y - 150, '💤', { fontSize: '46px' })
+          .setOrigin(0.5)
+          .setDepth(DEPTHS.itemBase + ld.host.y + 4);
+        this.tweens.add({
+          targets: ld.zzz,
+          y: ld.host.y - 210,
+          alpha: { from: 0.9, to: 0.15 },
+          duration: 3400,
+          repeat: -1,
+          ease: 'Sine.easeOut'
+        });
+      }
+      return;
+    }
+
+    // Waking up: put the rig back, and let it stretch before it stands.
+    ld.zzz?.destroy();
+    ld.zzz = undefined;
+    ld.host.setSleepBreath(false);
+    // Restore the STANDING art under the rig. The host is invisible while the
+    // rig stands in, but a pooled item that is released still carrying the
+    // curled texture would come back as a sleeping dragon in another tile's
+    // clothes (the pool's own rule: acquire must fully reset).
+    const standKey = `item_${ld.host.chain}_${ld.host.tier}`;
+    if (this.textures.exists(standKey)) {
+      ld.host.setArtTexture(standKey, this.ctx.data.anchors);
+      ld.host.setArtScale(ITEM_SCALE[`${ld.host.chain}_${ld.host.tier}`] ?? 1);
+    }
+    ld.host.setArtVisible(false);
+    ld.player.container.setVisible(true).setAlpha(1);
+    ld.shadow.setVisible(true);
+    if (was === 'asleep') {
+      ld.player.play('stretch');
+      ld.mode = 'idle';
+      ld.remainMs = DRAGON_WAKE_MS;
+    }
+  }
+
+  /**
+   * A dragon walked itself to another tile — fly it there.
+   *
+   * The move already happened in state (DragonLifeSystem owns that); this is
+   * only the journey. It arcs, because nothing on this board teleports, and the
+   * host is marked `busy` for the duration so the idle roll cannot fight the
+   * tween for the same properties.
+   */
+  private flyWander(itemId: number, to: TilePos): void {
+    const sprite = this.itemSprites.get(itemId);
+    if (!sprite) return;
+    sprite.col = to.col;
+    sprite.row = to.row;
+    const dest = gridToWorld(to.col, to.row);
+    const ld = this.liveDragons.get(itemId);
+    if (ld) {
+      ld.busy = true;
+      ld.player.setFacing(dest.x <= sprite.x ? 'left' : 'right');
+      ld.player.play('hover');
+    }
+    // Two tweens rather than a curve: x eases the whole way while y hops up and
+    // back down, which reads as a glide with a lift in the middle of it.
+    this.tweens.add({
+      targets: sprite,
+      x: dest.x,
+      duration: DRAGON_WANDER_FLIGHT_MS,
+      ease: 'Sine.easeInOut'
+    });
+    this.tweens.add({
+      targets: sprite,
+      y: dest.y - DRAGON_WANDER_ARC,
+      duration: DRAGON_WANDER_FLIGHT_MS / 2,
+      ease: 'Sine.easeOut',
+      yoyo: false,
+      onComplete: () => {
+        this.tweens.add({
+          targets: sprite,
+          y: dest.y,
+          duration: DRAGON_WANDER_FLIGHT_MS / 2,
+          ease: 'Sine.easeIn',
+          onComplete: () => {
+            sprite.settleDepth();
+            if (!ld) return;
+            ld.busy = false;
+            ld.mode = 'idle';
+            ld.remainMs = this.idleSpanMs(ld.calm);
+            if (ld.mood !== 'asleep') ld.player.play('idle');
+          }
+        });
+      }
+    });
   }
 
   /* ------------------------------ camera ------------------------------ */
@@ -563,7 +985,7 @@ export class BoardScene extends Phaser.Scene {
    * focal point, the same move previewed in the camera-keyframe tool.
    */
   private setupCamera(): void {
-    const map = this.ctx.data.map;
+    const map = this.ctx.state.map;
     const focusByLevel = new Map<number, { col: number; row: number }>();
     for (const kf of map.cameraKeyframes ?? []) {
       if (kf.focus) focusByLevel.set(kf.level, kf.focus);
@@ -587,7 +1009,7 @@ export class BoardScene extends Phaser.Scene {
     // to the image's exact world rect, and raise the minimum zoom to the image-fit
     // so the viewport can never grow past it (zoom-out stops at the full image).
     const bgRect = this.backgroundWorldRect();
-    const zoomCfg = this.ctx.data.map.cameraZoom ?? { min: 0.2, max: 1.4 };
+    const zoomCfg = this.ctx.state.map.cameraZoom ?? { min: 0.2, max: 1.4 };
     if (bgRect) {
       cam.setBounds(bgRect.x, bgRect.y, bgRect.w, bgRect.h);
       const fitZoom = Math.max(GAME_WIDTH / bgRect.w, LIVE_GAME_HEIGHT / bgRect.h);
@@ -605,17 +1027,18 @@ export class BoardScene extends Phaser.Scene {
         cam.setBounds(x0, y0, Math.max(...xs) - Math.min(...xs) + TILE_W * 2, Math.max(...ys) - Math.min(...ys) + TILE_H * 3);
       }
     }
-    const frame = this.frameForLevel(this.ctx.state.level);
+    const frame = this.openingFrame();
     // World framing stays logical (R cancels in world space); only the actual zoom
     // is ×renderScale so the same view renders into the larger hi-DPI backing.
     cam.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);
     cam.centerOn(frame.x, frame.y);
 
     this.offBus.push(
-      this.ctx.bus.on('keeper:leveled', ({ level }) => {
-        // Level 3 is the finale — a scripted sequence, not a plain glide.
-        if (level >= 3) this.runFinale();
-        else this.flyToLevel(level);
+      // Every level-up is now an ordinary glide to the new zone. Level 3 used to
+      // hijack this into the finale; the awakening is a QUEST beat now, below.
+      this.ctx.bus.on('keeper:leveled', ({ level }) => this.flyToLevel(level)),
+      this.ctx.bus.on('quest:completed', ({ questId }) => {
+        if (questId === GOLDEN_ALTAR.awakenQuestId) this.runFinale();
       })
     );
   }
@@ -623,11 +1046,14 @@ export class BoardScene extends Phaser.Scene {
   /* ------------------------- the Level-3 finale ------------------------- */
 
   /**
-   * The grand surprise, made real (DEMO-PLAN §THE FINALE): the Golden Egg
-   * cracks → the camera glides to the south terrace → the ash-fog parts
-   * HALFWAY for a two-second glimpse of warm light → the fog settles and the
-   * camera returns. UIScene runs Cindra's line + the chapter card on the same
-   * FINALE timeline, so the two scenes stay in step.
+   * The grand surprise, made real: the camera glides west to the Golden Altar,
+   * the Golden Egg cracks, the Elder awakens, and the camera comes home.
+   * UIScene runs her first line on the same FINALE timeline, so the two scenes
+   * stay in step.
+   *
+   * The demo's teaser tail — a fly to the south terrace and Chapter-Two
+   * silhouettes fading in under half-parted clouds — is gone. The finale ends on
+   * the Elder and gives the board straight back.
    */
   private runFinale(): void {
     if (this.finaleRan) return;
@@ -643,7 +1069,7 @@ export class BoardScene extends Phaser.Scene {
       this.glideToWorld(p.x, p.y + 60, 900);
     });
     // …and the Golden Egg cracks: the legendary Elder AWAKENS on her ledge.
-    // ONLY if Cindra's golden order was delivered — the egg is authored decor
+    // ONLY if Eleanor's golden order was delivered — the egg is authored decor
     // now, so its mere existence no longer implies the promise was earned; the
     // prophecy finale variant leaves her sleeping (deliver later → the late
     // awakening plays instead).
@@ -659,86 +1085,7 @@ export class BoardScene extends Phaser.Scene {
       }
     });
 
-    const region = this.ctx.data.map.regions.find((r) => r.id === FINALE_REGION);
-    if (!region || region.tiles.length === 0) return; // no terrace — hatch + card still play
-    const centroid = this.regionCentroid(region.tiles.map(([c, r]) => ({ col: c, row: r })));
-
-    // 2 — glide to the south terrace.
-    this.time.delayedCall(FINALE.flyAtMs, () => this.glideToWorld(centroid.x, centroid.y, FINALE.flyMs));
-
-    // 3 — the fog parts halfway; warm light floods; SHAPES appear in the murk
-    // (the shrine + two unfamiliar dragons — teaser silhouettes, not reveals);
-    // then the ash settles back over them.
-    this.time.delayedCall(FINALE.glimpseAtMs, () => {
-      const puffs: Phaser.GameObjects.Image[] = [];
-      for (const [col, row] of region.tiles) {
-        const puff = this.fog.get(`${col},${row}`);
-        if (puff) puffs.push(puff);
-      }
-      for (const puff of puffs) {
-        this.tweens.killTweensOf(puff);
-        this.tweens.add({
-          targets: puff,
-          alpha: FINALE.fogDipAlpha,
-          duration: 700,
-          ease: 'Sine.easeInOut'
-        });
-      }
-      // Silhouettes fade in UNDER the half-parted clouds (depth just below the
-      // fog band) so they read as shapes caught in the light, not placed art.
-      const shapes: Phaser.GameObjects.Image[] = [];
-      const silhouettes: Array<[string, number, number]> = [
-        ['fx_glimpse_shrine', 0, -60],
-        ['fx_glimpse_dragon_a', -250, 30],
-        ['fx_glimpse_dragon_b', 235, 50]
-      ];
-      for (const [key, dx, dy] of silhouettes) {
-        if (!this.textures.exists(key)) continue;
-        shapes.push(
-          this.add
-            .image(centroid.x + dx, centroid.y + dy, key)
-            .setOrigin(0.5, 1)
-            .setDepth(DEPTHS.itemBase + centroid.y + 1)
-            .setAlpha(0)
-        );
-      }
-      this.tweens.add({ targets: shapes, alpha: 0.92, duration: 800, delay: 250, ease: 'Sine.easeOut' });
-      this.glowFlash(centroid.x, centroid.y - 30, PALETTE.goldAccent, 0.8, 4.2);
-      this.burst.explode(14, centroid.x, centroid.y - 20);
-      this.time.delayedCall(FINALE.glimpseHoldMs, () => {
-        // The shapes sink back into the dark with the settling ash.
-        this.tweens.add({
-          targets: shapes,
-          alpha: 0,
-          duration: 900,
-          ease: 'Sine.easeIn',
-          onComplete: () => shapes.forEach((s) => s.destroy())
-        });
-        for (const puff of puffs) {
-          this.tweens.add({
-            targets: puff,
-            alpha: 0.97,
-            duration: 800,
-            ease: 'Sine.easeInOut',
-            onComplete: () => {
-              // Resume the slow rolling breath the glimpse interrupted.
-              this.tweens.add({
-                targets: puff,
-                alpha: 0.9,
-                scaleX: 1.02,
-                scaleY: 1.035,
-                duration: TIMINGS.fogPulsePeriodMs / 2,
-                yoyo: true,
-                repeat: -1,
-                ease: 'Sine.easeInOut'
-              });
-            }
-          });
-        }
-      });
-    });
-
-    // 4 — home again (the chapter card lands shortly after, from UIScene).
+    // 3 — home again: the board is handed straight back to the player.
     this.time.delayedCall(FINALE.returnAtMs, () => {
       const frame = this.frameForLevel(this.ctx.state.level);
       this.glideToWorld(frame.x, frame.y, 1100);
@@ -782,7 +1129,7 @@ export class BoardScene extends Phaser.Scene {
   /** World point + art scale of the altar (authored decor placement from
    *  golden-egg.json — cell, calibration and ratio math mirror buildMapDecor). */
   private altarPoint(): { x: number; y: number; scale: number } {
-    const ratio = TILE_W / (this.ctx.data.map.tile?.width ?? TILE_W);
+    const ratio = TILE_W / (this.ctx.state.map.tile?.width ?? TILE_W);
     const cal = GOLDEN_ALTAR.calibration;
     const w = gridToWorld(GOLDEN_ALTAR.cell.col, GOLDEN_ALTAR.cell.row);
     return { x: w.x + cal.offsetX * ratio, y: w.y + cal.offsetY * ratio, scale: cal.scale * ratio };
@@ -790,12 +1137,24 @@ export class BoardScene extends Phaser.Scene {
 
   /** Derive the altar's state from save-derivable facts (nothing extra is
    *  persisted): the Golden Egg is AUTHORED DECOR (golden-egg.json) — it sits
-   *  on the old altar from the very start; once Cindra's first order is
+   *  on the old altar from the very start; once Eleanor's first order is
    *  delivered AND Level 3 is reached, the awakened Elder stands there
    *  instead. Idempotent — safe on load, resync and rig-arrival. */
+  /** Has the awakening quest been completed? QuestSystem latches it into
+   *  `stats` as `q:done:<questId>`, so this is save-derivable and survives a
+   *  reload — which is what the altar needs, since she must still be standing
+   *  there next session. */
+  private goldenQuestDone(): boolean {
+    return this.ctx.state.stat(`q:done:${GOLDEN_ALTAR.awakenQuestId}`) > 0;
+  }
+
   private syncGoldenAltar(): void {
+    // Emberkeep's own story fixture, standing at an Emberkeep cell. Its address
+    // is off-grid on purpose, so on another world it would be drawn by that
+    // world's fallback lattice — an Emberkeep altar floating over the aurora.
+    if (this.ctx.state.worldId !== WORLD_ID) return;
     const delivered = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
-    const awake = delivered && this.ctx.state.level >= 3;
+    const awake = delivered && this.goldenQuestDone();
     if (awake) this.showAltarElder();
     else {
       this.showAltarEgg(false);
@@ -1027,6 +1386,34 @@ export class BoardScene extends Phaser.Scene {
     return { x: center.x, y: center.y, zoom };
   }
 
+  /**
+   * The view the board opens on.
+   *
+   * Framing by Keeper LEVEL is an EMBERKEEP idea: its regions gate on level and
+   * its map ships authored `cameraKeyframes` naming a focal cell per level. A
+   * world that gates on KEYS has no such ladder — every Borealis region buckets
+   * to level 1, so the level frame spanned all three isles and the Keeper
+   * arrived looking at locked ice with their own nine feet of shingle off the
+   * side of the screen, and Selyna eight pixels past the right edge.
+   *
+   * So: authored keyframes win, and everywhere else the board opens on THE
+   * GROUND YOU CAN STAND ON — the active regions, plus whoever lives here, so
+   * the person who speaks the arrival lines is in the frame she speaks them in.
+   */
+  private openingFrame(): CameraFrame {
+    const map = this.ctx.state.map;
+    if (map.cameraKeyframes?.length) return this.frameForLevel(this.ctx.state.level);
+    const tiles: [number, number][] = [];
+    for (const region of map.regions) {
+      if (this.ctx.state.regionStatus.get(region.id) !== 'active') continue;
+      tiles.push(...region.tiles);
+    }
+    for (const cfg of this.ctx.systems.characters.charactersIn(this.ctx.state.worldId)) {
+      tiles.push([cfg.anchor[0], cfg.anchor[1]]);
+    }
+    return tiles.length ? this.computeFrame(tiles) : this.frameForLevel(this.ctx.state.level);
+  }
+
   private frameForLevel(level: number): CameraFrame {
     for (let l = level; l >= 1; l--) {
       const f = this.levelFrames.get(l);
@@ -1039,6 +1426,12 @@ export class BoardScene extends Phaser.Scene {
     // Never yank the camera away mid-onboarding — the tutorial's scripted taps
     // all live in the L1 zone. Zones still unlock; the view just stays put.
     if (!this.tutorialDone) return;
+    // The LAST level opens the land the Golden Altar stands beside, so its glide
+    // reads as the game presenting the egg — a promise it cannot keep while the
+    // awakening quest is unfinished, and the player is left staring at an egg
+    // that does nothing. The land still opens; the camera stays where they are
+    // working, and the altar gets its move when the quest actually wakes her.
+    if (level >= LEVEL_XP.length && !this.goldenQuestDone()) return;
     const target = this.frameForLevel(level);
     // actual (×renderScale) zoom space — cam.zoom below is already scaled.
     const targetZoom = Math.max(target.zoom, this.minZoom) * renderScale.value; // stay inside the image
@@ -1112,7 +1505,7 @@ export class BoardScene extends Phaser.Scene {
 
   /** The art key + placement for a playable cell, from the authored world. */
   private tileArtKey(col: number, row: number): string {
-    const name = this.ctx.data.map.tilesByCell?.[`${col},${row}`];
+    const name = this.ctx.state.map.tilesByCell?.[`${col},${row}`];
     if (!name) return 'tile_moss';
     // Authored flower tiles ship as `tile_<artName>`; legacy border-grass-N
     // falls back to grass_N, then to plain moss.
@@ -1129,7 +1522,7 @@ export class BoardScene extends Phaser.Scene {
    * sits hidden under the cloud until the zone wakes.
    */
   private buildGround(): void {
-    const map = this.ctx.data.map;
+    const map = this.ctx.state.map;
     const ratio = TILE_W / (map.tile?.width ?? TILE_W); // authored 240 → game 256
     const invisible = new Set((map.invisible ?? []).map(([c, r]) => `${c},${r}`));
     for (const [col, row] of map.playable ?? []) {
@@ -1142,11 +1535,15 @@ export class BoardScene extends Phaser.Scene {
         scale: 1,
         anchor: { x: 0.5, y: 0.26 }
       };
-      const tileY = y + cal.offsetY * ratio;
+      // Zones do not share a tile size, so ground art is scaled to the tile of
+      // the zone it stands on. The authored isle's zone reports 1, which is why
+      // every tile on it lands at exactly the scale it always did.
+      const zoneScale = artScaleAt(this.ctx.state.world, col, row);
+      const tileY = y + cal.offsetY * ratio * zoneScale;
       const tile = this.add
-        .image(x + cal.offsetX * ratio, tileY, this.tileArtKey(col, row))
+        .image(x + cal.offsetX * ratio * zoneScale, tileY, this.tileArtKey(col, row))
         .setOrigin(cal.anchor.x, cal.anchor.y)
-        .setScale(cal.scale * ratio)
+        .setScale(cal.scale * ratio * zoneScale)
         // y-sorted within the floor band, always below items (itemBase=100).
         .setDepth(DEPTHS.tiles + y * 0.001);
       this.tiles.set(`${col},${row}`, tile);
@@ -1165,7 +1562,7 @@ export class BoardScene extends Phaser.Scene {
    * camera as part of the world. Skipped cleanly if the art isn't present.
    */
   private buildBackground(): void {
-    const map = this.ctx.data.map;
+    const map = this.ctx.state.map;
     if (!map.backgrounds?.length) return;
     const ratio = TILE_W / (map.tile?.width ?? TILE_W);
     for (const b of map.backgrounds) {
@@ -1193,7 +1590,7 @@ export class BoardScene extends Phaser.Scene {
    * world's border and nothing beyond it is ever shown.
    */
   private backgroundWorldRect(): { x: number; y: number; w: number; h: number } | null {
-    const map = this.ctx.data.map;
+    const map = this.ctx.state.map;
     const b = map.backgrounds?.[0];
     if (!b) return null;
     const key = `background_${b.name}`;
@@ -1224,7 +1621,7 @@ export class BoardScene extends Phaser.Scene {
    * until that zone wakes (fog sits at +2 above this band).
    */
   private buildMapDecor(): void {
-    const map = this.ctx.data.map;
+    const map = this.ctx.state.map;
     if (!map.mapDecor?.length) return;
     const ratio = TILE_W / (map.tile?.width ?? TILE_W);
     map.mapDecor.forEach((d, i) => {
@@ -1251,6 +1648,481 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /**
+   * The people standing IN the world — not on the merge board. Map decor with a
+   * tap handler: never in `state.items`, never draggable, never merged. Only the
+   * characters authored for THIS world appear, which is how "Selyna is never in
+   * Emberkeep" stays true rather than being remembered.
+   */
+  private buildWorldCharacters(): void {
+    for (const cfg of this.ctx.systems.characters.charactersIn(this.ctx.state.worldId)) {
+      const bank = STANDEE_BANKS[cfg.id];
+      // Prefer the animated banks; fall back to the static `char_<id>` texture,
+      // then skip entirely. Art missing must degrade, never block.
+      const animated = bank !== undefined && this.textures.exists(bank.keys.idle);
+      const key = animated ? bank!.keys.idle : `char_${cfg.id}`;
+      if (!animated && !this.textures.exists(key)) continue;
+      const [col, row] = cfg.anchor;
+      const cell = gridToWorld(col, row);
+      // Her authored nudge off the cell centre. Builder pixels, rebased onto the
+      // game's grid exactly as map decor's dx/dy is — so the offset holds its
+      // position whatever tile width the world was authored at.
+      const ratio = TILE_W / (this.ctx.state.map.tile?.width ?? TILE_W);
+      const x = cell.x + (cfg.dx ?? 0) * ratio;
+      const y = cell.y + (cfg.dy ?? 0) * ratio;
+      // Depth from where she is DRAWN, not from her cell: a free offset can carry
+      // her a whole tile out, and sorting her against scenery by a point she is
+      // no longer standing on is how a standee ends up behind the rock in front
+      // of her.
+      const sprite = this.add.sprite(x, y, key).setDepth(DEPTHS.itemBase + y);
+      // Baked size × the authored trim. Everything downstream (shadow, marker,
+      // pulses, breath) reads this one number or the live sprite scale.
+      const standeeScale = bank ? bank.scale * (STANDEE_SCALE_TRIM[cfg.id] ?? 1) : 1;
+      if (bank) {
+        // Her FEET are the origin, not the frame's bottom-centre. The baked
+        // frame box is the tight union of both banks and the cast's ember bolt
+        // reaches far to her left, so bottom-centre is empty air over the wrong
+        // cell (scripts/bake-standee.py bakes the anchor alongside the sheets).
+        sprite.setOrigin(bank.anchorX, bank.anchorY);
+        // She is a person standing next to whelp dragons — the authoring frame
+        // reads as a giant on the board, so bring her to roughly their size.
+        sprite.setScale(standeeScale);
+      } else {
+        sprite.setOrigin(0.5, 1);
+      }
+      if (animated) {
+        // She RESTS on idle frame 0 — the bake's still — and the idle bank is
+        // never played. Her standing life is the breath in `update`; the frame
+        // sequence read as a fidget next to it, and two idles running at once
+        // read as two different people. The bank stays loaded because the cast
+        // hands back to its first frame.
+        this.ensureStandeeAnims(cfg.id, bank!);
+        sprite.setFrame(0);
+      }
+      // Arm/disarm pulses read this instead of assuming 1.
+      sprite.setData('baseScale', sprite.scale);
+      // The ground shadow that plants her: sized to her BODY, never the frame
+      // (the frame also spans the cast's ember bolt, which would throw a shadow
+      // for a spell she is not casting). Just under her, so the breath lifts off
+      // it. Not tied to the sprite — it does not breathe with her.
+      this.addGroundShadow(
+        x,
+        y,
+        (bank ? bank.body.width * standeeScale : sprite.displayWidth) * STANDEE_SHADOW_WIDTH,
+        DEPTHS.itemBase + y - 1,
+        STANDEE_SHADOW_SQUASH,
+        STANDEE_SHADOW_DX
+      );
+      // Her hit area is her LOWER BODY, never her full frame. A standee is ~2
+      // tiles tall, so its bounding box reaches over the cells behind her and
+      // would swallow taps and drags meant for the board — the same trap the fog
+      // puffs have (they get a tile diamond, not their puffy frame). Measured
+      // off the baked BODY box, never the frame: the frame also contains the
+      // scepter blaze and the ember bolt, and neither is her. Texture space (so
+      // `setScale` does not shift it), and origin does not either.
+      const b = bank?.body ?? { x: 0, y: 0, width: sprite.width, height: sprite.height };
+      sprite.setInteractive(
+        new Phaser.Geom.Rectangle(b.x + b.width * 0.1, b.y + b.height * 0.55, b.width * 0.8, b.height * 0.45),
+        Phaser.Geom.Rectangle.Contains
+      );
+      this.input.setDraggable(sprite, false);
+      sprite.on('pointerup', () => this.onCharacterTapped(cfg.id, sprite));
+      this.characterSprites.set(cfg.id, sprite);
+      this.settleSprite(sprite, 120);
+      this.startBreathing(cfg.id, sprite);
+    }
+  }
+
+  /**
+   * Where a tutorial marker should sit to point at a world character: the world
+   * point at the TOP-CENTRE of her BODY box on the live standee.
+   *
+   * Read off the sprite, never off `characters.json`, and never off a cell
+   * authored in `tutorial.json`. Her cell, her dx/dy nudge and the bake's
+   * feet-anchor all move independently (the World Builder writes the first two),
+   * and a standee is ~2 tiles tall — so her tile centre is at her ankles and a
+   * remembered cell is wrong the moment she is moved. Her BODY box, not her
+   * frame: the frame also holds the scepter blaze and the ember bolt, and
+   * neither is her.
+   */
+  characterMarkerPoint(characterId: string): { x: number; y: number; bottom: number } | null {
+    const sprite = this.characterSprites.get(characterId);
+    if (!sprite) return null;
+    const body = STANDEE_BANKS[characterId]?.body;
+    if (!body) {
+      return { x: sprite.x, y: sprite.getTopCenter().y, bottom: sprite.getBottomCenter().y };
+    }
+    // Texture space → world. Her origin is her feet (bake anchor), so offset
+    // from it and ride the LIVE scale — the breath, the arm pulse and the
+    // cooldown nudge all write it, and the marker should follow what is drawn.
+    const originY = sprite.originY * sprite.height;
+    return {
+      x: sprite.x + (body.x + body.width / 2 - sprite.originX * sprite.width) * sprite.scaleX,
+      y: sprite.y + (body.y - originY) * sprite.scaleY,
+      // Her feet. The marker layer needs her HEIGHT, not just a point: she is
+      // ~2 tiles tall, so an arrow that has to sit below its target belongs
+      // under her shoes, not across her chest.
+      bottom: sprite.y + (body.y + body.height - originY) * sprite.scaleY
+    };
+  }
+
+  /**
+   * Put a breath under the standee: a slow vertical squash about her origin —
+   * which the bake puts at her FEET — so her height moves and her shoes do not.
+   * Written in `update` off absolute time rather than tweened, because a scale
+   * tween here would fight the arm pulse and the cooldown nudge for the same
+   * property (the longer one wins the write). Deriving scaleY from the LIVE
+   * scaleX instead means the breath rides on top of those, whatever they do.
+   */
+  private startBreathing(characterId: string, sprite: Phaser.GameObjects.Sprite): void {
+    // Deterministic per-id phase, not random: two standees in one frame must not
+    // inhale together, but the same standee must breathe the same on every run.
+    let hash = 0;
+    for (let i = 0; i < characterId.length; i++) hash = (hash * 31 + characterId.charCodeAt(i)) | 0;
+    const phase = ((Math.abs(hash) % 1000) / 1000) * STANDEE_BREATH.phaseSpread;
+    this.time.delayedCall(STANDEE_BREATH.startDelayMs, () => {
+      if (sprite.active) this.breathing.push({ sprite, phase });
+    });
+  }
+
+  private standeeAnimKey(characterId: string, bank: 'idle' | 'cast'): string {
+    return `standee_${characterId}_${bank}`;
+  }
+
+  /**
+   * Register the one-shot CAST. The idle bank is deliberately not registered:
+   * standing still is the breath (`update`), and playing a frame loop underneath
+   * it made her fidget. Idempotent — the scene instance is reused across restarts
+   * and Phaser keeps anims on the global manager.
+   */
+  private ensureStandeeAnims(characterId: string, bank: (typeof STANDEE_BANKS)[string]): void {
+    const key = this.standeeAnimKey(characterId, 'cast');
+    if (this.anims.exists(key)) return;
+    const texture = bank.keys.cast;
+    if (!this.textures.exists(texture)) return;
+    this.anims.create({
+      key,
+      frames: this.anims.generateFrameNumbers(texture, { start: 0, end: bank.frameCount - 1 }),
+      frameRate: bank.fps.cast,
+      repeat: 0
+    });
+  }
+
+  /**
+   * She was asked for something and answered — play the scepter cast once, then
+   * settle back onto her resting still. She never crosses the board to help: the
+   * whole point of the cast bank is that the magic travels and she does not.
+   *
+   * The cast swaps her texture to its own sheet, so handing back means putting
+   * the IDLE texture's frame 0 under her again — not replaying an idle loop.
+   */
+  private playStandeeCast(characterId: string): void {
+    const sprite = this.characterSprites.get(characterId);
+    const bank = STANDEE_BANKS[characterId];
+    if (!sprite || !bank || !this.anims.exists(this.standeeAnimKey(characterId, 'cast'))) return;
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      if (!sprite.active) return;
+      sprite.stop();
+      if (this.textures.exists(bank.keys.idle)) sprite.setTexture(bank.keys.idle, 0);
+    });
+    sprite.play(this.standeeAnimKey(characterId, 'cast'));
+  }
+
+  /**
+   * Tap her to ARM her help, tap her again to put it away. While armed, the next
+   * tap on a board piece is the target. Two taps, no menu — the same shape as
+   * every other board interaction.
+   */
+  private onCharacterTapped(characterId: string, sprite: Phaser.GameObjects.Image): void {
+    this.tapClaimed = true; // she is something; this tap was not on empty ground
+    // A held piece claims this tap. Checked BEFORE the tutorial's character gate:
+    // the player already committed to the gesture in the satchel, so refusing it
+    // here with a nudge would be refusing the thing we just told them to do.
+    if (this.pendingGive) {
+      this.deliverGiveTo({ kind: 'character', id: characterId });
+      return;
+    }
+    // She stands on the map from the first frame, so she is tappable before her
+    // lesson exists — until `eleanor_helps` arms her, the tap points back at
+    // whatever the current step wants (law 3: never refuse in silence).
+    if (!this.tutorialDone && !this.allow.character) {
+      this.ctx.bus.emit('tutorial:nudge', {});
+      return;
+    }
+    this.ctx.bus.emit('ui:character_tapped', { characterId });
+    if (this.armed?.kind === 'character' && this.armed.id === characterId) {
+      this.disarmCharacter();
+      // Tapping her a second time puts BOTH away — the favour she was holding
+      // and the readout she was showing. One gesture, one visible result.
+      this.clearSubject();
+      return;
+    }
+    // Looking at her is enough to read her: the status line follows the tap even
+    // when she is on cooldown and the ARM below refuses, because "how does she
+    // feel about me" is never the thing being refused.
+    this.selectSubject('character', characterId);
+    if (!this.ctx.systems.characters.isReady(characterId)) {
+      // Not an error the player caused — just a nudge, and the system says why.
+      scalePulse(this, sprite, 1.06, 110);
+      this.ctx.bus.emit('character:action_failed', { characterId, reason: 'cooldown' });
+      return;
+    }
+    this.armed = { kind: 'character', id: characterId };
+    sprite.setTint(0xffd84d);
+    this.armedTween?.remove();
+    // Relative to her OWN scale — a standee is rendered well under 1 and a
+    // literal `from: 1` would snap her to full authoring size for the pulse.
+    const base = baseScaleOf(sprite);
+    this.armedTween = this.tweens.add({
+      targets: sprite,
+      scale: { from: base, to: base * 1.06 },
+      duration: 520,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+  }
+
+  private disarmCharacter(): void {
+    const a = this.armed;
+    const sprite = a
+      ? a.kind === 'companion'
+        ? this.companionSprites.get(a.id)
+        : this.characterSprites.get(a.id)
+      : undefined;
+    this.armedTween?.remove();
+    this.armedTween = null;
+    if (sprite) {
+      sprite.clearTint();
+      sprite.setScale(baseScaleOf(sprite));
+    }
+    this.armed = null;
+  }
+
+  /**
+   * Point the status readout at somebody, and remember who so the same tap can
+   * put them away again.
+   *
+   * Selection is deliberately NOT the same thing as arming: an armed character
+   * is holding a favour ready, which a second tap cancels, while a selection is
+   * only where the player is looking. Keeping them apart is what lets a dragon —
+   * which is never armed — be selected at all.
+   */
+  private selectSubject(kind: 'character' | 'dragon', id: string, toggle = true): void {
+    if (toggle && this.selected?.kind === kind && this.selected.id === id) {
+      this.clearSubject();
+      return;
+    }
+    if (this.selected?.kind === kind && this.selected.id === id) return;
+    this.selected = { kind, id };
+    this.ctx.bus.emit('ui:subject_selected', { kind, id });
+  }
+
+  private clearSubject(): void {
+    if (!this.selected) return;
+    this.selected = null;
+    this.ctx.bus.emit('ui:subject_cleared', {});
+  }
+
+  // ------------------------------------------------------- giving from the bag
+
+  /** Hold a pocketed piece out and wait for the player to say who it is for. */
+  private armGive(chain: string, tier: number): void {
+    this.pendingGive = { chain, tier };
+    const cam = this.cameras.main;
+    this.floatText(cam.midPoint.x, cam.midPoint.y - 260, 'Tap who it is for', PALETTE.goldAccent);
+    this.pulseGiveTargets(true);
+  }
+
+  private cancelGive(): void {
+    if (!this.pendingGive) return;
+    this.pendingGive = null;
+    this.pulseGiveTargets(false);
+    // Say it. The piece goes back to the satchel either way, but a held thing
+    // that leaves the hand with no word for it reads as the game ignoring taps.
+    const cam = this.cameras.main;
+    this.floatText(cam.midPoint.x, cam.midPoint.y - 260, 'Back in the satchel', PALETTE.cream);
+    this.ctx.bus.emit('bag:give_cancelled', {});
+  }
+
+  /**
+   * Breathe every valid recipient while a piece is held out.
+   *
+   * A two-part gesture with no visible held state is the classic way to lose a
+   * player between the two halves — the float text says what to do once, and
+   * this says WHERE for as long as it is true. Everyone who can be handed
+   * something pulses; nothing else on the board does.
+   */
+  private pulseGiveTargets(on: boolean): void {
+    for (const tween of this.giveTweens) tween.remove();
+    this.giveTweens = [];
+    const targets: Phaser.GameObjects.GameObject[] = [];
+    for (const sprite of this.characterSprites.values()) targets.push(sprite);
+    for (const [id, sprite] of this.itemSprites) {
+      const item = this.ctx.state.items.get(id);
+      if (item && this.ctx.systems.dragons.isBoardDragon(item)) targets.push(sprite);
+    }
+    for (const target of targets) {
+      const obj = target as Phaser.GameObjects.Sprite;
+      if (!on) {
+        obj.setScale(baseScaleOf(obj));
+        continue;
+      }
+      // Relative to each one's OWN scale — a standee renders well under 1 and a
+      // literal `from: 1` would snap it to full authoring size for the pulse.
+      const base = baseScaleOf(obj);
+      this.giveTweens.push(
+        this.tweens.add({
+          targets: obj,
+          scale: { from: base, to: base * 1.07 },
+          duration: 560,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        })
+      );
+    }
+  }
+
+  /**
+   * Deliver the held piece to whoever was tapped.
+   *
+   * The same check-the-record-moved contract every other handing-over in this
+   * game holds: ask through the bus, read the recipient's own counter, and take
+   * the piece out of the bag ONLY if it actually moved. A refusal leaves the
+   * piece pocketed and the gesture armed, so the player can simply tap somebody
+   * else rather than starting again from the satchel.
+   */
+  private deliverGiveTo(target: { kind: 'character'; id: string } | { kind: 'dragon'; id: number }): void {
+    const held = this.pendingGive;
+    if (!held) return;
+    const { chain, tier } = held;
+
+    let taken = false;
+    if (target.kind === 'character') {
+      const before = this.ctx.systems.regard.given(target.id, chain, tier);
+      this.ctx.bus.emit('ui:gift_requested', { characterId: target.id, chain, tier });
+      taken = this.ctx.systems.regard.given(target.id, chain, tier) > before;
+      if (taken) this.selectSubject('character', target.id, false);
+    } else {
+      const before = this.ctx.systems.dragons.careOf(target.id).meals;
+      this.ctx.bus.emit('ui:feed_dragon_requested', { itemId: target.id, chain, tier });
+      taken = this.ctx.systems.dragons.careOf(target.id).meals > before;
+      if (taken) this.selectSubject('dragon', String(target.id), false);
+    }
+
+    if (!taken) return; // the refusal already spoke for itself (UIScene)
+    this.ctx.bus.emit('bag:consume', { chain, tier, count: 1 });
+    this.pendingGive = null;
+    this.pulseGiveTargets(false);
+    this.ctx.bus.emit('bag:give_cancelled', {});
+  }
+
+  /** Hand one good to a nest or a dragon. Returns whether it was taken — a
+   *  refusal must leave the piece on the board, not eat it silently. */
+  private offerFood(
+    a: { kind: 'character' | 'nest' | 'companion'; id: string; col?: number; row?: number },
+    chain: string,
+    tier: number
+  ): boolean {
+    if (!isDragonFood(chain, tier)) {
+      this.ctx.bus.emit(
+        a.kind === 'nest'
+          ? 'nest:offer_refused'
+          : 'character:action_failed',
+        a.kind === 'nest'
+          ? { col: a.col ?? 0, row: a.row ?? 0, reason: 'not_food' }
+          : { characterId: a.id, reason: 'invalid_target' }
+      );
+      return false;
+    }
+    if (a.kind === 'nest') {
+      const before = this.ctx.systems.dragons.nestAt(a.col ?? 0, a.row ?? 0).points;
+      this.ctx.bus.emit('ui:nest_offer_requested', { col: a.col ?? 0, row: a.row ?? 0, chain, tier });
+      // The daily cap refuses without taking anything — the piece stays.
+      return this.ctx.systems.dragons.nestAt(a.col ?? 0, a.row ?? 0).points > before;
+    }
+    this.ctx.bus.emit('ui:feed_companion_requested', { companionId: a.id, chain, tier });
+    return true;
+  }
+
+  /**
+   * Hand one piece to a person. Returns whether she took it.
+   *
+   * Asked and answered through the bus like everything else — the scene never
+   * calls into RegardSystem to CHANGE anything, it emits the intent and then
+   * reads the lifetime counter to see whether it moved. A decline leaves the
+   * piece exactly where it was and says so in her own voice (UIScene).
+   */
+  private offerGift(characterId: string, chain: string, tier: number): boolean {
+    const regard = this.ctx.systems.regard;
+    if (!regard.wants(characterId, chain, tier)) return false;
+    const before = regard.given(characterId, chain, tier);
+    this.ctx.bus.emit('ui:gift_requested', { characterId, chain, tier });
+    return regard.given(characterId, chain, tier) > before;
+  }
+
+  private onNestTapped(itemId: number, col: number, row: number): void {
+    if (this.armed?.kind === 'nest' && this.armed.id === String(itemId)) {
+      this.disarmCharacter();
+      return;
+    }
+    const n = this.ctx.systems.dragons.nestAt(col, row);
+    this.armed = { kind: 'nest', id: String(itemId), col, row };
+    this.ctx.bus.emit('nest:warmed', { col, row, points: n.points, required: n.required });
+  }
+
+  /** Named dragons standing where their nest gave them up. Scenery with a tap
+   *  handler — never pooled, never in `state.items`, never draggable. */
+  private buildCompanions(): void {
+    // A companion's `col`/`row` is the cell its nest stood on — an address in
+    // the world it was hatched in, which today is always Emberkeep. Drawing it
+    // on another world would put it at that world's cell of the same number,
+    // which is somewhere else entirely.
+    if (this.ctx.state.worldId !== WORLD_ID) return;
+    for (const c of this.ctx.systems.dragons.companions) {
+      if (this.companionSprites.has(c.id)) continue;
+      const key = `item_${c.chain}_${c.adult ? 4 : 3}`;
+      if (!this.textures.exists(key)) continue;
+      const { x, y } = gridToWorld(c.col, c.row);
+      const sprite = this.add.image(x, y, key).setOrigin(0.5, 0.85).setDepth(DEPTHS.itemBase + y);
+      const hw = sprite.width;
+      const hh = sprite.height;
+      // Same trap as the world characters: a tall sprite anchored to one cell
+      // overhangs the cells behind it, so the hit area is its lower body only.
+      sprite.setInteractive(
+        new Phaser.Geom.Rectangle(hw * 0.22, hh * 0.5, hw * 0.56, hh * 0.5),
+        Phaser.Geom.Rectangle.Contains
+      );
+      this.input.setDraggable(sprite, false);
+      sprite.on('pointerup', () => this.onCompanionTapped(c.id, sprite));
+      this.companionSprites.set(c.id, sprite);
+      this.settleSprite(sprite, 90);
+    }
+  }
+
+  /** An adult uses different art, so its standee is rebuilt rather than tinted. */
+  private rebuildCompanions(): void {
+    for (const s of this.companionSprites.values()) s.destroy();
+    this.companionSprites.clear();
+    this.buildCompanions();
+  }
+
+  private onCompanionTapped(companionId: string, sprite: Phaser.GameObjects.Image): void {
+    if (this.armed?.kind === 'companion' && this.armed.id === companionId) {
+      this.disarmCharacter();
+      return;
+    }
+    // Trust 2 digs, Trust 4 forages — both fire on the greeting, once a day.
+    this.ctx.systems.dragons.tap(companionId);
+    this.armed = { kind: 'companion', id: companionId };
+    sprite.setTint(0xffd84d);
+    this.armedTween?.remove();
+    this.armedTween = this.tweens.add({
+      targets: sprite, scale: { from: 1, to: 1.06 }, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+    });
+  }
+
+  /**
    * Build the live Three.js emerald crystal ONCE and graft it over the
    * `item_crystal_1` texture, so the Theme-Crystal generator (and every authored
    * 3D-decor placement) shows the spinning cel-shaded gem instead of the flat
@@ -1264,7 +2136,7 @@ export class BoardScene extends Phaser.Scene {
     // (drawImage of a WebGL canvas). Skip it there — the static `item_crystal_1` PNG
     // (loaded in preload) stays as the crystal texture, so the gem still renders 2D.
     if (IS_IOS) return;
-    const map = this.ctx.data.map;
+    const map = this.ctx.state.map;
     const spec = map.decor3d?.find((d) => d.model3d)?.model3d ?? undefined;
     try {
       const crystal = new Crystal3D(spec ?? {});
@@ -1288,7 +2160,7 @@ export class BoardScene extends Phaser.Scene {
    * up (WebGL-less); the gem only shows where the world placed it.
    */
   private buildMapDecor3d(): void {
-    const map = this.ctx.data.map;
+    const map = this.ctx.state.map;
     // Render wherever the crystal texture exists — the live 3D gem when present,
     // else the static PNG fallback (iOS / WebGL-less), so decor never silently drops.
     if (!map.decor3d?.length || !this.textures.exists('item_crystal_1')) return;
@@ -1321,8 +2193,11 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private buildFog(): void {
-    for (const region of this.ctx.data.map.regions) {
+    for (const region of this.ctx.state.map.regions) {
       if (this.ctx.state.regionStatus.get(region.id) === 'active') continue;
+      // `fog: false` = ground this chapter cannot reach; it keeps its painted
+      // scenery rather than a cloud that would never lift (see MapRegionConfig).
+      if (region.fog === false) continue;
       for (const [col, row] of region.tiles) {
         this.createFogSprite(region.id, col, row);
       }
@@ -1335,7 +2210,7 @@ export class BoardScene extends Phaser.Scene {
    * place the Level-3 finale finally glimpses into. Pure ambience.
    */
   private buildSouthPromise(): void {
-    const region = this.ctx.data.map.regions.find((r) => r.id === FINALE_REGION);
+    const region = this.ctx.state.map.regions.find((r) => r.id === FINALE_REGION);
     if (!region || region.tiles.length === 0) return;
     const c = this.regionCentroid(region.tiles.map(([col, row]) => ({ col, row })));
     const glow = this.add
@@ -1362,7 +2237,7 @@ export class BoardScene extends Phaser.Scene {
    * the region unlocks (see onRegionUnlocked).
    */
   private buildKeyBadges(): void {
-    for (const region of this.ctx.data.map.regions) {
+    for (const region of this.ctx.state.map.regions) {
       if (this.ctx.state.regionStatus.get(region.id) === 'active') continue;
       if (!region.unlock?.keys) continue;
       const { x, y } = this.regionCentroid(region.tiles.map(([col, row]) => ({ col, row })));
@@ -1381,15 +2256,20 @@ export class BoardScene extends Phaser.Scene {
     // The real authored level-blocker cloud (the same tile the world builder
     // paints), placed uniformly on the grid so neighbours overlap into one
     // seamless blanket. Anchor 0.5/0.62 puffs it up over the tile.
+    const zoneScale = artScaleAt(this.ctx.state.world, col, row);
     const puff = this.add
       .image(x, y, 'cloud_tile')
       .setOrigin(0.5, 0.62)
+      .setScale(zoneScale)
       .setDepth(DEPTHS.itemBase + y + 2)
       .setAlpha(0.995);
     puff.setData('regionId', regionId);
     // Hit area = just this tile's diamond, not the whole puffy frame —
     // otherwise the smoke drapes over (and steals input from) the active
-    // tiles one row south. Hit-area coords are frame-local (origin-shifted).
+    // tiles one row south. Hit-area coords are frame-local, so they stay the
+    // game tile's — `setScale(zoneScale)` above already shrinks both the cloud
+    // and its diamond to whatever tile the owning zone uses, and the authored
+    // isle's zone reports 1, leaving this exactly the area it has always been.
     const ox = puff.displayOriginX;
     const oy = puff.displayOriginY;
     const diamond = new Phaser.Geom.Polygon([
@@ -1635,6 +2515,22 @@ export class BoardScene extends Phaser.Scene {
         // bounce home even though the item hovered a free tile.
         const to = worldToGrid(this.dragTarget.x, this.dragTarget.y + 24);
 
+        // Food dragged onto a DRAGON → feed it. The mirror of the gesture just
+        // below (a dragon dragged onto a House), so the board has one verb for
+        // "put this on that" rather than two that look alike and behave apart.
+        // Checked FIRST: a Moss Tuft is not a dragon, so the two branches can
+        // never both match, and reading the food case first keeps the dragon
+        // case's `wearsRigTier` guard about the thing being DRAGGED.
+        if (
+          isDragonFood(obj.chain, obj.tier) &&
+          (this.tutorialDone || this.allow.feed) &&
+          this.tryFeedDrop(obj, to, pointer)
+        ) {
+          this.dragFrom = null;
+          this.time.delayedCall(60, () => obj.setData('dragged', false));
+          return;
+        }
+
         // Dragon dragged onto a passive generator (House) → start working directly.
         // wearsRigTier — an actual DRAGON tier (base/adult generator tiers of the
         // ember/emerald chains), never the chain's merge pieces: a Ruby or Egg
@@ -1659,6 +2555,11 @@ export class BoardScene extends Phaser.Scene {
             const home = gridToWorld(this.dragFrom.col, this.dragFrom.row);
             this.dragFrom = null;
             this.time.delayedCall(60, () => obj.setData('dragged', false));
+            // This path RETURNS before `drag:dropped`, so nothing else will ever
+            // undo liftForDrag(): without this the dragon keeps the drag scale
+            // and its lifted drag-shadow forever after the work trip — it reads
+            // as a dragon floating over a shadow that isn't its own.
+            obj.settleFromDrag();
             this.startDragonWork(obj, home, tgt); // work the EXACT house it was dropped on
             return;
           }
@@ -1673,6 +2574,88 @@ export class BoardScene extends Phaser.Scene {
         this.time.delayedCall(60, () => obj.setData('dragged', false));
       }
     );
+  }
+
+  /**
+   * A good was dropped somewhere — is a dragon standing there, and did it eat?
+   *
+   * Returns true only when the piece was actually EATEN, because that is what
+   * tells DRAG_END to stop: a refusal has to fall through to the ordinary drop
+   * so the piece settles on the board instead of vanishing. Same
+   * check-the-record-moved contract as a gift and a nest offering — the board
+   * consumes nothing it was not given credit for.
+   */
+  private tryFeedDrop(obj: BoardItem, to: TilePos, pointer: Phaser.Input.Pointer): boolean {
+    const dragons = this.ctx.systems.dragons;
+    // Cell match OR the drop landing anywhere on the dragon's art: a rig-hosted
+    // dragon is drawn well outside its own tile, and a cell-only test made the
+    // player aim at its feet.
+    const target = [...this.itemSprites.values()].find((s) => {
+      if (s.itemId === obj.itemId) return false;
+      const state = this.ctx.state.items.get(s.itemId);
+      if (!state || !dragons.isBoardDragon(state)) return false;
+      if (s.col === to.col && s.row === to.row) return true;
+      return s.getBounds().contains(pointer.worldX, pointer.worldY);
+    });
+    if (!target) return false;
+
+    const before = dragons.careOf(target.itemId).meals;
+    this.ctx.bus.emit('ui:feed_dragon_requested', {
+      itemId: target.itemId,
+      chain: obj.chain,
+      tier: obj.tier
+    });
+    if (dragons.careOf(target.itemId).meals <= before) {
+      // It turned its head away. Bounce the piece home and say so where the
+      // player is looking, rather than in a corner of the HUD.
+      obj.settleFromDrag();
+      this.floatText(target.x, target.y - 190, 'It turns its head away', PALETTE.cream);
+      return false;
+    }
+    obj.settleFromDrag();
+    this.ctx.bus.emit('board:consume_items', { itemIds: [obj.itemId], reason: 'delivered' });
+    // Feeding is the one moment the player is unambiguously looking at ONE
+    // dragon, so it also selects it — the readout they are about to watch move
+    // is already showing the animal they just fed. Never a toggle here: a second
+    // helping must not put the readout away mid-meal.
+    this.selectSubject('dragon', String(target.itemId), false);
+    return true;
+  }
+
+  /** It ate: a warm pulse and a little burst over the dragon's head. */
+  /**
+   * She ate. A FAVOURITE is a different event from a meal, and has to look like
+   * one: every breed has exactly one, it is the only food that moves trust two
+   * hearts in a day instead of one, and a player who is not told that in the
+   * moment has no way to learn it. So the favourite gets the flare, the longer
+   * celebration and her name said out loud; anything else gets the quiet chirp.
+   */
+  private feedFlourish(target: BoardItem, favourite = false): void {
+    this.glowFlash(
+      target.x,
+      target.y - 60,
+      favourite ? PALETTE.lava : PALETTE.goldAccent,
+      favourite ? 0.85 : 0.55,
+      favourite ? 1.6 : 1.15
+    );
+    this.sparks.explode(favourite ? 26 : 12, target.x, target.y - 80);
+    if (favourite) {
+      this.burst.explode(14, target.x, target.y - 70);
+      this.playBeatFX('favourite', target.x, target.y);
+      const name = this.ctx.systems.dragons.nameOf(target.itemId);
+      this.floatText(target.x, target.y - 210, name ? `${name} adores it!` : 'Adores it!', PALETTE.goldAccent);
+    }
+    // Same beat as waking a rested dragon: hand the idle roll a hover span and
+    // let it come back to idle on its own, rather than pinning an animation the
+    // state machine will fight over.
+    const ld = this.liveDragons.get(target.itemId);
+    if (ld && !ld.busy) {
+      ld.player.play('hover');
+      ld.player.playFace(1); // a chirp for the meal
+      ld.mode = 'hover';
+      const span = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
+      ld.remainMs = favourite ? span * 2 : span;
+    }
   }
 
   /** Exponential-smoothing follow + target-cell highlight for the live drag. */
@@ -1706,11 +2689,14 @@ export class BoardScene extends Phaser.Scene {
       const onObject = hits.some(
         (o) => o instanceof BoardItem || o.getData?.('regionId') !== undefined
       );
+      // A new tap: nothing has claimed it yet. Whoever Phaser dispatches to
+      // (see `tapClaimed`) will.
+      this.tapClaimed = false;
       if (onObject) return;
-      // A tap that lands on UI (energy pill, popups, buttons — they live in
-      // UIScene, invisible to this scene's hit test) must never start a pan:
-      // if the popup it opens swallows the pointer-up, the camera would stay
-      // glued to the mouse.
+      // A tap that lands on UI must never start a pan: UI lives in UIScene and
+      // is invisible to this scene's hit test, so it has to be asked separately.
+      // If the popup it opens swallows the pointer-up, the camera would
+      // otherwise stay glued to the mouse.
       const ui = this.scene.get(SCENES.ui);
       if (ui?.input?.hitTestPointer(pointer).length) return;
       this.flyTween?.stop();
@@ -1730,13 +2716,32 @@ export class BoardScene extends Phaser.Scene {
     const endPan = (): void => {
       this.panFrom = null;
     };
+    /**
+     * A held-out piece, released over nothing: put it away.
+     *
+     * Decided on the pointer-UP and from what Phaser actually dispatched, never
+     * from a hit test this handler runs itself. Re-running `hitTestPointer`
+     * inside the scene's own pointer-down handler is NOT reliable — measured, it
+     * came back empty for Eleanor while Phaser's own list for that very frame
+     * held her, and the same call one instruction later found her again. The
+     * give lesson died on it: the pointer-down read "empty ground", put the
+     * Crystal Ball away, and the pointer-up that followed armed her help instead
+     * of handing her anything. Tapping her did nothing, over and over.
+     *
+     * Object handlers run BEFORE this (processUpEvents dispatches to game
+     * objects, then emits the scene event), so a claim is always in by now.
+     */
+    this.input.on(Phaser.Input.Events.POINTER_UP, () => {
+      if (this.pendingGive && !this.tapClaimed) this.cancelGive();
+      this.tapClaimed = false;
+    });
     this.input.on(Phaser.Input.Events.POINTER_UP, endPan);
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, endPan);
     this.input.on(
       Phaser.Input.Events.POINTER_WHEEL,
       (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
         this.flyTween?.stop();
-        const z = this.ctx.data.map.cameraZoom ?? { min: 0.2, max: 1.4 }; // world-builder zoom lock
+        const z = this.ctx.state.map.cameraZoom ?? { min: 0.2, max: 1.4 }; // world-builder zoom lock
         // minZoom is raised to the background-image fit so you can't zoom out past it;
         // ×renderScale converts the logical bounds into the actual (scaled) zoom space.
         const r = renderScale.value;
@@ -1764,6 +2769,26 @@ export class BoardScene extends Phaser.Scene {
     return null;
   }
 
+  /**
+   * The world point a pointer test should aim at to hit a world character: the
+   * centre of the hit rect built in `buildWorldCharacters`, which is her lower
+   * body in TEXTURE space. Derived from the live sprite, so it follows both her
+   * authored dx/dy and her scale — aiming at her cell has not been the same
+   * thing since she gained a free offset. `null` if she is not on this map.
+   */
+  characterAimWorldPoint(characterId: string): { x: number; y: number } | null {
+    const sprite = this.characterSprites.get(characterId);
+    if (!sprite?.active) return null;
+    const hit = sprite.input?.hitArea as Phaser.Geom.Rectangle | undefined;
+    if (!hit) return { x: sprite.x, y: sprite.y };
+    // Texture space -> world: the hit rect and displayOrigin are both unscaled
+    // texture units, so the offset from the origin is what scales.
+    return {
+      x: sprite.x + (hit.centerX - sprite.displayOriginX) * sprite.scaleX,
+      y: sprite.y + (hit.centerY - sprite.displayOriginY) * sprite.scaleY
+    };
+  }
+
   private refreshDraggable(sprite: BoardItem): void {
     if (sprite.kind !== 'item') return;
     this.input.setDraggable(sprite, this.canDrag(sprite));
@@ -1776,7 +2801,48 @@ export class BoardScene extends Phaser.Scene {
   /* ------------------------- sprite lifecycle ----------------------- */
 
   private textureFor(snap: ItemSnapshot): string {
-    return snap.kind === 'decor' ? `decor_${snap.chain}` : `item_${snap.chain}_${snap.tier}`;
+    if (snap.kind === 'decor') return `decor_${snap.chain}`;
+    // A bought Manor skin replaces the top-tier Timber art and nothing else —
+    // same chain, same tier, same generator, same payout. Every skin ships on
+    // the Manor's own 430x450 canvas so ITEM_SCALE.lumber_4 applies unchanged.
+    const skin = this.ctx.state.manorSkin;
+    if (skin && snap.chain === 'lumber' && snap.tier === 4) {
+      const key = `skin_${skin}`;
+      if (this.textures.exists(key)) return key;
+    }
+    // A dragon skin is the same trade on the dragon chains: same chain, same
+    // tier, same generator, same payout — different pixels. Which tiers can be
+    // re-skinned is decided by which `skin_<id>_<tier>` textures exist, so a
+    // skin that only covers the whelp needs no code change here.
+    const dragonSkin = this.ctx.state.dragonSkins[snap.chain];
+    if (dragonSkin) {
+      const key = `skin_${dragonSkin}_${snap.tier}`;
+      if (this.textures.exists(key)) return key;
+    }
+    return `item_${snap.chain}_${snap.tier}`;
+  }
+
+  /** Re-texture every Manor on the board when the worn skin changes. */
+  private applyManorSkin(): void {
+    this.reskinChain('lumber', (item) => item.tier === 4);
+  }
+
+  /** Re-texture every dragon of one chain when its worn skin changes. Every
+   *  tier is offered to `textureFor`, which swaps only the ones that have skin
+   *  art — a whelp-only skin leaves the adult alone by itself. */
+  private applyDragonSkin(dragon: string): void {
+    this.reskinChain(dragon, () => true);
+  }
+
+  private reskinChain(chain: string, wants: (item: BoardItemState) => boolean): void {
+    for (const [id, sprite] of this.itemSprites) {
+      const item = this.ctx.state.items.get(id);
+      if (!item || item.chain !== chain || !wants(item)) continue;
+      sprite.setArtTexture(
+        this.textureFor(this.ctx.state.snapshot(item, this.ctx.clock.now())),
+        this.ctx.data.anchors
+      );
+    }
   }
 
   private generatorConfigFor(chain: string, tier: number): GeneratorConfig | undefined {
@@ -1874,12 +2940,25 @@ export class BoardScene extends Phaser.Scene {
 
   /** A soft ground shadow whose size tracks the art's width (decor, trees,
    *  dragon). Squashed into an ellipse; sits on the cell ground so a bouncing
-   *  sprite lifts off it. */
-  private addGroundShadow(x: number, y: number, displayWidth: number, depth: number): Phaser.GameObjects.Image {
+   *  sprite lifts off it.
+   *
+   *  `squash` (height as a fraction of the final width) and `dx` (a horizontal
+   *  nudge in fractions of that width) exist for the standees: a person's
+   *  contact patch spreads sideways under her feet without getting deeper, and
+   *  her weight is not over the point she is anchored on. Everything else takes
+   *  the defaults. */
+  private addGroundShadow(
+    x: number,
+    y: number,
+    displayWidth: number,
+    depth: number,
+    squash = 0.42,
+    dx = 0
+  ): Phaser.GameObjects.Image {
     const w = Math.max(70, displayWidth * 0.95);
     return this.add
-      .image(x, y, 'fx_shadow')
-      .setDisplaySize(w, w * 0.42)
+      .image(x + w * dx, y, 'fx_shadow')
+      .setDisplaySize(w, w * squash)
       .setDepth(depth);
   }
 
@@ -1933,7 +3012,26 @@ export class BoardScene extends Phaser.Scene {
       });
       sprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
         if (sprite!.getData('dragged')) return;
-        if (!this.isTap(pointer)) return;
+        // A short tap STORES a plain merge piece; a HOLD (past the tap window,
+        // without moving) opens the sell tooltip instead. Sell used to live on
+        // the tap, so it needed a new home when the bag took that gesture — and
+        // a hold is the standard merge-game idiom for "tell me about this".
+        if (
+          pointer.getDistance() <= TAP_MAX_DISTANCE_PX + 2 &&
+          pointer.getDuration() > TAP_MAX_MS &&
+          this.isStorable(sprite!.itemId)
+        ) {
+          this.ctx.bus.emit('item:tapped', { itemId: sprite!.itemId });
+          return;
+        }
+        if (!this.isTap(pointer)) {
+          // The pointer moved but nothing dragged — this piece isn't draggable
+          // yet. A swipe that does nothing reads as a broken board, so answer it.
+          if (!this.tutorialDone && !this.canDrag(sprite!)) {
+            this.ctx.bus.emit('tutorial:nudge', {});
+          }
+          return;
+        }
         this.onItemTapped(sprite!);
       });
     }
@@ -1980,9 +3078,70 @@ export class BoardScene extends Phaser.Scene {
     return sprite;
   }
 
+  /**
+   * Can this piece go in the bag? Only PLAIN merge pieces: anything with a
+   * generator (dragons, plants, houses, the crystal) keeps its own tap
+   * behaviour, coins still bank, the chest still opens, and story items
+   * (`sellable: false` — the Golden Egg and the Elder) are never pocketable.
+   */
+  private isStorable(itemId: number): boolean {
+    const item = this.ctx.state.items.get(itemId);
+    if (!item || item.kind !== 'item') return false;
+    if (COLLECTIBLE_REWARD[`${item.chain}_${item.tier}`] ?? COLLECTIBLE_REWARD[item.chain]) return false;
+    if (item.chain === 'chest') return false;
+    if (this.generatorConfigFor(item.chain, item.tier)) return false;
+    const tier = this.ctx.data.chains.chains
+      .find((c) => c.id === item.chain)
+      ?.tiers.find((t) => t.tier === item.tier);
+    if (tier?.sellable === false) return false;
+    // Mid-tutorial the board is a script; pocketing a scripted piece would
+    // strand the step that wants it merged. `allow.bag` opens it for the one
+    // beat that teaches the satchel, on a piece nothing else needs.
+    return this.tutorialDone || this.allow.bag;
+  }
+
   private onItemTapped(sprite: BoardItem): void {
+    this.tapClaimed = true; // a piece is something; this tap was not empty ground
     const item = this.ctx.state.items.get(sprite.itemId);
     if (!item) return;
+    // A held piece claims this tap too, when what was tapped can eat. Before the
+    // generator/bag gates, for the same reason it precedes the character gate.
+    if (this.pendingGive && this.ctx.systems.dragons.isBoardDragon(item)) {
+      this.deliverGiveTo({ kind: 'dragon', id: item.id });
+      return;
+    }
+    // An armed character claims this tap: she is being asked to help with THIS
+    // piece. WorldCharacterSystem decides whether she can, and says so either
+    // way — a refusal is never silent.
+    if (this.armed) {
+      const a = this.armed;
+      this.disarmCharacter();
+      if (a.kind === 'character') {
+        // GIVE outranks ASK. If she is standing there waiting for exactly this
+        // piece, handing it over is what the gesture means — a player holding
+        // the thing she asked for and being told a timer got shorter would read
+        // as a bug, however useful the favour was. Same check-the-counter-moved
+        // contract as feeding a nest: the board only consumes what she took.
+        if (this.offerGift(a.id, item.chain, item.tier)) {
+          this.ctx.bus.emit('board:consume_items', { itemIds: [item.id], reason: 'delivered' });
+          return;
+        }
+        this.ctx.bus.emit('ui:character_action_requested', { characterId: a.id, target: item.id });
+      } else {
+        // A nest and a dragon both eat: the tapped piece IS the meal, and it
+        // leaves the board only once the recipient has accepted it.
+        const accepted = this.offerFood(a, item.chain, item.tier);
+        if (accepted) {
+          this.ctx.bus.emit('board:consume_items', { itemIds: [item.id], reason: 'sold' });
+        }
+      }
+      return;
+    }
+    // A Cold Nest: tap it to arm an offering, tap again to put it away.
+    if (item.chain === 'nest') {
+      this.onNestTapped(item.id, item.col, item.row);
+      return;
+    }
     // Collectible (a Gold coin): tap banks it — +Gold, a coin flies to the gauge
     // (UIScene), and the board coin is consumed.
     const collect = COLLECTIBLE_REWARD[`${item.chain}_${item.tier}`] ?? COLLECTIBLE_REWARD[item.chain];
@@ -2009,17 +3168,49 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.bus.emit('chest:open', { itemId: item.id });
       return;
     }
-    // Merge-only items (no generator) are not interactable via tap beyond the sell path.
-    // Emeralds (emerald t1), Green Eggs (emerald t2), Red Eggs (ember_dragon t2), and Rubies (ember_dragon t1) are pure merge pieces.
-    if (item.chain === 'emerald' && item.tier < 3) return;
-    if (item.chain === 'ember_dragon' && item.tier < 3) return;
+    // A plain merge piece: TAP STORES IT. Drag still merges; this is the second
+    // verb on the same object, and it is free and instantly reversible so a
+    // mis-tap costs the player nothing (BagSystem).
+    if (this.isStorable(item.id)) {
+      this.ctx.bus.emit('ui:store_requested', { itemId: item.id });
+      return;
+    }
     const cfg = this.generatorConfigFor(item.chain, item.tier);
     const isGenerator = cfg !== undefined;
-    if (isGenerator && !this.tutorialDone && !this.allow.tapGenerators) return;
-    if (!isGenerator && !this.tutorialDone && !this.allow.sell) return;
+    // A refused tap must still answer — a dead button is indistinguishable from
+    // a broken one (tutorial-design law 3).
+    if (isGenerator && !this.tutorialDone && !this.allow.tapGenerators) {
+      this.ctx.bus.emit('tutorial:nudge', {});
+      return;
+    }
+    // Pocketing is the ONLY tap verb a plain piece has now that selling lives in
+    // the Bag, so `allow.bag` is what decides whether this tap can do anything.
+    if (!isGenerator && !this.tutorialDone && !this.allow.bag) {
+      this.ctx.bus.emit('tutorial:nudge', {});
+      return;
+    }
     // A DRAGON (with a generator) opens its Job menu (Work / Harvest, with rest & ruby timers).
     if (DRAGON_RIGS[item.chain] && isGenerator && (this.tutorialDone || this.allow.dragonWork)) {
+      // Tapping a dragon is the player looking straight at it, so the status
+      // readout follows the same tap the Job menu does.
+      this.selectSubject('dragon', String(item.id), false);
       this.showDragonMenu(sprite);
+      return;
+    }
+    // An undecided House asks what it should make — and keeps asking, because a
+    // player who dismissed the chooser must have a way back to it. Once
+    // committed this stops firing and the tap falls through to the skip offer,
+    // so a decided House behaves exactly as a House always has.
+    //
+    // Gated for the whole tutorial EXCEPT the beat that teaches it: the script
+    // raises a House of its own several beats earlier, and a modal panel opening
+    // unheralded on top of `plank_merge` would fight it for the same tap. On
+    // `house_commission` the gate opens and this is the lesson.
+    if (
+      (this.tutorialDone || this.allow.commission) &&
+      this.ctx.systems.generator.awaitingChoice(item)
+    ) {
+      this.ctx.bus.emit('ui:commission_requested', { itemId: item.id });
       return;
     }
     // Tapping a COOLING/WAITING generator offers the skip buttons (cost scales
@@ -2156,12 +3347,13 @@ export class BoardScene extends Phaser.Scene {
     maxGold?: number
   ): void {
     this.hideSkipButton();
+    this.ctx.bus.emit('ui:skip_offered', { itemId: sprite.itemId });
     this.skipMaxGold = maxGold; // per-generator gold cap (Crystal emeralds are dear)
     const btn = this.add.container(sprite.x, sprite.y + 100).setDepth(DEPTHS.dragged - 1);
     // Caption shown on hover, telling the player which payment a button uses.
     const caption = this.add
       .text(0, -58, '', {
-        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontFamily: FONT,
         fontSize: '28px',
         fontStyle: 'bold',
         color: '#fff6e0',
@@ -2243,7 +3435,7 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /** The dragon Job menu: WORK (fly to a House, speed its timer) and HARVEST
-   *  (collect a Ruby), with the rest (fatigue) and ruby timers shown above. */
+   *  (collect its drop), with the rest (fatigue) and drop timers shown above. */
   private showDragonMenu(sprite: BoardItem): void {
     this.hideDragonMenu();
     const menu = this.add.container(sprite.x, sprite.y + 104).setDepth(DEPTHS.dragged - 1);
@@ -2292,7 +3484,7 @@ export class BoardScene extends Phaser.Scene {
     this.refreshDragonMenu();
   }
 
-  /** Update the menu's rest/ruby countdown each tick while it's open. */
+  /** Update the menu's rest/drop countdown each tick while it's open. */
   private refreshDragonMenu(): void {
     if (!this.dragonMenuLabel || this.dragonMenuForId === 0) return;
     const item = this.ctx.state.items.get(this.dragonMenuForId);
@@ -2304,7 +3496,16 @@ export class BoardScene extends Phaser.Scene {
       const s = Math.ceil(ms / 1000);
       return s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
     };
-    const parts = [`Ruby ${cfg && rubyMs > 0 ? fmt(rubyMs) : 'ready'}`];
+    // Name the thing this dragon actually drops — both dragons now yield Gem
+    // Shards, so a hard-coded "Ruby" would lie about the red one.
+    const drop = cfg?.produces;
+    const dropName =
+      (drop &&
+        this.ctx.data.chains.chains
+          .find((c) => c.id === drop.chain)
+          ?.tiers.find((t) => t.tier === drop.tier)?.name) ??
+      'Drop';
+    const parts = [`${dropName} ${cfg && rubyMs > 0 ? fmt(rubyMs) : 'ready'}`];
     parts.push(rest > 0 ? `Rest ${fmt(rest)}` : this.ctx.systems.jobs.isWorking(this.dragonMenuForId) ? 'Working' : 'Idle');
     this.dragonMenuLabel.setText(parts.join('   '));
   }
@@ -2422,7 +3623,7 @@ export class BoardScene extends Phaser.Scene {
         .setStrokeStyle(4, num(PALETTE.plumShade));
       const label = this.add
         .text(18, 0, '', {
-          fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+          fontFamily: FONT,
           fontSize: '34px',
           fontStyle: 'bold',
           color: PALETTE.cream,
@@ -2467,7 +3668,7 @@ export class BoardScene extends Phaser.Scene {
     const s0 = Math.ceil(rest / 1000);
     const countdown = this.add
       .text(18, 0, `${Math.floor(s0 / 60)}:${String(s0 % 60).padStart(2, '0')}`, {
-        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontFamily: FONT,
         fontSize: '34px',
         fontStyle: 'bold',
         color: PALETTE.cream,
@@ -2485,6 +3686,51 @@ export class BoardScene extends Phaser.Scene {
     this.tweens.add({ targets: badge, scale: 1, duration: 170, ease: 'Back.easeOut' });
 
     this.restBadges.set(dragonId, badge);
+  }
+
+  /**
+   * Keep a "makes this" badge over every commissioned generator.
+   *
+   * Reconciled wholesale off state on the shared 240ms tick rather than hooked
+   * onto spawn/merge/remove/travel one event at a time. There are at most a
+   * handful of Houses, and the pooled BoardItem lifecycle means a per-event
+   * badge outlives its sprite the moment a piece is released back to the pool —
+   * which is exactly the class of bug the pool's own rules warn about.
+   */
+  private syncProduceBadges(): void {
+    for (const [id, badge] of this.produceBadges) {
+      const item = this.ctx.state.items.get(id);
+      const sprite = this.itemSprites.get(id);
+      if (!item?.produces || !sprite) {
+        badge.destroy();
+        this.produceBadges.delete(id);
+        continue;
+      }
+      badge.setPosition(sprite.x, sprite.y - PRODUCE_BADGE_LIFT);
+      badge.setDepth(DEPTHS.itemBase + sprite.y + 3);
+    }
+    for (const item of this.ctx.state.items.values()) {
+      if (!item.produces || this.produceBadges.has(item.id)) continue;
+      const sprite = this.itemSprites.get(item.id);
+      if (!sprite) continue;
+      const key = `item_${item.produces.chain}_${item.produces.tier}`;
+      if (!this.textures.exists(key)) continue;
+
+      const badge = this.add
+        .container(sprite.x, sprite.y - PRODUCE_BADGE_LIFT)
+        .setDepth(DEPTHS.itemBase + sprite.y + 3);
+      const disc = this.add.graphics();
+      disc.fillStyle(num(PALETTE.plumShade), 0.92);
+      disc.fillCircle(0, 0, PRODUCE_BADGE_R);
+      disc.lineStyle(5, num(PALETTE.goldAccent), 1);
+      disc.strokeCircle(0, 0, PRODUCE_BADGE_R);
+      const icon = this.add.image(0, 0, key);
+      icon.setScale((PRODUCE_BADGE_R * 1.5) / Math.max(icon.width, icon.height));
+      badge.add([disc, icon]);
+      badge.setScale(0);
+      this.tweens.add({ targets: badge, scale: 1, duration: 190, ease: 'Back.easeOut' });
+      this.produceBadges.set(item.id, badge);
+    }
   }
 
   /** The fatigue lifted — pop the badge, sparkle, and a "Refreshed!" cue so the
@@ -2521,16 +3767,75 @@ export class BoardScene extends Phaser.Scene {
 
   /* --------------------------- reactions ---------------------------- */
 
+  /**
+   * Pull in the art the world we are about to show needs and is not holding.
+   *
+   * Neither the other worlds' backdrops nor the standee banks of characters who
+   * live on them are in the boot preload — a 2610×1632 backdrop costs its GPU
+   * memory from the moment it is uploaded, drawn or not, and most sessions never
+   * leave Emberkeep. So they are fetched at the door instead, and `create()`
+   * runs only once they are resident: rebuilding onto a missing backdrop would
+   * paint the isle over open sky.
+   */
+  private fetchWorldArt(onReady: () => void): void {
+    const wanted = worldArtKeys(this.ctx, this.ctx.state.worldId);
+    const backdrops = wanted.filter((k) => k.startsWith('background_'));
+    // Spritesheets carry frame dimensions, so they cannot go through
+    // `ensureTextures` (which only knows about plain images) — queue them here
+    // and let that call start the single loader run for both.
+    let queued = 0;
+    for (const cfg of this.ctx.systems.characters.charactersIn(this.ctx.state.worldId)) {
+      const bank = STANDEE_BANKS[cfg.id];
+      if (!bank) continue;
+      for (const [name, key] of Object.entries(bank.keys)) {
+        if (this.textures.exists(key)) continue;
+        this.load.spritesheet(key, `sprites/${cfg.id}/world-${name}.webp`, {
+          frameWidth: bank.frameWidth,
+          frameHeight: bank.frameHeight
+        });
+        queued++;
+      }
+    }
+    if (queued === 0) {
+      // Nothing but (possibly) the backdrop: `ensureTextures` handles both the
+      // already-resident case and the fetch, and calls back either way.
+      ensureTextures(this, this.ctx, backdrops, onReady);
+      return;
+    }
+    // Sheets are already queued, so the callback has to hang off THIS loader run
+    // — handing the backdrop to `ensureTextures` would let it fire `onReady`
+    // synchronously when the backdrop happens to be resident, restarting the
+    // scene while the sheets were still in flight.
+    for (const key of backdrops) {
+      const entry = this.ctx.data.assets.images.find((e) => e.key === key);
+      if (this.textures.exists(key) || entry?.source !== 'file' || !entry.file) continue;
+      this.load.image(key, entry.file);
+    }
+    this.load.once(Phaser.Loader.Events.COMPLETE, onReady);
+    this.load.start();
+  }
+
   private subscribe(): void {
     const bus = this.ctx.bus;
     this.offBus.push(
+      // A different world is a different backdrop, different zones, different
+      // board — every single thing `create()` builds. Rebuilding the scene is
+      // both the cheapest way to get there and the only one that cannot leave a
+      // stale sprite behind, and the shutdown handler already tears down rigs,
+      // emitters and the 3D crystal properly because `game:reset` needed that.
+      // The backdrop is fetched first: the new world's art is deliberately not
+      // in the boot preload, and rebuilding onto a missing texture would paint
+      // the isle over open sky.
+      bus.on('world:switched', () => this.fetchWorldArt(() => this.scene.restart())),
+      bus.on('store:skin_changed', () => this.applyManorSkin()),
+      bus.on('store:dragon_skin_changed', ({ dragon }) => this.applyDragonSkin(dragon)),
       bus.on('item:spawned', ({ item }) => {
         const sprite = this.acquireSprite(item, false);
         // Any dragon generator (ember or emerald) wears its live rig.
         if (this.wearsRigTier(item.chain, item.tier)) this.attachDragon(sprite, false);
       }),
       bus.on('economy:changed', () => this.updateGoldenTremble()),
-      // The Golden Egg materialises ON THE ALTAR when Cindra's first order
+      // The Golden Egg materialises ON THE ALTAR when Eleanor's first order
       // completes — camera glide + gold flood (DEMO-PLAN §Act II, staged at
       // the authored lore spot). Two special timings:
       //  · delivery CROSSES Level 3 (keeper:leveled fired first, the finale is
@@ -2540,9 +3845,9 @@ export class BoardScene extends Phaser.Scene {
       bus.on('order:completed', ({ orderId }) => {
         if (orderId !== GOLDEN_ALTAR.orderId) return;
         const finaleLive =
-          this.finaleRan && this.time.now - this.finaleStartedMs < FINALE.cardAtMs;
+          this.finaleRan && this.time.now - this.finaleStartedMs < FINALE_ENDS_MS;
         if (finaleLive) this.showAltarEgg(false);
-        else if (this.ctx.state.level >= 3) this.lateGoldenAwakening();
+        else if (this.goldenQuestDone()) this.lateGoldenAwakening();
         else this.showAltarEgg(true);
       }),
       bus.on('item:moved', ({ itemId, to }) => {
@@ -2582,7 +3887,10 @@ export class BoardScene extends Phaser.Scene {
       bus.on('generator:reward', ({ generatorId, coins, xp, energy }) =>
         this.onGeneratorReward(generatorId, coins, xp, energy)
       ),
-      bus.on('chest:claimed', ({ chestId, label }) => this.onChestClaimed(chestId, label)),
+      bus.on('chest:claimed', ({ chestId, label, coins }) => this.onChestClaimed(chestId, label, coins)),
+      // ---- ambient life: the dragons living on the isle by themselves ----
+      bus.on('dragon:mood', ({ itemId, mood }) => this.applyDragonMood(itemId, mood)),
+      bus.on('dragon:wandered', ({ itemId, to }) => this.flyWander(itemId, to)),
       bus.on('dragon:rest', ({ dragonId }) => this.showRestBadge(dragonId)), // already home — the work trip is a brief flourish
       bus.on('dragon:rested', ({ dragonId }) => this.wakeDragon(dragonId)),
       bus.on('item:harvest_failed', ({ generatorId, reason }) => {
@@ -2592,7 +3900,21 @@ export class BoardScene extends Phaser.Scene {
           this.floatText(sprite.x, sprite.y - 140, 'No room!', PALETTE.cream);
         }
       }),
+      bus.on('bag:give_armed', ({ chain, tier }) => this.armGive(chain, tier)),
+      bus.on('ui:reveal_toggled', ({ open }) => this.onRevealToggled(open)),
+      // The reaction rides the FACT, not the gesture: dragged in or handed over
+      // from the satchel, a meal looks the same and only DragonSystem knows
+      // whether it was the one food this breed loves.
+      bus.on('dragon:fed', ({ itemId, favourite }) => {
+        const sprite = this.itemSprites.get(itemId);
+        if (sprite) this.feedFlourish(sprite, favourite);
+      }),
       bus.on('item:removed', ({ itemId }) => {
+        // A selected dragon that just merged, sold or was eaten by a quest has
+        // nothing left to read — the readout must not outlive its subject.
+        if (this.selected?.kind === 'dragon' && this.selected.id === String(itemId)) {
+          this.clearSubject();
+        }
         const sprite = this.itemSprites.get(itemId);
         if (!sprite) return;
         this.removeDragonRig(itemId);
@@ -2608,14 +3930,14 @@ export class BoardScene extends Phaser.Scene {
       }),
       bus.on('item:sold', ({ coins }) => {
         // Drift a "+N" toward the coin pill.
-        this.floatText(320, 240, `+${coins}`, PALETTE.goldAccent);
+        this.floatText(320, 240, `+${coins}`, PALETTE.goldAccent, true);
       }),
       bus.on('region:unlocked', (payload) =>
         this.onRegionUnlocked(payload.tiles, payload.revealed, payload.regionId)
       ),
       bus.on('region:unlock_failed', ({ regionId, reason }) => {
         if (reason !== 'keys') return;
-        const region = this.ctx.data.map.regions.find((r) => r.id === regionId);
+        const region = this.ctx.state.map.regions.find((r) => r.id === regionId);
         if (!region) return;
         const centroid = this.regionCentroid(region.tiles.map(([c, r]) => ({ col: c, row: r })));
         this.floatText(centroid.x, centroid.y - 100, 'Needs a Gold Key', PALETTE.goldAccent);
@@ -2631,7 +3953,7 @@ export class BoardScene extends Phaser.Scene {
         const showBadges = step.done || step.id === 'key_unlock';
         this.keyBadges.forEach((b) => b.setAlpha(showBadges ? 1 : 0));
         // Glide the camera to show the crystal when the player must tap it.
-        if (step.id === 'emerald_tap') {
+        if (step.id === 'crystal_tap') {
           const crystal = [...this.ctx.state.items.values()].find((i) => i.chain === 'crystal');
           if (crystal) {
             const w = gridToWorld(crystal.col, crystal.row);
@@ -2643,7 +3965,7 @@ export class BoardScene extends Phaser.Scene {
           (step.arrow && 'fogRegion' in step.arrow && step.arrow.fogRegion) ||
           (step.hand && 'fogRegion' in step.hand && step.hand.fogRegion);
         if (fog) this.panToRegion(fog);
-        // The golden tease: glide west to the sleeping egg while Laurah speaks;
+        // The golden tease: glide west to the sleeping egg while Eleanor speaks;
         // it stirs (wobble + aura wakes) — the camera returns on the next step.
         if (step.id === 'golden_tease') {
           const cam = this.cameras.main;
@@ -2725,13 +4047,63 @@ export class BoardScene extends Phaser.Scene {
           if (isDragon && !this.attachDragon(sprite, true)) {
             popIn(this, sprite, { duration: TIMINGS.spawnPop });
           }
+          // A House is finished — ask what it should make. After the pop, so the
+          // player watches the thing they built arrive before the panel covers
+          // it; the merge is the reason the question is being asked.
+          const built = this.ctx.state.items.get(output.id);
+          if (
+            (this.tutorialDone || this.allow.commission) &&
+            built &&
+            this.ctx.systems.generator.awaitingChoice(built)
+          ) {
+            this.time.delayedCall(TIMINGS.spawnPop + 260, () => {
+              // Re-check on arrival: the House may have been merged onward into
+              // a Manor during the delay, and a chooser for a piece that no
+              // longer exists would commission nothing.
+              const still = this.ctx.state.items.get(output.id);
+              if (still && this.ctx.systems.generator.awaitingChoice(still)) {
+                this.ctx.bus.emit('ui:commission_requested', { itemId: output.id });
+              }
+            });
+          }
         });
       });
     });
   }
 
   /** Shell-crack flash, spark confetti, then the hatchling pops in. */
+  /**
+   * The whelp waits behind her own introduction.
+   *
+   * The reveal card goes up in the same `item:hatched` emit that runs this
+   * ceremony (RevealSystem is subscribed first), so without holding the hatch
+   * the player would find her already standing on the board when the card
+   * closes — the card would be announcing something they had watched happen
+   * behind a scrim. Held here, the order reads the way it should: three eggs
+   * fuse, the isle stops to name what came out, and THEN she is standing there.
+   */
+  private heldHatches: ItemSnapshot[] = [];
+
+  private onRevealToggled(open: boolean): void {
+    this.revealOpen = open;
+    if (open) return;
+    const held = this.heldHatches;
+    this.heldHatches = [];
+    for (const snap of held) this.hatchSequence(snap);
+  }
+
+  private revealOpen = false;
+
   private hatchSequence(snap: ItemSnapshot): void {
+    if (this.revealOpen) {
+      this.heldHatches.push(snap);
+      // Never lost to a card that fails to close: the ceremony runs anyway once
+      // the longest a card can hold has passed.
+      this.time.delayedCall(REVEAL_HOLD_BACK_MAX_MS, () => {
+        if (this.heldHatches.includes(snap)) this.onRevealToggled(false);
+      });
+      return;
+    }
     // The tutorial can MOVE the hatchling in state synchronously inside the
     // 'item:hatched' emit (the chest step slides the green dragon aside) —
     // before this ceremony has created a sprite. Re-read the live cell so the
@@ -2826,10 +4198,12 @@ export class BoardScene extends Phaser.Scene {
     this.sparks.explode(12, gen.x, gen.y - 52);
     this.glowFlash(gen.x, gen.y - 44, PALETTE.goldAccent, 0.45, 0.95);
     const parts: string[] = [];
-    if (coins) parts.push(`+${coins}🪙`);
+    if (coins) parts.push(`+${coins}`);
     if (xp) parts.push(`+${xp} XP`);
     if (energy) parts.push(`+${energy}⚡`);
-    if (parts.length) this.floatText(gen.x, gen.y - 150, parts.join('  '), PALETTE.goldAccent);
+    if (parts.length) {
+      this.floatText(gen.x, gen.y - 150, parts.join('  '), PALETTE.goldAccent, coins > 0);
+    }
   }
 
   /** The standing chest paid out a gift — a treasure-reveal beat: pop open, a
@@ -2837,7 +4211,7 @@ export class BoardScene extends Phaser.Scene {
    *  rather than vanishing. The 10-minute recharge tint/countdown then rides the
    *  update loop (readyAt is already set). Deferred a frame so it never allocates
    *  GameObjects mid bus-emit (which can collide with a coincident level-up). */
-  private onChestClaimed(chestId: number, label: string): void {
+  private onChestClaimed(chestId: number, label: string, coins = false): void {
     this.time.delayedCall(0, () => {
       const chest = this.itemSprites.get(chestId);
       if (!chest || !chest.active) return;
@@ -2846,7 +4220,7 @@ export class BoardScene extends Phaser.Scene {
       this.burst.explode(12, chest.x, chest.y - 52);
       this.sparks.explode(18, chest.x, chest.y - 52);
       this.glowFlash(chest.x, chest.y - 46, PALETTE.goldAccent, 0.6, 1.15);
-      this.floatText(chest.x, chest.y - 150, label, PALETTE.goldAccent);
+      this.floatText(chest.x, chest.y - 150, label, PALETTE.goldAccent, coins);
       const y0 = chest.y; // a little hop in place: it moves, it does not disappear
       this.tweens.add({ targets: chest, y: y0 - 30, duration: 150, yoyo: true, ease: 'Sine.easeOut' });
     });
@@ -2992,6 +4366,32 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Draw every piece the board already holds.
+   *
+   * `item:spawned` covers everything that arrives while this scene is up, which
+   * is every case on the authored isle — the board is empty when the scene
+   * starts and fills under it. World travel breaks that assumption: GameState
+   * swaps to the destination's board (and `region:reveal` seeds it) BEFORE this
+   * scene restarts, so a scene that only ever listens for spawns comes up over a
+   * populated board and draws none of it. The Keeper landed in Borealis holding
+   * five pieces that existed in state and nowhere on screen — and every piece
+   * left behind in Emberkeep was invisible on the way home too.
+   *
+   * Idempotent, so it is safe next to the live spawn path.
+   */
+  private spawnExistingItems(): void {
+    const now = this.ctx.clock.now();
+    for (const item of this.ctx.state.items.values()) {
+      if (this.itemSprites.has(item.id)) continue;
+      const snap = this.ctx.state.snapshot(item, now);
+      const sprite = this.acquireSprite(snap, false);
+      // Restore the live rig for dragons already on the board (resting, not
+      // celebrating — they didn't just hatch).
+      if (this.wearsRigTier(snap.chain, snap.tier)) this.attachDragon(sprite, false);
+    }
+  }
+
   /** Rebuild everything visual from current state (after a save load). */
   private fullResync(): void {
     for (const ld of this.liveDragons.values()) ld.player.destroy();
@@ -3008,14 +4408,7 @@ export class BoardScene extends Phaser.Scene {
         this.fog.delete(key);
       }
     }
-    const now = this.ctx.clock.now();
-    for (const item of this.ctx.state.items.values()) {
-      const snap = this.ctx.state.snapshot(item, now);
-      const sprite = this.acquireSprite(snap, false);
-      // Restore the live rig for dragons already on the board (resting, not
-      // celebrating — they didn't just hatch).
-      if (this.wearsRigTier(snap.chain, snap.tier)) this.attachDragon(sprite, false);
-    }
+    this.spawnExistingItems();
     // Re-frame the camera on the loaded Keeper level (no glide).
     const frame = this.frameForLevel(this.ctx.state.level);
     this.cameras.main.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);
@@ -3048,7 +4441,7 @@ export class BoardScene extends Phaser.Scene {
   /** Glide the camera to centre a region (e.g. the key-fog gate the tutorial
    *  points at), keeping the current zoom. */
   private panToRegion(regionId: string): void {
-    const region = this.ctx.data.map.regions.find((r) => r.id === regionId);
+    const region = this.ctx.state.map.regions.find((r) => r.id === regionId);
     if (!region || region.tiles.length === 0) return;
     const c = this.regionCentroid(region.tiles.map(([col, row]) => ({ col, row })));
     this.flyTween?.stop();
@@ -3119,24 +4512,42 @@ export class BoardScene extends Phaser.Scene {
     });
   }
 
-  private floatText(x: number, y: number, message: string, color: string): void {
+  /**
+   * A reward label that floats up and fades. `withCoin` puts the REAL coin art
+   * beside the number: the 🪙 emoji this used to print renders as whatever
+   * glyph the device happens to ship — silver on some platforms, flat on others
+   * — and never matched the coin the game actually pays out.
+   */
+  private floatText(
+    x: number,
+    y: number,
+    message: string,
+    color: string,
+    withCoin = false
+  ): void {
+    const group = this.add.container(x, y).setDepth(DEPTHS.flash);
     const label = this.add
-      .text(x, y, message, {
-        fontFamily: FONT,
-        fontSize: '40px',
-        fontStyle: 'bold',
-        color
-      })
+      .text(0, 0, message, { fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color })
       .setOrigin(0.5)
-      .setStroke(PALETTE.night, 8)
-      .setDepth(DEPTHS.flash);
+      .setStroke(PALETTE.night, 8);
+    group.add(label);
+    if (withCoin) {
+      const coin = this.add.image(0, 0, 'ui_icon_coin');
+      coin.setScale(46 / Math.max(coin.width, coin.height));
+      const gap = 12;
+      const total = coin.displayWidth + gap + label.width;
+      coin.setX(-total / 2 + coin.displayWidth / 2);
+      label.setX(total / 2 - label.width / 2);
+      group.add(coin);
+    }
     this.tweens.add({
-      targets: label,
+      targets: group,
       y: y - 88,
       alpha: 0,
       duration: 1000,
       ease: 'Sine.easeOut',
-      onComplete: () => label.destroy()
+      onComplete: () => group.destroy()
     });
   }
+
 }

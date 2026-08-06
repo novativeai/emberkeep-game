@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emberkeep — motion-vector flipbook proof</title>
+<style>
+  html,body { margin:0; height:100%; background:#100b14; color:#FFF6E8;
+              font:13px "Trebuchet MS", Verdana, sans-serif; overflow:hidden; }
+  #game { position:absolute; inset:0; }
+  #hud { position:absolute; top:8px; left:0; right:0; text-align:center; pointer-events:none;
+         text-shadow:0 1px 3px #000; z-index:5; }
+  #hud b { color:#FFD84D; }
+</style>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="hud"></div>
+<script type="module">
+import Phaser from 'phaser';
+import { FlipbookFX, preloadFlipbooks, RAMP_TEXTURE } from '/src/render/FlipbookFX.ts';
+
+// A deterministic clock Playwright drives, so screenshots are reproducible.
+let VT = 0;
+window.__setT = (ms) => { VT = ms; };
+window.__advance = (ms) => { VT += ms; };
+const now = () => VT;
+
+const bank = await (await fetch('/vfx-bank/bank.mv.json')).json();
+const SHEETS = Object.fromEntries(bank.sheets.map((s) => [s.key, s]));
+window.__sheets = SHEETS;
+
+// Deliberately SLOW playback: a 16-frame sheet stretched over 2s is 8fps, far
+// below the sheet's authored rate. That is exactly where cross-dissolve ghosts
+// and motion vectors have to earn their keep.
+const SLOW_FPS = 8;
+
+class Proof extends Phaser.Scene {
+  preload() {
+    preloadFlipbooks(this.load, Object.values(SHEETS), '/vfx-bank/');
+  }
+  create() {
+    this.cameras.main.setBackgroundColor('#100b14');
+    window.__errors = [];
+    this.book = [];
+    this.layout('fb_flame_small', 0, 'ember');
+    this.layout('fb_fireburst', 1, 'lava');
+    this.layout('fb_smoke_wispy', 2, 'ash');
+    window.__ready = true;
+  }
+  layout(key, row, ramp) {
+    const s = SHEETS[key];
+    if (!s) return;
+    const y = 150 + row * 260;
+    const mk = (x, useMV) => {
+      const fx = new FlipbookFX(this, s, x, y, now, {
+        ramp, fps: SLOW_FPS, loop: true, useMotionVectors: useMV,
+        emissive: 0.8, destroyOnComplete: false
+      });
+      const k = 220 / Math.max(s.cellW, s.cellH);   // keep the cell's aspect
+      fx.setDisplaySize(s.cellW * k, s.cellH * k);
+      this.add.existing(fx);
+      return fx;
+    };
+    this.book.push(mk(360, false), mk(760, true));
+    this.add.text(360, y + 130, `${key}  —  cross-dissolve`, { fontSize: '15px', color: '#9b8d99' }).setOrigin(0.5);
+    this.add.text(760, y + 130, `${key}  —  motion vectors`, { fontSize: '15px', color: '#FFD84D' }).setOrigin(0.5);
+  }
+}
+
+const game = new Phaser.Game({
+  type: Phaser.WEBGL,
+  parent: 'game',
+  width: 1120, height: 840,
+  backgroundColor: '#100b14',
+  scene: Proof,
+  render: { antialias: true }
+});
+window.__game = game;
+document.getElementById('hud').innerHTML =
+  'Same sheet, same frame, same instant — <b>left</b> cross-dissolves, <b>right</b> warps along baked optical flow. Played at 8fps to expose the difference.';
+</script>
+</body>
+</html>

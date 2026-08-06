@@ -1,0 +1,731 @@
+{
+  "format": "emberkeep-vfx-bank",
+  "version": 1,
+  "note": "AAA VFX bank for Emberkeep. Every entry is baked by scripts/bake-vfx-bank.mjs through the FX Studio engine (tools/fxstudio/index.html), so the bank and the authoring tool can never drift. Sources are CC0 packs from Simon Schreibt's Textures-for-VFX database; colour ramps are the real src/core/Constants.ts PALETTE. Stills use the full technique chain; sheets use the per-pixel grade only (spatial ops would bleed across flipbook cells). Author on black: everything marked blend:add reads correctly under Phaser.BlendModes.ADD.",
+  "conventions": {
+    "blend": "add = additive (author on black, alpha carries intensity); normal = alpha-over",
+    "maxTexturePx": 4096,
+    "sheetOrder": "left-to-right, top-to-bottom",
+    "credits": "assets/CREDITS.md"
+  },
+  "assets": [
+    {
+      "key": "fx_ember",
+      "role": "Merge burst \u00b7 lava-seam updraft motes \u00b7 ember-flies swarm",
+      "replaces": "fx_ember (src/data/assets.json, currently an 18px painted placeholder)",
+      "usedBy": "BoardScene burst emitter, EMBER_MOTES ambient, ATMOSPHERE.fireflies",
+      "kind": "still",
+      "size": 128,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/circle_05.png",
+        "credit": "kenney-particle-pack"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "ember",
+        "alpha": "field",
+        "tech": {
+          "glowBlur": {
+            "on": true,
+            "radius": 3,
+            "passes": 2,
+            "strength": 0.4,
+            "wrap": false
+          },
+          "levels": {
+            "on": true,
+            "black": 0.02,
+            "white": 0.98,
+            "gamma": 1.1
+          },
+          "edgeFade": {
+            "on": true,
+            "width": 0.06,
+            "shape": "square"
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_spark",
+      "role": "Merge sparks, hatch, harvest, generator tap, chest, level-up",
+      "replaces": "fx_spark (currently a 22px painted 4-point star)",
+      "usedBy": "BoardScene sparks emitter (14 call sites), UIScene celebration bursts",
+      "kind": "still",
+      "size": 128,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/star_06.png",
+        "credit": "kenney-particle-pack"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "gold",
+        "alpha": "field",
+        "tech": {
+          "glowBlur": {
+            "on": true,
+            "radius": 2,
+            "passes": 2,
+            "strength": 0.55,
+            "wrap": false
+          },
+          "levels": {
+            "on": true,
+            "black": 0.04,
+            "white": 1,
+            "gamma": 0.95
+          },
+          "edgeFade": {
+            "on": true,
+            "width": 0.06,
+            "shape": "square"
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_glow",
+      "role": "The soft radial glow behind everything that needs to bloom",
+      "replaces": "fx_glow (currently a 256px flat white radial)",
+      "kind": "still",
+      "size": 256,
+      "blend": "add",
+      "source": null,
+      "recipe": {
+        "gen": "glow",
+        "params": {
+          "falloff": 2.6,
+          "core": 0.06
+        },
+        "ramp": "cream",
+        "alpha": "field",
+        "tech": {
+          "glowBlur": {
+            "on": true,
+            "radius": 6,
+            "passes": 2,
+            "strength": 0.3,
+            "wrap": false
+          },
+          "edgeFade": {
+            "on": true,
+            "width": 0.06,
+            "shape": "square"
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_debris",
+      "role": "Hatch / chest debris grit",
+      "usedBy": "BoardScene shells emitter \u2014 the grit layer around the bespoke shard",
+      "kind": "still",
+      "size": 128,
+      "blend": "normal",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/dirt_02.png",
+        "credit": "kenney-particle-pack"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "cream",
+        "alpha": "field",
+        "tech": {
+          "levels": {
+            "on": true,
+            "black": 0.12,
+            "white": 0.95,
+            "gamma": 1.15
+          }
+        }
+      },
+      "note": "The eggshell shard itself stays bespoke game art; this is the surrounding grit, NOT a replacement for fx_shell."
+    },
+    {
+      "key": "fx_mote",
+      "role": "Ember-fly twinkle \u2014 tiny, soft, ATMOSPHERE.fireflies (tint 0xffb03a)",
+      "kind": "still",
+      "size": 64,
+      "blend": "add",
+      "source": null,
+      "recipe": {
+        "gen": "glow",
+        "params": {
+          "falloff": 3.2,
+          "core": 0.1
+        },
+        "ramp": "ember",
+        "alpha": "field",
+        "tech": {
+          "edgeFade": {
+            "on": true,
+            "width": 0.06,
+            "shape": "square"
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_mist",
+      "role": "High mist wisps drifting across the isles (ATMOSPHERE.wisps)",
+      "kind": "still",
+      "size": 256,
+      "blend": "normal",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/flame_04.png",
+        "credit": "kenney-particle-pack"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "ash",
+        "alpha": "field",
+        "tech": {
+          "glowBlur": {
+            "on": true,
+            "radius": 5,
+            "passes": 1,
+            "strength": 0.35,
+            "wrap": false
+          },
+          "levels": {
+            "on": true,
+            "black": 0.0,
+            "white": 0.55,
+            "gamma": 1.6
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_fog_puff",
+      "role": "Region-blocker cloud puff (the authored fog cells)",
+      "kind": "still",
+      "size": 256,
+      "blend": "normal",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/whitePuff12.png",
+        "credit": "kenney-smoke-particles"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "ash",
+        "alpha": "field",
+        "tech": {
+          "levels": {
+            "on": true,
+            "black": 0.02,
+            "white": 0.72,
+            "gamma": 1.25
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_flare",
+      "role": "Chest open \u00b7 level-up \u00b7 reward pop \u2014 the anamorphic hero flare",
+      "kind": "still",
+      "size": 256,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/flare_01.png",
+        "credit": "kenney-particle-pack"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "gold",
+        "alpha": "field",
+        "tech": {
+          "glowBlur": {
+            "on": true,
+            "radius": 4,
+            "passes": 2,
+            "strength": 0.5,
+            "wrap": false
+          },
+          "edgeFade": {
+            "on": true,
+            "width": 0.06,
+            "shape": "square"
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_shock_ring",
+      "role": "Merge impact shockwave (the expanding ring)",
+      "kind": "still",
+      "size": 256,
+      "blend": "add",
+      "source": null,
+      "recipe": {
+        "gen": "ring",
+        "params": {
+          "radius": 0.36,
+          "width": 0.045,
+          "soft": 4
+        },
+        "ramp": "cream",
+        "alpha": "field",
+        "tech": {
+          "glowBlur": {
+            "on": true,
+            "radius": 4,
+            "passes": 2,
+            "strength": 0.45,
+            "wrap": false
+          },
+          "edgeFade": {
+            "on": true,
+            "width": 0.08,
+            "shape": "radial"
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_magic_circle",
+      "role": "Region unlock \u00b7 Gold-Key gate \u00b7 Chapter One finale sigil",
+      "kind": "still",
+      "size": 512,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/magic_02.png",
+        "credit": "kenney-particle-pack"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "radiant",
+        "alpha": "field",
+        "tech": {
+          "symmetry": {
+            "on": true,
+            "axes": 8,
+            "snowflake": true
+          },
+          "glowBlur": {
+            "on": true,
+            "radius": 3,
+            "passes": 2,
+            "strength": 0.5,
+            "wrap": false
+          },
+          "levels": {
+            "on": true,
+            "black": 0.05,
+            "white": 0.95,
+            "gamma": 1.0
+          },
+          "edgeFade": {
+            "on": true,
+            "width": 0.06,
+            "shape": "square"
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_scorch",
+      "role": "Lava-seam scorch decal / ground burn under braziers",
+      "kind": "still",
+      "size": 256,
+      "blend": "normal",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/scorch_02.png",
+        "credit": "kenney-particle-pack"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "lava",
+        "alpha": "field",
+        "tech": {
+          "dissolve": {
+            "on": true,
+            "amount": 0.3,
+            "soft": 0.25,
+            "scale": 7,
+            "seed": 2201
+          },
+          "levels": {
+            "on": true,
+            "black": 0.05,
+            "white": 0.9,
+            "gamma": 1.2
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_twirl",
+      "role": "Magic swirl for gem merges and the Radiant Gem tier",
+      "kind": "still",
+      "size": 256,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/twirl_03.png",
+        "credit": "kenney-particle-pack"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "gem",
+        "alpha": "field",
+        "tech": {
+          "glowBlur": {
+            "on": true,
+            "radius": 3,
+            "passes": 2,
+            "strength": 0.45,
+            "wrap": false
+          },
+          "edgeFade": {
+            "on": true,
+            "width": 0.1,
+            "shape": "square"
+          }
+        }
+      }
+    },
+    {
+      "key": "fx_leaf_spark",
+      "role": "Sparkweed / Emberberry harvest sparkle (the green chain)",
+      "kind": "still",
+      "size": 128,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/kenney/star_08.png",
+        "credit": "kenney-particle-pack"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "sparkweed",
+        "alpha": "field",
+        "tech": {
+          "glowBlur": {
+            "on": true,
+            "radius": 2,
+            "passes": 2,
+            "strength": 0.5,
+            "wrap": false
+          },
+          "edgeFade": {
+            "on": true,
+            "width": 0.06,
+            "shape": "square"
+          }
+        }
+      }
+    },
+    {
+      "key": "fb_smoke_wispy",
+      "role": "Ambient smoke curl \u2014 braziers, chimney, resting dragons",
+      "kind": "sheet",
+      "cols": 8,
+      "rows": 8,
+      "fps": 30,
+      "blend": "normal",
+      "source": {
+        "file": "assets/raw/vfx-sources/unity-labs/WispySmoke01_8x8.png",
+        "credit": "unity-labs"
+      },
+      "grade": {
+        "maskFrom": "alpha",
+        "ramp": "ash",
+        "gain": 1,
+        "levels": {
+          "on": true,
+          "black": 0.02,
+          "white": 0.92,
+          "gamma": 1.1
+        }
+      },
+      "cellW": 128,
+      "cellH": 128
+    },
+    {
+      "key": "fb_smoke_puff",
+      "role": "Merge / hatch smoke puff",
+      "kind": "sheet",
+      "cols": 8,
+      "rows": 8,
+      "fps": 30,
+      "blend": "normal",
+      "source": {
+        "file": "assets/raw/vfx-sources/unity-labs/WispySmoke03_8x8.png",
+        "credit": "unity-labs"
+      },
+      "grade": {
+        "maskFrom": "alpha",
+        "ramp": "ash",
+        "gain": 1,
+        "levels": {
+          "on": true,
+          "black": 0.02,
+          "white": 0.9,
+          "gamma": 1.1
+        }
+      },
+      "cellW": 128,
+      "cellH": 128
+    },
+    {
+      "key": "fb_flame_small",
+      "role": "Brazier flame \u00b7 lava-seam licks (loops)",
+      "kind": "sheet",
+      "cols": 16,
+      "rows": 4,
+      "fps": 30,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/unity-labs/SmallFlame01_16x4.png",
+        "credit": "unity-labs"
+      },
+      "grade": {
+        "maskFrom": "both",
+        "ramp": "lava",
+        "gain": 1.05,
+        "levels": {
+          "on": true,
+          "black": 0.03,
+          "white": 0.95,
+          "gamma": 1
+        }
+      },
+      "cellW": 64,
+      "cellH": 128
+    },
+    {
+      "key": "fb_flame",
+      "role": "Larger fire \u2014 forge, finale hatch",
+      "kind": "sheet",
+      "cols": 16,
+      "rows": 4,
+      "fps": 30,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/unity-labs/Flame03_16x4.png",
+        "credit": "unity-labs"
+      },
+      "grade": {
+        "maskFrom": "both",
+        "ramp": "lava",
+        "gain": 1.05,
+        "levels": {
+          "on": true,
+          "black": 0.03,
+          "white": 0.95,
+          "gamma": 1
+        }
+      },
+      "cellW": 64,
+      "cellH": 128
+    },
+    {
+      "key": "fb_fireburst",
+      "role": "Merge payoff \u00b7 egg hatch \u00b7 chest open (fiery)",
+      "kind": "sheet",
+      "cols": 5,
+      "rows": 5,
+      "fps": 30,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/unity-labs/Explosion00_5x5.png",
+        "credit": "unity-labs"
+      },
+      "grade": {
+        "maskFrom": "both",
+        "ramp": "ember",
+        "gain": 1,
+        "levels": {
+          "on": true,
+          "black": 0.04,
+          "white": 0.96,
+          "gamma": 1
+        }
+      },
+      "cellW": 192,
+      "cellH": 192
+    },
+    {
+      "key": "fb_dustburst",
+      "role": "Merge dust with no fire \u2014 the cozy default burst",
+      "kind": "sheet",
+      "cols": 5,
+      "rows": 5,
+      "fps": 30,
+      "blend": "normal",
+      "source": {
+        "file": "assets/raw/vfx-sources/unity-labs/Explosion01-nofire_5x5.png",
+        "credit": "unity-labs"
+      },
+      "grade": {
+        "maskFrom": "alpha",
+        "ramp": "ash",
+        "gain": 1,
+        "levels": {
+          "on": true,
+          "black": 0.03,
+          "white": 0.9,
+          "gamma": 1.1
+        }
+      },
+      "cellW": 192,
+      "cellH": 192
+    },
+    {
+      "key": "fb_fireball",
+      "role": "Dragon breath \u00b7 Chapter One golden-hatch finale",
+      "kind": "sheet",
+      "cols": 8,
+      "rows": 8,
+      "fps": 30,
+      "blend": "add",
+      "source": {
+        "file": "assets/raw/vfx-sources/unity-labs/FireBall02_8x8.png",
+        "credit": "unity-labs"
+      },
+      "grade": {
+        "maskFrom": "luma",
+        "ramp": "ember",
+        "gain": 1,
+        "levels": {
+          "on": true,
+          "black": 0.06,
+          "white": 0.95,
+          "gamma": 1.05
+        }
+      },
+      "cellW": 128,
+      "cellH": 128
+    },
+    {
+      "key": "fb_cloud",
+      "role": "Fog-cell reveal when a region unlocks",
+      "kind": "sheet",
+      "cols": 8,
+      "rows": 8,
+      "fps": 24,
+      "blend": "normal",
+      "source": {
+        "file": "assets/raw/vfx-sources/unity-labs/Cloud02_8x8.png",
+        "credit": "unity-labs"
+      },
+      "grade": {
+        "maskFrom": "alpha",
+        "ramp": "ash",
+        "gain": 1,
+        "levels": {
+          "on": true,
+          "black": 0.02,
+          "white": 0.94,
+          "gamma": 1.05
+        }
+      },
+      "cellW": 128,
+      "cellH": 128
+    },
+    {
+      "key": "fb_wisp",
+      "role": "Slow ambient wisp \u2014 the subtlest layer (20 frames)",
+      "kind": "sheet",
+      "cols": 20,
+      "rows": 4,
+      "fps": 24,
+      "blend": "normal",
+      "source": {
+        "file": "assets/raw/vfx-sources/unity-labs/CandleSmoke01_20x4.png",
+        "credit": "unity-labs"
+      },
+      "grade": {
+        "maskFrom": "alpha",
+        "ramp": "ash",
+        "gain": 1.15,
+        "levels": {
+          "on": true,
+          "black": 0.0,
+          "white": 0.7,
+          "gamma": 1.0
+        }
+      },
+      "cellW": 51,
+      "cellH": 128
+    },
+    {
+      "key": "noise_turbulence",
+      "role": "Tiling turbulence \u2014 dissolve masks, heat distortion, UV scroll",
+      "kind": "still",
+      "size": 256,
+      "blend": "normal",
+      "tiling": true,
+      "source": {
+        "file": "assets/raw/vfx-sources/sbs-noise/turbulence.png",
+        "credit": "sbs-noise"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "white",
+        "alpha": "opaque",
+        "tech": {
+          "levels": {
+            "on": true,
+            "black": 0.05,
+            "white": 0.95,
+            "gamma": 1
+          }
+        }
+      }
+    },
+    {
+      "key": "noise_vein",
+      "role": "Tiling vein/crackle \u2014 lava seams, shell cracks",
+      "kind": "still",
+      "size": 256,
+      "blend": "normal",
+      "tiling": true,
+      "source": {
+        "file": "assets/raw/vfx-sources/sbs-noise/vein.png",
+        "credit": "sbs-noise"
+      },
+      "recipe": {
+        "gen": "source",
+        "ramp": "white",
+        "alpha": "opaque",
+        "tech": {
+          "levels": {
+            "on": true,
+            "black": 0.05,
+            "white": 0.95,
+            "gamma": 1
+          }
+        }
+      }
+    },
+    {
+      "key": "noise_fbm",
+      "role": "Generated seamless fBm \u2014 the general-purpose dissolve field",
+      "kind": "still",
+      "size": 256,
+      "blend": "normal",
+      "tiling": true,
+      "source": null,
+      "recipe": {
+        "gen": "fbm",
+        "params": {
+          "scale": 6,
+          "octaves": 6,
+          "gain": 0.52,
+          "contrast": 1.15,
+          "seed": 20260727
+        },
+        "ramp": "white",
+        "alpha": "opaque",
+        "tech": {
+          "seamless": {
+            "on": true,
+            "feather": 0.2
+          }
+        }
+      }
+    }
+  ]
+}

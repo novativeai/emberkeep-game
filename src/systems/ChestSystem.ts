@@ -1,9 +1,8 @@
-import { CHEST_GIFTS, CHEST_INTERVAL_MS, REWARD_SPAWN_RADIUS } from '../core/Constants';
+import type { ChestGift } from '../core/Constants';
+import { CHEST_INTERVAL_MS, chestGiftsIn, REWARD_SPAWN_RADIUS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
-
-type ChestGift = (typeof CHEST_GIFTS)[number];
 
 /**
  * The standing treasure chest. It is a PERMANENT fixture — never consumed. Every
@@ -22,9 +21,15 @@ export class ChestSystem {
     bus.on('chest:open', ({ itemId }) => this.open(itemId));
   }
 
+  /** This world's gift table — a chest in the north pays northern goods. */
+  private get gifts(): ReadonlyArray<ChestGift> {
+    return chestGiftsIn(this.state.worldId);
+  }
+
   /** Which gift to grant — split out so a test can force a branch. */
   protected pick(): ChestGift {
-    return CHEST_GIFTS[Math.floor(Math.random() * CHEST_GIFTS.length)]!;
+    const table = this.gifts;
+    return table[Math.floor(Math.random() * table.length)]!;
   }
 
   private open(itemId: number): void {
@@ -37,13 +42,13 @@ export class ChestSystem {
     if (gift.kind === 'item' && this.spawnItems(chest.col, chest.row, gift.chain, gift.tier, gift.count) === 0) {
       // No room NEAR the chest (REWARD_SPAWN_RADIUS): pay the Gold gift instead
       // of teleporting pieces across the map or dropping them off-platform.
-      gift = CHEST_GIFTS.find((g) => g.kind === 'coins') ?? gift;
+      gift = this.gifts.find((g) => g.kind === 'coins') ?? gift;
     }
     if (gift.kind === 'coins') {
       this.bus.emit('economy:add', { coins: gift.amount, reason: 'chest' });
     }
     chest.readyAt = now + CHEST_INTERVAL_MS; // recharge; the chest is never consumed
-    this.bus.emit('chest:claimed', { chestId: itemId, label: gift.label });
+    this.bus.emit('chest:claimed', { chestId: itemId, label: gift.label, coins: gift.kind === 'coins' });
   }
 
   /** Pop `count` merge pieces onto free tiles NEAR the chest; returns how many

@@ -1,66 +1,295 @@
 {
   "orders": [
     {
-      "id": "cindra_brazier",
-      "giver": "cindra",
-      "title": "Rekindle the Brazier",
-      "blurb": "Six Gem Shards, Keeper. My brazier has been cold since the last keeper fled — light it, and I shall part with something truly golden.",
-      "requires": [{ "chain": "flame_gem", "tier": 1, "count": 6 }],
-      "rewards": { "coins": 25, "keys": 0, "xp": 30, "tease": "🥚 ???" }
+      "id": "eleanor_brazier",
+      "giver": "eleanor",
+      "title": "Light the Brazier",
+      "blurb": "Six Gem Shards, Keeper. That brazier has been cold since the last keeper fled — light it, and I will part with something I have kept far too long.",
+      "requires": [
+        {
+          "chain": "flame_gem",
+          "tier": 1,
+          "count": 6
+        }
+      ],
+      "rewards": {
+        "coins": 25,
+        "keys": 0,
+        "xp": 30,
+        "tease": "🥚 ???"
+      }
     },
     {
-      "id": "cindra_hearth",
-      "giver": "cindra",
+      "id": "eleanor_hearth",
+      "giver": "eleanor",
       "title": "Warm the Long Hearth",
-      "blurb": "Your little dragon keeps coughing up shards — splendid. Forge me THREE Flame Gems and the hall will be warm by supper.",
-      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 3 }],
-      "rewards": { "coins": 75, "keys": 0, "xp": 35 }
+      "blurb": "Your little dragon keeps coughing up shards — good. Forge me THREE Flame Gems and the hall will be warm by supper.",
+      "requires": [
+        {
+          "chain": "flame_gem",
+          "tier": 2,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 75,
+        "keys": 0,
+        "xp": 60
+      }
     },
     {
-      "id": "cindra_centerpiece",
-      "giver": "cindra",
-      "title": "The Radiant Centerpiece",
-      "blurb": "One Radiant Gem. ONE. Merge three Flame Gems into something that would make the old court gasp.",
-      "requires": [{ "chain": "flame_gem", "tier": 3, "count": 1 }],
-      "rewards": { "coins": 110, "keys": 0, "xp": 50 }
+      "id": "eleanor_centerpiece",
+      "giver": "eleanor",
+      "title": "Craft the Radiant Centerpiece",
+      "blurb": "One Radiant Gem. One. Merge three Flame Gems into something the old court would have stopped talking to look at.",
+      "requires": [
+        {
+          "chain": "flame_gem",
+          "tier": 3,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 110,
+        "keys": 0,
+        "xp": 80
+      }
     },
     {
-      "id": "cindra_hoard",
-      "giver": "cindra",
-      "title": "The Keeper's Hoard",
-      "blurb": "An encore, Keeper! Three Radiant Gems — a proper hoard for a proper Keep, and proof the Flame is truly back.",
-      "requires": [{ "chain": "flame_gem", "tier": 3, "count": 3 }],
-      "rewards": { "coins": 240, "keys": 0, "xp": 85 }
+      "id": "eleanor_hoard",
+      "giver": "eleanor",
+      "title": "Fill the Keeper's Hoard",
+      "blurb": "An encore, Keeper — three Radiant Gems. A proper hoard for a proper Keep, and proof enough for anyone still watching.",
+      "requires": [
+        {
+          "chain": "flame_gem",
+          "tier": 3,
+          "count": 3
+        }
+      ],
+      "rewards": {
+        "coins": 240,
+        "keys": 0,
+        "xp": 85
+      }
+    },
+    {
+      "id": "selyna_signal",
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Bank a Signal Fire",
+      "blurb": "You came a long way to stand on nine feet of ice. Bind me two faggots of that driftwood and I will light something you can steer by — then the door is yours.",
+      "requires": [
+        {
+          "chain": "driftwood",
+          "tier": 2,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 40,
+        "keys": 1,
+        "xp": 25
+      }
+    },
+    {
+      "id": "selyna_pitch",
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Feed the Northern Dragons",
+      "blurb": "Mine eat pitch, not berries. Nothing grows here, so the fire has to be built before it can be fed — a woodpile first, then three cakes of it. That is the whole north in one errand.",
+      "requires": [
+        {
+          "chain": "tarknot",
+          "tier": 2,
+          "count": 3
+        }
+      ],
+      "rewards": {
+        "coins": 110,
+        "keys": 1,
+        "xp": 40
+      }
+    },
+    {
+      "id": "selyna_frames",
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Salvage the Wrecks",
+      "blurb": "Two lashed frames. You will want to live under something eventually, and out here that means turning over what the sea has already finished with.",
+      "requires": [
+        {
+          "chain": "keel",
+          "tier": 2,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 120,
+        "keys": 1,
+        "xp": 40
+      }
+    },
+    {
+      "id": "selyna_spindle",
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Spin the Light-Fast Spindles",
+      "blurb": "Two spindles, wound tight. My sister catches light and keeps it in glass; I spin it into thread and it keeps something warm. Bring me these and I will tell you what I have been keeping.",
+      "requires": [
+        {
+          "chain": "frostsilk",
+          "tier": 3,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 320,
+        "keys": 0,
+        "xp": 95
+      }
     }
   ],
   "repeatable": [
     {
-      "giver": "cindra",
-      "title": "Shards for the Coffer",
+      "giver": "eleanor",
+      "title": "More Gem Shards",
       "blurb": "The brazier is hungry again. Eight Gem Shards, if your dragons would be so kind.",
-      "requires": [{ "chain": "flame_gem", "tier": 1, "count": 8 }],
-      "rewards": { "coins": 40, "keys": 0, "xp": 20 }
+      "requires": [
+        {
+          "chain": "flame_gem",
+          "tier": 1,
+          "count": 8
+        }
+      ],
+      "rewards": {
+        "coins": 40,
+        "keys": 0,
+        "xp": 20
+      }
     },
     {
-      "giver": "cindra",
-      "title": "Gems for the Gallery",
-      "blurb": "Two Flame Gems for the gallery alcoves. The old court would approve.",
-      "requires": [{ "chain": "flame_gem", "tier": 2, "count": 2 }],
-      "rewards": { "coins": 70, "keys": 0, "xp": 25 }
+      "giver": "eleanor",
+      "title": "More Flame Gems",
+      "blurb": "Two Flame Gems for the gallery alcoves. I want the light back in that corridor.",
+      "requires": [
+        {
+          "chain": "flame_gem",
+          "tier": 2,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 70,
+        "keys": 0,
+        "xp": 25
+      }
     },
     {
-      "giver": "cindra",
-      "title": "A Ruby Tithe",
+      "giver": "eleanor",
+      "title": "More Dragon Rubies",
       "blurb": "Five Dragon Rubies. Ask the red one — she hoards them anyway.",
-      "requires": [{ "chain": "ember_dragon", "tier": 1, "count": 5 }],
-      "rewards": { "coins": 55, "keys": 0, "xp": 20 }
+      "requires": [
+        {
+          "chain": "ember_dragon",
+          "tier": 1,
+          "count": 5
+        }
+      ],
+      "rewards": {
+        "coins": 55,
+        "keys": 0,
+        "xp": 20
+      }
     },
     {
-      "giver": "cindra",
-      "title": "One More Radiance",
-      "blurb": "Another Radiant Gem, Keeper. The Keep can never be too bright.",
-      "requires": [{ "chain": "flame_gem", "tier": 3, "count": 1 }],
-      "rewards": { "coins": 120, "keys": 0, "xp": 35 }
+      "giver": "eleanor",
+      "title": "Another Radiant Gem",
+      "blurb": "Another Radiant Gem, Keeper. The Keep can never be too bright, and I sleep better for it.",
+      "requires": [
+        {
+          "chain": "flame_gem",
+          "tier": 3,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 120,
+        "keys": 0,
+        "xp": 35
+      }
+    },
+    {
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "More Drift Spars",
+      "blurb": "Eight spars off the tide line. The fire does not keep itself.",
+      "requires": [
+        {
+          "chain": "driftwood",
+          "tier": 1,
+          "count": 8
+        }
+      ],
+      "rewards": {
+        "coins": 45,
+        "keys": 0,
+        "xp": 20
+      }
+    },
+    {
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "More Pitch Cakes",
+      "blurb": "Two more cakes. They have been out in it all night and they are not sentimental about who feeds them.",
+      "requires": [
+        {
+          "chain": "tarknot",
+          "tier": 2,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 85,
+        "keys": 0,
+        "xp": 28
+      }
+    },
+    {
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "More Frost Threads",
+      "blurb": "Five threads. I spin in the evenings. It is not a hobby.",
+      "requires": [
+        {
+          "chain": "frostsilk",
+          "tier": 1,
+          "count": 5
+        }
+      ],
+      "rewards": {
+        "coins": 60,
+        "keys": 0,
+        "xp": 22
+      }
+    },
+    {
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Another Black Ember",
+      "blurb": "One black ember. Keep it away from the thread, and away from me.",
+      "requires": [
+        {
+          "chain": "tarknot",
+          "tier": 3,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 140,
+        "keys": 0,
+        "xp": 38
+      }
     }
   ]
 }

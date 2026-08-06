@@ -43,12 +43,19 @@ declare global {
     __emberkeep: {
       gridToPage: (col: number, row: number) => { x: number; y: number };
       itemToPage: (col: number, row: number) => { x: number; y: number };
+      characterToPage: (characterId: string) => { x: number; y: number } | null;
       centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
       reset: () => void;
       saveKey: string;
       game: Phaser.Game;
       power: () => { state: string; fpsLimit: number; renderedFps: number };
+      worlds: () => {
+        active: string;
+        all: { id: string; name: string; level: number; zones: number; cells: number }[];
+        available: string[];
+      };
+      switchWorld: (id: string) => string;
     };
     webkitAudioContext?: typeof AudioContext;
   }
@@ -101,6 +108,35 @@ window.addEventListener('message', (event: MessageEvent) => {
   } else {
     game.loop.sleep();
   }
+});
+
+/**
+ * WRITE THE BOARD DOWN BEFORE THE PAGE GOES AWAY.
+ *
+ * Autosave is event-driven (SaveSystem.SAVE_ON), which covers every mutation but
+ * says nothing about the moment the player leaves — and leaving is not an event
+ * the game gets to see coming. A closed tab, a switched app, a phone locking:
+ * whatever happened since the last mutation would simply never be written.
+ *
+ * `pagehide` and `visibilitychange` are the pair that actually fire. `unload` and
+ * `beforeunload` are unreliable on mobile Safari and skipped entirely when a page
+ * goes into the back/forward cache, which is precisely the "come back later" case
+ * this exists for. The write is synchronous localStorage, so it completes inside
+ * the handler; both may fire for one departure and saving twice is harmless.
+ */
+const flushSave = (): void => {
+  // ONLY while a run is actually in progress. `running` is false before the
+  // first board exists and again the moment the game is reset — and a flush in
+  // either window writes an EMPTY state over the file. That is not a lost save,
+  // it is worse: the empty file LOADS, so `beginRun` sees a save, skips
+  // `newGame()`, and the player lands on a board with nothing on it at all. Reset
+  // wipes localStorage and reloads, so the flush fired between the two.
+  if (!ctx.running) return;
+  ctx.systems.save.save();
+};
+window.addEventListener('pagehide', flushSave);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushSave();
 });
 
 /* ------------------- agent instrumentation (spec §5) ------------------ */
@@ -229,6 +265,19 @@ window.__emberkeep = {
       | undefined;
     return worldToPage(board?.itemArtWorldPoint?.(col, row) ?? gridToWorld(col, row));
   },
+  /**
+   * Where to AIM at a world character — the middle of her BODY, not her cell.
+   * Her cell is no longer where she is drawn (characters.json carries a free
+   * dx/dy off it) and her hit rect is the lower half of her silhouette, which
+   * stands well above her feet either way. `null` if she is not on this map.
+   */
+  characterToPage: (characterId: string) => {
+    const board = game.scene.getScene(SCENES.board) as
+      | (Phaser.Scene & { characterAimWorldPoint?: (id: string) => { x: number; y: number } | null })
+      | undefined;
+    const at = board?.characterAimWorldPoint?.(characterId);
+    return at ? worldToPage(at) : null;
+  },
   /** Centre the board camera on a cell (test hook; the closer camera can leave
    *  off-zone targets like the fog gate out of view). */
   centerCell: (col: number, row: number) => {
@@ -236,6 +285,28 @@ window.__emberkeep = {
     if (!board) return;
     const { x, y } = gridToWorld(col, row);
     board.cameras.main.centerOn(x, y);
+  },
+  /**
+   * World travel. `worlds()` lists what this build can run and which of them the
+   * Keeper may currently reach; `switchWorld(id)` asks WorldSystem to go there —
+   * it refuses mid-tutorial and above the Keeper's rank exactly as any in-game
+   * door would, so driving it from here tests the real path rather than a
+   * shortcut around it. Returns the world actually being shown.
+   */
+  worlds: () => ({
+    active: ctx.state.worldId,
+    all: [...ctx.state.worlds.values()].map((w) => ({
+      id: w.id,
+      name: w.name,
+      level: w.level,
+      zones: w.zones.length,
+      cells: w.zones.reduce((n, z) => n + (z.dense ? z.matrix.cols * z.matrix.rows : z.cells.size), 0)
+    })),
+    available: ctx.systems.worlds.available().map((w) => w.id)
+  }),
+  switchWorld: (id: string) => {
+    ctx.bus.emit('world:switch', { to: id });
+    return ctx.state.worldId;
   },
   /** Battery-governor diagnostics: current state + real rendered step rate. */
   power: () => ({

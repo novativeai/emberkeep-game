@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "emitters": [
+    {
+      "id": "fx_2",
+      "preset": "smokeEmbers",
+      "world": "emberkeep",
+      "anchor": [
+        -1,
+        -2
+      ],
+      "seed": 775802,
+      "dx": -149,
+      "dy": -4
+    },
+    {
+      "id": "fx_3",
+      "preset": "fire",
+      "world": "emberkeep",
+      "anchor": [
+        2,
+        9
+      ],
+      "seed": 820761,
+      "dx": -72,
+      "dy": 44
+    },
+    {
+      "id": "fx_4",
+      "preset": "smokeEmbers",
+      "world": "emberkeep",
+      "anchor": [
+        8,
+        -2
+      ],
+      "seed": 565028,
+      "dx": 40,
+      "dy": -36,
+      "scale": 1.39,
+      "widthScale": 1.44
+    }
+  ]
+}

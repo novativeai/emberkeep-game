@@ -1,0 +1,33 @@
+{
+  "fps": 7,
+  "blendFrames": false,
+  "width": 774,
+  "height": 774,
+  "frameCount": 4,
+  "frames": [
+    {
+      "index": 0,
+      "file": "frost-dragon-eyes-open.png",
+      "durationMs": 2600,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "frost-dragon-eyes-halfOpen.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 2,
+      "file": "frost-dragon-eyes-closed.png",
+      "durationMs": 70,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "frost-dragon-eyes-halfOpen2.png",
+      "durationMs": 55,
+      "blend": false
+    }
+  ]
+}

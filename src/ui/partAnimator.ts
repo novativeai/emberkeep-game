@@ -9,7 +9,7 @@ import { ensureSequenceTextures, uiRegistry } from './theme';
 
 /**
  * Sequence playback shared by anim LAYERS (custom components) and animated
- * PARTS of built-in elements (a `sequence` part patch — e.g. the Laurah bubble
+ * PARTS of built-in elements (a `sequence` part patch — e.g. the dialogue bubble
  * portrait replaced by a talking bank). One resolver + one stepper, one truth.
  */
 

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "worlds": {
+    "borealis": {
+      "aurora": "borealis",
+      "auroraBand": 0.5,
+      "snow": "snowfall"
+    }
+  }
+}

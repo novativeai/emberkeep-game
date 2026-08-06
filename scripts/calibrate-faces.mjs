@@ -176,6 +176,44 @@ const CHARACTERS = {
   }
 };
 
+/**
+ * The breeds whose banks come from `scripts/make-face-frames.py`.
+ *
+ * Expanded from the convention rather than written out, because that script
+ * NAMES the files from the same convention: six hand-copied blocks of the same
+ * thirty lines is six chances to drift from what is actually on disk, and the
+ * drift would surface as a missing-file throw long after the art was made. Add
+ * a breed to this list and its two stages calibrate themselves.
+ */
+for (const breed of ['frost', 'storm', 'moonwhisker']) {
+  const dir = `assets/sprites/characters/dragon/${breed}-dragon`;
+  const stages = [
+    ['', `${dir}/rig/dragon-${breed}.rig.json`, `${dir}/head-animation`, `${breed}-dragon`],
+    ['-adult', `${dir}/rig-adult/${breed}-dragon.rig.json`, `${dir}/head-animation-adult`,
+      `${breed}-dragon-adult`]
+  ];
+  for (const [suffix, rig, fsDir, prefix] of stages) {
+    CHARACTERS[`dragon-${breed}${suffix}`] = {
+      rig,
+      layer: 'head',
+      fsDir,
+      basePath: fsDir.replace(/^assets\//, ''),
+      sets: {
+        blink: {
+          dir: `${prefix}-blink-animation`,
+          files: ['open', 'halfOpen', 'closed', 'halfOpen2'].map((s) => `${prefix}-eyes-${s}.png`),
+          ref: 0
+        },
+        talk: {
+          dir: `${prefix}-roar_talk-animation`,
+          files: [0, 1, 2, 3].map((i) => `${prefix}-roar_talk_0000${i}.png`),
+          ref: 0
+        }
+      }
+    };
+  }
+}
+
 /* ------------------------- minimal PNG decoder ------------------------- */
 /** 8-bit RGBA / RGB, non-interlaced (what our pipeline emits). Returns rgba. */
 function decodePng(buf) {

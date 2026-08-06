@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, IS_IOS, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE, POWER } from './Constants';
+import { GAME_WIDTH, IS_IOS, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE, POWER } from './Constants';
 import { renderScale } from './render-scale';
 import { BoardScene } from '../scenes/BoardScene';
 import { BootScene } from '../scenes/BootScene';
@@ -17,7 +17,12 @@ import { UIScene } from '../scenes/UIScene';
  * equals the config width/height, hence we scale those.
  */
 export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
-  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  // Cap the device-pixel-ratio: a 3×-DPR phone otherwise backs the framebuffer at
+  // full device pixels (the #1 GPU-memory + fill-rate hog). Weak devices cap at 2,
+  // others at 3 — oversampling a 3× panel down to 2×-equivalent is invisible (the
+  // fixed 2560 space already downsamples heavily) but reclaims a lot of framebuffer.
+  const rawDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  const dpr = Math.min(rawDpr, IS_LOW_END ? 2 : 3);
   // On mobile the game is PORTRAIT: width = the phone's SHORT side, height = long,
   // regardless of how the device is currently held.
   const dispW = IS_MOBILE ? Math.min(window.innerWidth, window.innerHeight) : window.innerWidth;
@@ -34,7 +39,12 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   // budget is far tighter than Android's, so it floors lower still — at floor 0.75
   // a hi-DPI iPhone SUPERSAMPLES well past its own screen (need≈0.46), needlessly
   // inflating GPU memory into the WebKit crash zone; 0.5 tracks device pixels.
-  const floor = IS_IOS ? 0.5 : IS_MOBILE ? 0.75 : 1;
+  // WEAK devices (IS_LOW_END: cheap Android, iOS, GPU-less/old PC) floor much lower
+  // AND never supersample above device pixels (cap 1) — the framebuffer is the #1
+  // GPU-memory hog, so tracking (or under-cutting) device pixels is what keeps the
+  // tab out of the "A problem repeatedly occurred" / blank-screen crash.
+  const floor = IS_IOS ? 0.5 : IS_LOW_END ? 0.34 : IS_MOBILE ? 0.75 : 1;
+  const ceiling = IS_LOW_END ? 1 : 1.5;
   // GPU ceiling: old-device MAX_TEXTURE_SIZE is 4096 — a backing axis past it
   // gets silently clipped by the driver (the canvas renders partial/blank while
   // the DOM logo still shows, so the title's Play button "disappears"). The
@@ -45,7 +55,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   renderScale.value = Phaser.Math.Clamp(
     Math.round(need * 8) / 8,
     Math.min(floor, gpuCap),
-    Math.min(1.5, gpuCap)
+    Math.min(ceiling, gpuCap)
   );
 
   return {

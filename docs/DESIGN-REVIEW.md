@@ -10,6 +10,34 @@
 > **This is an evaluation + improvement plan only. No changes have been made.**
 > Almost every fix below is a `Constants.ts` / `src/data/*.json` edit or a new
 > EventBus system — exactly what the architecture was built for (MECHANICS §18).
+>
+> ---
+>
+> ## 📌 HISTORICAL SNAPSHOT — most of this has since been fixed
+>
+> This audit describes the build **before** the Chapter One retune. Its findings
+> drove [DEMO-PLAN.md](DEMO-PLAN.md), which has shipped. Keep this file as the
+> record of *why* the current tuning exists — but do not read its numbers as
+> current. Since this was written:
+>
+> - Order 1 is **6× Gem Shard** (was 20×); the Ledger has **4 orders + 4
+>   repeatables** and no longer dead-ends.
+> - Warmth regen **1/60 s** (was 1/3 min), cap 30; dragon cooldown **45 s** (was
+>   5 min) with **passive gifts** on top, and every timer is **skippable** for
+>   Gold or Warmth.
+> - Offline return **banks 3 cycles per producer** and reports them in a
+>   welcome-back card (was one gift regardless of hours away).
+> - The Level-3 end screen is now the **scripted finale** (Golden Elder →
+>   fog glimpse → Cindra's only line → chapter card → encore sandbox).
+> - Laurah speaks after the tutorial (`dialogue.json → hints`); Cindra comments
+>   on every order completion.
+> - "Zero daily quests" → the **Keeper's Tasks** chapter checklist (`tasks.json`)
+>   plus **repeatable orders**. Calendar-based dailies remain deliberately out
+>   of scope for a demo.
+>
+> **Still open from this audit:** the key economy is a single scripted tutorial
+> grant with nowhere to go afterwards (MECHANICS §12), and board-full overflow is
+> still a hard block rather than bubbles (MECHANICS §4.4).
 
 ---
 

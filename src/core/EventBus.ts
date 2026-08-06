@@ -34,11 +34,29 @@ export class EventBus {
     this.handlers.get(event)?.delete(handler as Handler<EventKey>);
   }
 
+  /**
+   * Every subscriber is called, even if one of them throws.
+   *
+   * Emission is the ONLY channel between modules, and the handler order is
+   * arbitrary — whoever subscribed first. Letting an exception escape meant one
+   * broken listener silenced every listener behind it, and unwound the emitter
+   * too: a naming panel left over from a previous scene threw on its dead
+   * `scene`, so the live panel was never called and the tutorial beat gated on
+   * that panel could not be answered at all. A view's fault must not become
+   * gameplay's fault.
+   *
+   * The failure is not swallowed — it goes to the console with its event name —
+   * but it stops at the handler that caused it.
+   */
   emit<K extends EventKey>(event: K, payload: EventMap[K]): void {
     const set = this.handlers.get(event);
     if (!set) return;
     for (const handler of [...set]) {
-      (handler as Handler<K>)(payload);
+      try {
+        (handler as Handler<K>)(payload);
+      } catch (err) {
+        console.error(`[bus] handler for '${event}' threw`, err);
+      }
     }
   }
 

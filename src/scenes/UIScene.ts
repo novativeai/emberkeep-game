@@ -4,33 +4,44 @@ import {
   ATMOSPHERE,
   ENERGY_REGEN_MS,
   FINALE,
+  FINALE_ENDS_MS,
   GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_TREMBLE_PROGRESS,
-  IS_MOBILE,
+  HUD_COLUMN_X,
+  hudColumnY,
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
+  OPENING_HOLD_MS,
   SCENES,
+  TILE_W,
+  TIMINGS,
   UI_SCALE,
   WELCOME_BACK_MIN_MS
 } from '../core/Constants';
+import { FONT } from '../art/design';
 import { gridToWorld } from '../core/iso';
-import type { ResolvedArrow, ResolvedHand, TilePos, TutorialStepEvent } from '../core/types';
+import type { ResolvedArrow, ResolvedHand, SpeakerId, TilePos, TutorialStepEvent } from '../core/types';
+import type { BoardScene } from './BoardScene';
 import { CharacterBubble } from '../entities/CharacterBubble';
-import { BeyondDemoPanel } from '../ui/BeyondDemoPanel';
+import { BagPanel } from '../ui/BagPanel';
+import { CommissionPanel } from '../ui/CommissionPanel';
+import { StorePanel } from '../ui/StorePanel';
 import { CookbookPanel } from '../ui/CookbookPanel';
-import { EndScreen } from '../ui/EndScreen';
 import { Hud } from '../ui/Hud';
+import { NamePanel } from '../ui/NamePanel';
 import { LedgerPanel } from '../ui/LedgerPanel';
+import { QuestTracker } from '../ui/QuestTracker';
+import { StatusPanel } from '../ui/StatusPanel';
 import { ShopPanel } from '../ui/ShopPanel';
 import { renderScale } from '../core/render-scale';
 import { getMusicMuted, setMusicMuted } from '../audio/musicPref';
 import { CustomUiManager } from '../ui/customUi';
 import { uiRegistry } from '../ui/theme';
+import { DragonReveal } from '../ui/DragonReveal';
 import { Tooltip } from '../ui/Tooltip';
 
-const FONT = 'Trebuchet MS, Verdana, sans-serif';
 const DEPTH_HUD = 10;
 const DEPTH_PANEL = 60;
 const DEPTH_TUTORIAL = 100;
@@ -41,24 +52,38 @@ const HAND_MARKER_H = 172;
 const ARROW_MARKER_H = 148;
 
 /**
- * Runs in parallel above BoardScene: HUD, tooltip, Cindra's Ledger, the
- * tutorial presentation layer (Pip/Cindra bubble, guiding hand, bouncing
+ * Runs in parallel above BoardScene: HUD, tooltip, Eleanor's Ledger, the
+ * tutorial presentation layer (dialogue bubble, guiding hand, bouncing
  * arrow) and the reset-confirm dialog. Pure subscriber + intent emitter.
  */
 export class UIScene extends Phaser.Scene {
   private ctx!: GameContext;
   private regenAccum = 0;
   private hud!: Hud;
+  private reveal!: DragonReveal;
   private tooltip!: Tooltip;
   private ledger!: LedgerPanel;
   private shop!: ShopPanel;
+  private bag!: BagPanel;
+  /** "What shall it make?" — a finished House's one-time commission. */
+  private commission!: CommissionPanel;
+  private store!: StorePanel;
+  /** Self-driven: opens on `nest:hatched`. Held so it stays on the display
+   *  list and the UI Builder can style it; never read back. */
+  private naming!: NamePanel;
   private cookbook!: CookbookPanel;
+  private questTracker!: QuestTracker;
+  /** Who the player is looking at — under the tracker, same plate-free look. */
+  private statusPanel!: StatusPanel;
+  /** Has the tutorial reached the beat that teaches the readout? Latched — see
+   *  where it is set. Re-created with the scene, so a reset clears it. */
+  private statusTaught = false;
   private cookbookButton!: Phaser.GameObjects.Container;
   private cookbookDot!: Phaser.GameObjects.Arc;
   private bubble!: CharacterBubble;
-  /** The Level-3 finale is running — suppress competing banners. */
+  /** The awakening finale is running — suppress competing banners. */
   private finaleActive = false;
-  /** One-shot Laurah nudges (per session). */
+  /** One-shot Eleanor nudges (per session). */
   private hintShown = new Set<string>();
   /** Active recipe mini-tutorial (`chain:from>to`), if one is demonstrating. */
   private recipeHint: string | null = null;
@@ -66,8 +91,12 @@ export class UIScene extends Phaser.Scene {
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
   private dialog: Phaser.GameObjects.Container | null = null;
-  private endScreen: EndScreen | null = null;
+  /** The travelling curtain, while a destination world's art loads. */
+  private travelVeil?: Phaser.GameObjects.Container;
   private lastStep: TutorialStepEvent | null = null;
+  /** The opening's held silence is a one-shot: only the very first step of a
+   *  run waits, and a resumed save never re-holds. */
+  private openingHeld = false;
   private offBus: (() => void)[] = [];
   // Tutorial markers are anchored to BOARD CELLS, not the screen: the board
   // camera pans/zooms over the big map, so each frame we re-project the cell to
@@ -76,7 +105,9 @@ export class UIScene extends Phaser.Scene {
   private handDrag: { from: TilePos; to: TilePos } | null = null;
   private handProg = { t: 0 }; // 0..1 along from→to, driven by a looping tween
   private handPoint: (() => { x: number; y: number } | null) | null = null;
-  private arrowAnchor: (() => { x: number; y: number } | null) | null = null;
+  /** `height` = how far the target extends below the anchor point (0 for a
+   *  button, a full standee for a world character) — see update(). */
+  private arrowAnchor: (() => { x: number; y: number; height?: number } | null) | null = null;
   private arrowLift = 128;
   private arrowBob = { v: 0 };
   private handBob = { v: 0 }; // tap-press offset for the point gesture
@@ -101,23 +132,91 @@ export class UIScene extends Phaser.Scene {
 
     this.hud = new Hud(this, this.ctx.bus, this.ctx.state, {
       onLedger: () => (this.ledger.isOpen ? this.ledger.requestClose() : this.ledger.open()),
-      onGear: () => this.openResetDialog()
+      onGear: () => this.openResetDialog(),
+      // The satchel sits on screen from the first frame. Until its lesson, the
+      // button answers by re-pointing at the current step rather than opening an
+      // empty panel over the board (tutorial-design law 3).
+      onBag: () => {
+        if (!this.bagAllowed()) {
+          this.nudgeMarkers();
+          return;
+        }
+        return this.bag.isOpen ? this.bag.requestClose() : this.bag.open();
+      },
+      // Cosmetics only — nothing in there advances play, so it stays shut for
+      // the whole tutorial rather than competing with the lesson on screen.
+      onStore: () => {
+        if (!this.storeAllowed()) {
+          this.nudgeMarkers();
+          return;
+        }
+        return this.store.isOpen ? this.store.requestClose() : this.store.open();
+      }
     });
     this.hud.ledgerButton.setDepth(DEPTH_HUD);
+    this.hud.bagButton.setDepth(DEPTH_HUD);
+    this.hud.storeButton.setDepth(DEPTH_HUD);
+    this.hud.storeButton.setVisible(this.ctx.state.tutorialDone);
+    this.hud.setBagCount(this.ctx.state.bag.length);
     this.hud.gearButton.setDepth(DEPTH_HUD);
 
-    this.tooltip = new Tooltip(this, this.ctx.bus, this.ctx.data.chains);
+    this.tooltip = new Tooltip(this, this.ctx.data.chains);
     this.tooltip.setDepth(DEPTH_PANEL - 5);
 
     this.ledger = new LedgerPanel(this, this.ctx.bus, this.ctx.systems.order, this.ctx.systems.tasks, this.ctx.state);
     this.ledger.setDepth(DEPTH_PANEL);
 
+    this.bag = new BagPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
+    // Opens on nest:hatched and cannot be dismissed — the dragon is waiting.
+    this.naming = new NamePanel(this, this.ctx.bus);
+    this.naming.resolveChain = (itemId) => this.ctx.state.items.get(itemId)?.chain;
+    void this.naming;
+    this.bag.setDepth(DEPTH_PANEL + 6);
+    this.commission = new CommissionPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
+    // Above the Bag: it is asked ABOUT the bag's contents, and the two are never
+    // usefully open at once.
+    this.commission.setDepth(DEPTH_PANEL + 9);
     this.shop = new ShopPanel(this, this.ctx.bus, this.ctx.state);
     this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
 
-    this.cookbook = new CookbookPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
+    this.store = new StorePanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.store);
+    this.store.setDepth(DEPTH_PANEL + 7);
+
+    this.cookbook = new CookbookPanel(this, this.ctx.bus, this.ctx.state, {
+      ...this.ctx.data,
+      worldId: this.ctx.state.worldId
+    });
     this.cookbook.setDepth(DEPTH_PANEL + 4);
     this.cookbookButton = this.buildCookbookButton();
+
+    // On-screen quest readout, top-right. Backgroundless HUD summary of the
+    // quest ladder — the active quest over its own ordered subquests.
+    this.questTracker = new QuestTracker(this, this.ctx.bus, this.ctx.systems.quests);
+    this.questTracker.setDepth(DEPTH_HUD);
+    this.questTracker.setStoryVisible(this.ctx.state.tutorialDone);
+    this.questTracker.setTasksVisible(this.ctx.state.tutorialDone);
+
+    // Directly under the quest cluster: who the player is looking at, and how
+    // that person or animal feels about them. Same backgroundless language.
+    this.statusPanel = new StatusPanel(
+      this,
+      this.ctx.bus,
+      this.ctx.state,
+      this.ctx.data.chains,
+      this.ctx.systems.regard,
+      this.ctx.systems.dragons
+    );
+    this.statusPanel.setDepth(DEPTH_HUD);
+    // Field initialisers run once per scene INSTANCE, and this scene is reused
+    // across a restart — so the latch is seated here, where a resumed save gets
+    // it from the one fact that survives: a mid-tutorial reload replays its
+    // step, which re-latches on its own if that beat has been reached.
+    this.statusTaught = this.ctx.state.tutorialDone;
+    this.statusPanel.setEnabled(this.statusTaught);
+
+    // The reveal card. It plays wherever it is earned, tutorial or not — the
+    // one thing it must never do is arrive long after the moment it is about.
+    this.reveal = new DragonReveal(this, this.ctx.bus);
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
@@ -125,6 +224,26 @@ export class UIScene extends Phaser.Scene {
     this.bubble.setPosition(GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
     this.bubble.setDepth(DEPTH_TUTORIAL);
     this.bubble.registerUi();
+    // GIVE is a two-part act: the bag arms it, the board delivers it. The panel
+    // has to get out of the way in between, or the recipient is behind it.
+    //
+    // Tracked in `offBus` because THIS SCENE restarts (Reset → Title → Play): an
+    // untracked handler would still be listening on the next run, and a second
+    // copy of this one would arm the same gift twice.
+    this.offBus.push(
+      this.ctx.bus.on('ui:bag_give_requested', ({ chain, tier }) => {
+        this.bag.requestClose();
+        this.ctx.bus.emit('bag:give_armed', { chain, tier });
+      })
+    );
+    // `{dragon}` in any authored line resolves to what the player called her,
+    // and the bubble paints it in lava. Seeded from state so a resumed save
+    // speaks her name too, then kept live off the naming fact.
+    const named = this.ctx.systems.dragons.firstNamed();
+    if (named) this.bubble.setToken('dragon', named.name);
+    this.offBus.push(
+      this.ctx.bus.on('dragon:named', ({ name }) => this.bubble.setToken('dragon', name))
+    );
 
     this.hand = this.add.image(0, 0, 'ui_hand').setDepth(DEPTH_TUTORIAL + 2).setVisible(false);
     // A replaced hand/arrow (UI Builder upload) may carry its own anchor so the
@@ -164,6 +283,10 @@ export class UIScene extends Phaser.Scene {
       this.hud.teardown();
       this.ledger.teardown();
       this.cookbook.teardown();
+      this.shop.teardown();
+      this.commission.teardown();
+      this.questTracker.teardown();
+      this.statusPanel.teardown();
     });
 
     // If resuming from a completed-tutorial save, key pill is permanently hidden.
@@ -177,6 +300,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    this.reveal.tick(delta);
     // Re-project board-anchored tutorial markers EVERY frame so they stay glued
     // to their cell as the board camera pans/zooms (they live on the UI scene's
     // own fixed camera, so without this they'd appear stuck to the screen).
@@ -206,7 +330,10 @@ export class UIScene extends Phaser.Scene {
         this.arrow.setPosition(
           a.x,
           nearTop
-            ? a.y + 18 + this.arrow.displayHeight + this.arrowBob.v
+            // `a.height` is how far the target extends BELOW its anchor point —
+            // 0 for a button, but a whole standee for a world character. Without
+            // it the flipped arrow is drawn across the thing it is pointing at.
+            ? a.y + (a.height ?? 0) + 18 + this.arrow.displayHeight + this.arrowBob.v
             : a.y - this.arrowLift + this.arrowBob.v
         );
       }
@@ -232,6 +359,40 @@ export class UIScene extends Phaser.Scene {
     const bus = this.ctx.bus;
     this.offBus.push(
       bus.on('tutorial:step', (step) => this.onTutorialStep(step)),
+      bus.on('dragon:revealed', (card) => this.reveal.play(card)),
+      bus.on('story:chapter', ({ chapter }) => this.playChapterBeats(chapter)),
+      bus.on('story:arrival', ({ worldId }) => this.playArrivalBeats(worldId)),
+      // The House's commission. The board decides WHEN to ask; the panel is the
+      // UI's, so neither reaches into the other.
+      bus.on('ui:commission_requested', ({ itemId }) => {
+        this.commission.openFor(itemId);
+        // Once ever: the panel says WHAT it wants, she says why it matters —
+        // that the choice cannot be taken back, which is the part a title bar
+        // cannot carry.
+        this.showHint('houseCommission', 6500);
+      }),
+      bus.on('generator:produce_set', ({ chain, tier }) =>
+        this.floatWarning(`This house now makes ${this.pieceName(chain, tier)}.`)
+      ),
+      bus.on('generator:produce_refused', ({ reason }) =>
+        this.floatWarning(
+          reason === 'not_in_bag'
+            ? 'Pocket one first — a house can only make what you carry.'
+            : reason === 'already_set'
+              ? 'This house is already spoken for. Build another.'
+              : 'That cannot be commissioned.'
+        )
+      ),
+      // ---- Regard: the five hearts. She speaks for herself in all three cases;
+      // a relationship gauge that only ever moved a row of icons would be a
+      // scoreboard, and the icons are the LEAST of what is meant to change.
+      bus.on('regard:gift_accepted', ({ characterId, chain, tier }) =>
+        this.sayGiftLine(characterId, true, tier + chain.length)
+      ),
+      bus.on('regard:gift_declined', ({ characterId, chain, tier }) =>
+        this.sayGiftLine(characterId, false, tier + chain.length)
+      ),
+      bus.on('regard:heart', ({ characterId, hearts }) => this.playRegardBeats(characterId, hearts)),
       bus.on('ui:ledger_toggled', () => {
         // applyMarkers() below wipes ALL markers — retire an active recipe
         // demonstration cleanly rather than leaving its state half-cleared.
@@ -257,6 +418,49 @@ export class UIScene extends Phaser.Scene {
         this.time.delayedCall(700, () => this.checkRecipeHints());
       }),
       bus.on('gold:collected', ({ at, coins }) => this.flyCoinToGold(at, coins ?? 1)),
+      bus.on('bag:stored', ({ chain, tier, at }) => this.flyItemToBag(chain, tier, at)),
+      bus.on('bag:changed', ({ used }) => this.hud.setBagCount(used)),
+      bus.on('bag:store_failed', ({ reason }) =>
+        this.floatWarning(reason === 'full' ? 'Bag is full!' : 'No room on the board!')
+      ),
+      // A character's refusal is never silent. `not_mine` is the story one:
+      // she cannot wake what is sleeping, and saying so every time is what
+      // teaches the mystery long before chapter 8 explains it.
+      // Husbandry feedback — a nest that refuses, a dragon that grows up.
+      bus.on('nest:offer_refused', ({ reason }) =>
+        this.floatWarning(
+          reason === 'daily_cap'
+            ? 'It has taken all it will today.'
+            : 'It will not eat that.'
+        )
+      ),
+      bus.on('nest:warmed', ({ points, required }) =>
+        this.floatWarning(`The nest is warmer.  ${points} / ${required}`)
+      ),
+      bus.on('companion:named', ({ name }) => this.floatWarning(`${name}.  That's a real one, then.`)),
+      bus.on('companion:refused', ({ companionId }) => {
+        const c = this.ctx.systems.dragons.find(companionId);
+        this.floatWarning(`${c?.name || 'It'} turns its head away.`);
+      }),
+      bus.on('companion:gave', ({ companionId, kind }) => {
+        const c = this.ctx.systems.dragons.find(companionId);
+        this.floatWarning(
+          kind === 'dug' ? `${c?.name || 'It'} dug this up for you.` : `${c?.name || 'It'} brought you something.`
+        );
+      }),
+      bus.on('companion:grew', ({ companionId }) => {
+        const c = this.ctx.systems.dragons.find(companionId);
+        this.floatWarning(`${c?.name || 'It'} has grown.`);
+      }),
+      bus.on('character:action_failed', ({ reason }) =>
+        this.floatWarning(
+          reason === 'cooldown'
+            ? 'She needs to rest first.'
+            : reason === 'not_mine'
+              ? '“That one\u2019s yours.”'
+              : 'Nothing there she can hurry.'
+        )
+      ),
       bus.on('ui:shop_requested', ({ currency }) => {
         if (!(this.lastStep?.done || (this.lastStep?.allow.marketplace ?? false))) return;
         this.shop.open(currency);
@@ -268,6 +472,11 @@ export class UIScene extends Phaser.Scene {
         this.celebrateOrder(orderId, rewards);
       }),
       bus.on('keeper:leveled', ({ level }) => this.celebrateLevelUp(level)),
+      bus.on('quest:completed', ({ questId }) => {
+        // The Golden Elder's awakening — UIScene runs her voice, BoardScene the
+        // camera and the egg, both off this one beat.
+        if (questId === GOLDEN_ALTAR.awakenQuestId) this.time.delayedCall(0, () => this.runFinaleUi());
+      }),
       bus.on('tasks:all_complete', () => this.celebrateTasksComplete()),
       bus.on('energy:changed', ({ current }) => {
         if (current === 0) this.showHint('zeroWarmth');
@@ -295,12 +504,17 @@ export class UIScene extends Phaser.Scene {
       bus.on('tutorial:step', (step) => {
         // Appears for its tutorial introduction, then permanently post-tutorial.
         this.cookbookButton.setVisible(step.done || step.allow.cookbook);
+        this.hud.storeButton.setVisible(step.done);
         // Safety net only — the cookbook_close step has the player close the
         // book themselves; any later step that disallows it just shuts it.
         if (!step.done && !step.allow.cookbook && this.cookbook.isOpen) {
           this.cookbook.requestClose();
         }
       }),
+      bus.on('tutorial:nudge', () => this.nudgeMarkers()),
+      // The popup offers Gold AND Warmth; the tutorial only ever demonstrated
+      // Warmth on the House, so name the cheaper option the first time it shows.
+      bus.on('ui:skip_offered', () => this.showHint('goldSkip')),
       bus.on('cookbook:discovered', ({ chain, fromTier, resultTier }) => {
         // The demonstrated recipe was performed — retire the guiding hand.
         if (`${chain}:${fromTier}>${resultTier}` === this.recipeHint) this.clearRecipeHint();
@@ -315,32 +529,111 @@ export class UIScene extends Phaser.Scene {
         });
       }),
       bus.on('game:reset', () => {
-        this.endScreen?.destroy();
-        this.endScreen = null;
         this.scene.stop(SCENES.board);
         this.scene.start(SCENES.title);
-      })
+      }),
+      // Travel: the veil goes up when the world flips and comes down when the
+      // new board exists. Between those two the destination's backdrop is coming
+      // over the network — without this the player taps a door and the game
+      // simply does nothing for a second or two.
+      bus.on('world:switched', ({ to }) => this.showTravelVeil(to)),
+      bus.on('world:ready', () => this.hideTravelVeil())
     );
   }
 
-  /** Emberkeep Cookbook button — sits directly above the Ledger (quest)
-   *  button; hidden during the tutorial. The lava dot marks new pages. */
+  /**
+   * The travelling curtain: a scrim over the board while the destination loads.
+   *
+   * It lives in UIScene rather than on the board because the board is exactly
+   * what is being torn down and rebuilt — a veil parented to it would be
+   * destroyed at the moment it is needed most. UIScene's camera is fixed and its
+   * scene never restarts, so the curtain is the one thing on screen that spans
+   * the whole journey.
+   */
+  private showTravelVeil(worldId: string): void {
+    this.hideTravelVeil();
+    const name = this.ctx.state.worlds.get(worldId)?.name ?? worldId;
+    const c = this.add.container(0, 0).setDepth(DEPTH_DIALOG + 50);
+    // Interactive so a tap during the load cannot reach the board underneath —
+    // the board it would reach is the one being replaced.
+    const scrim = this.add
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.97)
+      .setOrigin(0)
+      .setInteractive();
+    const label = this.add
+      .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 30, name, {
+        fontFamily: FONT.ui,
+        fontSize: '64px',
+        fontStyle: 'bold',
+        color: PALETTE.cream
+      })
+      .setOrigin(0.5);
+    c.add([scrim, label]);
+    // Three breathing embers rather than a progress bar: the loader reports
+    // bytes, not the scene rebuild that follows it, so a bar would fill and then
+    // sit at full while the board was still being built — worse than no bar.
+    // Drawn as circles, not `fx_glow`: that texture is a wide soft falloff (the
+    // sun haze uses it at scale 7) and three of them this close smear into one
+    // blob rather than reading as a count.
+    for (let i = 0; i < 3; i++) {
+      const dot = this.add
+        .circle(GAME_WIDTH / 2 + (i - 1) * 74, LIVE_GAME_HEIGHT / 2 + 74, 13, num(PALETTE.goldAccent))
+        .setAlpha(0.22);
+      this.tweens.add({
+        targets: dot,
+        alpha: 1,
+        scale: 1.35,
+        duration: 460,
+        delay: i * 160,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+      c.add(dot);
+    }
+    c.setAlpha(0);
+    this.tweens.add({ targets: c, alpha: 1, duration: 180, ease: 'Sine.easeOut' });
+    this.travelVeil = c;
+  }
+
+  private hideTravelVeil(): void {
+    const veil = this.travelVeil;
+    if (!veil) return;
+    this.travelVeil = undefined;
+    // Held a beat past `world:ready`: the board camera runs its own 320ms fade-in
+    // on create, and lifting the curtain first would show the new world arriving
+    // out of black instead of simply being there.
+    this.tweens.add({
+      targets: veil,
+      alpha: 0,
+      delay: 200,
+      duration: 260,
+      ease: 'Sine.easeIn',
+      onComplete: () => veil.destroy()
+    });
+  }
+
+  /** Emberkeep Cookbook button — bottom-right column, above the Bag; hidden
+   *  during the tutorial. The lava dot marks new pages. */
   private buildCookbookButton(): Phaser.GameObjects.Container {
-    // Bottom-right, stacked above the Ledger; magnified + lifted clear of it on mobile.
+    // Slot 2 of the shared column (Ledger 0, Bag 1) — its own offsets used to sit
+    // 36 units from the Bag's, so the satchel covered this button entirely.
     const button = this.add
-      .container(GAME_WIDTH - (IS_MOBILE ? 190 : 156), LIVE_GAME_HEIGHT - (IS_MOBILE ? 560 : 356))
+      .container(HUD_COLUMN_X, hudColumnY(2))
       .setScale(UI_SCALE)
       .setDepth(DEPTH_HUD);
-    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.05);
+    // Plate, icon and dot all at the column's shared 1.5 — this button used to be
+    // built at 1.05 and read as a runt beside the Bag and the Ledger.
+    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.5);
     const icon = this.textures.exists('ui_icon_cookbook')
-      ? this.add.image(0, -6, 'ui_icon_cookbook').setDisplaySize(100, 100)
-      : this.add.text(0, -8, '📖', { fontSize: '56px' }).setOrigin(0.5);
+      ? this.add.image(0, -12, 'ui_icon_cookbook').setDisplaySize(125, 125)
+      : this.add.text(0, -12, '📖', { fontSize: '76px' }).setOrigin(0.5);
     this.cookbookDot = this.add
-      .circle(46, -46, 16, num(PALETTE.lava))
+      .circle(68, -68, 18, num(PALETTE.lava))
       .setStrokeStyle(5, num(PALETTE.cream))
       .setVisible(false);
     button.add([bg, icon, this.cookbookDot]);
-    button.setSize(134, 134);
+    button.setSize(192, 192);
     button.setInteractive({ useHandCursor: true });
     button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
     button.on('pointerout', () => button.setScale(UI_SCALE));
@@ -397,6 +690,72 @@ export class UIScene extends Phaser.Scene {
   /** Tapped Gold arcs from its board cell up to the Gold gauge — one coin
    *  sprite per banked coin (the Pouch sends 3), staggered so each arrival
    *  lands separately and pulses the gauge on impact. */
+  /**
+   * The store beat: the piece leaves its tile, arcs to the satchel and the
+   * button pulses as it lands. Deliberately the SAME motion as the coin flight
+   * below — one curved hop, shrinking as it goes — so storing feels like
+   * something the player already knows rather than a new mechanic.
+   */
+  private flyItemToBag(chain: string, tier: number, at: TilePos): void {
+    const key = `item_${chain}_${tier}`;
+    const start = this.cellToScreen(at.col, at.row);
+    const end = this.hud.getBagPos();
+    if (!this.textures.exists(key)) {
+      this.hud.bumpBag();
+      return;
+    }
+    const art = this.add.image(start.x, start.y - 30, key).setDepth(DEPTH_PANEL + 5);
+    // Normalise: item art ranges from ~190px to ~760px, so a fixed scale would
+    // send a moss tuft and a resin lump off at wildly different sizes.
+    const fit = 96 / Math.max(art.width, art.height);
+    art.setScale(fit * 0.6);
+    this.tweens.add({ targets: art, scale: fit, duration: 140, ease: 'Back.easeOut' });
+    const proxy = { t: 0 };
+    this.tweens.add({
+      targets: proxy,
+      t: 1,
+      duration: 520,
+      delay: 120,
+      ease: 'Sine.easeIn',
+      onUpdate: () => {
+        const t = proxy.t;
+        art.x = Phaser.Math.Linear(start.x, end.x, t);
+        art.y = Phaser.Math.Linear(start.y - 30, end.y, t) - Math.sin(Math.PI * t) * 140;
+        art.rotation = t * Math.PI * 0.6;
+        art.setScale(fit * (1 - 0.55 * t));
+        art.setAlpha(1 - 0.25 * t);
+      },
+      onComplete: () => {
+        art.destroy();
+        this.hud.bumpBag();
+      }
+    });
+  }
+
+  /** A short cream line that rises and fades over the board — used when a store
+   *  or a retrieval could not happen, so the tap is never silently ignored. */
+  private floatWarning(text: string): void {
+    const label = this.add
+      .text(this.scale.width / 2, this.scale.height * 0.62, text, {
+        fontFamily: FONT.display,
+        fontSize: '54px',
+        fontStyle: 'bold',
+        color: PALETTE.cream,
+        stroke: PALETTE.night,
+        strokeThickness: 8
+      })
+      .setOrigin(0.5)
+      .setDepth(DEPTH_PANEL + 20);
+    this.tweens.add({
+      targets: label,
+      y: label.y - 90,
+      alpha: 0,
+      duration: 1100,
+      ease: 'Sine.easeOut',
+      onComplete: () => label.destroy()
+    });
+  }
+
   private flyCoinToGold(at: TilePos, count = 1): void {
     const start = this.cellToScreen(at.col, at.row);
     const end = this.hud.getCoinPos();
@@ -432,78 +791,64 @@ export class UIScene extends Phaser.Scene {
   /** The level-up reward beat: a warm banner — Warmth refilled + Gold. Deferred a
    *  frame: keeper:leveled can fire mid bus-emit (even from an external trigger),
    *  and allocating Text/particles right then can hit a not-yet-ready canvas.
-   *  Level 3 takes the FINALE path instead (no banner — the screen holds while
-   *  the Golden Egg cracks; DEMO-PLAN §THE FINALE). */
+   *  EVERY level gets the banner now — Level 3 used to be swallowed by the
+   *  finale, which has moved onto `GOLDEN_ALTAR.awakenQuestId`. */
   private celebrateLevelUp(level: number): void {
-    if (level >= 3) {
-      this.time.delayedCall(0, () => this.runFinaleUi());
-      return;
-    }
     this.time.delayedCall(0, () => this.buildLevelUpBanner(level));
   }
 
   /**
-   * UIScene's half of the Level-3 finale timeline (BoardScene runs the board
-   * half off the same keeper:leveled beat): Cindra speaks — for the first time
-   * in the entire demo — then the Chapter One card.
+   * UIScene's half of the finale timeline (BoardScene runs the board half off
+   * the same `quest:completed` beat): the Golden Elder speaks, for the first
+   * time in the whole game — and that is the end of it.
+   *
+   * Nothing follows her. The finale used to close on a "Beyond the demo"
+   * roadmap and a Chapter One card offering Keep Playing / Play Again; both were
+   * demo furniture, and a modal that interrupts a player to ask whether they
+   * would like to keep playing is the wrong last thing a chapter says. Her line
+   * lands, the camera comes home, and play continues uninterrupted.
    */
   private runFinaleUi(): void {
-    if (this.finaleActive || this.endScreen) return;
+    if (this.finaleActive) return;
     this.finaleActive = true;
     this.clearRecipeHint(); // the finale owns the stage — no competing pointers
     this.ledger.requestClose();
     this.shop.requestClose();
     this.cookbook.requestClose();
-    this.time.delayedCall(FINALE.cindraAtMs, () => {
+    this.time.delayedCall(FINALE.elderAtMs, () => {
       // No egg earned (Order 1 skipped)? Her line reads as PROPHECY — selling
       // the promise the player hasn't collected yet, never claiming an
       // awakening that didn't happen.
       const eggEarned = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
       this.bubble.say(
-        'cindra',
-        eggEarned ? this.ctx.data.dialogue.finaleCindra : this.ctx.data.dialogue.finaleCindraProphecy,
-        FINALE.cindraHoldMs
+        'golden_elder',
+        eggEarned ? this.ctx.data.dialogue.finaleElder : this.ctx.data.dialogue.finaleElderProphecy,
+        FINALE.elderHoldMs
       );
     });
-    this.time.delayedCall(FINALE.cardAtMs, () => {
+    // The stage is released when her line does, not when a panel is dismissed.
+    this.time.delayedCall(FINALE_ENDS_MS, () => {
       this.finaleActive = false;
-      if (this.endScreen) return;
-      const showCard = (): void => {
-        if (this.endScreen || !this.scene.isActive()) return;
-        this.endScreen = new EndScreen(this, 'chapter');
-        this.add.existing(this.endScreen);
-        this.endScreen.setDepth(DEPTH_DIALOG + 50);
-        this.endScreen.once(Phaser.GameObjects.Events.DESTROY, () => {
-          this.endScreen = null;
-        });
-      };
-      // "Beyond the demo" is the ending's HEADLINE — it leads, unprompted, so
-      // no session finishes without seeing it; the Chapter One card (its home,
-      // which keeps the reopen button) follows when the player closes it.
-      // Without the trailer art there is nothing to headline — straight to card.
-      if (this.textures.exists('trailer_world_ice') || this.textures.exists('trailer_legend_frost')) {
-        const panel = new BeyondDemoPanel(this);
-        panel.setDepth(DEPTH_DIALOG + 50);
-        panel.once(Phaser.GameObjects.Events.DESTROY, showCard);
-      } else {
-        showCard();
-      }
     });
   }
 
   /** Order completion — the demo's primary reward beat — now celebrates at
-   *  level-up parity: banner + spark burst + a rotating Cindra quote stamped on
+   *  level-up parity: banner + spark burst + a rotating Eleanor quote stamped on
    *  the card (her VOICE stays reserved for the finale). The golden order gets
    *  its own beats: a dedicated arrival quote, and — delivered after Level 3 —
-   *  Cindra SPEAKS over the late awakening playing out at the altar. */
+   *  The Golden Elder SPEAKS over the late awakening playing out at the altar. */
   private celebrateOrder(orderId: string, rewards: { coins: number; keys: number; xp?: number }): void {
     if (this.finaleActive || !this.ctx.state.tutorialDone) return;
     const golden = orderId === GOLDEN_ALTAR.orderId;
     this.time.delayedCall(0, () => {
-      const quotes = this.ctx.data.dialogue.orderComplete;
+      // Her banter is banked by story stage, so the Ledger says something new
+      // as the campaign moves (docs/script-chapters.md, Part II).
+      const quotes = this.ctx.systems.story.orderCompleteBank();
       const quote = golden
         ? this.ctx.data.dialogue.goldenArrival
-        : quotes[(this.ctx.state.completedOrderIds.length - 1) % quotes.length] ?? '';
+        : quotes.length
+          ? quotes[(this.ctx.state.completedOrderIds.length - 1) % quotes.length] ?? ''
+          : '';
       const parts: string[] = [];
       if (rewards.coins) parts.push(`◎ +${rewards.coins} Gold`);
       if (rewards.xp) parts.push(`✦ +${rewards.xp} XP`);
@@ -513,7 +858,7 @@ export class UIScene extends Phaser.Scene {
       // BoardScene's lateGoldenAwakening cracks the egg at ~2.4s — her line
       // lands right as the Elder rises.
       this.time.delayedCall(3200, () => {
-        this.bubble.say('cindra', this.ctx.data.dialogue.lateAwakening, 4600);
+        this.bubble.say('golden_elder', this.ctx.data.dialogue.lateAwakening, 4600);
       });
     }
   }
@@ -521,7 +866,7 @@ export class UIScene extends Phaser.Scene {
   private celebrateTasksComplete(): void {
     this.time.delayedCall(0, () => {
       this.buildCelebrationBanner('EVERY TASK COMPLETE', '◎ Gold  ⚡ Warmth — a golden thank-you', '');
-      this.bubble.say('cindra', this.ctx.data.dialogue.tasksComplete, 5200);
+      this.bubble.say('eleanor', this.ctx.data.dialogue.tasksComplete, 5200);
     });
   }
 
@@ -541,13 +886,13 @@ export class UIScene extends Phaser.Scene {
     g.fillRoundedRect(-378, -height / 2 + 12, 756, height - 24, 24);
     const ribbon = this.add
       .text(0, -height / 2 + 58, title, {
-        fontFamily: FONT, fontSize: '48px', fontStyle: 'bold', color: PALETTE.textBrown
+        fontFamily: FONT.ui, fontSize: '46px', fontStyle: 'bold', color: PALETTE.cream
       })
       .setOrigin(0.5)
       .setStroke(PALETTE.cream, 5);
     const sub = this.add
       .text(0, -height / 2 + 122, rewardLine, {
-        fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: PALETTE.goldShade
+        fontFamily: FONT.ui, fontSize: '30px', fontStyle: 'bold', color: PALETTE.goldShade
       })
       .setOrigin(0.5);
     c.add([g, ribbon, sub]);
@@ -555,7 +900,7 @@ export class UIScene extends Phaser.Scene {
       c.add(
         this.add
           .text(0, -height / 2 + 182, quote, {
-            fontFamily: FONT, fontSize: '26px', fontStyle: 'italic', color: '#8A6248',
+            fontFamily: FONT.ui, fontSize: '26px', fontStyle: 'italic', color: '#8A6248',
             wordWrap: { width: 700 }, align: 'center'
           })
           .setOrigin(0.5)
@@ -609,17 +954,17 @@ export class UIScene extends Phaser.Scene {
       .setDepth(DEPTH_HUD - 1); // over the board render, under every UI element
   }
 
-  /** One-shot Laurah nudge (post-tutorial guidance without a second tutorial). */
+  /** One-shot Eleanor nudge (post-tutorial guidance without a second tutorial). */
   private showHint(key: keyof GameContext['data']['dialogue']['hints'], holdMs = 5200): void {
     if (!this.ctx.state.tutorialDone || this.finaleActive || this.hintShown.has(key)) return;
     this.hintShown.add(key);
-    this.bubble.say('laurah', this.ctx.data.dialogue.hints[key], holdMs);
+    this.bubble.say('eleanor', this.ctx.data.dialogue.hints[key], holdMs);
   }
 
   /**
    * Contextual recipe mini-tutorials: the moment the board first holds the TWO
    * pieces of a 2→1 recipe (two Red Dragons → Adult, two Houses → Manor),
-   * Laurah teases the merge and the guiding gauntlet demonstrates the drag
+   * Eleanor teases the merge and the guiding gauntlet demonstrates the drag
    * between the actual pieces. Purely presentational — nothing is gated, no
    * input is blocked; it clears itself on discovery, timeout, or the finale.
    */
@@ -627,7 +972,7 @@ export class UIScene extends Phaser.Scene {
     if (!this.ctx.state.tutorialDone || this.finaleActive || this.recipeHint) return;
     const candidates = [
       { key: 'twoDragons', recipe: 'ember_dragon:3>4', chain: 'ember_dragon', tier: 3 },
-      { key: 'twoHouses', recipe: 'lumber:2>3', chain: 'lumber', tier: 2 }
+      { key: 'twoHouses', recipe: 'lumber:3>4', chain: 'lumber', tier: 3 }
     ] as const;
     for (const c of candidates) {
       if (this.hintShown.has(c.key)) continue;
@@ -705,13 +1050,13 @@ export class UIScene extends Phaser.Scene {
     g.fillRoundedRect(-348, -84, 696, 168, 24);
     const ribbon = this.add
       .text(0, -46, `KEEPER LEVEL ${level}`, {
-        fontFamily: FONT, fontSize: '60px', fontStyle: 'bold', color: PALETTE.textBrown
+        fontFamily: FONT.ui, fontSize: '64px', fontStyle: 'bold', color: PALETTE.cream
       })
       .setOrigin(0.5)
       .setStroke(PALETTE.cream, 6);
     const sub = this.add
       .text(0, 34, '⚡ Warmth refilled    ◎ Gold reward', {
-        fontFamily: FONT, fontSize: '34px', fontStyle: 'bold', color: PALETTE.goldShade
+        fontFamily: FONT.ui, fontSize: '34px', fontStyle: 'bold', color: PALETTE.goldShade
       })
       .setOrigin(0.5);
     c.add([g, ribbon, sub]);
@@ -729,13 +1074,40 @@ export class UIScene extends Phaser.Scene {
       targets: c, alpha: 0, scale: 1.04, delay: 1500, duration: 360, ease: 'Sine.easeIn',
       onComplete: () => c.destroy()
     });
-    // (Level 3 never reaches here — celebrateLevelUp routes it to the finale.)
   }
 
   private onTutorialStep(step: TutorialStepEvent): void {
     this.lastStep = step;
     this.hud.setLedgerEnabled(step.done || step.allow.ledger);
+    // The tracker is a readout of the Ledger, so BOTH halves ride the same gate
+    // as the Ledger button.
+    //
+    // The sub-rows used to wait for `step.done`, which made quest one's
+    // subquests dead UI: the tutorial delivers Eleanor's first order itself, so
+    // that quest was already finished by the time the rows were allowed to
+    // appear, and the player's first sight of the tracker was a bare title over
+    // a number with nothing explaining what the number counted. Showing them on
+    // the Ledger beats instead means the widget introduces itself at the moment
+    // the tutorial is pointing at the Ledger anyway — one row, reading
+    // "Deliver 6 Gem Shards to Eleanor", which is exactly the instruction.
+    const ledgerBeat = step.done || step.allow.ledger;
+    this.questTracker.setStoryVisible(ledgerBeat);
+    this.questTracker.setTasksVisible(ledgerBeat);
     this.ledger.setDeliverAllowed(step.done || step.allow.deliver);
+    this.bag.setSellAllowed(step.done || step.allow.sell);
+    this.bag.setGiveAllowed(step.done || step.allow.give);
+    // The status readout debuts on the beat that teaches feeding — it is the
+    // surface that lesson's payoff is READ on — and then LATCHES for the rest of
+    // the script. Every other `allow` flag is a permission that a later beat is
+    // right to take back; this one is a concept that has been taught, and a
+    // gauge that vanished again three beats later would read as a bug. The latch
+    // also means the beats after it do not each have to remember `feed: true`.
+    if (step.allow.status) this.statusTaught = true;
+    this.statusPanel.setEnabled(step.done || this.statusTaught);
+    // Safety net, same shape as the Cookbook's: a beat that does not allow the
+    // satchel shuts it, so the panel's dim can never swallow the tap the next
+    // step is waiting on (`sell_it` leaves the bag open behind it).
+    if (!step.done && !step.allow.bag && this.bag.isOpen) this.bag.requestClose();
     // Show key pill only during the key_unlock step; hide it otherwise.
     this.hud.setKeyVisible(!step.done && step.id === 'key_unlock');
     // A step that no longer involves the Ledger closes it, so its dim never
@@ -746,21 +1118,93 @@ export class UIScene extends Phaser.Scene {
       this.clearMarkers();
       return;
     }
+    // Beat 0 of the opening: the board is visible and SILENT before her first
+    // line, so the player sees the ash before anyone frames it. Staging only —
+    // the director has already emitted the step (docs/opening-scene.md).
+    if (step.index === 0 && !this.openingHeld) {
+      this.openingHeld = true;
+      this.clearMarkers();
+      this.time.delayedCall(OPENING_HOLD_MS, () => {
+        if (this.lastStep?.id !== step.id) return;
+        this.bubble.show(step);
+        this.applyMarkers(step);
+      });
+      return;
+    }
     this.bubble.show(step);
     this.applyMarkers(step);
+  }
+
+  /** A chapter turned: play its beats, tap by tap. Fires once per chapter — the
+   *  pointer is persisted, so a reload never replays them. */
+  private playChapterBeats(chapter: number): void {
+    const beats = this.ctx.systems.story.beatsFor(chapter);
+    if (!beats) return;
+    // Let the order-complete celebration land first; her reaction is TO it.
+    this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () => {
+        this.ctx.bus.emit('story:beats_finished', { chapter });
+      });
+    });
+  }
+
+  /** A piece's authored name, for a line that has to say WHICH piece. Falls
+   *  back to the key rather than to "item", so a missing name is debuggable. */
+  private pieceName(chain: string, tier: number): string {
+    return (
+      this.ctx.data.chains.chains.find((c) => c.id === chain)?.tiers.find((t) => t.tier === tier)
+        ?.name ?? `${chain} T${tier}`
+    );
+  }
+
+  /**
+   * A gift changed hands (or did not). One line, in her voice, immediately —
+   * this is feedback on a gesture the player just made, so it does not queue
+   * behind anything the way a chapter beat does.
+   */
+  private sayGiftLine(characterId: string, accepted: boolean, seed: number): void {
+    const line = this.ctx.systems.story.giftLine(characterId, accepted, seed);
+    if (!line) return;
+    this.bubble.say(characterId as SpeakerId, line, accepted ? 3600 : 3000);
+  }
+
+  /**
+   * A whole heart filled. The milestone scene, played once ever.
+   *
+   * Delayed by the same beat a chapter is: the gift's own line is on screen and
+   * her reaction is TO it, not over it.
+   */
+  private playRegardBeats(characterId: string, hearts: number): void {
+    const beats = this.ctx.systems.story.regardBeats(characterId, hearts);
+    if (!beats) return;
+    this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      this.bubble.sequence(beats.speaker as SpeakerId, beats.lines);
+    });
+  }
+
+  /** A world entered for the first time: whoever lives there speaks. Waits out
+   *  the travelling curtain — she is not talking over a black screen. */
+  private playArrivalBeats(worldId: string): void {
+    const beats = this.ctx.systems.story.arrivalBeats(worldId);
+    if (!beats) return;
+    this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      this.bubble.sequence(beats.speaker as SpeakerId, beats.lines);
+    });
   }
 
   private maybeShowTooltip(itemId: number): void {
     const item = this.ctx.state.items.get(itemId);
     if (!item || item.kind !== 'item') return;
     if (item.readyAt !== undefined) return; // generators harvest instead
-    // Story items (Golden Egg/Elder) are unsellable — no tooltip; the board
+    // Story items (Golden Egg/Elder) are not merchandise — no card; the board
     // plays their own tap beat instead.
     const tier = this.ctx.data.chains.chains
       .find((c) => c.id === item.chain)
       ?.tiers.find((t) => t.tier === item.tier);
     if (tier?.sellable === false) return;
-    if (!this.ctx.state.tutorialDone && !(this.lastStep?.allow.sell ?? false)) return;
+    // The card is the inspect half of the same gesture pair as tap-to-pocket, so
+    // it rides the same permission rather than the retired board-sell one.
+    if (!this.bagAllowed()) return;
     const { x, y } = this.cellToScreen(item.col, item.row);
     this.tooltip.openFor(itemId, item.chain, item.tier, x, y - 116);
   }
@@ -787,6 +1231,40 @@ export class UIScene extends Phaser.Scene {
       };
     }
     return { x: wx, y: wy };
+  }
+
+  /**
+   * The player touched something this step doesn't allow. Rather than swallow
+   * it, re-point: a quick pop on whichever guidance marker is live, and a bump
+   * on the bubble that says what the step wants. Purely additive — the marker's
+   * own looping tween keeps running underneath (tutorial-design law 3).
+   */
+  /** The satchel is usable once the tutorial has taught it, and always after. */
+  /** The Store is cosmetics — it opens the moment the tutorial is over and
+   *  never during it. There is no `allow.store`: no beat teaches it, because
+   *  nothing in it is a rule. */
+  private storeAllowed(): boolean {
+    return this.lastStep?.done ?? this.ctx.state.tutorialDone;
+  }
+
+
+  private bagAllowed(): boolean {
+    return (this.lastStep?.done ?? this.ctx.state.tutorialDone) || (this.lastStep?.allow.bag ?? false);
+  }
+
+  private nudgeMarkers(): void {
+    if (this.lastStep?.done) return;
+    const live = [this.hand, this.arrow].filter((m) => m.visible);
+    for (const marker of live) {
+      const base = marker === this.hand ? this.handBaseScale : this.arrowBaseScale;
+      this.tweens.add({
+        targets: marker,
+        scale: { from: base * 1.28, to: base },
+        duration: 220,
+        ease: 'Back.easeOut'
+      });
+    }
+    this.bubble.bump();
   }
 
   private clearMarkers(): void {
@@ -834,17 +1312,53 @@ export class UIScene extends Phaser.Scene {
     else if (step.arrow) this.placeArrow(step.arrow);
   }
 
-  private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' } | { fogRegion: string }): { x: number; y: number } | null {
+  private uiTarget(
+    ref:
+      | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' }
+      | { fogRegion: string }
+      | { character: string }
+  ): { x: number; y: number; height?: number } | null {
+    if ('character' in ref) {
+      // Ask the board for her LIVE standee — she is authored in the World
+      // Builder, so nothing here may remember where she stands.
+      const board = this.scene.get(SCENES.board) as BoardScene | undefined;
+      const point = board?.characterMarkerPoint?.(ref.character);
+      if (point) {
+        const head = this.worldToScreen(point.x, point.y);
+        return { ...head, height: this.worldToScreen(point.x, point.bottom).y - head.y };
+      }
+      // Her art failed to load, so there is no standee to point at — fall back
+      // to the cell + nudge she WOULD stand on, computed the same way the board
+      // computes it, so the arrow still lands on the right patch of ground.
+      const cfg = this.ctx.systems.characters.get(ref.character);
+      if (!cfg) return null;
+      const cell = gridToWorld(cfg.anchor[0], cfg.anchor[1]);
+      const ratio = TILE_W / (this.ctx.state.map.tile?.width ?? TILE_W);
+      return this.worldToScreen(cell.x + (cfg.dx ?? 0) * ratio, cell.y + (cfg.dy ?? 0) * ratio);
+    }
     if ('ui' in ref) {
       // The ⚡+ button until the Emporium opens, then the FREE! card inside it —
       // handPoint/arrowAnchor re-evaluate each frame, so the marker follows live.
       if (ref.ui === 'marketplace') return this.shop.getFreeButtonPos() ?? this.hud.getEnergyPlusPos();
       if (ref.ui === 'ledger') return this.hud.getLedgerPos();
+      // The status readout is a HUD block, not a button: the marker wants its
+      // whole height so the arrow can sit clear of it rather than across the
+      // hearts it is pointing at (same `height` contract the standee uses).
+      if (ref.ui === 'status') return this.statusPanel.getMarkerPos();
       if (ref.ui === 'cookbook') return { x: this.cookbookButton.x, y: this.cookbookButton.y };
       if (ref.ui === 'cookbook_close') return this.cookbook.isOpen ? this.cookbook.getClosePos() : null;
+      // Same smart-target shape as `marketplace`: the satchel button until the
+      // bag is open, then the chosen slot's Sell plate inside it. Re-evaluated
+      // every frame, so the arrow walks the player through open → tap → Sell
+      // instead of pointing at a button that is no longer the next thing to do.
+      if (ref.ui === 'bag') return this.bag.getSellPos() ?? this.hud.getBagPos();
+      // Same walk-the-player-through shape as `bag`, aimed at the third verb:
+      // the satchel button until the bag is open, then the Give plate inside the
+      // chosen slot's chooser.
+      if (ref.ui === 'bag_give') return this.bag.getGivePos() ?? this.hud.getBagPos();
       return this.ledger.isOpen ? this.ledger.getDeliverPos() : null;
     }
-    const region = this.ctx.data.map.regions.find((r) => r.id === ref.fogRegion);
+    const region = this.ctx.state.map.regions.find((r) => r.id === ref.fogRegion);
     if (!region) return null;
     const tiles: TilePos[] = region.tiles.map(([c, r]) => ({ col: c, row: r }));
     let sx = 0;
@@ -949,7 +1463,10 @@ export class UIScene extends Phaser.Scene {
       this.arrowLift = 156;
     } else {
       this.arrowAnchor = () => this.uiTarget(arrow);
-      this.arrowLift = 'ui' in arrow ? 116 : 192;
+      // A character anchor is already the top of her head, so it wants the
+      // smallest gap of the three; a fog region resolves to the middle of a
+      // whole strip and wants the largest.
+      this.arrowLift = 'character' in arrow ? 84 : 'ui' in arrow ? 116 : 192;
     }
     const target = this.arrowAnchor();
     if (!target) {
@@ -1009,10 +1526,10 @@ export class UIScene extends Phaser.Scene {
     panel.strokeRoundedRect(-450, -310, 900, 620, 52);
     const title = this.add
       .text(0, -244, 'Settings', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '54px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown
+        color: PALETTE.cream
       })
       .setOrigin(0.5);
 
@@ -1024,8 +1541,8 @@ export class UIScene extends Phaser.Scene {
       .setScale(1.05, 0.8);
     const musicText = this.add
       .text(0, -10, musicLabel(), {
-        fontFamily: FONT,
-        fontSize: '42px',
+        fontFamily: FONT.ui,
+        fontSize: '40px',
         fontStyle: 'bold',
         color: '#FFFFFF'
       })
@@ -1044,15 +1561,15 @@ export class UIScene extends Phaser.Scene {
     const divider = this.add.rectangle(0, -76, 760, 3, num(PALETTE.lava), 0.22);
     const resetTitle = this.add
       .text(0, -22, 'Reset Cinder Hollow?', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '40px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown
+        color: PALETTE.cream
       })
       .setOrigin(0.5);
     const body = this.add
       .text(0, 48, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '30px',
         color: '#8A6248',
         align: 'center',
@@ -1071,8 +1588,8 @@ export class UIScene extends Phaser.Scene {
       const bg = this.add.image(0, 0, texture).setScale(scaleX, 0.78);
       const text = this.add
         .text(0, -10, label, {
-          fontFamily: FONT,
-          fontSize: '42px',
+          fontFamily: FONT.ui,
+          fontSize: '40px',
           fontStyle: 'bold',
           color: '#FFFFFF'
         })

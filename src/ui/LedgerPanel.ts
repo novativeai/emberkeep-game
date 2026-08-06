@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
+import { FONT, INK } from '../art/design';
+import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { OrderConfig } from '../core/types';
@@ -7,13 +8,39 @@ import type { OrderSystem } from '../systems/OrderSystem';
 import type { TaskSystem } from '../systems/TaskSystem';
 import { uiRegistry } from './theme';
 
-const FONT = 'Trebuchet MS, Verdana, sans-serif';
 // Card centres: half the card art (640×0.9 → ±288) + this must stay inside the
 // ui_panel's inner face (~±612) — at 330/0.96 the cards overflowed the frame.
 const CARD_X = 300;
 const TAB_W = 520;
 const TAB_H = 104;
 const TAB_Y = -384;
+
+// ---- Order-card portrait medallion ----
+// Eleanor sits in the SAME gold ring the dialogue bubble frames her with
+// (`portrait_ring`, 512px art), so the quest book and her bubble read as one
+// medallion language rather than two unrelated treatments. Every radius below
+// is a ratio of that art's own geometry — the window hole ends at 200/512 and
+// the gold's outer edge at 250/512 — so re-sizing is one constant.
+const MEDALLION_SIZE = 184;
+/** Centred in the band between the card's top edge (-315) and the title. */
+const MEDALLION_Y = -214;
+const RING_HOLE_R = MEDALLION_SIZE * (200 / 512);
+const RING_OUTER_R = MEDALLION_SIZE * (250 / 512);
+/** Portrait clip radius — just inside the gold, so the crop's edge hides UNDER
+ *  the band and never reads as a hard circle against the moss. */
+const RING_MASK_R = MEDALLION_SIZE * (247 / 512);
+/** Bust height as a multiple of the window's diameter. Just over 1 — the same
+ *  proportion the dialogue bubble frames her at, so the crop lands on her robe
+ *  hem and her shoulders and braid still read. Scaling to COVER the window's
+ *  width instead cropped her at the jaw and lost the bust entirely. */
+const MEDALLION_FILL = 1.1;
+/** Headroom between the window's top and the top of the art, so her hair has
+ *  air instead of butting into the frame. */
+const MEDALLION_HEAD_INSET = 6;
+/** Moss interior — the same two greens CharacterBubble fills its ring window
+ *  with, so the gaps beside her silhouette read as the medallion's inside. */
+const MOSS_BACK = 0x3e745b;
+const MOSS_LIGHT = 0x549270;
 
 type LedgerTab = 'orders' | 'tasks';
 
@@ -23,6 +50,9 @@ interface OrderCard {
   slotIcon: Phaser.GameObjects.Image;
   slotCount: Phaser.GameObjects.Text;
   rewardText: Phaser.GameObjects.Text;
+  /** Real coin art in front of the reward line — shown only when the order pays
+   *  Gold, and re-seated on every refresh because the line's width changes. */
+  rewardCoin: Phaser.GameObjects.Image;
   deliverButton: Phaser.GameObjects.Container;
   order: OrderConfig | null;
   deliverable: boolean;
@@ -44,7 +74,7 @@ interface TabHandle {
 }
 
 /**
- * Cindra's Ledger — the game's single quest board. Two tabs under one frame:
+ * Eleanor's Ledger — the game's single quest board. Two tabs under one frame:
  *   • Orders — the two-slot order board (DEMO-PLAN §Act III): both active
  *     orders visible at once, so the player CHOOSES what to chase.
  *   • Tasks — the Keeper's Tasks chapter checklist (DEMO-PLAN §Act V) with
@@ -69,6 +99,15 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private ordersTab: TabHandle;
   private tasksTab: TabHandle;
   private taskRows: TaskRow[] = [];
+  /** Per-card portrait clip circles, re-seated in world space each frame. */
+  private portraitMasks: Array<{ g: Phaser.GameObjects.Graphics; root: Phaser.GameObjects.Container }> = [];
+  /** The owning scene, held separately from the GameObject's own `this.scene`.
+   *  Phaser's DisplayList destroys every child during scene shutdown, and a
+   *  destroyed GameObject has `scene === undefined` — but our SHUTDOWN listener
+   *  is registered in create(), so it runs AFTER that. `teardown()` therefore
+   *  cannot reach the scene through `this.scene`; it would throw and abort the
+   *  whole teardown chain (the panels after it would keep their subscriptions). */
+  private readonly owner: Phaser.Scene;
 
   constructor(
     scene: Phaser.Scene,
@@ -78,25 +117,26 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     private gameState: GameState
   ) {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    this.owner = scene;
 
     this.dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.55)
       .setInteractive(); // swallow board input behind the panel
     this.dim.on('pointerup', () => this.requestClose());
 
-    const panel = scene.add.image(0, 16, 'ui_panel');
+    const panel = scene.add.image(0, 16, 'ui_quest_panel');
     this.baseScale = panelMobileScale(panel.width);
 
     // Tab lozenges along the top edge — Orders sits centred (classic Ledger
     // header) until the tutorial ends and the Tasks tab joins it.
-    this.ordersTab = this.buildTab(scene, 'Cindra’s Orders', () => this.switchTab('orders'));
+    this.ordersTab = this.buildTab(scene, 'Eleanor’s Orders', () => this.switchTab('orders'));
     this.tasksTab = this.buildTab(scene, 'Keeper’s Tasks', () => this.switchTab('tasks'));
 
     // Close button.
     const closeButton = scene.add.container(592, -392);
-    const closeBg = scene.add.circle(0, 0, 42, num(PALETTE.lava)).setStrokeStyle(6, num(PALETTE.cream));
+    const closeBg = scene.add.circle(0, 0, 42, num(INK.field)).setStrokeStyle(6, num(INK.goldMid));
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: PALETTE.cream })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
     closeButton.setSize(96, 96);
@@ -109,22 +149,22 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
 
     // The active card's flavor line runs along the bottom of the board.
     this.blurb = scene.add
-      .text(0, 400, '', {
-        fontFamily: FONT,
-        fontSize: '28px',
+      .text(0, 372, '', {
+        fontFamily: FONT.ui,
+        fontSize: '26px',
         fontStyle: 'italic',
-        color: '#8A6248',
+        color: INK.onFieldDim,
         align: 'center',
-        wordWrap: { width: 1150 }
+        wordWrap: { width: 1050 }
       })
       .setOrigin(0.5);
 
     this.emptyText = scene.add
-      .text(0, 20, 'The brazier roars again!\nCindra will have new work for you soon.', {
-        fontFamily: FONT,
+      .text(0, 20, 'The brazier roars again!\nEleanor will have new work for you soon.', {
+        fontFamily: FONT.ui,
         fontSize: '38px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown,
+        color: INK.onField,
         align: 'center',
         lineSpacing: 12
       })
@@ -139,8 +179,9 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.add([this.dim, panel, this.ordersTab.root, this.tasksTab.root, closeButton, this.ordersPage, this.tasksPage]);
     scene.add.existing(this);
     this.setVisible(false);
+    scene.events.on(Phaser.Scenes.Events.UPDATE, this.syncPortraitMasks, this);
 
-    uiRegistry.register(scene, 'panel.ledger', 'Cindra’s Ledger panel', 'Panels', this, {
+    uiRegistry.register(scene, 'panel.ledger', 'Eleanor’s Ledger panel', 'Panels', this, {
       frame: panel,
       title: this.ordersTab.label,
       orderTitle: this.cards[0]!.title,
@@ -165,10 +206,10 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     const bg = scene.add.graphics();
     const label = scene.add
       .text(0, 0, text, {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '40px',
         fontStyle: 'bold',
-        color: PALETTE.cream
+        color: INK.onField
       })
       .setOrigin(0.5)
       .setShadow(0, 4, 'rgba(36,27,34,0.5)', 6);
@@ -179,7 +220,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     return { root, bg, label };
   }
 
-  /** Five checklist rows + the Cindra reward footer, in panel space. */
+  /** Five checklist rows + the reward footer, in panel space. */
   private buildTasksPage(scene: Phaser.Scene): void {
     const rowTop = -236;
     const rowGap = 118;
@@ -187,42 +228,42 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       const y = rowTop + i * rowGap;
       const label = scene.add
         .text(-548, y, task.label, {
-          fontFamily: FONT,
+          fontFamily: FONT.ui,
           fontSize: '31px',
           fontStyle: 'bold',
-          color: PALETTE.textBrown,
+          color: INK.onField,
           wordWrap: { width: 640 }
         })
         .setOrigin(0, 0.5);
       const barX = 160;
       const barBg = scene.add.graphics();
-      barBg.fillStyle(num(PALETTE.plumShade), 0.5);
+      barBg.fillStyle(num(INK.fieldDeep), 0.85);
       barBg.fillRoundedRect(barX, y + 18, 320, 22, 11);
       const fill = scene.add.graphics();
       const count = scene.add
         .text(barX + 160, y - 14, '', {
-          fontFamily: FONT,
+          fontFamily: FONT.ui,
           fontSize: '27px',
           fontStyle: 'bold',
-          color: PALETTE.goldShade
+          color: INK.onFieldGold
         })
         .setOrigin(0.5);
       const check = scene.add
         .text(548, y, '✓', {
-          fontFamily: FONT,
+          fontFamily: FONT.ui,
           fontSize: '46px',
           fontStyle: 'bold',
-          color: PALETTE.mossShade
+          color: INK.gain
         })
         .setOrigin(0.5)
         .setVisible(false);
       // Replaces the bar while the task's subject doesn't exist yet.
       const hint = scene.add
         .text(340, y, task.lockedHint ? `🔒 ${task.lockedHint}` : '', {
-          fontFamily: FONT,
+          fontFamily: FONT.ui,
           fontSize: '24px',
           fontStyle: 'italic',
-          color: '#8A6248',
+          color: INK.onFieldDim,
           align: 'center',
           wordWrap: { width: 430 }
         })
@@ -233,11 +274,11 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     });
 
     const footer = scene.add
-      .text(0, 348, `Finish all ${this.taskSystem.tasks.length} → a golden reward from Cindra`, {
-        fontFamily: FONT,
+      .text(0, 348, `Finish all ${this.taskSystem.tasks.length} → a golden reward from Eleanor`, {
+        fontFamily: FONT.ui,
         fontSize: '28px',
         fontStyle: 'bold',
-        color: PALETTE.goldShade
+        color: INK.onFieldGold
       })
       .setOrigin(0.5);
     this.tasksPage.add(footer);
@@ -247,15 +288,13 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private buildCard(scene: Phaser.Scene, x: number): OrderCard {
     const root = scene.add.container(x, 16);
     const cardBg = scene.add.image(0, 0, 'ui_card').setScale(0.9);
-    // Fixed on-card size — the real 412px bubble-icon art and the 192px
-    // painted fallback must both read the same here.
-    const portrait = scene.add.image(0, -218, 'portrait_cindra').setDisplaySize(178, 178);
+    const medallion = this.buildMedallion(scene, root);
     const title = scene.add
       .text(0, -96, '', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '30px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown,
+        color: INK.onField,
         align: 'center',
         wordWrap: { width: 400 }
       })
@@ -264,19 +303,21 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     const slotIcon = scene.add.image(0, 28, 'item_flame_gem_2').setScale(0.72);
     const slotCount = scene.add
       .text(48, 80, '0/0', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '30px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown
+        color: INK.onField
       })
       .setOrigin(0.5)
       .setShadow(0, 2, '#FFFFFF', 4);
+    const rewardCoin = scene.add.image(0, 148, 'ui_icon_coin').setVisible(false);
+    rewardCoin.setScale(34 / Math.max(rewardCoin.width, rewardCoin.height));
     const rewardText = scene.add
       .text(0, 148, '', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '28px',
         fontStyle: 'bold',
-        color: PALETTE.goldShade
+        color: INK.onFieldGold
       })
       .setOrigin(0.5);
 
@@ -284,7 +325,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     const deliverBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.86);
     const deliverText = scene.add
       .text(0, -8, 'Deliver', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '44px',
         fontStyle: 'bold',
         color: '#FFFFFF'
@@ -303,18 +344,92 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       slotIcon,
       slotCount,
       rewardText,
+      rewardCoin,
       deliverButton,
       order: null,
       deliverable: false
     };
     deliverBg.on('pointerup', () => this.onDeliverPressed(card));
-    root.add([cardBg, portrait, title, slot, slotIcon, slotCount, rewardText, deliverButton]);
+    root.add([cardBg, ...medallion, title, slot, slotIcon, slotCount, rewardCoin, rewardText, deliverButton]);
     return card;
+  }
+
+  /**
+   * Eleanor framed in the dialogue bubble's gold ring: drop shadow, moss
+   * interior, her bust cropped to the window, ring on top. Returns the layers in
+   * back-to-front order for the card to add.
+   *
+   * The bust art is TALLER than it is wide (391×560), so it is COVER-fit and
+   * top-anchored — the window takes her head and shoulders and the crop falls at
+   * the chest, the way a portrait medallion should read. (The card previously
+   * forced it into a 178px square with `setDisplaySize`, which squashed her to
+   * 70% height.) The painted fallback is square, so the same cover rule centres
+   * it instead of top-anchoring — either way the art can never under-fill the
+   * window and let moss show through as a gap.
+   */
+  private buildMedallion(
+    scene: Phaser.Scene,
+    root: Phaser.GameObjects.Container
+  ): Phaser.GameObjects.GameObject[] {
+    // Lift: a soft dark disc under the gold so the medallion sits ON the card
+    // rather than floating flat against it.
+    const shadow = scene.add.graphics();
+    shadow.fillStyle(num(INK.scrim), 0.4);
+    shadow.fillCircle(0, MEDALLION_Y + 5, RING_OUTER_R + 2);
+
+    // Moss interior, filled past the hole to the clip radius so no card colour
+    // survives as a sliver under the ring's inner antialiased edge.
+    const back = scene.add.graphics();
+    back.fillStyle(MOSS_BACK, 1);
+    back.fillCircle(0, MEDALLION_Y, RING_MASK_R);
+    back.fillStyle(MOSS_LIGHT, 1);
+    back.fillCircle(0, MEDALLION_Y - RING_HOLE_R * 0.085, RING_HOLE_R * 0.915);
+
+    const portrait = scene.add.image(0, MEDALLION_Y, 'portrait_eleanor');
+    const window = RING_MASK_R * 2;
+    if (portrait.height > portrait.width * 1.15) {
+      // Bust art: size by HEIGHT and hang it from the window's top, so the
+      // window takes her head, shoulders and braid and the crop falls on the
+      // robe. Moss shows at her sides — that is the frame reading as a window.
+      const fit = (window * MEDALLION_FILL) / portrait.height;
+      portrait.setScale(fit);
+      portrait.y = MEDALLION_Y - RING_MASK_R + MEDALLION_HEAD_INSET + (portrait.height * fit) / 2;
+    } else {
+      // Square art — the painted fallback, itself a little framed medallion.
+      // Contain it and centre it; a fallback should look plain, never cropped.
+      portrait.setScale(window / Math.max(1, portrait.width));
+    }
+
+    // Geometry masks live in WORLD space, so the circle is re-seated every frame
+    // against the panel's position and its open/close scale tween (the same
+    // treatment CharacterBubble gives its ring window).
+    const maskG = scene.make.graphics();
+    maskG.fillStyle(0xffffff, 1);
+    maskG.fillCircle(0, 0, RING_MASK_R);
+    portrait.setMask(maskG.createGeometryMask());
+    this.portraitMasks.push({ g: maskG, root });
+
+    const ring = scene.add.image(0, MEDALLION_Y, 'portrait_ring');
+    ring.setDisplaySize(MEDALLION_SIZE, MEDALLION_SIZE);
+
+    return [shadow, back, portrait, ring];
+  }
+
+  /** Keep every card's portrait clip circle over its ring window. */
+  private syncPortraitMasks(): void {
+    if (!this.visible) return;
+    for (const { g, root } of this.portraitMasks) {
+      g.setPosition(this.x + root.x * this.scaleX, this.y + (root.y + MEDALLION_Y) * this.scaleY);
+      g.setScale(this.scaleX, this.scaleY);
+    }
   }
 
   teardown(): void {
     this.offBus.forEach((off) => off());
     this.offBus.length = 0;
+    this.owner.events.off(Phaser.Scenes.Events.UPDATE, this.syncPortraitMasks, this);
+    this.portraitMasks.forEach(({ g }) => g.destroy());
+    this.portraitMasks.length = 0;
   }
 
   /** World position of the FIRST card's Deliver button (tutorial hand target). */
@@ -359,6 +474,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.setVisible(true);
     this.setAlpha(0);
     this.setScale(this.baseScale * 0.92);
+    this.syncPortraitMasks(); // seat the clip circles before the first frame renders
     this.scene.tweens.add({ targets: this, alpha: 1, scale: this.baseScale, duration: 200, ease: 'Back.easeOut' });
     this.bus.emit('ui:ledger_toggled', { open: true });
   }
@@ -398,21 +514,22 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.tasksTab.root.setVisible(twoTabs);
     this.ordersTab.root.x = twoTabs ? -270 : 0;
     this.tasksTab.root.x = 270;
-    this.paintTab(this.ordersTab, PALETTE.lava, this.activeTab === 'orders');
-    this.paintTab(this.tasksTab, PALETTE.gold, this.activeTab === 'tasks');
-    // Gold's cream stroke washes out — the tasks tab keeps brown text.
-    this.tasksTab.label.setColor(this.activeTab === 'tasks' ? PALETTE.textBrown : PALETTE.cream);
+    this.paintTab(this.ordersTab, this.activeTab === 'orders');
+    this.paintTab(this.tasksTab, this.activeTab === 'tasks');
     this.ordersPage.setVisible(this.activeTab === 'orders');
     this.tasksPage.setVisible(this.activeTab === 'tasks');
   }
 
-  private paintTab(tab: TabHandle, activeColor: string, active: boolean): void {
+  /** A header tab. State is LIGHT, not hue: the selected tab is a lit lozenge,
+   *  the unselected one the same shape sunk into the frame. */
+  private paintTab(tab: TabHandle, active: boolean): void {
     tab.bg.clear();
-    tab.bg.fillStyle(active ? num(activeColor) : num(PALETTE.plumShade), active ? 1 : 0.92);
+    tab.bg.fillStyle(num(active ? INK.fieldLift : INK.fieldDeep), active ? 1 : 0.9);
     tab.bg.fillRoundedRect(-TAB_W / 2, -TAB_H / 2, TAB_W, TAB_H, TAB_H / 2);
-    tab.bg.lineStyle(6, num(PALETTE.cream), active ? 0.95 : 0.4);
+    tab.bg.lineStyle(6, num(active ? INK.gold : INK.goldDeep), active ? 1 : 0.75);
     tab.bg.strokeRoundedRect(-TAB_W / 2, -TAB_H / 2, TAB_W, TAB_H, TAB_H / 2);
-    tab.label.setAlpha(active ? 1 : 0.8);
+    tab.label.setColor(active ? INK.onField : INK.onFieldDim);
+    tab.label.setAlpha(active ? 1 : 0.85);
     tab.root.setScale(active ? 1 : 0.94);
   }
 
@@ -441,11 +558,22 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       card.slotIcon.setTexture(slotKey).setScale(slotBoardScale != null ? slotBoardScale * 2.0 : 0.72);
       card.slotCount.setText(`${have[0] ?? 0}/${requirement.count}`);
       const parts: string[] = [];
-      if (order.rewards.coins) parts.push(`🪙 ${order.rewards.coins}`);
+      if (order.rewards.coins) parts.push(`${order.rewards.coins}`);
       if (order.rewards.xp) parts.push(`✦ ${order.rewards.xp} XP`);
       if (order.rewards.spawn) parts.push('🎁 ???');
       if (order.rewards.tease) parts.push(order.rewards.tease);
       card.rewardText.setText(parts.join('   '));
+      // The Gold figure leads the line, so its coin hangs off the line's left
+      // edge — measured after setText, since the width moves with the rewards.
+      const paysGold = !!order.rewards.coins;
+      card.rewardCoin.setVisible(paysGold);
+      if (paysGold) {
+        const half = card.rewardText.width / 2;
+        card.rewardCoin.setX(-half - 24);
+        card.rewardText.setX(card.rewardCoin.displayWidth / 2 + 2);
+      } else {
+        card.rewardText.setX(0);
+      }
       card.slotIcon.setAlpha(deliverable ? 1 : 0.75);
       card.deliverButton.setAlpha(deliverable ? 1 : 0.55);
     });
@@ -472,7 +600,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       row.check.setVisible(done);
       row.fill.clear();
       if (!locked) {
-        row.fill.fillStyle(num(done ? PALETTE.moss : PALETTE.gold), 1);
+        row.fill.fillStyle(num(done ? INK.gain : INK.gold), 1);
         row.fill.fillRoundedRect(barX, y + 18, Math.max(12, (progress / task.target) * 320), 22, 11);
       }
       row.label.setAlpha(done ? 0.62 : locked ? 0.5 : 1);

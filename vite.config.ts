@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 
@@ -42,6 +43,247 @@ const uiThemeEndpoint = (): Plugin => ({
           } catch (e) {
             res.statusCode = 400;
             res.end(JSON.stringify({ ok: false, error: String(e) }));
+          }
+        });
+        return;
+      }
+      res.statusCode = 405;
+      res.end();
+    });
+  }
+});
+
+/**
+ * Dev-only endpoint for the FX Lab (tools/fxlab):
+ *   GET  /__fxlab/presets → current src/data/fx-emitters.json
+ *   POST /__fxlab/presets → validate + write it
+ *
+ * The game BUNDLES this file, so a save from the lab lands in the real game
+ * rather than in a copy — the same contract the UI Builder theme endpoint has.
+ * Validation is structural only (the authoritative check is
+ * `validatePresetFile` in src/render/fx/emitterTypes.ts, which the unit test
+ * runs); this just refuses to overwrite good data with something that is not a
+ * preset document at all.
+ */
+const fxLabPresetsEndpoint = (): Plugin => ({
+  name: 'emberkeep-fxlab-presets',
+  configureServer(server: ViteDevServer) {
+    const file = path.resolve(__dirname, 'src/data/fx-emitters.json');
+    server.middlewares.use('/__fxlab/presets', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === 'GET') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(readFileSync(file, 'utf8'));
+        return;
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          try {
+            const doc = JSON.parse(body) as { version?: number; presets?: Record<string, { layers?: unknown }> };
+            if (doc.version !== 1) throw new Error('version must be 1');
+            const presets = Object.values(doc.presets ?? {});
+            if (!presets.length) throw new Error('no presets');
+            for (const p of presets) if (!Array.isArray(p.layers) || !p.layers.length) throw new Error('a preset has no layers');
+            writeFileSync(file, JSON.stringify(doc, null, 2) + '\n');
+            res.setHeader('Content-Type', 'application/json');
+            res.end('{"ok":true}');
+          } catch (e) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+          }
+        });
+        return;
+      }
+      res.statusCode = 405;
+      res.end();
+    });
+  }
+});
+
+/**
+ * Dev-only endpoint for the Aurora Lab (tools/auroralab):
+ *   GET  /__auroralab/presets → current src/data/aurora.json
+ *   POST /__auroralab/presets → validate + write it
+ *
+ * Same contract as the FX Lab: the game bundles this file, so a save lands in
+ * the real game rather than in a copy. The authoritative check is
+ * `validateAuroraFile` in src/render/fx/AuroraFX.ts (which the unit test runs);
+ * this only refuses a body that is not an aurora document at all.
+ */
+const auroraLabEndpoint = (): Plugin => ({
+  name: 'emberkeep-auroralab-presets',
+  configureServer(server: ViteDevServer) {
+    const file = path.resolve(__dirname, 'src/data/aurora.json');
+    server.middlewares.use('/__auroralab/presets', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === 'GET') {
+        res.end(readFileSync(file, 'utf8'));
+        return;
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          try {
+            const doc = JSON.parse(body) as { version?: number; presets?: Record<string, { layers?: unknown }> };
+            if (doc.version !== 1) throw new Error('version must be 1');
+            const presets = Object.values(doc.presets ?? {});
+            if (!presets.length) throw new Error('no presets');
+            for (const p of presets) {
+              if (!Array.isArray(p.layers) || !p.layers.length) throw new Error('a preset has no layers');
+            }
+            writeFileSync(file, JSON.stringify(doc, null, 2) + '\n');
+            res.end('{"ok":true}');
+          } catch (e) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+          }
+        });
+        return;
+      }
+      res.statusCode = 405;
+      res.end();
+    });
+  }
+});
+
+/**
+ * Dev-only endpoint for the Snow Lab (tools/snowlab):
+ *   GET  /__snowlab/presets → current src/data/snow.json
+ *   POST /__snowlab/presets → validate + write it
+ *
+ * Same contract as the Aurora Lab. The authoritative check is `validateSnowFile`
+ * in src/render/fx/snowConfig.ts (which the unit test runs); this only refuses a
+ * body that is not a snow document at all.
+ */
+const snowLabEndpoint = (): Plugin => ({
+  name: 'emberkeep-snowlab-presets',
+  configureServer(server: ViteDevServer) {
+    const file = path.resolve(__dirname, 'src/data/snow.json');
+    server.middlewares.use('/__snowlab/presets', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === 'GET') {
+        res.end(readFileSync(file, 'utf8'));
+        return;
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          try {
+            const doc = JSON.parse(body) as { version?: number; presets?: Record<string, { planes?: unknown }> };
+            if (doc.version !== 1) throw new Error('version must be 1');
+            const presets = Object.values(doc.presets ?? {});
+            if (!presets.length) throw new Error('no presets');
+            for (const p of presets) {
+              if (!Array.isArray(p.planes) || !p.planes.length) throw new Error('a preset has no planes');
+            }
+            writeFileSync(file, JSON.stringify(doc, null, 2) + '\n');
+            res.end('{"ok":true}');
+          } catch (e) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+          }
+        });
+        return;
+      }
+      res.statusCode = 405;
+      res.end();
+    });
+  }
+});
+
+/**
+ * Dev-only endpoint for the worldbuilder FX page (tools/worldbuilder, 🔥 tab):
+ *   GET  /__worldbuilder/emitters → { placements, presets }
+ *   POST /__worldbuilder/emitters → validate + write src/data/emitters.json
+ *
+ * The builder needs the PRESETS as well as the placements: it renders the real
+ * `FxEmitterRig` on its map, so it has to know what the presets contain, and
+ * fetching them here means the tool cannot be looking at a different roster
+ * from the one the game bundles.
+ *
+ * Validation mirrors `validatePlacementFile` in
+ * src/render/fx/emitterPlacements.ts (which the unit test runs against the
+ * committed file) — enough to refuse a body that is not a placement document,
+ * so a broken POST cannot silently erase authored placements.
+ */
+const worldbuilderEmittersEndpoint = (): Plugin => ({
+  name: 'emberkeep-worldbuilder-emitters',
+  configureServer(server: ViteDevServer) {
+    const file = path.resolve(__dirname, 'src/data/emitters.json');
+    const presetFile = path.resolve(__dirname, 'src/data/fx-emitters.json');
+    server.middlewares.use('/__worldbuilder/emitters', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === 'GET') {
+        res.end(
+          JSON.stringify({
+            placements: JSON.parse(readFileSync(file, 'utf8')),
+            presets: JSON.parse(readFileSync(presetFile, 'utf8'))
+          })
+        );
+        return;
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          try {
+            const doc = JSON.parse(body) as { version?: number; emitters?: unknown };
+            if (doc.version !== 1) throw new Error('version must be 1');
+            if (!Array.isArray(doc.emitters)) throw new Error('emitters must be an array');
+            const presets = JSON.parse(readFileSync(presetFile, 'utf8')) as { presets: Record<string, unknown> };
+            const known = Object.keys(presets.presets ?? {});
+            const seen = new Set<string>();
+            for (const raw of doc.emitters) {
+              const e = raw as { id?: string; preset?: string; world?: string; anchor?: unknown };
+              if (!e.id) throw new Error('an emitter has no id');
+              if (seen.has(e.id)) throw new Error(`duplicate emitter id "${e.id}"`);
+              seen.add(e.id);
+              if (!e.preset || !known.includes(e.preset)) throw new Error(`unknown preset "${String(e.preset)}"`);
+              if (!e.world) throw new Error(`emitter "${e.id}" has no world`);
+              if (!Array.isArray(e.anchor) || e.anchor.length !== 2 || !e.anchor.every((n) => Number.isFinite(n))) {
+                throw new Error(`emitter "${e.id}" anchor must be [col, row]`);
+              }
+            }
+            writeFileSync(file, JSON.stringify(doc, null, 2) + '\n');
+            res.end(JSON.stringify({ ok: true, count: doc.emitters.length }));
+          } catch (e) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
           }
         });
         return;
@@ -107,21 +349,379 @@ const worldbuilderMergeEndpoint = (): Plugin => ({
 });
 
 /**
+ * Dev-only endpoint that hands the worldbuilder the map the game is ACTUALLY
+ * running: GET /__worldbuilder/map → src/data/map.json.
+ *
+ * The tool needs this to know where the game's cell (0,0) is. It cannot derive
+ * that: ingest fixes the frame by the most-NW placement of whatever document was
+ * exported, `map.json` is hand-tuned and never fully regenerated afterwards, and
+ * a project that has since lost that NW-most placement renumbers every cell
+ * under the tool's feet. The world's BACKGROUND appears in both frames and never
+ * moves, so the tool pins itself to the game by matching that one placement
+ * (`gameOrigin` in tools/worldbuilder/index.html).
+ */
+const worldbuilderMapEndpoint = (): Plugin => ({
+  name: 'emberkeep-worldbuilder-map',
+  configureServer(server: ViteDevServer) {
+    server.middlewares.use('/__worldbuilder/map', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method !== 'GET') {
+        res.statusCode = 405;
+        res.end();
+        return;
+      }
+      res.end(readFileSync(path.resolve(__dirname, 'src/data/map.json'), 'utf8'));
+    });
+  }
+});
+
+/**
+ * Dev-only endpoint for the worldbuilder's 🧩 Worlds & grids page:
+ *   GET  /__worldbuilder/zones → current src/data/zones.json (or an empty doc)
+ *   POST /__worldbuilder/zones → validate + write src/data/zones.json
+ *
+ * This is the file the game reads for zones, per-world boards and travel
+ * (src/core/world.ts). It is normally GENERATED by `scripts/build-zones.mjs`
+ * from the imported editor registry; this endpoint lets the World Builder be
+ * the other producer, so a grid can be authored rather than only imported.
+ *
+ * The validation below is deliberately structural rather than cosmetic — a
+ * zones.json that parses but lies about its geometry would put every cell of a
+ * world a few hundred pixels off its island, and the failure would look like an
+ * art bug rather than a data one.
+ */
+const worldbuilderZonesEndpoint = (): Plugin => ({
+  name: 'emberkeep-worldbuilder-zones',
+  configureServer(server: ViteDevServer) {
+    server.middlewares.use('/__worldbuilder/zones', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Content-Type', 'application/json');
+      const file = path.resolve(__dirname, 'src/data/zones.json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === 'GET') {
+        if (!existsSync(file)) {
+          res.end(JSON.stringify({ format: 'emberkeep-zones', version: 1, worlds: [] }));
+          return;
+        }
+        res.end(readFileSync(file, 'utf8'));
+        return;
+      }
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end();
+        return;
+      }
+      // `?dryRun=1` runs the whole validation and reports, without touching the
+      // file — what a regression harness needs so it can exercise the REAL
+      // validator rather than a copy of its rules that could drift from it.
+      const dryRun = /[?&]dryRun=1\b/.test(req.url ?? '');
+      let body = '';
+      req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+      req.on('end', () => {
+        try {
+          const doc = JSON.parse(body) as {
+            format?: string;
+            worlds?: {
+              id?: string;
+              zones?: {
+                id?: string;
+                block?: number[];
+                matrix?: number[];
+                origin?: number[];
+                u?: number[];
+                v?: number[];
+                pivot?: number[];
+                cells?: number[][];
+              }[];
+            }[];
+          };
+          if (doc.format !== 'emberkeep-zones') throw new Error('not an emberkeep-zones document');
+          const worlds = doc.worlds ?? [];
+          if (!Array.isArray(worlds) || worlds.length === 0) throw new Error('no worlds');
+          const seenWorlds = new Set<string>();
+          let zoneCount = 0;
+          let cellCount = 0;
+          for (const w of worlds) {
+            if (!w.id) throw new Error('a world has no id');
+            if (seenWorlds.has(w.id)) throw new Error(`duplicate world id "${w.id}"`);
+            seenWorlds.add(w.id);
+            const seenZones = new Set<string>();
+            // Index blocks must not overlap, or two grids would share addresses
+            // and a piece saved on one would load onto the other.
+            const taken: { c0: number; c1: number; r0: number; r1: number; id: string }[] = [];
+            for (const z of w.zones ?? []) {
+              if (!z.id) throw new Error(`${w.id}: a grid has no id`);
+              if (seenZones.has(z.id)) throw new Error(`${w.id}: duplicate grid id "${z.id}"`);
+              seenZones.add(z.id);
+              const nums = [z.block, z.matrix, z.origin, z.u, z.v, z.pivot];
+              if (nums.some((a) => !Array.isArray(a) || a.length !== 2 || a.some((n) => !Number.isFinite(n)))) {
+                throw new Error(`${w.id}/${z.id}: block/matrix/origin/u/v/pivot must each be two finite numbers`);
+              }
+              const [cols, rows] = z.matrix as number[];
+              if (cols < 1 || rows < 1) throw new Error(`${w.id}/${z.id}: empty matrix`);
+              // A degenerate basis is not invertible — the renderer could place
+              // a cell but never find one again.
+              const det = (z.u as number[])[0] * (z.v as number[])[1] - (z.v as number[])[0] * (z.u as number[])[1];
+              if (!Number.isFinite(det) || Math.abs(det) < 1e-6) {
+                throw new Error(`${w.id}/${z.id}: u and v are parallel — the grid has no area`);
+              }
+              const [bc, br] = z.block as number[];
+              const box = { c0: bc, c1: bc + cols - 1, r0: br, r1: br + rows - 1, id: z.id };
+              for (const t of taken) {
+                if (box.c0 <= t.c1 && t.c0 <= box.c1 && box.r0 <= t.r1 && t.r0 <= box.r1) {
+                  throw new Error(`${w.id}: grids "${t.id}" and "${z.id}" claim overlapping cell addresses`);
+                }
+              }
+              taken.push(box);
+              for (const c of z.cells ?? []) {
+                if (!Array.isArray(c) || c.length !== 2) throw new Error(`${w.id}/${z.id}: bad cell`);
+                if (c[0] < 0 || c[1] < 0 || c[0] >= cols || c[1] >= rows) {
+                  throw new Error(`${w.id}/${z.id}: cell ${c[0]},${c[1]} is outside its ${cols}×${rows} matrix`);
+                }
+                cellCount++;
+              }
+              zoneCount++;
+            }
+          }
+          if (!dryRun) writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
+          res.end(JSON.stringify({
+            ok: true,
+            dryRun,
+            worlds: worlds.length,
+            zones: zoneCount,
+            cells: cellCount,
+            note: `${worlds.length} worlds, ${zoneCount} grids, ${cellCount} cells validated${dryRun ? ' (dry run — nothing written)' : ''}.`
+          }));
+        } catch (e) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+        }
+      });
+    });
+  }
+});
+
+/**
+ * Dev-only endpoint for the worldbuilder Characters tab (tools/worldbuilder, 🧝):
+ *   GET  /__worldbuilder/characters → current src/data/characters.json
+ *   POST /__worldbuilder/characters { characters: [{id, world?, col, row, dx?, dy?}] }
+ *        → rewrites the `anchor` + `dx`/`dy` of each one (scripts/
+ *          apply-characters.mjs, the same implementation the export → ingest
+ *          route uses). Only her POSITION moves — action/cooldown stay design
+ *          data.
+ * Cells arrive already in GAME grid space (the builder normalises them the way
+ * ingest does) and dx/dy in builder pixels, so a placement here is exactly where
+ * the game renders her.
+ */
+const worldbuilderCharactersEndpoint = (): Plugin => ({
+  name: 'emberkeep-worldbuilder-characters',
+  configureServer(server: ViteDevServer) {
+    server.middlewares.use('/__worldbuilder/characters', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === 'GET') {
+        res.end(readFileSync(path.resolve(__dirname, 'src/data/characters.json'), 'utf8'));
+        return;
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          void (async () => {
+            try {
+              const { applyCharacters } = await import('./scripts/apply-characters.mjs');
+              const summary = applyCharacters(JSON.parse(body), __dirname);
+              res.end(JSON.stringify({ ok: true, summary }));
+            } catch (e) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+            }
+          })();
+        });
+        return;
+      }
+      res.statusCode = 405;
+      res.end();
+    });
+  }
+});
+
+/**
+ * Dev-only endpoint for the worldbuilder Island generator (tools/worldbuilder, 🏝 tab):
+ *   POST /__worldbuilder/island {action:'preview', ...spec}
+ *     → tools/mapmask/island.py — fits the tile lattice into the drawn shapes
+ *       (hugging the right rim), hangs the rock skirt below them by the border
+ *       law, and returns the map mask as data URLs plus per-island stats.
+ *   POST /__worldbuilder/island {action:'generate', prompt, mask, reference?, name}
+ *     → .claude/skills/nano-banana/scripts/artgen.py map-seedream — renders the
+ *       island from that mask (plus an optional style reference) with Seedream
+ *       5.0 Pro into assets/raw/map-gen/islands/.
+ * Both shell out to the scripts the CLI pipelines already use, so there is one
+ * implementation of each step. Generation is server-side because it needs FAL_KEY.
+ */
+const worldbuilderIslandEndpoint = (): Plugin => ({
+  name: 'emberkeep-worldbuilder-island',
+  configureServer(server: ViteDevServer) {
+    const PY = process.env.PYTHON ?? 'python3';
+    const OUT_DIR = path.resolve(__dirname, 'assets/raw/map-gen/islands');
+
+    const python = (args: string[], stdin?: string) =>
+      new Promise<{ code: number; out: string; err: string }>((resolve) => {
+        const proc = spawn(PY, args, { cwd: __dirname });
+        let out = '';
+        let err = '';
+        proc.stdout.on('data', (d: Buffer) => (out += d.toString()));
+        proc.stderr.on('data', (d: Buffer) => (err += d.toString()));
+        proc.on('error', (e) => resolve({ code: -1, out, err: String(e) }));
+        proc.on('close', (code) => resolve({ code: code ?? -1, out, err }));
+        if (stdin !== undefined) proc.stdin.end(stdin);
+      });
+
+    /** `data:image/png;base64,…` → a real file, so artgen can take it as -i. */
+    const writeDataUrl = (dataUrl: string, file: string) => {
+      const comma = dataUrl.indexOf(',');
+      if (!dataUrl.startsWith('data:') || comma < 0) throw new Error('not a data URL');
+      writeFileSync(file, Buffer.from(dataUrl.slice(comma + 1), 'base64'));
+    };
+
+    server.middlewares.use('/__worldbuilder/island', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end('{"ok":false,"error":"POST only"}');
+        return;
+      }
+      const chunks: Buffer[] = [];
+      let size = 0;
+      req.on('data', (chunk: Buffer) => {
+        size += chunk.length;
+        // A reference photo plus a 2610x1632 mask is a few MB; anything past
+        // this is a mistake, and buffering it would be the server's problem.
+        if (size > 64 * 1024 * 1024) req.destroy();
+        else chunks.push(chunk);
+      });
+      req.on('end', () => {
+        void (async () => {
+          try {
+            const doc = JSON.parse(Buffer.concat(chunks).toString()) as Record<string, unknown>;
+            const action = doc.action ?? 'preview';
+
+            if (action === 'preview') {
+              const { action: _drop, ...spec } = doc;
+              const r = await python([path.resolve(__dirname, 'tools/mapmask/island.py'), '--stdin'],
+                                     JSON.stringify(spec));
+              if (r.code !== 0 || !r.out.trim()) {
+                throw new Error(r.err.trim() || `island.py exited ${r.code}`);
+              }
+              res.end(r.out);
+              return;
+            }
+
+            if (action === 'generate') {
+              const prompt = String(doc.prompt ?? '').trim();
+              if (!prompt) throw new Error('the prompt is empty');
+              if (typeof doc.mask !== 'string') throw new Error('build the island first');
+              const name = (String(doc.name ?? 'island').toLowerCase().replace(/[^a-z0-9_-]+/g, '-')
+                .replace(/^-+|-+$/g, '') || 'island');
+              const work = path.join(OUT_DIR, '.work');
+              mkdirSync(work, { recursive: true });
+              const maskFile = path.join(work, `${name}-mask.png`);
+              writeDataUrl(doc.mask, maskFile);
+              const refs = ['-i', maskFile];
+              if (typeof doc.reference === 'string' && doc.reference.startsWith('data:')) {
+                const refFile = path.join(work, `${name}-ref.png`);
+                writeDataUrl(doc.reference, refFile);
+                refs.push('-i', refFile);
+              }
+              const dst = path.join(OUT_DIR, `${name}.jpg`);
+              writeFileSync(path.join(OUT_DIR, `${name}.prompt.txt`), prompt + '\n');
+              const r = await python([
+                path.resolve(__dirname, '.claude/skills/nano-banana/scripts/artgen.py'),
+                'map-seedream', prompt, ...refs, '-o', dst
+              ]);
+              if (r.code !== 0 || !existsSync(dst)) {
+                throw new Error((r.err || r.out).trim().split('\n').pop() || `artgen exited ${r.code}`);
+              }
+              res.end(JSON.stringify({
+                ok: true,
+                image: 'data:image/jpeg;base64,' + readFileSync(dst).toString('base64'),
+                file: path.relative(__dirname, dst),
+                log: (r.out || r.err).trim().split('\n').pop()
+              }));
+              return;
+            }
+            throw new Error(`unknown action ${String(action)}`);
+          } catch (e) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+          }
+        })();
+      });
+    });
+  }
+});
+
+/**
  * Deploy slimming: `assets/` (the publicDir) doubles as the art WORKSPACE —
  * AE frame sources, reference shots, uncropped masters and the PNG originals of
  * webp-converted sprites live there for future editing but are never requested
- * at runtime. Strip them from dist AFTER the copy so the deploy ships only what
- * the game can actually load. Two rules:
+ * at runtime, and they are 2.2 GB of its 2.8 GB.
+ *
+ * So Vite's own publicDir copy is OFF (`build.copyPublicDir: false`) and this
+ * plugin does the copy through a FILTER. It used to copy all 2.8 GB into dist
+ * and then delete most of it again — >2 GB of disk dirtied per build to throw
+ * the majority away, on top of whatever else was writing at the time. Filtering
+ * on the way in writes only what ships. Three rules:
  *   1. an explicit list of source-only dirs/files;
- *   2. any .png whose sibling .webp exists (the webp is what assets.json
- *      references; the png is the kept master).
+ *   2. under `sprites/`, any .png whose sibling .webp exists (the webp is what
+ *      assets.json references; the png is the kept master);
+ *   3. under `vfx-bank/`, only the files the runtime actually loads.
  */
-const pruneDistArt = (): Plugin => ({
-  name: 'emberkeep-prune-dist-art',
+const copyRuntimeArt = (): Plugin => ({
+  name: 'emberkeep-copy-runtime-art',
   apply: 'build',
   closeBundle() {
+    const publicDir = path.resolve(__dirname, 'assets');
     const dist = path.resolve(__dirname, 'dist');
-    if (!existsSync(dist)) return;
+    if (!existsSync(publicDir)) return;
+    // `raw/` is the GENERATION WORKSPACE and is DEFAULT-DENY: every art run
+    // (dragons, characters, shop/bag concepts, merge chains, UI kits…) drops
+    // its full-resolution masters there, and naming the offenders one by one
+    // meant every new run silently re-entered the deploy — this pass alone had
+    // 2.1 GB of it inside `dist`, over Vercel's ceiling and 25x the hub's copy.
+    // Only what the RUNNING GAME fetches is listed here; keep this in step with
+    // the `raw/` paths in src/data/assets.json (`raw/ai` is referenced there
+    // too, but is a placeholder set TextureFactory paints at runtime, so it
+    // stays out and the loader's fallback chain covers it).
+    const RAW_SHIPPED = ['raw/screamingbrain'];
     const SOURCE_ONLY = [
       'raw/ai', // placeholder sources — TextureFactory paints these at runtime
       // VFX bank (docs/vfx-textures.md): `raw/vfx-sources` is the CC0 pack art
@@ -133,97 +733,233 @@ const pruneDistArt = (): Plugin => ({
       // authoring manifests are workspace-only and are dropped by
       // `pruneVfxBank` below. Widen SHIPPED and the prune follows automatically.
       'raw/vfx-sources',
+      // AI map generations + their briefs (assets/raw/map-gen/README.md).
+      // Concept art at full generation resolution — 145 MB and climbing, none
+      // of it requested at runtime. The chosen map gets promoted into
+      // `sprites/background/` as a sized, converted file like any other sprite.
+      'raw/map-gen',
       'raw/screamingbrain/Overworld - Large',
       'position-reference',
       'sprites/background/title-screen-background.jpg', // byte-dup of sprites/ui/
       'sprites/environment/level-blocker/cloud/cloud-non-cropped.png',
-      // Laurah AE exports — the game/builder use the downscaled sprites/laurah copies.
-      'sprites/guide-characters/laurah-dragonMaster/laurah_idle_1',
-      'sprites/guide-characters/laurah-dragonMaster/laurah_idle_2',
-      'sprites/guide-characters/laurah-dragonMaster/laurah_talk_short',
-      'sprites/guide-characters/laurah-dragonMaster/laurah_talk_mid',
-      'sprites/guide-characters/laurah-dragonMaster/laurah_talk_long'
+      // Character AE/Sprite-Studio exports — the game and the builder use the
+      // downscaled `sprites/<name>/` copies and the baked disc atlas.
+      'sprites/characters/eleanor',
+      'sprites/characters/selyna',
+      // Same rule for the merge-style bubble art: the game loads the downscaled
+      // `sprites/<who>-merge/` copies and the baked disc atlas, never these
+      // full-resolution frame exports (211 MB, no reference anywhere in src).
+      'sprites/characters-merge'
     ];
-    let removed = 0;
-    let bytes = 0;
-    const sizeOf = (p: string): number => {
-      const st = statSync(p);
-      if (!st.isDirectory()) return st.size;
-      return readdirSync(p).reduce((a, f) => a + sizeOf(path.join(p, f)), 0);
-    };
-    for (const rel of SOURCE_ONLY) {
-      const p = path.join(dist, rel);
-      if (!existsSync(p)) continue;
-      bytes += sizeOf(p);
-      rmSync(p, { recursive: true });
-      removed++;
-    }
-    const dropPngMasters = (dir: string): void => {
-      for (const f of readdirSync(dir)) {
-        const p = path.join(dir, f);
-        if (statSync(p).isDirectory()) {
-          dropPngMasters(p);
-        } else if (f.endsWith('.png') && existsSync(p.replace(/\.png$/, '.webp'))) {
-          bytes += statSync(p).size;
-          rmSync(p);
-          removed++;
-        }
-      }
-    };
-    dropPngMasters(path.join(dist, 'sprites'));
-
     // VFX bank: keep ONLY what the runtime loads — the ramp LUT plus the
     // `_pack`/`_mv` pair for each shipped sheet. The graded colour sheets are
     // the bake INPUT, the other flipbooks are unshipped, and the manifests are
     // authoring data; none are fetched by the game. Derived from the same
     // SHIPPED list the loader uses, so this cannot drift out of sync.
-    const bankDir = path.join(dist, 'vfx-bank');
-    if (existsSync(bankDir)) {
+    const bankKeep = new Set(['ramps.png']);
+    {
       const src = readFileSync(path.resolve(__dirname, 'src/render/vfxBank.ts'), 'utf8');
       const decl = /export const SHIPPED\s*=\s*\[([^\]]*)\]/.exec(src);
-      if (!decl) throw new Error('[prune-dist-art] could not read SHIPPED from src/render/vfxBank.ts');
-      const shipped = [...decl[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
-      const keep = new Set(['ramps.png']);
-      for (const key of shipped) {
-        keep.add(path.join('flipbooks', `${key}_pack.png`));
-        keep.add(path.join('flipbooks', `${key}_mv.png`));
+      if (!decl) throw new Error('[copy-runtime-art] could not read SHIPPED from src/render/vfxBank.ts');
+      for (const [, key] of decl[1].matchAll(/'([^']+)'/g)) {
+        bankKeep.add(`flipbooks/${key}_pack.png`);
+        bankKeep.add(`flipbooks/${key}_mv.png`);
       }
-      const sweep = (dir: string): void => {
-        for (const f of readdirSync(dir)) {
-          const p = path.join(dir, f);
-          const rel = path.relative(bankDir, p);
-          if (statSync(p).isDirectory()) {
-            sweep(p);
-            if (readdirSync(p).length === 0) rmSync(p, { recursive: true });
-          } else if (!keep.has(rel)) {
-            bytes += statSync(p).size;
-            rmSync(p);
-            removed++;
+      // …plus the particle stills the world emitters reference. PreloadScene
+      // always queues these (they are a few KB each), so dropping them turns
+      // every build into a wall of loader errors — read the preset file rather
+      // than restating the list, so the two cannot drift.
+      const presets = JSON.parse(
+        readFileSync(path.resolve(__dirname, 'src/data/fx-emitters.json'), 'utf8')
+      ) as { textures?: Record<string, string> };
+      for (const rel of Object.values(presets.textures ?? {})) bankKeep.add(rel);
+    }
+
+    let copied = 0;
+    let copiedBytes = 0;
+    let skipped = 0;
+    let skippedBytes = 0;
+    const sizeOf = (p: string): number => {
+      const st = statSync(p);
+      if (!st.isDirectory()) return st.size;
+      return readdirSync(p).reduce((a, f) => a + sizeOf(path.join(p, f)), 0);
+    };
+    /** `false` prunes the whole subtree — the filter is never called below it. */
+    const ships = (from: string): boolean => {
+      const rel = path.relative(publicDir, from).split(path.sep).join('/');
+      if (!rel) return true; // the publicDir itself
+      const isDir = statSync(from).isDirectory();
+      if (SOURCE_ONLY.some((s) => rel === s || rel.startsWith(`${s}/`))) return false;
+      // Default-deny the workspace: `raw` itself ships (it has kept children),
+      // anything under it must be on — or an ancestor of — RAW_SHIPPED.
+      if (rel === 'raw' || rel.startsWith('raw/')) {
+        if (rel !== 'raw' && !RAW_SHIPPED.some((k) => rel === k || rel.startsWith(`${k}/`) || k.startsWith(`${rel}/`)))
+          return false;
+      }
+      if (!isDir && rel.startsWith('sprites/') && rel.endsWith('.png')) {
+        if (existsSync(from.replace(/\.png$/, '.webp'))) return false;
+      }
+      if (rel === 'vfx-bank' || rel.startsWith('vfx-bank/')) {
+        const inBank = rel.slice('vfx-bank/'.length);
+        if (rel === 'vfx-bank') return true;
+        // A directory ships only if a kept file lives under it, so the bank
+        // arrives with no empty scaffolding.
+        return isDir
+          ? [...bankKeep].some((k) => k.startsWith(`${inBank}/`))
+          : bankKeep.has(inBank);
+      }
+      return true;
+    };
+    cpSync(publicDir, dist, {
+      recursive: true,
+      filter: (from) => {
+        const keep = ships(from);
+        const isDir = statSync(from).isDirectory();
+        if (keep) {
+          if (!isDir) {
+            copied++;
+            copiedBytes += statSync(from).size;
           }
+        } else {
+          skipped++;
+          skippedBytes += sizeOf(from);
         }
-      };
-      sweep(bankDir);
-      const kept = existsSync(bankDir) ? [...keep].filter((k) => existsSync(path.join(bankDir, k))) : [];
-      if (kept.length !== keep.size) {
-        this.warn(
-          `[prune-dist-art] VFX bank: expected ${keep.size} runtime files, found ${kept.length}. ` +
-            `Missing: ${[...keep].filter((k) => !existsSync(path.join(bankDir, k))).join(', ')}`
-        );
+        return keep;
       }
+    });
+
+    const missing = [...bankKeep].filter((k) => !existsSync(path.join(dist, 'vfx-bank', k)));
+    if (missing.length) {
+      this.warn(`[copy-runtime-art] VFX bank: ${missing.length} runtime file(s) missing: ${missing.join(', ')}`);
     }
     console.log(
-      `[prune-dist-art] removed ${removed} source-art entries (${(bytes / 1048576).toFixed(1)}MB) from dist`
+      `[copy-runtime-art] copied ${copied} art files (${(copiedBytes / 1048576).toFixed(1)}MB) into dist; ` +
+        `skipped ${skipped} source-only entries (${(skippedBytes / 1048576).toFixed(1)}MB never written)`
     );
+  }
+});
+
+/* ── Dev-server watch scope ─────────────────────────────────────────────────
+ * The repo root holds far more than the game: `assets/raw` (2.2 GB of art
+ * workspace, which the island endpoint above writes into), `embergames/` (a
+ * whole Next.js hub with its OWN dev server and its own public/ copy of dist),
+ * `path-of-embers/`, `.claude/worktrees/` (full repo checkouts). Vite's default
+ * chokidar ignore list is only `.git`, `node_modules`, `test-results` and the
+ * outDir, so all of that was watched recursively through fsevents — and any
+ * second writer in the tree (the hub's `next dev`, `sync:game`, an art
+ * generation run, an agent worktree) turned every write into invalidate →
+ * full-reload → Rolldown rebundle across every core, for as long as it ran.
+ *
+ * The watcher is therefore an ALLOW-list: only the directories the running game
+ * is built from, and anything new that lands at the repo root is ignored until
+ * it is named here. Ignoring a path never stops it being SERVED — publicDir
+ * files are read per request — it only means no auto-reload when it changes.
+ */
+const WATCHED_DIRS = new Set(['src', 'assets', 'tools', 'scripts']);
+const WATCH_DENY = [
+  /^assets\/raw\//, // generation workspace: never loaded by the running game
+  /^assets\/map\//, // 28 MB worldbuilder project files
+  /^assets\/position-reference\//,
+  /(^|\/)__pycache__\//,
+  /(^|\/)\.work\//
+];
+const watchIgnored = (file: string): boolean => {
+  const rel = path.relative(__dirname, file).split(path.sep).join('/');
+  // '' is the root itself; '..' means Vite added the file deliberately from
+  // outside root (config deps, env files) — never second-guess those.
+  if (!rel || rel.startsWith('..')) return false;
+  const slash = rel.indexOf('/');
+  if (slash < 0) return false; // a root-level FILE: index.html, vite.config.ts, .env
+  if (!WATCHED_DIRS.has(rel.slice(0, slash))) return true;
+  return WATCH_DENY.some((re) => re.test(rel));
+};
+
+/**
+ * Rebuild-storm circuit breaker. The allow-list above removes the writers we
+ * know about; this one catches the next one. Watcher events are counted in a
+ * rolling window: a directory that floods it gets UNWATCHED (dev keeps working
+ * for everything else), and a flood coming from everywhere at once stops the
+ * watcher outright. Either way the loop is broken in seconds instead of
+ * rebundling on 16 threads until someone notices the fans.
+ *
+ * Build tooling, so wall-clock `Date.now()` is right here — the GameClock rule
+ * is about gameplay timers.
+ */
+const WATCH_WINDOW_MS = 5_000;
+const WATCH_DIR_LIMIT = 150; // events from ONE directory within a window
+const WATCH_ALL_LIMIT = 400; // events from everywhere within a window
+
+const watchGuard = (): Plugin => ({
+  name: 'emberkeep-watch-guard',
+  apply: 'serve',
+  configureServer(server: ViteDevServer) {
+    const perDir = new Map<string, number>();
+    const dropped = new Set<string>();
+    let windowStart = Date.now();
+    let total = 0;
+    let halted = false;
+    server.watcher.on('all', (_event, file) => {
+      if (halted) return;
+      const now = Date.now();
+      if (now - windowStart > WATCH_WINDOW_MS) {
+        windowStart = now;
+        total = 0;
+        perDir.clear();
+      }
+      total += 1;
+      const rel = path.relative(__dirname, String(file)).split(path.sep).join('/');
+      const dir = rel.split('/').slice(0, 2).join('/');
+      if (total >= WATCH_ALL_LIMIT) {
+        halted = true;
+        void server.watcher.close();
+        server.config.logger.error(
+          `[watch-guard] ${total} file events in ${WATCH_WINDOW_MS / 1000}s across the tree — ` +
+            'stopping the watcher before it rebuilds in a loop. Find the writer (a second dev ' +
+            'server, a build, an asset run), stop it, then restart `pnpm dev`.',
+          { timestamp: true }
+        );
+        return;
+      }
+      if (dropped.has(dir)) return;
+      const n = (perDir.get(dir) ?? 0) + 1;
+      perDir.set(dir, n);
+      if (n >= WATCH_DIR_LIMIT) {
+        dropped.add(dir);
+        server.watcher.unwatch(path.resolve(__dirname, dir));
+        server.config.logger.error(
+          `[watch-guard] ${dir} fired ${n} file events in ${WATCH_WINDOW_MS / 1000}s — something is ` +
+            'writing there in a loop. It is UNWATCHED for the rest of this session (no auto-reload ' +
+            'from it); stop the writer, then restart `pnpm dev`.',
+          { timestamp: true }
+        );
+      }
+    });
   }
 });
 
 export default defineConfig({
   base: './',
   publicDir: 'assets',
-  plugins: [uiThemeEndpoint(), worldbuilderMergeEndpoint(), pruneDistArt()],
+  plugins: [
+    uiThemeEndpoint(),
+    fxLabPresetsEndpoint(),
+    auroraLabEndpoint(),
+    snowLabEndpoint(),
+    worldbuilderMergeEndpoint(),
+    worldbuilderEmittersEndpoint(),
+    worldbuilderCharactersEndpoint(),
+    worldbuilderMapEndpoint(),
+    worldbuilderZonesEndpoint(),
+    worldbuilderIslandEndpoint(),
+    watchGuard(),
+    copyRuntimeArt()
+  ],
   server: {
     port: 5173,
-    strictPort: false
+    // strict: a second `pnpm dev` must FAIL, not silently start on 5174 with a
+    // second recursive watcher over the same multi-GB tree.
+    strictPort: true,
+    watch: { ignored: watchIgnored }
   },
   preview: {
     port: 4173,
@@ -232,6 +968,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsInlineLimit: 0,
-    chunkSizeWarningLimit: 1600
+    chunkSizeWarningLimit: 1600,
+    // `copyRuntimeArt` does the publicDir copy through a ship/skip filter.
+    copyPublicDir: false
   }
 });

@@ -1,0 +1,58 @@
+{
+  "character": "selyna",
+  "sequence": "blink",
+  "fps": 7,
+  "width": 550,
+  "height": 768,
+  "frameCount": 8,
+  "frames": [
+    {
+      "index": 0,
+      "file": "selyna_blink_00000.png",
+      "durationMs": 2575,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "selyna_blink_00001.png",
+      "durationMs": 23,
+      "blend": true
+    },
+    {
+      "index": 2,
+      "file": "selyna_blink_00002.png",
+      "durationMs": 23,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "selyna_blink_00003.png",
+      "durationMs": 23,
+      "blend": true
+    },
+    {
+      "index": 4,
+      "file": "selyna_blink_00004.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 5,
+      "file": "selyna_blink_00005.png",
+      "durationMs": 28,
+      "blend": true
+    },
+    {
+      "index": 6,
+      "file": "selyna_blink_00006.png",
+      "durationMs": 28,
+      "blend": false
+    },
+    {
+      "index": 7,
+      "file": "selyna_blink_00007.png",
+      "durationMs": 28,
+      "blend": true
+    }
+  ]
+}

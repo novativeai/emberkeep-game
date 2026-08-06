@@ -268,5 +268,329 @@
         ]
       }
     }
+  },
+  "dragon-frost": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/frost-dragon/head-animation",
+    "sets": {
+      "blink": {
+        "dir": "frost-dragon-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.7778,
+        "frames": [
+          {
+            "file": "frost-dragon-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "frost-dragon-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "frost-dragon-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "frost-dragon-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "frost-dragon-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.60687,
+        "frames": [
+          {
+            "file": "frost-dragon-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-frost-adult": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/frost-dragon/head-animation-adult",
+    "sets": {
+      "blink": {
+        "dir": "frost-dragon-adult-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.8886,
+        "frames": [
+          {
+            "file": "frost-dragon-adult-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "frost-dragon-adult-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "frost-dragon-adult-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "frost-dragon-adult-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "frost-dragon-adult-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.62903,
+        "frames": [
+          {
+            "file": "frost-dragon-adult-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-adult-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-adult-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-adult-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-storm": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/storm-dragon/head-animation",
+    "sets": {
+      "blink": {
+        "dir": "storm-dragon-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.7778,
+        "frames": [
+          {
+            "file": "storm-dragon-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "storm-dragon-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "storm-dragon-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "storm-dragon-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "storm-dragon-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.60565,
+        "frames": [
+          {
+            "file": "storm-dragon-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-storm-adult": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/storm-dragon/head-animation-adult",
+    "sets": {
+      "blink": {
+        "dir": "storm-dragon-adult-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.8886,
+        "frames": [
+          {
+            "file": "storm-dragon-adult-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "storm-dragon-adult-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "storm-dragon-adult-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "storm-dragon-adult-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "storm-dragon-adult-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.62636,
+        "frames": [
+          {
+            "file": "storm-dragon-adult-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-adult-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-adult-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-adult-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-moonwhisker": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/moonwhisker-dragon/head-animation",
+    "sets": {
+      "blink": {
+        "dir": "moonwhisker-dragon-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.7778,
+        "frames": [
+          {
+            "file": "moonwhisker-dragon-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "moonwhisker-dragon-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "moonwhisker-dragon-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "moonwhisker-dragon-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "moonwhisker-dragon-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.60322,
+        "frames": [
+          {
+            "file": "moonwhisker-dragon-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-moonwhisker-adult": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/moonwhisker-dragon/head-animation-adult",
+    "sets": {
+      "blink": {
+        "dir": "moonwhisker-dragon-adult-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.8886,
+        "frames": [
+          {
+            "file": "moonwhisker-dragon-adult-eyes-open.png",
+            "durationMs": 2600
+          },
+          {
+            "file": "moonwhisker-dragon-adult-eyes-halfOpen.png",
+            "durationMs": 45
+          },
+          {
+            "file": "moonwhisker-dragon-adult-eyes-closed.png",
+            "durationMs": 70
+          },
+          {
+            "file": "moonwhisker-dragon-adult-eyes-halfOpen2.png",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "moonwhisker-dragon-adult-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.62903,
+        "frames": [
+          {
+            "file": "moonwhisker-dragon-adult-roar_talk_00000.png",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-adult-roar_talk_00001.png",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-adult-roar_talk_00002.png",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-adult-roar_talk_00003.png",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
   }
 }

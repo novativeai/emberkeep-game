@@ -1,9 +1,14 @@
 import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES, STANDEE_BANKS } from '../core/Constants';
+import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
+import { ANIMATED_SPEAKERS, discTextureFor } from '../entities/PortraitAnimator';
+import { preloadFlipbooks } from '../render/FlipbookFX';
 import { BUILTIN_SEQUENCES, builtinSequence, builtinSequenceFiles, type BuiltinSequence } from '../render/sequenceCatalog';
+import { preloadEmitterAssets } from '../render/fx/emitterAssets';
+import { BANK_BASE, shippedSheets } from '../render/vfxBank';
 import { applyUiReplacements, sequenceFrameKey, uiRegistry, uploadKey } from '../ui/theme';
 import type { UiThemeDoc } from '../ui/themeCore';
 
@@ -44,6 +49,34 @@ export class PreloadScene extends Phaser.Scene {
     const factory = this.registry.get('textureFactory') as TextureFactory;
 
     const fileEntries = ctx.data.assets.images.filter((e) => e.source === 'file' && e.file);
+
+    // Art the shipped map / code actually reference. A texture costs GPU memory
+    // from the moment it is uploaded, drawn or not, and the `tile_`/`decor_` banks
+    // are almost entirely UNPLACED weight — the authored 13×12 map uses the
+    // `invisible` tile and one crystal, so 47 of the 49 entries were paying for
+    // ground nothing stands on. Rebuilt from the map each boot rather than listed
+    // by hand, so a re-exported world that DOES place a tile loads it automatically
+    // and there is nothing to keep in sync.
+    const map = ctx.state.map;
+    // Backdrops are the single heaviest textures in the game (2610×1632 each)
+    // and there is now one per world. Only the world we are about to show gets
+    // uploaded; BoardScene fetches the others at the door when travel happens.
+    const liveBackdrops = new Set((map.backgrounds ?? []).map((b) => `background_${b.name}`));
+    const neededArt = new Set<string>(['tile_ash', 'tile_ash_alt']); // TextureFactory generators
+    for (const v of Object.values(map.tilesByCell ?? {})) neededArt.add(`tile_${v}`);
+    for (const d of map.mapDecor ?? []) neededArt.add(`decor_${d.name}`);
+    for (const d of map.decor3d ?? []) neededArt.add(`decor_${d.name}`);
+    for (const d of map.startingDecor ?? []) neededArt.add(`decor_${d.decor}`);
+    for (const r of map.regions ?? []) for (const d of r.decor ?? []) neededArt.add(`decor_${d.decor}`);
+    const skipAtBoot = (key: string): boolean =>
+      (/^(tile_|decor_)/.test(key) && !neededArt.has(key)) ||
+      (/^background_/.test(key) && !liveBackdrops.has(key)) ||
+      // Uploaded but never drawn in Phaser — the visible title logo is the DOM
+      // <img class="title-logo"> in index.html.
+      key === 'title_logo' ||
+      // Rare-screen art, fetched by `ensureTextures` when its screen opens.
+      isLazyScreenArt(key);
+
     if (fileEntries.length > 0) {
       const barBg = this.add
         .rectangle(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
@@ -65,17 +98,54 @@ export class PreloadScene extends Phaser.Scene {
         factory.generate(file.key);
       });
       for (const entry of fileEntries) {
+        if (skipAtBoot(entry.key)) continue;
         this.load.image(entry.key, entry.file as string);
       }
     }
-    // Animated dialogue portrait: every Laurah bank as 300x400 bust cutouts
-    // (top 95% of each frame, natural alpha) in ONE 2100x2400 spritesheet
-    // (scripts/bake-laurah-portrait.py) — idle pair first, then the talk banks
-    // in catalog order. One fetch, one GPU texture.
-    this.load.spritesheet('laurah_disc', 'sprites/laurah/disc-atlas.png', {
-      frameWidth: 300,
-      frameHeight: 400
-    });
+    // Animated dialogue portrait: the guide's banks as 270x360 bust cutouts
+    // (top 95% of each frame, natural alpha) in ONE 2160x2880 spritesheet
+    // (scripts/bake-portrait-disc.py) — rest pair first, then talk, then blink.
+    // One fetch, one GPU texture.
+    // Cell size is fixed across characters; only the sheet's grid differs, and
+    // Phaser derives the frame count from the image size, so a bigger atlas
+    // needs no change here (scripts/bake-portrait-disc.py sizes the grid).
+    for (const who of ANIMATED_SPEAKERS) {
+      this.load.spritesheet(discTextureFor(who), `sprites/${who}-merge/disc-atlas.png`, {
+        frameWidth: 270,
+        frameHeight: 360
+      });
+    }
+    // World-standee banks for the characters who stand ON the map: an idle loop
+    // and a one-shot scepter cast, both 8 frames on ONE shared canvas so the
+    // sprite swaps between them without her body jumping. A missing sheet is
+    // survivable — BoardScene falls back to the static `char_<id>` texture.
+    //
+    // Only THIS world's cast is fetched. `STANDEE_BANKS` is the whole roster
+    // (Selyna is Borealis-only), and each bank is ~1 MB of spritesheet — loading
+    // a character the board can never show would cost that for nothing.
+    // `characters.json` stays the single owner of who belongs where.
+    for (const [id, seq] of Object.entries(STANDEE_BANKS)) {
+      if (ctx.data.characters.characters.find((c) => c.id === id)?.world !== ctx.state.worldId)
+        continue;
+      for (const [bank, key] of Object.entries(seq.keys)) {
+        this.load.spritesheet(key, `sprites/${id}/world-${bank}.webp`, {
+          frameWidth: seq.frameWidth,
+          frameHeight: seq.frameHeight
+        });
+      }
+    }
+    // VFX bank flipbooks for the payoff beats (hatch / finale / merge / chest).
+    // Only the sheets in `SHIPPED` — see src/render/vfxBank.ts for the VRAM
+    // reasoning. Each is a channel-packed frame sheet plus its motion vectors;
+    // colour comes from the shared ramp LUT at draw time. A missing file is
+    // survivable: BoardScene checks `hasFlipbook` and falls back to the
+    // particle-only beat it has always played.
+    preloadFlipbooks(this.load, shippedSheets(), BANK_BASE);
+    // World FX emitters (docs/vfx-textures.md §7): the bank particle stills the
+    // presets reference, under their own `fxb_*` keys so they never restyle the
+    // game's existing fx_ember / fx_spark / fx_glow beats. The sheets they need
+    // are already in SHIPPED above.
+    preloadEmitterAssets(this.load, BANK_BASE, { sheets: false });
     // UI Builder uploads (ui-theme.json `assets`, self-contained data URLs).
     for (const [name, uri] of Object.entries(uiRegistry.doc.assets)) {
       if (!this.textures.exists(uploadKey(name))) this.load.image(uploadKey(name), uri);
@@ -88,7 +158,7 @@ export class PreloadScene extends Phaser.Scene {
         if (!this.textures.exists(key)) this.load.image(key, uri);
       });
     }
-    // Built-in (Laurah) sequences are FILE-backed. The editor preloads ALL of
+    // Built-in (guide/character) sequences are FILE-backed. The editor preloads ALL of
     // them so the Animations rail is instantly draggable; the game loads only
     // the banks a saved component actually references (they're heavy).
     const uiedit = new URLSearchParams(window.location.search).has('uiedit');

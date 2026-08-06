@@ -50,7 +50,7 @@ adjust [`anchors.json`](../src/data/anchors.json) if footing differs.
 ## Gap analysis — what free packs do NOT cover
 
 The **hero art** (chibi hatchling/whelp matching `asset-reference/dragon-character.png`,
-the speckled egg with crack stages, Pip/Cindra portraits, the nest) has no
+the speckled egg with crack stages, Laurah/Cindra portraits, the nest) has no
 free-pack equivalent at AAA quality — exactly as planned, it arrives as
 **AI-generated PNG sheets via the ingest pipeline** (`pnpm probe`, then
 `assets.json` flips). Everything else above keeps the runtime placeholders as

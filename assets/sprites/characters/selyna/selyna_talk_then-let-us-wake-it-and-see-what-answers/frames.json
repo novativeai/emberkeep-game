@@ -1,0 +1,424 @@
+{
+  "character": "selyna",
+  "sequence": "then-let-us-wake-it-and-see-what-answers",
+  "fps": 12,
+  "width": 550,
+  "height": 768,
+  "frameCount": 69,
+  "frames": [
+    {
+      "index": 0,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00000.png",
+      "durationMs": 68,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00001.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 2,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00002.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00003.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 4,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00004.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 5,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00005.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 6,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00006.png",
+      "durationMs": 95,
+      "blend": false
+    },
+    {
+      "index": 7,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00007.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 8,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00008.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 9,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00009.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 10,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00010.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 11,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00011.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 12,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00012.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 13,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00013.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 14,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00014.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 15,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00015.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 16,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00016.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 17,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00017.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 18,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00018.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 19,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00019.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 20,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00020.png",
+      "durationMs": 95,
+      "blend": false
+    },
+    {
+      "index": 21,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00021.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 22,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00022.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 23,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00023.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 24,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00024.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 25,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00025.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 26,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00026.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 27,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00027.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 28,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00028.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 29,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00029.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 30,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00030.png",
+      "durationMs": 70,
+      "blend": false
+    },
+    {
+      "index": 31,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00031.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 32,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00032.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 33,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00033.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 34,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00034.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 35,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00035.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 36,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00036.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 37,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00037.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 38,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00038.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 39,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00039.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 40,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00040.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 41,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00041.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 42,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00042.png",
+      "durationMs": 95,
+      "blend": false
+    },
+    {
+      "index": 43,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00043.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 44,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00044.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 45,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00045.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 46,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00046.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 47,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00047.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 48,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00048.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 49,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00049.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 50,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00050.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 51,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00051.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 52,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00052.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 53,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00053.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 54,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00054.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 55,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00055.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 56,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00056.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 57,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00057.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 58,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00058.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 59,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00059.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 60,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00060.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 61,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00061.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 62,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00062.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 63,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00063.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 64,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00064.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 65,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00065.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 66,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00066.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 67,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00067.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 68,
+      "file": "selyna_then-let-us-wake-it-and-see-what-answers_00068.png",
+      "durationMs": 68,
+      "blend": false
+    }
+  ]
+}

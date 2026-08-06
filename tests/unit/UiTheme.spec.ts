@@ -73,10 +73,10 @@ describe('ui theme — custom components (the composer JSON)', () => {
   it('keeps anim layers (uploaded PNG sequences) with their playback fields', () => {
     const out = sanitizeCustom({
       guide: { label: 'Guide', x: 0, y: 0, layers: [
-        { kind: 'anim', name: 'talk', x: 0, y: 0, sequence: 'laurah_talk_short', fps: 12, loop: false }
+        { kind: 'anim', name: 'talk', x: 0, y: 0, sequence: 'eleanor_talk', fps: 12, loop: false }
       ] }
     });
-    expect(out['guide']!.layers[0]).toMatchObject({ kind: 'anim', sequence: 'laurah_talk_short', fps: 12, loop: false });
+    expect(out['guide']!.layers[0]).toMatchObject({ kind: 'anim', sequence: 'eleanor_talk', fps: 12, loop: false });
   });
 });
 
@@ -146,10 +146,10 @@ describe('ui theme — prunePatch (what gets saved)', () => {
   it('keeps part sequence animations (with loop) and drops cleared ones', () => {
     const kept = prunePatch({
       parts: {
-        icon: { sequence: 'laurah_talk_short', loop: false },
+        icon: { sequence: 'eleanor_talk', loop: false },
         other: { sequence: null, loop: true } // cleared → nothing to save
       }
     })!;
-    expect(kept).toEqual({ parts: { icon: { sequence: 'laurah_talk_short', loop: false } } });
+    expect(kept).toEqual({ parts: { icon: { sequence: 'eleanor_talk', loop: false } } });
   });
 });

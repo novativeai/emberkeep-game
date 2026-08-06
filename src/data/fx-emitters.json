@@ -1,0 +1,401 @@
+{
+  "version": 1,
+  "_note": "Authored FX emitter presets. Schema + the reasoning behind each layer kind: src/render/fx/emitterTypes.ts. Tune live in tools/fxlab/index.html and paste the export back here. Sizes are GAME-SPACE px (2560x1600 canvas, TILE_W 256 / TILE_H 128), so a 130px-wide flame is half a tile across. NOTE: the fire deliberately uses fb_flame, NOT fb_flame_small \u2014 the latter is baked with its art overflowing its own cell borders (92% border alpha, 25/32 cells) and renders as two half-flames side by side at any size. `python3 scripts/audit-sheet-bleed.py` is the check.",
+  "sheets": [
+    "fb_flame",
+    "fb_smoke_wispy"
+  ],
+  "textures": {
+    "fxb_ember": "particles/fx_ember.png",
+    "fxb_spark": "particles/fx_spark.png",
+    "fxb_glow": "particles/fx_glow.png",
+    "fxb_scorch": "particles/fx_scorch.png"
+  },
+  "presets": {
+    "fire": {
+      "label": "Fire",
+      "note": "Brazier / campfire. Three instances of ONE flipbook at different sizes, rates and phases give the body its depth for zero extra VRAM; the ground light lags the flame by 60ms so it reads as caused by it.",
+      "windInfluence": 0.6,
+      "radiusPx": 340,
+      "flicker": {
+        "seed": 4211,
+        "octaves": [
+          {
+            "hz": 11.7,
+            "amp": 0.3
+          },
+          {
+            "hz": 4.3,
+            "amp": 0.44
+          },
+          {
+            "hz": 1.13,
+            "amp": 0.26
+          }
+        ]
+      },
+      "layers": [
+        {
+          "id": "scorch",
+          "kind": "decal",
+          "z": -3,
+          "lod": 1,
+          "texture": "fxb_scorch",
+          "width": 214,
+          "squash": 0.42,
+          "alpha": 0.55,
+          "tint": "#241B22",
+          "blend": "normal"
+        },
+        {
+          "id": "groundLight",
+          "kind": "glow",
+          "z": -2,
+          "lod": 0,
+          "texture": "fxb_glow",
+          "width": 330,
+          "squash": 0.4,
+          "tint": "#FF8A3C",
+          "blend": "add",
+          "alpha": {
+            "base": 0.32,
+            "amp": 0.18
+          },
+          "scaleAmp": 0.12,
+          "lagMs": 60,
+          "flickerPhase": 0
+        },
+        {
+          "id": "bodyOuter",
+          "kind": "sheet",
+          "z": 0,
+          "lod": 0,
+          "sheet": "fb_flame",
+          "ramp": "lava",
+          "width": 200,
+          "fps": 26,
+          "emissive": 0.5,
+          "alpha": 0.62,
+          "blend": "add",
+          "anchor": "base",
+          "phase": 0,
+          "flickerPhase": 0,
+          "flickerAmp": 0.12,
+          "breathe": 0.045,
+          "swayPx": 5,
+          "leanDeg": 7,
+          "height": 300
+        },
+        {
+          "id": "bodyInner",
+          "kind": "sheet",
+          "z": 1,
+          "lod": 0,
+          "sheet": "fb_flame",
+          "ramp": "ember",
+          "width": 148,
+          "fps": 31,
+          "emissive": 0.95,
+          "alpha": 0.8,
+          "blend": "add",
+          "anchor": "base",
+          "phase": 0.37,
+          "flickerPhase": 3.7,
+          "flickerAmp": 0.18,
+          "breathe": 0.07,
+          "swayPx": 3,
+          "leanDeg": 5,
+          "height": 224
+        },
+        {
+          "id": "bodyCore",
+          "kind": "sheet",
+          "z": 2,
+          "lod": 2,
+          "sheet": "fb_flame",
+          "ramp": "gold",
+          "width": 92,
+          "fps": 37,
+          "emissive": 1.4,
+          "alpha": 0.72,
+          "blend": "add",
+          "anchor": "base",
+          "phase": 0.71,
+          "flickerPhase": 8.9,
+          "flickerAmp": 0.26,
+          "breathe": 0.09,
+          "swayPx": 2,
+          "leanDeg": 3,
+          "height": 140
+        },
+        {
+          "id": "licks",
+          "kind": "particles",
+          "z": 3,
+          "lod": 1,
+          "dy": -30,
+          "texture": "fxb_ember",
+          "blend": "add",
+          "frequency": 42,
+          "quantity": 1,
+          "lifespan": [
+            300,
+            560
+          ],
+          "speedX": [
+            -42,
+            42
+          ],
+          "speedY": [
+            -210,
+            -110
+          ],
+          "accelerationY": 120,
+          "scale": {
+            "start": 0.075,
+            "end": 0,
+            "ease": "sine.out"
+          },
+          "color": [
+            "#FFF6E8",
+            "#FFD84D",
+            "#F7A437",
+            "#C73A2E"
+          ],
+          "colorEase": "quad.out",
+          "alpha": {
+            "peak": 0.85,
+            "rise": 0.1,
+            "twinkleHz": 14,
+            "twinkleAmp": 0.25,
+            "tail": 1.6
+          },
+          "spread": [
+            34,
+            17
+          ],
+          "sway": {
+            "px": 9,
+            "cycles": 1.2
+          },
+          "windGain": 26
+        },
+        {
+          "id": "coreBloom",
+          "kind": "glow",
+          "z": 4,
+          "lod": 2,
+          "dy": -70,
+          "texture": "fxb_glow",
+          "width": 96,
+          "squash": 1,
+          "tint": "#FFD84D",
+          "blend": "add",
+          "alpha": {
+            "base": 0.1,
+            "amp": 0.09
+          },
+          "scaleAmp": 0.16,
+          "lagMs": 0,
+          "flickerPhase": 2.1
+        }
+      ]
+    },
+    "smokeEmbers": {
+      "label": "Smoke + sparks & embers",
+      "note": "The byproduct emitter: pooled flipbook puffs (particles have no internal motion, so they cannot fake volumetric smoke), buoyant embers that COOL over their life, and fast sparks that arc back down under gravity. Place it on the same anchor as `fire` for a full campfire.",
+      "windInfluence": 1,
+      "radiusPx": 520,
+      "flicker": {
+        "seed": 8123,
+        "octaves": [
+          {
+            "hz": 2.9,
+            "amp": 0.3
+          },
+          {
+            "hz": 0.93,
+            "amp": 0.5
+          },
+          {
+            "hz": 0.29,
+            "amp": 0.4
+          }
+        ]
+      },
+      "layers": [
+        {
+          "id": "baseGlow",
+          "kind": "glow",
+          "z": -1,
+          "lod": 2,
+          "texture": "fxb_glow",
+          "width": 164,
+          "squash": 0.42,
+          "tint": "#E8503C",
+          "blend": "add",
+          "alpha": {
+            "base": 0.14,
+            "amp": 0.08
+          },
+          "scaleAmp": 0.08,
+          "lagMs": 0,
+          "flickerPhase": 0
+        },
+        {
+          "id": "smoke",
+          "kind": "puffs",
+          "z": 0,
+          "lod": 0,
+          "dy": -30,
+          "sheet": "fb_smoke_wispy",
+          "ramp": "smoke",
+          "blend": "normal",
+          "emissive": 0.02,
+          "pool": 11,
+          "releaseMs": [
+            620,
+            900
+          ],
+          "lifeMs": [
+            4200,
+            6400
+          ],
+          "width": [
+            80,
+            250
+          ],
+          "risePx": [
+            230,
+            330
+          ],
+          "spreadPx": 22,
+          "alpha": {
+            "peak": 0.27,
+            "peakAt": 0.22,
+            "tail": 1.5
+          },
+          "spinDeg": [
+            8,
+            26
+          ],
+          "windLean": 120,
+          "fps": [
+            5,
+            8
+          ],
+          "tint": "#FFE8D8"
+        },
+        {
+          "id": "embers",
+          "kind": "particles",
+          "z": 2,
+          "lod": 0,
+          "dy": -12,
+          "texture": "fxb_ember",
+          "blend": "add",
+          "frequency": 110,
+          "quantity": 1,
+          "lifespan": [
+            2400,
+            4200
+          ],
+          "speedX": [
+            -22,
+            22
+          ],
+          "speedY": [
+            -135,
+            -52
+          ],
+          "accelerationY": 58,
+          "scale": {
+            "start": 0.055,
+            "end": 0.008,
+            "ease": "sine.out"
+          },
+          "color": [
+            "#FFF6E8",
+            "#FFD84D",
+            "#F7A437",
+            "#E8503C",
+            "#5A1206"
+          ],
+          "colorEase": "quad.out",
+          "alpha": {
+            "peak": 0.9,
+            "rise": 0.12,
+            "twinkleHz": 7.5,
+            "twinkleAmp": 0.35,
+            "tail": 1.3
+          },
+          "spread": [
+            40,
+            20
+          ],
+          "sway": {
+            "px": 30,
+            "cycles": 1.7
+          },
+          "windGain": 34
+        },
+        {
+          "id": "sparks",
+          "kind": "particles",
+          "z": 3,
+          "lod": 1,
+          "dy": -24,
+          "texture": "fxb_spark",
+          "blend": "add",
+          "frequency": 380,
+          "quantity": [
+            1,
+            3
+          ],
+          "lifespan": [
+            300,
+            620
+          ],
+          "speedX": [
+            -150,
+            150
+          ],
+          "speedY": [
+            -430,
+            -210
+          ],
+          "gravityY": 520,
+          "scale": {
+            "start": 0.19,
+            "end": 0.012,
+            "ease": "quad.out"
+          },
+          "scaleY": {
+            "start": 0.06,
+            "end": 0.012,
+            "ease": "quad.out"
+          },
+          "color": [
+            "#FFFFFF",
+            "#FFD84D",
+            "#E8503C"
+          ],
+          "colorEase": "quad.out",
+          "alpha": {
+            "peak": 1,
+            "rise": 0.04,
+            "twinkleHz": 22,
+            "twinkleAmp": 0.3,
+            "tail": 1.1
+          },
+          "spread": [
+            18,
+            9
+          ],
+          "alignToVelocity": true,
+          "windGain": 10
+        }
+      ]
+    }
+  }
+}
