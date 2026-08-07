@@ -98,6 +98,8 @@ export class UIScene extends Phaser.Scene {
   /** The travelling curtain, while a destination world's art loads. */
   private travelVeil?: Phaser.GameObjects.Container;
   private lastStep: TutorialStepEvent | null = null;
+  /** Heart milestones banked while the tutorial owns the bubble (see playRegardBeats). */
+  private pendingHearts: Array<{ characterId: string; hearts: number }> = [];
   /** The opening's held silence is a one-shot: only the very first step of a
    *  run waits, and a resumed save never re-holds. */
   private openingHeld = false;
@@ -1087,6 +1089,11 @@ export class UIScene extends Phaser.Scene {
 
   private onTutorialStep(step: TutorialStepEvent): void {
     this.lastStep = step;
+    if (step.done && this.pendingHearts.length) {
+      for (const beat of this.pendingHearts.splice(0)) {
+        this.playRegardBeats(beat.characterId, beat.hearts);
+      }
+    }
     this.hud.setLedgerEnabled(step.done || step.allow.ledger);
     // The tracker is a readout of the Ledger, so BOTH halves ride the same gate
     // as the Ledger button.
@@ -1172,6 +1179,11 @@ export class UIScene extends Phaser.Scene {
    * behind anything the way a chapter beat does.
    */
   private sayGiftLine(characterId: string, accepted: boolean, seed: number): void {
+    // The tutorial owns the bubble until it's done — `say()` wipes the tap
+    // gate, and the scripted gift beat already answers in her voice
+    // (`eleanor_hearts` IS the thank-you). Overwriting it soft-locked the
+    // tutorial on that step.
+    if (!this.ctx.state.tutorialDone) return;
     const line = this.ctx.systems.story.giftLine(characterId, accepted, seed);
     if (!line) return;
     this.bubble.say(characterId as SpeakerId, line, accepted ? 3600 : 3000);
@@ -1184,6 +1196,14 @@ export class UIScene extends Phaser.Scene {
    * her reaction is TO it, not over it.
    */
   private playRegardBeats(characterId: string, hearts: number): void {
+    // Mid-tutorial (the Crystal Ball pays exactly one heart) the sequence
+    // would seize the bubble and end on hide(), stranding the tap-gated step
+    // it interrupted. The milestone plays once ever, so it is deferred, not
+    // dropped: `onTutorialStep` flushes the queue on the done beat.
+    if (!this.ctx.state.tutorialDone) {
+      this.pendingHearts.push({ characterId, hearts });
+      return;
+    }
     const beats = this.ctx.systems.story.regardBeats(characterId, hearts);
     if (!beats) return;
     this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
