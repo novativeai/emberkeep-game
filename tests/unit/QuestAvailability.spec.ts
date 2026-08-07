@@ -91,17 +91,25 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
       maxEver: 1
     });
     expect(finalAvailability.get(pieceKey('cinder_vein', 3))?.reachable).toBe(false);
-    // Moonwater is taught exactly as far as the isle can take it: three seeded
-    // Dew Drops make the one Vial `moonwater_merge` asks for, and no further.
+    // Moonwater goes all the way now: the Dew Basin merged out of `level_5`'s
+    // parts produces Dew Drops forever, so the tier `eleanor_moonwater` asks
+    // for ("Catch the Moonwater") is renewable, not a one-off.
     expect(finalAvailability.get(pieceKey('moonwater', 2))).toMatchObject({
       reachable: true,
+      renewable: true
+    });
+    expect(finalAvailability.get(pieceKey('moonwater', 3))).toMatchObject({
+      reachable: true,
+      renewable: true
+    });
+    // The Basin left HIDDEN_CHAINS when moonwater got its recipient: `level_5`
+    // seeds Hollow Stone ×3 + Dew Hollow ×2, so exactly one Basin can be built.
+    expect(finalAvailability.get(pieceKey('dew_basin', 1))?.blockedBy).toBeUndefined();
+    expect(finalAvailability.get(pieceKey('dew_basin', 3))).toMatchObject({
+      reachable: true,
+      renewable: false,
       maxEver: 1
     });
-    expect(finalAvailability.get(pieceKey('moonwater', 3))?.reachable).toBe(false);
-    // The Basin that would feed a second Vial is husbandry, and husbandry is a
-    // later chapter — held in HIDDEN_CHAINS rather than merely out of reach.
-    expect(finalAvailability.get(pieceKey('dew_basin', 1))?.blockedBy).toContain('HIDDEN_CHAINS');
-    expect(finalAvailability.get(pieceKey('dew_basin', 3))?.reachable).toBe(false);
   });
 
   it('the recipe book promises only what this chapter can deliver', () => {
@@ -112,10 +120,13 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
     expect(keys.has('moonwater:1>2')).toBe(true);
     // Live now that `level_5` opens: three stones make the one Cinder Seam.
     expect(keys.has('cinder_vein:1>2')).toBe(true);
-    // Dead, and therefore never printed: one Seam cannot make a Vein, and
-    // Moonwater's third tier has no source this chapter.
+    // Dead, and therefore never printed: one Seam cannot make a Vein.
     expect(keys.has('cinder_vein:2>3')).toBe(false);
-    expect(keys.has('moonwater:2>3')).toBe(false);
+    // Live now that the Dew Basin ships: its Drops feed Vials feed Moonwater,
+    // the piece "Catch the Moonwater" asks Eleanor's Ledger for.
+    expect(keys.has('moonwater:2>3')).toBe(true);
+    expect(keys.has('dew_basin:1>2')).toBe(true);
+    expect(keys.has('dew_basin:2>3')).toBe(true);
     // A hidden chain contributes nothing at all.
     for (const key of keys) {
       expect(HIDDEN_CHAINS.has(key.split(':')[0]!)).toBe(false);

@@ -44,24 +44,31 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 | 2 🥚 | **Warm the Long Hearth** | `eleanor_hearth` | Make 2 Flame Gems · Deliver 2 Flame Gems to Eleanor |
 | 3 | **Craft the Radiant Centerpiece** | `eleanor_centerpiece` | Make 1 Radiant Gem · Deliver 1 Radiant Gem to Eleanor |
 | 4 | **Fill the Keeper's Hoard** | `eleanor_hoard` | Merge 2 Houses into a Manor · Make 3 Radiant Gems · Deliver 3 Radiant Gems to Eleanor |
-| 5 | **What She Keeps** | — | Give Eleanor 2 Emberberry Baskets · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart)* |
-| 6 🥚 | **Raise the Roofs** | — | Build 2 Houses |
-| 7 | **Light the Long Gallery** | — | Make 4 Flame Gems |
-| 8 | **Fill the Larder** | — | Make 2 Emberberry Preserves |
-| 9 | **The Keeper's Tasks** | — | the five `tasks.json` entries, by reference |
-| 10 🥚 | **Raise the Ember Brood** | — | Make 4 Red Eggs |
-| 11 | **Wake the Ashdrake** | — | Merge 3 Ashdrake Eggs into the Ashdrake |
-| 12 | *(the live order's title)* | the encore | Deliver 8 × Gem Shard to Eleanor |
+| 5 | **Catch the Moonwater** | `eleanor_moonwater` | Make 1 Moonwater · Deliver 1 Moonwater to Eleanor |
+| 6 | **What She Keeps** | — | Give Eleanor 2 Emberberry Baskets · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart)* |
+| 7 🥚 | **Raise the Roofs** | — | Build 2 Houses |
+| 8 | **Light the Long Gallery** | — | Make 4 Flame Gems |
+| 9 | **Fill the Larder** | — | Make 2 Emberberry Preserves |
+| 10 | **The Keeper's Tasks** | — | the five `tasks.json` entries, by reference |
+| 11 🥚 | **Raise the Ember Brood** | — | Make 4 Red Eggs |
+| 12 | **Wake the Ashdrake** | — | Merge 3 Ashdrake Eggs into the Ashdrake |
+| 13 | *(the live order's title)* | the encore | Deliver 8 × Gem Shard to Eleanor |
+
+Quest 5 is the tutorial's `moonwater_merge` promise kept: Eleanor tells the
+player "three vials make true Moonwater, and that is what I will ask you for",
+and this is the order that asks. Moonwater and quartz are `MAGE_ONLY` — no
+dragon eats any tier of either — so without this sink the chain and the Dew
+Basin that feeds it would be dead stock.
 
 *Borealis (`world: "borealis"`).*
 
 | # | Quest | Order | Subquests |
 | --- | --- | --- | --- |
 | 1 | **Make Camp on the Ice** | `selyna_signal` | Merge 3 Drift Spars into a Bound Faggot · Deliver 2 Bound Faggots to Selyna |
-| 2 🥚 | **Open Selyna's Keep** | — | Spend 1 Gold Key on the fog around the keep |
+| 2 🥚 | **Open the Wrack Coast** | — | Spend 1 Gold Key on the fog along the coast |
 | 3 | **Feed the Northern Dragons** | `selyna_pitch` | Build a Drift Stack from 9 Drift Spars · Make 3 Pitch Cakes · Deliver 3 Pitch Cakes to Selyna |
 | 4 | **Salvage the Wrecks** | `selyna_frames` | Make 2 Lashed Frames · Deliver 2 Lashed Frames to Selyna |
-| 5 | **Open the Wrack Coast** | — | Spend 2 Gold Keys on the fog along the coast |
+| 5 | **Open Selyna's Keep** | — | Spend 2 Gold Keys on the fog around the keep |
 | 6 🥚 | **What She Will Take** | — | Give Selyna 2 Bound Faggots · Give Selyna 3 Frost Flowers |
 | 7 | **Raise a Longhall** | — | Merge 2 Lashed Frames into an Upturned Hull · Merge 2 Upturned Hulls into a Longhall |
 | 8 | **Stock the Pitchworks** | — | Make 1 Black Ember |
@@ -69,6 +76,15 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 | 10 🥚 | **Spin the Light-Fast Spindles** | `selyna_spindle` | Earn a place at Selyna's fire · Grow a Rime Bloom · Make 2 Light-Fast Spindles · Deliver 2 to Selyna |
 | 11 | **Wake the Rimewyrm** | — | Merge 3 Rimewyrm Eggs into the Rimewyrm |
 | 12 | *(the live order's title)* | the encore | whatever her Ledger asks |
+
+**The Borealis fog lifts south → north, on keys alone.** Shore (open, cy≈1509
+world px) → coast (1 key, cy≈884) → keep (2 keys, cy≈652): each cloud is the
+next island up the map, and the escalating cost makes the march unspendable out
+of order — at one banked key only the coast is affordable. Every generator a
+quest needs stands on ground already open when it asks (shore's Wrack Line funds
+the signal fire; the coast's Wrack Lines, Hoarfrost Fonts and six Broken Strakes
+fund the pitch and frames orders that pay for the keep) — `pnpm quests --all`
+proves it, and Selyna's door is deliberately the arc's last and dearest fog.
 
 **A quest title and its Ledger order carry the SAME name.** `quests.json` and
 `orders.json` are edited together — the player opens the Ledger to act on the
@@ -357,12 +373,20 @@ The rule lives in `Constants.ts` (`LEGENDARY_EGG_COUNT`) and is enforced by
 
 1. **One per zone.** A world has at most one chain marked `legendary` in
    `chains.json`. Egg is tier 1, the dragon is tier 2, three eggs merge into it.
-2. **No producer ever makes an egg.** Not a generator, not a region seed, not a
-   chest, not an order, not the tutorial. The only source is a quest
-   `rewards.spawn`. Checked *structurally* over every table that can put a piece
-   on a board — not by asking the solver whether one turns up, because a
-   producer behind a fog the audit never lifts is invisible to the solver and
-   perfectly real in play.
+2. **No producer on a BOARD ever makes an egg.** Not a generator, not a region
+   seed, not a chest, not an order, not the tutorial. On the boards, the only
+   source is a quest `rewards.spawn`. Checked *structurally* over every table
+   that can put a piece on a board — not by asking the solver whether one turns
+   up, because a producer behind a fog the audit never lifts is invisible to
+   the solver and perfectly real in play.
+   **The one sanctioned exception is Selyna's Cauldron** (`src/data/cauldron.json`,
+   the pot in the hatchery hub): a deliberate late-game faucet that BREWS eggs
+   out of the Bag, priced in renewable tier-3 goods so a legendary egg is a
+   session-scale project rather than a drop. It trades Bag→Bag only — it can
+   never place a piece on a board — which is why it lives outside the audit's
+   producer tables, and why every recipe input must stay RENEWABLE (the
+   `CauldronSystem.spec.ts` data tests hold the shape; check renewability here
+   when touching a recipe).
 3. **Three eggs, one per quest.** Never two from the same quest, and never from
    the endless tail — it does not finish, so its reward never lands.
 4. **Spaced by 3–4 quests that pay something else.** Back-to-back eggs make the

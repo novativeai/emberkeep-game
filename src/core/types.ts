@@ -479,6 +479,27 @@ export interface TasksData {
 }
 
 /* ------------------------------------------------------------------ */
+/* The Cauldron (src/data/cauldron.json)                                */
+/* ------------------------------------------------------------------ */
+
+/** One brew: consume `inputs` out of the Bag, bank `output` into it. The
+ *  cauldron trades in the Bag ONLY — it never touches a board, which is what
+ *  lets it live in the hatchery hub and still spend goods gathered anywhere. */
+export interface CauldronRecipeConfig {
+  id: string;
+  output: { chain: string; tier: number; count: number };
+  inputs: Array<{ chain: string; tier: number; count: number }>;
+  /** Selyna's grimoire line — italic flavor under the recipe name. */
+  flavor: string;
+  /** What the output is FOR — the panel's answer to "why brew this". */
+  use: string;
+}
+
+export interface CauldronData {
+  recipes: CauldronRecipeConfig[];
+}
+
+/* ------------------------------------------------------------------ */
 /* The quest ladder (src/data/quests.json)                              */
 /* ------------------------------------------------------------------ */
 
@@ -1024,6 +1045,17 @@ export interface EventMap {
   /** The Emberkeep Cookbook panel opened/closed (tutorial gates + analytics). */
   'ui:cookbook_opened': { discovered: number };
   'ui:cookbook_closed': { discovered: number };
+  /** Intent: the cauldron decor in the hatchery hub was tapped. */
+  'ui:cauldron_tapped': Record<string, never>;
+  /** The Cauldron panel opened/closed. */
+  'ui:cauldron_toggled': { open: boolean };
+  /** Command: brew this recipe. CauldronSystem validates the Bag and owns the
+   *  outcome — the panel only asks. */
+  'cauldron:brew': { recipeId: string };
+  /** Fact: inputs left the Bag, the output was banked into it. */
+  'cauldron:brewed': { recipeId: string; output: { chain: string; tier: number; count: number } };
+  /** Fact: the brew was refused, and why — never silently. */
+  'cauldron:brew_failed': { recipeId: string; reason: 'ingredients' | 'bag_full' };
   'ui:deliver_requested': { orderId: string };
   /** A gauge "+" button opened the currency shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' };

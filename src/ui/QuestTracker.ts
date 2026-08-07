@@ -7,12 +7,12 @@ import type { QuestSystem } from '../systems/QuestSystem';
 import { uiRegistry } from './theme';
 
 
-/** Right margin of the SUB rows — the cluster's outermost edge. */
+/** Right margin of the cluster — main line and sub rows share this edge, so
+ *  every `x / n` counter sits in ONE right-aligned column. (An indent was tried
+ *  here and dropped: with right-aligned lines whose counters ride the right
+ *  edge, offsetting the parent offsets its COUNTER, and the column breaks.
+ *  Hierarchy comes from the main line's larger type instead.) */
 const MARGIN_R = IS_MOBILE ? 64 : 56;
-/** The main quest line pulls this far LEFT of the sub rows, so the sub rows read
- *  as indented under it. The whole cluster is right-aligned, so an indent has to
- *  push the parent OUT rather than the child IN. */
-const MAIN_INDENT = 46;
 /** Below the settings gear (y 104, a 128-unit plate → bottom ≈ 168). */
 const TOP_Y = IS_MOBILE ? 300 : 196;
 /** Exported so anything that hangs BELOW the cluster derives its own seat from
@@ -86,8 +86,9 @@ interface Row {
  *   • MAIN quest — the active quest on the ladder (`QuestSystem`). This is the
  *     line the story advances along, so there is exactly one and it never
  *     scrolls.
- *   • SUB quests — that quest's own ordered steps, indented slightly further
- *     right, three at a time, scrollable (wheel or drag) when there are more.
+ *   • SUB quests — that quest's own ordered steps, three at a time, scrollable
+ *     (wheel or drag) when there are more, their counters in the same
+ *     right-hand column as the main line's.
  *
  * The two are one thing, not two lists side by side: the sub rows are always the
  * steps OF the line above them, so the HUD answers "what am I doing, and what is
@@ -140,7 +141,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.setScale(UI_SCALE); // magnifies down-left from the top-right anchor
 
     // ---- Main quest ----
-    this.mainGroup = scene.add.container(-MAIN_INDENT, 0);
+    this.mainGroup = scene.add.container(0, 0);
     this.mainTitle = this.styleText(
       scene.add.text(0, MAIN_TITLE_Y, '', {
         fontFamily: FONT.ui,
@@ -336,14 +337,14 @@ export class QuestTracker extends Phaser.GameObjects.Container {
       this.scene.tweens.add({
         targets: this.mainGroup,
         alpha: 0,
-        x: -MAIN_INDENT + 30,
+        x: 30,
         delay: 300,
         duration: 400,
         ease: 'Sine.easeIn',
         onComplete: () => {
           this.mainStrike.clear();
           this.mainTitle.setColor(PALETTE.cream);
-          this.mainGroup.setX(-MAIN_INDENT);
+          this.mainGroup.setX(0);
           this.mainRetiring = false;
           this.refreshMain();
           // The next order arrives on its own line rather than snapping in.

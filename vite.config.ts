@@ -446,6 +446,7 @@ const worldbuilderZonesEndpoint = (): Plugin => ({
                 pivot?: number[];
                 cells?: number[][];
               }[];
+              portals?: { id?: string; to?: string; rect?: number[] }[];
             }[];
           };
           if (doc.format !== 'emberkeep-zones') throw new Error('not an emberkeep-zones document');
@@ -454,6 +455,7 @@ const worldbuilderZonesEndpoint = (): Plugin => ({
           const seenWorlds = new Set<string>();
           let zoneCount = 0;
           let cellCount = 0;
+          let portalCount = 0;
           for (const w of worlds) {
             if (!w.id) throw new Error('a world has no id');
             if (seenWorlds.has(w.id)) throw new Error(`duplicate world id "${w.id}"`);
@@ -495,6 +497,35 @@ const worldbuilderZonesEndpoint = (): Plugin => ({
               }
               zoneCount++;
             }
+            // Portals are INVISIBLE rectangles, so every one of these mistakes
+            // is a door that looks perfectly fine and does nothing when tapped.
+            // They cost nothing to catch here and are near-impossible to
+            // diagnose on the board.
+            const seenPortals = new Set<string>();
+            for (const p of w.portals ?? []) {
+              if (!p.id) throw new Error(`${w.id}: a portal has no id`);
+              if (seenPortals.has(p.id)) throw new Error(`${w.id}: duplicate portal id "${p.id}"`);
+              seenPortals.add(p.id);
+              const r = p.rect;
+              if (!Array.isArray(r) || r.length !== 4 || r.some((n) => !Number.isFinite(n))) {
+                throw new Error(`${w.id}/${p.id}: rect must be four finite numbers [x, y, w, h]`);
+              }
+              if ((r[2] as number) <= 0 || (r[3] as number) <= 0) {
+                throw new Error(`${w.id}/${p.id}: a portal with no width or height can never be tapped`);
+              }
+              if (!p.to) throw new Error(`${w.id}/${p.id}: portal leads nowhere`);
+              if (p.to === w.id) throw new Error(`${w.id}/${p.id}: portal leads to its own world`);
+              portalCount++;
+            }
+          }
+          // Checked across ALL worlds, so it has to wait for the loop to finish:
+          // a door may legitimately name a world declared later in the document.
+          for (const w of worlds) {
+            for (const p of w.portals ?? []) {
+              if (!seenWorlds.has(p.to as string)) {
+                throw new Error(`${w.id}/${p.id}: leads to unknown world "${p.to}"`);
+              }
+            }
           }
           if (!dryRun) writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
           res.end(JSON.stringify({
@@ -503,7 +534,8 @@ const worldbuilderZonesEndpoint = (): Plugin => ({
             worlds: worlds.length,
             zones: zoneCount,
             cells: cellCount,
-            note: `${worlds.length} worlds, ${zoneCount} grids, ${cellCount} cells validated${dryRun ? ' (dry run — nothing written)' : ''}.`
+            portals: portalCount,
+            note: `${worlds.length} worlds, ${zoneCount} grids, ${cellCount} cells, ${portalCount} portals validated${dryRun ? ' (dry run — nothing written)' : ''}.`
           }));
         } catch (e) {
           res.statusCode = 400;
@@ -753,8 +785,10 @@ const copyRuntimeArt = (): Plugin => ({
       // Superseded / never-referenced art, each verified against the reference
       // graph (`node scripts/audit-art.mjs`) rather than by eye:
       'sprites/background/emberkeep.jpg', //  background_emberkeep points at emberkeep-nb2.webp
-      'sprites/background/hatchery.webp', //  worlds.json-only; not a zone, so nothing can load it
-      'sprites/background/runevault.webp', // ditto
+      // (hatchery.webp used to sit here as "worlds.json-only, not a zone". It is
+      //  a zone now — Borealis's hub, ground measured out of this very file by
+      //  scripts/fit-deck-grid.py — so it ships like any other backdrop.)
+      'sprites/background/runevault.webp', //  worlds.json-only; not a zone, so nothing can load it
       'sprites/environment/full-water-bg',
       'sprites/environment/level-blocker', //  superseded by sprites/environment/blockers/
       'sprites/environment/blockers/cloud/cloud-cropped', // cloud_tile is the shipped one

@@ -82,7 +82,9 @@ export interface RigInstance {
   /** Rotation of the GROUND-plane layers (scorch, light pool), degrees — so a
    *  burn mark can align to a wall instead of the world axes. */
   groundRotDeg: number;
-  /** Emission-rate multiplier for particle layers. >1 = more, denser. */
+  /** Emission-rate multiplier for BOTH particle layers and puff release.
+   *  >1 = more, denser. It has to cover puffs: in a smoke-led emitter the puff
+   *  layer is the density, so thinning only the particles changes nothing. */
   rate: number;
   /** Overrides the preset's wind sensitivity. `null` keeps the preset's. */
   windInfluence: number | null;
@@ -111,6 +113,16 @@ export interface RigOptions extends Partial<RigInstance> {
   seed?: number;
   /** Recolour the whole emitter by overriding every layer's ramp. */
   ramp?: string;
+  /**
+   * Instance colour, dark → bright: `[rim, mid, core]`.
+   *
+   * Layers that declare `palette` take their tint from here instead of their
+   * own, which is what lets ONE preset be five different dragons' auras rather
+   * than five near-identical presets drifting apart in five places. Construction
+   * -time, like `ramp`: a particle emitter's colour ramp is baked into its
+   * config, so changing it means a new rig, and an egg never changes colour.
+   */
+  palette?: string[];
   /** Master opacity over the stack. */
   alpha?: number;
 }
@@ -140,6 +152,7 @@ interface PuffSlot {
   startMs: number;
   lifeMs: number;
   dx: number;
+  dy: number;
   rise: number;
   widthA: number;
   widthB: number;
@@ -165,6 +178,7 @@ export class FxEmitterRig {
   private readonly nowFn: () => number;
   private readonly seed: number;
   private readonly rampOverride?: string;
+  private readonly paletteOverride?: string[];
   private readonly layers: LayerRT[] = [];
 
   private x: number;
@@ -189,6 +203,7 @@ export class FxEmitterRig {
     this.master = opts.alpha ?? 1;
     this.seed = (opts.seed ?? 0) + preset.flicker.seed;
     this.rampOverride = opts.ramp;
+    this.paletteOverride = opts.palette?.length ? opts.palette : undefined;
     this.inst = {
       widthScale: opts.widthScale ?? NEUTRAL_INSTANCE.widthScale,
       heightScale: opts.heightScale ?? NEUTRAL_INSTANCE.heightScale,
@@ -429,10 +444,30 @@ export class FxEmitterRig {
       .setBlendMode(blendOf(blend));
   }
 
+  /**
+   * One stop of the instance palette, or undefined if this layer did not ask
+   * for one (or no palette was supplied — every existing preset).
+   */
+  private paletteStop(want: FxLayer['palette']): string | undefined {
+    const p = this.paletteOverride;
+    if (!p?.length || !want || want === 'ramp') return undefined;
+    const i = want === 'rim' ? 0 : want === 'mid' ? 1 : want === 'core' ? 2 : 3;
+    return p[Math.min(i, p.length - 1)];
+  }
+
+  /** The colour a layer should wear: its palette stop if it asked for one,
+   *  otherwise its authored tint, otherwise the art's own colours. */
+  private tintOf(spec: FxLayer & { tint?: string }): number | undefined {
+    const stop = this.paletteStop(spec.palette);
+    if (stop !== undefined) return hexToInt(stop);
+    return spec.tint ? hexToInt(spec.tint) : undefined;
+  }
+
   private buildDecal(spec: DecalLayer): DecalRT | undefined {
     const obj = this.image(spec.texture, spec.blend ?? 'normal', spec.z);
     if (!obj) return undefined;
-    if (spec.tint) obj.setTint(hexToInt(spec.tint));
+    const tint = this.tintOf(spec);
+    if (tint !== undefined) obj.setTint(tint);
     obj.setFlipX(this.inst.flipX);
     return { kind: 'decal', spec, obj };
   }
@@ -440,7 +475,8 @@ export class FxEmitterRig {
   private buildGlow(spec: GlowLayer): GlowRT | undefined {
     const obj = this.image(spec.texture, spec.blend ?? 'add', spec.z);
     if (!obj) return undefined;
-    if (spec.tint) obj.setTint(hexToInt(spec.tint));
+    const tint = this.tintOf(spec);
+    if (tint !== undefined) obj.setTint(tint);
     obj.setFlipX(this.inst.flipX);
     return { kind: 'glow', spec, obj };
   }
@@ -451,7 +487,7 @@ export class FxEmitterRig {
     const fps = spec.fps;
     const fx = new FlipbookFX(this.scene, sheet, this.x, this.y, this.nowFn, {
       ramp: this.rampOverride ?? spec.ramp,
-      tint: spec.tint ? hexToInt(spec.tint) : undefined,
+      tint: this.tintOf(spec),
       fps,
       loop: true,
       emissive: spec.emissive,
@@ -528,8 +564,18 @@ export class FxEmitterRig {
       cfg.scale = { start: spec.scale.start, end: spec.scale.end, ease: spec.scale.ease ?? 'Linear' };
     }
 
-    if (spec.color?.length) {
-      cfg.color = spec.color.map(hexToInt);
+    // A particle layer has no `tint` — its colour IS the ramp over its life, so
+    // the palette lands here: the whole palette for 'ramp', a single stop for
+    // one of the named stops.
+    const stop = this.paletteStop(spec.palette);
+    const colors =
+      spec.palette === 'ramp' && this.paletteOverride?.length
+        ? this.paletteOverride
+        : stop !== undefined
+          ? [stop]
+          : spec.color;
+    if (colors?.length) {
+      cfg.color = colors.map(hexToInt);
       cfg.colorEase = spec.colorEase ?? 'linear';
     }
 
@@ -608,7 +654,10 @@ export class FxEmitterRig {
       if (now - rt.nextAt > s.lifeMs[1]) rt.nextAt = now;
       if (live < cap) this.spawnPuff(rt, now, wind);
       const r = hash01(this.seed + rt.released * 6427);
-      rt.nextAt = now + lerp(s.releaseMs[0], s.releaseMs[1], r);
+      // `rate` governs puffs too, not just particles. For a smoke-led emitter
+      // the puff layer IS the density, so a half-rate instance that only
+      // thinned the particles would look identical to the full one.
+      rt.nextAt = now + lerp(s.releaseMs[0], s.releaseMs[1], r) / Math.max(0.05, this.inst.rate);
     }
 
     const sx = this.uniform * this.inst.widthScale;
@@ -631,9 +680,12 @@ export class FxEmitterRig {
       const drift = (valueNoise(p * 2.3 + slot.swayPhase, this.seed) - 0.5) * 26;
       slot.fx.setPosition(
         this.x + ((s.dx ?? 0) + slot.dx + drift) * sx * mirror + windX * s.windLean * grip * sx,
-        this.y + (s.dy ?? 0) * sy - rise * sy
+        this.y + ((s.dy ?? 0) + slot.dy) * sy - rise * sy
       );
-      slot.fx.setDisplaySize(width * sx, ((width * rt.sheet.cellH) / rt.sheet.cellW) * sy);
+      slot.fx.setDisplaySize(
+        width * sx,
+        ((width * rt.sheet.cellH) / rt.sheet.cellW) * sy * (s.squash ?? 1)
+      );
       slot.fx.setAngle(slot.spin * p);
       // Expanding smoke thins out: alpha falls as the volume grows, which is
       // mass conservation doing the art direction for us.
@@ -648,7 +700,7 @@ export class FxEmitterRig {
       if (rt.slots.length >= s.pool) return;
       const fx = new FlipbookFX(this.scene, rt.sheet, this.x, this.y, this.nowFn, {
         ramp: this.rampOverride ?? s.ramp,
-        tint: s.tint ? hexToInt(s.tint) : undefined,
+        tint: this.tintOf(s),
         fps: s.fps[0],
         loop: true,
         emissive: s.emissive ?? 0,
@@ -663,6 +715,7 @@ export class FxEmitterRig {
         startMs: now,
         lifeMs: s.lifeMs[0],
         dx: 0,
+        dy: 0,
         rise: s.risePx[0],
         widthA: s.width[0],
         widthB: s.width[1],
@@ -677,7 +730,13 @@ export class FxEmitterRig {
     slot.active = true;
     slot.startMs = now;
     slot.lifeMs = lerp(s.lifeMs[0], s.lifeMs[1], r(1));
-    slot.dx = (r(2) - 0.5) * 2 * s.spreadPx;
+    // Seed on the iso ground ELLIPSE, area-uniform (sqrt on the radius), so a
+    // wide low pool fills evenly instead of crowding its own centre. y takes
+    // half, which is TILE_H / TILE_W.
+    const ang = r(2) * Math.PI * 2;
+    const rad = Math.sqrt(r(9)) * s.spreadPx;
+    slot.dx = Math.cos(ang) * rad;
+    slot.dy = Math.sin(ang) * rad * 0.5;
     slot.rise = lerp(s.risePx[0], s.risePx[1], r(3));
     slot.widthA = s.width[0] * lerp(0.85, 1.15, r(4));
     slot.widthB = s.width[1] * lerp(0.85, 1.15, r(5));

@@ -27,6 +27,7 @@ import type { BoardScene } from './BoardScene';
 import { CharacterBubble } from '../entities/CharacterBubble';
 import { BagPanel } from '../ui/BagPanel';
 import { CommissionPanel } from '../ui/CommissionPanel';
+import { CauldronPanel } from '../ui/CauldronPanel';
 import { StorePanel } from '../ui/StorePanel';
 import { CookbookPanel } from '../ui/CookbookPanel';
 import { Hud } from '../ui/Hud';
@@ -68,6 +69,7 @@ export class UIScene extends Phaser.Scene {
   /** "What shall it make?" — a finished House's one-time commission. */
   private commission!: CommissionPanel;
   private store!: StorePanel;
+  private cauldron!: CauldronPanel;
   /** Self-driven: opens on `nest:hatched`. Held so it stays on the display
    *  list and the UI Builder can style it; never read back. */
   private naming!: NamePanel;
@@ -181,6 +183,11 @@ export class UIScene extends Phaser.Scene {
 
     this.store = new StorePanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.store, this.ctx);
     this.store.setDepth(DEPTH_PANEL + 7);
+
+    // Selyna's Cauldron — opened by tapping the pot decor in the hatchery hub.
+    this.cauldron = new CauldronPanel(this, this.ctx.bus, this.ctx);
+    this.cauldron.setDepth(DEPTH_PANEL + 7);
+    this.offBus.push(this.ctx.bus.on('ui:cauldron_tapped', () => this.cauldron.open()));
 
     this.cookbook = new CookbookPanel(this, this.ctx.bus, this.ctx.state, {
       ...this.ctx.data,

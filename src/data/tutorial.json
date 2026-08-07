@@ -563,13 +563,9 @@
     {
       "id": "eleanor_hearts",
       "speaker": "eleanor",
-      "text": "Thank you. Now tap me once more — those hearts are me, and how far I have come round to you. They only move for things you actually do.",
+      "text": "Thank you. Those hearts under your quest list — that is me, and how far I have come round to you. They only move for things you actually do.",
       "gate": {
-        "type": "event",
-        "event": "ui:character_tapped"
-      },
-      "arrow": {
-        "character": "eleanor"
+        "type": "tap"
       },
       "allow": {
         "character": true,

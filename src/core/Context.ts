@@ -1,6 +1,7 @@
 import { BagSystem } from '../systems/BagSystem';
 import { StoreSystem } from '../systems/StoreSystem';
 import { BoardSystem } from '../systems/BoardSystem';
+import { CauldronSystem } from '../systems/CauldronSystem';
 import { ChestSystem } from '../systems/ChestSystem';
 import { DragonJobSystem } from '../systems/DragonJobSystem';
 import { DragonLifeSystem } from '../systems/DragonLifeSystem';
@@ -27,6 +28,7 @@ import { GameState } from './GameState';
 import type {
   AnchorsData,
   AssetsManifest,
+  CauldronData,
   ChainsData,
   CharactersData,
   DialogueData,
@@ -39,6 +41,7 @@ import type {
 } from './types';
 import anchorsJson from '../data/anchors.json';
 import assetsJson from '../data/assets.json';
+import cauldronJson from '../data/cauldron.json';
 import chainsJson from '../data/chains.json';
 import charactersJson from '../data/characters.json';
 import dialogueJson from '../data/dialogue.json';
@@ -50,6 +53,7 @@ import tasksJson from '../data/tasks.json';
 import tutorialJson from '../data/tutorial.json';
 
 export interface GameData {
+  cauldron: CauldronData;
   chains: ChainsData;
   orders: OrdersData;
   map: MapData;
@@ -65,6 +69,7 @@ export interface GameData {
 
 export interface GameSystems {
   board: BoardSystem;
+  cauldron: CauldronSystem;
   merge: MergeSystem;
   energy: EnergySystem;
   generator: GeneratorSystem;
@@ -104,6 +109,7 @@ export class GameContext {
 
   constructor(storage: StorageLike, overrides?: Partial<GameData>) {
     this.data = {
+      cauldron: cauldronJson as unknown as CauldronData,
       chains: chainsJson as unknown as ChainsData,
       orders: ordersJson as unknown as OrdersData,
       map: mapJson as unknown as MapData,
@@ -145,6 +151,7 @@ export class GameContext {
     const dragons = new DragonSystem(this.state, this.bus, this.clock, this.data.chains);
     this.systems = {
       board: new BoardSystem(this.state, this.bus, this.clock, this.data.chains),
+      cauldron: new CauldronSystem(this.state, this.bus, this.data.cauldron),
       merge: new MergeSystem(this.state, this.bus, this.clock, this.data.chains),
       energy: new EnergySystem(this.state, this.bus, this.clock),
       generator: new GeneratorSystem(this.state, this.bus, this.clock, this.data.chains),

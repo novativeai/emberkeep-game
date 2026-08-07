@@ -324,6 +324,10 @@ export const ITEM_SCALE: Record<string, number> = {
   emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red
   emerald_4: 0.45, // Adult Emerald Dragon: baked adult rig (836px) — same treatment as the adult red
   golden_egg_1: 0.10, // Golden Egg (golden-egg.png 1176×1451) — same scale as red/green egg
+  ashdrake_1: 0.064, // Ashdrake Egg (ashdrake-egg.png 1160×1440) — same scale as red/green egg
+  ashdrake_2: 0.21, // young ashdrake: static art (1054px) at the board dragons' size
+  rimewyrm_1: 0.064, // Rimewyrm Egg (rimewyrm-egg.png 1160×1440) — same scale as red/green egg
+  rimewyrm_2: 0.21, // young rimewyrm: static art (1054px) at the board dragons' size
   coin_1: 0.12, // SMALLER than an egg, per spec
   coin_2: 0.15, // Gold Pouch — reduced 25% on request (0.20 → 0.15); still bigger than the coin (0.12)
   // ---- merge-chains.md roster (art registered in assets.json) ----
@@ -408,8 +412,13 @@ export const HIDDEN_CHAINS = new Set<string>([
   // let the player finish. Same rule, same fix, same one-line switch as the
   // Borealis block below.
   'firepine',
-  'dew_basin',
   'nest',
+  // NOT 'dew_basin' — it is the moonwater farm, and moonwater has a Chapter One
+  // recipient now: Eleanor's `eleanor_moonwater` order ("Catch the Moonwater"),
+  // the promise the tutorial's `moonwater_merge` line makes. `level_5` seeds it
+  // as parts (Hollow Stone ×3 + Dew Hollow ×2), so the player MERGES the Basin
+  // into being and both of its Cookbook rows are discoverable — a seeded t3
+  // would have left them permanent "· · ·" rows.
   // NOT 'emberberry' — the Ripe Emberberry Plant the tutorial grants now yields
   // the berry itself (berry ×3 → basket ×3 → preserve), so this chapter both
   // produces the chain and can finish its two Cookbook rows. It stays husbandry
@@ -690,11 +699,10 @@ export const STANDEE_BREATH = {
  * dragon form is theirs.
  *
  * Keyed by `<chain>:<tier>`, so a breed is ready here the moment it is given a
- * chain and needs no code to switch on. `golden_egg` is deliberately ABSENT: the
- * Golden Elder's awakening is the chapter's one irreversible story beat and it
- * is already choreographed off `FINALE` in both scenes. Putting a card in front
- * of it would be the "teaser glimpse" the finale exists to refuse — her art is
- * registered (`reveal_golden`/`reveal_golden_adult`) and used by nothing.
+ * chain and needs no code to switch on. `golden_egg:2` earned its card when
+ * Selyna's Cauldron made Golden Eggs brewable: merging three is now a real
+ * player act, distinct from the altar's finale — which stays choreographed off
+ * `FINALE` on its quest trigger and never shows this card.
  */
 export const DRAGON_REVEAL: Record<string, { art: string; name: string; epithet: string }> = {
   'ember_dragon:3': {
@@ -716,6 +724,28 @@ export const DRAGON_REVEAL: Record<string, { art: string; name: string; epithet:
     art: 'reveal_emerald_adult',
     name: 'Emerald Dragon',
     epithet: 'the moss and the ash both answer to her now'
+  },
+  // The legendary breeds hatch AT tier 2 — egg to animal in one merge — so
+  // their one card is the young form. Brewed at Selyna's Cauldron or paid out
+  // by the ladder's egg arc; either road ends on this same screen.
+  'ashdrake:2': {
+    art: 'reveal_ashdrake',
+    name: 'Ashdrake',
+    epithet: 'what the fire keeps when everything else has burned away'
+  },
+  'rimewyrm:2': {
+    art: 'reveal_rimewyrm',
+    name: 'Rimewyrm',
+    epithet: 'the cold come back curious, and glad to be held'
+  },
+  // Present since the Cauldron made the Golden Egg brewable: a player can now
+  // MERGE three into an Elder outside the finale, and that hatch deserves the
+  // same ceremony. The finale's own altar beat is untouched — it is a QUEST
+  // trigger, and it still refuses a teaser.
+  'golden_egg:2': {
+    art: 'reveal_golden',
+    name: 'Golden Elder',
+    epithet: 'older than the isle, and awake because you insisted'
   }
 };
 
@@ -1091,7 +1121,7 @@ export const CHEST_GIFTS: ReadonlyArray<ChestGift> = [
 /** Never rolled by the `anyItem` wildcard, whatever world it opens in. */
 export const CHEST_WILDCARD_NEVER = new Set<string>([
   'coin', // currency, and the chest already has a Gold face
-  'golden_egg', // the finale's, placed by the altar and by nothing else
+  'golden_egg', // the finale's — placed by the altar, brewed at Selyna's Cauldron, and by nothing else
   'emerald' // the dropped green-dragon chain — the whole point of the change
 ]);
 
@@ -1359,6 +1389,30 @@ export const DRAG = {
   /** Highlight diamond on the cell under the dragged item. */
   cellHighlightAlpha: 0.5,
   cellHighlightColor: 0xffd27a
+} as const;
+
+/** The authored decor piece (zones.json `decor` name) that opens Selyna's
+ *  Cauldron when tapped. It stands in the hatchery hub; the panel itself is
+ *  world-agnostic because the cauldron trades only in the Bag. */
+export const CAULDRON_DECOR = 'pink_cauldron';
+
+/**
+ * Dragon job menu (Work / Harvest under a tapped dragon) — 2560-space units.
+ * Icon-led: the verbs are emoji on compact ui_btn_green plates, and the status
+ * pill above shows the drop's own art + a countdown (✓ when ready, 💤 resting).
+ */
+export const DRAGON_MENU = {
+  /** Status pill centre, relative to the menu container (buttons sit at y 0). */
+  statusY: -74,
+  /** Drop art height inside the pill. */
+  iconH: 46,
+  plateH: 60,
+  platePadX: 20,
+  /** Button centres at ±btnX; scales are on the 420×152 ui_btn_green texture
+   *  (icon-only labels need far less width than the old worded ones). */
+  btnX: 96,
+  btnScaleX: 0.36,
+  btnScaleY: 0.5
 } as const;
 
 /** Pointer forgiveness (game px) around the exact hit point when alpha-testing

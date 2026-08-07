@@ -14,6 +14,7 @@ import {
   cellAtWorldPoint,
   hasCell,
   neighborsOf,
+  portalAtWorldPoint,
   worldPointOf,
   ZONES,
   zoneAt
@@ -240,12 +241,141 @@ describe('zones — new ground beside the isle', () => {
         }
       }
     }
-    expect(checked).toBe(36 + 141 + 141); // emberkeep's new ground + borealis + roothold
+    // emberkeep's new ground + borealis + roothold + hatchery's measured deck
+    expect(checked).toBe(36 + 141 + 141 + 246);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {
     const ids = [...WORLDS.values()].flatMap((w) => w.map.regions.map((r) => r.id));
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* the doors out                                                        */
+/* ------------------------------------------------------------------ */
+
+describe('portals — every world has a way out of it', () => {
+  /** The nearest playable cell to a world point, in world px. */
+  const distToGround = (world: (typeof WORLDS) extends Map<string, infer W> ? W : never, x: number, y: number): number => {
+    let best = Infinity;
+    for (const z of world.zones) {
+      const cells = z.dense
+        ? [...Array(z.matrix.cols * z.matrix.rows).keys()].map((n) => [n % z.matrix.cols, Math.floor(n / z.matrix.cols)])
+        : [...z.cells].map((c) => c.split(',').map(Number));
+      for (const [i = 0, j = 0] of cells) {
+        const p = worldPointOf(world, z.block.col + i, z.block.row + j);
+        best = Math.min(best, Math.hypot(p.x - x, p.y - y));
+      }
+    }
+    return best;
+  };
+
+  /**
+   * The whole point of the feature, stated as an invariant. A world with no door
+   * is one the player walks into and cannot leave — and because a portal is an
+   * INVISIBLE rectangle, there is nothing on screen that would ever show it is
+   * missing.
+   */
+  it('gives every world at least one door', () => {
+    for (const world of WORLDS.values()) {
+      expect(world.portals.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('never lets a door lead nowhere, or back into its own world', () => {
+    const ids = new Set(WORLDS.keys());
+    const seen = new Set<string>();
+    for (const world of WORLDS.values()) {
+      for (const p of world.portals) {
+        expect(ids.has(p.to)).toBe(true);
+        expect(p.to).not.toBe(world.id);
+        expect(seen.has(p.id)).toBe(false); // one id, one door, across the whole doc
+        seen.add(p.id);
+        expect(p.width).toBeGreaterThan(0);
+        expect(p.height).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  /** A tap inside the rectangle must find the door the author drew there — the
+   *  one thing the runtime does with a portal, asserted against the data. */
+  it('answers a tap anywhere inside its rectangle', () => {
+    for (const world of WORLDS.values()) {
+      for (const p of world.portals) {
+        for (const [fx, fy] of [[0.5, 0.5], [0.02, 0.02], [0.98, 0.98]] as const) {
+          const hit = portalAtWorldPoint(world, p.x + p.width * fx, p.y + p.height * fy);
+          expect(hit?.id).toBe(p.id);
+        }
+        // …and nothing outside it.
+        expect(portalAtWorldPoint(world, p.x - 1, p.y - 1)).toBeUndefined();
+        expect(portalAtWorldPoint(world, p.x + p.width + 1, p.y + p.height + 1)).toBeUndefined();
+      }
+    }
+  });
+
+  /**
+   * A door in open sky is a door the camera may never reach. Each is authored
+   * over the gateway its backdrop paints, and every one of those gateways stands
+   * on an island — so the measure that catches a mis-typed coordinate is
+   * distance to the nearest ground. Measured: the furthest of the shipped three
+   * is 239 px from a cell centre, ~0.57 of the authored 420 px tile. Allowing
+   * one and a half tiles leaves an author room to hang a door off a rim without
+   * letting a rect that landed hundreds of pixels out over open cloud through.
+   */
+  it('puts every door beside the ground, never out over open sky', () => {
+    const TILE = MAP.tile?.width ?? 256;
+    for (const world of WORLDS.values()) {
+      for (const p of world.portals) {
+        const d = distToGround(world, p.x + p.width / 2, p.y + p.height / 2);
+        expect(d).toBeLessThan(TILE * 1.5);
+      }
+    }
+  });
+
+  /**
+   * No world is a dead end: each has a door OUT and a door IN.
+   *
+   * Deliberately not "everything is reachable from Emberkeep by doors". The
+   * worlds come in pairs — a sanctuary and its hub — and crossing from
+   * Emberkeep's pair to Borealis's is the story beat, not an arch. What must
+   * never happen is a world you can enter and not leave, or one nothing leads
+   * to, and both of those are invisible on a board whose doors are invisible.
+   */
+  it('leaves no world a dead end — a door out and a door in, each', () => {
+    const into = new Set([...WORLDS.values()].flatMap((w) => w.portals.map((p) => p.to)));
+    for (const world of WORLDS.values()) {
+      expect(world.portals.length).toBeGreaterThan(0);
+      expect(into.has(world.id)).toBe(true);
+    }
+  });
+
+  /** And each pair is a round trip: every door has one coming back the other
+   *  way, so a hub can never strand the Keeper away from their board. */
+  it('pairs every door with its return', () => {
+    for (const world of WORLDS.values()) {
+      for (const p of world.portals) {
+        const back = WORLDS.get(p.to)!.portals.some((q) => q.to === world.id);
+        expect(back).toBe(true);
+      }
+    }
+  });
+
+  /**
+   * A door is an INTENT, never a shortcut. WorldSystem owns whether the journey
+   * happens, so tapping the Ember Gate mid-tutorial must leave the player
+   * exactly where they were — otherwise the first door authored onto the board
+   * would be a hole in the shipped onboarding.
+   */
+  it('cannot carry the player out of the tutorial', () => {
+    const ctx = createTestContext();
+    expect(ctx.state.tutorialDone).toBe(false);
+    // The shipped door's destination, driven through a fixture context — that
+    // context's own emberkeep is the 8×8 unit map, which by design carries no
+    // zones and so no portals.
+    const door = EMBERKEEP.portals[0]!;
+    ctx.bus.emit('world:switch', { to: door.to });
+    expect(ctx.state.worldId).toBe(WORLD_ID);
   });
 });
 
@@ -449,7 +579,14 @@ describe('worlds — a first arrival puts the opening board out', () => {
     ctx.bus.emit('world:switch', { to: 'borealis' });
 
     const standing = [...ctx.state.items.values()].map((i) => i.chain).sort();
-    expect(standing).toEqual(['driftwood', 'driftwood', 'driftwood', 'driftwood', 'wrackline']);
+    expect(standing).toEqual([
+      'driftwood',
+      'driftwood',
+      'driftwood',
+      'driftwood',
+      'driftwood',
+      'wrackline'
+    ]);
     // Every piece is on ground that is actually open…
     for (const item of ctx.state.items.values()) {
       expect(ctx.state.isTileActive(item.col, item.row)).toBe(true);

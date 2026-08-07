@@ -116,15 +116,34 @@ pixels off its island.
 
 ## 3. Worlds
 
-| id | level | zones | cells | backdrop |
-|---|---|---|---|---|
-| `emberkeep` | 1 | 1 dense + 17 | 46 authored + 36 | `emberkeep` (nb2 render) |
-| `borealis` | 3 | 38 | 141 | `borealis` |
-| `roothold` | 4 | 19 | 141 | `roothold` |
+| id | level | zones | cells | backdrop | role |
+|---|---|---|---|---|---|
+| `emberkeep` | 1 | 1 dense + 17 | 46 authored + 36 | `emberkeep` (nb2 render) | sanctuary |
+| `roothold` | 4 | 19 | 141 | `roothold` | **hub** — Eleanor's home |
+| `borealis` | 3 | 38 | 141 | `borealis` | sanctuary |
+| `hatchery` | 3 | 2 | 223 | `hatchery` | **hub** — Selyna's home |
 
-Borealis and Roothold are worlds of their own: their whole `MapData` is generated
+They come in pairs: a **sanctuary**, where you do things, and its **hub**, where
+you change something about yourself — buy, decorate, read, talk. Each pair is
+joined by a portal each way (below).
+
+The three worlds that are not Emberkeep carry their whole `MapData`, generated
 (all cells `invisible`, because the backdrop already paints the slabs — no new
-tile art needed), placed with the same backdrop calibration Emberkeep uses.
+tile art needed) and placed with the same backdrop calibration Emberkeep uses.
+
+**Hatchery's ground was measured, not imported.** It is the one world with no
+grid in the map editor's export — only a painting. So `scripts/fit-deck-grid.py`
+recovers the flagstone lattice from the backdrop itself: autocorrelation for the
+tile steps, the Fourier phase for where the stones sit, a stone-vs-forest probe
+and a flood fill for the extent. Out comes `assets/map/hatchery-deck.json` (223
+cells across the deck and its 2×3 outpost, in backdrop px), which
+`build-zones.mjs` puts through the same `artToWorld` every editor zone goes
+through — so a measured world and an authored one land in one coordinate system
+by construction. Re-run it with `--overlay` and the fit is checkable by eye:
+
+```
+python3 scripts/fit-deck-grid.py hatchery --overlay /tmp/fit.png
+```
 
 **Per-world boards.** `GameState` keeps `{ items, grid, nests }` per world; the
 board you leave keeps standing, timers and all, so travel is a change of view and
@@ -174,19 +193,82 @@ portraits) is absent from it by construction and is never touched.
   progress bar: the loader reports bytes, not the scene rebuild that follows, so
   a bar would fill and then sit at 100% while the board was still being built.
 
-**There is no player-facing door yet, on purpose.** The shipped Chapter One ends
-on the Elder and hands the board straight back (CLAUDE.md); adding a travel
-affordance to that ending is a design decision, not an engine one. The machinery
-is complete and reachable from `window.__emberkeep.worlds()` /
-`switchWorld(id)`, which go through `WorldSystem` and are refused by the same
-rules any in-game door would be.
+### Portals — the doors out
+
+A portal is an **invisible axis-aligned rectangle in world pixels with a
+destination world**. Tapping inside it emits `world:switch`; everything else is
+the travel path above.
+
+Invisible is the design, not an omission: every backdrop already **paints** its
+gateway — Emberkeep's lit stone arch on the north-east isle, Borealis's glowing
+keep door, Roothold's vined archway onto the rope bridge — so the rectangle is
+only the hit area over art that is already there. A second marker drawn on top
+would be the game failing to trust its own painting.
+
+A rectangle in world px rather than a set of cells, because a gateway is
+**scenery** and scenery does not stand on the lattice: Emberkeep's arch is off
+every playable cell, hanging over the isle's rim. Cells could also not describe
+a door as tall as the art.
+
+| world | door | painted as | leads to |
+|---|---|---|---|
+| `emberkeep` | The Ember Gate | the lit stone arch on the north-east isle | `roothold` |
+| `roothold` | The Vine Arch | the vined archway onto the rope bridge | `emberkeep` |
+| `borealis` | The Keep Door | the glowing door in the keep | `hatchery` |
+| `hatchery` | The Rune Circle | the gold rune inlay in the middle of the deck | `borealis` |
+
+**Pairs, not a ring.** Each sanctuary and its hub have a door each way, and
+`Zones.spec.ts` pins both halves: no world is a dead end (a door out AND a door
+in), and every door has its return. Crossing between the two PAIRS is
+deliberately not a door — reaching the north is the story beat the editor
+records as `teleport` (hatch a tier-2 flame gem), and an arch on Emberkeep that
+skipped it would give away the one journey Chapter Two is built on.
+
+**Authored map decor is placed the same way** — `DECOR` in `build-zones.mjs`,
+by a point on the backdrop. `at` is where the art's own anchor must land in
+backdrop px (for a standing prop, the centre of its ground contact), and the
+cell plus the free `dx`/`dy` nudge are *derived*: which cell a point falls in is
+a property of the fitted deck and would go stale the moment that fit changed.
+Hatchery's pink cauldron is authored as `at: [1542.5, 742.5]` — the rune
+circle's centre, read off the image — and lands on cell (12,6) + (−50, 45).
+
+Hatchery's door is the rune circle inlaid in the *middle* of its deck, standing
+on playable ground. That costs nothing and is the point: a portal is the lowest
+interactive band on the board, so a piece standing on the circle takes the tap
+and only bare stone travels.
+
+Four properties worth knowing:
+
+- **A door is an intent, never a shortcut.** It emits `world:switch` and
+  `WorldSystem` decides, so a door cannot carry the player out of the tutorial
+  or above their rank. Tested.
+- **A door the Keeper cannot use is not there.** `BoardScene.refreshPortals`
+  disables any whose destination `WorldSystem.available()` does not list, and
+  re-asks on `keeper:leveled` and on the tutorial handing over. The alternative
+  — a live rectangle that refuses — is dead input on an invisible object.
+- **The lowest interactive band on the board** (`DEPTHS.tiles + 1`, under every
+  item, badge, standee and cloud). Scenery must never win a tap that landed on
+  something the player can pick up, and fog draws over a door for the same
+  reason it draws over ground.
+- **A `Zone`, not a transparent rectangle.** `setAlpha(0)` clears Phaser's
+  render flag and the object stops being hit-tested at all, so the obvious
+  spelling of "invisible" is the one that silently does nothing.
+
+Authored in the World Builder (⭘ Portal, `P`) or in `PORTALS` in
+`scripts/build-zones.mjs`, where they are written in **backdrop pixels** — read
+straight off the 2610×1632 art — and converted by the same `artToWorld` every
+zone origin goes through. Both producers refuse a door that leads nowhere or to
+a world this build cannot run, as does the `/__worldbuilder/zones` validator;
+`build-zones.mjs` additionally refuses to write a world with no door at all.
 
 ## 4. Authoring them
 
 `tools/worldbuilder` 🧩 **Worlds & grids** is the authoring surface, and it
 covers the model above with nothing left to hand-edited JSON: worlds (id, name,
-level, backdrop) and grids (name, tile, skew, rotation, world-px origin, unlock
-level, cells). ⤒ Apply grids writes `src/data/zones.json` through
+level, backdrop), grids (name, tile, skew, rotation, world-px origin, unlock
+level, cells) and doors (⭘ Portal / `P` — drag one out, drag inside it to move,
+its corner to resize, `Delete` to remove; destination and exact rect on the 🧩
+page). ⤒ Apply grids writes `src/data/zones.json` through
 `/__worldbuilder/zones`, which validates it the way this file describes; ↺ Reload
 pulls worlds back out so imported grids can be edited. Full workflow in
 `docs/pipelines.md` § Multi-world authoring; regression in
@@ -201,8 +283,17 @@ reference grid through `gameOrigin`.
 
 - **Re-export `map.json`** → re-run `scripts/build-zones.mjs`, or the
   `baseSignature` guard silently drops every extra zone.
+- **Regenerate a backdrop** → if a world's ground was MEASURED from it
+  (Hatchery), re-run `scripts/fit-deck-grid.py <name> --overlay …`, then
+  `build-zones.mjs`. A backdrop at a different size or crop moves every cell.
 - **Add a world** → `WORLDS` in `build-zones.mjs`, a `background_<id>` entry in
   `assets.json`, and check `PreloadScene`'s backdrop trim still skips it at boot.
+  It also needs a **door out** and a door **in** from somewhere already
+  reachable, or it is a room with no handles — `build-zones.mjs` refuses the
+  first and `Zones.spec.ts`'s reachability walk catches the second.
+- **Move a backdrop's gateway art** → re-measure that world's rect in `PORTALS`
+  (`build-zones.mjs`), in backdrop px. `Zones.spec.ts` only catches a door that
+  drifts more than 1.5 tiles from any ground.
 - **Add ground to Emberkeep** → check the region's `unlock.level` against
   `LEVEL_XP.length`, and `Zones.spec.ts`'s "cannot open during Chapter One".
 - **Change `neighborsOf` / `hasCell`** → `MergeSystem`, `BoardSystem` drops and

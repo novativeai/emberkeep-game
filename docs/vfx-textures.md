@@ -810,3 +810,62 @@ Before that guard this harness printed *negative* shader costs.
 and `snow.json`. That test exists because the failure mode is silent: the lookup
 is by name, at runtime, in a world the e2e tutorial never visits, and a miss is a
 no-op — so without it a rename takes a world's sky away and nobody notices.
+
+---
+
+## 11. Egg auras — a per-ITEM emitter
+
+`src/data/egg-aura.json` · `src/render/fx/eggAura.ts` · the `eggAura` preset in
+`fx-emitters.json` · `tests/unit/EggAura.spec.ts`.
+
+Heavy, low-lying surface fog pooled around a dragon egg, lit in that dragon's own
+colour. §7's emitters are placed at a world CELL; this one is attached to an
+ITEM, so it follows the piece through merges, drags and spawn tweens on exactly
+the dragon-rig lifecycle (`attachItemAura` / `syncItemAuras` / `detachItemAura`,
+next to `syncDragon` in BoardScene, torn down at every site `removeDragonRig` is).
+
+### One preset, every dragon
+
+Five colours of one effect would be five presets drifting apart in five places
+the first time anyone retuned the smoke. Instead a layer declares
+`palette: "rim" | "mid" | "core" | "haze" | "ramp"` and takes its colour from the
+INSTANCE, and `egg-aura.json` supplies it per egg. A layer with no `palette`
+keeps its authored tint, so every existing preset is untouched.
+
+Each palette's first three stops are **sampled from that egg's own art** — the
+mean hue of its brightest saturated tenth, which is the emissive signature the
+eye reads as "its colour" — so the aura and the egg can never disagree. The
+validator enforces dark → bright ordering.
+
+### Weight: what "half" means
+
+`weight: 1` for a legendary (the `legendary` flag on the chain — Ashdrake,
+Rimewyrm), `0.5` for an ordinary chain egg. `auraInstanceFor()` maps that to
+`rate` and `alpha` — half the puffs and particles released, at half the opacity.
+Size deliberately does NOT halve (1.00 → 0.81): a half-size aura reads as a
+smaller egg rather than a lesser one.
+
+Two engine gaps had to close for that to be true:
+
+- **`rate` now scales puff release, not just particle frequency.** This effect is
+  smoke-led, so the puff layer IS the density — a half-rate instance that only
+  thinned the particles looked identical to the full one.
+- **Puffs gained `squash` and are seeded on the iso ground ELLIPSE.** Surface
+  smoke rendered upright reads as a column no matter how little it rises, and a
+  wide low pool seeded on a line crowds its own centre.
+
+The Golden Egg is deliberately absent: it is `altarEgg`, not a board item, with
+its own tease/finale choreography and its own aura. Adding it is one entry.
+
+### Two things that made it render nothing, then render wrong
+
+Both were found by looking at the frame, not the config — the layers reported
+themselves alive and correctly sized the whole time.
+
+1. **Saturated tint × the grey `smoke` ramp ≈ black.** Tinting the puffs with
+   `mid` multiplied the ramp down until nothing was visible. Hence the fourth
+   palette stop, `haze`: smoke lit by a coloured glow is pale grey carrying a
+   hue, not saturated pigment.
+2. **`normal` blend painted a dark stain on the rock** — the opposite of an
+   aura. The fog is lit from within, so it ADDS light. Additive plus the pale
+   `haze` tint is what turns it from a smudge into a glow.

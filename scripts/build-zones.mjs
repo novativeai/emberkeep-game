@@ -244,6 +244,49 @@ function zoneOf(grid, block) {
   };
 }
 
+/**
+ * A world whose ground came from the PAINTING rather than the map editor.
+ *
+ * Hatchery has no editor grid — only its backdrop — so `scripts/fit-deck-grid.py`
+ * measures the flagstone lattice out of the art itself and writes
+ * `assets/map/<name>-deck.json` in backdrop px. This turns one of its islands
+ * into a runtime zone, through the very same `artToWorld` the editor worlds go
+ * through, so a measured world and an authored one land in one coordinate
+ * system by construction.
+ *
+ * Local (0,0) is the island's own NW-most cell, which is what makes the matrix
+ * tight and every local index non-negative — the block model's requirement.
+ */
+function deckZone(deck, island, index, block) {
+  const cells = island.cells;
+  const minI = Math.min(...cells.map((c) => c[0]));
+  const minJ = Math.min(...cells.map((c) => c[1]));
+  const maxI = Math.max(...cells.map((c) => c[0]));
+  const maxJ = Math.max(...cells.map((c) => c[1]));
+  const art = (i, j) => ({
+    x: deck.origin[0] + i * deck.u[0] + j * deck.v[0],
+    y: deck.origin[1] + i * deck.u[1] + j * deck.v[1]
+  });
+  const a0 = art(minI, minJ);
+  const origin = artToWorld(a0.x, a0.y);
+  return {
+    id: `${deck.backdrop}_d${index + 1}`,
+    name: index === 0 ? 'Deck' : `Outpost ${index}`,
+    block: [block.col, block.row],
+    matrix: [maxI - minI + 1, maxJ - minJ + 1],
+    origin: [round2(origin.x), round2(origin.y)],
+    u: [round2(deck.u[0] * unit), round2(deck.u[1] * unit)],
+    v: [round2(deck.v[0] * unit), round2(deck.v[1] * unit)],
+    // The lattice is measured off an unrotated painting, so there is no turn to
+    // apply and the pivot is free; pinning it to the origin keeps the record
+    // self-consistent rather than leaving a number that means nothing.
+    rotation: 0,
+    pivot: [round2(origin.x), round2(origin.y)],
+    artScale: round2((Math.abs(deck.u[0] - deck.v[0]) * unit) / TILE_W),
+    cells: cells.map(([i, j]) => [i - minI, j - minJ])
+  };
+}
+
 /** World px centre of an editor cell — the address everything else derives from. */
 function editorCellWorld(grid, i, j) {
   const iso = grid.perspective !== 'ortho';
@@ -309,20 +352,26 @@ const BOREALIS_PLAN = {
   1: {
     id: 'borealis_shore',
     status: 'active',
-    // 9 cells. One landmark and four spars leaves four free — enough to merge
-    // in (a merge needs three touching) and not enough to sprawl. The first
-    // Bound Faggot is reachable in the first minute; the second needs the tide.
+    // 9 cells. One landmark and five spars leaves three free — enough to merge
+    // in (a merge needs three touching) and not enough to sprawl. Both Bound
+    // Faggots for Selyna's signal fire are one haul away, so the door quest
+    // never stalls on the tide.
     seeds: [
       ['wrackline', 1, 1],
-      ['driftwood', 1, 4]
+      ['driftwood', 1, 5]
     ]
   },
   3: {
     id: 'borealis_keep',
     status: 'unlockable',
-    unlock: { keys: 1 },
-    // 29 cells — the keep with the door, where Selyna stands. Her own island
-    // has to run the whole northern economy, so it gets one of everything.
+    unlock: { keys: 2 },
+    // 29 cells — the keep with the door, where Selyna stands, and the LAST
+    // fog to lift: the march is south → north (shore cy≈1509 → coast cy≈884 →
+    // keep cy≈652 in world px), so her door is the arc's payoff, not its
+    // second beat — "I have not decided anything about you" holds until the
+    // coast has been worked. Two keys, which is exactly what the pitch and
+    // frames orders have paid by then; at one banked key only the coast is
+    // affordable, so the march cannot be spent out of order.
     seeds: [
       ['frostfont', 1, 1],
       ['wrackline', 1, 1],
@@ -335,9 +384,12 @@ const BOREALIS_PLAN = {
   2: {
     id: 'borealis_coast',
     status: 'unlockable',
-    unlock: { keys: 2 },
-    // 103 cells — the mainland, and the only board in the north big enough to
-    // run two farms and a gold loop at once.
+    unlock: { keys: 1 },
+    // 103 cells — the mainland, the second step of the south→north march and
+    // one signal-fire key away: the first door already puts five generators in
+    // the player's hands (shore Wrack Line + two more + two Hoarfrost Fonts
+    // here), and its six Broken Strakes fund the frames order without waiting
+    // on the Wrack Line's every-third-haul bonus.
     seeds: [
       ['wrackline', 1, 2],
       ['frostfont', 1, 2],
@@ -382,6 +434,85 @@ function seedRegion(cells, seeds, taken) {
   return out;
 }
 
+/**
+ * THE DOORS — every world's portal out, measured ON ITS BACKDROP.
+ *
+ * A portal is an invisible rectangle that travels when tapped, and the reason
+ * it can be invisible is that each backdrop already PAINTS its gateway: the lit
+ * stone arch on Emberkeep's north-east isle, the glowing keep door on
+ * Borealis's, the vined archway onto Roothold's rope bridge. So these are
+ * authored in BACKDROP PIXELS, read straight off the 2610×1632 art, and
+ * converted below by the same `artToWorld` every zone origin goes through.
+ * Anyone can re-measure one by opening the image; nobody has to reason in world
+ * px, which is where a hand-authored rect would go wrong.
+ *
+ * `[x, y, w, h]`, top-left first.
+ *
+ * They come in PAIRS — a sanctuary and its hub, each with a door to the other:
+ *
+ *   Emberkeep  ⇄  Roothold   (Eleanor's home)
+ *   Borealis   ⇄  Hatchery   (Selyna's home)
+ *
+ * A sanctuary is where you do things; a hub is where you change something about
+ * yourself — buy, decorate, read, talk. Crossing between the two PAIRS is not a
+ * door: reaching the north is the story beat the editor records as `teleport`
+ * (hatch a tier-2 flame gem), and putting an arch on Emberkeep that skipped it
+ * would give away the one journey Chapter Two is built on.
+ */
+const PORTALS = {
+  emberkeep: [
+    { id: 'emberkeep_gate', to: 'roothold', label: 'The Ember Gate', art: [1768, 137, 229, 241] }
+  ],
+  roothold: [
+    { id: 'roothold_arch', to: 'emberkeep', label: 'The Vine Arch', art: [1750, 215, 200, 400] }
+  ],
+  borealis: [
+    { id: 'borealis_keep_door', to: 'hatchery', label: 'The Keep Door', art: [2010, 180, 156, 200] }
+  ],
+  hatchery: [
+    // The gold rune circle inlaid in the middle of the deck. It sits ON playable
+    // ground, which is exactly right and costs nothing: a portal is the lowest
+    // interactive band on the board, so a piece standing on the circle takes the
+    // tap and only bare stone travels.
+    { id: 'hatchery_circle', to: 'borealis', label: 'The Rune Circle', art: [1335, 605, 415, 275] }
+  ]
+};
+
+/**
+ * AUTHORED MAP DECOR, placed the way the doors are: by a point ON THE BACKDROP.
+ *
+ * `at` is where the art's own anchor must land, in backdrop px — for a standing
+ * prop that is the centre of its ground contact, so "on the rune circle" is
+ * literally the circle's centre read off the image. The cell and the free
+ * dx/dy nudge are DERIVED below, because the cell a point falls in is a
+ * property of the fitted deck and would go stale the moment that fit changed.
+ *
+ * `anchor` is measured on the art itself: the horizontal centre of the foot
+ * ring, and the height of the two side feet (in a 2:1 iso view the side feet
+ * sit at the contact ellipse's vertical centre, the front foot at its bottom).
+ */
+const DECOR = {
+  hatchery: [
+    {
+      name: 'pink_cauldron',
+      at: [1542.5, 742.5], // the gold rune circle's centre
+      anchor: { x: 0.502, y: 0.845 },
+      scale: 1
+    }
+  ]
+};
+
+/** One authored door, in the world pixels the runtime hit-tests against. */
+function portalOf(p) {
+  const tl = artToWorld(p.art[0], p.art[1]);
+  return {
+    id: p.id,
+    to: p.to,
+    label: p.label,
+    rect: [round2(tl.x), round2(tl.y), round2(p.art[2] * unit), round2(p.art[3] * unit)]
+  };
+}
+
 const WORLDS = [
   {
     id: 'emberkeep',
@@ -420,6 +551,21 @@ const WORLDS = [
     skipOnAuthoredIsle: false,
     levelOf: plainLevel,
     regionPrefix: 'roothold'
+  },
+  {
+    id: 'hatchery',
+    name: 'Hatchery',
+    // Borealis's hub, so it opens with Borealis: a hub the player cannot reach
+    // from the sanctuary it serves is a shop with the lights off.
+    level: 3,
+    // No editor grid exists for this world — its ground is MEASURED out of the
+    // backdrop by scripts/fit-deck-grid.py. See `deckZone`.
+    deck: 'hatchery',
+    backdrop: 'hatchery',
+    extendsAuthoredMap: false,
+    skipOnAuthoredIsle: false,
+    levelOf: plainLevel,
+    regionPrefix: 'hatchery'
   }
 ];
 
@@ -427,8 +573,9 @@ const built = [];
 const report = [];
 
 for (const spec of WORLDS) {
-  const src = source.worlds.find((w) => w.map === spec.editorMap);
-  if (!src) throw new Error(`build-zones: no editor world named "${spec.editorMap}"`);
+  const deck = spec.deck ? read(`assets/map/${spec.deck}-deck.json`) : null;
+  const src = deck ? null : source.worlds.find((w) => w.map === spec.editorMap);
+  if (!deck && !src) throw new Error(`build-zones: no editor world named "${spec.editorMap}"`);
 
   // Index blocks start past the authored lattice for emberkeep, at the origin
   // for a world that is nothing but zones.
@@ -440,7 +587,24 @@ for (const spec of WORLDS) {
   const byLevel = new Map();
   let dropped = 0;
 
-  for (const grid of src.grids ?? []) {
+  // A MEASURED world: one zone per painted island, cells straight from the fit.
+  for (const [n, island] of (deck?.islands ?? []).entries()) {
+    const zone = deckZone(deck, island, n, { col: nextCol, row: 0 });
+    for (const [i, j] of zone.cells) {
+      const col = nextCol + i;
+      const row = j;
+      playable.push([col, row]);
+      invisible.push([col, row]); // the backdrop already paints the flagstones
+      const list = byLevel.get(1) ?? [];
+      const p = { x: zone.origin[0] + i * zone.u[0] + j * zone.v[0], y: zone.origin[1] + i * zone.u[1] + j * zone.v[1] };
+      list.push({ col, row, at: p });
+      byLevel.set(1, list);
+    }
+    zones.push(zone);
+    nextCol += zone.matrix[0] + BLOCK_GUTTER;
+  }
+
+  for (const grid of src?.grids ?? []) {
     if (!(grid.cells ?? []).length) continue;
     const keep = [];
     for (const c of grid.cells) {
@@ -502,6 +666,40 @@ for (const spec of WORLDS) {
       };
     });
 
+  // Decor: art px → the cell it stands on, plus the leftover as a free nudge.
+  // Nearest cell rather than "the cell containing the point" because the anchor
+  // may legitimately sit between two cells — the renderer takes any (col,row)
+  // plus dx/dy, so the only thing the cell has to be is CLOSE, which keeps the
+  // ground shadow (drawn on the cell) under the prop.
+  const mapDecor = [];
+  const decorCalibration = {};
+  for (const d of DECOR[spec.id] ?? []) {
+    const target = artToWorld(d.at[0], d.at[1]);
+    let home;
+    for (const z of zones) {
+      for (const [i, j] of z.cells) {
+        const p = {
+          x: z.origin[0] + i * z.u[0] + j * z.v[0],
+          y: z.origin[1] + i * z.u[1] + j * z.v[1]
+        };
+        const dist = Math.hypot(p.x - target.x, p.y - target.y);
+        if (!home || dist < home.dist) home = { dist, col: z.block[0] + i, row: z.block[1] + j, p };
+      }
+    }
+    if (!home) throw new Error(`build-zones: ${spec.id} has no ground for decor "${d.name}"`);
+    mapDecor.push({
+      name: d.name,
+      col: home.col,
+      row: home.row,
+      z: 0,
+      // `ratio` back out of world px, because that is the space MapDecorRender's
+      // dx/dy is authored in — BoardScene multiplies it by TILE_W/tile.width.
+      dx: round2((target.x - home.p.x) / ratio),
+      dy: round2((target.y - home.p.y) / ratio)
+    });
+    decorCalibration[d.name] = { offsetX: 0, offsetY: 0, scale: d.scale, anchor: d.anchor };
+  }
+
   const cols = Math.max(spec.extendsAuthoredMap ? authored.cols : 0, nextCol);
   const rows = Math.max(
     spec.extendsAuthoredMap ? authored.rows : 1,
@@ -511,14 +709,16 @@ for (const spec of WORLDS) {
 
   /** For a world of its own, the whole MapData; for emberkeep, only what is
    *  ADDED to the authored map (which stays the file it is on disk). */
+  const decor = mapDecor.length ? { mapDecor, decorCalibration } : {};
   const map = spec.extendsAuthoredMap
-    ? { cols, rows, playable, invisible, regions }
+    ? { cols, rows, playable, invisible, regions, ...decor }
     : {
         cols,
         rows,
         playable,
         invisible,
         regions,
+        ...decor,
         startingItems: [],
         tile: authored.tile,
         backgrounds: [{ name: spec.backdrop, col: bg.col, row: bg.row, z: 0, dx: bg.dx, dy: bg.dy }],
@@ -539,16 +739,32 @@ for (const spec of WORLDS) {
     // every new zone a silent few hundred pixels off its island.
     ...(spec.extendsAuthoredMap ? { baseSignature: signatureOf(spec.id, authored) } : {}),
     map,
-    zones
+    zones,
+    portals: (PORTALS[spec.id] ?? []).map(portalOf)
   });
   report.push({
     id: spec.id,
     zones: zones.length,
     cells: playable.length,
+    portals: (PORTALS[spec.id] ?? []).map((p) => `→${p.to}`).join(' ') || 'none',
     dropped,
     regions: regions.map((r) => `${r.id}(${r.tiles.length})`).join(' '),
     extent: `${cols}x${rows}`
   });
+}
+
+// A door is dead input the moment it names a world this build cannot run, and a
+// world with no door is one the player walks into and cannot leave. Both are
+// invisible on screen — the rectangle is invisible by design — so they are
+// caught here, where the data is written, rather than by someone tapping an
+// arch that does nothing.
+const knownWorlds = new Set(built.map((w) => w.id));
+for (const w of built) {
+  if (!w.portals.length) throw new Error(`build-zones: ${w.id} has no portal — nothing leads out of it`);
+  for (const p of w.portals) {
+    if (!knownWorlds.has(p.to)) throw new Error(`build-zones: ${w.id}/${p.id} leads to unknown world "${p.to}"`);
+    if (p.to === w.id) throw new Error(`build-zones: ${w.id}/${p.id} leads to itself`);
+  }
 }
 
 const acc = fitAccuracy();
@@ -577,7 +793,8 @@ console.log(`            reproduces the editor's own gameCell for ${acc.hit}/${a
 for (const r of report) {
   console.log(
     `${r.id.padEnd(10)} zones ${String(r.zones).padStart(2)}  cells ${String(r.cells).padStart(3)}  ` +
-      `dropped-onto-authored-isle ${String(r.dropped).padStart(2)}  extent ${r.extent.padEnd(8)}  ${r.regions}`
+      `dropped-onto-authored-isle ${String(r.dropped).padStart(2)}  extent ${r.extent.padEnd(8)}  ` +
+      `door ${r.portals.padEnd(11)}  ${r.regions}`
   );
 }
 console.log(`wrote ${OUT}`);

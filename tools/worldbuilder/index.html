@@ -122,6 +122,7 @@
     <button class="tool" id="toolMove" title="M — drag a placed element to move it: decor / background / 3D move freely off the grid, a character snaps cell to cell">✥ Move</button>
     <button class="tool" id="toolErase" title="E — click to remove the topmost element on a cell">⌫ Erase</button>
     <button class="tool" id="toolPan" title="H — drag to pan (also: hold Space, middle/right-drag, or arrow keys)">✋ Pan</button>
+    <button class="tool" id="toolPortal" title="P — drag out a DOOR: an invisible rectangle that travels to another world when tapped in game. Drag inside one to move it, its corner to resize, Delete to remove. Pick its destination on the 🧩 page.">⭘ Portal</button>
     <span class="sep"></span>
     <label class="hint" style="padding:0">Tile&nbsp;
       <input id="tileW" type="number" value="240" title="Tile width — grid cell horizontal span (px)" style="width:52px" />×
@@ -538,6 +539,31 @@ function makeZone(over = {}) {
     level: over.level ?? 1
   };
 }
+let portalSeq = 1;
+/**
+ * A DOOR OUT — an invisible rectangle that travels when tapped in game.
+ *
+ * Free world pixels, not cells, and that is the whole design: the gateway is
+ * already PAINTED on every backdrop (Emberkeep's lit arch, Borealis's keep
+ * door, Roothold's vined archway), the rectangle is only the hit area over it,
+ * and painted scenery does not sit on the lattice. `x`/`y` is the top-left in
+ * this document's world px — the same space a grid's `ox`/`oy` uses — so the
+ * exporter puts it through the identical affine.
+ */
+function makePortal(over = {}) {
+  return {
+    id: over.id || `p${portalSeq++}`,
+    /** World id this door leads to. Empty until you choose one. */
+    to: over.to || '',
+    label: over.label || 'Door',
+    x: over.x ?? 0, y: over.y ?? 0,
+    w: Math.max(PORTAL_MIN_PX, over.w ?? 240),
+    h: Math.max(PORTAL_MIN_PX, over.h ?? 240)
+  };
+}
+/** Smallest door worth drawing — under this a drag is a misclick, not a rect. */
+const PORTAL_MIN_PX = 24;
+
 function makeWorld(over = {}) {
   const zones = over.zones && over.zones.length ? over.zones.map(makeZone) : [makeZone({ id: 'main', name: 'Main grid' })];
   return {
@@ -547,6 +573,9 @@ function makeWorld(over = {}) {
     /** Backdrop asset name for this world (its `background_<name>` key). */
     backdrop: over.backdrop || '',
     zones, activeZone: zones[0].id,
+    /** Doors out — invisible rectangles in this document's world px, each with
+     *  the world it travels to. See the ⭘ Portal tool. */
+    portals: (over.portals || []).map(makePortal),
     placements: over.placements || [],
     cameraKeyframes: over.cameraKeyframes || {},
     gameZoom: over.gameZoom || { min: 0.2, max: 1.4 },
@@ -562,6 +591,7 @@ const S = {
   category: 'tile',    // active sidebar tab: 'tile' | 'decor' | 'blocker'
   selectedAssetId: null,   // asset chosen to paint
   selectedPlacement: null, // placed-element id under inspection
+  selectedPortal: null,    // portal id under inspection (⭘ Portal tool)
   activeLevel: 1,      // level stamped on newly-placed blockers
   tool: 'paint',
   spaceHeld: false,    // spacebar held → temporary pan override
@@ -600,6 +630,7 @@ function Z() { return zoneById(AW().activeZone); }
 // old code assigned (`S.placements = ...` filters, `S.nextZ++`).
 Object.defineProperties(S, {
   placements: { get: () => AW().placements, set: (v) => { AW().placements = v; } },
+  portals: { get: () => AW().portals, set: (v) => { AW().portals = v; } },
   cameraKeyframes: { get: () => AW().cameraKeyframes, set: (v) => { AW().cameraKeyframes = v; } },
   gameZoom: { get: () => AW().gameZoom, set: (v) => { AW().gameZoom = v; } },
   nextZ: { get: () => AW().nextZ, set: (v) => { AW().nextZ = v; } },
@@ -1148,6 +1179,40 @@ function render(transient) {
       ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
       ctx.restore();
     }
+  }
+
+  // DOORS OUT. Drawn here and nowhere in the game: a portal is an invisible
+  // rectangle over a gateway the backdrop already paints, so the editor is the
+  // only place it can ever be seen. Cyan against the world's greens and golds,
+  // with its destination on the tab — a door whose target is blank is drawn red,
+  // because that is the one mistake that produces a rectangle which looks
+  // finished and does nothing.
+  for (const pt of AW().portals) {
+    const a = toScreen(pt.x, pt.y);
+    const b = toScreen(pt.x + pt.w, pt.y + pt.h);
+    const sel = pt.id === S.selectedPortal;
+    const bad = !pt.to;
+    const stroke = bad ? '#E8503C' : sel ? '#FFD84D' : '#5FD9E0';
+    ctx.save();
+    ctx.lineWidth = sel ? 2.5 : 1.5;
+    ctx.setLineDash(sel ? [] : [8, 6]);
+    ctx.strokeStyle = stroke;
+    ctx.fillStyle = bad ? 'rgba(232,80,60,0.10)' : 'rgba(95,217,224,0.10)';
+    ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.setLineDash([]);
+    // The resize grip, on the corner the drag handler reads.
+    if (sel) { ctx.fillStyle = stroke; ctx.fillRect(b.x - 7, b.y - 7, 14, 14); }
+    const label = `⭘ ${pt.label}${pt.to ? ` → ${pt.to}` : ' → (nowhere)'}`;
+    ctx.font = 'bold 12px Trebuchet MS';
+    const lw = ctx.measureText(label).width + 12;
+    ctx.fillStyle = bad ? 'rgba(232,80,60,0.92)' : sel ? 'rgba(255,216,77,0.92)' : 'rgba(36,27,34,0.85)';
+    ctx.fillRect(a.x, a.y - 20, lw, 18);
+    ctx.fillStyle = bad || sel ? '#241B22' : '#5FD9E0';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, a.x + 6, a.y - 11);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
   }
 
   // cell coordinates — stamped on visible cells in GAME grid space (ingest-
@@ -2313,7 +2378,19 @@ function buildWorldZoneSpec(world, authored) {
             ...backdropSpec(world),
             cameraZoom: { min: +world.gameZoom.min, max: +world.gameZoom.max }
           },
-      zones
+      zones,
+      // Doors out, in GAME world px. The same affine every zone origin goes
+      // through (`M.px` for the corner, `M.ratio` for the size), so a door and
+      // the slab it stands beside can never drift apart. A door with no
+      // destination is dropped rather than exported: the engine would build an
+      // invisible rectangle that swallows a tap and does nothing.
+      portals: (world.portals || []).filter((p) => p.to).map((p) => {
+        const tl = M.px(p.x, p.y);
+        return {
+          id: p.id, to: p.to, label: p.label,
+          rect: [tl.x, tl.y, +(p.w * M.ratio).toFixed(2), +(p.h * M.ratio).toFixed(2)]
+        };
+      })
     };
     if (extend) spec.baseSignature = mapSignatureOf(world.id, authored);
     return spec;
@@ -2411,7 +2488,12 @@ async function applyZonesToGame() {
     const out = await devEndpoint('/__worldbuilder/zones', 'POST', doc);
     const n = doc.worlds.reduce((a, w) => a + w.zones.length, 0);
     const c = doc.worlds.reduce((a, w) => a + w.zones.reduce((b, z) => b + z.cells.length, 0), 0);
-    say(`⤒ Wrote <b>src/data/zones.json</b> — ${doc.worlds.length} worlds, <b>${n}</b> extra grids, <b>${c}</b> cells.${out?.note ? ` ${out.note}` : ''} Reload the game to see them.`);
+    const d = doc.worlds.reduce((a, w) => a + w.portals.length, 0);
+    // A world nobody can leave is the kind of thing you only find by playing it,
+    // so it is named here rather than left to be discovered.
+    const shut = doc.worlds.filter((w) => !w.portals.length).map((w) => w.id);
+    say(`⤒ Wrote <b>src/data/zones.json</b> — ${doc.worlds.length} worlds, <b>${n}</b> extra grids, <b>${c}</b> cells, <b>${d}</b> doors.${out?.note ? ` ${out.note}` : ''} Reload the game to see them.` +
+      (shut.length ? ` <b style="color:var(--gold2)">No way out of: ${shut.join(', ')}</b> — add a ⭘ Portal.` : ''));
   } catch (e) {
     say(`Apply failed: <b>${e.message}</b>. The game's dev server (<code>pnpm dev</code>) has to be running.`);
   }
@@ -2443,7 +2525,7 @@ async function reloadZonesFromGame() {
   const O = gameOrigin();
   const base = worldOf(O.c, O.r, ref);
   const doc2World = (x, y) => ({ x: (x - GAME_BOARD_ORIGIN.x) / ratio + base.x, y: (y - GAME_BOARD_ORIGIN.y) / ratio + base.y });
-  let added = 0, grids = 0;
+  let added = 0, grids = 0, doors = 0;
   for (const w of doc.worlds) {
     // The authored world's reference grid is this project's own; only bring in
     // worlds we do not already have, so a reload never overwrites live editing.
@@ -2475,13 +2557,23 @@ async function reloadZonesFromGame() {
       }
       grids++;
     }
+    // Doors come back too, or reloading a world would quietly drop the way out
+    // of it and the next ⤒ Apply would write that loss to the game.
+    for (const p of w.portals || []) {
+      const tl = doc2World(p.rect[0], p.rect[1]);
+      rec.portals.push(makePortal({
+        id: p.id, to: p.to, label: p.label || p.to,
+        x: tl.x, y: tl.y, w: p.rect[2] / ratio, h: p.rect[3] / ratio
+      }));
+      doors++;
+    }
     if (!rec.zones.length) rec.zones = [makeZone({ id: 'main', name: 'Main grid' })];
     rec.activeZone = rec.zones[0].id;
     S.worlds.push(rec);
   }
   syncWorldBar(); renderWorldsPage(); render(); scheduleSave();
   say(added
-    ? `↺ Brought in <b>${grids}</b> grids / <b>${added}</b> cells from the game's zones.json. Switch worlds with the 🌍 selector.`
+    ? `↺ Brought in <b>${grids}</b> grids / <b>${added}</b> cells / <b>${doors}</b> doors from the game's zones.json. Switch worlds with the 🌍 selector.`
     : '↺ Nothing new — every world in zones.json is already in this project.');
 }
 
@@ -2536,6 +2628,17 @@ function renderWorldsPage() {
         <b>${w.placements.length}</b> placements · reference tile <b>${mainZone().tileW}×${mainZone().tileH}</b></div>
     </div>
 
+    <div class="zWorld">
+      <h4 style="font-size:13px;margin-bottom:8px">⭘ Doors out — ${w.portals.length}</h4>
+      <div class="zRule" style="margin:0 0 8px">
+        A portal is an <b>invisible rectangle</b>: the gateway is already painted on the backdrop, this is only
+        where the tap lands. Press <b>P</b> and drag one out on the canvas, then set where it leads.
+        A door with no destination is drawn red and is <b>not exported</b>.
+      </div>
+      ${w.portals.length ? w.portals.map(portalCard).join('') : '<div class="zMeta">No way out of this world yet — press <b>P</b> and drag a rectangle over its gateway.</div>'}
+      <div class="zBtns" style="margin-top:8px"><button id="zAddPortal">＋ Add door</button></div>
+    </div>
+
     <div class="zActions">
       <button id="zAddZone">＋ Add grid</button>
       <button id="zApply" class="primary" title="POST every world's grids to the dev server → src/data/zones.json">⤒ Apply grids to game</button>
@@ -2556,11 +2659,70 @@ function renderWorldsPage() {
   document.getElementById('zwLevel').onchange = (e) => { w.level = Math.max(1, +e.target.value || 1); renderWorldsPage(); scheduleSave(); };
   document.getElementById('zwBackdrop').onchange = (e) => { w.backdrop = e.target.value; renderWorldsPage(); scheduleSave(); };
   document.getElementById('zAddZone').onclick = () => addZone();
+  document.getElementById('zAddPortal').onclick = () => {
+    // Dropped at the middle of the view rather than at the origin, so a new door
+    // lands where you are looking instead of somewhere off screen.
+    const c = toWorld(wrap.clientWidth / 2, wrap.clientHeight / 2);
+    const p = addPortal({ x: c.x - 120, y: c.y - 120 });
+    setTool('portal');
+    say(`<b>${p.label}</b> added at the centre of the view — drag it onto the gateway, and set where it leads.`);
+  };
+  for (const p of w.portals) wirePortalCard(p);
   document.getElementById('zApply').onclick = applyZonesToGame;
   document.getElementById('zExport').onclick = exportZonesFile;
   document.getElementById('zReload').onclick = reloadZonesFromGame;
 
   for (const z of AW().zones) wireZoneCard(z);
+}
+
+function portalCard(p) {
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const sel = p.id === S.selectedPortal;
+  const others = S.worlds.filter((x) => x.id !== AW().id);
+  return `
+    <div class="zCard${sel ? ' sel' : ''}" data-p="${p.id}" style="margin-bottom:8px">
+      <h4><span class="dot" style="background:${p.to ? '#5FD9E0' : '#E8503C'}"></span>
+        <input type="text" data-f="label" value="${esc(p.label)}" title="A name for this door — authoring only, never shown in game" /></h4>
+      <div class="zRow"><span class="cap">leads to</span>
+        <select data-f="to" title="The world this door travels to. WorldSystem still refuses the trip mid-tutorial or above the Keeper's rank.">
+          <option value=""${p.to ? '' : ' selected'}>— nowhere (not exported) —</option>
+          ${others.map((x) => `<option value="${esc(x.id)}"${x.id === p.to ? ' selected' : ''}>${esc(x.name)} · lvl ${x.level}</option>`).join('')}
+        </select></div>
+      <div class="zRow"><span class="cap">top-left px</span>
+        <input type="number" data-f="x" value="${Math.round(p.x)}" step="10" />
+        <input type="number" data-f="y" value="${Math.round(p.y)}" step="10" /></div>
+      <div class="zRow"><span class="cap">size px</span>
+        <input type="number" data-f="w" value="${Math.round(p.w)}" step="10" min="${PORTAL_MIN_PX}" /> ×
+        <input type="number" data-f="h" value="${Math.round(p.h)}" step="10" min="${PORTAL_MIN_PX}" /></div>
+      <div class="zBtns">
+        <button data-a="sel">${sel ? '● selected' : 'Select'}</button>
+        <button data-a="focus">Focus</button>
+        <button data-a="del">Delete</button>
+      </div>
+    </div>`;
+}
+
+function wirePortalCard(p) {
+  const card = document.querySelector(`#zonesPage .zCard[data-p="${p.id}"]`);
+  if (!card) return;
+  card.querySelectorAll('input, select').forEach((inp) => {
+    inp.onchange = () => {
+      const f = inp.dataset.f;
+      if (f === 'label') p.label = inp.value.trim() || p.label;
+      else if (f === 'to') p.to = inp.value;
+      else if (f === 'w' || f === 'h') p[f] = Math.max(PORTAL_MIN_PX, +inp.value || PORTAL_MIN_PX);
+      else p[f] = +inp.value || 0;
+      renderWorldsPage(); render(); scheduleSave();
+    };
+  });
+  card.querySelectorAll('button').forEach((btn) => {
+    btn.onclick = () => {
+      const a = btn.dataset.a;
+      if (a === 'sel') { S.selectedPortal = p.id; setTool('portal'); renderWorldsPage(); render(); }
+      else if (a === 'focus') { S.selectedPortal = p.id; flyCameraTo({ wx: p.x + p.w / 2, wy: p.y + p.h / 2, zoom: S.cam.zoom }, 600); renderWorldsPage(); }
+      else if (a === 'del') deletePortal(p);
+    };
+  });
 }
 
 function zoneCard(z, i) {
@@ -2906,7 +3068,7 @@ function ensureInvisibleTile() {
 /* --------------------------- tools & input --------------------------- */
 function setTool(tool) {
   S.tool = tool;
-  for (const [id, t] of [['toolPaint', 'paint'], ['toolSelect', 'select'], ['toolMove', 'move'], ['toolErase', 'erase'], ['toolPan', 'pan']])
+  for (const [id, t] of [['toolPaint', 'paint'], ['toolSelect', 'select'], ['toolMove', 'move'], ['toolErase', 'erase'], ['toolPan', 'pan'], ['toolPortal', 'portal']])
     document.getElementById(id).classList.toggle('active', t === tool);
   updateCursor();
   render();
@@ -2915,6 +3077,8 @@ function setTool(tool) {
 function updateCursor() {
   const panning = S.tool === 'pan' || S.spaceHeld;
   stage.style.cursor = S.drag && (S.drag.kind === 'pan' || S.drag.kind === 'movefree' || S.drag.kind === 'movecell') ? 'grabbing'
+    : S.drag && S.drag.kind === 'portalsize' ? 'nwse-resize'
+    : S.drag && S.drag.kind === 'portalmove' ? 'grabbing'
     : panning ? 'grab' : S.tool === 'move' ? 'move' : 'crosshair';
 }
 document.getElementById('toolPaint').onclick = () => setTool('paint');
@@ -2922,6 +3086,52 @@ document.getElementById('toolSelect').onclick = () => setTool('select');
 document.getElementById('toolMove').onclick = () => setTool('move');
 document.getElementById('toolErase').onclick = () => setTool('erase');
 document.getElementById('toolPan').onclick = () => setTool('pan');
+document.getElementById('toolPortal').onclick = () => {
+  setTool('portal');
+  say('⭘ <b>Portal</b> — drag out a rectangle over the gateway the backdrop paints. It is INVISIBLE in game: the art is the door, this is only where the tap lands. Choose where it leads on the 🧩 page.');
+};
+
+/* ------------------------------- portals ------------------------------- */
+
+/** The door under a screen point, topmost-authored first — the same precedence
+ *  the game's `portalAtWorldPoint` uses, so what you click here is what a tap
+ *  finds there. */
+function portalAt(sx, sy) {
+  const w = toWorld(sx, sy);
+  for (let i = AW().portals.length - 1; i >= 0; i--) {
+    const p = AW().portals[i];
+    if (w.x >= p.x && w.y >= p.y && w.x <= p.x + p.w && w.y <= p.y + p.h) return p;
+  }
+  return null;
+}
+/** Is the point on the selected door's resize grip (its bottom-right corner)? */
+function portalGripAt(sx, sy) {
+  const p = AW().portals.find((x) => x.id === S.selectedPortal);
+  if (!p) return null;
+  const b = toScreen(p.x + p.w, p.y + p.h);
+  return Math.abs(sx - b.x) <= 9 && Math.abs(sy - b.y) <= 9 ? p : null;
+}
+function portalById(id) { return AW().portals.find((p) => p.id === id) || null; }
+
+/** New door, defaulting its destination to the next world in the project — a
+ *  door that leads nowhere is the one thing a portal must not silently be, and
+ *  a project with one world is the only case where nowhere is the honest
+ *  answer. */
+function addPortal(over = {}) {
+  const other = S.worlds.find((w) => w.id !== AW().id);
+  const p = makePortal({ to: other ? other.id : '', label: over.label || `Door ${AW().portals.length + 1}`, ...over });
+  AW().portals.push(p);
+  S.selectedPortal = p.id;
+  renderWorldsPage(); render(); scheduleSave();
+  return p;
+}
+
+function deletePortal(p) {
+  S.portals = AW().portals.filter((x) => x.id !== p.id);
+  if (S.selectedPortal === p.id) S.selectedPortal = null;
+  renderWorldsPage(); render(); scheduleSave();
+  say(`Removed the door <b>${p.label}</b>.`);
+}
 
 /** Topmost placement whose drawn rect contains the screen point (handles free
  *  off-grid elements that aren't at their cell). `filter` narrows by asset. */
@@ -3010,6 +3220,24 @@ stage.addEventListener('mousedown', (e) => {
   if (e.button === 1 || e.button === 2 || e.altKey || S.spaceHeld || S.tool === 'pan') {
     S.drag = { kind: 'pan', sx, sy, camX: S.cam.x, camY: S.cam.y }; updateCursor(); return;
   }
+  if (S.tool === 'portal') {
+    // Grip first, then body, then empty air — the standard rectangle-editing
+    // precedence, so resizing a door never starts by dragging the whole thing.
+    const grip = portalGripAt(sx, sy);
+    const hit = grip || portalAt(sx, sy);
+    if (hit) {
+      S.selectedPortal = hit.id;
+      S.drag = grip
+        ? { kind: 'portalsize', id: hit.id, sx, sy, w0: hit.w, h0: hit.h }
+        : { kind: 'portalmove', id: hit.id, sx, sy, x0: hit.x, y0: hit.y };
+    } else {
+      const w = toWorld(sx, sy);
+      const p = addPortal({ x: w.x, y: w.y, w: PORTAL_MIN_PX, h: PORTAL_MIN_PX });
+      S.drag = { kind: 'portaldraw', id: p.id, x0: w.x, y0: w.y };
+    }
+    renderWorldsPage(); render();
+    return;
+  }
   const cell = cellOf(sx, sy);
   if (S.tool === 'paint') { paintAt(cell.col, cell.row); refreshInspector(); S.drag = { kind: 'paint', last: `${cell.col},${cell.row}` }; }
   else if (S.tool === 'erase') { removePlacement(pickAt(sx, sy)); S.drag = { kind: 'erase' }; }
@@ -3043,6 +3271,28 @@ window.addEventListener('mousemove', (e) => {
     else if (S.drag.kind === 'paint') { const k = `${S.hover.col},${S.hover.row}`; if (k !== S.drag.last) { paintAt(S.hover.col, S.hover.row); S.drag.last = k; } }
     else if (S.drag.kind === 'erase') removePlacement(pickAt(sx, sy));
     else if (S.drag.kind === 'movefree') { const p = placementById(S.drag.id); if (p) { p.dx = S.drag.dx0 + (sx - S.drag.sx) / S.cam.zoom; p.dy = S.drag.dy0 + (sy - S.drag.sy) / S.cam.zoom; } }
+    else if (S.drag.kind === 'portaldraw') {
+      // Drag out from the anchor in any direction; the record always stores the
+      // top-left, so a rect dragged up-left is not stored inside out.
+      const p = portalById(S.drag.id);
+      const w = toWorld(sx, sy);
+      if (p) {
+        p.x = Math.min(S.drag.x0, w.x); p.y = Math.min(S.drag.y0, w.y);
+        p.w = Math.max(PORTAL_MIN_PX, Math.abs(w.x - S.drag.x0));
+        p.h = Math.max(PORTAL_MIN_PX, Math.abs(w.y - S.drag.y0));
+      }
+    }
+    else if (S.drag.kind === 'portalmove') {
+      const p = portalById(S.drag.id);
+      if (p) { p.x = S.drag.x0 + (sx - S.drag.sx) / S.cam.zoom; p.y = S.drag.y0 + (sy - S.drag.sy) / S.cam.zoom; }
+    }
+    else if (S.drag.kind === 'portalsize') {
+      const p = portalById(S.drag.id);
+      if (p) {
+        p.w = Math.max(PORTAL_MIN_PX, S.drag.w0 + (sx - S.drag.sx) / S.cam.zoom);
+        p.h = Math.max(PORTAL_MIN_PX, S.drag.h0 + (sy - S.drag.sy) / S.cam.zoom);
+      }
+    }
     else if (S.drag.kind === 'movecell') {
       const p = placementById(S.drag.id);
       // Snap on the element's OWN grid, so dragging a piece that lives on
@@ -3056,7 +3306,13 @@ window.addEventListener('mousemove', (e) => {
   }
   render();
 });
-window.addEventListener('mouseup', () => { S.drag = null; updateCursor(); });
+window.addEventListener('mouseup', () => {
+  // A door only reaches the 🧩 card and the auto-save once the drag that shaped
+  // it is finished — otherwise every pixel of the drag would queue a write.
+  const shaped = S.drag && /^portal/.test(S.drag.kind);
+  S.drag = null; updateCursor();
+  if (shaped) { renderWorldsPage(); scheduleSave(); }
+});
 
 /* ----------------- drag an asset from the sidebar onto the canvas ------ */
 stage.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
@@ -3300,6 +3556,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'm' || e.key === 'M') setTool('move');
   if (e.key === 'e' || e.key === 'E') setTool('erase');
   if (e.key === 'h' || e.key === 'H') setTool('pan');
+  if (e.key === 'p' || e.key === 'P') document.getElementById('toolPortal').click();
   if (e.key === 'f' || e.key === 'F') fitView();
   if (e.key === 'g' || e.key === 'G') { S.showGrid = !S.showGrid; render(); }
   if (e.key === 'n' || e.key === 'N') { addZone(); }
@@ -3324,7 +3581,10 @@ window.addEventListener('keydown', (e) => {
     const step = (e.shiftKey ? 220 : 80);
     S.cam.x += ARROWS[e.key][0] * step; S.cam.y += ARROWS[e.key][1] * step; render();
   }
-  if ((e.key === 'Delete' || e.key === 'Backspace') && S.selectedPlacement) {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && S.tool === 'portal' && S.selectedPortal) {
+    const p = portalById(S.selectedPortal);
+    if (p) deletePortal(p);
+  } else if ((e.key === 'Delete' || e.key === 'Backspace') && S.selectedPlacement) {
     S.placements = S.placements.filter((p) => p.id !== S.selectedPlacement);
     S.selectedPlacement = null; refreshInspector(); render();
   }
@@ -3594,6 +3854,7 @@ function buildDoc(embed) {
       worlds: S.worlds.map((w) => ({
         id: w.id, name: w.name, level: w.level, backdrop: w.backdrop,
         zones: w.zones.map((z) => ({ ...z })),
+        portals: w.portals.map((p) => ({ ...p })),
         activeZone: w.activeZone,
         cameraKeyframes: w.cameraKeyframes,
         cameraZoom: { min: +w.gameZoom.min, max: +w.gameZoom.max },
@@ -3679,6 +3940,7 @@ function loadWorldDoc(doc, label) {
     S.worlds = proj.worlds.map((w) => makeWorld({
       id: w.id, name: w.name, level: w.level, backdrop: w.backdrop,
       zones: (w.zones && w.zones.length) ? w.zones : [makeZone({ id: 'main', name: 'Main grid' })],
+      portals: w.portals,
       cameraKeyframes: w.cameraKeyframes, gameZoom: w.cameraZoom
     }));
     S.worlds.forEach((rec, i) => {
@@ -3688,6 +3950,9 @@ function loadWorldDoc(doc, label) {
     S.activeWorldId = S.worlds.some((w) => w.id === proj.activeWorld) ? proj.activeWorld : S.worlds[0].id;
     for (const w of S.worlds) for (const z of w.zones) {
       const m = /^z(\d+)$/.exec(z.id); if (m) zoneSeq = Math.max(zoneSeq, +m[1] + 1);
+    }
+    for (const w of S.worlds) for (const p of w.portals) {
+      const m = /^p(\d+)$/.exec(p.id); if (m) portalSeq = Math.max(portalSeq, +m[1] + 1);
     }
   } else {
     S.worlds = [makeWorld({
@@ -4083,7 +4348,7 @@ function serializeSession() {
     activeWorldId: S.activeWorldId,
     worlds: S.worlds.map((w) => ({
       id: w.id, name: w.name, level: w.level, backdrop: w.backdrop,
-      zones: w.zones, activeZone: w.activeZone,
+      zones: w.zones, activeZone: w.activeZone, portals: w.portals,
       cameraKeyframes: w.cameraKeyframes, gameZoom: w.gameZoom, nextZ: w.nextZ, cam: w.cam,
       placements: w.placements.filter((p) => {
         const a = assetById(p.assetId);
@@ -4188,6 +4453,7 @@ function restoreSession() {
     S.worlds = doc.worlds.map((w) => makeWorld({
       id: w.id, name: w.name, level: w.level, backdrop: w.backdrop,
       zones: (w.zones && w.zones.length) ? w.zones : [makeZone({ id: 'main', name: 'Main grid', tileW: doc.tileW, tileH: doc.tileH, skew: doc.gridSkew })],
+      portals: w.portals,
       cameraKeyframes: w.cameraKeyframes, gameZoom: w.gameZoom, nextZ: w.nextZ, cam: w.cam
     }));
     S.worlds.forEach((rec, i) => { rec.activeZone = doc.worlds[i].activeZone && rec.zones.some((z) => z.id === doc.worlds[i].activeZone) ? doc.worlds[i].activeZone : rec.zones[0].id; });
@@ -4195,6 +4461,10 @@ function restoreSession() {
     // Keep the highest zone counter used, so a new grid can never reuse an id.
     for (const w of S.worlds) for (const z of w.zones) {
       const m = /^z(\d+)$/.exec(z.id); if (m) zoneSeq = Math.max(zoneSeq, +m[1] + 1);
+    }
+    // Same for doors — a reused id would collapse two portals into one 🧩 card.
+    for (const w of S.worlds) for (const p of w.portals) {
+      const m = /^p(\d+)$/.exec(p.id); if (m) portalSeq = Math.max(portalSeq, +m[1] + 1);
     }
   } else {
     S.worlds = [makeWorld({
@@ -4911,6 +5181,7 @@ window.__wbfx = {
   fxSyncOverlayVisibility, placementById, assetById, gameOrigin, worldOf, toScreen,
   // Worlds & grids, for tools/checks/wbzonestest.mjs.
   AW, Z, zoneById, zoneBounds, zoneLayout, gameAddressOf, zoneFloorCells,
+  makePortal, addPortal, deletePortal, portalAt, portalById,
   addWorld, deleteWorld, switchWorld, addZone, duplicateZone, deleteZone,
   buildZonesDoc, buildDoc, makeZone, makeWorld, worldToCell, cellOf, render,
   paintAt, invisibleAssetId, characterPlacements, syncWorldBar, setCategory

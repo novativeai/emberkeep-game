@@ -41,6 +41,17 @@ export interface LayerCommon {
   dx?: number;
   dy?: number;
   lod?: 0 | 1 | 2;
+  /**
+   * Take this layer's colour from the INSTANCE palette rather than its own
+   * `tint`, so one preset serves every colour it is ever asked for.
+   *
+   * `rim` | `mid` | `core` | `haze` pick a stop (dark → bright, `haze` being a
+   * pale smoke tint); `ramp` hands the whole
+   * palette to a particle layer's colour-over-life. Without an instance palette
+   * the layer falls back to its authored `tint` and nothing changes — which is
+   * what every existing preset does.
+   */
+  palette?: 'rim' | 'mid' | 'core' | 'haze' | 'ramp';
 }
 
 /** Static ground contact. Blend `normal` so it can DARKEN — ADD cannot. */
@@ -166,8 +177,16 @@ export interface PuffLayer extends LayerCommon {
   /** Display width at birth and at death — smoke expands as it cools, and its
    *  density (so its alpha) drops as it does. */
   width: [number, number];
+  /**
+   * Vertical squash of the puff sprite. 1 is an upright cloud; ~0.45 lays it
+   * on the iso ground plane, which is what SURFACE smoke needs — a low pool
+   * rendered upright reads as a column no matter how little it rises.
+   */
+  squash?: number;
   /** Climb over the life, px. Eased out: buoyancy decays. */
   risePx: [number, number];
+  /** Birth footprint radius. Puffs are seeded on the iso ground ELLIPSE
+   *  (y gets half of this), never on a line through the anchor. */
   spreadPx: number;
   alpha: { peak: number; peakAt: number; tail?: number };
   /** Degrees of roll across the life; the sign is randomised per puff. */
@@ -233,6 +252,13 @@ export function validatePresetFile(doc: FxPresetFile): string[] {
       ids.add(layer.id);
       if (typeof layer.z !== 'number') errors.push(`${at}: z must be a number`);
       if (layer.lod !== undefined && ![0, 1, 2].includes(layer.lod)) errors.push(`${at}: lod must be 0, 1 or 2`);
+      if (layer.palette !== undefined && !['rim', 'mid', 'core', 'haze', 'ramp'].includes(layer.palette)) {
+        errors.push(`${at}: palette must be rim, mid, core, haze or ramp`);
+      }
+      // 'ramp' is a colour-OVER-LIFE, which only a particle layer has.
+      if (layer.palette === 'ramp' && layer.kind !== 'particles') {
+        errors.push(`${at}: palette "ramp" only means anything on a particles layer — pick a stop instead`);
+      }
 
       switch (layer.kind) {
         case 'decal':

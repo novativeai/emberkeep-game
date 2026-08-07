@@ -76,6 +76,35 @@ export interface ZoneRuntime {
   dense: boolean;
 }
 
+/**
+ * A door out of a world: an invisible axis-aligned rectangle in world pixels
+ * that travels somewhere when tapped.
+ *
+ * INVISIBLE IS THE POINT, not an omission. Every shipped backdrop already
+ * PAINTS its gateway — Emberkeep's lit stone arch, Borealis's keep door,
+ * Roothold's vined archway onto the bridge — so a portal is the hit area over
+ * art that is already there. Drawing a second marker on top would be the game
+ * failing to trust its own painting.
+ *
+ * A rectangle in SCREEN-ALIGNED world pixels rather than a set of cells,
+ * because a gateway is a piece of scenery and scenery does not stand on the
+ * lattice: the arch Emberkeep opens through is off every playable cell, hanging
+ * over the north-east rim. Cells would also make a door as tall as the art
+ * impossible to describe.
+ */
+export interface PortalRuntime {
+  id: string;
+  /** World id this door leads to. */
+  to: string;
+  /** Authoring/diagnostic name. Never drawn — see the type's doc comment. */
+  label: string;
+  /** Top-left in world px, and its size. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface WorldRuntime {
   id: string;
   name: string;
@@ -113,6 +142,8 @@ export interface WorldRuntime {
    * zone is absent from it on purpose and keeps the index rule.
    */
   adjacency: Map<string, TilePos[]>;
+  /** Doors out of this world, in authoring order. */
+  portals: PortalRuntime[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -341,6 +372,15 @@ export interface ZoneSpec {
   cells: [number, number][];
 }
 
+/** A portal as `src/data/zones.json` carries it: `[x, y, width, height]` in
+ *  world px, top-left first. */
+export interface PortalSpec {
+  id: string;
+  to: string;
+  label?: string;
+  rect: [number, number, number, number];
+}
+
 export interface WorldSpec {
   id: string;
   name: string;
@@ -357,6 +397,10 @@ export interface WorldSpec {
   baseSignature?: string;
   map: Partial<MapData> & { cols: number; rows: number };
   zones: ZoneSpec[];
+  /** Doors out. Absent on a world with none — every world SHOULD have one, but
+   *  a world mid-authoring legitimately does not, and a missing door is a world
+   *  you cannot leave rather than a world that fails to load. */
+  portals?: PortalSpec[];
 }
 
 export interface ZonesDoc {
@@ -366,6 +410,30 @@ export interface ZonesDoc {
 }
 
 export const ZONES = zonesJson as unknown as ZonesDoc;
+
+const portalFromSpec = (s: PortalSpec): PortalRuntime => ({
+  id: s.id,
+  to: s.to,
+  label: s.label ?? s.to,
+  x: s.rect[0],
+  y: s.rect[1],
+  width: s.rect[2],
+  height: s.rect[3]
+});
+
+/** The portal under a world point, if any. Topmost-authored wins, so two
+ *  overlapping doors resolve the way the list reads rather than by accident. */
+export function portalAtWorldPoint(
+  world: WorldRuntime,
+  x: number,
+  y: number
+): PortalRuntime | undefined {
+  for (let i = world.portals.length - 1; i >= 0; i--) {
+    const p = world.portals[i] as PortalRuntime;
+    if (x >= p.x && y >= p.y && x < p.x + p.width && y < p.y + p.height) return p;
+  }
+  return undefined;
+}
 
 const zoneFromSpec = (s: ZoneSpec): ZoneRuntime => ({
   id: s.id,
@@ -546,7 +614,8 @@ export function buildWorld(spec: WorldSpec, authored: MapData): WorldRuntime {
     signature: mapSignature(spec.id, baseMap),
     playable: new Set((map.playable ?? []).map(([c, r]) => key(c, r))),
     tileRegion,
-    adjacency: buildAdjacency(zones)
+    adjacency: buildAdjacency(zones),
+    portals: (spec.portals ?? []).map(portalFromSpec)
   };
 }
 

@@ -54,9 +54,12 @@ describe('RevealSystem (first sight of a dragon form)', () => {
 
     merged('ember_dragon', 4);
     merged('ashmoss', 3); // food, not a dragon
-    merged('golden_egg', 2); // the finale's beat — deliberately has no card
+    merged('golden_egg', 2); // a merged Elder (brewed eggs) — has a card
 
-    expect(seen.map((s) => `${s.chain}:${s.tier}`)).toEqual(['ember_dragon:4']);
+    expect(seen.map((s) => `${s.chain}:${s.tier}`)).toEqual([
+      'ember_dragon:4',
+      'golden_egg:2'
+    ]);
   });
 });
 
@@ -72,11 +75,13 @@ describe('the reveal roster and the Emporium landmarks (authored data)', () => {
     }
   });
 
-  it('the Golden Elder has no card — the finale is her reveal', () => {
-    // MECHANICS/CLAUDE.md: the awakening is the chapter's one irreversible
-    // story beat and it ENDS there. A card in front of it is the teaser the
-    // finale exists to refuse. Her plate is drawn and registered regardless.
-    expect(DRAGON_REVEAL['golden_egg:2']).toBeUndefined();
+  it('the Golden Elder has a card for a MERGED hatch; the altar keeps the finale', () => {
+    // Amended when Selyna's Cauldron made Golden Eggs brewable: merging three
+    // is a player act outside the story, and that hatch gets the ceremony. The
+    // finale itself is a QUEST trigger (`FINALE`, `quest:completed`) — it never
+    // routes through DRAGON_REVEAL, so the altar beat is untouched by this card.
+    expect(DRAGON_REVEAL['golden_egg:2']).toBeDefined();
+    expect(DRAGON_REVEAL['golden_egg:2']!.art).toBe('reveal_golden');
     expect(keys).toContain('reveal_golden_adult');
   });
 

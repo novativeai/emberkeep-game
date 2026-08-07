@@ -852,6 +852,30 @@
       "file": "sprites/ui/icon_shop.webp"
     },
     {
+      "key": "item_ashdrake_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/ashdrake-egg.webp"
+    },
+    {
+      "key": "item_rimewyrm_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/rimewyrm-egg.webp"
+    },
+    {
+      "key": "item_ashdrake_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/ashdrake/ashdrake-young.webp"
+    },
+    {
+      "key": "item_rimewyrm_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/rimewyrm/rimewyrm-young.webp"
+    },
+    {
       "key": "item_emerald_1",
       "source": "file",
       "generator": "item",
@@ -892,6 +916,18 @@
       "source": "file",
       "generator": "decor",
       "file": "sprites/background/roothold.webp"
+    },
+    {
+      "key": "background_hatchery",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/background/hatchery.webp"
+    },
+    {
+      "key": "decor_pink_cauldron",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/pink_cauldron.webp"
     },
     {
       "key": "trailer_world_ice",
@@ -1410,6 +1446,16 @@
       "key": "reveal_storm_adult",
       "source": "file",
       "file": "sprites/characters/dragon/reveals/storm_adult.webp"
+    },
+    {
+      "key": "reveal_ashdrake",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/ashdrake.webp"
+    },
+    {
+      "key": "reveal_rimewyrm",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/rimewyrm.webp"
     },
     {
       "key": "reveal_moonwhisker",

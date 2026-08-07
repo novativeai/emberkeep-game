@@ -422,6 +422,29 @@ edit. **[L1]**
 
 ---
 
+## 11b. Selyna's Cauldron — brewing **[L1]**
+
+The pot standing in the **hatchery hub** opens a brew screen on tap
+(`ui:cauldron_tapped` → `CauldronPanel`). Recipes live in
+`src/data/cauldron.json`; `CauldronSystem` owns the trade.
+
+- **Bag → Bag only.** Inputs are validated against and consumed FROM the Bag
+  (`bag:consume`), the output is banked INTO it (`bag:bank`). The cauldron never
+  touches a board, which is what lets goods gathered on any world pay for it.
+- **The outputs are the point**: every dragon egg in the roster is brewable —
+  Red and Green cheaply, the legendary Ashdrake/Rimewyrm eggs in multiples of
+  cross-world tier-3 goods, and the Golden Egg as the mythic peak — plus
+  utility brews (Hearth Cake, Treasure Chest). Difficulty scales with rarity;
+  every input is a RENEWABLE piece (see `docs/quest-ladder.md` §6 for why that
+  is load-bearing).
+- **Refusals are loud and up-front**: `ingredients` (a have-count is red) or
+  `bag_full` (the output would need a slot the Bag cannot free), and nothing is
+  spent on a refusal — validated in full before the first `bag:consume`.
+- UI grammar: recipe ledger left (lit dot = brewable now), the selected
+  formula right — flavor, use, one ingredient card per input showing need and
+  the in-bag count in **red when short** — and a BREW button that sleeps until
+  the Bag covers everything.
+
 ## 12. Keys & region unlocks
 
 > ### Shipped scope — the key is a single scripted prop

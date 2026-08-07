@@ -3,12 +3,14 @@ import type { GameContext } from '../core/Context';
 import {
   ANIMATED_TILE_NAMES,
   ATMOSPHERE,
+  CAULDRON_DECOR,
   CHEST_INTERVAL_MS,
   COLLECTIBLE_REWARD,
   DECOR_SCALE,
   DEPTHS,
   DRAG,
   DRAGON_ANIM,
+  DRAGON_MENU,
   DRAGON_RIG_SCALE,
   EMBER_MOTES,
   FINALE,
@@ -69,6 +71,9 @@ import { FlipbookFX, RAMP_TEXTURE } from '../render/FlipbookFX';
 import { EMITTER_PRESETS } from '../render/fx/emitterAssets';
 import { resolvePlacement } from '../render/fx/emitterPlacements';
 import { FxDirector } from '../render/fx/FxDirector';
+import type { FxEmitterRig } from '../render/fx/EmitterFX';
+import { auraInstanceFor, auraKey, type EggAuraFile } from '../render/fx/eggAura';
+import eggAuraJson from '../data/egg-aura.json';
 import { AuroraFX, type AuroraPresetFile } from '../render/fx/AuroraFX';
 import { SnowFX, type SnowPresetFile } from '../render/fx/SnowFX';
 import type { WeatherFile } from '../render/fx/weatherConfig';
@@ -160,6 +165,28 @@ const faceTextureKey =
 
 const FONT = FONT_FAMILIES.ui;
 
+/** The baked BODY box of a standee — never its frame, which also holds the
+ *  scepter blaze and the ember bolt. */
+interface HitBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * A world character's tap area, in TEXTURE space so `setScale` cannot shift it.
+ *
+ * `whole` widens it from her lower body to all of her — used only while a give
+ * is armed, when there is no board tap left to protect and a miss would cancel
+ * the gesture instead of landing it.
+ */
+function characterHitRect(b: HitBox, whole: boolean): Phaser.Geom.Rectangle {
+  return whole
+    ? new Phaser.Geom.Rectangle(b.x, b.y, b.width, b.height)
+    : new Phaser.Geom.Rectangle(b.x + b.width * 0.1, b.y + b.height * 0.55, b.width * 0.8, b.height * 0.45);
+}
+
 /** A sprite's authored resting scale. World standees render well under 1, so
  *  every pulse/tween must be relative to this rather than to a literal 1. */
 const baseScaleOf = (sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Image): number =>
@@ -204,6 +231,8 @@ export class BoardScene extends Phaser.Scene {
   /** Dragon job menu (Work / Harvest) + the dragon it belongs to. */
   private dragonMenu?: Phaser.GameObjects.Container;
   private dragonMenuLabel?: Phaser.GameObjects.Text;
+  private dragonMenuPlate?: Phaser.GameObjects.Graphics;
+  private dragonMenuIcon?: Phaser.GameObjects.Image;
   private dragonMenuForId = 0;
   /** Countdown pill floating above a rig-hosted dragon: the BoardItem's own
    *  pill renders UNDER the rig (glued at host.depth + 0.5), so the timer
@@ -298,6 +327,10 @@ export class BoardScene extends Phaser.Scene {
   private fireflyZone?: Phaser.Geom.Rectangle;
   /** Authored world FX emitters (src/data/emitters.json) + their orchestrator. */
   private fx?: FxDirector;
+  /** Per-item ambient auras (eggs), keyed by item id. Same lifecycle as the
+   *  dragon rigs: attached on acquire, followed every frame, torn down wherever
+   *  `removeDragonRig` is. */
+  private itemAuras = new Map<number, { rig: FxEmitterRig; host: BoardItem }>();
   private aurora?: AuroraFX;
   private snow?: SnowFX;
   /** Golden Egg ambient tremble (starts near the Level-3 threshold). */
@@ -310,6 +343,8 @@ export class BoardScene extends Phaser.Scene {
   private altarElder?: RigPlayer;
   private altarElderFallback?: Phaser.GameObjects.Image;
   private altarZone?: Phaser.GameObjects.Zone;
+  /** The invisible doors out of this world — see `buildPortals`. */
+  private portalZones: { zone: Phaser.GameObjects.Zone; to: string }[] = [];
   private altarElderRoll = { mode: 'idle' as 'idle' | 'hover', remainMs: 0 };
   /** The Level-3 finale runs exactly once per session. */
   private finaleRan = false;
@@ -330,6 +365,7 @@ export class BoardScene extends Phaser.Scene {
     // re-asserts it because the scene is what draws the result.
     setActiveWorld(this.ctx.state.world);
     this.itemSprites.clear();
+    this.itemAuras.clear();
     this.pool = [];
     this.tiles.clear();
     this.fog.clear();
@@ -365,6 +401,10 @@ export class BoardScene extends Phaser.Scene {
     this.altarElderFallback = undefined;
     this.altarElderRoll = { mode: 'idle', remainMs: 0 };
     this.altarZone = undefined;
+    // Travel restarts this scene, so last world's doors died with it — never
+    // carry the refs, or the new board would hold rectangles leading out of a
+    // world the player has already left.
+    this.portalZones = [];
     this.goldenTremble = undefined;
     this.teaseReturn = null;
     this.finaleRan = false;
@@ -391,6 +431,7 @@ export class BoardScene extends Phaser.Scene {
     this.buildFog();
     this.buildSouthPromise();
     this.buildKeyBadges();
+    this.buildPortals(); // the doors out — after buildFog, so a cloud covers one
     this.spawnExistingItems(); // before the camera frames — travel arrives on a populated board
     this.syncGoldenAltar();
     this.buildEmitters();
@@ -429,6 +470,7 @@ export class BoardScene extends Phaser.Scene {
       this.crystal3d?.dispose();
       this.crystal3d = undefined;
       this.crystalTex = undefined;
+      for (const id of [...this.itemAuras.keys()]) this.detachItemAura(id);
       this.fx?.destroy();
       this.fx = undefined;
       this.aurora?.destroy();
@@ -516,9 +558,15 @@ export class BoardScene extends Phaser.Scene {
    * is how a brazier ends up burning through the rock in front of it.
    */
   private buildWorldEmitters(): void {
-    const placements = (emittersJson as { emitters?: unknown }).emitters;
-    if (!Array.isArray(placements) || !placements.length) return;
+    // The director is built UNCONDITIONALLY: egg auras are rigs too, and this
+    // used to return early when emitters.json was empty — which it is on a
+    // fresh checkout — leaving every egg without an aura for no stated reason.
     this.fx = new FxDirector(this, EMITTER_PRESETS, { now: () => this.ctx.clock.now() });
+    const placements = (emittersJson as { emitters?: unknown }).emitters;
+    if (!Array.isArray(placements) || !placements.length) {
+      this.fx.setPowerState((this.power?.state ?? 'active') as PowerState);
+      return;
+    }
     const ratio = TILE_W / (this.ctx.state.map.tile?.width ?? TILE_W);
     for (const raw of placements) {
       const e = resolvePlacement(raw as Parameters<typeof resolvePlacement>[0]);
@@ -572,6 +620,7 @@ export class BoardScene extends Phaser.Scene {
     }
     // One pass for every authored emitter: cull, rank by distance from the view
     // centre, allocate quality, sample the wind field per position.
+    this.syncItemAuras();
     this.fx?.update();
     // Both are cheap no-ops when this world has no weather. The aurora usually
     // returns after comparing two numbers (it re-renders 20×/s, not 60); the
@@ -817,6 +866,65 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
+  /* ------------------------- egg auras ------------------------------- */
+
+  /**
+   * Give an egg its aura: heavy low surface smoke and a colour pool in the
+   * sleeping dragon's own hue (`src/data/egg-aura.json`).
+   *
+   * One preset serves every egg; the instance palette supplies the colour and
+   * the instance `weight` supplies the density — a legendary gets the full
+   * effect, an ordinary chain egg gets half. An item that is not in the table
+   * (which is almost all of them) costs one Map lookup and nothing else.
+   */
+  private attachItemAura(host: BoardItem): void {
+    if (!this.fx || host.kind !== 'item' || this.itemAuras.has(host.itemId)) return;
+    const doc = eggAuraJson as unknown as EggAuraFile;
+    const spec = doc.eggs[auraKey(host.chain, host.tier)];
+    if (!spec) return;
+    const inst = auraInstanceFor(spec.weight);
+    const rig = this.fx.spawn(doc.preset, host.x, host.y, {
+      depth: host.depth,
+      palette: spec.palette,
+      // Per-item seed: two Red Eggs side by side must not pulse in unison, and
+      // this is the only thing standing between them and that.
+      seed: host.itemId * 7919,
+      alpha: inst.alpha,
+      rate: inst.rate,
+      widthScale: inst.widthScale,
+      heightScale: inst.heightScale
+    });
+    if (rig) this.itemAuras.set(host.itemId, { rig, host });
+  }
+
+  private detachItemAura(itemId: number): void {
+    const aura = this.itemAuras.get(itemId);
+    if (!aura) return;
+    this.fx?.remove(aura.rig);
+    this.itemAuras.delete(itemId);
+  }
+
+  /**
+   * Follow the host, exactly as `syncDragon` does — an egg slides on a merge,
+   * a drag and a spawn tween, and an aura that sat at the spawn point would
+   * strand a puddle of smoke on an empty tile.
+   */
+  private syncItemAuras(): void {
+    for (const [id, aura] of this.itemAuras) {
+      const host = aura.host;
+      if (!host.active) {
+        this.detachItemAura(id);
+        continue;
+      }
+      aura.rig.setPosition(host.x, host.y);
+      // A LIFTED egg has no ground to pool smoke on. Hiding the rig while it is
+      // in the player's hand is not a detail: at drag depth the ground pool
+      // would float over the whole board.
+      const lifted = this.dragSprite === host;
+      aura.rig.setMasterAlpha(lifted ? 0 : 1).setDepth(host.depth);
+    }
+  }
+
   private removeDragonRig(itemId: number): void {
     const ld = this.liveDragons.get(itemId);
     if (!ld) return;
@@ -1040,7 +1148,11 @@ export class BoardScene extends Phaser.Scene {
     this.offBus.push(
       // Every level-up is now an ordinary glide to the new zone. Level 3 used to
       // hijack this into the finale; the awakening is a QUEST beat now, below.
-      this.ctx.bus.on('keeper:leveled', ({ level }) => this.flyToLevel(level)),
+      this.ctx.bus.on('keeper:leveled', ({ level }) => {
+        this.flyToLevel(level);
+        // A rank can be what opens a world — the door to it wakes with it.
+        this.refreshPortals();
+      }),
       this.ctx.bus.on('quest:completed', ({ questId }) => {
         if (questId === GOLDEN_ALTAR.awakenQuestId) this.runFinale();
       })
@@ -1648,6 +1760,19 @@ export class BoardScene extends Phaser.Scene {
       this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
       // Slow spring-bounce (not a smooth float): lazy spring, staggered, calm.
       this.settleSprite(sprite, (i % 8) * 35); // one-time landing settle
+      // The one piece of scenery that IS a screen: Selyna's pot opens the brew
+      // panel. Same shape as a world character — map decor with a tap handler.
+      if (d.name === CAULDRON_DECOR) {
+        sprite.setInteractive({ useHandCursor: true });
+        sprite.on(
+          'pointerup',
+          (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
+            ev.stopPropagation();
+            this.tapClaimed = true; // the pot is something; not empty ground
+            this.ctx.bus.emit('ui:cauldron_tapped', {});
+          }
+        );
+      }
     });
   }
 
@@ -1725,10 +1850,8 @@ export class BoardScene extends Phaser.Scene {
       // scepter blaze and the ember bolt, and neither is her. Texture space (so
       // `setScale` does not shift it), and origin does not either.
       const b = bank?.body ?? { x: 0, y: 0, width: sprite.width, height: sprite.height };
-      sprite.setInteractive(
-        new Phaser.Geom.Rectangle(b.x + b.width * 0.1, b.y + b.height * 0.55, b.width * 0.8, b.height * 0.45),
-        Phaser.Geom.Rectangle.Contains
-      );
+      sprite.setData('bodyBox', b);
+      sprite.setInteractive(characterHitRect(b, false), Phaser.Geom.Rectangle.Contains);
       this.input.setDraggable(sprite, false);
       sprite.on('pointerup', () => this.onCharacterTapped(cfg.id, sprite));
       this.characterSprites.set(cfg.id, sprite);
@@ -1965,6 +2088,27 @@ export class BoardScene extends Phaser.Scene {
     for (const [id, sprite] of this.itemSprites) {
       const item = this.ctx.state.items.get(id);
       if (item && this.ctx.systems.dragons.isBoardDragon(item)) targets.push(sprite);
+    }
+    // While a piece is held out, a standee's hit area becomes her WHOLE body.
+    //
+    // It is normally her lower body only, so her two-tile-tall frame cannot
+    // swallow taps meant for the cells behind her. But a held piece has no
+    // board interaction left to protect — every tap is aimed at a recipient —
+    // and the narrow rect made tapping her head miss, fall through to empty
+    // ground, and CANCEL the give. That is the "had to try twice" on the
+    // Crystal Ball: the tutorial arrow points at her top-centre, which was
+    // exactly the part of her that was not listening.
+    //
+    // The rect is mutated IN PLACE. `setInteractive` cannot do this: Phaser's
+    // `InputPlugin.enable` only calls `setHitArea` when the object has no
+    // `input` yet, so handing an already-interactive sprite a new shape is
+    // silently ignored and the old area stays live.
+    for (const sprite of this.characterSprites.values()) {
+      const box = sprite.getData('bodyBox') as HitBox | undefined;
+      const area = sprite.input?.hitArea as Phaser.Geom.Rectangle | undefined;
+      if (!box || !area) continue;
+      const r = characterHitRect(box, on);
+      area.setTo(r.x, r.y, r.width, r.height);
     }
     for (const target of targets) {
       const obj = target as Phaser.GameObjects.Sprite;
@@ -2253,6 +2397,56 @@ export class BoardScene extends Phaser.Scene {
         .setAlpha(this.tutorialDone ? 1 : 0); // hidden until key_unlock step
       hoverBob(this, badge, 10, 520);
       this.keyBadges.set(region.id, badge);
+    }
+  }
+
+  /**
+   * The doors out of this world — one invisible rectangle per authored portal,
+   * over the gateway the backdrop already paints (`world.ts` PortalRuntime).
+   *
+   * A `Zone`, not a transparent rectangle: `setAlpha(0)` clears the render flag
+   * and Phaser then skips the object in hit-testing entirely, so the obvious
+   * "invisible" spelling is the one that silently does nothing. A Zone never
+   * renders BY CONSTRUCTION and stays fully interactive.
+   *
+   * Deliberately the LOWEST interactive band on the board (`DEPTHS.tiles`, under
+   * every item, badge, standee and cloud). A door is scenery: it must never win
+   * a tap that landed on something the player can actually pick up, and the
+   * gateways are painted off the playable ground anyway. Fog draws over it for
+   * the same reason it draws over ground — you cannot walk through a door behind
+   * a cloud.
+   */
+  private buildPortals(): void {
+    for (const p of this.ctx.state.world.portals) {
+      const zone = this.add
+        .zone(p.x + p.width / 2, p.y + p.height / 2, p.width, p.height)
+        .setDepth(DEPTHS.tiles + 1)
+        .setInteractive({ useHandCursor: true });
+      zone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+        if (!this.isTap(pointer)) return;
+        // An INTENT, never the switch itself: WorldSystem owns whether the
+        // journey is allowed, and a door that bypassed it could carry the player
+        // out of the tutorial mid-step.
+        this.ctx.bus.emit('world:switch', { to: p.to });
+      });
+      this.portalZones.push({ zone, to: p.to });
+    }
+    this.refreshPortals();
+  }
+
+  /**
+   * A door the Keeper cannot walk through yet simply is not there.
+   *
+   * The alternative — a live rectangle that refuses — is dead input on an
+   * INVISIBLE object: the player taps painted scenery, nothing happens, and
+   * there is nothing on screen to explain why. So availability is asked of
+   * WorldSystem (the same rule the door would be refused by) and re-asked
+   * whenever it can have changed: ranking up, and the tutorial handing over.
+   */
+  private refreshPortals(): void {
+    const open = new Set(this.ctx.systems.worlds.available().map((w) => w.id));
+    for (const { zone, to } of this.portalZones) {
+      if (zone.input) zone.input.enabled = open.has(to);
     }
   }
 
@@ -3071,6 +3265,7 @@ export class BoardScene extends Phaser.Scene {
       sprite.isGenerator = true;
     }
     this.itemSprites.set(snap.id, sprite);
+    this.attachItemAura(sprite);
     this.refreshDraggable(sprite);
     // Every object gets the "placed on the ground" settle. With an entrance pop
     // the squash plays once the container has finished growing; without one
@@ -3445,29 +3640,41 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /** The dragon Job menu: WORK (fly to a House, speed its timer) and HARVEST
-   *  (collect its drop), with the rest (fatigue) and drop timers shown above. */
+   *  (collect its drop), with a status pill above — the drop's own art plus a
+   *  countdown (✓ when ready), and a 💤 timer only while she rests. Icons carry
+   *  the meaning; the only text left is the numbers. */
   private showDragonMenu(sprite: BoardItem): void {
     this.hideDragonMenu();
     const menu = this.add.container(sprite.x, sprite.y + 104).setDepth(DEPTHS.dragged - 1);
+    // Status pill parts — laid out (and the plate redrawn to fit) every refresh,
+    // because the countdown's width changes as it drains.
+    this.dragonMenuPlate = this.add.graphics();
+    menu.add(this.dragonMenuPlate);
+    const drop = this.generatorConfigFor(sprite.chain, sprite.tier)?.produces;
+    const iconKey = drop ? `item_${drop.chain}_${drop.tier}` : '';
+    if (iconKey && this.textures.exists(iconKey)) {
+      const icon = this.add.image(0, DRAGON_MENU.statusY, iconKey);
+      icon.setScale(DRAGON_MENU.iconH / icon.height);
+      this.dragonMenuIcon = icon;
+      menu.add(icon);
+    }
     this.dragonMenuLabel = this.add
-      .text(0, -64, '', {
+      .text(0, DRAGON_MENU.statusY, '', {
         fontFamily: 'Segoe UI, sans-serif',
-        fontSize: '28px',
+        fontSize: '30px',
         fontStyle: 'bold',
         color: '#fff6e0',
-        align: 'center',
         stroke: '#241b22',
-        strokeThickness: 5,
-        backgroundColor: 'rgba(28,20,26,0.74)',
-        padding: { x: 12, y: 5 }
+        strokeThickness: 4
       })
-      .setOrigin(0.5);
+      .setOrigin(0, 0.5);
+    menu.add(this.dragonMenuLabel);
     const mkBtn = (dx: number, text: string, onTap: () => void): void => {
-      const bg = this.add.image(dx, 0, 'ui_btn_green').setScale(0.5, 0.54);
+      const bg = this.add.image(dx, 0, 'ui_btn_green').setScale(DRAGON_MENU.btnScaleX, DRAGON_MENU.btnScaleY);
       const label = this.add
         .text(dx, -2, text, {
           fontFamily: 'Segoe UI, sans-serif',
-          fontSize: '26px',
+          fontSize: '32px',
           fontStyle: 'bold',
           color: '#fff6e0',
           stroke: '#1f3a14',
@@ -3483,20 +3690,23 @@ export class BoardScene extends Phaser.Scene {
       });
       menu.add([bg, label]);
     };
-    // Spell out the Warmth cost of each action BEFORE it runs: Work is free,
-    // Harvest spends the dragon's energyCost (so the player isn't surprised).
+    // Icon-only verbs (the VS16 keeps ⛏ an emoji, not a thin text glyph). Work
+    // is free so it shows no cost; Harvest spells its Warmth price BEFORE it
+    // runs, so the player isn't surprised.
     const harvestCost = this.generatorConfigFor(sprite.chain, sprite.tier)?.energyCost ?? 0;
-    mkBtn(-150, '⛏ Work · free', () => this.startDragonWork(sprite));
-    mkBtn(150, `✋ Harvest · ⚡${harvestCost}`, () => this.ctx.bus.emit('item:tapped', { itemId: sprite.itemId }));
-    menu.add(this.dragonMenuLabel);
+    mkBtn(-DRAGON_MENU.btnX, '⛏️', () => this.startDragonWork(sprite));
+    mkBtn(DRAGON_MENU.btnX, `✋⚡${harvestCost}`, () => this.ctx.bus.emit('item:tapped', { itemId: sprite.itemId }));
     this.dragonMenu = menu;
     this.dragonMenuForId = sprite.itemId;
     this.refreshDragonMenu();
   }
 
-  /** Update the menu's rest/drop countdown each tick while it's open. */
+  /** Update the status pill each tick while the menu is open: set the text,
+   *  re-seat icon + label around the shared centre, redraw the plate to wrap. */
   private refreshDragonMenu(): void {
-    if (!this.dragonMenuLabel || this.dragonMenuForId === 0) return;
+    const label = this.dragonMenuLabel;
+    const plate = this.dragonMenuPlate;
+    if (!label || !plate || this.dragonMenuForId === 0) return;
     const item = this.ctx.state.items.get(this.dragonMenuForId);
     const now = this.ctx.clock.now();
     const rest = this.ctx.systems.jobs.restRemaining(this.dragonMenuForId);
@@ -3506,24 +3716,29 @@ export class BoardScene extends Phaser.Scene {
       const s = Math.ceil(ms / 1000);
       return s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
     };
-    // Name the thing this dragon actually drops — both dragons now yield Gem
-    // Shards, so a hard-coded "Ruby" would lie about the red one.
-    const drop = cfg?.produces;
-    const dropName =
-      (drop &&
-        this.ctx.data.chains.chains
-          .find((c) => c.id === drop.chain)
-          ?.tiers.find((t) => t.tier === drop.tier)?.name) ??
-      'Drop';
-    const parts = [`${dropName} ${cfg && rubyMs > 0 ? fmt(rubyMs) : 'ready'}`];
-    parts.push(rest > 0 ? `Rest ${fmt(rest)}` : this.ctx.systems.jobs.isWorking(this.dragonMenuForId) ? 'Working' : 'Idle');
-    this.dragonMenuLabel.setText(parts.join('   '));
+    // The drop's art (not its name) says WHAT; ✓ or the countdown says WHEN.
+    let text = cfg && rubyMs > 0 ? fmt(rubyMs) : '✓';
+    if (rest > 0) text += `  💤 ${fmt(rest)}`;
+    label.setText(text);
+    const iconW = this.dragonMenuIcon?.displayWidth ?? 0;
+    const gap = this.dragonMenuIcon ? 10 : 0;
+    const total = iconW + gap + label.width;
+    this.dragonMenuIcon?.setX(-total / 2 + iconW / 2);
+    label.setX(-total / 2 + iconW + gap);
+    const { statusY, plateH, platePadX } = DRAGON_MENU;
+    plate.clear();
+    plate.fillStyle(num(PALETTE.night), 0.82);
+    plate.fillRoundedRect(-total / 2 - platePadX, statusY - plateH / 2, total + platePadX * 2, plateH, plateH / 2);
+    plate.lineStyle(2.5, num(PALETTE.gold), 0.9);
+    plate.strokeRoundedRect(-total / 2 - platePadX, statusY - plateH / 2, total + platePadX * 2, plateH, plateH / 2);
   }
 
   private hideDragonMenu(): void {
     this.dragonMenu?.destroy();
     this.dragonMenu = undefined;
     this.dragonMenuLabel = undefined;
+    this.dragonMenuPlate = undefined;
+    this.dragonMenuIcon = undefined;
     this.dragonMenuForId = 0;
   }
 
@@ -3928,6 +4143,7 @@ export class BoardScene extends Phaser.Scene {
         const sprite = this.itemSprites.get(itemId);
         if (!sprite) return;
         this.removeDragonRig(itemId);
+        this.detachItemAura(itemId);
         this.itemSprites.delete(itemId);
         this.tweens.add({
           targets: sprite,
@@ -3957,6 +4173,9 @@ export class BoardScene extends Phaser.Scene {
         this.tutorialDone = step.done;
         this.tutorialStepId = step.id;
         this.refreshAllDraggable();
+        // Travel is barred for the whole tutorial, so the doors come alive on
+        // the step that ends it — not on a later reload.
+        this.refreshPortals();
         this.setHighlights(step.highlight);
         // Key badges appear only on the key_unlock step (during tutorial); always
         // visible after tutorial is done.
@@ -4028,6 +4247,7 @@ export class BoardScene extends Phaser.Scene {
       const sprite = this.itemSprites.get(id);
       if (!sprite) continue;
       this.removeDragonRig(id); // hatchlings merging into a whelp
+      this.detachItemAura(id);
       this.itemSprites.delete(id);
       this.tweens.add({
         targets: sprite,
@@ -4443,6 +4663,7 @@ export class BoardScene extends Phaser.Scene {
   private fullResync(): void {
     for (const ld of this.liveDragons.values()) ld.player.destroy();
     this.liveDragons.clear();
+    for (const id of [...this.itemAuras.keys()]) this.detachItemAura(id);
     for (const sprite of this.itemSprites.values()) sprite.release();
     this.itemSprites.clear();
     for (const tile of this.tiles.values()) tile.clearTint();

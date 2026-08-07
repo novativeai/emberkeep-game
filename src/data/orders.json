@@ -74,11 +74,29 @@
       }
     },
     {
+      "id": "eleanor_moonwater",
+      "giver": "eleanor",
+      "title": "Catch the Moonwater",
+      "blurb": "The basin on the high ground fills whether anyone watches it or not. Three drops make a vial, three vials make Moonwater — bring me one, and I will show you what the moon does with borrowed light.",
+      "requires": [
+        {
+          "chain": "moonwater",
+          "tier": 3,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 130,
+        "keys": 0,
+        "xp": 60
+      }
+    },
+    {
       "id": "selyna_signal",
       "giver": "selyna",
       "world": "borealis",
       "title": "Bank a Signal Fire",
-      "blurb": "You came a long way to stand on nine feet of ice. Bind me two faggots of that driftwood and I will light something you can steer by — then the door is yours.",
+      "blurb": "You came a long way to stand on nine feet of ice. Bind me two faggots of that driftwood and I will light something you can steer by — then the coast is yours to walk. The door comes later, if I like what you do with it.",
       "requires": [
         {
           "chain": "driftwood",

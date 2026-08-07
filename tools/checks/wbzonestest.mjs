@@ -16,6 +16,9 @@
  *     through the engine's formula lands on the cell the builder drew
  *   · emitters and characters keep working and export game-resolvable addresses
  *   · worlds are isolated: switching keeps each board standing
+ *   · a PORTAL — the invisible rectangle that travels to another world — is
+ *     found by the same tap the game would make, exports in game pixels, and
+ *     never reaches the game leading nowhere
  *
  * It writes nothing to the game: every export is built in memory and asserted
  * there, and `src/data/zones.json` is left exactly as it was.
@@ -331,6 +334,56 @@ const rejected = await page.evaluate(async (b) => {
 }, BASE);
 check('and rejects overlapping index blocks', rejected.status === 400 && !rejected.body.ok,
   rejected.body.error || 'accepted a clash');
+
+/* ---------------------------------------------------------------- */
+/* 10. doors out — the invisible rectangles                          */
+/* ---------------------------------------------------------------- */
+// Every one of these is invisible in game, so a portal that is subtly wrong
+// looks exactly like one that is right. The authoring surface is the only place
+// the mistake can be caught, which is why it is checked here rather than left
+// to a screenshot.
+const doors = await page.evaluate(async () => {
+  const { S, AW, addPortal, portalAt, switchWorld, buildZonesDoc } = window.__wbfx;
+  const home = AW().id;
+  const other = S.worlds.find((w) => w.id !== home).id;
+  const p = addPortal({ x: 500, y: 500, w: 300, h: 400, to: other, label: 'Test door' });
+  // The tap test the game runs, run here: the editor and `portalAtWorldPoint`
+  // must agree about what is under a point, or authoring is guesswork.
+  const cx = 500 + 150, cy = 500 + 200;
+  const s = { x: cx * S.cam.zoom + S.cam.x, y: cy * S.cam.zoom + S.cam.y };
+  const insideId = portalAt(s.x, s.y)?.id ?? null;
+  const outside = portalAt((499 * S.cam.zoom + S.cam.x) - 40, (499 * S.cam.zoom + S.cam.y) - 40);
+  // A door with no destination is authorable (you have to draw it before you
+  // can choose) but must never reach the game.
+  const blank = addPortal({ x: 900, y: 900, to: '' });
+  const doc = await buildZonesDoc();
+  const w = doc.worlds.find((x) => x.id === home);
+  const exported = w.portals.map((q) => ({ id: q.id, to: q.to, rect: q.rect }));
+  // …and it survives a world switch, because portals belong to their world.
+  switchWorld(other); switchWorld(home);
+  const kept = AW().portals.length;
+  return { pid: p.id, blankId: blank.id, insideId, outsideNull: outside === null, exported, kept, other };
+});
+check('a drawn door is found by a tap inside it', doors.insideId === doors.pid, doors.insideId || 'nothing there');
+check('and not by one outside it', doors.outsideNull);
+check('the export carries the door in game pixels',
+  doors.exported.length === 1 && doors.exported[0].to === doors.other && doors.exported[0].rect.every(Number.isFinite),
+  JSON.stringify(doors.exported));
+check('a door that leads nowhere is never exported',
+  !doors.exported.some((q) => q.id === doors.blankId));
+check('doors belong to their world and survive a switch', doors.kept === 2, `${doors.kept} portals`);
+
+// The endpoint validator is the last gate before the game reads it.
+const badDoor = await page.evaluate(async (b) => {
+  const doc = await window.__wbfx.buildZonesDoc();
+  doc.worlds[0].portals = [{ id: 'nowhere', to: 'atlantis', rect: [0, 0, 100, 100] }];
+  const res = await fetch(`${b}/__worldbuilder/zones?dryRun=1`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(doc)
+  });
+  return { status: res.status, body: await res.json() };
+}, BASE);
+check('the validator rejects a door to a world that does not exist',
+  badDoor.status === 400 && !badDoor.body.ok, badDoor.body.error || 'accepted it');
 
 await page.screenshot({ path: `${OUT}/wb-zones.png` });
 await page.evaluate(() => window.__wbfx.setCategory('zones'));

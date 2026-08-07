@@ -361,8 +361,10 @@ describe('fx-emitters.json', () => {
     expect(validatePresetFile(PRESETS)).toEqual([]);
   });
 
-  it('ships the two authored emitters', () => {
-    expect(Object.keys(PRESETS.presets).sort()).toEqual(['fire', 'smokeEmbers']);
+  it('ships the authored emitters', () => {
+    // `fire` and `smokeEmbers` are world placements (the World Builder's 🔥 tab);
+    // `eggAura` is attached per ITEM and is covered by tests/unit/EggAura.spec.ts.
+    expect(Object.keys(PRESETS.presets).sort()).toEqual(['eggAura', 'fire', 'smokeEmbers']);
   });
 
   it('references only sheets the motion-vector bank actually baked', () => {

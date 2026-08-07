@@ -148,6 +148,36 @@
       }
     },
     {
+      "id": "catch_the_moonwater",
+      "chapter": 2,
+      "giver": "eleanor",
+      "title": "Catch the Moonwater",
+      "orderId": "eleanor_moonwater",
+      "steps": [
+        {
+          "id": "moonwater_make",
+          "label": "Make 1 Moonwater",
+          "goal": {
+            "kind": "have",
+            "chain": "moonwater",
+            "tier": 3,
+            "count": 1
+          }
+        },
+        {
+          "id": "moonwater_deliver",
+          "label": "Deliver 1 Moonwater to Eleanor",
+          "goal": {
+            "kind": "order",
+            "orderId": "eleanor_moonwater"
+          }
+        }
+      ],
+      "rewards": {
+        "coins": 45
+      }
+    },
+    {
       "id": "what_she_keeps",
       "chapter": 2,
       "giver": "eleanor",
@@ -408,18 +438,18 @@
       }
     },
     {
-      "id": "north_door",
+      "id": "north_coast",
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Open Selyna's Keep",
+      "title": "Open the Wrack Coast",
       "steps": [
         {
-          "id": "door_open",
-          "label": "Spend 1 Gold Key on the fog around the keep",
+          "id": "coast_open",
+          "label": "Spend 1 Gold Key on the fog along the coast",
           "goal": {
             "kind": "region",
-            "regionId": "borealis_keep"
+            "regionId": "borealis_coast"
           }
         }
       ],
@@ -505,18 +535,18 @@
       }
     },
     {
-      "id": "north_coast",
+      "id": "north_door",
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Open the Wrack Coast",
+      "title": "Open Selyna's Keep",
       "steps": [
         {
-          "id": "coast_open",
-          "label": "Spend 2 Gold Keys on the fog along the coast",
+          "id": "door_open",
+          "label": "Spend 2 Gold Keys on the fog around the keep",
           "goal": {
             "kind": "region",
-            "regionId": "borealis_coast"
+            "regionId": "borealis_keep"
           }
         }
       ],

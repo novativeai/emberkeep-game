@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_note": "Authored FX emitter presets. Schema + the reasoning behind each layer kind: src/render/fx/emitterTypes.ts. Tune live in tools/fxlab/index.html and paste the export back here. Sizes are GAME-SPACE px (2560x1600 canvas, TILE_W 256 / TILE_H 128), so a 130px-wide flame is half a tile across. NOTE: the fire deliberately uses fb_flame, NOT fb_flame_small \u2014 the latter is baked with its art overflowing its own cell borders (92% border alpha, 25/32 cells) and renders as two half-flames side by side at any size. `python3 scripts/audit-sheet-bleed.py` is the check.",
+  "_note": "Authored FX emitter presets. Schema + the reasoning behind each layer kind: src/render/fx/emitterTypes.ts. Tune live in tools/fxlab/index.html and paste the export back here. Sizes are GAME-SPACE px (2560x1600 canvas, TILE_W 256 / TILE_H 128), so a 130px-wide flame is half a tile across. NOTE: the fire deliberately uses fb_flame, NOT fb_flame_small — the latter is baked with its art overflowing its own cell borders (92% border alpha, 25/32 cells) and renders as two half-flames side by side at any size. `python3 scripts/audit-sheet-bleed.py` is the check.",
   "sheets": [
     "fb_flame",
     "fb_smoke_wispy"
@@ -394,6 +394,248 @@
           ],
           "alignToVelocity": true,
           "windGain": 10
+        }
+      ]
+    },
+    "eggAura": {
+      "label": "Egg aura — surface smoke + the dragon's colour",
+      "note": "Heavy low-lying surface smoke pooled around an egg, lit by an aura in the sleeping dragon's OWN colour. Every colour comes from the instance palette (src/data/egg-aura.json), sampled from each egg's own art — one preset, five dragons. The smoke is squashed onto the iso ground plane and barely rises: it SPREADS. Instance rate/alpha halve the whole thing for an ordinary chain egg.",
+      "windInfluence": 0.45,
+      "radiusPx": 300,
+      "flicker": {
+        "seed": 4517,
+        "octaves": [
+          {
+            "hz": 1.7,
+            "amp": 0.25
+          },
+          {
+            "hz": 0.61,
+            "amp": 0.45
+          },
+          {
+            "hz": 0.19,
+            "amp": 0.5
+          }
+        ]
+      },
+      "layers": [
+        {
+          "id": "groundPool",
+          "kind": "glow",
+          "z": -3,
+          "lod": 0,
+          "dy": 6,
+          "texture": "fxb_glow",
+          "width": 252,
+          "squash": 0.33,
+          "palette": "rim",
+          "blend": "add",
+          "alpha": {
+            "base": 0.4,
+            "amp": 0.11
+          },
+          "scaleAmp": 0.07,
+          "lagMs": 120,
+          "flickerPhase": 0
+        },
+        {
+          "id": "smokeSkirt",
+          "kind": "puffs",
+          "z": -2,
+          "lod": 1,
+          "dy": 18,
+          "sheet": "fb_smoke_wispy",
+          "ramp": "smoke",
+          "blend": "add",
+          "palette": "mid",
+          "emissive": 0.1,
+          "pool": 16,
+          "releaseMs": [
+            150,
+            260
+          ],
+          "lifeMs": [
+            3000,
+            4800
+          ],
+          "width": [
+            140,
+            360
+          ],
+          "squash": 0.34,
+          "risePx": [
+            2,
+            12
+          ],
+          "spreadPx": 104,
+          "alpha": {
+            "peak": 0.38,
+            "peakAt": 0.34,
+            "tail": 1.9
+          },
+          "spinDeg": [
+            5,
+            18
+          ],
+          "windLean": 22,
+          "fps": [
+            3,
+            6
+          ]
+        },
+        {
+          "id": "surfaceSmoke",
+          "kind": "puffs",
+          "z": -1,
+          "lod": 0,
+          "dy": 10,
+          "sheet": "fb_smoke_wispy",
+          "ramp": "smoke",
+          "blend": "add",
+          "palette": "haze",
+          "emissive": 0.16,
+          "pool": 26,
+          "releaseMs": [
+            85,
+            150
+          ],
+          "lifeMs": [
+            2600,
+            4200
+          ],
+          "width": [
+            95,
+            285
+          ],
+          "squash": 0.44,
+          "risePx": [
+            8,
+            26
+          ],
+          "spreadPx": 70,
+          "alpha": {
+            "peak": 0.56,
+            "peakAt": 0.26,
+            "tail": 1.7
+          },
+          "spinDeg": [
+            8,
+            30
+          ],
+          "windLean": 30,
+          "fps": [
+            4,
+            7
+          ]
+        },
+        {
+          "id": "auraBloom",
+          "kind": "glow",
+          "z": 1,
+          "lod": 0,
+          "dy": -30,
+          "texture": "fxb_glow",
+          "width": 132,
+          "squash": 0.92,
+          "palette": "mid",
+          "blend": "add",
+          "alpha": {
+            "base": 0.26,
+            "amp": 0.13
+          },
+          "scaleAmp": 0.13,
+          "lagMs": 40,
+          "flickerPhase": 0.37
+        },
+        {
+          "id": "motes",
+          "kind": "particles",
+          "z": 2,
+          "lod": 0,
+          "dy": -8,
+          "texture": "fxb_ember",
+          "blend": "add",
+          "palette": "ramp",
+          "frequency": 190,
+          "quantity": 1,
+          "lifespan": [
+            2200,
+            3800
+          ],
+          "speedX": [
+            -16,
+            16
+          ],
+          "speedY": [
+            -52,
+            -18
+          ],
+          "accelerationY": 16,
+          "scale": {
+            "start": 0.052,
+            "end": 0.008,
+            "ease": "sine.out"
+          },
+          "colorEase": "quad.out",
+          "alpha": {
+            "peak": 0.85,
+            "rise": 0.2,
+            "twinkleHz": 5.3,
+            "twinkleAmp": 0.32,
+            "tail": 1.4
+          },
+          "spread": [
+            70,
+            34
+          ],
+          "sway": {
+            "px": 24,
+            "cycles": 1.3
+          },
+          "windGain": 16
+        },
+        {
+          "id": "glints",
+          "kind": "particles",
+          "z": 3,
+          "lod": 2,
+          "dy": -26,
+          "texture": "fxb_spark",
+          "blend": "add",
+          "palette": "core",
+          "frequency": 620,
+          "quantity": 1,
+          "lifespan": [
+            420,
+            860
+          ],
+          "speedX": [
+            -30,
+            30
+          ],
+          "speedY": [
+            -70,
+            -24
+          ],
+          "accelerationY": 30,
+          "scale": {
+            "start": 0.075,
+            "end": 0.006,
+            "ease": "quad.out"
+          },
+          "alpha": {
+            "peak": 1,
+            "rise": 0.08,
+            "twinkleHz": 17,
+            "twinkleAmp": 0.42,
+            "tail": 1.2
+          },
+          "spread": [
+            54,
+            26
+          ],
+          "windGain": 8
         }
       ]
     }
