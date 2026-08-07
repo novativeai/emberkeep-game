@@ -1,6 +1,14 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { BAG_SLOTS, num, PALETTE, panelMobileScale, TIMINGS } from '../core/Constants';
+import {
+  BAG_SLOTS,
+  GAME_WIDTH,
+  LIVE_GAME_HEIGHT,
+  num,
+  PALETTE,
+  panelMobileScale,
+  TIMINGS
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { BagStack, ChainsData } from '../core/types';
@@ -95,12 +103,17 @@ export class BagPanel extends Phaser.GameObjects.Container {
     this.setVisible(false);
     this.baseScale = panelMobileScale(FRAME_W);
 
-    const cx = scene.scale.width / 2;
-    const cy = scene.scale.height / 2;
+    // The AUTHORED space, never `scene.scale.*`: the canvas backing is
+    // GAME_WIDTH × renderScale (the Graphics setting picks the factor at boot,
+    // off the SAVED profile), and the cameras zoom to compensate — so on a
+    // resumed session `scale.width/2` is the centre of the BACKING, which
+    // parked this panel in the top-left. UI coordinates live in 2560×1600.
+    const cx = GAME_WIDTH / 2;
+    const cy = LIVE_GAME_HEIGHT / 2;
 
     // Tap-anywhere-outside closes. The dim sits in the panel so it fades with it.
     this.dim = scene.add
-      .rectangle(cx, cy, scene.scale.width * 2, scene.scale.height * 2, num(PALETTE.night), 0.62)
+      .rectangle(cx, cy, GAME_WIDTH * 2, LIVE_GAME_HEIGHT * 2, num(PALETTE.night), 0.62)
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { num, PALETTE, panelMobileScale, TIMINGS } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, panelMobileScale, TIMINGS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { uiRegistry } from './theme';
 
@@ -81,11 +81,13 @@ export class NamePanel extends Phaser.GameObjects.Container {
     this.setVisible(false);
     this.setDepth(60000);
 
-    const cx = scene.scale.width / 2;
-    const cy = scene.scale.height / 2;
+    // The authored 2560x1600 space, never `scene.scale.*` — the backing is
+    // GAME_WIDTH x renderScale (Graphics setting), cameras zoom to compensate.
+    const cx = GAME_WIDTH / 2;
+    const cy = LIVE_GAME_HEIGHT / 2;
     // No tap-outside-to-close: naming is not dismissible. The dragon is waiting.
     const dim = scene.add
-      .rectangle(cx, cy, scene.scale.width * 2, scene.scale.height * 2, num(PALETTE.night), 0.7)
+      .rectangle(cx, cy, GAME_WIDTH * 2, LIVE_GAME_HEIGHT * 2, num(PALETTE.night), 0.7)
       .setInteractive();
 
     const body = scene.add.container(cx, cy).setScale(panelMobileScale(FRAME_W));

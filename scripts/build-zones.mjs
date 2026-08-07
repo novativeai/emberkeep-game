@@ -448,26 +448,29 @@ function seedRegion(cells, seeds, taken) {
  *
  * `[x, y, w, h]`, top-left first.
  *
- * They come in PAIRS — a sanctuary and its hub, each with a door to the other:
+ * They come in PAIRS, each with a door to the other. The LIVE pair is the
+ * chapter crossing itself:
  *
- *   Emberkeep  ⇄  Roothold   (Eleanor's home)
- *   Borealis   ⇄  Hatchery   (Selyna's home)
+ *   Emberkeep  ⇄  Borealis   (the Ember Gate ⇄ the Keep Door)
  *
- * A sanctuary is where you do things; a hub is where you change something about
- * yourself — buy, decorate, read, talk. Crossing between the two PAIRS is not a
- * door: reaching the north is the story beat the editor records as `teleport`
- * (hatch a tier-2 flame gem), and putting an arch on Emberkeep that skipped it
- * would give away the one journey Chapter Two is built on.
+ * The Gate does not open on level: WorldSystem holds Borealis shut until the
+ * Golden Elder has woken (`q:done:keepers_hoard`), and Eleanor speaks the Gate
+ * open right after the finale — the awakening IS the key. Roothold and
+ * Hatchery keep their doors OUT authored (a world with no door out is refused
+ * below), but nothing leads INTO them yet: they are empty boards, and their
+ * chapters will re-pair them when they gain content. The editor's `teleport`
+ * record (hatch a tier-2 flame gem) is the same journey's older phrasing and
+ * stays as registry data only.
  */
 const PORTALS = {
   emberkeep: [
-    { id: 'emberkeep_gate', to: 'roothold', label: 'The Ember Gate', art: [1768, 137, 229, 241] }
+    { id: 'emberkeep_gate', to: 'borealis', label: 'The Ember Gate', art: [1768, 137, 229, 241] }
   ],
   roothold: [
     { id: 'roothold_arch', to: 'emberkeep', label: 'The Vine Arch', art: [1750, 215, 200, 400] }
   ],
   borealis: [
-    { id: 'borealis_keep_door', to: 'hatchery', label: 'The Keep Door', art: [2010, 180, 156, 200] }
+    { id: 'borealis_keep_door', to: 'emberkeep', label: 'The Keep Door', art: [2010, 180, 156, 200] }
   ],
   hatchery: [
     // The gold rune circle inlaid in the middle of the deck. It sits ON playable

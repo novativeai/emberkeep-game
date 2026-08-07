@@ -165,6 +165,19 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   asks for — or hands over — a piece with no producer, no recipient and no order
   on that board. `pnpm quests --all` is the check.
 
+- **TOUCH a Keeper's Task target, or the supply behind one → RUN `pnpm quests`.**
+  A counter task is not an item ask, so nothing in the ladder audit used to look
+  at it — which is how **"Hatch 4 dragons" survived the decision to make dragons
+  scarce and dear** and quietly became a wall. It is now `recipes_20`
+  ("Discover 20 Cookbook recipes"), and `auditLadder` checks a `recipes` target
+  against the Cookbook rows actually printable AT THE STEP THAT ASKS
+  (`recipeKeysFrom`). The other kinds are unbounded by construction — gold,
+  merges and orders all come off renewable loops — so `recipes` is the only one
+  with a ceiling the data can state.
+  Two numbers worth keeping in view when retuning it: the tutorial alone
+  discovers **13** recipes, and **27** rows are reachable by the time the
+  checklist is asked. A target at or below 13 is a task that is already done.
+
 - **TOUCH a `legendary` chain, a quest's `rewards.spawn`, or the ORDER of quests
   in quests.json → RUN `pnpm quests`.** The legendary egg arc is a directive
   (Constants §LEGENDARY_EGG_COUNT, docs/quest-ladder.md §6) enforced by
@@ -270,8 +283,9 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   animal, which reads as hovering, not breathing.
 - **TOUCH `CHEST_GIFTS` → CHECK what the audit loses.** The chest is a permanent renewable
   SOURCE in `availability.ts`, so deleting a gift can strand a quest that had no other
-  supply: dropping the Emeralds is what made `the_emerald_brood` and `hatch_4`'s Green
-  Dragon UNREACHABLE, and both had to be retargeted onto `ember_dragon`. The `anyItem`
+  supply: dropping the Emeralds is what made `the_emerald_brood` and the old `hatch_4`'s
+  Green Dragon UNREACHABLE, and both had to be retargeted onto `ember_dragon`.
+  `hatch_4` is gone entirely now — see the counter-task rule below. The `anyItem`
   wildcard is deliberately NOT counted as a source (it names no chain, so nothing can
   rely on it), and `chestWildcardChains` is the only thing standing between a random
   table and the Legendary Egg Directive — `pnpm quests` asserts the roster itself, not

@@ -136,10 +136,13 @@ Every producer is *built*, so a farm is something the player made rather than
 something the map handed over. Seeds and rubble arrive as authored region
 contents (§1.3).
 
-**Ash Moss is the one exception, deliberately.** It has no farm — a **rekindled
-terrace** sprouts one Moss Tuft every 2 minutes on its own. Restoration *is* the
-moss supply, which turns the shipped ash→moss bloom from scenery into a farm and
-gives land restoration a mechanical payoff it has never had.
+**Ash Moss has a farm now: the Emberbark Stump** (`emberbark`, SHIPPED) — a
+single-tier landmark like the Theme Crystal, tapped for one Moss Tuft on a
+2-minute cooldown. It stands on the authored isle from the first frame and the
+tutorial opens on it (`moss_stump`: the first tree the fire took, dressing
+itself in moss again). This retires the earlier "no farm by design /
+restoration IS the moss supply" rule — the rekindled-terrace idea can still
+arrive later as a second, passive source without contradicting the stump.
 
 ### Layer B — goods you spend
 | Chain | T1 | T2 | T3 | Recipient |

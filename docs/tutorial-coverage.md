@@ -13,11 +13,12 @@ Eleanor herself are all rows: they are live from the first frame.
 
 | Concept | First on screen | Taught at | Note |
 |---|---|---|---|
-| Drag three alike to merge | first scripted spawn | `ash_green` | the game's FIRST interaction; the hand demonstrates the exact drag |
+| Emberbark Stump — the moss farm | the Stump, from the first frame | `moss_stump` | the game's FIRST interaction: she names the burned tree, the player taps it, a Moss Tuft drops. "it will always grow more" says renewable out loud |
+| Drag three alike to merge | first scripted spawn | `ash_green` | the harvested tuft plus two spawned at the stump; the hand demonstrates the exact drag |
 | Merging climbs tiers | after the first merge | `dragon_hatch` | egg → dragon |
 | The Cookbook records recipes | after the first merge | `cookbook_intro` | button appears for this beat, then permanently |
 | Closing a panel | cookbook open | `cookbook_close` | the player closes it, not the script |
-| Tap a ready generator to harvest | the Theme Crystal, from the first frame | `crystal_tap` | |
+| Tap a ready generator to harvest | the Emberbark Stump, from the first frame | `moss_stump` | reinforced at `crystal_tap` on the Crystal |
 | **Quartz — the mage's own stone** | the Crystal's first drop, at `crystal_tap` | `crystal_tap` → `quartz_merge` → `quartz_ball` | the Crystal shed Emeralds and a second dragon ladder until this pass; it sheds Quartz now, so the beat it anchors is about ELEANOR instead of about another egg. Taught end to end (pebble → Cut Crystal → Crystal Ball), both Cookbook rows discovered, and RENEWABLE off the same Crystal — which is what let it leave `HIDDEN_CHAINS` |
 | Some chains are hers, not the dragons' | `quartz_merge` | `quartz_merge` | recipient locking (`MAGE_ONLY`) said out loud — "no dragon will touch it, and no dragon should". `isle_materials` later says the same of Moonwater, so the rule is named twice before anything depends on it |
 | Why she wants them | `quartz_ball` | `quartz_ball` | the Crystal Ball is her reason for asking, which is what turns a merge chain into a motive |
@@ -71,7 +72,7 @@ Eleanor herself are all rows: they are live from the first frame.
 | Eleanor stands on the map | frame 1, at her `characters.json` anchor | `eleanor_helps` | tappable from the first frame; the beat's arrow is `{"character":"eleanor"}` — never a literal cell, which goes stale the moment the World Builder moves her |
 | Moonwater — the isle's own material | level_2 + the gate, at `key_unlock` | `isle_materials` | 3 seeded on the west ledge; hers end to end (`MAGE_ONLY`) |
 | Moonwater merges like anything else | `isle_materials` names it | `moonwater_merge` | she names the chain, then has the player actually fuse it — 3 Dew Drops → a Dew Vial |
-| Ash Moss — the isle's green, given back | `ash_green`, the first interaction | `ash_green` | 3 tufts spawned where the player landed → a Moss Bundle. Pays off `arrival_ask`'s "the warmth, the green, and whatever's still asleep"; the Bale (tier 3) needs 9 and is not offered |
+| Ash Moss — the isle's green, given back | the Stump's first drop, at `moss_stump` | `moss_stump` → `ash_green` | 1 harvested + 2 spawned at the stump → a Moss Bundle. Pays off `arrival_ask`'s "the warmth, the green, and whatever's still asleep"; the Bale (tier 3) needs 9 and is not offered |
 | Cracked Stones — rubble, not a chain | level_2, at `levelup` | `pocket_it` | exactly 2 seeded: one to pocket, one to sell. `minGroup` is 3, so they never merge, and the Cookbook does not print their recipe |
 | **A dragon is somebody, and she has a name** | the Red Dragon, the instant she stands out of the shell | `name_intro` → `name_choose` | three beats with nothing else on screen: Eleanor makes the case, the picker opens (`nameDragon` effect, not dismissible), and `name_said` says it back. Placed immediately after `dragon_hatch` — before the Crystal, before anything else asks for the player's attention |
 | Her name is hers, and the game uses it | `name_said` | `name_said` | the ONLY coloured word in any bubble (`PALETTE.lava`), because it is the only word the player wrote. `{dragon}` resolves in any authored line; `feed_dragon` and `dragon_status` both use it |
@@ -92,10 +93,12 @@ Eleanor herself are all rows: they are live from the first frame.
 
 **The husbandry roster is HELD, not merely out of reach** — all of it but two.
 `emberberry` left the set because the tutorial's Ripe Emberberry Plant now drops
-it (berry ×3 → basket). `ashmoss` left because it is the one husbandry chain
-with **no farm by design** — `merge-chains.md` §2: *"restoration IS the moss
-supply"* — which makes it the only one this chapter can honestly own, and
-`ash_green` opens the game with it. `firepine`, `dew_basin`, `nest`, `resin` and
+it (berry ×3 → basket). `ashmoss` left because this chapter owns it end to end:
+the Emberbark Stump (`emberbark`, a single-tier landmark like the Crystal)
+farms it from the first frame, `moss_stump` opens the game by harvesting it,
+and `ash_green` merges the harvest. (The old "no farm by design" rule —
+`merge-chains.md` §2's *"restoration IS the moss supply"* — was retired when
+the stump shipped.) `firepine`, `dew_basin`, `nest`, `resin` and
 `quartz` sit in `HIDDEN_CHAINS` — a later CHAPTER of this world. The Borealis
 four are withheld for a different reason and by a different mechanism
 (`chains.json` → `world: "borealis"`; `docs/merge-chains.md` §2.4.1,

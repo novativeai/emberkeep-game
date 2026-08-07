@@ -1,3 +1,4 @@
+import { GOLDEN_ALTAR } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { WorldRuntime } from '../core/world';
@@ -34,8 +35,22 @@ export class WorldSystem {
   /** Worlds the Keeper may travel to right now, in the order they open. */
   available(): WorldRuntime[] {
     return [...this.state.worlds.values()]
-      .filter((w) => this.state.tutorialDone && this.state.level >= w.level)
+      .filter(
+        (w) => this.state.tutorialDone && this.state.level >= w.level && this.storyOpen(w.id)
+      )
       .sort((a, b) => a.level - b.level);
+  }
+
+  /**
+   * The north opens on the STORY, not on a number: the Ember Gate wakes when
+   * the Golden Elder does (`q:done:keepers_hoard` — the same latch the altar
+   * derives her presence from), because a level the player crosses mid-merge
+   * is the wrong key for the chapter crossing. Save-derivable, so a reload
+   * finds the Gate exactly as open as it was.
+   */
+  private storyOpen(worldId: string): boolean {
+    if (worldId !== 'borealis') return true;
+    return this.state.stat(`q:done:${GOLDEN_ALTAR.awakenQuestId}`) > 0;
   }
 
   private switchTo(to: string): void {
@@ -54,6 +69,10 @@ export class WorldSystem {
     }
     if (this.state.level < world.level) {
       this.bus.emit('world:switch_failed', { to, reason: 'level' });
+      return;
+    }
+    if (!this.storyOpen(to)) {
+      this.bus.emit('world:switch_failed', { to, reason: 'story' });
       return;
     }
     const from = this.state.worldId;

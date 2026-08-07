@@ -106,7 +106,8 @@ describe('arrivals — a world speaks the first time you stand in it', () => {
   it('fires once ever, and never touches the chapter ladder', () => {
     const ctx = createTestContext();
     ctx.state.tutorialDone = true;
-    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!; // Borealis opens at the cap
+    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!; // the cap…
+    ctx.state.addStat('q:done:keepers_hoard', 1); // …and the woken Elder open Borealis
     const seen: string[] = [];
     ctx.bus.on('story:arrival', ({ worldId }) => seen.push(worldId));
     const chapters: number[] = [];

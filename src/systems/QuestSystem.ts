@@ -26,7 +26,8 @@ const STAT_VERB: Record<string, string> = {
   merges: 'Merge',
   orders: 'Complete',
   goldEarned: 'Earn',
-  elderTaps: 'Tap the Golden Elder'
+  elderTaps: 'Tap the Golden Elder',
+  recipes: 'Discover'
 };
 
 /**

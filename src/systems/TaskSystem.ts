@@ -5,7 +5,7 @@ import type { TaskConfig, TasksData } from '../core/types';
 /**
  * Keeper's Tasks — the chapter checklist that carries the encore sandbox
  * (DEMO-PLAN §Act V). Owns the lifetime stat counters in `GameState.stats`
- * (hatches, merges, orders, goldEarned, elderTaps) and, once EVERY task hits
+ * (hatches, merges, orders, goldEarned, elderTaps, recipes) and, once EVERY task hits
  * its target, pays the one-time reward bundle and fires `tasks:all_complete`
  * (persisted via `stats.tasksClaimed`). Phaser-free — runs in the node tests.
  */
@@ -23,6 +23,10 @@ export class TaskSystem {
     });
     bus.on('item:sold', ({ coins }) => this.bump('goldEarned', coins));
     bus.on('elder:tapped', () => this.bump('elderTaps', 1));
+    // A Cookbook page turns exactly once per recipe (MergeSystem only emits on
+    // a FIRST merge of that pair), so this counter cannot be farmed by redoing
+    // a merge — which is what makes it safe to put a target on.
+    bus.on('cookbook:discovered', () => this.bump('recipes', 1));
   }
 
   /** Progress toward one task, clamped to its target. */

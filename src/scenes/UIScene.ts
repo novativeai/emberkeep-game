@@ -32,6 +32,7 @@ import { StorePanel } from '../ui/StorePanel';
 import { CookbookPanel } from '../ui/CookbookPanel';
 import { Hud } from '../ui/Hud';
 import { NamePanel } from '../ui/NamePanel';
+import { TravelPrompt } from '../ui/TravelPrompt';
 import { LedgerPanel } from '../ui/LedgerPanel';
 import { QuestTracker } from '../ui/QuestTracker';
 import { StatusPanel } from '../ui/StatusPanel';
@@ -177,6 +178,8 @@ export class UIScene extends Phaser.Scene {
     this.naming = new NamePanel(this, this.ctx.bus);
     this.naming.resolveChain = (itemId) => this.ctx.state.items.get(itemId)?.chain;
     void this.naming;
+    // Answers `ui:travel_requested` from a portal tap; owns its own bus release.
+    new TravelPrompt(this, this.ctx.bus);
     this.bag.setDepth(DEPTH_PANEL + 6);
     this.commission = new CommissionPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
     // Above the Bag: it is asked ABOUT the bag's contents, and the two are never
@@ -747,7 +750,7 @@ export class UIScene extends Phaser.Scene {
    *  or a retrieval could not happen, so the tap is never silently ignored. */
   private floatWarning(text: string): void {
     const label = this.add
-      .text(this.scale.width / 2, this.scale.height * 0.62, text, {
+      .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.62, text, {
         fontFamily: FONT.display,
         fontSize: '54px',
         fontStyle: 'bold',
@@ -840,6 +843,21 @@ export class UIScene extends Phaser.Scene {
     // The stage is released when her line does, not when a panel is dismissed.
     this.time.delayedCall(FINALE_ENDS_MS, () => {
       this.finaleActive = false;
+      // The Gate ceremony rides the finale's tail: Eleanor speaks the arch
+      // open (tap-advanced, STORY_BEAT_HOLD_MS backstop — it cannot strand),
+      // and the last line blooming into `gate:opened` is what turns the
+      // portal FX on and the door live. A reload after the finale skips the
+      // ceremony: BoardScene derives the open Gate from the q:done latch.
+      const beats = this.ctx.data.dialogue.gateOpens;
+      if (beats?.lines.length) {
+        this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+          this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () =>
+            this.ctx.bus.emit('gate:opened', {})
+          );
+        });
+      } else {
+        this.ctx.bus.emit('gate:opened', {});
+      }
     });
   }
 

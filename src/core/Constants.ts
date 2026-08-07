@@ -319,6 +319,7 @@ export const ITEM_SCALE: Record<string, number> = {
   strawberry_3: 0.252, // the ripe plant, 620×618 → 156 units; t3 reads biggest
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
+  emberbark_1: 0.32, // Emberbark Stump (emberbark.png 620×520) — low wide landmark, ~200 units
   emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
   emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red
@@ -431,11 +432,14 @@ export const HIDDEN_CHAINS = new Set<string>([
   // the whole husbandry idea. It stays RENEWABLE afterwards because the same
   // lesson commissions the House to press beads (`house_commission`), which is
   // the point of putting the two beats next to each other.
-  // NOT 'ashmoss' — it is the one husbandry chain with no farm by design
-  // (merge-chains.md §2: "restoration IS the moss supply"), which makes it the
-  // only one Chapter One can honestly own. `ash_green` opens the game with it:
-  // her arrival asks for "the warmth, the green, and whatever's still asleep",
-  // and the green is the first thing the isle gives back.
+  // NOT 'ashmoss' — Chapter One owns it end to end: the Emberbark Stump
+  // (`emberbark`, a single-tier landmark like the Crystal) farms it from the
+  // first frame, and `moss_stump` → `ash_green` open the game on it. Her
+  // arrival asks for "the warmth, the green, and whatever's still asleep",
+  // and the green is the first thing the isle gives back. (merge-chains.md
+  // §2's old "restoration IS the moss supply" rule retired with the stump.)
+  // NOT 'emberbark' — the stump IS that farm; hiding it would strand the
+  // opening beat.
   // NOT 'quartz' — the Theme Crystal sheds it now (it used to shed Emeralds),
   // which makes it the one MAGE_ONLY chain Chapter One has a live producer for.
   // The opening teaches it end to end in place of the old Emerald ladder:
@@ -1335,6 +1339,12 @@ export const FINALE = {
  *  finale still running?" against this; it used to be the chapter card's cue. */
 export const FINALE_ENDS_MS = FINALE.elderAtMs + FINALE.elderHoldMs;
 
+/** The Ember Gate portal FX height in world px — sized to Eleanor's standee
+ *  (she stands right beside the arch), so the door reads as tall as the person
+ *  telling you about it. The tap area is the FX's own bounds (PortalFX.hitSize),
+ *  never a smaller rectangle inside the glow. */
+export const GATE_FX_HEIGHT = 380;
+
 /* --------------------------- welcome-back moment -------------------------- */
 
 /** Only show the "While you were away" card after a real absence. */
@@ -1616,7 +1626,9 @@ export const POWER = {
  *  zone system, and by then the saves in the wild already carry the pixels
  *  needed to migrate rather than discard them. */
 export const SAVE_KEY = 'emberkeep_save';
-export const SAVE_VERSION = 11;
+// v12: the Emberbark Stump beat (`moss_stump`) shifts every persisted
+// tutorialIndex, and the stump itself is a new startingItem older boards lack.
+export const SAVE_VERSION = 12;
 
 /** The opening's held silence: the board is visible and quiet before Eleanor's
  *  first line, so the player sees the ash before anyone frames it

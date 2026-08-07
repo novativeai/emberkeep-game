@@ -619,6 +619,29 @@
       ]
     },
     {
+      "id": "emberbark",
+      "name": "Emberbark Stump",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "emberbark_1",
+          "name": "Emberbark Stump",
+          "sell": 0,
+          "xp": 0,
+          "generator": {
+            "produces": {
+              "chain": "ashmoss",
+              "tier": 1
+            },
+            "cooldownMs": 120000,
+            "energyCost": 0,
+            "tappable": true,
+            "skipMaxGold": 30
+          }
+        }
+      ]
+    },
+    {
       "id": "stormcap",
       "name": "Stormcap",
       "tiers": [

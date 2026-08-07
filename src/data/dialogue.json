@@ -50,6 +50,14 @@
   "finaleElder": "…Keeper. I have slept an age, and I woke to YOUR hands. So hear it from the only one still living who SAW: the Great Flame did not die. It was TAKEN. And it was carried NORTH. There is a woman on that ice who kept a light burning while the rest of us slept — she will not be glad to see you. Go anyway.",
   "finaleElderProphecy": "…Keeper. I stir, but I do not rise — the altar is still cold, and Eleanor's first request goes unanswered. Finish it, and I will tell you what no one else living can: the Great Flame did not die. It was TAKEN.",
   "goldenArrival": "“The old altar ANSWERS you, Keeper. So the stories about that egg were true.” — Eleanor",
+  "gateOpens": {
+    "speaker": "eleanor",
+    "lines": [
+      "…Do you feel that? The arch beside me — the Ember Gate. Shut for sixty years, and the moment she woke, it remembered it is a door.",
+      "It goes north, to the ice. My sister keeps that shore. Selyna. Sharper than me, and alone far longer than sixty years.",
+      "The fire you raised is what opened it, so it is yours to walk through. Whenever you are ready, Keeper — I will keep the isle warm."
+    ]
+  },
   "lateAwakening": "…At last. I waited for YOU, Keeper — not for her. The Elder rises, just as the stories promised.",
   "hints": {
     "zeroWarmth": "Out of Warmth? Rest by the fire — it returns on its own. The emberberry patch never needs any!",

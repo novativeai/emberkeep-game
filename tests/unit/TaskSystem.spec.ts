@@ -30,7 +30,9 @@ describe("TaskSystem (Keeper's Tasks — the encore checklist)", () => {
     const item = { id: 1, chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' as const };
 
     // Drive every counter past its target.
-    for (let i = 0; i < 4; i++) ctx.bus.emit('item:hatched', { item });
+    for (let i = 0; i < 20; i++) {
+      ctx.bus.emit('cookbook:discovered', { chain: `c${i}`, fromTier: 1, resultTier: 2 });
+    }
     for (let i = 0; i < 30; i++)
       ctx.bus.emit('item:merged', {
         chain: 'sparkweed', fromTier: 1, resultTier: 2, at: { col: 1, row: 1 },
@@ -74,3 +76,36 @@ describe("TaskSystem (Keeper's Tasks — the encore checklist)", () => {
     expect(ctx.systems.tasks.isLocked(merges)).toBe(false);
   });
 });
+
+describe('the Cookbook task — the counter that replaced "Hatch 4 dragons"', () => {
+  it('counts a first-time recipe, and nothing else', () => {
+    const ctx = createTestContext();
+    const task = ctx.systems.tasks.tasks.find((t) => t.id === 'recipes_20')!;
+    expect(ctx.systems.tasks.progressFor(task)).toBe(0);
+
+    for (let i = 0; i < 3; i++) {
+      ctx.bus.emit('cookbook:discovered', { chain: 'flame_gem', fromTier: 1, resultTier: 2 });
+    }
+    expect(ctx.systems.tasks.progressFor(task)).toBe(3);
+
+    // A merge that discovers nothing new must not move it. MergeSystem only
+    // emits `cookbook:discovered` on a FIRST merge of that pair, which is what
+    // makes the target safe to put a number on: it cannot be farmed.
+    ctx.bus.emit('item:merged', {
+      chain: 'flame_gem', fromTier: 1, resultTier: 2, at: { col: 0, row: 0 },
+      consumedIds: [], consumedAt: [], outputs: [], xp: 0
+    });
+    expect(ctx.systems.tasks.progressFor(task)).toBe(3);
+  });
+
+  /** The bug this task exists to avoid: a checklist target that quietly stops
+   *  being attainable when the design around it changes. */
+  it('no Keeper’s Task asks for more dragons than the chapter means to give', () => {
+    const hatchTasks = ctx0().systems.tasks.tasks.filter((t) => t.kind === 'hatches');
+    expect(hatchTasks).toEqual([]);
+  });
+});
+
+function ctx0(): ReturnType<typeof createTestContext> {
+  return createTestContext();
+}

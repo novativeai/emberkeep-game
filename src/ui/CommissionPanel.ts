@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BAG_SLOTS, num, panelMobileScale, TIMINGS } from '../core/Constants';
+import { BAG_SLOTS, GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, TIMINGS } from '../core/Constants';
 import { FONT, INK, TYPE } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
@@ -72,11 +72,13 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     this.setVisible(false);
     this.baseScale = panelMobileScale(FRAME_W);
 
-    const cx = scene.scale.width / 2;
-    const cy = scene.scale.height / 2;
+    // The authored 2560x1600 space, never `scene.scale.*` — the backing is
+    // GAME_WIDTH x renderScale (Graphics setting), cameras zoom to compensate.
+    const cx = GAME_WIDTH / 2;
+    const cy = LIVE_GAME_HEIGHT / 2;
 
     this.dim = scene.add
-      .rectangle(cx, cy, scene.scale.width * 2, scene.scale.height * 2, num(INK.scrim), 0.62)
+      .rectangle(cx, cy, GAME_WIDTH * 2, LIVE_GAME_HEIGHT * 2, num(INK.scrim), 0.62)
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 

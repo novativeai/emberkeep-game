@@ -599,7 +599,10 @@ Verified with Playwright screenshots (tutorial header, both tabs) + `pnpm verify
 
 Traced each Keeper's Task to its supply loop in the encore sandbox:
 - **Hatch 4** — tutorial banks 2; the ruby loop (dragon → rubies → eggs →
-  dragon) is self-sustaining. **Merge 30** — the strawberry generator is free
+  dragon) is self-sustaining. *(Superseded: dragons are deliberately scarce and
+  dear now, so the ruby loop is no longer a chapter's work but a wall. Replaced
+  by `recipes_20`, "Discover 20 Cookbook recipes", with an audit guard on the
+  target — see ripple-map.)* **Merge 30** — the strawberry generator is free
   (0 Warmth, 20s), so merge fodder never dries up even at zero energy.
 - **5 orders / 500 gold** — order slot 1 always holds the oldest uncompleted
   order and the encore pool is endless; the four authored orders pay 450 gold,

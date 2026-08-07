@@ -14,6 +14,7 @@ import {
   DRAGON_RIG_SCALE,
   EMBER_MOTES,
   FINALE,
+  GATE_FX_HEIGHT,
   FINALE_ENDS_MS,
   FINALE_REGION,
   GAME_WIDTH,
@@ -67,6 +68,7 @@ import { renderScale } from '../core/render-scale';
 import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAllow } from '../core/types';
 import facesJson from '../data/faces.json';
 import { BoardItem } from '../entities/BoardItem';
+import { PortalFX } from '../entities/PortalFX';
 import { Crystal3D } from '../render/Crystal3D';
 import type { FacesData } from '../render/faceAnimations';
 import { FlipbookFX, RAMP_TEXTURE } from '../render/FlipbookFX';
@@ -2453,14 +2455,55 @@ export class BoardScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       zone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
         if (!this.isTap(pointer)) return;
-        // An INTENT, never the switch itself: WorldSystem owns whether the
-        // journey is allowed, and a door that bypassed it could carry the player
-        // out of the tutorial mid-step.
-        this.ctx.bus.emit('world:switch', { to: p.to });
+        // An INTENT chain, never the switch itself: the tap asks for the
+        // travel prompt, the prompt's Cross emits `world:switch`, and
+        // WorldSystem still owns whether the journey is allowed — a door that
+        // bypassed it could carry the player out of the tutorial mid-step.
+        const world = this.ctx.state.worlds.get(p.to);
+        const display = world ? world.name.charAt(0).toUpperCase() + world.name.slice(1) : p.to;
+        this.ctx.bus.emit('ui:travel_requested', { to: p.to, label: p.label, world: display });
       });
       this.portalZones.push({ zone, to: p.to });
+      // The Ember Gate wears the portal FX — the one door whose opening is a
+      // story beat. Standing already-lit on a reload (the q:done latch is the
+      // truth), blooming on `gate:opened` after Eleanor's ceremony otherwise.
+      if (p.id === 'emberkeep_gate') this.buildGateFx(p, zone);
     }
     this.refreshPortals();
+  }
+
+  /**
+   * The Ember Gate's portal FX + its enlarged tap area.
+   *
+   * The authored door rect is the ARCH's art; the lit portal reads bigger than
+   * the arch (it is sized to Eleanor — the figure standing right beside it),
+   * so once the FX is up, the hit zone grows to the FX's own bounds: the whole
+   * effect is the door, not a smaller invisible rectangle inside it.
+   */
+  private buildGateFx(p: { x: number; y: number; width: number; height: number }, zone: Phaser.GameObjects.Zone): void {
+    const cx = p.x + p.width / 2;
+    const cy = p.y + p.height / 2;
+    const fx = new PortalFX(this, cx, cy, GATE_FX_HEIGHT);
+    fx.setDepth(DEPTHS.itemBase + cy);
+    const widen = (): void => {
+      const { width, height } = fx.hitSize();
+      zone.setSize(width, height);
+      const hit = zone.input?.hitArea as Phaser.Geom.Rectangle | undefined;
+      if (hit) hit.setSize(width, height);
+    };
+    if (this.goldenQuestDone()) {
+      fx.standIdle();
+      widen();
+    }
+    this.offBus.push(
+      this.ctx.bus.on('gate:opened', () => {
+        fx.bloom();
+        widen();
+        // The latch behind `available()` flipped when the quest completed —
+        // the door itself goes live here, with the ceremony, not before.
+        this.refreshPortals();
+      })
+    );
   }
 
   /**
@@ -3855,9 +3898,13 @@ export class BoardScene extends Phaser.Scene {
     sprite: BoardItem,
     timer: { remaining: number; total: number } | null
   ): void {
-    // Keep the (invisible) host's cooling state coherent — its pill/tint/star
-    // visuals are suppressed while a rig stands in (BoardItem.artHidden).
+    // Keep the host's cooling state coherent (it drives the muted tint and the
+    // ready-star on the sleep painting) — but its countdown pill stays OFF on
+    // this path always: the floating badge below owns the countdown, and once
+    // the sleep art stands in, `artHidden` alone would let a cooling flip
+    // re-show the host pill with a label nothing here ever fills.
     sprite.setCooling(timer !== null);
+    sprite.hideCountdownPill();
     const existing = this.coolBadges.get(sprite.itemId);
     if (!timer) {
       if (existing) {

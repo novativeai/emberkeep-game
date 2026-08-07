@@ -1174,7 +1174,7 @@
       "portals": [
         {
           "id": "emberkeep_gate",
-          "to": "roothold",
+          "to": "borealis",
           "label": "The Ember Gate",
           "rect": [
             2149.18,
@@ -5052,7 +5052,7 @@
       "portals": [
         {
           "id": "borealis_keep_door",
-          "to": "hatchery",
+          "to": "emberkeep",
           "label": "The Keep Door",
           "rect": [
             2444.19,

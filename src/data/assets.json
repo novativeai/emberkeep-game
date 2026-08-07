@@ -199,6 +199,12 @@
       "file": "sprites/items/crystal.webp"
     },
     {
+      "key": "item_emberbark_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/emberbark.webp"
+    },
+    {
       "key": "item_coin_1",
       "source": "file",
       "generator": "item",

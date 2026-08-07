@@ -19,26 +19,28 @@ import { uiRegistry } from './theme';
 
 /** Card geometry, in the 2560-space. Four across inside the shop frame. */
 const CARD_W = 452;
-const CARD_H = 470;
+const CARD_H = 460;
 const CARD_R = 34;
 const COLS = 4;
 const COL_GAP = 476;
 /**
- * Vertical budget, measured off the frame rather than guessed. The tab row sits
- * at -430 and the panel's inner floor is +660, so the grid owns -300..+660 —
- * 960 units. Two rows of 470 leave 20 between them, which is why CARD_H cannot
- * grow: a taller card pushes the second row through the frame.
+ * The grid window, measured off the PAINTED frame rather than off its texture:
+ * the plate the storePanel painter fills is 1016×620 logical drawn at y+40, so
+ * its inner floor sits at +652 — not +660, which is merely where the texture
+ * ends. The shelf owns -300 (under the tabs) down to +640, keeping a 12-unit
+ * air gap above the floor. That gap is the whole fix for "the bottom row
+ * overflows the panel": the old window ran to +660, eight units PAST the
+ * floor, so any layout that filled it exactly (the dragon-skin hero section,
+ * Decorations at full scroll) stood its bottom row on the frame's bezel.
  */
-const GRID_MID = 180;
-const ROW_GAP = 490;
-/**
- * The grid's visible height. The tab row sits at -430 and the frame's inner
- * floor is +660, so the shelf owns -300..+660 — 960 units, exactly two rows.
- * A section with more than `COLS * 2` items therefore SCROLLS: Decorations
- * carries thirteen, which is four rows, and before this they simply drew
- * straight through the bottom of the frame and out onto the board.
- */
-const VIEW_H = 960;
+const VIEW_TOP = -300;
+const VIEW_BOTTOM = 640;
+const VIEW_H = VIEW_BOTTOM - VIEW_TOP;
+const GRID_MID = (VIEW_TOP + VIEW_BOTTOM) / 2;
+/** Two rows of 460 + the 20 between them = 940, the window exactly — which is
+ *  why CARD_H cannot grow: a taller card pushes row two onto the bezel again.
+ *  A section with more than `COLS * 2` items SCROLLS instead of squeezing. */
+const ROW_GAP = 480;
 /** Past this much drag the gesture is a scroll, and the card under the finger
  *  must not also be bought. */
 const DRAG_SLOP = 12;
@@ -50,7 +52,7 @@ const DRAG_SLOP = 12;
  * that is the thing a foiled legendary is pretending to be.
  */
 const HERO_H = ROW_GAP + CARD_H;
-const HERO_W = 687;
+const HERO_W = Math.round(HERO_H * 0.716);
 const HERO_GAP = 96;
 /** A section with a showcase card fits two ordinary columns beside it. */
 const HERO_COLS = 2;
@@ -373,14 +375,17 @@ export class StorePanel extends Phaser.GameObjects.Container {
         ? -((rows - 1) * ROW_GAP) / 2
         : -VIEW_H / 2 + CARD_H / 2;
     this.maxScroll = Math.max(0, contentH - VIEW_H);
+    // Every row starts at the block's left edge — the BLOCK is centred, the
+    // rows inside it are a grid. A short final row therefore leaves its gap on
+    // the right rather than re-centring itself, so columns line up top to
+    // bottom and a lone last item sits under the first column, not adrift in
+    // the middle.
+    const colStartX = blockMidX - ((cols - 1) * COL_GAP) / 2;
     rest.forEach((item, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      // A short final row centres itself rather than hanging off to the left.
-      const inRow = Math.min(cols, rest.length - row * cols);
-      const rowStartX = blockMidX - ((inRow - 1) * COL_GAP) / 2;
       this.place(
-        this.makeCard(rowStartX + col * COL_GAP, startY + row * ROW_GAP, item, section),
+        this.makeCard(colStartX + col * COL_GAP, startY + row * ROW_GAP, item, section),
         item
       );
     });
@@ -564,7 +569,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
     if (this.scene.textures.exists(item.art)) {
       card.add(this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h));
     }
-    card.add(addScrim(this.scene, inner.w, 440, 30));
+    card.add(addScrim(this.scene, inner.w, inner.h / 2 - 30, 30));
     // The sheen crosses the ART as well as the plate — a foil card whose gloss
     // stops at the picture is a picture in a shiny frame, not a foil card.
     card.add(plate.sheen);
@@ -606,8 +611,15 @@ export class StorePanel extends Phaser.GameObjects.Container {
     // A legendary is printed on the foil plate; everything else keeps the cream
     // card. That is the only thing rarity changes about how a card behaves.
     const foil = !!item.rarity && RARITY[item.rarity].foil;
+    // A dragon skin's art is a portrait, and a portrait in a letterboxed stage
+    // reads as a thumbnail — so on this shelf every card is printed like the
+    // hero: art bled to the plate's edges, the words on a scrim over it. The
+    // Manor skins and Decorations keep the stage: their art is an OBJECT, and
+    // an object wants a card around it, not a poster.
+    const bleed = section.kind === 'dragon_skin';
 
     let rim: Phaser.GameObjects.Graphics | null = null;
+    let sheen: Phaser.GameObjects.TileSprite | null = null;
     if (foil) {
       const plate = makeFoilPlate(
         this.scene,
@@ -617,53 +629,67 @@ export class StorePanel extends Phaser.GameObjects.Container {
         worn ? INK.ember : undefined
       );
       card.add(plate.under);
-      card.add(plate.sheen);
       rim = plate.rim;
-      // Stagger the passes so two legendaries on one shelf do not flash in
-      // lockstep, which reads as a screen glitch rather than a material.
-      this.sheens.push(runSheen(this.scene, plate.sheen, this.sheens.length * 900));
+      sheen = plate.sheen;
     } else {
       const g = this.scene.add.graphics();
       g.fillStyle(num(INK.goldDeep), 1);
       g.fillRoundedRect(-CARD_W / 2, -CARD_H / 2 + 8, CARD_W, CARD_H, CARD_R);
       g.fillStyle(num(INK.field), 1);
       g.fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
-      g.lineStyle(6, num(worn ? INK.ember : INK.gold), 1);
-      g.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
       card.add(g);
+      // The rim is its own layer so full-bleed art can slide UNDER it — a
+      // stroke fused into the plate would be painted over by the art.
+      rim = this.scene.add.graphics();
+      rim.lineStyle(6, num(worn ? INK.ember : INK.gold), 1);
+      rim.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
     }
 
-    // Art, contain-fit into the card's stage so a tall Manor and a squat rune
-    // pad both sit inside the same rectangle.
-    // Art / name / blurb / button, stacked to land inside 470 units. The art is
-    // capped at 188 tall rather than filling the top of the card: the blurb is
-    // the reason anyone reads a card twice, and it needs three lines.
     if (this.scene.textures.exists(item.art)) {
-      const art = this.scene.add.image(0, -122, item.art);
-      art.setScale(Math.min(300 / art.width, 188 / art.height));
-      card.add(art);
+      if (bleed) {
+        const inner = { w: CARD_W - PLATE_INSET * 2, h: CARD_H - PLATE_INSET * 2 };
+        card.add(this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h));
+        // Scrim under everything the player must read — from just above the
+        // name down to the plate's foot, same treatment as the hero.
+        card.add(addScrim(this.scene, inner.w, inner.h / 2 - 12, -12));
+      } else {
+        // Contain-fit into the card's stage so a tall Manor and a squat rune
+        // pad both sit inside the same rectangle, capped at 188 tall: the
+        // blurb is the reason anyone reads a card twice, and it needs lines.
+        const art = this.scene.add.image(0, -122, item.art);
+        art.setScale(Math.min(300 / art.width, 188 / art.height));
+        card.add(art);
+      }
+    }
+    // The sheen crosses the ART as well as the plate (same law as the hero) —
+    // staggered so two legendaries on one shelf do not flash in lockstep,
+    // which reads as a screen glitch rather than a material.
+    if (sheen) {
+      card.add(sheen);
+      this.sheens.push(runSheen(this.scene, sheen, this.sheens.length * 900));
     }
     if (rim) card.add(rim);
     if (item.rarity) card.add(this.makeRibbon(item.rarity, -CARD_H / 2 + 8));
 
-    card.add(
-      this.scene.add
-        .text(0, 8, item.name, {
-          fontFamily: FONT.ui, fontSize: '32px', fontStyle: 'bold',
-          color: INK.onField,
-          align: 'center', wordWrap: { width: CARD_W - 56 }
-        })
-        .setOrigin(0.5)
-    );
-    card.add(
-      this.scene.add
-        .text(0, 40, item.blurb, {
-          fontFamily: FONT.ui, fontSize: '22px', color: foil ? FOIL.rim : INK.onFieldDim,
-          align: 'center', wordWrap: { width: CARD_W - 64 }
-        })
-        .setOrigin(0.5, 0)
-        .setAlpha(foil ? 1 : 0.9)
-    );
+    const name = this.scene.add
+      .text(0, 8, item.name, {
+        fontFamily: FONT.ui, fontSize: '32px', fontStyle: 'bold',
+        color: INK.onField,
+        align: 'center', wordWrap: { width: CARD_W - 56 }
+      })
+      .setOrigin(0.5);
+    if (bleed) name.setShadow(0, 4, 'rgba(36,27,34,0.7)', 6);
+    card.add(name);
+    const blurb = this.scene.add
+      .text(0, 40, item.blurb, {
+        fontFamily: FONT.ui, fontSize: '22px',
+        color: bleed || foil ? FOIL.rim : INK.onFieldDim,
+        align: 'center', wordWrap: { width: CARD_W - 64 }
+      })
+      .setOrigin(0.5, 0)
+      .setAlpha(bleed || foil ? 1 : 0.9);
+    if (bleed) blurb.setShadow(0, 3, 'rgba(36,27,34,0.7)', 5);
+    card.add(blurb);
     card.add(this.makeAction(item, section, owned, worn, CARD_H / 2 - 62, 0.74, 38));
     return card;
   }

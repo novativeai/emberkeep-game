@@ -334,29 +334,41 @@ describe('portals — every world has a way out of it', () => {
   });
 
   /**
-   * No world is a dead end: each has a door OUT and a door IN.
+   * The LIVE pair is a round trip and no ENTERABLE world is a dead end.
    *
-   * Deliberately not "everything is reachable from Emberkeep by doors". The
-   * worlds come in pairs — a sanctuary and its hub — and crossing from
-   * Emberkeep's pair to Borealis's is the story beat, not an arch. What must
-   * never happen is a world you can enter and not leave, or one nothing leads
-   * to, and both of those are invisible on a board whose doors are invisible.
+   * The chapter crossing is the Ember Gate ⇄ the Keep Door (Emberkeep ⇄
+   * Borealis) — a door each way, so neither shore can strand the Keeper.
+   * Roothold and Hatchery keep their doors OUT authored, but nothing leads
+   * INTO them yet: they are empty boards, and a door into an empty board is a
+   * trap wearing a doorway. Their chapters re-pair them when they gain
+   * content — at which point the `LIVE` set below is the one line to grow.
    */
-  it('leaves no world a dead end — a door out and a door in, each', () => {
+  const LIVE = ['emberkeep', 'borealis'];
+
+  it('leaves no enterable world a dead end — a door out and a door in, each', () => {
     const into = new Set([...WORLDS.values()].flatMap((w) => w.portals.map((p) => p.to)));
     for (const world of WORLDS.values()) {
-      expect(world.portals.length).toBeGreaterThan(0);
-      expect(into.has(world.id)).toBe(true);
+      expect(world.portals.length).toBeGreaterThan(0); // a world you cannot leave is refused at build
+      if (LIVE.includes(world.id)) expect(into.has(world.id)).toBe(true);
     }
+    // The empty worlds are exactly the ones with no door in — nothing else.
+    const doorless = [...WORLDS.values()].filter((w) => !into.has(w.id)).map((w) => w.id);
+    expect(doorless.sort()).toEqual(['hatchery', 'roothold']);
   });
 
-  /** And each pair is a round trip: every door has one coming back the other
-   *  way, so a hub can never strand the Keeper away from their board. */
-  it('pairs every door with its return', () => {
+  /** And the live pair is a round trip: each of its doors has one coming back
+   *  the other way. Every authored door — live or parked — leads somewhere
+   *  that can send the Keeper onward, so no door is a one-way oubliette. */
+  it('pairs every live door with its return', () => {
+    for (const id of LIVE) {
+      for (const p of WORLDS.get(id)!.portals) {
+        const back = WORLDS.get(p.to)!.portals.some((q) => q.to === id);
+        expect(back).toBe(true);
+      }
+    }
     for (const world of WORLDS.values()) {
       for (const p of world.portals) {
-        const back = WORLDS.get(p.to)!.portals.some((q) => q.to === world.id);
-        expect(back).toBe(true);
+        expect(WORLDS.get(p.to)!.portals.length).toBeGreaterThan(0);
       }
     }
   });
@@ -376,6 +388,29 @@ describe('portals — every world has a way out of it', () => {
     const door = EMBERKEEP.portals[0]!;
     ctx.bus.emit('world:switch', { to: door.to });
     expect(ctx.state.worldId).toBe(WORLD_ID);
+  });
+
+  /**
+   * The Gate opens on the STORY, not the cap: Borealis stays shut at Level 3
+   * until the Golden Elder has woken (`q:done:keepers_hoard` — the same latch
+   * the altar derives her presence from). A level the player crosses mid-merge
+   * is the wrong key for the chapter's one crossing.
+   */
+  it('holds Borealis shut until the Golden Elder has woken', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
+    expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('borealis');
+    const failures: string[] = [];
+    ctx.bus.on('world:switch_failed', ({ reason }) => failures.push(reason));
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    expect(ctx.state.worldId).toBe(WORLD_ID);
+    expect(failures).toEqual(['story']);
+
+    ctx.state.addStat('q:done:keepers_hoard', 1);
+    expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('borealis');
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    expect(ctx.state.worldId).toBe('borealis');
   });
 });
 
@@ -565,6 +600,10 @@ describe('worlds — a first arrival puts the opening board out', () => {
   const atCap = (ctx: ReturnType<typeof createTestContext>): void => {
     ctx.state.tutorialDone = true;
     ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
+    // The north opens on the STORY, not the cap: the Ember Gate holds Borealis
+    // shut until the Golden Elder has woken. These tests are about arrival
+    // mechanics, so they arrive the way a real save does — latch set.
+    ctx.state.addStat('q:done:keepers_hoard', 1);
   };
 
   /**

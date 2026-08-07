@@ -49,7 +49,7 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 | 7 🥚 | **Raise the Roofs** | — | Build 2 Houses |
 | 8 | **Light the Long Gallery** | — | Make 4 Flame Gems |
 | 9 | **Fill the Larder** | — | Make 2 Emberberry Preserves |
-| 10 | **The Keeper's Tasks** | — | the five `tasks.json` entries, by reference |
+| 10 | **The Keeper's Tasks** | — | the five `tasks.json` entries, by reference — recipes 20 · merges 30 · orders 5 · gold 500 · Elder 10 |
 | 11 🥚 | **Raise the Ember Brood** | — | Make 4 Red Eggs |
 | 12 | **Wake the Ashdrake** | — | Merge 3 Ashdrake Eggs into the Ashdrake |
 | 13 | *(the live order's title)* | the encore | Deliver 8 × Gem Shard to Eleanor |
@@ -362,6 +362,30 @@ Ledger. `pnpm quests --all` proves every step and every key.
 > travel and `UIScene` already draws the travelling curtain, but nothing on
 > screen asks for it — only `window.__emberkeep.switchWorld`. That affordance
 > belongs to the hub work (board EMB-23); everything behind it is proven.
+
+### Counter tasks, and the one that has a ceiling
+
+`The Keeper's Tasks` mirrors `tasks.json` by id, so those five rows have exactly
+one definition and the HUD cannot disagree with the Ledger's Tasks tab. Four of
+the five measure loops that are unbounded by construction — gold, merges and
+orders all come off renewable supply, and the Elder can be tapped forever.
+
+**`recipes_20` is the exception, and it is the one that needed a guard.** It
+counts Cookbook pages discovered, which is finite by definition: there are only
+so many recipes a chapter can print. `auditLadder` therefore checks the target
+against the rows actually printable *at the step that asks for it*
+(`recipeKeysFrom`), and fails the build if it asks for more.
+
+It replaced **"Hatch 4 dragons"**. That target was fine when it was written and
+stopped being fine when dragons became deliberately scarce and dear — the ruby
+loop is technically self-sustaining, so no reachability check ever complained,
+but four hatches had quietly turned from a chapter's work into a wall. Nothing
+in the audit was looking at counter targets at all, which is exactly why the
+guard exists now rather than a note somewhere.
+
+Two numbers to keep in view when retuning it: the tutorial alone discovers **13**
+recipes, and **27** rows are reachable by the time the checklist is asked. A
+target at or below 13 is a task that is already complete when it appears.
 
 ## 6. THE LEGENDARY EGG DIRECTIVE
 

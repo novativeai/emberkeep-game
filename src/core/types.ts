@@ -309,6 +309,9 @@ export interface DialogueData {
   finaleElderProphecy: string;
   /** Eleanor's banner quote the moment the egg materialises on the altar. */
   goldenArrival: string;
+  /** Eleanor speaks the Ember Gate open, right after the finale hands the
+   *  board back — the beat that ends with the portal blooming (`gate:opened`). */
+  gateOpens: { speaker: string; lines: string[] };
   /** The Elder's line when Order 1 completes AFTER Level 3 — the late awakening. */
   lateAwakening: string;
   /** One-shot Eleanor nudges post-tutorial. */
@@ -407,7 +410,18 @@ export interface CharactersData {
   characters: CharacterConfig[];
 }
 
-export type TaskKind = 'hatches' | 'orders' | 'goldEarned' | 'merges' | 'elderTaps';
+/**
+ * A lifetime counter a Keeper's Task can be measured against. Each kind is a
+ * `GameState.stats` key TaskSystem owns, so a task never keeps a tally of its
+ * own and cannot drift from the thing it claims to measure.
+ *
+ * `recipes` counts Cookbook pages discovered — first-time merges, which is a
+ * number that only ever goes up and that every chain on the board contributes
+ * to. It replaced a `hatches` task: dragons are deliberately scarce and dear
+ * now, so a checklist row asking for four of them stopped being a chapter's
+ * work and became a wall.
+ */
+export type TaskKind = 'hatches' | 'orders' | 'goldEarned' | 'merges' | 'elderTaps' | 'recipes';
 
 export interface TaskConfig {
   id: string;
@@ -1377,7 +1391,13 @@ export interface EventMap {
    *  here, not on `world:switched` — between the two there is a texture fetch,
    *  and that gap is the entire reason a loading state exists. */
   'world:ready': { world: string };
-  'world:switch_failed': { to: string; reason: 'unknown' | 'level' | 'tutorial' | 'same' };
+  'world:switch_failed': { to: string; reason: 'unknown' | 'level' | 'tutorial' | 'same' | 'story' };
+  /** Intent: a portal was tapped — UIScene answers with the travel prompt.
+   *  `label` is the door's authored name, `world` the destination's display name. */
+  'ui:travel_requested': { to: string; label: string; world: string };
+  /** Fact: the Ember Gate ceremony finished (Eleanor's lines after the finale).
+   *  BoardScene blooms the portal FX and re-enables its door on this. */
+  'gate:opened': Record<string, never>;
 }
 
 export type ResolvedHand =

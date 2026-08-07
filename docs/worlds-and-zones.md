@@ -212,17 +212,26 @@ a door as tall as the art.
 
 | world | door | painted as | leads to |
 |---|---|---|---|
-| `emberkeep` | The Ember Gate | the lit stone arch on the north-east isle | `roothold` |
+| `emberkeep` | The Ember Gate | the lit stone arch on the north-east isle | `borealis` |
+| `borealis` | The Keep Door | the glowing door in the keep | `emberkeep` |
 | `roothold` | The Vine Arch | the vined archway onto the rope bridge | `emberkeep` |
-| `borealis` | The Keep Door | the glowing door in the keep | `hatchery` |
 | `hatchery` | The Rune Circle | the gold rune inlay in the middle of the deck | `borealis` |
 
-**Pairs, not a ring.** Each sanctuary and its hub have a door each way, and
-`Zones.spec.ts` pins both halves: no world is a dead end (a door out AND a door
-in), and every door has its return. Crossing between the two PAIRS is
-deliberately not a door — reaching the north is the story beat the editor
-records as `teleport` (hatch a tier-2 flame gem), and an arch on Emberkeep that
-skipped it would give away the one journey Chapter Two is built on.
+**The live pair is the chapter crossing itself: Emberkeep ⇄ Borealis.** The
+Ember Gate does not open on level — `WorldSystem.storyOpen` holds Borealis
+shut until the Golden Elder has woken (`q:done:keepers_hoard`), Eleanor speaks
+the Gate open right after the finale (`dialogue.gateOpens` → `gate:opened`),
+and the Gate is the ONE door that wears a drawn marker: `PortalFX`
+(entities/PortalFX.ts) — glow, molten core, vortex in-fall — because an arch
+that has been shut all chapter changing state IS news, the exception to
+"trust the painting". Its tap area grows to the FX bounds, and every portal
+tap now asks `ui:travel_requested` → the TravelPrompt's Cross emits
+`world:switch`. Roothold and Hatchery keep their doors OUT authored, but
+nothing leads INTO them until their chapters give them content — a door into
+an empty board is a trap wearing a doorway. `Zones.spec.ts` pins the live
+round trip, the gate latch, and that exactly those two worlds are door-less.
+The editor's `teleport` record (hatch a tier-2 flame gem) is the same
+journey's older phrasing and stays registry data only.
 
 **Authored map decor is placed the same way** — `DECOR` in `build-zones.mjs`,
 by a point on the backdrop. `at` is where the art's own anchor must land in

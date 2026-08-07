@@ -435,15 +435,19 @@ const recipeCache = new WeakMap<ChainsData, Map<string, Set<string>>>();
  * would drift the moment a seed count changes. Memoised per chains document —
  * this is a pure function of the shipped data, not of the save.
  */
-export function reachableRecipeKeys(data: AuditData): Set<string> {
-  // Keyed by world as well as by document: the same chains.json promises a
-  // different book in the north, because half its roster does not exist there.
-  const perWorld = recipeCache.get(data.chains) ?? new Map<string, Set<string>>();
-  const cached = perWorld.get(data.worldId);
-  if (cached) return cached;
-  const availability = auditLadder(data).finalAvailability;
+/**
+ * The Cookbook rows a given availability map can print — one per adjacent tier
+ * pair whose OUTPUT is reachable, which is the guarantee that makes `n / N`
+ * finishable.
+ *
+ * Split out from `reachableRecipeKeys` so the ladder walk can ask the same
+ * question PARTWAY through, against the world as it stands at one step. The
+ * public version answers for the finished game and would recurse if called
+ * from inside the audit.
+ */
+export function recipeKeysFrom(availability: AvailabilityMap, chains: ChainsData): Set<string> {
   const keys = new Set<string>();
-  for (const chain of data.chains.chains) {
+  for (const chain of chains.chains) {
     for (const tier of chain.tiers) {
       const next = chain.tiers.find((t) => t.tier === tier.tier + 1);
       if (!next) continue;
@@ -452,6 +456,16 @@ export function reachableRecipeKeys(data: AuditData): Set<string> {
       }
     }
   }
+  return keys;
+}
+
+export function reachableRecipeKeys(data: AuditData): Set<string> {
+  // Keyed by world as well as by document: the same chains.json promises a
+  // different book in the north, because half its roster does not exist there.
+  const perWorld = recipeCache.get(data.chains) ?? new Map<string, Set<string>>();
+  const cached = perWorld.get(data.worldId);
+  if (cached) return cached;
+  const keys = recipeKeysFrom(auditLadder(data).finalAvailability, data.chains);
   perWorld.set(data.worldId, keys);
   recipeCache.set(data.chains, perWorld);
   return keys;
@@ -1357,6 +1371,32 @@ export function auditLadder(input: AuditData): LadderAudit {
           });
         }
         rows.push({ requirement, availability: entry, verdict });
+      }
+
+      // A COUNTER task is not an item ask, so nothing above checks it — and a
+      // target that quietly stopped being attainable is exactly how "Hatch 4
+      // dragons" survived the decision to make dragons scarce. Only `recipes`
+      // has a hard ceiling the data can state; the rest are unbounded by
+      // construction (gold, merges and orders all come from renewable loops).
+      const mirrored = step.goal;
+      if (mirrored.kind === 'task') {
+        const task = data.tasks.tasks.find((t) => t.id === mirrored.taskId);
+        if (!task) {
+          stepFindings.push({
+            severity: 'error',
+            at,
+            message: `no task '${mirrored.taskId}' in tasks.json — the step mirrors nothing`
+          });
+        } else if (task.kind === 'recipes') {
+          const printable = recipeKeysFrom(availability, data.chains).size;
+          if (task.target > printable) {
+            stepFindings.push({
+              severity: 'error',
+              at,
+              message: `'${task.label}' wants ${task.target} recipes, but only ${printable} Cookbook rows are reachable when it is asked`
+            });
+          }
+        }
       }
 
       // Board room: a step that wants N pieces held AT ONCE needs N tiles for

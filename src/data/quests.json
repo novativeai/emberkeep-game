@@ -292,18 +292,11 @@
       "title": "The Keeper's Tasks",
       "steps": [
         {
-          "id": "tasks_hatch",
+          "id": "tasks_recipes",
           "goal": {
             "kind": "task",
-            "taskId": "hatch_4"
-          },
-          "needs": [
-            {
-              "chain": "ember_dragon",
-              "tier": 3,
-              "count": 1
-            }
-          ]
+            "taskId": "recipes_20"
+          }
         },
         {
           "id": "tasks_merges",

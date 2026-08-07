@@ -64,6 +64,25 @@
       "allow": {}
     },
     {
+      "id": "moss_stump",
+      "speaker": "eleanor",
+      "text": "See that charred stump? The first tree the fire took — and the first thing the isle is dressing in moss again. Tap it and gather a tuft; it will always grow more.",
+      "gate": {
+        "type": "event",
+        "event": "item:harvested",
+        "chain": "ashmoss"
+      },
+      "arrow": {
+        "tile": {
+          "chain": "emberbark",
+          "nth": 0
+        }
+      },
+      "allow": {
+        "tapGenerators": true
+      }
+    },
+    {
       "id": "ash_green",
       "speaker": "eleanor",
       "text": "…Look down. The grey is going green where your hands were. Ash Moss — the isle's first answer. Three tufts make a bundle; drag them together.",
@@ -77,9 +96,9 @@
           "spawn": {
             "chain": "ashmoss",
             "tier": 1,
-            "count": 3,
+            "count": 2,
             "at": [
-              7,
+              9,
               5
             ]
           }
@@ -587,8 +606,8 @@
             "tier": 1,
             "count": 1,
             "at": [
-              7,
-              2
+              9,
+              7
             ]
           }
         }

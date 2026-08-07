@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
-import { GAME_WIDTH, ITEM_SCALE, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
+import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { discTextureFor } from '../entities/PortraitAnimator';
 import type { GameState } from '../core/GameState';
@@ -12,6 +12,9 @@ import { uiRegistry } from './theme';
 // Card centres: half the card art (640×0.9 → ±288) + this must stay inside the
 // ui_panel's inner face (~±612) — at 330/0.96 the cards overflowed the frame.
 const CARD_X = 300;
+/** The requirement icon contain-fits this box — the `ui_slot` backdrop is 144
+ *  units, so the art sits inside it with a small air gap all round. */
+const SLOT_ICON_FIT = 128;
 const TAB_W = 520;
 const TAB_H = 104;
 const TAB_Y = -384;
@@ -561,9 +564,13 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       card.deliverable = deliverable;
       card.title.setText(order.title);
       const slotKey = `item_${requirement.chain}_${requirement.tier}`;
-      const slotBoardScale =
-        ITEM_SCALE[`${requirement.chain}_${requirement.tier}`] ?? ITEM_SCALE[requirement.chain];
-      card.slotIcon.setTexture(slotKey).setScale(slotBoardScale != null ? slotBoardScale * 2.0 : 0.72);
+      // Contain-fit into the requirement SLOT, never the item's board scale:
+      // board scale is tuned to a tile footprint, and doubling it put a
+      // Radiant Gem at 230 units on a 144-unit slot — over the card's title.
+      card.slotIcon.setTexture(slotKey);
+      card.slotIcon.setScale(
+        SLOT_ICON_FIT / Math.max(card.slotIcon.width, card.slotIcon.height)
+      );
       card.slotCount.setText(`${have[0] ?? 0}/${requirement.count}`);
       const parts: string[] = [];
       if (order.rewards.coins) parts.push(`${order.rewards.coins}`);

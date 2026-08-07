@@ -443,6 +443,22 @@ export class BoardItem extends Phaser.GameObjects.Container {
     }
   }
 
+  /**
+   * Force the in-container countdown pill off, whatever `setCooling` decided.
+   *
+   * For a rig-hosted dragon the SCENE's floating badge owns the countdown, and
+   * `artHidden` stops being a safe proxy for "a rig is presenting" the moment
+   * the sleep painting stands in: the art is visible again, so a cooling flip
+   * during sleep re-shows this pill — with a label nothing on the rig path
+   * ever fills. The scene calls this every badge tick; because it runs in the
+   * same frame as the flip, the empty pill never reaches the screen.
+   */
+  hideCountdownPill(): void {
+    this.cooldownLabel.setVisible(false);
+    this.timePill.setVisible(false);
+    this.timeIcon.setVisible(false);
+  }
+
   /** Update the countdown text + resize the pill around it: "8s" under a
    *  minute, "9:58" mm:ss above. */
   setCooldownRemaining(ms: number): void {
