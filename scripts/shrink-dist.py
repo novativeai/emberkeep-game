@@ -13,22 +13,36 @@ Cap a texture at **2× the largest size it can occupy on the 2560×1600 canvas**
 Two, not one: the spare stop is headroom for the board camera's zoom and for any
 placement that scales a piece up.
 
-## What may NOT be resized
+## RESIZING IS OPT-IN, AND NOTHING IS OPTED IN
 
-`ITEM_SCALE`, `DECOR_SCALE` and chains' `artScale` are RATIOS applied to a
-source's natural pixel size, so resizing such a file resizes the piece in the
-game. Shrinking the 1160px Ashdrake egg to 148px turned it into a 9px speck on
-the board — the same class of bug as resizing a backdrop without recalibrating
-map.json. `scale_bound_files()` reads `assets.json` and Constants to find them;
-they are re-encoded but never resized.
+The runtime almost never asks "how big should this be?" — it asks "how big IS
+this?" and multiplies. Three separate mechanisms do it:
 
-## Where the waste was, measured
+  * `ITEM_SCALE` / `DECOR_SCALE` / chains' `artScale` are RATIOS on a source's
+    natural pixel size. Shrinking the 1160px Ashdrake egg to 148px turned it
+    into a 9px speck on the board.
+  * `src/data/faces.json` carries a per-SET `textureScale` (0.938 for a blink
+    bank, 0.471 for a roar bank) measured against that bank's own pixel size, so
+    a swapped head frame lands on the rig's neck. Forcing both banks to 340px
+    wide left every dragon's head shrinking the moment it blinked or roared.
+  * Sprite sheets are sliced with a FIXED cell (`disc-atlas.webp` at 270x360,
+    the standee banks at `STANDEE_BANKS.frameWidth`). Resize the sheet and the
+    grid stops landing on the art — Eleanor's dialogue bubble showed a lattice
+    of frame fragments instead of a portrait.
 
-  head-animation frames  14.7 MB  857-1056px art for a head that renders ~140px
-                                  (the rig's head layer is 666 of 1054 bounds
-                                  units, and a board dragon is 221px wide)
+Those are three different bindings, in three different files, and there is no
+property of a path that predicts which one applies. So the policy is inverted:
+**this script re-encodes, and does not resize.** `GROUP_CAPS` is kept as the
+mechanism, with every entry `None`; adding a cap means first proving nothing
+downstream reads that file's dimensions, and `scale_bound_files()` is the
+belt-and-braces check for the ITEM_SCALE/DECOR_SCALE family.
+
+Re-encoding alone is safe by construction: same pixels, fewer bytes.
+
+## Where the savings are, measured
+
   dragon rig .json       14.2 MB  eight base64 PNGs embedded per rig
-  disc atlases            3.8 MB  1890px sheets for ~200px discs
+  everything else                 lossy re-encode of art over 60 KB
 
 Rigs are re-encoded PNG→WebP inside the data URL. `RigPlayer.loadTextures`
 hands those straight to `scene.load.image`, which accepts any data URL the
@@ -68,17 +82,21 @@ REQUANT_MIN_KB = 60
 # Below this saving, a rewrite is not worth a generation of loss.
 MIN_GAIN = 0.08
 
-# Max width in canvas px per art class, = 2x the largest on-screen size.
-#   head-frames  a board dragon is 221px wide and its head layer is 666/1054 of
-#                that (~140px); adults fit inside 340 with room to spare.
-#   golden-elder the finale, framed large on her ledge - a bigger cap.
-#   disc-atlas   a merge disc is ~200px on a 3x4 sheet.
-#   reveals / background  full-screen art. Never resized.
+# Max width in canvas px per art class. EVERY ENTRY IS None ON PURPOSE — see the
+# module docstring. A cap here is a promise that nothing downstream measures the
+# file, and the three classes that used to carry one all broke that promise:
+#
+#   head-frames  340   heads shrank on blink/roar (faces.json textureScale)
+#   disc-atlas   1200  the dialogue bubble showed a grid (fixed 270x360 cells)
+#   golden-elder 560   same head-frame binding, via calibrate-faces.mjs
+#   characters   560   swept in rig and standee art with no way to tell which
+#
+# Restore a cap only with the consumer in front of you.
 GROUP_CAPS: dict[str, "int | None"] = {
-    "head-frames": 340,
-    "golden-elder": 560,
-    "characters-other": 560,
-    "disc-atlas": 1200,
+    "head-frames": None,
+    "golden-elder": None,
+    "characters-other": None,
+    "disc-atlas": None,
     "reveals": None,
     "background": None,
     "environment": None,
@@ -89,7 +107,7 @@ GROUP_CAPS: dict[str, "int | None"] = {
 
 
 def group_of(rel: str) -> str:
-    if "/head-animation/" in rel:
+    if "/head-animation" in rel:  # …and head-animation-adult, which the / missed
         return "head-frames"
     if "/golden-elder/" in rel:
         return "golden-elder"
@@ -214,6 +232,39 @@ def shrink_rigs(check):
     return before, after, touched
 
 
+def verify_dimensions():
+    """Every shipped image must be the size its workspace master is.
+
+    The re-encode path cannot change dimensions, so this only ever fires on a
+    resize — which is the exact failure that put shrinking heads and a lattice
+    of portrait fragments into production. It costs about a second and it fails
+    the build, which is the only place a silent visual regression gets caught:
+    no test renders a dragon's blink or Eleanor's bubble.
+    """
+    mismatches = []
+    for shipped in sorted(DIST.rglob("*")):
+        if shipped.suffix.lower() not in (".webp", ".png", ".jpg", ".jpeg"):
+            continue
+        rel = shipped.relative_to(DIST)
+        master = ROOT / "assets" / rel
+        if not master.exists():
+            # `optimize:art` re-encodes a .png master to .webp; the pair moves
+            # together, so fall back to the sibling before giving up.
+            for alt in (master.with_suffix(".png"), master.with_suffix(".webp")):
+                if alt.exists():
+                    master = alt
+                    break
+        if not master.exists():
+            continue  # generated in the build, no master to compare against
+        try:
+            with Image.open(master) as a, Image.open(shipped) as b:
+                if a.size != b.size:
+                    mismatches.append((rel.as_posix(), a.size, b.size))
+        except Exception:
+            continue
+    return mismatches
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="report without writing")
@@ -235,10 +286,20 @@ def main():
     print("[shrink-dist] dist     %6.1f -> %6.1f MB%s"
           % (mb(total_before), mb(total_after), "  (dry run)" if args.check else ""))
 
+    status = 0
     if mb(total_after) > args.budget:
         print("[shrink-dist] FAIL: over the %.0f MB budget" % args.budget, file=sys.stderr)
-        return 1
-    return 0
+        status = 1
+
+    if not args.check:
+        bad = verify_dimensions()
+        print("[shrink-dist] dimensions match the workspace masters"
+              if not bad else "[shrink-dist] FAIL: %d shipped images were resized" % len(bad))
+        for rel, want, got in bad[:10]:
+            print("  %s  %s -> %s" % (rel, want, got), file=sys.stderr)
+        if bad:
+            status = 1
+    return status
 
 
 if __name__ == "__main__":
