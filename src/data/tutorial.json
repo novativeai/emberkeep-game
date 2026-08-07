@@ -1013,7 +1013,7 @@
     {
       "id": "isle_materials",
       "speaker": "eleanor",
-      "text": "Emberkeep grows more than berries. Those Dew Drops on the west ledge are Moonwater, Keeper — mine, and I will want them one day.",
+      "text": "Those Dew Drops are caught moonlight — Moonwater, the one thing my craft spends. A Dew Basin sleeps under the southern fog; open that land and the drops never run out.",
       "gate": {
         "type": "tap"
       },
@@ -1039,7 +1039,7 @@
     {
       "id": "moonwater_merge",
       "speaker": "eleanor",
-      "text": "Go on — gather the three Dew Drops into one Dew Vial. Drag them together, the same as the rubies.",
+      "text": "Gather the three Dew Drops into one Dew Vial — drag them together, the same as the rubies. Three vials make true Moonwater, and that is what I will ask you for.",
       "gate": {
         "type": "event",
         "event": "item:merged",
