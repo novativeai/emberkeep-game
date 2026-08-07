@@ -24,6 +24,8 @@ playwright-report/
 # never commit them so clone stays fast.
 assets/map/*.json
 assets/map/*.worldproject.json
+# …except the editor export tests/unit/Worlds.spec.ts typechecks against (156 KB).
+!assets/map/nionja-worlds.json
 
 # Root-level source / duplicate art folders — canonical copies live under assets/sprites/.
 # e2e shots are generated output, not baselines — re-run `pnpm e2e` to regenerate.
