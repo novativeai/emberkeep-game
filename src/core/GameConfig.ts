@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, IS_IOS, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE, POWER } from './Constants';
+import { GAME_WIDTH, IS_IOS, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
+import { graphics } from './graphicsState';
 import { renderScale } from './render-scale';
 import { BoardScene } from '../scenes/BoardScene';
 import { BootScene } from '../scenes/BootScene';
@@ -22,7 +23,11 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   // others at 3 — oversampling a 3× panel down to 2×-equivalent is invisible (the
   // fixed 2560 space already downsamples heavily) but reclaims a lot of framebuffer.
   const rawDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  const dpr = Math.min(rawDpr, IS_LOW_END ? 2 : 3);
+  // The graphics profile can only ever LOWER these: `high` carries the same
+  // dprCap 3 / ceiling 1.5 the engine always used, so a capable device — and
+  // anyone who picks High by hand — boots byte-identically to before.
+  const gfx = graphics.profile;
+  const dpr = Math.min(rawDpr, IS_LOW_END ? 2 : 3, gfx.dprCap);
   // On mobile the game is PORTRAIT: width = the phone's SHORT side, height = long,
   // regardless of how the device is currently held.
   const dispW = IS_MOBILE ? Math.min(window.innerWidth, window.innerHeight) : window.innerWidth;
@@ -44,7 +49,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   // GPU-memory hog, so tracking (or under-cutting) device pixels is what keeps the
   // tab out of the "A problem repeatedly occurred" / blank-screen crash.
   const floor = IS_IOS ? 0.5 : IS_LOW_END ? 0.34 : IS_MOBILE ? 0.75 : 1;
-  const ceiling = IS_LOW_END ? 1 : 1.5;
+  const ceiling = Math.min(IS_LOW_END ? 1 : 1.5, gfx.backingCeiling);
   // GPU ceiling: old-device MAX_TEXTURE_SIZE is 4096 — a backing axis past it
   // gets silently clipped by the driver (the canvas renders partial/blank while
   // the DOM logo still shows, so the title's Play button "disappears"). The
@@ -54,7 +59,9 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   const gpuCap = Math.floor(((4096 / Math.max(GAME_WIDTH, LIVE_GAME_HEIGHT)) * 8)) / 8;
   renderScale.value = Phaser.Math.Clamp(
     Math.round(need * 8) / 8,
-    Math.min(floor, gpuCap),
+    // A profile ceiling below the device floor must win — on Low the whole
+    // point is to under-cut device pixels.
+    Math.min(floor, gpuCap, ceiling),
     Math.min(ceiling, gpuCap)
   );
 
@@ -77,7 +84,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     // retunes the cap live (62 active / 30 idle / 15 doze) to spare batteries.
     // 62 (not 60) so a 60 Hz display renders every vsync — see POWER.
     fps: {
-      limit: POWER.activeFps
+      limit: gfx.activeFps
     },
     render: {
       // antialias = LINEAR texture filtering (smooth when the camera scales sprites

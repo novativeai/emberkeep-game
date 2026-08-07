@@ -50,6 +50,8 @@ export class FxDirector {
   private readonly scene: Phaser.Scene;
   private readonly file: FxPresetFile;
   private readonly nowFn: () => number;
+  private powerCeiling: FxTier = 'high';
+  private gfxCeiling: FxTier = 'high';
   private readonly rigs: FxEmitterRig[] = [];
   private readonly highSlots: number;
   private readonly mediumSlots: number;
@@ -97,7 +99,23 @@ export class FxDirector {
   }
 
   setPowerState(state: PowerState): void {
-    this.ceiling = POWER_CEILING[state];
+    this.powerCeiling = POWER_CEILING[state];
+    this.applyCeiling();
+  }
+
+  /**
+   * Hard cap from the graphics profile. It composes with the power state rather
+   * than replacing it: the effective ceiling is the LOWER of the two, so a Low
+   * device never runs high-tier emitters even while the player is active.
+   */
+  setTierCeiling(ceiling: FxTier): void {
+    this.gfxCeiling = ceiling;
+    this.applyCeiling();
+  }
+
+  private applyCeiling(): void {
+    const order: FxTier[] = ['off', 'low', 'medium', 'high'];
+    this.ceiling = order[Math.min(order.indexOf(this.powerCeiling), order.indexOf(this.gfxCeiling))] ?? 'off';
   }
 
   /** Sample the shared field — the lab and any caller that wants to draw it. */

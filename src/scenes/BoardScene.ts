@@ -61,6 +61,8 @@ import { ensureTextures } from '../core/lazyTextures';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
 import { artScaleAt, setActiveWorld } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
+import { cappedTier } from '../core/graphics';
+import { GRAPHICS_EVENT, graphics } from '../core/graphicsState';
 import { renderScale } from '../core/render-scale';
 import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAllow } from '../core/types';
 import facesJson from '../data/faces.json';
@@ -456,9 +458,14 @@ export class BoardScene extends Phaser.Scene {
     // input or gameplay beat flips the governor back and everything resumes.
     this.game.events.on(POWER_STATE_EVENT, this.onPowerState, this);
     this.onPowerState((this.power?.state ?? 'active') as PowerState);
+    // A quality change rebuilds the board: weather, the crystal and the ambient
+    // emitter counts are all decided in create(), and applying half of them
+    // live would leave the scene in a state no profile describes.
+    this.game.events.on(GRAPHICS_EVENT, this.onGraphicsChanged, this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(POWER_STATE_EVENT, this.onPowerState, this);
+      this.game.events.off(GRAPHICS_EVENT, this.onGraphicsChanged, this);
       this.ambientEmitters = [];
       this.twinkleTimer = undefined;
       this.offBus.forEach((off) => off());
@@ -496,6 +503,17 @@ export class BoardScene extends Phaser.Scene {
       ?.tiers.find((t) => t.tier === tier)?.artScale;
   }
 
+  /** Ambient emission interval after the graphics profile — a lower `ambient`
+   *  means a longer gap between motes. Ambient life is the cheapest thing to
+   *  thin out: nothing in the game reads it. */
+  private ambientGap(ms: number): number {
+    return Math.round(ms / Math.max(0.05, graphics.profile.ambient));
+  }
+
+  private onGraphicsChanged(): void {
+    this.scene.restart();
+  }
+
   private onPowerState(state: PowerState): void {
     const doze = state === 'doze';
     for (const emitter of this.ambientEmitters) emitter.emitting = !doze;
@@ -503,12 +521,17 @@ export class BoardScene extends Phaser.Scene {
     // The FX director takes the state itself: it caps quality in two steps
     // (active → high, idle → medium, doze → off) rather than the single on/off
     // the older ambient emitters have.
+    const ceiling = graphics.profile.fxCeiling;
     this.fx?.setPowerState(state);
+    this.fx?.setTierCeiling(ceiling);
     // The sky FREEZES on doze (a still aurora is just a painting) but the snow
     // FADES OUT — flakes stopped in mid-air read as a broken game. Each effect
-    // owns that difference; this only hands the state over.
+    // owns that difference; this only hands the state over — then the graphics
+    // profile caps whatever it asked for.
     this.aurora?.setPowerState(state);
+    if (this.aurora) this.aurora.setTier(cappedTier(this.aurora.currentTier, ceiling));
     this.snow?.setPowerState(state);
+    if (this.snow) this.snow.setTier(cappedTier(this.snow.currentTier, ceiling));
   }
 
   /**
@@ -520,6 +543,9 @@ export class BoardScene extends Phaser.Scene {
    * world but Borealis today.
    */
   private buildWeather(): void {
+    // Weather is the first thing a weak device gives up: two full-screen shader
+    // passes buy atmosphere, not playability.
+    if (!graphics.profile.weather) return;
     const spec = (weatherJson as WeatherFile).worlds?.[this.ctx.state.worldId];
     if (!spec) return;
     const now = (): number => this.ctx.clock.now();
@@ -2280,6 +2306,9 @@ export class BoardScene extends Phaser.Scene {
    * default emerald. WebGL-less contexts keep the PNG (the try/catch falls back).
    */
   private ensureCrystal3D(): void {
+    // A live three.js render every few frames for one board item. The painted
+    // fallback texture is already there, so skipping this costs a highlight.
+    if (!graphics.profile.crystal3d) return;
     // iOS Safari's renderer process crashes ("A problem repeatedly occurred") under
     // the memory of a SECOND live WebGL context plus its per-frame GPU→CPU readback
     // (drawImage of a WebGL canvas). Skip it there — the static `item_crystal_1` PNG
@@ -2553,7 +2582,7 @@ export class BoardScene extends Phaser.Scene {
           lifespan: EMBER_MOTES.lifespanMs,
           scale: { start: EMBER_MOTES.minScale, end: 0 },
           alpha: { start: EMBER_MOTES.alpha * 0.8, end: 0 },
-          frequency: 420,
+          frequency: this.ambientGap(420),
           blendMode: Phaser.BlendModes.ADD
         })
         .setDepth(DEPTHS.cliffs + 1)
@@ -2568,7 +2597,7 @@ export class BoardScene extends Phaser.Scene {
           lifespan: EMBER_MOTES.lifespanMs,
           scale: { start: EMBER_MOTES.maxScale, end: 0 },
           alpha: { start: EMBER_MOTES.alpha * 0.55, end: 0 },
-          frequency: 900,
+          frequency: this.ambientGap(900),
           blendMode: Phaser.BlendModes.ADD
         })
         .setDepth(DEPTHS.particles)
@@ -2602,7 +2631,7 @@ export class BoardScene extends Phaser.Scene {
           // Sine bell over the life: 0 → peak → 0 — a slow twinkle, never a pop.
           alpha: { onUpdate: (_p, _k, t) => Math.sin(Math.PI * t) * A.fireflies.alphaPeak },
           tint: A.fireflies.tint,
-          frequency: A.fireflies.frequency,
+          frequency: this.ambientGap(A.fireflies.frequency),
           blendMode: Phaser.BlendModes.ADD
         })
         .setDepth(DEPTHS.particles)
@@ -2611,8 +2640,9 @@ export class BoardScene extends Phaser.Scene {
     // --- mid-far: low clouds drifting beneath the platforms (altitude!).
     const world = cam.getBounds();
     if (this.textures.exists('cloud_tile')) {
-      for (let i = 0; i < A.wisps.count; i++) {
-        const t = i / Math.max(1, A.wisps.count - 1);
+      const wispCount = Math.max(1, Math.round(A.wisps.count * graphics.profile.ambient));
+      for (let i = 0; i < wispCount; i++) {
+        const t = i / Math.max(1, wispCount - 1);
         const y = Phaser.Math.Linear(world.y + world.height * 0.3, world.bottom - 300, t);
         const wisp = this.add
           .image(0, y, 'cloud_tile')

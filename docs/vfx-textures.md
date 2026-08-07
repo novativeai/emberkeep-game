@@ -869,3 +869,72 @@ themselves alive and correctly sized the whole time.
 2. **`normal` blend painted a dark stain on the rock** — the opposite of an
    aura. The fog is lit from within, so it ADDS light. Additive plus the pale
    `haze` tint is what turns it from a smudge into a glow.
+
+---
+
+## 12. Graphics quality — low-tier support without touching the top
+
+`src/core/graphics.ts` (Phaser-free model) · `graphicsState.ts` (live holder) ·
+`tests/unit/Graphics.spec.ts` · the setting lives in the gear → Settings dialog.
+
+### The contract
+
+**`high` reproduces the engine exactly as it was.** Every number in that profile
+is the value the code already used on a capable device — `dprCap 3`,
+`backingCeiling 1.5`, `activeFps 62`, all effects on. A unit test pins each one
+against its original source (`POWER.activeFps` and GameConfig's own caps), and a
+second test proves every lever is monotonic, so a lower tier can never ask for
+more work than a higher one. Low-tier support is added strictly BELOW the
+existing behaviour; nothing here can cost a strong device anything.
+
+### Why the device tier needed more than `IS_LOW_END`
+
+`IS_LOW_END` existed but only ever tuned the canvas backing. Nothing else scaled
+with the device: a four-year-old phone ran the same particle counts, the same
+two full-screen weather shaders and the same live three.js crystal as a desktop.
+The backing is the biggest single lever, and it is also the one the player can
+least afford to lose — it costs sharpness everywhere. **Cut effects first,
+resolution last.**
+
+| lever | high | balanced | low | live? |
+| --- | --- | --- | --- | --- |
+| `dprCap` / `backingCeiling` | 3 / 1.5 | 2 / 1.0 | 1.5 / 0.6 | boot only |
+| `fxCeiling` (emitters, aurora, snow) | high | medium | low | yes |
+| `weather` (sky + snowfall) | on | on | **off** | rebuild |
+| `crystal3d` (offscreen three.js) | on | on | **off** | rebuild |
+| `ambient` (mote emission) | 1 | 0.6 | 0.25 | rebuild |
+| `activeFps` | 62 | 62 | **30** | yes |
+
+`fxCeiling` composes with the power governor rather than replacing it: the
+effective tier is the LOWER of the two, so a Low device never runs high-tier
+emitters even while the player is active (`FxDirector.setTierCeiling`,
+`cappedTier`). `low` under-cuts device pixels deliberately — at
+`backingCeiling 0.6` the profile ceiling wins over the device floor, which is
+the whole point on hardware that cannot hold the framebuffer.
+
+### Auto, and why an unknown device gets High
+
+`detectTier` has two bands below high: ≤2 GB or ≤2 cores is hardware that cannot
+hold the framebuffer at all, so it goes straight to Low; the existing
+`IS_LOW_END` population goes to **Balanced, not Low** — they already ran the
+game, and dropping them two tiers would be a downgrade of a working experience
+rather than a rescue. An unrecognised device resolves to **High**: it is far
+likelier to be current than a decade old, and guessing low would quietly degrade
+it with no signal to the player.
+
+The button shows what Auto picked (`Graphics: Auto (High)`) so the resolution is
+never invisible.
+
+### Applying a change
+
+Anything create-time — weather, the crystal, ambient counts — is applied by
+restarting the board rather than half-updating it, because a scene with the new
+fps but the old emitter counts is in a state no profile describes. The canvas
+backing is fixed when Phaser boots, so changing a tier that moves `dprCap` or
+`backingCeiling` adds "Reload the page to resize the canvas" under the button;
+`graphics.set()` returns whether that is the case rather than making the caller
+work it out.
+
+The choice is stored under its own localStorage key, **not in the save** —
+resetting Cinder Hollow must not throw the player back to a quality their device
+cannot run.

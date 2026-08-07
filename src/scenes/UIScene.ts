@@ -37,6 +37,8 @@ import { QuestTracker } from '../ui/QuestTracker';
 import { StatusPanel } from '../ui/StatusPanel';
 import { ShopPanel } from '../ui/ShopPanel';
 import { renderScale } from '../core/render-scale';
+import { GRAPHICS_QUALITIES } from '../core/graphics';
+import { GRAPHICS_EVENT, GRAPHICS_PROFILES, graphics } from '../core/graphicsState';
 import { getMusicMuted, setMusicMuted } from '../audio/musicPref';
 import { CustomUiManager } from '../ui/customUi';
 import { uiRegistry } from '../ui/theme';
@@ -1536,23 +1538,25 @@ export class UIScene extends Phaser.Scene {
       .setInteractive();
     const panel = this.add.graphics();
     panel.fillStyle(num(PALETTE.night), 0.25);
-    panel.fillRoundedRect(-450, -310 + 16, 900, 620, 52);
+    panel.fillRoundedRect(-450, -368 + 16, 900, 736, 52);
     panel.fillStyle(num(PALETTE.cream), 1);
-    panel.fillRoundedRect(-450, -310, 900, 620, 52);
+    panel.fillRoundedRect(-450, -368, 900, 736, 52);
     panel.lineStyle(8, num(PALETTE.lava), 1);
-    panel.strokeRoundedRect(-450, -310, 900, 620, 52);
+    panel.strokeRoundedRect(-450, -368, 900, 736, 52);
     const title = this.add
-      .text(0, -244, 'Settings', {
+      .text(0, -320, 'Settings', {
         fontFamily: FONT.ui,
         fontSize: '54px',
         fontStyle: 'bold',
-        color: PALETTE.cream
+        // NOT PALETTE.cream — the panel is filled cream, so a cream heading is
+        // invisible on it (it always was; nobody had reason to look).
+        color: PALETTE.night
       })
       .setOrigin(0.5);
 
     // Background-music toggle (persists; the AudioManager applies it via the bus).
     const musicLabel = (): string => (getMusicMuted() ? 'Music: Off' : 'Music: On');
-    const musicBtn = this.add.container(0, -148);
+    const musicBtn = this.add.container(0, -232);
     const musicBg = this.add
       .image(0, 0, getMusicMuted() ? 'ui_btn_play' : 'ui_btn_green')
       .setScale(1.05, 0.8);
@@ -1575,17 +1579,59 @@ export class UIScene extends Phaser.Scene {
       musicBg.setTexture(muted ? 'ui_btn_play' : 'ui_btn_green');
     });
 
-    const divider = this.add.rectangle(0, -76, 760, 3, num(PALETTE.lava), 0.22);
+    // Graphics quality. Cycles Auto → High → Balanced → Low. `high` is the
+    // engine unchanged, so nothing here can cost a capable device anything —
+    // the lower tiers only ever subtract.
+    const gfxBtn = this.add.container(0, -104);
+    const gfxBg = this.add.image(0, 0, 'ui_btn_green').setScale(1.05, 0.8);
+    const gfxText = this.add
+      .text(0, -10, graphics.label, {
+        fontFamily: FONT.ui,
+        fontSize: '36px',
+        fontStyle: 'bold',
+        color: '#FFFFFF'
+      })
+      .setOrigin(0.5)
+      .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
+    gfxBtn.add([gfxBg, gfxText]);
+    gfxBtn.setSize(380 * 1.05, 118).setInteractive({ useHandCursor: true });
+    const gfxNote = this.add
+      .text(0, -30, GRAPHICS_PROFILES[graphics.tier].note, {
+        fontFamily: FONT.ui,
+        fontSize: '26px',
+        color: '#8A6248',
+        align: 'center',
+        lineSpacing: 6,
+        wordWrap: { width: 780 }
+      })
+      .setOrigin(0.5, 0);
+    gfxBtn.on('pointerup', () => {
+      const order = GRAPHICS_QUALITIES;
+      const next = order[(order.indexOf(graphics.quality) + 1) % order.length];
+      const needsReload = graphics.set(next);
+      gfxText.setText(graphics.label);
+      gfxNote.setText(
+        needsReload
+          ? `${GRAPHICS_PROFILES[graphics.tier].note}\nReload the page to resize the canvas.`
+          : GRAPHICS_PROFILES[graphics.tier].note
+      );
+      (this.registry.get('power') as { refreshFps?: () => void } | undefined)?.refreshFps?.();
+      // Weather, the crystal and the ambient counts are decided when the board
+      // is built, so the board rebuilds rather than half-applying.
+      this.game.events.emit(GRAPHICS_EVENT);
+    });
+
+    const divider = this.add.rectangle(0, 46, 760, 3, num(PALETTE.lava), 0.22);
     const resetTitle = this.add
-      .text(0, -22, 'Reset Cinder Hollow?', {
+      .text(0, 88, 'Reset Cinder Hollow?', {
         fontFamily: FONT.ui,
         fontSize: '40px',
         fontStyle: 'bold',
-        color: PALETTE.cream
+        color: PALETTE.night
       })
       .setOrigin(0.5);
     const body = this.add
-      .text(0, 48, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
+      .text(0, 150, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
         fontFamily: FONT.ui,
         fontSize: '30px',
         color: '#8A6248',
@@ -1601,7 +1647,7 @@ export class UIScene extends Phaser.Scene {
       scaleX: number,
       onTap: () => void
     ): Phaser.GameObjects.Container => {
-      const button = this.add.container(x, 190);
+      const button = this.add.container(x, 272);
       const bg = this.add.image(0, 0, texture).setScale(scaleX, 0.78);
       const text = this.add
         .text(0, -10, label, {
@@ -1627,7 +1673,7 @@ export class UIScene extends Phaser.Scene {
       this.closeResetDialog()
     );
 
-    container.add([dim, panel, title, musicBtn, divider, resetTitle, body, resetButton, keepButton]);
+    container.add([dim, panel, title, musicBtn, gfxBtn, gfxNote, divider, resetTitle, body, resetButton, keepButton]);
     container.setAlpha(0);
     container.setScale(0.94);
     this.tweens.add({ targets: container, alpha: 1, scale: 1, duration: 170, ease: 'Back.easeOut' });
