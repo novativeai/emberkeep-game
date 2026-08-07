@@ -82,3 +82,6 @@ tools/mapmask/out/
 embergames/
 
 __pycache__/
+
+# Spotlight exclusion markers (mds_stores re-indexes multi-GB build/workspace trees)
+.metadata_never_index

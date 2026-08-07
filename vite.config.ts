@@ -995,6 +995,12 @@ const copyRuntimeArt = (): Plugin => ({
     }
     console.log(`[copy-runtime-art] minified shipped JSON: ${(jsonSaved / 1048576).toFixed(1)}MB saved`);
 
+    // Keep Spotlight out of dist. 1.5 GB is rewritten here on every build, and
+    // mds_stores re-indexes all of it each time — nobody has ever Spotlight-searched
+    // a build output. `emptyOutDir` deletes the marker with everything else, so it
+    // is re-written here rather than left as a file someone has to remember.
+    writeFileSync(path.join(dist, '.metadata_never_index'), '');
+
     const missing = [...bankKeep].filter((k) => !existsSync(path.join(dist, 'vfx-bank', k)));
     if (missing.length) {
       this.warn(`[copy-runtime-art] VFX bank: ${missing.length} runtime file(s) missing: ${missing.join(', ')}`);
