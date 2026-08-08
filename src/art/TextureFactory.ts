@@ -141,6 +141,7 @@ export class TextureFactory {
       case 'char_selyna': return this.characterStandee(key, P.tealDeep, P.teal);
       case 'fx_ember': return this.ember(key);
       case 'fx_spark': return this.spark(key);
+      case 'fx_confetti': return this.confetti(key);
       case 'fx_glow': return this.glow(key);
       case 'fx_shell': return this.shell(key);
       case 'portrait_pip': return this.portraitPip(key);
@@ -1130,6 +1131,21 @@ export class TextureFactory {
     this.paint(key, 22, 22, (g) => {
       this.star4(g, 11, 11, 10, P.goldAccent, 1);
       this.star4(g, 11, 11, 5, '#FFFFFF', 0.95);
+    });
+  }
+
+  /** A white paper slip — emitters tint it per burst, and the slight
+   *  parallelogram keeps a spinning piece reading as paper, not a square. */
+  private confetti(key: string): void {
+    this.paint(key, 20, 14, (g) => {
+      g.fillStyle = '#FFFFFF';
+      g.beginPath();
+      g.moveTo(2, 0);
+      g.lineTo(20, 2);
+      g.lineTo(18, 14);
+      g.lineTo(0, 12);
+      g.closePath();
+      g.fill();
     });
   }
 

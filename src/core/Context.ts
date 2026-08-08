@@ -9,6 +9,7 @@ import { DragonSystem } from '../systems/DragonSystem';
 import { EconomySystem } from '../systems/EconomySystem';
 import { EnergySystem } from '../systems/EnergySystem';
 import { GeneratorSystem } from '../systems/GeneratorSystem';
+import { IapSystem } from '../systems/IapSystem';
 import { MergeSystem } from '../systems/MergeSystem';
 import { OrderSystem } from '../systems/OrderSystem';
 import { QuestSystem } from '../systems/QuestSystem';
@@ -76,6 +77,7 @@ export interface GameSystems {
   jobs: DragonJobSystem;
   order: OrderSystem;
   economy: EconomySystem;
+  iap: IapSystem;
   reward: RewardSystem;
   reveal: RevealSystem;
   chest: ChestSystem;
@@ -158,6 +160,7 @@ export class GameContext {
       jobs,
       order,
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
+      iap: new IapSystem(this.state, this.bus),
       reward: new RewardSystem(this.bus),
       reveal: new RevealSystem(this.state, this.bus),
       chest: new ChestSystem(this.state, this.bus, this.clock, this.data.chains),

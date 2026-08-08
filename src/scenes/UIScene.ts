@@ -21,8 +21,9 @@ import {
   WELCOME_BACK_MIN_MS
 } from '../core/Constants';
 import { FONT } from '../art/design';
+import { iapBridge } from '../core/iapBridge';
 import { gridToWorld } from '../core/iso';
-import type { ResolvedArrow, ResolvedHand, SpeakerId, TilePos, TutorialStepEvent } from '../core/types';
+import type { EventMap, ResolvedArrow, ResolvedHand, SpeakerId, TilePos, TutorialStepEvent } from '../core/types';
 import type { BoardScene } from './BoardScene';
 import { CharacterBubble } from '../entities/CharacterBubble';
 import { BagPanel } from '../ui/BagPanel';
@@ -96,6 +97,8 @@ export class UIScene extends Phaser.Scene {
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
   private dialog: Phaser.GameObjects.Container | null = null;
+  /** Real-money purchase dialog (confirm, then the waiting card). */
+  private iapDialog: Phaser.GameObjects.Container | null = null;
   /** The travelling curtain, while a destination world's art loads. */
   private travelVeil?: Phaser.GameObjects.Container;
   private lastStep: TutorialStepEvent | null = null;
@@ -479,6 +482,14 @@ export class UIScene extends Phaser.Scene {
         if (!(this.lastStep?.done || (this.lastStep?.allow.marketplace ?? false))) return;
         this.shop.open(currency);
       }),
+      // Real-money packs: strictly post-tutorial (the buy_energy beat allows
+      // the Emporium, never a checkout — its gate is the free Spark).
+      bus.on('ui:iap_buy_requested', ({ packId }) => {
+        if (!this.lastStep?.done) return;
+        this.openIapConfirmDialog(packId);
+      }),
+      bus.on('iap:completed', (grant) => this.celebratePurchase(grant)),
+      bus.on('iap:failed', ({ reason }) => this.onIapFailed(reason)),
       bus.on('order:completed', ({ orderId, rewards }) => {
         this.time.delayedCall(650, () => {
           if (this.ledger.isOpen && this.lastStep?.gateType === 'tap') this.ledger.requestClose();
@@ -1721,5 +1732,202 @@ export class UIScene extends Phaser.Scene {
   private closeResetDialog(): void {
     this.dialog?.destroy();
     this.dialog = null;
+  }
+
+  /* ------------------------- real-money packs ------------------------ */
+
+  /** Shared chrome for the purchase dialogs — cream card, gold keyline. */
+  private iapCard(height: number): Phaser.GameObjects.Container {
+    const container = this.add.container(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
+    const dim = this.add
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
+      .setInteractive();
+    const panel = this.add.graphics();
+    panel.fillStyle(num(PALETTE.night), 0.25);
+    panel.fillRoundedRect(-450, -height / 2 + 16, 900, height, 52);
+    panel.fillStyle(num(PALETTE.cream), 1);
+    panel.fillRoundedRect(-450, -height / 2, 900, height, 52);
+    panel.lineStyle(8, num(PALETTE.gold), 1);
+    panel.strokeRoundedRect(-450, -height / 2, 900, height, 52);
+    container.add([dim, panel]);
+    container.setAlpha(0).setScale(0.94);
+    this.tweens.add({ targets: container, alpha: 1, scale: 1, duration: 170, ease: 'Back.easeOut' });
+    return container;
+  }
+
+  private iapButton(
+    x: number,
+    y: number,
+    label: string,
+    texture: string,
+    scaleX: number,
+    onTap: () => void
+  ): Phaser.GameObjects.Container {
+    const button = this.add.container(x, y);
+    const bg = this.add.image(0, 0, texture).setScale(scaleX, 0.78);
+    const text = this.add
+      .text(0, -10, label, { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: '#FFFFFF' })
+      .setOrigin(0.5)
+      .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
+    button.add([bg, text]);
+    button.setSize(380 * scaleX, 112).setInteractive({ useHandCursor: true });
+    button.on('pointerup', onTap);
+    return button;
+  }
+
+  private static describeGrant(grant: { coins: number; keys: number; energy: number }): string {
+    const parts: string[] = [];
+    if (grant.coins > 0) parts.push(`◎ +${grant.coins.toLocaleString()} Gold`);
+    if (grant.keys > 0) parts.push(`🗝 +${grant.keys} Gold Key${grant.keys > 1 ? 's' : ''}`);
+    if (grant.energy > 0) parts.push(`⚡ +${grant.energy} Warmth`);
+    return parts.join('    ');
+  }
+
+  /**
+   * VALIDATION BEFORE MONEY MOVES: exactly what the pack contains, exactly
+   * what it costs, and where the payment will happen — Buy or Cancel. The Buy
+   * tap itself opens the checkout window (it must: the popup needs the tap's
+   * transient activation to clear the blocker).
+   */
+  private openIapConfirmDialog(packId: string): void {
+    if (this.dialog || this.iapDialog) return;
+    const pack = iapBridge.pack(packId);
+    if (!pack) return;
+
+    const card = this.iapCard(660);
+    card.add(
+      this.add
+        .text(0, -262, 'CONFIRM PURCHASE', {
+          fontFamily: FONT.ui, fontSize: '48px', fontStyle: 'bold', color: PALETTE.night
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.add
+        .text(0, -168, pack.name, {
+          fontFamily: FONT.ui, fontSize: '54px', fontStyle: 'bold', color: '#8A6248'
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.add
+        .text(0, -92, UIScene.describeGrant(pack), {
+          fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: PALETTE.goldShade
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.add
+        .text(0, -6, `€${pack.amountEur.toFixed(2)}`, {
+          fontFamily: FONT.ui, fontSize: '64px', fontStyle: 'bold', color: PALETTE.night
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.add
+        .text(0, 96, 'Payment opens in a secure checkout window.\nYour pack is delivered the moment it completes.', {
+          fontFamily: FONT.ui, fontSize: '28px', color: '#8A6248', align: 'center', lineSpacing: 8
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.iapButton(-210, 240, 'Cancel', 'ui_btn_play', 0.72, () => this.closeIapDialog())
+    );
+    card.add(
+      this.iapButton(210, 240, `Buy €${pack.amountEur.toFixed(2)}`, 'ui_btn_green', 0.95, () => {
+        // Synchronous, inside the tap: the checkout window opens now.
+        const started = iapBridge.beginCheckout(pack.id);
+        this.closeIapDialog();
+        if (started) this.openIapWaitingDialog();
+        else this.floatWarning('Purchases are available on the EmberGames page.');
+      })
+    );
+    this.iapDialog = card;
+  }
+
+  /** The checkout is in flight in its own window; the board stays playable. */
+  private openIapWaitingDialog(): void {
+    if (this.iapDialog) return;
+    const card = this.iapCard(420);
+    const title = this.add
+      .text(0, -120, 'Waiting for payment…', {
+        fontFamily: FONT.ui, fontSize: '48px', fontStyle: 'bold', color: PALETTE.night
+      })
+      .setOrigin(0.5);
+    card.add(title);
+    this.tweens.add({ targets: title, alpha: 0.55, duration: 640, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    card.add(
+      this.add
+        .text(0, -32, 'Finish your purchase in the secure window.\nYour pack arrives here the moment it completes.', {
+          fontFamily: FONT.ui, fontSize: '28px', color: '#8A6248', align: 'center', lineSpacing: 8
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.iapButton(0, 122, 'Continue playing', 'ui_btn_green', 0.95, () => this.closeIapDialog())
+    );
+    this.iapDialog = card;
+  }
+
+  private closeIapDialog(): void {
+    this.iapDialog?.destroy();
+    this.iapDialog = null;
+  }
+
+  /** CONGRATULATIONS: banner with exactly what was bought, confetti, and the
+   *  purchase fanfare (AudioManager rides the same `iap:completed` fact). */
+  private celebratePurchase(grant: EventMap['iap:completed']): void {
+    this.closeIapDialog();
+    this.buildCelebrationBanner(
+      'PURCHASE COMPLETE!',
+      UIScene.describeGrant(grant),
+      `${grant.name} — thank you, Keeper!`
+    );
+    this.confettiBurst(GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.3);
+  }
+
+  /** Paper-slip confetti in the celebration palette, raining over the banner. */
+  private confettiBurst(cx: number, cy: number): void {
+    const tints = [0xffd75e, 0xe8593a, 0x7fc16a, 0x6fc3e0, 0xfff6e8];
+    tints.forEach((tint, i) => {
+      const burst = this.add
+        .particles(cx, cy - 60, 'fx_confetti', {
+          speed: { min: 280, max: 680 },
+          angle: { min: 235, max: 305 },
+          gravityY: 980,
+          lifespan: { min: 1000, max: 1700 },
+          scale: { start: 1, end: 0.6 },
+          alpha: { start: 1, end: 0 },
+          rotate: { min: 0, max: 720 },
+          tint,
+          quantity: 0,
+          emitting: false
+        })
+        .setDepth(DEPTH_DIALOG - 6);
+      burst.explode(14 + i * 2);
+      this.time.delayedCall(2400, () => burst.destroy());
+    });
+    const sparks = this.add
+      .particles(cx, cy, 'fx_spark', {
+        speed: { min: 220, max: 540 }, angle: { min: 0, max: 360 }, gravityY: 260,
+        lifespan: { min: 500, max: 900 }, scale: { start: 0.9, end: 0 },
+        alpha: { start: 1, end: 0 }, quantity: 0, emitting: false
+      })
+      .setDepth(DEPTH_DIALOG - 6);
+    sparks.explode(26);
+    this.time.delayedCall(1400, () => sparks.destroy());
+  }
+
+  private onIapFailed(reason: EventMap['iap:failed']['reason']): void {
+    this.closeIapDialog();
+    this.floatWarning(
+      reason === 'declined'
+        ? 'The payment was declined — nothing was delivered.'
+        : reason === 'pending'
+          ? 'Payment still processing — your pack arrives once it confirms.'
+          : reason === 'unavailable'
+            ? 'Purchases are available on the EmberGames page.'
+            : 'Payment cancelled — nothing was charged.'
+    );
   }
 }

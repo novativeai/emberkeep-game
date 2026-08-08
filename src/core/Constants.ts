@@ -1650,6 +1650,22 @@ export const OPENING_HOLD_MS = 1500;
  *  never strand the board. */
 export const STORY_BEAT_HOLD_MS = 9000;
 
+/** Host-page IAP bridge — real-money packs; the EmberGames hub does the
+ *  charging, the game only confirms, celebrates and applies the grant.
+ *  Real wall-clock, deliberately NOT GameClock: a payment happens in the
+ *  world outside the simulation and must not fast-forward with it. */
+export const IAP = {
+  /** Checkout window size (CSS pixels, the hosted card page's own space). */
+  popupWidth: 520,
+  popupHeight: 780,
+  /** Cadence for watching the checkout window's closed flag. */
+  popupWatchMs: 1_000,
+  /** After the checkout window closes, keep waiting this long for the hub's
+   *  verdict before calling it cancelled — the gateway's webhook can land
+   *  moments after the window goes. */
+  popupGraceMs: 15_000
+} as const;
+
 /** Audio master volumes 0..1. */
 export const AUDIO = {
   master: 0.8,

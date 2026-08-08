@@ -3,13 +3,14 @@ import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Con
 import { FONT, INK } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
+import { iapBridge } from '../core/iapBridge';
 import { uiRegistry } from './theme';
 
 type Currency = 'energy' | 'coins';
 
 interface Product {
   amount: number;
-  /** Mock real-money price tag (the IAP showcase — Gold Shop). */
+  /** Real-money price tag ("€2.99"). Mock values when the hub isn't there. */
   price: string;
   /** In-game GOLD price — the demo's Warmth refills are bought with the Gold
    *  the player earns (MECHANICS §7: Gold buys comfort, never progression). */
@@ -17,6 +18,9 @@ interface Product {
   best?: boolean;
   /** Shelf name, so a pack reads as a good rather than as a number. */
   name: string;
+  /** Set when this row is a REAL hub pack — tapping it starts the purchase
+   *  flow (`ui:iap_buy_requested`) instead of the mock grant. */
+  packId?: string;
 }
 const SHOP: Record<Currency, { title: string; tab: string; icon: string; iconScale: number; items: Product[] }> = {
   energy: {
@@ -102,11 +106,14 @@ function fitArt(img: Phaser.GameObjects.Image, slot: number): void {
  * WALKED INTO, not like another sheet of the same parchment the Ledger is
  * printed on. `SHOP_INK` (TextureFactory) holds the sampled values.
  *
- * Content is unchanged and still MECHANICS §7: the WARMTH shelf is a real GOLD
- * SINK (after the one-time free Ember Spark, refills cost earned Gold), and the
- * GOLD shelf keeps mock money tags as the IAP showcase. The two are now tabs of
- * one hall rather than two separate popups, which is what the concept shows and
- * what lets a player who came for Warmth see what Gold is for.
+ * Content is still MECHANICS §7: the WARMTH shelf is a real GOLD SINK (after
+ * the one-time free Ember Spark, refills cost earned Gold). The GOLD shelf is
+ * the REAL IAP shop when the game runs inside the EmberGames hub — packs and
+ * EUR prices arrive over `iapBridge`, and tapping one starts the confirm →
+ * secure-checkout flow (`ui:iap_buy_requested`). Standalone builds keep the
+ * authored mock tags as the showcase, since there is no gateway to charge.
+ * The two are tabs of one hall, which is what lets a player who came for
+ * Warmth see what Gold is for.
  */
 export class ShopPanel extends Phaser.GameObjects.Container {
   isOpen = false;
@@ -187,6 +194,12 @@ export class ShopPanel extends Phaser.GameObjects.Container {
 
     this.offBus.push(bus.on('economy:changed', () => this.refreshWallet()));
     this.offBus.push(bus.on('energy:changed', () => this.refreshWallet()));
+    // The hub's pack catalog can arrive after the panel was opened.
+    this.offBus.push(
+      bus.on('iap:catalog_changed', () => {
+        if (this.isOpen && this.currency === 'coins') this.build();
+      })
+    );
   }
 
   teardown(): void {
@@ -301,20 +314,45 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     this.refreshWallet();
 
     const cfg = SHOP[this.currency];
+    const items = this.shelfItems();
     // The one-time free Ember Spark leads the shelf while it is unclaimed — a
     // gift further down a list is a gift that gets missed, and the tutorial's
     // guiding hand points at it. Otherwise the order is as authored.
     const freeIndex =
       this.currency === 'energy' && this.gameState.stat('freeSparkUsed') === 0 ? 0 : -1;
-    const order = cfg.items.map((item, tier) => ({ item, tier }));
+    const order = items.map((item, tier) => ({ item, tier }));
     if (freeIndex >= 0) order.unshift(...order.splice(freeIndex, 1));
 
     const total = order.length * ROW_H + (order.length - 1) * ROW_GAP;
     const top = SHELF_TOP + (SHELF_H - total) / 2 + ROW_H / 2;
     order.forEach(({ item, tier }, i) => {
       const y = top + i * (ROW_H + ROW_GAP);
-      this.shelf.add(this.makeRow(item, cfg, tier, y, freeIndex >= 0 && i === 0));
+      this.shelf.add(this.makeRow(item, cfg, items, tier, y, freeIndex >= 0 && i === 0));
     });
+  }
+
+  /**
+   * What the current shelf actually sells. The WARMTH shelf is always the
+   * authored gold-sink. The GOLD shelf is the REAL hub catalog whenever the
+   * game runs inside EmberGames (prices in EUR, checkout via the bridge) and
+   * falls back to the authored mock showcase standalone, where there is no
+   * gateway to charge anyone.
+   */
+  private shelfItems(): Product[] {
+    if (this.currency === 'coins') {
+      const packs = iapBridge.coinPacks();
+      if (packs.length > 0) {
+        const biggest = Math.max(...packs.map((p) => p.coins));
+        return packs.map((p) => ({
+          amount: p.coins,
+          price: `€${p.amountEur.toFixed(2)}`,
+          name: p.name,
+          best: packs.length > 1 && p.coins === biggest,
+          packId: p.id
+        }));
+      }
+    }
+    return SHOP[this.currency].items;
   }
 
   /**
@@ -368,12 +406,12 @@ export class ShopPanel extends Phaser.GameObjects.Container {
    * thing that makes a store read as placeholder art, so the claim and the
    * arithmetic behind it ship together or not at all.
    */
-  private bonusPercent(cfg: (typeof SHOP)[Currency], item: Product): number {
+  private bonusPercent(items: Product[], item: Product): number {
     const rate = (p: Product): number => {
       const cost = p.gold ?? Number(p.price.replace(/[^0-9.]/g, ''));
       return cost > 0 ? p.amount / cost : 0;
     };
-    const base = rate(cfg.items[0]!);
+    const base = rate(items[0]!);
     if (!base) return 0;
     return Math.round((rate(item) / base - 1) * 100);
   }
@@ -391,10 +429,10 @@ export class ShopPanel extends Phaser.GameObjects.Container {
    * doing what it was really for (the highlight and the banner slot) under its
    * honest name, MOST POPULAR.
    */
-  private tagFor(cfg: (typeof SHOP)[Currency], item: Product, isFree: boolean): string | null {
+  private tagFor(items: Product[], item: Product, isFree: boolean): string | null {
     if (isFree) return 'GIFT';
-    const bonuses = cfg.items.map((i) => this.bonusPercent(cfg, i));
-    const topValue = cfg.items[bonuses.indexOf(Math.max(...bonuses))];
+    const bonuses = items.map((i) => this.bonusPercent(items, i));
+    const topValue = items[bonuses.indexOf(Math.max(...bonuses))];
     if (item === topValue) return 'BEST VALUE';
     return item.best ? 'MOST POPULAR' : null;
   }
@@ -402,6 +440,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
   private makeRow(
     item: Product,
     cfg: (typeof SHOP)[Currency],
+    items: Product[],
     tier: number,
     y: number,
     isFree: boolean
@@ -436,7 +475,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0, 0.5);
     row.add(amount);
-    const bonus = this.bonusPercent(cfg, item);
+    const bonus = this.bonusPercent(items, item);
     if (!isFree && bonus >= 5) {
       row.add(
         this.scene.add
@@ -450,7 +489,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       );
     }
 
-    const tag = this.tagFor(cfg, item, isFree);
+    const tag = this.tagFor(items, item, isFree);
     if (tag) row.add(this.ribbon(ROW_TAG_X, 0, tag));
     row.add(this.pricePlate(ROW_PRICE_X, 0, item, isFree, 1));
     return row;
@@ -510,6 +549,13 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     bg.on('pointerout', () => btn.setScale(scale));
     bg.on('pointerup', () => {
       btn.setScale(scale);
+      // A REAL hub pack: hand the intent to UIScene (confirm dialog → secure
+      // checkout). The Emporium stays open — the wallet updates live when the
+      // grant lands, which is the shop's own receipt.
+      if (item.packId) {
+        this.bus.emit('ui:iap_buy_requested', { packId: item.packId });
+        return;
+      }
       // GOLD-priced pack: check the coffer; deny with a shake + red flash when
       // short (the coins never go negative).
       if (!isFree && item.gold !== undefined) {

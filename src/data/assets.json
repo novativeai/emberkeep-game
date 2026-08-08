@@ -265,6 +265,11 @@
       "file": "raw/ai/fx_spark.png"
     },
     {
+      "key": "fx_confetti",
+      "source": "placeholder",
+      "generator": "fx"
+    },
+    {
       "key": "fx_glow",
       "source": "placeholder",
       "generator": "fx",

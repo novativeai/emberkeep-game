@@ -995,6 +995,26 @@ export interface SaveDataV1 {
 }
 
 /* ------------------------------------------------------------------ */
+/* Real-money packs (IAP)                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A real-money pack offered by the EmberGames hub. The catalog arrives over
+ * the host-page bridge (`iapBridge`) — the game never hard-codes prices, so
+ * the hub's `IAP_PACKS` stays the single source of truth for what money buys.
+ */
+export interface IapPackInfo {
+  id: string;
+  name: string;
+  blurb: string;
+  /** Price in EUR (display only — the hub's gateway does the charging). */
+  amountEur: number;
+  coins: number;
+  keys: number;
+  energy: number;
+}
+
+/* ------------------------------------------------------------------ */
 /* EventBus contract                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -1073,6 +1093,9 @@ export interface EventMap {
   'ui:deliver_requested': { orderId: string };
   /** A gauge "+" button opened the currency shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' };
+  /** Intent: a real-money pack's price plate was tapped in the Emporium.
+   *  UIScene gates it (post-tutorial only) and opens the confirm dialog. */
+  'ui:iap_buy_requested': { packId: string };
   /** Intent: buy a store cosmetic. StoreSystem validates gold and ownership. */
   'ui:store_buy_requested': { itemId: string };
   /** Intent: wear an owned Manor skin, or null to go back to the authored one. */
@@ -1100,6 +1123,11 @@ export interface EventMap {
   'energy:set': { value: number; reason: string };
   'economy:add': { coins?: number; keys?: number; xp?: number; reason: string };
   'economy:spend_keys': { keys: number; reason: string };
+  /** Command: a hub-confirmed real-money purchase arrived over the bridge.
+   *  IapSystem applies it EXACTLY ONCE (`stats['iap:<purchaseId>']` is the
+   *  latch), granting via `economy:add` / `energy:add`, then announces
+   *  `iap:completed`. Replayed deliveries are silently absorbed. */
+  'iap:grant': { purchaseId: string; packId: string; name: string; coins: number; keys: number; energy: number };
   'board:consume_items': { itemIds: number[]; reason: string };
   /** Scripted spawn of `count` items, into free tiles near an item of `nearChain`. */
   /**
@@ -1131,6 +1159,17 @@ export interface EventMap {
   'chest:claimed': { chestId: number; label: string; coins: boolean };
 
   /* -- state-change notifications (systems emit; UI + audio subscribe) -- */
+  /** Fact: the hub sent (or updated) the real-money pack catalog. An empty
+   *  list means purchases are unavailable (standalone build, no hub parent). */
+  'iap:catalog_changed': { packs: IapPackInfo[] };
+  /** Fact: the secure checkout window was opened for this pack. */
+  'iap:checkout_opened': { packId: string };
+  /** Fact: the purchase was applied — UIScene throws the confetti, the
+   *  AudioManager plays the purchase fanfare. Amounts are what was granted. */
+  'iap:completed': { purchaseId: string; packId: string; name: string; coins: number; keys: number; energy: number };
+  /** Fact: the checkout ended without a delivery, and why. `pending` means the
+   *  gateway hasn't confirmed yet — the hub delivers it on a later visit. */
+  'iap:failed': { packId: string; reason: 'cancelled' | 'declined' | 'pending' | 'unavailable' };
   'item:spawned': { item: ItemSnapshot; cause: SpawnCause };
   'item:moved': { itemId: number; from: TilePos; to: TilePos };
   'item:move_bounced': { itemId: number; at: TilePos };

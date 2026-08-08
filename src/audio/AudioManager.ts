@@ -40,6 +40,7 @@ export class AudioManager {
     bus.on('item:produced', () => this.giftChime());
     bus.on('item:sold', () => this.coinBlip());
     bus.on('order:completed', () => this.fanfare());
+    bus.on('iap:completed', () => this.purchaseFanfare());
     bus.on('keeper:leveled', () => this.levelUp());
     bus.on('region:unlocked', () => this.fogWhoosh());
     bus.on('item:move_bounced', () => this.deny(140, 0.05));
@@ -211,6 +212,21 @@ export class AudioManager {
       this.tone(freq / 2, 0.16, { type: 'sine', gain: 0.05, delay: i * 0.095 });
     });
     this.tone(1568, 0.3, { type: 'sine', gain: 0.07, delay: 0.4, release: 0.45 });
+  }
+
+  /** A real-money pack arrived: the fanfare's rise, resolved a full octave up
+   *  with a coin-bright double ping on top — grander than an order, and it
+   *  ends on the same sparkle the wallet blip uses, so it reads as "paid in". */
+  private purchaseFanfare(): void {
+    const notes = [523, 659, 784, 1046, 1318];
+    notes.forEach((freq, i) => {
+      this.tone(freq, 0.14, { type: 'triangle', gain: 0.14, delay: i * 0.08, release: 0.24 });
+      this.tone(freq / 2, 0.15, { type: 'sine', gain: 0.05, delay: i * 0.08 });
+    });
+    [1568, 2093].forEach((freq, i) => {
+      this.tone(freq, 0.22, { type: 'sine', gain: 0.07, delay: 0.5 + i * 0.09, release: 0.4 });
+    });
+    this.noiseSweep(0.5, 2800, 6400, 0.05, 0.15);
   }
 
   private fogWhoosh(): void {

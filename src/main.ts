@@ -4,6 +4,7 @@ import { GameContext } from './core/Context';
 import { GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
 import { createGameConfig } from './core/GameConfig';
 import { PowerGovernor } from './core/PowerGovernor';
+import { iapBridge } from './core/iapBridge';
 import { gridToWorld } from './core/iso';
 
 interface BoardCellText {
@@ -95,6 +96,10 @@ if (audio) document.addEventListener('pointerdown', () => audio.unlock());
 // whenever the board sits untouched. Scenes read it from the registry.
 const power = new PowerGovernor(game, ctx.bus);
 game.registry.set('power', power);
+
+// Host-page bridge: real-money packs. Requests the hub's catalog when the
+// game is embedded; standalone builds stay on the Emporium's mock showcase.
+iapBridge.attach(ctx.bus);
 
 // Host-page bridge: the EmberGames hub reports when the game's iframe is
 // scrolled out of view — sleep the whole loop (tab-hidden is Phaser built-in).
