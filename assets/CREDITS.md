@@ -56,6 +56,18 @@ Every file that lands in `assets/raw/` gets a line here: source, license, date.
   closes is a real hole in the silhouette. `ITEM_SCALE` reproduces the STANDING
   dragon's on-board footprint, so a nap does not change how much tile the animal
   takes. SynthID-watermarked. 2026-08-06.
+- **Borealis fixtures + Wreck Timber ladder**
+  (`sprites/items/chains/{wrackline_1,frostfont_1,keel_1,keel_2,keel_3,keel_4}.webp`)
+  — The Wrack Line, the Hoarfrost Font, and Broken Strake → Lashed Frame →
+  Upturned Hull → Longhall: the six pieces of Selyna's roster that had no art
+  and rendered as loader fallbacks. AI-generated in-house via
+  `.claude/skills/nano-banana/` (`artgen.py asset`) on **Google Nano Banana 2**
+  (gemini-3.1-flash-image) at 1K, one call per item, style-referenced on the
+  shipped `driftwood_3` + `rimebloom_3` renders so the north stays one hand.
+  Magenta-keyed (`dekey.py --trim`), Lanczos-resized to sibling class sizes.
+  Prompts: `raw/merge-chains/prompts/borealis-missing.txt`; raws + de-keyed
+  masters: `raw/merge-chains/borealis/`. All six usable on the first pass.
+  SynthID-watermarked. 2026-08-08.
 - **Fir chain, tiers 1–2** (`sprites/items/chains/firgrain_{1,2}.webp`) — Fir
   Grain → Small Fir Tree, what an Ancient Tree drops as it is worked and what
   that seed grows back into. Tier 3 is the Ancient Tree's own painting

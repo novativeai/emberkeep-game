@@ -72,6 +72,19 @@
         "event": "item:harvested",
         "chain": "ashmoss"
       },
+      "effects": [
+        {
+          "spawn": {
+            "chain": "emberbark",
+            "tier": 1,
+            "count": 1,
+            "at": [
+              9,
+              5
+            ]
+          }
+        }
+      ],
       "arrow": {
         "tile": {
           "chain": "emberbark",

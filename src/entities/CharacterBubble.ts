@@ -652,7 +652,13 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.portraitBack.fillStyle(0x549270, 1);
     this.portraitBack.fillCircle(ringX + 2, ringY - 10, RING_HOLE_RADIUS - 10);
 
-    if (this.portrait.texture.key === ELEANOR_DISC_TEXTURE) {
+    // ANY mounted disc sheet gets the split treatment — matching setSpeakerArt,
+    // which keys on isAnimatedSpeaker. This used to compare against Eleanor's
+    // texture specifically, so Selyna (whose disc loads and animates) fell into
+    // the static-medallion branch below: positioned as if centre-origined while
+    // setSpeakerArt had bottom-anchored her, her whole bust floated ABOVE the
+    // ring with nothing tucked behind the frame.
+    if (this.portrait.texture.key.endsWith('_disc')) {
       // Both split copies share one transform: centred in the ring (with a
       // slight upward bias) like the original medallion placement, bottom-
       // anchored so breathing grows upward. Scale goes through the animator

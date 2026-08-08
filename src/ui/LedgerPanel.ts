@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
 import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import { speakerName } from '../entities/CharacterBubble';
 import { discTextureFor } from '../entities/PortraitAnimator';
 import type { GameState } from '../core/GameState';
 import type { OrderConfig } from '../core/types';
@@ -50,6 +51,9 @@ type LedgerTab = 'orders' | 'tasks';
 
 interface OrderCard {
   root: Phaser.GameObjects.Container;
+  /** The face in the medallion ring — retargeted to each order's `giver` on
+   *  refresh, so Selyna's orders wear Selyna and Eleanor's wear Eleanor. */
+  medallion: Phaser.GameObjects.Image;
   title: Phaser.GameObjects.Text;
   slotIcon: Phaser.GameObjects.Image;
   slotCount: Phaser.GameObjects.Text;
@@ -292,7 +296,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private buildCard(scene: Phaser.Scene, x: number): OrderCard {
     const root = scene.add.container(x, 16);
     const cardBg = scene.add.image(0, 0, 'ui_card').setScale(0.9);
-    const medallion = this.buildMedallion(scene, root);
+    const { layers: medallion, portrait } = this.buildMedallion(scene, root);
     const title = scene.add
       .text(0, -96, '', {
         fontFamily: FONT.ui,
@@ -344,6 +348,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
 
     const card: OrderCard = {
       root,
+      medallion: portrait,
       title,
       slotIcon,
       slotCount,
@@ -374,7 +379,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private buildMedallion(
     scene: Phaser.Scene,
     root: Phaser.GameObjects.Container
-  ): Phaser.GameObjects.GameObject[] {
+  ): { layers: Phaser.GameObjects.GameObject[]; portrait: Phaser.GameObjects.Image } {
     // Lift: a soft dark disc under the gold so the medallion sits ON the card
     // rather than floating flat against it.
     const shadow = scene.add.graphics();
@@ -397,19 +402,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     const portrait = scene.textures.exists(discKey)
       ? scene.add.image(0, MEDALLION_Y, discKey, 0)
       : scene.add.image(0, MEDALLION_Y, 'portrait_ring'); // never the green mark
-    const window = RING_MASK_R * 2;
-    if (portrait.height > portrait.width * 1.15) {
-      // Bust art: size by HEIGHT and hang it from the window's top, so the
-      // window takes her head, shoulders and braid and the crop falls on the
-      // robe. Moss shows at her sides — that is the frame reading as a window.
-      const fit = (window * MEDALLION_FILL) / portrait.height;
-      portrait.setScale(fit);
-      portrait.y = MEDALLION_Y - RING_MASK_R + MEDALLION_HEAD_INSET + (portrait.height * fit) / 2;
-    } else {
-      // Square art — the painted fallback, itself a little framed medallion.
-      // Contain it and centre it; a fallback should look plain, never cropped.
-      portrait.setScale(window / Math.max(1, portrait.width));
-    }
+    this.seatMedallion(portrait);
 
     // Geometry masks live in WORLD space, so the circle is re-seated every frame
     // against the panel's position and its open/close scale tween (the same
@@ -423,7 +416,36 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     const ring = scene.add.image(0, MEDALLION_Y, 'portrait_ring');
     ring.setDisplaySize(MEDALLION_SIZE, MEDALLION_SIZE);
 
-    return [shadow, back, portrait, ring];
+    return { layers: [shadow, back, portrait, ring], portrait };
+  }
+
+  /** Fit whatever face is mounted into the ring window — run on build AND after
+   *  every texture swap, because the fit depends on the mounted art's size. */
+  private seatMedallion(portrait: Phaser.GameObjects.Image): void {
+    const window = RING_MASK_R * 2;
+    if (portrait.height > portrait.width * 1.15) {
+      // Bust art: size by HEIGHT and hang it from the window's top, so the
+      // window takes her head, shoulders and braid and the crop falls on the
+      // robe. Moss shows at her sides — that is the frame reading as a window.
+      const fit = (window * MEDALLION_FILL) / portrait.height;
+      portrait.setScale(fit);
+      portrait.y = MEDALLION_Y - RING_MASK_R + MEDALLION_HEAD_INSET + (portrait.height * fit) / 2;
+    } else {
+      // Square art — the painted fallback, itself a little framed medallion.
+      // Contain it and centre it; a fallback should look plain, never cropped.
+      portrait.setScale(window / Math.max(1, portrait.width));
+      portrait.y = MEDALLION_Y;
+    }
+  }
+
+  /** Mount `giver`'s face in a card's medallion (frame 0 of their disc atlas =
+   *  the rest bust). A giver with no disc keeps the current face rather than
+   *  showing the missing-texture mark — art failures degrade, never block. */
+  private setMedallionGiver(card: OrderCard, giver: string): void {
+    const discKey = discTextureFor(giver);
+    if (!this.owner.textures.exists(discKey) || card.medallion.texture.key === discKey) return;
+    card.medallion.setTexture(discKey, 0);
+    this.seatMedallion(card.medallion);
   }
 
   /** Keep every card's portrait clip circle over its ring window. */
@@ -550,6 +572,15 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.blurb.setVisible(orders.length > 0);
     this.blurb.setText(orders[0] ? `”${orders[0].blurb}”` : '');
 
+    // The Ledger belongs to whoever keeps it HERE: Selyna's board in the north
+    // wears her name and her face, Eleanor's at home wears hers. Derived from
+    // the orders data (OrderSystem.giverHere), never from a world-id table.
+    const host = this.orderSystem.giverHere;
+    this.ordersTab.label.setText(`${speakerName(host)}’s Orders`);
+    this.emptyText.setText(
+      `The brazier roars again!\n${speakerName(host)} will have new work for you soon.`
+    );
+
     this.cards.forEach((card, i) => {
       const order = orders[i] ?? null;
       card.order = order;
@@ -558,6 +589,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
         card.deliverable = false;
         return;
       }
+      this.setMedallionGiver(card, order.giver ?? host);
       const requirement = order.requires[0];
       if (!requirement) return;
       const { have, deliverable } = this.orderSystem.progressFor(order);

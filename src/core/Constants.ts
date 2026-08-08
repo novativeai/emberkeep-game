@@ -275,7 +275,11 @@ export const ITEM_SCALE: Record<string, number> = {
   // borrow; keeping it would have shrunk the shard by nearly 40%.)
   flame_gem_1: 0.19,
   flame_gem_2: 0.21,
-  flame_gem_3: 0.24,
+  // Radiant Gem: 462px bbox × 0.195 ≈ 90 units — the same width class as its
+  // tier-3 peers (Crystal Ball 90, Preserve 96, Dew Vial 86). At the old 0.24
+  // it was 111 wide AND 110 tall, and a square silhouette at that width reads
+  // bulkier than the taller-than-wide pieces beside it.
+  flame_gem_3: 0.195,
   // Timber loop art. The chain gained a milling step — Cut Wood → Plank Set →
   // House → Manor — so the House and the Manor each moved DOWN one tier and
   // keep their tuned sizes under their new keys. Tiers 1–2 are new art cut from
@@ -319,7 +323,14 @@ export const ITEM_SCALE: Record<string, number> = {
   strawberry_3: 0.252, // the ripe plant, 620×618 → 156 units; t3 reads biggest
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
-  emberbark_1: 0.32, // Emberbark Stump (emberbark.png 620×520) — low wide landmark, ~200 units
+  // Emberbark Stump (emberbark.png 620×520) — low wide landmark, ~200 units.
+  // Its anchor (anchors.json) is 0.8, NOT the 0.9 it shipped with, and the
+  // number comes from the SILHOUETTE, not the bbox: the wide dark base ends at
+  // 0.83 of the canvas and only thin root tips reach the 0.927 alpha bottom.
+  // Anchoring off the bbox bottom left that whole visual base ABOVE the tile
+  // origin — the stump hovered over its shadow with just a root grazing it.
+  // At 0.8 the base sits ~5 units below the origin and the roots ~21, planted.
+  emberbark_1: 0.32,
   emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
   emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red
@@ -386,7 +397,14 @@ export const ITEM_SCALE: Record<string, number> = {
   rimebloom_3: 0.22,
   frostsilk_1: 0.16,
   frostsilk_2: 0.17,
-  frostsilk_3: 0.22
+  frostsilk_3: 0.22,
+  // The north's fixtures + the Wreck Timber ladder (target units / alpha bbox).
+  wrackline_1: 0.299, // The Wrack Line — low wide tide-heap landmark, 635px → ~190 units
+  frostfont_1: 0.29, // Hoarfrost Font — working font, 518px tall → ~150 units
+  keel_1: 0.177, // Broken Strake, 418px → 74 units (the Cut Wood class)
+  keel_2: 0.21, // Lashed Frame, 476px → 100 units (the Plank Set class)
+  keel_3: 0.409, // Upturned Hull, 635px → 260 units (the House class)
+  keel_4: 0.49 // Longhall, 714px → 350 units (the Manor class)
 };
 
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
@@ -1406,24 +1424,10 @@ export const DRAG = {
  *  world-agnostic because the cauldron trades only in the Bag. */
 export const CAULDRON_DECOR = 'pink_cauldron';
 
-/**
- * Dragon job menu (Work / Harvest under a tapped dragon) — 2560-space units.
- * Icon-led: the verbs are emoji on compact ui_btn_green plates, and the status
- * pill above shows the drop's own art + a countdown (✓ when ready, 💤 resting).
- */
-export const DRAGON_MENU = {
-  /** Status pill centre, relative to the menu container (buttons sit at y 0). */
-  statusY: -74,
-  /** Drop art height inside the pill. */
-  iconH: 46,
-  plateH: 60,
-  platePadX: 20,
-  /** Button centres at ±btnX; scales are on the 420×152 ui_btn_green texture
-   *  (icon-only labels need far less width than the old worded ones). */
-  btnX: 96,
-  btnScaleX: 0.36,
-  btnScaleY: 0.5
-} as const;
+// (The bespoke dragon Job menu — Work ⛏️ / Harvest ✋ under a tapped dragon —
+// is GONE, and its DRAGON_MENU block with it: a dragon now offers the same two
+// skip buttons every generator does. Work is the drag onto a House the tutorial
+// teaches; harvest is the tap itself.)
 
 /** Pointer forgiveness (game px) around the exact hit point when alpha-testing
  *  board-item art: near-misses on thin/holey sprites (sprout stems) still land,
@@ -1628,7 +1632,12 @@ export const POWER = {
 export const SAVE_KEY = 'emberkeep_save';
 // v12: the Emberbark Stump beat (`moss_stump`) shifts every persisted
 // tutorialIndex, and the stump itself is a new startingItem older boards lack.
-export const SAVE_VERSION = 12;
+// v13: the stump is no longer a startingItem — `moss_stump` SPAWNS it, so the
+// isle stays bare through Eleanor's arrival lines. A v12 save paused inside
+// those lines already carries the stump as a board item, and the new spawn
+// effect firing over it would seed a SECOND free generator — wipe, same rule
+// as v12 itself.
+export const SAVE_VERSION = 13;
 
 /** The opening's held silence: the board is visible and quiet before Eleanor's
  *  first line, so the player sees the ash before anyone frames it

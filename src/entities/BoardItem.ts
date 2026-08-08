@@ -35,6 +35,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
    *  landing squash and the drag lift for the same two properties. */
   private sleepBreath = false;
   private breathPhase = 0;
+  private sleepGroundY = 0;
   /** The art's own scale, so the breath can modulate it without drifting. */
   private artBaseX = 1;
   private artBaseY = 1;
@@ -154,6 +155,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.artBaseX = artScale;
     this.artBaseY = artScale;
     this.sleepBreath = false;
+    this.sleepGroundY = 0;
     this.sprite.setVisible(true); // a pooled item may have been a hidden rig host
     // Soft shadow scaled to the art's footprint (proportional to its size).
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
@@ -370,7 +372,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
         this.artBaseX * (1 - SLEEP_BREATH.amount * 0.45 * k),
         this.artBaseY * (1 + SLEEP_BREATH.amount * k)
       );
-      this.sprite.setY(SLEEP_BREATH.lift * k);
+      this.sprite.setY(this.sleepGroundY + SLEEP_BREATH.lift * k);
       return;
     }
     if (this.sprite.y !== 0) this.sprite.setY(0);
@@ -382,10 +384,17 @@ export class BoardItem extends Phaser.GameObjects.Container {
    * `phase` staggers two sleepers so a pair of dragons never inhales in unison
    * — the same deterministic-per-id trick the standees use, and the reason it
    * is passed in rather than randomised here.
+   *
+   * `groundY` seats the sleeper: the sleep art's anchor is its own bbox bottom,
+   * which lands the belly on the container origin — but the RIG this painting
+   * replaces stood `groundLift` px lower (its shadow was tuned to feet there),
+   * so the caller passes that drop and the belly lies on the same floor line
+   * the feet used. The breath scales around the anchor, so it never moves.
    */
-  setSleepBreath(on: boolean, phase = 0): void {
+  setSleepBreath(on: boolean, phase = 0, groundY = 0): void {
     this.sleepBreath = on;
     this.breathPhase = phase;
+    this.sleepGroundY = on ? groundY : 0;
     if (!on) {
       this.sprite.setScale(this.artBaseX, this.artBaseY);
       this.sprite.setY(0);

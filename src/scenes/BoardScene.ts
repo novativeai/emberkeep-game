@@ -10,7 +10,6 @@ import {
   DEPTHS,
   DRAG,
   DRAGON_ANIM,
-  DRAGON_MENU,
   DRAGON_RIG_SCALE,
   EMBER_MOTES,
   FINALE,
@@ -107,8 +106,10 @@ interface LiveDragon {
   mood: 'awake' | 'hungry' | 'asleep';
   /** Clock ms until the next hungry roar; only counts down while `hungry`. */
   roarInMs: number;
-  /** The floating 💤, while it sleeps. */
-  zzz?: Phaser.GameObjects.Text;
+  /** The floating 💤, while it sleeps — a container so `syncDragon` can carry
+   *  it with the host (a sleeping dragon can still be dragged) while the drift
+   *  tween animates the text INSIDE it, in host-local space. */
+  zzz?: Phaser.GameObjects.Container;
 }
 
 /** Where the camera sits to frame a given Keeper level (world centre + zoom). */
@@ -233,11 +234,6 @@ export class BoardScene extends Phaser.Scene {
   private skipForId = 0;
   private skipMaxGold?: number; // per-generator gold cap for the live skip price
   /** Dragon job menu (Work / Harvest) + the dragon it belongs to. */
-  private dragonMenu?: Phaser.GameObjects.Container;
-  private dragonMenuLabel?: Phaser.GameObjects.Text;
-  private dragonMenuPlate?: Phaser.GameObjects.Graphics;
-  private dragonMenuIcon?: Phaser.GameObjects.Image;
-  private dragonMenuForId = 0;
   /** Countdown pill floating above a rig-hosted dragon: the BoardItem's own
    *  pill renders UNDER the rig (glued at host.depth + 0.5), so the timer
    *  lives in a scene-level badge instead. Keyed by dragon itemId. */
@@ -254,6 +250,9 @@ export class BoardScene extends Phaser.Scene {
   private produceBadges = new Map<number, Phaser.GameObjects.Container>();
   /** One floating key badge per key-locked region, so it reads as "needs a key". */
   private keyBadges = new Map<string, Phaser.GameObjects.Image>();
+  /** Badges waiting for their reveal cinematic, played one at a time. */
+  private keyRevealQueue: Phaser.GameObjects.Image[] = [];
+  private keyRevealPlaying = false;
   private highlights: Phaser.GameObjects.Image[] = [];
   private allow: Required<TutorialAllow> = { ...NO_ALLOW };
   private tutorialDone = false;
@@ -376,8 +375,6 @@ export class BoardScene extends Phaser.Scene {
     this.keyBadges.clear();
     this.skipButton = undefined; // a fresh scene; old container died with the last
     this.skipForId = 0;
-    this.dragonMenu = undefined;
-    this.dragonMenuForId = 0;
     this.restBadges.clear();
     this.produceBadges.clear();
     this.breathing = []; // last run's standees died with it — never carry the refs
@@ -675,7 +672,6 @@ export class BoardScene extends Phaser.Scene {
     this.coolAccum += delta;
     if (this.coolAccum >= 240) {
       this.coolAccum = 0;
-      if (this.dragonMenu) this.refreshDragonMenu(); // live rest/drop countdown
       this.syncProduceBadges();
       for (const [id, badge] of this.restBadges) {
         const sp = this.itemSprites.get(id);
@@ -855,6 +851,7 @@ export class BoardScene extends Phaser.Scene {
     ld.player.container.setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift);
     ld.player.container.setDepth(ld.host.depth + 0.5);
     ld.shadow.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth - 0.5);
+    ld.zzz?.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth + 4);
   }
 
   private updateLiveDragons(delta: number): void {
@@ -1012,8 +1009,14 @@ export class BoardScene extends Phaser.Scene {
         ld.host.setGroundShadowVisible(false);
         // A still frame reads as a dead sprite, so the painting BREATHES.
         // Phase is hashed off the item id — two dragons asleep side by side
-        // must not inhale together.
-        ld.host.setSleepBreath(true, ((ld.host.itemId * 2654435761) >>> 0) % 1000 / 1000 * Math.PI * 2);
+        // must not inhale together. The groundLift drop seats the belly on the
+        // exact floor line the rig's feet stood on — the line its kept shadow
+        // was tuned to — instead of the container origin 20px above it.
+        ld.host.setSleepBreath(
+          true,
+          (((ld.host.itemId * 2654435761) >>> 0) % 1000 / 1000) * Math.PI * 2,
+          -DRAGON_ANIM.groundLift
+        );
       } else {
         ld.player.container.setAlpha(0.65);
       }
@@ -1024,13 +1027,15 @@ export class BoardScene extends Phaser.Scene {
       ld.zzz?.destroy();
       ld.zzz = undefined;
       if (!resting) {
+        const puff = this.add.text(0, -150, '💤', { fontSize: '46px' }).setOrigin(0.5);
         ld.zzz = this.add
-          .text(ld.host.x, ld.host.y - 150, '💤', { fontSize: '46px' })
-          .setOrigin(0.5)
+          .container(ld.host.x, ld.host.y, [puff])
           .setDepth(DEPTHS.itemBase + ld.host.y + 4);
+        // The drift tweens the TEXT inside the container, so the container is
+        // free to follow the host — a dragged sleeper takes its 💤 along.
         this.tweens.add({
-          targets: ld.zzz,
-          y: ld.host.y - 210,
+          targets: puff,
+          y: -210,
           alpha: { from: 0.9, to: 0.15 },
           duration: 3400,
           repeat: -1,
@@ -1084,12 +1089,15 @@ export class BoardScene extends Phaser.Scene {
       ld.player.play('hover');
     }
     // Two tweens rather than a curve: x eases the whole way while y hops up and
-    // back down, which reads as a glide with a lift in the middle of it.
+    // back down, which reads as a glide with a lift in the middle of it. Depth
+    // follows the flight off this full-length tween (itemBase + y every frame),
+    // so the flier sorts with the scenery it passes instead of over it.
     this.tweens.add({
       targets: sprite,
       x: dest.x,
       duration: DRAGON_WANDER_FLIGHT_MS,
-      ease: 'Sine.easeInOut'
+      ease: 'Sine.easeInOut',
+      onUpdate: () => sprite.settleDepth()
     });
     this.tweens.add({
       targets: sprite,
@@ -2425,10 +2433,76 @@ export class BoardScene extends Phaser.Scene {
         .image(x, y - 64, 'icon_key_bronze')
         .setScale(1.2)
         .setDepth(DEPTHS.itemBase + y + 1000) // above this region's cloud band
-        .setAlpha(this.tutorialDone ? 1 : 0); // hidden until key_unlock step
+        .setAlpha(0)
+        .setVisible(false); // earned into view — see syncKeyBadges
       hoverBob(this, badge, 10, 520);
       this.keyBadges.set(region.id, badge);
     }
+    this.syncKeyBadges(false);
+  }
+
+  /**
+   * A key badge is a PROMISE the player can keep, so it appears over a region
+   * only while the Keeper actually HOLDS the keys it costs — never on arrival.
+   * Borealis opens with two key-locked isles, and floating both keys from the
+   * first frame told the player the gates were already theirs; now the coast's
+   * badge appears when Selyna's first order pays its key, and the keep's when
+   * the second key is banked. Spending keys re-hides what is no longer covered.
+   *
+   * `cinematic` earns the appearance a beat: the camera glides to the gate,
+   * leans in, the key pops in gold, and the camera comes home (queued, so two
+   * keys arriving together reveal one after the other). Quiet mode is for
+   * loads, world arrivals and tutorial steps — states, not moments.
+   */
+  private syncKeyBadges(cinematic: boolean): void {
+    for (const [regionId, badge] of this.keyBadges) {
+      const cost =
+        this.ctx.state.map.regions.find((r) => r.id === regionId)?.unlock?.keys ?? 1;
+      // During the tutorial only the key_unlock lesson may show a key at all.
+      const gate = this.tutorialDone || this.tutorialStepId === 'key_unlock';
+      const show = gate && this.ctx.state.keys >= cost;
+      if (show === (badge.getData('shown') === true)) continue;
+      badge.setData('shown', show);
+      if (!show) {
+        badge.setVisible(false).setAlpha(0);
+      } else if (cinematic) {
+        this.keyRevealQueue.push(badge);
+        if (!this.keyRevealPlaying) this.playNextKeyReveal();
+      } else {
+        badge.setVisible(true).setAlpha(1);
+      }
+    }
+  }
+
+  /** One queued key-reveal cinematic: glide + lean in, pop the key, come home. */
+  private playNextKeyReveal(): void {
+    const badge = this.keyRevealQueue.shift();
+    if (!badge) {
+      this.keyRevealPlaying = false;
+      return;
+    }
+    this.keyRevealPlaying = true;
+    const cam = this.cameras.main;
+    const home = { x: cam.midPoint.x, y: cam.midPoint.y, zoom: cam.zoom };
+    this.glideToWorld(badge.x, badge.y + 60, 850);
+    cam.zoomTo(home.zoom * 1.16, 850, 'Sine.easeInOut');
+    this.time.delayedCall(870, () => {
+      badge.setVisible(true).setAlpha(0).setScale(0.25);
+      this.glowFlash(badge.x, badge.y, PALETTE.goldAccent, 0.65, 1.5);
+      this.sparks.explode(12, badge.x, badge.y);
+      this.tweens.add({
+        targets: badge,
+        alpha: 1,
+        scale: 1.2,
+        duration: 460,
+        ease: 'Back.easeOut'
+      });
+      this.time.delayedCall(1000, () => {
+        cam.zoomTo(home.zoom, 700, 'Sine.easeInOut');
+        this.glideToWorld(home.x, home.y, 700);
+        this.time.delayedCall(730, () => this.playNextKeyReveal());
+      });
+    });
   }
 
   /**
@@ -2957,9 +3031,6 @@ export class BoardScene extends Phaser.Scene {
       if (this.skipButton && !hits.some((o) => o === this.skipButton || o.parentContainer === this.skipButton)) {
         this.hideSkipButton();
       }
-      if (this.dragonMenu && !hits.some((o) => o === this.dragonMenu || o.parentContainer === this.dragonMenu)) {
-        this.hideDragonMenu();
-      }
       const onObject = hits.some(
         (o) => o instanceof BoardItem || o.getData?.('regionId') !== undefined
       );
@@ -3467,13 +3538,14 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.bus.emit('tutorial:nudge', {});
       return;
     }
-    // A DRAGON (with a generator) opens its Job menu (Work / Harvest, with rest & ruby timers).
+    // A DRAGON is a tap generator like any other: tapping while it cools falls
+    // through to the SAME two skip buttons (Gold / Warmth) every generator
+    // offers, and a ready tap harvests. The old bespoke Job menu (Work ⛏️ /
+    // Harvest ✋) duplicated verbs that already exist — work is the drag onto a
+    // House the tutorial teaches, harvest is the tap itself — at the price of a
+    // second UI language for one item kind. Only the status readout stays.
     if (DRAGON_RIGS[item.chain] && isGenerator && (this.tutorialDone || this.allow.dragonWork)) {
-      // Tapping a dragon is the player looking straight at it, so the status
-      // readout follows the same tap the Job menu does.
       this.selectSubject('dragon', String(item.id), false);
-      this.showDragonMenu(sprite);
-      return;
     }
     // An undecided House asks what it should make — and keeps asking, because a
     // player who dismissed the chooser must have a way back to it. Once
@@ -3561,7 +3633,12 @@ export class BoardScene extends Phaser.Scene {
           DRAGON_RIGS[s.chain] !== undefined && // any rigged dragon, not just the red
           s.isGenerator &&
           s.itemId !== plant.itemId &&
-          !this.busyDragons.has(s.itemId)
+          !this.busyDragons.has(s.itemId) &&
+          // A sleeper sleeps through it. The flourish is pure theatre AFTER the
+          // harvest has already paid out, so skipping it costs nothing — while a
+          // curled painting snapping upright to fly a lap would cost the nap all
+          // its credibility.
+          this.ctx.systems.dragonLife.moodOf(s.itemId) !== 'asleep'
       )
       .sort(
         (a, b) =>
@@ -3579,7 +3656,6 @@ export class BoardScene extends Phaser.Scene {
       ld.player.setFacing(landX <= plant.x ? 'right' : 'left');
       ld.player.play('hover');
     }
-    dragon.setDepth(DEPTHS.dragged);
     const land = (): void => {
       this.glowFlash(plant.x, plant.y - 36, PALETTE.goldAccent, 0.6, 1.2);
       this.sparks.explode(14, plant.x, plant.y - 34);
@@ -3594,12 +3670,16 @@ export class BoardScene extends Phaser.Scene {
         ld.remainMs = this.idleSpanMs(ld.calm);
       }
     };
+    // Depth FOLLOWS the flight (itemBase + y each frame) rather than jumping to
+    // the always-on-top band: a dragon crossing the isle should slide behind
+    // taller scenery like everything else does, not float over the whole board.
     this.tweens.add({
       targets: dragon,
       x: landX,
       y: plant.y,
       duration: DRAGON_ANIM.flyToMs,
       ease: 'Sine.easeInOut',
+      onUpdate: () => dragon.settleDepth(),
       onComplete: () => {
         land();
         this.tweens.add({
@@ -3609,6 +3689,7 @@ export class BoardScene extends Phaser.Scene {
           delay: DRAGON_ANIM.workMs,
           duration: DRAGON_ANIM.flyBackMs,
           ease: 'Sine.easeInOut',
+          onUpdate: () => dragon.settleDepth(),
           onComplete: done
         });
       }
@@ -3712,109 +3793,6 @@ export class BoardScene extends Phaser.Scene {
     this.skipForId = 0;
   }
 
-  /** The dragon Job menu: WORK (fly to a House, speed its timer) and HARVEST
-   *  (collect its drop), with a status pill above — the drop's own art plus a
-   *  countdown (✓ when ready), and a 💤 timer only while she rests. Icons carry
-   *  the meaning; the only text left is the numbers. */
-  private showDragonMenu(sprite: BoardItem): void {
-    this.hideDragonMenu();
-    const menu = this.add.container(sprite.x, sprite.y + 104).setDepth(DEPTHS.dragged - 1);
-    // Status pill parts — laid out (and the plate redrawn to fit) every refresh,
-    // because the countdown's width changes as it drains.
-    this.dragonMenuPlate = this.add.graphics();
-    menu.add(this.dragonMenuPlate);
-    const drop = this.generatorConfigFor(sprite.chain, sprite.tier)?.produces;
-    const iconKey = drop ? `item_${drop.chain}_${drop.tier}` : '';
-    if (iconKey && this.textures.exists(iconKey)) {
-      const icon = this.add.image(0, DRAGON_MENU.statusY, iconKey);
-      icon.setScale(DRAGON_MENU.iconH / icon.height);
-      this.dragonMenuIcon = icon;
-      menu.add(icon);
-    }
-    this.dragonMenuLabel = this.add
-      .text(0, DRAGON_MENU.statusY, '', {
-        fontFamily: 'Segoe UI, sans-serif',
-        fontSize: '30px',
-        fontStyle: 'bold',
-        color: '#fff6e0',
-        stroke: '#241b22',
-        strokeThickness: 4
-      })
-      .setOrigin(0, 0.5);
-    menu.add(this.dragonMenuLabel);
-    const mkBtn = (dx: number, text: string, onTap: () => void): void => {
-      const bg = this.add.image(dx, 0, 'ui_btn_green').setScale(DRAGON_MENU.btnScaleX, DRAGON_MENU.btnScaleY);
-      const label = this.add
-        .text(dx, -2, text, {
-          fontFamily: 'Segoe UI, sans-serif',
-          fontSize: '32px',
-          fontStyle: 'bold',
-          color: '#fff6e0',
-          stroke: '#1f3a14',
-          strokeThickness: 5,
-          align: 'center'
-        })
-        .setOrigin(0.5);
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
-        ev.stopPropagation();
-        onTap();
-        this.hideDragonMenu();
-      });
-      menu.add([bg, label]);
-    };
-    // Icon-only verbs (the VS16 keeps ⛏ an emoji, not a thin text glyph). Work
-    // is free so it shows no cost; Harvest spells its Warmth price BEFORE it
-    // runs, so the player isn't surprised.
-    const harvestCost = this.generatorConfigFor(sprite.chain, sprite.tier)?.energyCost ?? 0;
-    mkBtn(-DRAGON_MENU.btnX, '⛏️', () => this.startDragonWork(sprite));
-    mkBtn(DRAGON_MENU.btnX, `✋⚡${harvestCost}`, () => this.ctx.bus.emit('item:tapped', { itemId: sprite.itemId }));
-    this.dragonMenu = menu;
-    this.dragonMenuForId = sprite.itemId;
-    this.refreshDragonMenu();
-  }
-
-  /** Update the status pill each tick while the menu is open: set the text,
-   *  re-seat icon + label around the shared centre, redraw the plate to wrap. */
-  private refreshDragonMenu(): void {
-    const label = this.dragonMenuLabel;
-    const plate = this.dragonMenuPlate;
-    if (!label || !plate || this.dragonMenuForId === 0) return;
-    const item = this.ctx.state.items.get(this.dragonMenuForId);
-    const now = this.ctx.clock.now();
-    const rest = this.ctx.systems.jobs.restRemaining(this.dragonMenuForId);
-    const cfg = item && this.generatorConfigFor(item.chain, item.tier);
-    const rubyMs = item?.readyAt !== undefined ? Math.max(0, item.readyAt - now) : 0;
-    const fmt = (ms: number): string => {
-      const s = Math.ceil(ms / 1000);
-      return s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-    };
-    // The drop's art (not its name) says WHAT; ✓ or the countdown says WHEN.
-    let text = cfg && rubyMs > 0 ? fmt(rubyMs) : '✓';
-    if (rest > 0) text += `  💤 ${fmt(rest)}`;
-    label.setText(text);
-    const iconW = this.dragonMenuIcon?.displayWidth ?? 0;
-    const gap = this.dragonMenuIcon ? 10 : 0;
-    const total = iconW + gap + label.width;
-    this.dragonMenuIcon?.setX(-total / 2 + iconW / 2);
-    label.setX(-total / 2 + iconW + gap);
-    const { statusY, plateH, platePadX } = DRAGON_MENU;
-    plate.clear();
-    plate.fillStyle(num(PALETTE.night), 0.82);
-    plate.fillRoundedRect(-total / 2 - platePadX, statusY - plateH / 2, total + platePadX * 2, plateH, plateH / 2);
-    plate.lineStyle(2.5, num(PALETTE.gold), 0.9);
-    plate.strokeRoundedRect(-total / 2 - platePadX, statusY - plateH / 2, total + platePadX * 2, plateH, plateH / 2);
-  }
-
-  private hideDragonMenu(): void {
-    this.dragonMenu?.destroy();
-    this.dragonMenu = undefined;
-    this.dragonMenuLabel = undefined;
-    this.dragonMenuPlate = undefined;
-    this.dragonMenuIcon = undefined;
-    this.dragonMenuForId = 0;
-  }
-
   /** Send a dragon to WORK a House: it flies over and stands by it, speeding its
    *  timer until it tires. Works `targetHouse` when given (the tile it was dropped
    *  on), else the NEAREST passive production building. */
@@ -3854,17 +3832,18 @@ export class BoardScene extends Phaser.Scene {
       ld.player.setFacing('left');
       ld.player.play('hover');
     }
-    sprite.setDepth(DEPTHS.dragged);
     // Same beat as the harvest flourish: fly over, breathe a brief burst of
     // work-magic onto the building, and come STRAIGHT home. The job itself
     // (DragonJobSystem's speed-up + fatigue cycle) runs on its own clock and
-    // never depended on the dragon standing there.
+    // never depended on the dragon standing there. Depth follows the flight
+    // (see sendDragonFlourish) — never the always-on-top band.
     this.tweens.add({
       targets: sprite,
       x: landX,
       y: house.y + 24,
       duration: DRAGON_ANIM.flyToMs,
       ease: 'Sine.easeInOut',
+      onUpdate: () => sprite.settleDepth(),
       onComplete: () => {
         this.glowFlash(house.x, house.y - 36, PALETTE.goldAccent, 0.6, 1.2);
         this.sparks.explode(14, house.x, house.y - 34);
@@ -3875,6 +3854,7 @@ export class BoardScene extends Phaser.Scene {
           delay: DRAGON_ANIM.workMs,
           duration: DRAGON_ANIM.flyBackMs,
           ease: 'Sine.easeInOut',
+          onUpdate: () => sprite.settleDepth(),
           onComplete: () => {
             sprite.settleDepth();
             this.busyDragons.delete(sprite.itemId);
@@ -4137,6 +4117,9 @@ export class BoardScene extends Phaser.Scene {
         if (this.wearsRigTier(item.chain, item.tier)) this.attachDragon(sprite, false);
       }),
       bus.on('economy:changed', () => this.updateGoldenTremble()),
+      // A key arriving (or being spent) moves which gates the player can pay —
+      // post-tutorial that reveal is a story beat and earns the cinematic.
+      bus.on('economy:changed', () => this.syncKeyBadges(this.tutorialDone)),
       // The Golden Egg materialises ON THE ALTAR when Eleanor's first order
       // completes — camera glide + gold flood (DEMO-PLAN §Act II, staged at
       // the authored lore spot). Two special timings:
@@ -4254,10 +4237,9 @@ export class BoardScene extends Phaser.Scene {
         // the step that ends it — not on a later reload.
         this.refreshPortals();
         this.setHighlights(step.highlight);
-        // Key badges appear only on the key_unlock step (during tutorial); always
-        // visible after tutorial is done.
-        const showBadges = step.done || step.id === 'key_unlock';
-        this.keyBadges.forEach((b) => b.setAlpha(showBadges ? 1 : 0));
+        // Key badges: earned into view (held keys ≥ region cost) — quiet here,
+        // because the tutorial's own script stages the key_unlock beat.
+        this.syncKeyBadges(false);
         // Glide the camera to show the crystal when the player must tap it.
         if (step.id === 'crystal_tap') {
           const crystal = [...this.ctx.state.items.values()].find((i) => i.chain === 'crystal');
@@ -4759,7 +4741,7 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);
     this.cameras.main.centerOn(frame.x, frame.y);
     this.tutorialDone = this.ctx.state.tutorialDone;
-    this.keyBadges.forEach((b) => b.setAlpha(this.tutorialDone ? 1 : 0));
+    this.syncKeyBadges(false); // a load restores a STATE — no cinematic replay
     this.syncGoldenAltar();
   }
 

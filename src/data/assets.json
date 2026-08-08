@@ -1542,6 +1542,42 @@
       "source": "file",
       "generator": "item",
       "file": "sprites/characters/dragon/red-dragon/sleep/red_adult_sleep.webp"
+    },
+    {
+      "key": "item_wrackline_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/wrackline_1.webp"
+    },
+    {
+      "key": "item_frostfont_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/frostfont_1.webp"
+    },
+    {
+      "key": "item_keel_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/keel_1.webp"
+    },
+    {
+      "key": "item_keel_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/keel_2.webp"
+    },
+    {
+      "key": "item_keel_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/keel_3.webp"
+    },
+    {
+      "key": "item_keel_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/keel_4.webp"
     }
   ]
 }

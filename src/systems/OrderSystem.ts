@@ -91,6 +91,19 @@ export class OrderSystem {
     return this.orders.repeatable ?? [];
   }
 
+  /**
+   * Whose Ledger this is, in the world the Keeper is standing in — the giver of
+   * this world's authored orders (Selyna in Borealis, Eleanor at home).
+   * Data-derived so a third world with a third host needs no code change; the
+   * fallback only matters for a world with no orders at all.
+   */
+  get giverHere(): string {
+    const owned = [...this.orders.orders, ...(this.orders.repeatable ?? [])].find((o) =>
+      this.here(o)
+    );
+    return owned?.giver ?? 'eleanor';
+  }
+
   /** The orders the Ledger shows, in priority order. */
   get activeOrders(): OrderConfig[] {
     const out: OrderConfig[] = [];

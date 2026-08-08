@@ -272,15 +272,62 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   first pass read the `666` in `addGroundShadow(…, 666 * scale, …)` as the rig's width
   and dropped `DRAGON_RIG_SCALE` entirely, which put the sleeping whelp at 306 units
   against a 160-unit dragon. **666 is a shadow width.** Get the rig art's number.
-- **TOUCH the sleep anchor, `SLEEP_BREATH.lift`, or who owns the shadow while a dragon
-  sleeps → CHECK it still lies ON the floor.** Three things cooperate and any one of
-  them lifts it off: the sleep anchor in `anchors.json` is the art's own alpha-bbox
-  BOTTOM (0.9932 / 0.9942, not a guessed 0.97), so the belly lands on the tile origin;
-  `applyDragonMood` keeps the RIG's ground shadow (`ld.shadow`, already on that origin
-  via `syncDragon`) and hides the item's own (`setGroundShadowVisible(false)`), so there
-  is one shadow and the dragon is on it; and `SLEEP_BREATH.lift` is **0** because
-  `amount` alone raises the ribcage off a planted belly. A non-zero lift moves the whole
-  animal, which reads as hovering, not breathing.
+- **TOUCH the sleep anchor, `SLEEP_BREATH.lift`, `setSleepBreath`'s `groundY`, or who
+  owns the shadow while a dragon sleeps → CHECK it still lies ON the floor.** Four
+  things cooperate and any one of them lifts it off: the sleep anchor in `anchors.json`
+  is the art's own alpha-bbox BOTTOM (0.9932 / 0.9942, not a guessed 0.97); the belly is
+  then SEATED `-DRAGON_ANIM.groundLift` (20px) below the container origin via
+  `setSleepBreath`'s `groundY` — the floor line the rig's FEET stood on and the line its
+  shadow was tuned to, because a belly left at the origin itself hovers exactly that gap
+  above the shadow; `applyDragonMood` keeps the RIG's ground shadow (`ld.shadow`, on
+  that line via `syncDragon`) and hides the item's own (`setGroundShadowVisible(false)`),
+  so there is one shadow and the dragon is on it; and `SLEEP_BREATH.lift` is **0**
+  because `amount` alone raises the ribcage off a planted belly. A non-zero lift moves
+  the whole animal, which reads as hovering, not breathing.
+- **TOUCH the 💤, or move a sleeping dragon → RULE the marker RIDES `syncDragon`.** The
+  💤 is a container at the host's position whose inner text tweens in HOST-LOCAL space
+  (`0,-150 → -210`); `syncDragon` re-seats the container every frame like the rig and
+  the shadow. Tween the marker's own x/y in WORLD space and a dragged or wandering
+  sleeper leaves its 💤 hanging over the tile it left.
+- **TOUCH a dragon flight (wander / flourish / work), or a new one → RULE depth FOLLOWS
+  the flight.** Every flight tween carries `onUpdate: () => sprite.settleDepth()`
+  (itemBase + y each frame) and none sets `DEPTHS.dragged`: the always-on-top band is
+  for the player's OWN hand (drag), and a self-moving dragon in it glides over UI
+  badges and every tall landmark on the isle. Natural y-sorting also means the
+  flourish/work flights no longer need their depth restored in `done()` — but
+  `settleDepth()` stays there for the frame the tween ends off-target.
+- **TOUCH key badges, `economy:changed`, or a region's `unlock.keys` → RULE a badge is
+  EARNED into view.** `syncKeyBadges` shows a region's bronze key only while the Keeper
+  HOLDS ≥ that region's key cost (and never mid-tutorial except the `key_unlock`
+  lesson); post-tutorial the appearance plays a queued cinematic (glide + zoom-in, key
+  pops gold, camera home). Borealis is why: both its isles are key-gated and floating
+  both keys on arrival promised gates the player hadn't earned — now the coast's key
+  appears when Selyna's first order pays it, the keep's when the second is banked.
+  Loads/arrivals/tutorial steps sync QUIETLY (states, not moments). Spending keys
+  re-hides what is no longer covered; `onRegionUnlocked` still lifts the badge away.
+- **TOUCH a dialogue speaker's portrait, or add an animated speaker → RULE the split
+  treatment keys on `_disc`, never on a name.** `CharacterBubble.layout()` applies the
+  head-above-frame / body-behind-frame split to WHATEVER disc sheet is mounted
+  (`texture.key.endsWith('_disc')`), matching `setSpeakerArt`'s `isAnimatedSpeaker`
+  gate. It used to compare against `ELEANOR_DISC_TEXTURE`, so Selyna — animated, disc
+  loaded — fell into the static-medallion branch and her bust floated above the ring
+  (centre-position maths under a bottom-anchored origin). A new speaker needs: the
+  `ANIMATED_SPEAKERS` entry, a disc bake, the Preload spritesheet — and nothing here.
+- **TOUCH the Ledger's face/title, or author orders for a new world → RULE the Ledger
+  belongs to whoever keeps it HERE.** `OrderSystem.giverHere` derives the host from the
+  orders data (first order whose `world` matches); `LedgerPanel.refresh` sets the tab
+  title + empty text from it and mounts each card's medallion from the ORDER's own
+  `giver` (`setMedallionGiver`, frame 0 of their disc atlas). No world→host table
+  exists anywhere — a third world's Ledger is right the moment its orders carry
+  `giver`/`world`.
+- **TOUCH how a tap lands on a dragon → RULE dragons speak GENERATOR, not a dialect.**
+  The bespoke Job menu (Work ⛏️ / Harvest ✋, `DRAGON_MENU`) is deleted: a cooling
+  dragon offers the SAME Gold/Warmth skip pair as every generator (`showSkipButton`),
+  a ready one harvests on the tap itself, and work is the drag-onto-a-House the
+  `dragon_work` beat teaches. Do not reintroduce a second verb UI for one item kind;
+  the status readout (`selectSubject('dragon', …)`) is the only dragon-specific tap
+  effect left. The flourish also skips any dragon whose `moodOf` is `asleep` — theatre
+  never wakes a sleeper, and the harvest it decorates has ALREADY paid out.
 - **TOUCH `CHEST_GIFTS` → CHECK what the audit loses.** The chest is a permanent renewable
   SOURCE in `availability.ts`, so deleting a gift can strand a quest that had no other
   supply: dropping the Emeralds is what made `the_emerald_brood` and the old `hatch_4`'s
