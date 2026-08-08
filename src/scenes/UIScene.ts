@@ -74,6 +74,7 @@ export class UIScene extends Phaser.Scene {
   private commission!: CommissionPanel;
   private store!: StorePanel;
   private cauldron!: CauldronPanel;
+  private tourUiArrow?: Phaser.GameObjects.Image;
   /** Self-driven: opens on `nest:hatched`. Held so it stays on the display
    *  list and the UI Builder can style it; never read back. */
   private naming!: NamePanel;
@@ -166,7 +167,7 @@ export class UIScene extends Phaser.Scene {
     this.hud.ledgerButton.setDepth(DEPTH_HUD);
     this.hud.bagButton.setDepth(DEPTH_HUD);
     this.hud.storeButton.setDepth(DEPTH_HUD);
-    this.hud.storeButton.setVisible(this.ctx.state.tutorialDone);
+    this.hud.storeButton.setVisible(this.ctx.state.tutorialDone && this.shopUnlocked());
     this.hud.setBagCount(this.ctx.state.bag.length);
     this.hud.gearButton.setDepth(DEPTH_HUD);
 
@@ -529,7 +530,7 @@ export class UIScene extends Phaser.Scene {
       bus.on('tutorial:step', (step) => {
         // Appears for its tutorial introduction, then permanently post-tutorial.
         this.cookbookButton.setVisible(step.done || step.allow.cookbook);
-        this.hud.storeButton.setVisible(step.done);
+        this.hud.storeButton.setVisible(step.done && this.shopUnlocked());
         // Safety net only — the cookbook_close step has the player close the
         // book themselves; any later step that disallows it just shuts it.
         if (!step.done && !step.allow.cookbook && this.cookbook.isOpen) {
@@ -562,7 +563,11 @@ export class UIScene extends Phaser.Scene {
       // over the network — without this the player taps a door and the game
       // simply does nothing for a second or two.
       bus.on('world:switched', ({ to }) => this.showTravelVeil(to)),
-      bus.on('world:ready', () => this.hideTravelVeil())
+      bus.on('world:ready', () => this.hideTravelVeil()),
+      // The Roothold house is the Emporium's storefront — its tap opens the
+      // same panel the (later-unlocked) HUD button does.
+      bus.on('ui:emporium_requested', () => this.store.open()),
+      bus.on('world:switched', ({ to }) => this.maybeStartTour(to))
     );
   }
 
@@ -1224,6 +1229,122 @@ export class UIScene extends Phaser.Scene {
    * Delayed by the same beat a chapter is: the gift's own line is on screen and
    * her reaction is TO it, not over it.
    */
+  /**
+   * The hub tours — Eleanor walks Roothold's Emporium, Selyna the Hatchery's
+   * cauldron, each ONCE ever (stats `tour:<world>`, save-derivable). Not
+   * TutorialDirector beats: the tutorial is long over, nothing here gates
+   * input, and every wait state is armed on an event that stays live — a
+   * player who wanders off mid-tour is never stuck, and an unfinished tour
+   * simply re-runs on the next arrival.
+   */
+  private maybeStartTour(worldId: string): void {
+    if (worldId === 'roothold' && this.ctx.state.stat('tour:roothold') === 0) {
+      this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runRootholdTour());
+    }
+    if (worldId === 'hatchery' && this.ctx.state.stat('tour:hatchery') === 0) {
+      this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runHatcheryTour());
+    }
+  }
+
+  private runRootholdTour(): void {
+    const t = this.ctx.data.dialogue.tours?.roothold;
+    if (!t) return;
+    const bus = this.ctx.bus;
+    this.bubble.sequence('eleanor', t.intro, () => {
+      bus.emit('tour:point', { target: 'roothold_house' });
+      this.bubble.say('eleanor', t.house, 120000);
+      const offOpen = bus.on('ui:store_toggled', ({ open }) => {
+        if (!open) return;
+        offOpen();
+        bus.emit('tour:unpoint', {});
+        this.runShopWalkthrough(t);
+      });
+      this.offBus.push(offOpen);
+    });
+  }
+
+  /** The 3 sections with the pointer moving between them, then the ✕. The
+   *  arrow rides the LINE (sequence onLine), and the panel shows the section
+   *  she is naming, so eye, pointer and shelf agree. */
+  private runShopWalkthrough(t: { sections: string[]; close: string; outro: string }): void {
+    this.bubble.sequence('eleanor', [...t.sections, t.close], undefined, (i) => {
+      if (i < t.sections.length) {
+        this.store.showSection(i);
+        this.pointUi(this.store.getTabPos(i));
+      } else {
+        this.pointUi(this.store.getClosePos());
+      }
+    });
+    const offClose = this.ctx.bus.on('ui:store_toggled', ({ open }) => {
+      if (open) return;
+      offClose();
+      this.clearUiPointer();
+      // Only AFTER the shop closes does she hand over the button — and only
+      // after her line does it appear. Before this moment it never has.
+      this.bubble.sequence('eleanor', [t.outro], () => {
+        this.ctx.state.addStat('shop:unlocked', 1);
+        this.ctx.state.addStat('tour:roothold', 1);
+        this.hud.storeButton.setVisible(this.ctx.state.tutorialDone && this.shopUnlocked());
+        this.ctx.bus.emit('tour:completed', { id: 'roothold' });
+      });
+    });
+    this.offBus.push(offClose);
+  }
+
+  private runHatcheryTour(): void {
+    const t = this.ctx.data.dialogue.tours?.hatchery;
+    if (!t) return;
+    const bus = this.ctx.bus;
+    this.bubble.sequence('selyna', t.intro, () => {
+      bus.emit('tour:point', { target: 'hatchery_cauldron' });
+      this.bubble.say('selyna', t.cauldron, 120000);
+      const offOpen = bus.on('ui:cauldron_toggled', ({ open }) => {
+        if (!open) return;
+        offOpen();
+        bus.emit('tour:unpoint', {});
+        this.bubble.sequence('selyna', [t.explain, t.close], undefined, (i) => {
+          if (i === 1) this.pointUi(this.cauldron.getClosePos());
+        });
+        const offClose = bus.on('ui:cauldron_toggled', ({ open: o }) => {
+          if (o) return;
+          offClose();
+          this.clearUiPointer();
+          this.ctx.state.addStat('tour:hatchery', 1);
+          this.ctx.bus.emit('tour:completed', { id: 'hatchery' });
+        });
+        this.offBus.push(offClose);
+      });
+      this.offBus.push(offOpen);
+    });
+  }
+
+  private shopUnlocked(): boolean {
+    return this.ctx.state.stat('shop:unlocked') > 0;
+  }
+
+  /** The tours' UI-space pointer (panel tabs, close buttons). */
+  private pointUi(pos: { x: number; y: number } | null): void {
+    this.clearUiPointer();
+    if (!pos) return;
+    const arrow = this.add.image(pos.x, pos.y - 96, 'ui_arrow').setScale(0.42).setDepth(DEPTH_TUTORIAL - 1);
+    this.tweens.add({
+      targets: arrow,
+      y: pos.y - 62,
+      duration: 420,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    this.tourUiArrow = arrow;
+  }
+
+  private clearUiPointer(): void {
+    if (!this.tourUiArrow) return;
+    this.tweens.killTweensOf(this.tourUiArrow);
+    this.tourUiArrow.destroy();
+    this.tourUiArrow = undefined;
+  }
+
   private playRegardBeats(characterId: string, hearts: number): void {
     // Mid-tutorial (the Crystal Ball pays exactly one heart) the sequence
     // would seize the bubble and end on hide(), stranding the tap-gated step

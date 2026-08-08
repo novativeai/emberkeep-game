@@ -334,43 +334,43 @@ describe('portals — every world has a way out of it', () => {
   });
 
   /**
-   * The LIVE pair is a round trip and no ENTERABLE world is a dead end.
+   * The full network: six doors, no world a dead end, every door a round trip.
    *
-   * The chapter crossing is the Ember Gate ⇄ the Keep Door (Emberkeep ⇄
-   * Borealis) — a door each way, so neither shore can strand the Keeper.
-   * Roothold and Hatchery keep their doors OUT authored, but nothing leads
-   * INTO them yet: they are empty boards, and a door into an empty board is a
-   * trap wearing a doorway. Their chapters re-pair them when they gain
-   * content — at which point the `LIVE` set below is the one line to grow.
+   *   Emberkeep → Roothold (the Ember Gate) and → Borealis (the North
+   *   Crossing); Roothold → Emberkeep (the Vine Arch); Borealis → Emberkeep
+   *   (the Ash Road) and → Hatchery (the Rune Way); Hatchery → Borealis (the
+   *   Rune Circle). WorldSystem's story gates decide WHEN each opens — the
+   *   topology's job is only that nowhere can strand the Keeper.
    */
-  const LIVE = ['emberkeep', 'borealis'];
-
-  it('leaves no enterable world a dead end — a door out and a door in, each', () => {
+  it('leaves no world a dead end — a door out and a door in, each', () => {
     const into = new Set([...WORLDS.values()].flatMap((w) => w.portals.map((p) => p.to)));
     for (const world of WORLDS.values()) {
-      expect(world.portals.length).toBeGreaterThan(0); // a world you cannot leave is refused at build
-      if (LIVE.includes(world.id)) expect(into.has(world.id)).toBe(true);
+      expect(world.portals.length).toBeGreaterThan(0);
+      expect(into.has(world.id)).toBe(true);
     }
-    // The empty worlds are exactly the ones with no door in — nothing else.
-    const doorless = [...WORLDS.values()].filter((w) => !into.has(w.id)).map((w) => w.id);
-    expect(doorless.sort()).toEqual(['hatchery', 'roothold']);
   });
 
-  /** And the live pair is a round trip: each of its doors has one coming back
-   *  the other way. Every authored door — live or parked — leads somewhere
-   *  that can send the Keeper onward, so no door is a one-way oubliette. */
-  it('pairs every live door with its return', () => {
-    for (const id of LIVE) {
-      for (const p of WORLDS.get(id)!.portals) {
-        const back = WORLDS.get(p.to)!.portals.some((q) => q.to === id);
+  it('pairs every door with its return', () => {
+    for (const world of WORLDS.values()) {
+      for (const p of world.portals) {
+        const back = WORLDS.get(p.to)!.portals.some((q) => q.to === world.id);
         expect(back).toBe(true);
       }
     }
-    for (const world of WORLDS.values()) {
-      for (const p of world.portals) {
-        expect(WORLDS.get(p.to)!.portals.length).toBeGreaterThan(0);
-      }
-    }
+  });
+
+  it('routes exactly the authored network', () => {
+    const routes = [...WORLDS.values()]
+      .flatMap((w) => w.portals.map((p) => `${w.id}->${p.to}`))
+      .sort();
+    expect(routes).toEqual([
+      'borealis->emberkeep',
+      'borealis->hatchery',
+      'emberkeep->borealis',
+      'emberkeep->roothold',
+      'hatchery->borealis',
+      'roothold->emberkeep'
+    ]);
   });
 
   /**
@@ -411,6 +411,38 @@ describe('portals — every world has a way out of it', () => {
     expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('borealis');
     ctx.bus.emit('world:switch', { to: 'borealis' });
     expect(ctx.state.worldId).toBe('borealis');
+  });
+
+  /** The Ember Gate: Roothold opens on Eleanor's FIRST delivered order — which
+   *  the tutorial itself delivers, so a finished tutorial can always walk in. */
+  it('holds Roothold shut until Order 1 is delivered', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('roothold');
+    ctx.bus.emit('world:switch', { to: 'roothold' });
+    expect(ctx.state.worldId).toBe(WORLD_ID);
+
+    ctx.state.completedOrderIds.push('eleanor_brazier');
+    expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('roothold');
+    ctx.bus.emit('world:switch', { to: 'roothold' });
+    expect(ctx.state.worldId).toBe('roothold');
+  });
+
+  /** The Rune Way: Hatchery opens on the per-world quest counter QuestSystem
+   *  keeps, never on an id list that could drift. */
+  it('holds the Hatchery shut until three Selyna quests are done', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
+    ctx.state.addStat('q:world:borealis:done', 2);
+    expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('hatchery');
+    ctx.bus.emit('world:switch', { to: 'hatchery' });
+    expect(ctx.state.worldId).toBe(WORLD_ID);
+
+    ctx.state.addStat('q:world:borealis:done', 1);
+    expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('hatchery');
+    ctx.bus.emit('world:switch', { to: 'hatchery' });
+    expect(ctx.state.worldId).toBe('hatchery');
   });
 });
 
@@ -536,7 +568,8 @@ describe('world art — visiting a world never leaves the others worse off', () 
     // world's to release, and releasing it would break the world we are ON.
     for (const id of ctx.state.worlds.keys()) {
       for (const key of worldArtKeys(ctx, id)) {
-        expect(key).toMatch(/^(background_|[a-z]+_world_)/);
+        // Backdrop, standee banks, and (since the Hatchery cauldron) map decor.
+        expect(key).toMatch(/^(background_|decor_|[a-z]+_world_)/);
       }
     }
   });

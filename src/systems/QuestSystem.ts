@@ -247,6 +247,10 @@ export class QuestSystem {
       const doneKey = latchKey(`done:${quest.id}`);
       if (this.isComplete(quest) && this.state.stat(doneKey) === 0) {
         this.state.addStat(doneKey, 1);
+        // The per-world completion counter WorldSystem's Rune Way gate reads
+        // (`q:world:borealis:done` >= HATCHERY_QUESTS_NEEDED). A counter, not
+        // an id list, so renaming a quest can never silently re-lock a door.
+        this.state.addStat(`q:world:${quest.world ?? 'emberkeep'}:done`, 1);
         // Paid on the LATCH flipping, not on `announce`. A save resumed past
         // this quest already carries the latch, so a reload can never pay
         // twice; and a quest that genuinely completes during a silent

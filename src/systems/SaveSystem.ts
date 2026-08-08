@@ -47,6 +47,9 @@ export class SaveSystem {
     'economy:changed',
     'bag:changed',
     'order:completed',
+    // A finished hub tour is a latch (`tour:<world>`, `shop:unlocked`) the
+    // player must never re-walk because the tab closed.
+    'tour:completed',
     'region:unlocked',
     'story:chapter',
     'nest:warmed',

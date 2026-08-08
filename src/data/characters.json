@@ -25,6 +25,20 @@
       "cooldownMs": 900000,
       "dx": -108,
       "dy": -152
+    },
+    {
+      "id": "eleanor_home",
+      "speaker": "eleanor",
+      "art": "eleanor",
+      "world": "roothold",
+      "anchor": [
+        73,
+        0
+      ],
+      "action": "give_back",
+      "cooldownMs": 900000,
+      "dx": 10,
+      "dy": -45
     }
   ]
 }

@@ -119,7 +119,7 @@ pixels off its island.
 | id | level | zones | cells | backdrop | role |
 |---|---|---|---|---|---|
 | `emberkeep` | 1 | 1 dense + 17 | 46 authored + 36 | `emberkeep` (nb2 render) | sanctuary |
-| `roothold` | 4 | 19 | 141 | `roothold` | **hub** — Eleanor's home |
+| `roothold` | 1 | 19 | 141 | `roothold` | **hub** — Eleanor's home |
 | `borealis` | 3 | 38 | 141 | `borealis` | sanctuary |
 | `hatchery` | 3 | 2 | 223 | `hatchery` | **hub** — Selyna's home |
 
@@ -210,58 +210,26 @@ A rectangle in world px rather than a set of cells, because a gateway is
 every playable cell, hanging over the isle's rim. Cells could also not describe
 a door as tall as the art.
 
-| world | door | painted as | leads to |
-|---|---|---|---|
-| `emberkeep` | The Ember Gate | the lit stone arch on the north-east isle | `borealis` |
-| `borealis` | The Keep Door | the glowing door in the keep | `emberkeep` |
-| `roothold` | The Vine Arch | the vined archway onto the rope bridge | `emberkeep` |
-| `hatchery` | The Rune Circle | the gold rune inlay in the middle of the deck | `borealis` |
+| world | door | colour | leads to | opens |
+|---|---|---|---|---|
+| `emberkeep` | The Ember Gate | forest green | `roothold` | Order 1 delivered |
+| `emberkeep` | The North Crossing (by the Golden Altar) | ice blue | `borealis` | the Elder wakes |
+| `roothold` | The Vine Arch | flame red/pink | `emberkeep` | always |
+| `borealis` | The Ash Road (by the landing shore) | flame red/pink | `emberkeep` | always |
+| `borealis` | The Rune Way (the circular inlay, mainland top) | ice blue | `hatchery` | 3 Selyna quests |
+| `hatchery` | The Rune Circle | ice blue | `borealis` | always |
 
-**The live pair is the chapter crossing itself: Emberkeep ⇄ Borealis.** The
-Ember Gate does not open on level — `WorldSystem.storyOpen` holds Borealis
-shut until the Golden Elder has woken (`q:done:keepers_hoard`), Eleanor speaks
-the Gate open right after the finale (`dialogue.gateOpens` → `gate:opened`),
-and the Gate is the ONE door that wears a drawn marker: `PortalFX`
-(entities/PortalFX.ts) — glow, molten core, vortex in-fall — because an arch
-that has been shut all chapter changing state IS news, the exception to
-"trust the painting". Its tap area grows to the FX bounds, and every portal
-tap now asks `ui:travel_requested` → the TravelPrompt's Cross emits
-`world:switch`. Roothold and Hatchery keep their doors OUT authored, but
-nothing leads INTO them until their chapters give them content — a door into
-an empty board is a trap wearing a doorway. `Zones.spec.ts` pins the live
-round trip, the gate latch, and that exactly those two worlds are door-less.
-The editor's `teleport` record (hatch a tier-2 flame gem) is the same
-journey's older phrasing and stays registry data only.
-
-**Authored map decor is placed the same way** — `DECOR` in `build-zones.mjs`,
-by a point on the backdrop. `at` is where the art's own anchor must land in
-backdrop px (for a standing prop, the centre of its ground contact), and the
-cell plus the free `dx`/`dy` nudge are *derived*: which cell a point falls in is
-a property of the fitted deck and would go stale the moment that fit changed.
-Hatchery's pink cauldron is authored as `at: [1542.5, 742.5]` — the rune
-circle's centre, read off the image — and lands on cell (12,6) + (−50, 45).
-
-Hatchery's door is the rune circle inlaid in the *middle* of its deck, standing
-on playable ground. That costs nothing and is the point: a portal is the lowest
-interactive band on the board, so a piece standing on the circle takes the tap
-and only bare stone travels.
-
-Four properties worth knowing:
-
-- **A door is an intent, never a shortcut.** It emits `world:switch` and
-  `WorldSystem` decides, so a door cannot carry the player out of the tutorial
-  or above their rank. Tested.
-- **A door the Keeper cannot use is not there.** `BoardScene.refreshPortals`
-  disables any whose destination `WorldSystem.available()` does not list, and
-  re-asks on `keeper:leveled` and on the tutorial handing over. The alternative
-  — a live rectangle that refuses — is dead input on an invisible object.
-- **The lowest interactive band on the board** (`DEPTHS.tiles + 1`, under every
-  item, badge, standee and cloud). Scenery must never win a tap that landed on
-  something the player can pick up, and fog draws over a door for the same
-  reason it draws over ground.
-- **A `Zone`, not a transparent rectangle.** `setAlpha(0)` clears Phaser's
-  render flag and the object stops being hit-tested at all, so the obvious
-  spelling of "invisible" is the one that silently does nothing.
+**Every door wears a `PortalFX` coloured by its DESTINATION** (Constants
+`PORTAL_TINTS`: flame home, green to Roothold, ice north) — the exception to
+"trust the painting", because an opening door is news. The tap area is the FX's
+own bounds; a tap asks `ui:travel_requested` → the TravelPrompt's Cross emits
+`world:switch`. WorldSystem's story gates (`storyOpen`) decide WHEN each opens —
+all three keys are save-derivable stats — and `Zones.spec.ts` pins the exact
+six routes, the round trips, and each gate. The North Crossing is
+ceremony-lit (`gate:opened`, Eleanor's lines after the finale); the hubs run
+first-arrival tours (UIScene `tours`: Roothold's Emporium walkthrough unlocks
+the shop button, Hatchery's cauldron lesson). The editor's `teleport` record
+stays registry data only.
 
 Authored in the World Builder (⭘ Portal, `P`) or in `PORTALS` in
 `scripts/build-zones.mjs`, where they are written in **backdrop pixels** — read

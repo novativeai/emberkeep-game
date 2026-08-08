@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { PORTAL_TINTS, type PortalTints } from '../core/Constants';
 
 /**
  * The Ember Gate's living portal — the one piece of scenery that is drawn ON
@@ -31,10 +32,15 @@ export class PortalFX extends Phaser.GameObjects.Container {
   private layers: Phaser.GameObjects.Image[] = [];
   private live = false;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, height: number) {
+  private readonly tints: PortalTints;
+
+  constructor(scene: Phaser.Scene, x: number, y: number, height: number, destination?: string) {
     super(scene, x, y);
     scene.add.existing(this);
     this.h = height;
+    // A door wears where it GOES (Constants PORTAL_TINTS): flame home, forest
+    // green to Roothold, ice blue north. Unknown destinations run warm.
+    this.tints = PORTAL_TINTS[destination ?? ''] ?? PORTAL_TINTS.emberkeep!;
     this.setVisible(false);
   }
 
@@ -59,7 +65,7 @@ export class PortalFX extends Phaser.GameObjects.Container {
     const scene = this.scene;
     // Ignition flash — a hot core blown up and burned off.
     const flash = scene.add.image(0, 0, 'fx_glow').setBlendMode(Phaser.BlendModes.ADD);
-    flash.setTint(0xfff1cf);
+    flash.setTint(this.tints.heart);
     flash.setDisplaySize(this.h * 0.3, this.h * 0.3);
     this.add(flash);
     scene.tweens.add({
@@ -73,7 +79,7 @@ export class PortalFX extends Phaser.GameObjects.Container {
     });
     // Shockwave shell riding the flash.
     const shell = scene.add.image(0, 0, 'fx_shell').setBlendMode(Phaser.BlendModes.ADD);
-    shell.setTint(0xffc46a);
+    shell.setTint(this.tints.core);
     shell.setDisplaySize(this.h * 0.2, this.h * 0.2);
     this.add(shell);
     scene.tweens.add({
@@ -130,9 +136,9 @@ export class PortalFX extends Phaser.GameObjects.Container {
       });
       return img;
     };
-    layer(0xff7a2a, this.h * 1.1, this.h * 1.2, 0.72, 2600); // breath glow
-    layer(0xffb45e, this.h * 0.54, this.h * 1.0, 0.95, 1900); // molten core
-    const heart = layer(0xfff3d0, this.h * 0.22, this.h * 0.62, 1, 1300); // white heart
+    layer(this.tints.glow, this.h * 1.1, this.h * 1.2, 0.72, 2600); // breath glow
+    layer(this.tints.core, this.h * 0.54, this.h * 1.0, 0.95, 1900); // molten core
+    const heart = layer(this.tints.heart, this.h * 0.22, this.h * 0.62, 1, 1300); // white heart
     scene.tweens.add({
       targets: heart,
       alpha: { from: Math.max(startAlpha, 0.01), to: 0.7 },
@@ -144,8 +150,8 @@ export class PortalFX extends Phaser.GameObjects.Container {
     // Energy swirl: two elongated streaks counter-rotating around the core —
     // the cheap read of "this surface is turning" that a glow alone never has.
     for (const [dir, tint, alpha] of [
-      [1, 0xffc46a, 0.5],
-      [-1, 0xff8a3a, 0.42]
+      [1, this.tints.streaks[0], 0.5],
+      [-1, this.tints.streaks[1], 0.42]
     ] as const) {
       const streak = scene.add.image(0, 0, 'fx_glow').setBlendMode(Phaser.BlendModes.ADD);
       streak.setTint(tint);
@@ -172,7 +178,7 @@ export class PortalFX extends Phaser.GameObjects.Container {
       scale: { start: 0.9, end: 0 },
       alpha: { start: 1, end: 0 },
       rotate: { min: 0, max: 360 },
-      tint: [0xffe9b0, 0xffc46a, 0xff8a3a],
+      tint: this.tints.sparks,
       frequency: 55,
       blendMode: Phaser.BlendModes.ADD
     });
@@ -186,7 +192,7 @@ export class PortalFX extends Phaser.GameObjects.Container {
       lifespan: { min: 1800, max: 2600 },
       scale: { start: 0.4, end: 0 },
       alpha: { start: 0.8, end: 0 },
-      tint: [0xffc46a, 0xff9a4a],
+      tint: this.tints.motes,
       frequency: 240,
       blendMode: Phaser.BlendModes.ADD
     });

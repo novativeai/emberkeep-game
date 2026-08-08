@@ -1,4 +1,4 @@
-import { GOLDEN_ALTAR } from '../core/Constants';
+import { GOLDEN_ALTAR, HATCHERY_QUESTS_NEEDED } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { WorldRuntime } from '../core/world';
@@ -42,15 +42,22 @@ export class WorldSystem {
   }
 
   /**
-   * The north opens on the STORY, not on a number: the Ember Gate wakes when
-   * the Golden Elder does (`q:done:keepers_hoard` — the same latch the altar
-   * derives her presence from), because a level the player crosses mid-merge
-   * is the wrong key for the chapter crossing. Save-derivable, so a reload
-   * finds the Gate exactly as open as it was.
+   * Every door beyond Emberkeep opens on the STORY, never on a number a player
+   * crosses mid-merge. All three keys are save-derivable stats, so a reload
+   * finds each gate exactly as open as it was:
+   *
+   *   roothold — Eleanor's first delivered order (the tutorial delivers it, so
+   *              her hub opens the moment the game hands over);
+   *   borealis — the Golden Elder awake (`q:done:keepers_hoard`, the same
+   *              latch the altar derives her presence from);
+   *   hatchery — HATCHERY_QUESTS_NEEDED of Selyna's quests done, read off the
+   *              per-world counter QuestSystem keeps (`q:world:borealis:done`).
    */
   private storyOpen(worldId: string): boolean {
-    if (worldId !== 'borealis') return true;
-    return this.state.stat(`q:done:${GOLDEN_ALTAR.awakenQuestId}`) > 0;
+    if (worldId === 'roothold') return this.state.completedOrderIds.includes('eleanor_brazier');
+    if (worldId === 'borealis') return this.state.stat(`q:done:${GOLDEN_ALTAR.awakenQuestId}`) > 0;
+    if (worldId === 'hatchery') return this.state.stat('q:world:borealis:done') >= HATCHERY_QUESTS_NEEDED;
+    return true;
   }
 
   private switchTo(to: string): void {

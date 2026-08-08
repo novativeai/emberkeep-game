@@ -75,6 +75,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
   private titleText: Phaser.GameObjects.Text;
   private titleBg: Phaser.GameObjects.Graphics;
   private tabsRow: Phaser.GameObjects.Container;
+  private closeBtn: Phaser.GameObjects.Container;
   /** Named `shelf`, not `body`: GameObject.body is Phaser's physics slot. */
   private shelf: Phaser.GameObjects.Container;
   /** Clipped window the shelf scrolls inside. */
@@ -137,6 +138,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
 
     const close = scene.add.container(956, -540);
+    this.closeBtn = close;
     const closeBg = scene.add.image(0, 6, 'ui_btn_round').setScale(0.92).setTint(num(INK.field));
     const closeX = scene.add
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '54px', fontStyle: 'bold', color: INK.onFieldGold })
@@ -220,6 +222,29 @@ export class StorePanel extends Phaser.GameObjects.Container {
       onUpdate: () => this.seatMask()
     });
     this.bus.emit('ui:store_toggled', { open: true });
+  }
+
+  /** Tour accessors — page-space anchors for the walkthrough's pointer.
+   *  Null while the panel is closed, exactly like BagPanel's verb accessors. */
+  getTabPos(i: number): { x: number; y: number } | null {
+    if (!this.visible) return null;
+    const tab = this.tabsRow.list[i] as Phaser.GameObjects.Container | undefined;
+    if (!tab) return null;
+    const m = tab.getWorldTransformMatrix();
+    return { x: m.tx, y: m.ty };
+  }
+
+  getClosePos(): { x: number; y: number } | null {
+    if (!this.visible) return null;
+    const m = this.closeBtn.getWorldTransformMatrix();
+    return { x: m.tx, y: m.ty };
+  }
+
+  /** Jump the shelf to a section — the tour walks them as Eleanor names them. */
+  showSection(i: number): void {
+    if (i < 0 || i >= this.sections.length || this.activeIndex === i) return;
+    this.activeIndex = i;
+    this.refresh();
   }
 
   requestClose(): void {

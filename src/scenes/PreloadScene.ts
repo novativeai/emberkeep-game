@@ -125,7 +125,9 @@ export class PreloadScene extends Phaser.Scene {
     // a character the board can never show would cost that for nothing.
     // `characters.json` stays the single owner of who belongs where.
     for (const [id, seq] of Object.entries(STANDEE_BANKS)) {
-      if (ctx.data.characters.characters.find((c) => c.id === id)?.world !== ctx.state.worldId)
+      // A bank is fetched when anyone in THIS world wears it — `art ?? id`, so
+      // Eleanor-at-home (id eleanor_home, art eleanor) pulls Eleanor's sheets.
+      if (!ctx.data.characters.characters.some((c) => (c.art ?? c.id) === id && c.world === ctx.state.worldId))
         continue;
       for (const [bank, key] of Object.entries(seq.keys)) {
         this.load.spritesheet(key, `sprites/${id}/world-${bank}.webp`, {

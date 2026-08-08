@@ -14,6 +14,7 @@ import {
   EMBER_MOTES,
   FINALE,
   GATE_FX_HEIGHT,
+  ROOTHOLD_HOUSE,
   FINALE_ENDS_MS,
   FINALE_REGION,
   GAME_WIDTH,
@@ -346,8 +347,12 @@ export class BoardScene extends Phaser.Scene {
   private altarElder?: RigPlayer;
   private altarElderFallback?: Phaser.GameObjects.Image;
   private altarZone?: Phaser.GameObjects.Zone;
-  /** The invisible doors out of this world — see `buildPortals`. */
-  private portalZones: { zone: Phaser.GameObjects.Zone; to: string }[] = [];
+  /** The doors out of this world, each with its lit FX — see `buildPortals`. */
+  private portalDoors = new Map<string, { fx: PortalFX; zone: Phaser.GameObjects.Zone; to: string }>();
+  /** World-position anchors the hub tours point at (the Emporium house, the
+   *  cauldron) — registered by whichever builder places the landmark. */
+  private tourTargets = new Map<string, { x: number; y: number }>();
+  private tourArrow?: Phaser.GameObjects.Image;
   private altarElderRoll = { mode: 'idle' as 'idle' | 'hover', remainMs: 0 };
   /** The Level-3 finale runs exactly once per session. */
   private finaleRan = false;
@@ -405,7 +410,9 @@ export class BoardScene extends Phaser.Scene {
     // Travel restarts this scene, so last world's doors died with it — never
     // carry the refs, or the new board would hold rectangles leading out of a
     // world the player has already left.
-    this.portalZones = [];
+    this.portalDoors = new Map();
+    this.tourTargets = new Map();
+    this.tourArrow = undefined;
     this.goldenTremble = undefined;
     this.teaseReturn = null;
     this.finaleRan = false;
@@ -734,23 +741,37 @@ export class BoardScene extends Phaser.Scene {
     return this.generatorConfigFor(chain, tier) !== undefined;
   }
 
-  /** Fetch + load every dragon rig once — ALL rigs in parallel (they're ~1MB
-   *  each; sequential fetches made cold loads wear the baked fallback for many
-   *  seconds). Any failure leaves that dragon as the pooled placeholder sprite
-   *  (graceful: the board still works). */
+  /** Fetch + load every dragon rig once. The JSON FETCHES run in parallel
+   *  (they're the slow network part; sequential fetches made cold loads wear
+   *  the baked fallback for many seconds) — but the LOADER phases run strictly
+   *  one rig at a time: five overlapping `load.start()` + once-COMPLETE pairs
+   *  on the one shared LoaderPlugin can wedge its queue permanently (measured:
+   *  26 files pending, none in flight, forever — and every later world travel
+   *  hangs behind the dead loader). Any failure leaves that dragon as the
+   *  pooled placeholder sprite (graceful: the board still works). */
   private async loadDragonRigs(): Promise<void> {
     const base = (import.meta.env.BASE_URL ?? './').replace(/\/?$/, '/');
-    await Promise.all(
-      Object.entries(DRAGON_RIGS).map(([rigKey, url]) => this.loadDragonRig(base, rigKey, url))
+    const docs = await Promise.all(
+      Object.entries(DRAGON_RIGS).map(async ([rigKey, url]): Promise<[string, RigDoc] | null> => {
+        if (this.dragonRigs.has(rigKey)) return null;
+        try {
+          const res = await fetch(base + url);
+          if (!res.ok) return null;
+          return [rigKey, (await res.json()) as RigDoc];
+        } catch {
+          return null;
+        }
+      })
     );
+    for (const entry of docs) {
+      if (!entry || !this.scene.isActive()) continue;
+      await this.loadDragonRig(base, entry[0], entry[1]);
+    }
   }
 
-  private async loadDragonRig(base: string, rigKey: string, url: string): Promise<void> {
+  private async loadDragonRig(base: string, rigKey: string, rig: RigDoc): Promise<void> {
     if (this.dragonRigs.has(rigKey)) return;
     try {
-      const res = await fetch(base + url);
-      if (!res.ok || !this.scene.isActive()) return;
-      const rig = (await res.json()) as RigDoc;
       if (rig.format !== 'emberkeep-rig' || !rig.images || !this.scene.isActive()) return;
       // A rig exported with the tool's default name would collide with any
       // other default-named rig on the shared texture keys — give it its
@@ -1187,8 +1208,10 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.bus.on('keeper:leveled', ({ level }) => {
         this.flyToLevel(level);
         // A rank can be what opens a world — the door to it wakes with it.
-        this.refreshPortals();
+        this.syncPortalFx(true);
       }),
+      this.ctx.bus.on('tour:point', ({ target }) => this.onTourPoint(target)),
+      this.ctx.bus.on('tour:unpoint', () => this.clearTourArrow()),
       this.ctx.bus.on('quest:completed', ({ questId }) => {
         if (questId === GOLDEN_ALTAR.awakenQuestId) this.runFinale();
       })
@@ -1799,6 +1822,8 @@ export class BoardScene extends Phaser.Scene {
       // The one piece of scenery that IS a screen: Selyna's pot opens the brew
       // panel. Same shape as a world character — map decor with a tap handler.
       if (d.name === CAULDRON_DECOR) {
+        // The Hatchery tour points here ("The cauldron, on the rune — tap it").
+        this.tourTargets.set('hatchery_cauldron', { x: sprite.x, y: baseY - sprite.displayHeight * 0.55 });
         sprite.setInteractive({ useHandCursor: true });
         sprite.on(
           'pointerup',
@@ -1820,11 +1845,13 @@ export class BoardScene extends Phaser.Scene {
    */
   private buildWorldCharacters(): void {
     for (const cfg of this.ctx.systems.characters.charactersIn(this.ctx.state.worldId)) {
-      const bank = STANDEE_BANKS[cfg.id];
-      // Prefer the animated banks; fall back to the static `char_<id>` texture,
-      // then skip entirely. Art missing must degrade, never block.
+      const art = cfg.art ?? cfg.id;
+      const bank = STANDEE_BANKS[art];
+      // Prefer the animated banks; fall back to the static `char_<art>` texture,
+      // then skip entirely. Art missing must degrade, never block. `art` (not
+      // id) keys the wardrobe, so Eleanor-at-home wears Eleanor.
       const animated = bank !== undefined && this.textures.exists(bank.keys.idle);
-      const key = animated ? bank!.keys.idle : `char_${cfg.id}`;
+      const key = animated ? bank!.keys.idle : `char_${art}`;
       if (!animated && !this.textures.exists(key)) continue;
       const [col, row] = cfg.anchor;
       const cell = gridToWorld(col, row);
@@ -1841,7 +1868,7 @@ export class BoardScene extends Phaser.Scene {
       const sprite = this.add.sprite(x, y, key).setDepth(DEPTHS.itemBase + y);
       // Baked size × the authored trim. Everything downstream (shadow, marker,
       // pulses, breath) reads this one number or the live sprite scale.
-      const standeeScale = bank ? bank.scale * (STANDEE_SCALE_TRIM[cfg.id] ?? 1) : 1;
+      const standeeScale = bank ? bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1) : 1;
       if (bank) {
         // Her FEET are the origin, not the frame's bottom-centre. The baked
         // frame box is the tight union of both banks and the cast's ember bolt
@@ -1860,7 +1887,7 @@ export class BoardScene extends Phaser.Scene {
         // sequence read as a fidget next to it, and two idles running at once
         // read as two different people. The bank stays loaded because the cast
         // hands back to its first frame.
-        this.ensureStandeeAnims(cfg.id, bank!);
+        this.ensureStandeeAnims(art, bank!);
         sprite.setFrame(0);
       }
       // Arm/disarm pulses read this instead of assuming 1.
@@ -1889,10 +1916,12 @@ export class BoardScene extends Phaser.Scene {
       sprite.setData('bodyBox', b);
       sprite.setInteractive(characterHitRect(b, false), Phaser.Geom.Rectangle.Contains);
       this.input.setDraggable(sprite, false);
-      sprite.on('pointerup', () => this.onCharacterTapped(cfg.id, sprite));
-      this.characterSprites.set(cfg.id, sprite);
+      // Identity is the WARDROBE key: Eleanor-at-home is Eleanor — one Regard
+      // gauge, one dialogue bank, one action cooldown, wherever she stands.
+      sprite.on('pointerup', () => this.onCharacterTapped(art, sprite));
+      this.characterSprites.set(art, sprite);
       this.settleSprite(sprite, 120);
-      this.startBreathing(cfg.id, sprite);
+      this.startBreathing(art, sprite);
     }
   }
 
@@ -2537,62 +2566,129 @@ export class BoardScene extends Phaser.Scene {
         const display = world ? world.name.charAt(0).toUpperCase() + world.name.slice(1) : p.to;
         this.ctx.bus.emit('ui:travel_requested', { to: p.to, label: p.label, world: display });
       });
-      this.portalZones.push({ zone, to: p.to });
-      // The Ember Gate wears the portal FX — the one door whose opening is a
-      // story beat. Standing already-lit on a reload (the q:done latch is the
-      // truth), blooming on `gate:opened` after Eleanor's ceremony otherwise.
-      if (p.id === 'emberkeep_gate') this.buildGateFx(p, zone);
+      // EVERY door wears a PortalFX, coloured by its DESTINATION (PORTAL_TINTS)
+      // — the player learns the routes by colour before they learn them by name.
+      const cx = p.x + p.width / 2;
+      const cy = p.y + p.height / 2;
+      const fx = new PortalFX(this, cx, cy, GATE_FX_HEIGHT, p.to);
+      fx.setDepth(DEPTHS.itemBase + cy);
+      this.portalDoors.set(p.id, { fx, zone, to: p.to });
+    }
+    // Doors already earned stand lit from the first frame (all three story
+    // gates are save-derivable), including the ceremony door on a reload.
+    this.syncPortalFx(false);
+    this.refreshPortals();
+    this.offBus.push(
+      // The North Crossing's opening IS a ceremony: the finale ends, Eleanor
+      // speaks it open, and `gate:opened` lights it — never the latch alone.
+      this.ctx.bus.on('gate:opened', () => this.ignitePortal('emberkeep_altar_gate')),
+      // The Ember Gate (→ Roothold) opens on Order 1; the Rune Way
+      // (→ Hatchery) on the third Selyna quest. Both are plain availability
+      // flips, so one sync serves them — and any future gate — unchanged.
+      this.ctx.bus.on('order:completed', () => this.syncPortalFx(true)),
+      this.ctx.bus.on('quest:completed', () => this.syncPortalFx(true))
+    );
+    this.buildHubLandmarks();
+  }
+
+  /**
+   * The painted landmarks a hub is FOR, given hands: in Roothold, the house is
+   * the Emporium's storefront — tapping it opens the shop, exactly as the tour
+   * teaches. A zone over the painting, like a portal, but in the ITEM band:
+   * a storefront is a thing, not ground.
+   */
+  private buildHubLandmarks(): void {
+    if (this.ctx.state.worldId !== 'roothold') return;
+    const r = ROOTHOLD_HOUSE;
+    const zone = this.add
+      .zone(r.x + r.width / 2, r.y + r.height / 2, r.width, r.height)
+      .setDepth(DEPTHS.itemBase + r.y + r.height)
+      .setInteractive({ useHandCursor: true });
+    zone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (!this.isTap(pointer)) return;
+      this.tapClaimed = true;
+      this.ctx.bus.emit('ui:emporium_requested', {});
+    });
+    // The tour's arrow lands over the roofline.
+    this.tourTargets.set('roothold_house', { x: r.x + r.width / 2, y: r.y + 40 });
+  }
+
+  /** The hub tours' bouncing pointer over a board landmark. */
+  private onTourPoint(target: string): void {
+    this.clearTourArrow();
+    const at = this.tourTargets.get(target);
+    if (!at) return;
+    const arrow = this.add.image(at.x, at.y - 60, 'ui_arrow').setScale(0.5).setDepth(DEPTHS.dragged + 10);
+    this.tweens.add({
+      targets: arrow,
+      y: at.y - 20,
+      duration: 420,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    this.tourArrow = arrow;
+  }
+
+  private clearTourArrow(): void {
+    if (!this.tourArrow) return;
+    this.tweens.killTweensOf(this.tourArrow);
+    this.tourArrow.destroy();
+    this.tourArrow = undefined;
+  }
+
+  /**
+   * Light every door whose destination is now available. `bloom` animates a
+   * fresh opening (ignition flash + shockwave); build time passes false so an
+   * already-earned door simply stands lit. The North Crossing is excluded from
+   * LIVE syncs — its quest latch flips mid-finale, and lighting it there would
+   * scoop Eleanor's ceremony; `gate:opened` ignites it instead.
+   */
+  private syncPortalFx(bloom: boolean): void {
+    const open = new Set(this.ctx.systems.worlds.available().map((w) => w.id));
+    for (const [id, door] of this.portalDoors) {
+      if (door.fx.isLive || !open.has(door.to)) continue;
+      if (bloom && id === 'emberkeep_altar_gate') continue;
+      if (bloom) door.fx.bloom();
+      else door.fx.standIdle();
+      this.widenDoor(door);
     }
     this.refreshPortals();
   }
 
-  /**
-   * The Ember Gate's portal FX + its enlarged tap area.
-   *
-   * The authored door rect is the ARCH's art; the lit portal reads bigger than
-   * the arch (it is sized to Eleanor — the figure standing right beside it),
-   * so once the FX is up, the hit zone grows to the FX's own bounds: the whole
-   * effect is the door, not a smaller invisible rectangle inside it.
-   */
-  private buildGateFx(p: { x: number; y: number; width: number; height: number }, zone: Phaser.GameObjects.Zone): void {
-    const cx = p.x + p.width / 2;
-    const cy = p.y + p.height / 2;
-    const fx = new PortalFX(this, cx, cy, GATE_FX_HEIGHT);
-    fx.setDepth(DEPTHS.itemBase + cy);
-    const widen = (): void => {
-      const { width, height } = fx.hitSize();
-      zone.setSize(width, height);
-      const hit = zone.input?.hitArea as Phaser.Geom.Rectangle | undefined;
-      if (hit) hit.setSize(width, height);
-    };
-    if (this.goldenQuestDone()) {
-      fx.standIdle();
-      widen();
-    }
-    this.offBus.push(
-      this.ctx.bus.on('gate:opened', () => {
-        fx.bloom();
-        widen();
-        // The latch behind `available()` flipped when the quest completed —
-        // the door itself goes live here, with the ceremony, not before.
-        this.refreshPortals();
-      })
-    );
+  private ignitePortal(id: string): void {
+    const door = this.portalDoors.get(id);
+    if (!door || door.fx.isLive) return;
+    door.fx.bloom();
+    this.widenDoor(door);
+    this.refreshPortals();
+  }
+
+  /** Once lit, the whole FX is the door: the hit zone grows to cover the
+   *  effect's own bounds (sized to Eleanor) — and only ever GROWS. A door whose
+   *  authored rect is already wider than the glow (the Rune Circle) keeps it:
+   *  shrinking to the FX would strand the painted stone outside its own tap. */
+  private widenDoor(door: { fx: PortalFX; zone: Phaser.GameObjects.Zone }): void {
+    const { width, height } = door.fx.hitSize();
+    const w = Math.max(width, door.zone.width);
+    const h = Math.max(height, door.zone.height);
+    door.zone.setSize(w, h);
+    const hit = door.zone.input?.hitArea as Phaser.Geom.Rectangle | undefined;
+    if (hit) hit.setSize(w, h);
   }
 
   /**
    * A door the Keeper cannot walk through yet simply is not there.
    *
-   * The alternative — a live rectangle that refuses — is dead input on an
-   * INVISIBLE object: the player taps painted scenery, nothing happens, and
-   * there is nothing on screen to explain why. So availability is asked of
-   * WorldSystem (the same rule the door would be refused by) and re-asked
-   * whenever it can have changed: ranking up, and the tutorial handing over.
+   * Enabled only when the destination is available AND the FX is lit — an
+   * unlit door taking taps would be dead input on an invisible object, and a
+   * lit door that refused would be worse. `syncPortalFx` keeps the two in
+   * step, re-asked whenever availability can have changed.
    */
   private refreshPortals(): void {
     const open = new Set(this.ctx.systems.worlds.available().map((w) => w.id));
-    for (const { zone, to } of this.portalZones) {
-      if (zone.input) zone.input.enabled = open.has(to);
+    for (const door of this.portalDoors.values()) {
+      if (door.zone.input) door.zone.input.enabled = open.has(door.to) && door.fx.isLive;
     }
   }
 
@@ -4061,17 +4157,23 @@ export class BoardScene extends Phaser.Scene {
    */
   private fetchWorldArt(onReady: () => void): void {
     const wanted = worldArtKeys(this.ctx, this.ctx.state.worldId);
-    const backdrops = wanted.filter((k) => k.startsWith('background_'));
+    // Everything assets.json can resolve — the backdrop AND the map's decor
+    // (standee sheets have no assets entry; ensureTextures skips them and the
+    // spritesheet queue below carries them instead).
+    const fetchable = wanted.filter((k) => !k.startsWith('rig:'));
     // Spritesheets carry frame dimensions, so they cannot go through
     // `ensureTextures` (which only knows about plain images) — queue them here
     // and let that call start the single loader run for both.
     let queued = 0;
     for (const cfg of this.ctx.systems.characters.charactersIn(this.ctx.state.worldId)) {
-      const bank = STANDEE_BANKS[cfg.id];
+      // The wardrobe key (`art ?? id`) names both the bank and its files —
+      // Eleanor-at-home fetches Eleanor's own sheets.
+      const art = cfg.art ?? cfg.id;
+      const bank = STANDEE_BANKS[art];
       if (!bank) continue;
       for (const [name, key] of Object.entries(bank.keys)) {
         if (this.textures.exists(key)) continue;
-        this.load.spritesheet(key, `sprites/${cfg.id}/world-${name}.webp`, {
+        this.load.spritesheet(key, `sprites/${art}/world-${name}.webp`, {
           frameWidth: bank.frameWidth,
           frameHeight: bank.frameHeight
         });
@@ -4081,14 +4183,14 @@ export class BoardScene extends Phaser.Scene {
     if (queued === 0) {
       // Nothing but (possibly) the backdrop: `ensureTextures` handles both the
       // already-resident case and the fetch, and calls back either way.
-      ensureTextures(this, this.ctx, backdrops, onReady);
+      ensureTextures(this, this.ctx, fetchable, onReady);
       return;
     }
     // Sheets are already queued, so the callback has to hang off THIS loader run
     // — handing the backdrop to `ensureTextures` would let it fire `onReady`
     // synchronously when the backdrop happens to be resident, restarting the
     // scene while the sheets were still in flight.
-    for (const key of backdrops) {
+    for (const key of fetchable) {
       const entry = this.ctx.data.assets.images.find((e) => e.key === key);
       if (this.textures.exists(key) || entry?.source !== 'file' || !entry.file) continue;
       this.load.image(key, entry.file);
@@ -4234,8 +4336,10 @@ export class BoardScene extends Phaser.Scene {
         this.tutorialStepId = step.id;
         this.refreshAllDraggable();
         // Travel is barred for the whole tutorial, so the doors come alive on
-        // the step that ends it — not on a later reload.
-        this.refreshPortals();
+        // the step that ends it — not on a later reload. Order 1 was delivered
+        // MID-tutorial, so the Ember Gate blooms right here, as the game hands
+        // over: the first thing free play shows is a new door.
+        this.syncPortalFx(true);
         this.setHighlights(step.highlight);
         // Key badges: earned into view (held keys ≥ region cost) — quiet here,
         // because the tutorial's own script stages the key_unlock beat.

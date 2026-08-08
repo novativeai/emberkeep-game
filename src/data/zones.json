@@ -1174,13 +1174,24 @@
       "portals": [
         {
           "id": "emberkeep_gate",
-          "to": "borealis",
+          "to": "roothold",
           "label": "The Ember Gate",
           "rect": [
             2149.18,
             126.44,
             279.16,
             293.79
+          ]
+        },
+        {
+          "id": "emberkeep_altar_gate",
+          "to": "borealis",
+          "label": "The North Crossing",
+          "rect": [
+            457.14,
+            227.62,
+            231.62,
+            280.38
           ]
         }
       ]
@@ -5051,14 +5062,25 @@
       ],
       "portals": [
         {
-          "id": "borealis_keep_door",
+          "id": "borealis_shore_gate",
           "to": "emberkeep",
-          "label": "The Keep Door",
+          "label": "The Ash Road",
           "rect": [
-            2444.19,
-            178.86,
-            190.17,
-            243.81
+            1749.33,
+            1361.33,
+            182.86,
+            256
+          ]
+        },
+        {
+          "id": "borealis_rune_gate",
+          "to": "hatchery",
+          "label": "The Rune Way",
+          "rect": [
+            438.86,
+            245.9,
+            213.33,
+            249.9
           ]
         }
       ]
@@ -5066,7 +5088,7 @@
     {
       "id": "roothold",
       "name": "Roothold",
-      "level": 4,
+      "level": 1,
       "backdrop": "roothold",
       "extendsAuthoredMap": false,
       "map": {
@@ -10995,7 +11017,7 @@
             "offsetY": 0,
             "scale": 1,
             "anchor": {
-              "x": 0.502,
+              "x": 0.5,
               "y": 0.845
             }
           }

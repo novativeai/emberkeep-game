@@ -53,10 +53,35 @@
   "gateOpens": {
     "speaker": "eleanor",
     "lines": [
-      "…Do you feel that? The arch beside me — the Ember Gate. Shut for sixty years, and the moment she woke, it remembered it is a door.",
-      "It goes north, to the ice. My sister keeps that shore. Selyna. Sharper than me, and alone far longer than sixty years.",
-      "The fire you raised is what opened it, so it is yours to walk through. Whenever you are ready, Keeper — I will keep the isle warm."
+      "…Do you feel that? Beside her altar — the air is standing open. She woke, and the way north woke with her.",
+      "It goes to the ice. My sister keeps that shore. Selyna. Sharper than me, and alone far longer than sixty years.",
+      "Her fire opened it, so it is yours to walk through. Whenever you are ready, Keeper — I will keep the isle warm."
     ]
+  },
+  "tours": {
+    "roothold": {
+      "intro": [
+        "So this is what I could not show you before. Roothold — my home, and the last roof the fire never reached.",
+        "Sixty years I kept shop up here alone. From today, the door stands open for you."
+      ],
+      "house": "That house is my Emporium — everything I kept safe from the old court. Tap it.",
+      "sections": [
+        "Manor skins. The Keep wears what you choose — walls remember being looked after.",
+        "Decorations. Small things, but small things are how ground becomes yours.",
+        "Dragon skins. My needle, their scales. They do preen, you know."
+      ],
+      "close": "That is the whole of it. The ✕ up there closes the shop — go on.",
+      "outro": "And now it travels with you: the shop button, bottom right, wherever you stand. My shelves are always open, Keeper."
+    },
+    "hatchery": {
+      "intro": [
+        "The Hatchery. Mine before it was anyone's — every dragon the north still has hatched inside that circle.",
+        "You will not be shown all of it today. One thing first."
+      ],
+      "cauldron": "The cauldron, on the rune. Tap it.",
+      "explain": "It trades from your satchel: the right things in, and it gives back what no board can grow. The circle decides what is right.",
+      "close": "The ✕ shuts it. That is all I am showing you until I trust you with more."
+    }
   },
   "lateAwakening": "…At last. I waited for YOU, Keeper — not for her. The Elder rises, just as the stories promised.",
   "hints": {

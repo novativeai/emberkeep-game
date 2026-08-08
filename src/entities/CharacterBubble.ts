@@ -104,6 +104,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   private seqIdx = 0;
   private seqSpeaker: SpeakerId = 'eleanor';
   private seqDone: (() => void) | undefined;
+  private seqOnLine?: (idx: number) => void;
   /** Coloured runs drawn over the body copy (the dragon's name). */
   private highlightFx!: Phaser.GameObjects.Container;
   /** Unwrapped, invisible twin of `label`, used only to measure run widths. */
@@ -457,7 +458,12 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
    * `STORY_BEAT_HOLD_MS` is only a safety net so a bubble can never strand the
    * board if the player walks away.
    */
-  sequence(speaker: SpeakerId, lines: string[], onDone?: () => void): void {
+  sequence(
+    speaker: SpeakerId,
+    lines: string[],
+    onDone?: () => void,
+    onLine?: (idx: number) => void
+  ): void {
     if (!lines.length) {
       onDone?.();
       return;
@@ -466,6 +472,9 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.seqIdx = 0;
     this.seqSpeaker = speaker;
     this.seqDone = onDone;
+    // Per-line hook — the hub tours move their pointer as she talks (section
+    // by section, then the close button), so the arrow is part of the line.
+    this.seqOnLine = onLine;
     this.playSequenceLine();
   }
 
@@ -475,6 +484,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       this.endSequence();
       return;
     }
+    this.seqOnLine?.(this.seqIdx);
     this.sayTimer?.remove();
     this.currentStepId = '';
     this.lastStep = null;
@@ -499,6 +509,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.seqIdx = 0;
     const done = this.seqDone;
     this.seqDone = undefined;
+    this.seqOnLine = undefined;
     this.hide();
     done?.();
   }
@@ -509,6 +520,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.seqLines = [];
     this.seqIdx = 0;
     this.seqDone = undefined;
+    this.seqOnLine = undefined;
   }
 
   /** Hold a still face on the current speaker. Set it before the line reveals —

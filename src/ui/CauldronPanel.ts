@@ -54,6 +54,7 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
   private selectedId: string;
   private baseScale = 1;
   private offBus: (() => void)[] = [];
+  private closeBtn!: Phaser.GameObjects.Container;
 
   constructor(
     scene: Phaser.Scene,
@@ -80,6 +81,7 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       .setShadow(0, 5, 'rgba(36,27,34,0.55)', 6);
 
     const close = scene.add.container(956, -540);
+    this.closeBtn = close;
     const closeBg = scene.add.image(0, 6, 'ui_btn_round').setScale(0.92).setTint(num(INK.field));
     const closeX = scene.add
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '54px', fontStyle: 'bold', color: INK.onFieldGold })
@@ -119,6 +121,13 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
 
   private get recipes(): readonly CauldronRecipeConfig[] {
     return this.ctx.systems.cauldron.recipes;
+  }
+
+  /** Tour accessor — the ✕'s page-space anchor for Selyna's pointer. */
+  getClosePos(): { x: number; y: number } | null {
+    if (!this.visible) return null;
+    const m = this.closeBtn.getWorldTransformMatrix();
+    return { x: m.tx, y: m.ty };
   }
 
   open(): void {

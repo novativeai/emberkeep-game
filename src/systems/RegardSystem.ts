@@ -46,7 +46,10 @@ export class RegardSystem {
     characters: CharactersData,
     private quests: QuestSystem
   ) {
-    this.ids = characters.characters.map((c) => c.id);
+    // Canonical PEOPLE, not standee entries: `art ?? id` folds Eleanor-at-home
+    // (roothold) onto Eleanor — one Regard gauge and one heart-scene bank per
+    // person, however many worlds they stand in.
+    this.ids = [...new Set(characters.characters.map((c) => c.art ?? c.id))];
 
     bus.on('ui:gift_requested', ({ characterId, chain, tier }) =>
       this.offer(characterId, chain, tier)

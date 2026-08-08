@@ -309,9 +309,16 @@ export interface DialogueData {
   finaleElderProphecy: string;
   /** Eleanor's banner quote the moment the egg materialises on the altar. */
   goldenArrival: string;
-  /** Eleanor speaks the Ember Gate open, right after the finale hands the
+  /** Eleanor speaks the North Crossing open, right after the finale hands the
    *  board back — the beat that ends with the portal blooming (`gate:opened`). */
   gateOpens: { speaker: string; lines: string[] };
+  /** First-arrival walkthroughs of the two hubs. Each plays once ever
+   *  (stats `tour:<world>`); the Roothold one ends by unlocking the shop
+   *  button (`shop:unlocked`). */
+  tours: {
+    roothold: { intro: string[]; house: string; sections: string[]; close: string; outro: string };
+    hatchery: { intro: string[]; cauldron: string; explain: string; close: string };
+  };
   /** The Elder's line when Order 1 completes AFTER Level 3 — the late awakening. */
   lateAwakening: string;
   /** One-shot Eleanor nudges post-tutorial. */
@@ -358,6 +365,11 @@ export interface CharacterConfig {
    *  centred. Authored in the World Builder (scripts/apply-characters.mjs). */
   dx?: number;
   dy?: number;
+  /** Who this standee IS — wardrobe (standee banks, fallback, scale trim) AND
+   *  identity (Regard, dialogue, action cooldown). Absent = the id. This is
+   *  what lets Eleanor stand in Roothold too: a second placement entry that is
+   *  still, in every social sense, Eleanor. */
+  art?: string;
   action: CharacterAction;
   cooldownMs: number;
 }
@@ -1437,6 +1449,14 @@ export interface EventMap {
   /** Fact: the Ember Gate ceremony finished (Eleanor's lines after the finale).
    *  BoardScene blooms the portal FX and re-enables its door on this. */
   'gate:opened': Record<string, never>;
+  /** Intent: open the Emporium — the Roothold house is its physical storefront. */
+  'ui:emporium_requested': Record<string, never>;
+  /** Tour pointer over a BOARD landmark. BoardScene resolves the target's own
+   *  world position (only it knows them) and bounces an arrow there. */
+  'tour:point': { target: 'roothold_house' | 'hatchery_cauldron' };
+  'tour:unpoint': Record<string, never>;
+  /** Fact: a world tour finished and its latch is set — a save point. */
+  'tour:completed': { id: string };
 }
 
 export type ResolvedHand =

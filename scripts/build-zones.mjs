@@ -448,29 +448,41 @@ function seedRegion(cells, seeds, taken) {
  *
  * `[x, y, w, h]`, top-left first.
  *
- * They come in PAIRS, each with a door to the other. The LIVE pair is the
- * chapter crossing itself:
+ * THE NETWORK — six doors, every one wearing a PortalFX coloured by its
+ * DESTINATION (Constants PORTAL_TINTS: flame red/pink home to Emberkeep,
+ * forest green to Roothold, ice blue north), every one story-gated by
+ * WorldSystem, never by an authored level:
  *
- *   Emberkeep  ⇄  Borealis   (the Ember Gate ⇄ the Keep Door)
+ *   Emberkeep ─ the Ember Gate (green)      → Roothold   opens: Order 1 done
+ *   Emberkeep ─ the North Crossing (ice)    → Borealis   opens: the Elder wakes
+ *   Roothold  ─ the Vine Arch (flame)       → Emberkeep  always
+ *   Borealis  ─ the Ash Road (flame)        → Emberkeep  always
+ *   Borealis  ─ the Rune Way (ice)          → Hatchery   opens: 3 Selyna quests
+ *   Hatchery  ─ the Rune Circle (ice)       → Borealis   always
  *
- * The Gate does not open on level: WorldSystem holds Borealis shut until the
- * Golden Elder has woken (`q:done:keepers_hoard`), and Eleanor speaks the Gate
- * open right after the finale — the awakening IS the key. Roothold and
- * Hatchery keep their doors OUT authored (a world with no door out is refused
- * below), but nothing leads INTO them yet: they are empty boards, and their
- * chapters will re-pair them when they gain content. The editor's `teleport`
- * record (hatch a tier-2 flame gem) is the same journey's older phrasing and
- * stays as registry data only.
+ * The North Crossing stands beside the Golden Altar because the Elder IS its
+ * key — Eleanor speaks it open right after the finale. The Ash Road hovers by
+ * the shore the player lands on, so the north can never strand them. The Rune
+ * Way sits just above the circular inlay at the top of the mainland. The
+ * editor's `teleport` record (hatch a tier-2 flame gem) is the same journey's
+ * older phrasing and stays as registry data only.
  */
 const PORTALS = {
   emberkeep: [
-    { id: 'emberkeep_gate', to: 'borealis', label: 'The Ember Gate', art: [1768, 137, 229, 241] }
+    { id: 'emberkeep_gate', to: 'roothold', label: 'The Ember Gate', art: [1768, 137, 229, 241] },
+    // Beside the Golden Altar's crystal ring (the altar cell (-2,2) reads back
+    // to art (635, 292)) — on the terrace flat, left of the ring.
+    { id: 'emberkeep_altar_gate', to: 'borealis', label: 'The North Crossing', art: [380, 220, 190, 230] }
   ],
   roothold: [
     { id: 'roothold_arch', to: 'emberkeep', label: 'The Vine Arch', art: [1750, 215, 200, 400] }
   ],
   borealis: [
-    { id: 'borealis_keep_door', to: 'emberkeep', label: 'The Keep Door', art: [2010, 180, 156, 200] }
+    // Hovering just west of the landing shore — the way home is visible from
+    // the first nine tiles the player owns in the north.
+    { id: 'borealis_shore_gate', to: 'emberkeep', label: 'The Ash Road', art: [1440, 1150, 150, 210] },
+    // Over the circular inlay at the top-left of the mainland deck.
+    { id: 'borealis_rune_gate', to: 'hatchery', label: 'The Rune Way', art: [365, 235, 175, 205] }
   ],
   hatchery: [
     // The gold rune circle inlaid in the middle of the deck. It sits ON playable
@@ -499,7 +511,7 @@ const DECOR = {
     {
       name: 'pink_cauldron',
       at: [1542.5, 742.5], // the gold rune circle's centre
-      anchor: { x: 0.502, y: 0.845 },
+      anchor: { x: 0.5, y: 0.845 },
       scale: 1
     }
   ]
@@ -547,7 +559,10 @@ const WORLDS = [
   {
     id: 'roothold',
     name: 'Roothold',
-    level: 4,
+    // Eleanor's hub. The Ember Gate opens on her FIRST delivered order — which
+    // the tutorial itself completes — so the level must never be the wall:
+    // WorldSystem's story gate is the whole lock.
+    level: 1,
     editorMap: 'roothold',
     backdrop: 'roothold',
     extendsAuthoredMap: false,

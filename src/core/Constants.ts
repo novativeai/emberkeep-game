@@ -1357,11 +1357,70 @@ export const FINALE = {
  *  finale still running?" against this; it used to be the chapter card's cue. */
 export const FINALE_ENDS_MS = FINALE.elderAtMs + FINALE.elderHoldMs;
 
-/** The Ember Gate portal FX height in world px — sized to Eleanor's standee
- *  (she stands right beside the arch), so the door reads as tall as the person
- *  telling you about it. The tap area is the FX's own bounds (PortalFX.hitSize),
- *  never a smaller rectangle inside the glow. */
+/** Portal FX height in world px — sized to Eleanor's standee, so a door reads
+ *  as tall as the people who use it. The tap area is the FX's own bounds
+ *  (PortalFX.hitSize), never a smaller rectangle inside the glow. */
 export const GATE_FX_HEIGHT = 380;
+
+/**
+ * Portal colours, keyed by DESTINATION — the door wears where it goes, so the
+ * player learns the routes by colour before they learn them by name:
+ * flame red/pink carries you home to Emberkeep, forest green to Roothold,
+ * ice blue north (Borealis and Selyna's Hatchery both).
+ */
+export interface PortalTints {
+  glow: number;
+  core: number;
+  heart: number;
+  streaks: [number, number];
+  sparks: number[];
+  motes: number[];
+}
+export const PORTAL_TINTS: Record<string, PortalTints> = {
+  emberkeep: {
+    glow: 0xd63a5f,
+    core: 0xff7a95,
+    heart: 0xffe8ee,
+    streaks: [0xff9ab0, 0xe84f70],
+    sparks: [0xffe0e8, 0xff9ab0, 0xf05f80],
+    motes: [0xff9ab0, 0xf07090]
+  },
+  roothold: {
+    glow: 0x2f8f4a,
+    core: 0x66cf7a,
+    heart: 0xeaffe8,
+    streaks: [0x8fe8a0, 0x3fae5c],
+    sparks: [0xeaffdd, 0x9fe8a0, 0x4fbf6a],
+    motes: [0x9fe8a0, 0x63c979]
+  },
+  borealis: {
+    glow: 0x2f7fd6,
+    core: 0x6fd0ff,
+    heart: 0xeafaff,
+    streaks: [0xa9e7ff, 0x4fa8e8],
+    sparks: [0xe8fbff, 0xa9e7ff, 0x5fb8f0],
+    motes: [0xa9e7ff, 0x6fc0f0]
+  },
+  hatchery: {
+    glow: 0x2f7fd6,
+    core: 0x6fd0ff,
+    heart: 0xeafaff,
+    streaks: [0xa9e7ff, 0x4fa8e8],
+    sparks: [0xe8fbff, 0xa9e7ff, 0x5fb8f0],
+    motes: [0xa9e7ff, 0x6fc0f0]
+  }
+};
+
+/** Selyna quests that must be DONE before the Rune Way (Borealis → Hatchery)
+ *  opens — counted off the per-world `q:world:borealis:done` stat, so the gate
+ *  never keeps a quest-id list that could drift. */
+export const HATCHERY_QUESTS_NEEDED = 3;
+
+/** The Roothold house — the Emporium's painted storefront — as a world-px
+ *  rect: roothold.webp [755, 205, 330, 340] through the shared art→world
+ *  transform (build-zones: origin (1584.8, 954.2), unit 1.2190). Tapping it
+ *  opens the shop; the arrival tour points at it. */
+export const ROOTHOLD_HOUSE = { x: 915, y: 209, width: 402, height: 414 };
 
 /* --------------------------- welcome-back moment -------------------------- */
 

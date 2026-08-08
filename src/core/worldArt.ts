@@ -23,9 +23,18 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
   const keys = (world?.map.backgrounds ?? []).map((b) => `background_${b.name}`);
   for (const cfg of ctx.data.characters.characters) {
     if (cfg.world !== worldId) continue;
-    const bank = STANDEE_BANKS[cfg.id];
+    const bank = STANDEE_BANKS[cfg.art ?? cfg.id];
     if (bank) keys.push(...Object.values(bank.keys));
   }
+  // The map's own decor (the Hatchery cauldron, and whatever a world stands
+  // up next). Boot only preloads the ACTIVE map's decor, so a travelling
+  // player fetches the destination's at the door — and hands it back when
+  // they leave, exactly like the backdrop.
+  const map = world?.map;
+  for (const d of map?.mapDecor ?? []) keys.push(`decor_${d.name}`);
+  for (const d of map?.decor3d ?? []) keys.push(`decor_${d.name}`);
+  for (const d of map?.startingDecor ?? []) keys.push(`decor_${d.decor}`);
+  for (const r of map?.regions ?? []) for (const d of r.decor ?? []) keys.push(`decor_${d.decor}`);
   return keys;
 }
 
@@ -46,11 +55,17 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
  * leaves the others worse off than before, not that the game holds nothing.
  */
 export function releaseAwayWorldArt(bin: TextureBin, ctx: GameContext): string[] {
+  // Art the ACTIVE world is showing right now is untouchable no matter which
+  // other worlds also list it. Wardrobes are shared — Eleanor stands in both
+  // Emberkeep and Roothold wearing one bank — and evicting a texture under a
+  // live sprite null-crashes the renderer, which kills Phaser's RAF chain and
+  // freezes the whole game (loader, scene ops, travel — everything).
+  const keep = new Set(worldArtKeys(ctx, ctx.state.worldId));
   const freed: string[] = [];
   for (const id of ctx.state.worlds.keys()) {
     if (id === ctx.state.worldId || id === WORLD_ID) continue;
     for (const key of worldArtKeys(ctx, id)) {
-      if (!bin.exists(key)) continue;
+      if (keep.has(key) || !bin.exists(key)) continue;
       bin.remove(key);
       freed.push(key);
     }
