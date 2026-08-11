@@ -6,6 +6,15 @@ import { stepSequence, type SequenceState } from '../ui/partAnimator';
  *  poses, then every talk bank in catalog order — all circle-cropped to the
  *  bubble-portrait framing. */
 export const LAURAH_DISC_TEXTURE = 'laurah_disc';
+/** Every guide who has a baked disc atlas. Each ships `<who>-merge/disc-atlas`
+ *  (Laurah's lives at `laurah/disc-atlas` for historical reasons) and its own
+ *  talk banks in the sequence catalog, keyed `<who>_talk_*`. */
+export const ANIMATED_SPEAKERS = ['laurah', 'eleanor'] as const;
+export type AnimatedSpeaker = (typeof ANIMATED_SPEAKERS)[number];
+export const discTextureFor = (speaker: string): string =>
+  speaker === 'laurah' ? LAURAH_DISC_TEXTURE : `${speaker}_disc`;
+export const isAnimatedSpeaker = (s: string): s is AnimatedSpeaker =>
+  (ANIMATED_SPEAKERS as readonly string[]).includes(s);
 const IDLE_ONE = 0;
 const IDLE_TWO = 1;
 const FIRST_TALK_FRAME = 2;
@@ -24,19 +33,31 @@ interface DiscBank {
  *  the disc sheet is baked bank-after-bank, so offsets are cumulative. */
 const BANKS: Record<string, DiscBank> = (() => {
   const banks: Record<string, DiscBank> = {};
-  let offset = FIRST_TALK_FRAME;
-  for (const seq of BUILTIN_SEQUENCES) {
-    const frames = Array.from({ length: seq.count }, (_, i) => offset + i);
-    frames.push(seq.endIdle.includes('idle_1') ? IDLE_ONE : IDLE_TWO);
-    banks[seq.key] = { frames, durations: [...seq.durations, IDLE_HOLD_MS] };
-    offset += seq.count;
+  // PER SPEAKER. Each atlas is baked rest-pair-then-banks from ITS OWN frames, so
+  // the running offset has to restart for every guide — sharing one counter across
+  // the whole catalog would have Eleanor reading frames out of Laurah's sheet.
+  for (const who of ANIMATED_SPEAKERS) {
+    let offset = FIRST_TALK_FRAME;
+    for (const seq of BUILTIN_SEQUENCES) {
+      if (!seq.key.startsWith(`${who}_`)) continue;
+      const frames = Array.from({ length: seq.count }, (_, i) => offset + i);
+      // Laurah has a pair of idle poses and picks between them; a guide with a
+      // single rest frame settles on the first, which is where it is baked.
+      frames.push(seq.endIdle.includes('idle_2') ? IDLE_TWO : IDLE_ONE);
+      banks[seq.key] = { frames, durations: [...seq.durations, IDLE_HOLD_MS] };
+      offset += seq.count;
+    }
   }
   return banks;
 })();
 
 /** Talk bank for a spoken line — longer lines get the longer mouth banks. */
-const bankFor = (text: string): string =>
-  text.length <= 70 ? 'laurah_talk_short' : text.length <= 170 ? 'laurah_talk_mid' : 'laurah_talk_long';
+const bankFor = (speaker: string, text: string): string =>
+  text.length <= 70
+    ? `${speaker}_talk_short`
+    : text.length <= 170
+      ? `${speaker}_talk_mid`
+      : `${speaker}_talk_long`;
 
 /** Subtle idle "breathing puppet" — a slow scaleY rise/fall (with a faint
  *  inverse scaleX for a touch of squash-stretch), pivoting from CharacterBubble's
@@ -74,15 +95,18 @@ export class PortraitAnimator {
     });
   }
 
-  /** True while the primary image is showing the Laurah disc sheet (vs. a
+  /** True while the primary image is showing SOME guide's disc sheet (vs. a
    *  static speaker portrait like Cindra's) — playback and breathing only
    *  apply then. */
   private get onDiscSheet(): boolean {
-    return this.imgs[0]!.texture.key === LAURAH_DISC_TEXTURE;
+    return this.discKeys.has(this.imgs[0]!.texture.key);
   }
 
+  /** Every disc-atlas texture key, so the check does not name one guide. */
+  private readonly discKeys = new Set(ANIMATED_SPEAKERS.map(discTextureFor));
+
   private setFrameAll(frame: number): void {
-    for (const img of this.imgs) if (img.texture.key === LAURAH_DISC_TEXTURE) img.setFrame(frame);
+    for (const img of this.imgs) if (this.discKeys.has(img.texture.key)) img.setFrame(frame);
   }
 
   /** CharacterBubble's layout pass calls this every relayout with the fit
@@ -95,8 +119,8 @@ export class PortraitAnimator {
   }
 
   /** Play the right talk bank for a line, once, then rest on its idle. */
-  talk(text: string): void {
-    const bank = BANKS[bankFor(text)];
+  talk(speaker: string, text: string): void {
+    const bank = BANKS[bankFor(speaker, text)];
     if (!bank || !this.onDiscSheet) return;
     this.state = {
       frameKeys: bank.frames.map(String),

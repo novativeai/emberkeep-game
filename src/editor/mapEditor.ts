@@ -344,6 +344,13 @@ export class MapEditor {
   private async restoreMaps(scene: Phaser.Scene): Promise<void> {
     if (this.mapsRestored) return;
     this.mapsRestored = true;
+    // The disk project has to land BEFORE the pager is built. It is fetched in the
+    // constructor and `open()` fires this without waiting, so opening the editor
+    // quickly built the pager from localStorage alone — and localStorage silently
+    // drops any map past its ~4MB budget. That is how roothold "disappeared": not
+    // deleted, just never read. And because the next Save bakes the pager back to
+    // disk, one fast open could make the loss permanent.
+    await this.diskReady.catch(() => {}); // a dead dev store must not block the editor
     const baseName = this.ctx.data.map.backgrounds?.[0]?.name ?? 'Base map';
     editorStore.seedBaseMap(baseName); // map #1 — the game backdrop (skipped if deleted)
 

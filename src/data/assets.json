@@ -1,13 +1,53 @@
 {
   "images": [
-    { "key": "duel_rock_red", "source": "file", "generator": "icon", "file": "sprites/duel/duel_rock_red.png" },
-    { "key": "duel_paper_red", "source": "file", "generator": "icon", "file": "sprites/duel/duel_paper_red.png" },
-    { "key": "duel_scissors_red", "source": "file", "generator": "icon", "file": "sprites/duel/duel_scissors_red.png" },
-    { "key": "duel_rock_green", "source": "file", "generator": "icon", "file": "sprites/duel/duel_rock_green.png" },
-    { "key": "duel_paper_green", "source": "file", "generator": "icon", "file": "sprites/duel/duel_paper_green.png" },
-    { "key": "duel_scissors_green", "source": "file", "generator": "icon", "file": "sprites/duel/duel_scissors_green.png" },
-    { "key": "duel_face_red", "source": "file", "generator": "icon", "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-head.png" },
-    { "key": "duel_face_green", "source": "file", "generator": "icon", "file": "sprites/characters/dragon/emerald-dragon/sprite/emerald-dragon-head.png" },
+    {
+      "key": "duel_rock_red",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/duel/duel_rock_red.png"
+    },
+    {
+      "key": "duel_paper_red",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/duel/duel_paper_red.png"
+    },
+    {
+      "key": "duel_scissors_red",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/duel/duel_scissors_red.png"
+    },
+    {
+      "key": "duel_rock_green",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/duel/duel_rock_green.png"
+    },
+    {
+      "key": "duel_paper_green",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/duel/duel_paper_green.png"
+    },
+    {
+      "key": "duel_scissors_green",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/duel/duel_scissors_green.png"
+    },
+    {
+      "key": "duel_face_red",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-head.png"
+    },
+    {
+      "key": "duel_face_green",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/characters/dragon/emerald-dragon/sprite/emerald-dragon-head.png"
+    },
     {
       "key": "tile_ash",
       "source": "file",
@@ -114,19 +154,19 @@
       "key": "item_strawberry_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/level1/item_strawberry_1.png"
+      "file": "sprites/items/chains/emberberry_plant_1.webp"
     },
     {
       "key": "item_strawberry_2",
       "source": "file",
       "generator": "item",
-      "file": "sprites/level1/item_strawberry_2.png"
+      "file": "sprites/items/chains/emberberry_plant_2.webp"
     },
     {
       "key": "item_strawberry_3",
       "source": "file",
       "generator": "item",
-      "file": "sprites/level1/item_strawberry_3.png"
+      "file": "sprites/items/chains/emberberry_plant_3.webp"
     },
     {
       "key": "item_ember_dragon_1",
@@ -156,19 +196,19 @@
       "key": "item_flame_gem_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/diamond.webp"
+      "file": "sprites/items/chains/flame_gem_1.webp"
     },
     {
       "key": "item_flame_gem_2",
-      "source": "placeholder",
+      "source": "file",
       "generator": "item",
-      "file": "raw/ai/item_flame_gem_2.png"
+      "file": "sprites/items/chains/flame_gem_2.webp"
     },
     {
       "key": "item_flame_gem_3",
-      "source": "placeholder",
+      "source": "file",
       "generator": "item",
-      "file": "raw/ai/item_flame_gem_3.png"
+      "file": "sprites/items/chains/flame_gem_3.webp"
     },
     {
       "key": "item_lumber_1",

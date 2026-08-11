@@ -218,7 +218,11 @@ export class UIScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.weather?.destroy());
 
     // The objective tracker (top-right): main + side quest cards. Populate it now.
+    // Built either way — QuestSystem keeps score and the tutorial's sub-quests keep
+    // completing — but HIDDEN behind HUD_WIDGETS.questPanel, which is off to match
+    // main's barer top bar. Hiding, not removing: one flag brings it back whole.
     this.questPanel = new QuestPanel(this, this.ctx.bus).setDepth(DEPTH_HUD + 4);
+    this.questPanel.setVisible(HUD_WIDGETS.questPanel);
     this.ctx.systems.quest.announce();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.questPanel.destroy());
 
@@ -1013,7 +1017,7 @@ export class UIScene extends Phaser.Scene {
   private showHint(key: keyof GameContext['data']['dialogue']['hints'], holdMs = 5200): void {
     if (!this.ctx.state.tutorialDone || this.finaleActive || this.hintShown.has(key)) return;
     this.hintShown.add(key);
-    this.bubble.say('laurah', this.ctx.data.dialogue.hints[key], holdMs);
+    this.bubble.say('eleanor', this.ctx.data.dialogue.hints[key], holdMs);
   }
 
   /**

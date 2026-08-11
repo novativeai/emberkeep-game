@@ -109,6 +109,19 @@ export class QuestPanel {
     this.setOpen(false);
   }
 
+  /**
+   * Show or hide the WHOLE tracker — the toggle button, its badge and any open
+   * card stack. The system underneath keeps running: quests still complete, the
+   * tutorial's sub-quests still tick, the panel is simply not on screen.
+   * Returns `this` so the caller can chain it like a game object.
+   */
+  setVisible(v: boolean): this {
+    this.toggle.setVisible(v);
+    this.toggle.input!.enabled = v;
+    if (!v) this.setOpen(false);
+    return this;
+  }
+
   private setOpen(v: boolean): void {
     this.open = v;
     this.cardsRoot.setVisible(v);

@@ -1312,6 +1312,7 @@ class EditorStore {
       if (successor) this.mergeDesignInto('__base__', successor.id);
     } else {
       this.mapStates.delete(layer.id); // drop its edit state too
+      this.deletedMapIds.add(layer.id); // an INTENTIONAL removal — serializeProject may drop it
     }
     this.maps.splice(this.currentMap, 1);
     this.currentMap = Math.max(0, Math.min(this.currentMap, this.maps.length - 1));
@@ -1335,15 +1336,24 @@ class EditorStore {
   private persistMaps(): void {
     try {
       const slim: MapLayer[] = [];
+      const dropped: string[] = [];
       let budget = 4_000_000; // ~4MB of base64 across all saved maps
       for (const m of this.maps) {
         const url = m.dataUrl ?? '';
         if (url && url.length < budget) {
           slim.push({ ...m });
           budget -= url.length;
+        } else if (url) {
+          dropped.push(m.name);
         }
       }
       window.localStorage.setItem(this.MAPS_KEY, JSON.stringify(slim));
+      // Never silently: a map too big for the quota lives only until the tab closes,
+      // and "it was there yesterday" is the worst way to find that out. Save bakes it
+      // to disk (asset3d/editor-map.json), which has no such limit.
+      if (dropped.length) {
+        console.warn(`[editor] too big for localStorage — Save to keep: ${dropped.join(', ')}`);
+      }
     } catch {
       /* quota / unavailable — maps still live in-session */
     }
@@ -1523,6 +1533,9 @@ class EditorStore {
   /* ---- on-disk default project (asset3d/editor-map.json) — survives cookie wipe ---- */
   /** Imported map layers restored from disk (used by restoreMaps over localStorage). */
   private diskMaps: MapLayer[] = [];
+  /** Maps the user DELETED this session — the only reason serializeProject may drop
+   *  one that is still on disk. */
+  private deletedMapIds = new Set<string>();
   /** The editor design to bake to disk as the game's DEFAULT: per-map unlock-level
    *  allocations + placed-asset metadata + imported map layers (so they survive a
    *  cookie/localStorage wipe). */
@@ -1544,7 +1557,24 @@ class EditorStore {
       if (s.zones.length) zones[id] = s.zones.map((z) => ({ ...z, points: z.points.map((p) => ({ ...p })) }));
       if (s.grids.length) grids[id] = s.grids.map((g) => ({ ...g }));
     }
-    return { allocations, assets, zones, grids, maps: this.maps.filter((m) => !m.base).map((m) => ({ ...m })), baseHidden: this.baseHidden };
+    // Safety net: a map that is ON DISK but absent from the live pager was never
+    // loaded (a slow disk read, a texture that failed) — it was NOT deleted. Baking
+    // the pager as-is would erase it permanently, which is how a fast editor open
+    // could cost a whole map. Only an explicit delete may remove one.
+    const live = this.maps.filter((m) => !m.base);
+    const inPager = new Set(live.map((m) => m.id));
+    const rescued = this.diskMaps.filter((m) => !inPager.has(m.id) && !this.deletedMapIds.has(m.id));
+    if (rescued.length) {
+      console.warn(`[editor] kept map(s) the pager never loaded: ${rescued.map((m) => m.name).join(', ')}`);
+    }
+    return {
+      allocations,
+      assets,
+      zones,
+      grids,
+      maps: [...live.map((m) => ({ ...m })), ...rescued.map((m) => ({ ...m }))],
+      baseHidden: this.baseHidden
+    };
   }
   /** Load the on-disk default design (disk is the source of truth for the default). */
   ingestProject(data: {
@@ -1579,9 +1609,20 @@ class EditorStore {
     this.backfillAssetPins(); // bake pinned assets' world centres (robust across reloads)
     this.emit();
   }
-  /** Imported maps to restore on open — disk (permanent) preferred over localStorage. */
+  /**
+   * Imported maps to restore on open: everything on disk, PLUS any map that only
+   * localStorage knows about.
+   *
+   * Disk stays the source of truth for what it holds — it survives a cookie wipe and
+   * it is what a teammate gets from git. But it was winner-take-all, so a map
+   * imported since the last bake existed only in localStorage and silently vanished
+   * on the next reload unless you remembered to Save. Deletes are written to BOTH
+   * (see deleteMap → persistMaps), so nothing deleted can come back through here.
+   */
   resolvedSavedMaps(): MapLayer[] {
-    return this.diskMaps.length ? this.diskMaps : this.savedMaps();
+    if (!this.diskMaps.length) return this.savedMaps();
+    const onDisk = new Set(this.diskMaps.map((m) => m.id));
+    return [...this.diskMaps, ...this.savedMaps().filter((m) => !m.base && !onDisk.has(m.id))];
   }
 }
 

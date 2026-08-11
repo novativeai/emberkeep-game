@@ -13,7 +13,25 @@ import { saveAsset3dFile } from './asset3dFs';
  */
 
 let uid = 0;
-const nextKey = (kind: string): string => `editorAsset_${kind}_${uid++}`;
+/**
+ * The Phaser texture key for an imported file — derived from the FILENAME, never
+ * from a counter.
+ *
+ * `uid` restarted at 0 on every page load, so the first import of a new session
+ * claimed `editorAsset_png_0` — a key an EARLIER session had already handed to
+ * another map. Phaser texture keys are global, so the two maps then shared one
+ * image: importing a new map made roothold show the NEW map's backdrop, and after a
+ * reload `restoreMaps` (which skips a key that already exists) gave whichever loaded
+ * first to both, so the same picture appeared twice in the pager. It survived a
+ * cookie wipe because the collision was baked into asset3d/editor-map.json.
+ *
+ * Same file → same key, deliberately: re-importing replaces its own texture instead
+ * of leaking a second copy of a 4K backdrop into GPU memory.
+ */
+const nextKey = (kind: string, fileName?: string): string => {
+  const slug = (fileName ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return slug ? `editorAsset_${kind}_${slug}` : `editorAsset_${kind}_x${uid++}`;
+};
 
 type ModelExt = 'obj' | 'fbx' | 'glb';
 
@@ -133,7 +151,7 @@ export async function importAsset(scene: Phaser.Scene, file: File): Promise<Impo
     // Save the ORIGINAL image into asset3d/ too, so a teammate `git pull` gets the
     // real file (the texture itself uses the downscaled canvas + dataUrl).
     const savedUrl = await saveAsset3dFile(file.name, abToBase64(await file.arrayBuffer()));
-    const t = await loadImageTexture(scene, file, nextKey('png'));
+    const t = await loadImageTexture(scene, file, nextKey('png', file.name));
     return { textureKey: t.key, kind: 'png', name, fileName: file.name, w: t.w, h: t.h, dataUrl: t.dataUrl, file2d: savedUrl ? file.name : undefined };
   }
   if (ext === 'obj' || ext === 'fbx' || ext === 'glb' || ext === 'gltf') {
@@ -146,7 +164,7 @@ export async function importAsset(scene: Phaser.Scene, file: File): Promise<Impo
     const data: string | ArrayBuffer = asText ? new TextDecoder().decode(buf) : buf;
     const pExt: ModelExt = ext === 'gltf' ? 'glb' : ext;
     const kind = (ext === 'gltf' ? 'glb' : ext) as ImportedAsset['kind'];
-    const t = await importModel(scene, data, pExt, nextKey(pExt));
+    const t = await importModel(scene, data, pExt, nextKey(pExt, file.name));
     return {
       textureKey: t.key,
       kind,

@@ -49,11 +49,22 @@ export const GAME_HEIGHT = 1600;
  * the bonus back with zero other changes). Turned OFF to strip the free-reward /
  * duel bonuses from the game UI for now; nothing is deleted.
  */
-export const HUD_WIDGETS: { sparkWell: boolean; milestoneGift: boolean; dragonDuel: boolean; dragonGauges: boolean } = {
+export const HUD_WIDGETS: {
+  sparkWell: boolean;
+  milestoneGift: boolean;
+  dragonDuel: boolean;
+  dragonGauges: boolean;
+  questPanel: boolean;
+} = {
   sparkWell: false, // Emberfont "Spark Well" orb (StokeMeter) — free gem/ruby/emerald on tap
   milestoneGift: false, // 🎁 milestone quest-reward button (gives coins on claim)
   dragonDuel: false, // ✌️ Dragon Duel launcher + arena
-  dragonGauges: false // red/green duel gauges — now shown per-dragon on tap (BoardScene), not as a fixed HUD
+  dragonGauges: false, // red/green duel gauges — now shown per-dragon on tap (BoardScene), not as a fixed HUD
+  // The top-right quest toggle + its remaining-count badge. OFF to match main's
+  // barer top bar. The QuestSystem keeps running underneath and the tutorial's
+  // speech bubbles are untouched — this hides the panel, it does not remove the
+  // quests. Flip to `true` and the button comes back exactly as it was.
+  questPanel: false
 };
 
 /**
@@ -247,22 +258,28 @@ export const ITEM_SCALE: Record<string, number> = {
   ember_dragon_2: 0.0384, // Red Egg — nionja −40% piece
   ember_dragon_3: 0.21, // Red Dragon: baked rig art (1054px) — main's scale
   ember_dragon_4: 0.45, // Adult Red Dragon: baked adult rig (836px) — main's scale
-  flame_gem_1: 0.09, // Gem Shard — nionja −40% piece
+  // The Flame Gem chain, drawn at last: tiers 2 and 3 were PLACEHOLDERS painted by
+  // TextureFactory at runtime — the ruby the whole tutorial is about was programmer
+  // art past its first tier. Tier 1 keeps its exact size; 2 and 3 step up gently.
+  flame_gem_1: 0.150, // Gem Shard  — art 310px opaque
+  flame_gem_2: 0.154, // Flame Gem  — art 390px opaque
+  flame_gem_3: 0.164, // Ruby       — art 462px opaque
   // Timber loop art (Decors/): wood 273×240, house 361×380, big tree 622×823.
   lumber_1: 0.2016, // a log / Bush — nionja −40% piece
   lumber_2: 0.72, // the House generator — main's scale
   lumber_3: 0.82, // the Manor — main's scale
   bigtree_1: 0.17, // Ancient Tree generator — main's scale
   chest_1: 0.19, // Treasure Chest fixture — main's scale
-  // The sprout art is 42% content and 58% empty frame (bush 60%, plant 83%), so the
-  // −40% retune left it DRAWING 20×23 px on screen while the bush drew 35 — a speck
-  // on the lair's pale stone, and the reason five of them beside the dragon read as
-  // an empty room. 0.55 brings the drawn shoot to ~28 px: still the smallest of the
-  // three, now visible. Measured, not guessed — the frame sizes are all 240px, only
-  // the opaque box differs.
-  strawberry_1: 0.55, // emberberry sprout
-  strawberry_2: 0.48, // emberberry bush — −40% merge piece
-  strawberry_3: 0.468, // emberberry plant — −40% merge piece
+  // Emberberry, from main's drawn set (2026-08-06) — the PLANT chain, not the
+  // harvest one: main split them, and tier 3 here is the generator that fruits, so
+  // it has to be a laden bush, never the jam jar the other chain ends on.
+  // The art is TRIMMED — opaque
+  // box ≈ frame — where the old sprites were 42% content in a 240px frame, so the
+  // scales are re-derived to land the same on-board size, not carried over.
+  // 55 / 70 / 94 game px wide, the family this build already reads as one chain.
+  strawberry_1: 0.170, // Emberberry sprout — art 323px opaque
+  strawberry_2: 0.131, // Emberberry bush   — art 534px opaque
+  strawberry_3: 0.152, // Emberberry plant  — art 620px opaque
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // Crystal generator — main's scale
   emerald_1: 0.15, // Emerald gem — nionja piece size
@@ -368,6 +385,32 @@ export const CHEST_INTERVAL_MS = 300_000;
  *  this the drop is BLOCKED (harvest fails / chest pays Gold / passive skips)
  *  — rewards must never teleport across the map or off the platforms. */
 export const REWARD_SPAWN_RADIUS = 3;
+
+/**
+ * Battery governor (PowerGovernor): the loop runs at full rate only while the
+ * player is interacting; an untouched board throttles down in two steps. All
+ * gameplay timing is wall-clock (GameClock.now), so render fps never affects
+ * logic or determinism.
+ *
+ * activeFps is 62, not 60, on purpose: Phaser's fps.limit skips a step when the
+ * accumulated delta is a hair under the limit-rate, so 60 on a 60 Hz display
+ * micro-stutters (~55 real fps). 62 fires every vsync at 60 Hz and halves a
+ * 120 Hz display to 60 — the cap costs nothing on standard screens.
+ */
+export const POWER = {
+  activeFps: 62,
+  idleFps: 30,
+  dozeFps: 15,
+  /** No input/gameplay for this long → idle (30 fps). */
+  idleAfterMs: 10_000,
+  /** …and for this long → doze (15 fps, ambient FX + crystal paused). */
+  dozeAfterMs: 45_000,
+  /** Gameplay bus events hold ACTIVE this long (finale beats hold longer). */
+  eventHoldMs: 10_000,
+  finaleHoldMs: 45_000,
+  /** Crystal3D re-render cadence per state; it PAUSES entirely in doze. */
+  crystalMs: { active: 33, idle: 100 }
+} as const;
 
 /** How far (manhattan tiles) a sub-world's furniture may stand from its dragon
  *  before `board:gather` walks it back. Generous on purpose: a piece the player

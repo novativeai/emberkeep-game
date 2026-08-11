@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { num, PALETTE, TIMINGS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { TutorialStepEvent } from '../core/types';
-import { LAURAH_DISC_TEXTURE, PortraitAnimator } from './PortraitAnimator';
+import { discTextureFor, isAnimatedSpeaker, LAURAH_DISC_TEXTURE, PortraitAnimator } from './PortraitAnimator';
 import { uiRegistry } from '../ui/theme';
 
 const BUBBLE_WIDTH = 1200;
@@ -22,7 +22,7 @@ const STATIC_DISC_SIZE = RING_SIZE * 0.98;
  *  split-layered around the ring:
  *    - BODY copy (rows 0..BODY_CROP_ROWS) drawn BEHIND the ring — the band
  *      covers her shoulders/bottom, tucking them UNDER the exterior frame;
- *    - HEAD copy (rows 0..HEAD_CROP_ROWS) drawn ABOVE the ring — only her
+ *    - HEAD copy (rows 0..headRows, see GUIDE_DISC) drawn ABOVE the ring — only her
  *      head/hair exceeds the frame, z-index wise.
  *  The split line sits at her NECK, where her silhouette is far inside the
  *  ring's window — both copies are pixel-identical there, so the handoff is
@@ -30,11 +30,30 @@ const STATIC_DISC_SIZE = RING_SIZE * 0.98;
 const LAURAH_DISPLAY_HEIGHT = 320;
 const LAURAH_CELL_W = 300;
 const LAURAH_CELL_H = 400;
+
+/**
+ * Per-guide disc geometry. Each atlas is baked at its own cell size, so the head
+ * crop and the fit-scale have to follow the guide, not a constant: Eleanor's
+ * cells are 270x360, and cropping her at Laurah's 265 rows took two thirds of a
+ * SHORTER cell — her head spilled out of the ring. `headRows` is the same
+ * fraction of the cell in both (≈66%), which is what actually reads as "cut at
+ * the neck".
+ */
+const GUIDE_DISC: Record<string, { cellW: number; cellH: number; headRows: number }> = {
+  laurah: { cellW: LAURAH_CELL_W, cellH: LAURAH_CELL_H, headRows: 265 },
+  eleanor: { cellW: 270, cellH: 360, headRows: 239 }
+};
+const discGeom = (speaker: string): { cellW: number; cellH: number; headRows: number } =>
+  GUIDE_DISC[speaker] ?? GUIDE_DISC.laurah!;
 /** Slight upward bias from dead-centre so her head clears the ring's top. */
 const PORTRAIT_CENTER_DY = -4;
-/** Head copy crop (cell rows): down to her neck — narrowest point (~86px wide
- *  at display scale vs the 234px window), so the seam never crosses the band. */
-const HEAD_CROP_ROWS = 265;
+
+/** Display name per speaker id (the id is what tutorial.json / dialogue.json use). */
+const SPEAKER_NAMES: Record<string, string> = {
+  cindra: 'Cindra',
+  laurah: 'Laurah',
+  eleanor: 'Eleanor'
+};
 /** Body copy circular clip radius — the ring's OUTER edge (250/512 of its
  *  canvas) minus a hair: the FULL sprite shows through the window, but a
  *  GeometryMask stops it ever overflowing the frame's bottom/side arcs. */
@@ -161,8 +180,9 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   }
 
   /** The baked Laurah disc spritesheet loaded and sliced into frames. */
-  private hasDiscSheet(): boolean {
-    return this.scene.textures.exists(LAURAH_DISC_TEXTURE) && this.scene.textures.get(LAURAH_DISC_TEXTURE).frameTotal > 2;
+  private hasDiscSheet(speaker = 'laurah'): boolean {
+    const key = discTextureFor(speaker);
+    return this.scene.textures.exists(key) && this.scene.textures.get(key).frameTotal > 2;
   }
 
   /** Seat the right art in the ring for the speaker, start/stop the talk
@@ -173,9 +193,13 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
    *  Static speaker (Cindra) — single disc INSIDE the ring like a medallion
    *  photo (ring in front, centred origin), matching the original look. */
   private setSpeakerArt(speaker: string, text: string): void {
-    if (speaker === 'laurah' && this.hasDiscSheet()) {
-      if (this.portrait.texture.key !== LAURAH_DISC_TEXTURE) this.portrait.setTexture(LAURAH_DISC_TEXTURE, 0);
-      if (this.portraitTop.texture.key !== LAURAH_DISC_TEXTURE) this.portraitTop.setTexture(LAURAH_DISC_TEXTURE, 0);
+    // ANY guide with a baked disc atlas gets the split-layer puppet treatment,
+    // not just Laurah — the name used to be spelled into the condition, which is
+    // why a second guide could only ever be a flat medallion.
+    if (isAnimatedSpeaker(speaker) && this.hasDiscSheet(speaker)) {
+      const disc = discTextureFor(speaker);
+      if (this.portrait.texture.key !== disc) this.portrait.setTexture(disc, 0);
+      if (this.portraitTop.texture.key !== disc) this.portraitTop.setTexture(disc, 0);
       // Bottom-anchored so the breathing puppet grows upward from the frame.
       this.portrait.setOrigin(0.5, 1);
       this.portraitTop.setOrigin(0.5, 1);
@@ -183,10 +207,11 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       // circle by the mask; head copy above it, cropped at the neck.
       this.portrait.setCrop();
       this.portrait.setMask(this.portraitMask);
-      this.portraitTop.setCrop(0, 0, LAURAH_CELL_W, HEAD_CROP_ROWS);
+      const geom = discGeom(speaker);
+      this.portraitTop.setCrop(0, 0, geom.cellW, geom.headRows);
       this.portraitTop.setVisible(true);
       this.portraitBack.setVisible(true);
-      this.portraitAnim.talk(text);
+      this.portraitAnim.talk(speaker, text);
       return;
     }
     this.portraitAnim.rest();
@@ -257,7 +282,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     if (!this.visible && !this.samplePeek) return;
     if (this.lastStep) {
       const step = this.lastStep;
-      const speaker = { cindra: 'Cindra', laurah: 'Laurah' }[step.speaker] ?? step.speaker;
+      const speaker = SPEAKER_NAMES[step.speaker] ?? step.speaker;
       this.nameTag.setText(speaker);
       this.label.setText(step.text);
       this.layout(step.speaker);
@@ -271,14 +296,14 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
    * post-tutorial nudges). Not tap-gated; auto-hides after `holdMs`. Never used
    * while a tutorial step is up — the tutorial owns the bubble until it's done.
    */
-  say(speaker: 'cindra' | 'laurah', text: string, holdMs = 4200): void {
+  say(speaker: 'cindra' | 'laurah' | 'eleanor', text: string, holdMs = 4200): void {
     this.sayTimer?.remove();
     this.currentStepId = '';
     this.tapGated = false;
     this.lastStep = null;
     this.samplePeek = false;
     this.chevronTween?.remove();
-    const speakerName = { cindra: 'Cindra', laurah: 'Laurah' }[speaker] ?? speaker;
+    const speakerName = SPEAKER_NAMES[speaker] ?? speaker;
     this.nameTag.setText(speakerName);
     this.label.setText(text);
     this.setSpeakerArt(speaker, text);
@@ -314,7 +339,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.tapGated = step.gateType === 'tap';
     this.lastStep = step;
     this.samplePeek = false;
-    const speakerName = { cindra: 'Cindra', laurah: 'Laurah' }[step.speaker] ?? step.speaker;
+    const speakerName = SPEAKER_NAMES[step.speaker] ?? step.speaker;
     this.nameTag.setText(speakerName);
     this.label.setText(step.text);
     this.setSpeakerArt(step.speaker, step.text);
@@ -414,13 +439,13 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.portraitBack.fillStyle(0x549270, 1);
     this.portraitBack.fillCircle(ringX + 2, ringY - 10, RING_HOLE_RADIUS - 10);
 
-    if (this.portrait.texture.key === LAURAH_DISC_TEXTURE) {
+    if (this.portrait.texture.key === discTextureFor(speaker) && isAnimatedSpeaker(speaker)) {
       // Both split copies share one transform: centred in the ring (with a
       // slight upward bias) like the original medallion placement, bottom-
       // anchored so breathing grows upward. Scale goes through the animator
       // so the breathing puppet oscillates on top of this base without
       // fighting the layout.
-      const s = (LAURAH_DISPLAY_HEIGHT / LAURAH_CELL_H) * oPortrait.scale;
+      const s = (LAURAH_DISPLAY_HEIGHT / discGeom(speaker).cellH) * oPortrait.scale;
       const px = ringX + oPortrait.dx;
       const py = ringY + PORTRAIT_CENTER_DY + LAURAH_DISPLAY_HEIGHT / 2 + oPortrait.dy;
       this.portrait.setPosition(px, py);

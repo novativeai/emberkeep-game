@@ -2,8 +2,8 @@
   "steps": [
     {
       "id": "lore_1",
-      "speaker": "laurah",
-      "text": "Long ago, Emberkeep blazed with dragon fire. Then the cold came... and the dragons slept.",
+      "speaker": "eleanor",
+      "text": "This place burned bright once. Then the cold came, and every dragon in it went to sleep.",
       "gate": {
         "type": "tap"
       },
@@ -11,8 +11,8 @@
     },
     {
       "id": "lore_2",
-      "speaker": "laurah",
-      "text": "I am Laurah, Dragon Master of the ancient flame. And you, Keeper, are the one who will wake them.",
+      "speaker": "eleanor",
+      "text": "I'm Eleanor. I keep the old fires — badly, lately. You're the one who's going to wake them.",
       "gate": {
         "type": "tap"
       },
@@ -21,8 +21,8 @@
     {
       "id": "ruby_merge",
       "task": "Merge 3 Dragon Rubies into a Red Egg",
-      "speaker": "laurah",
-      "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch a Red Egg.",
+      "speaker": "eleanor",
+      "text": "Three Dragon Rubies. Seeds of fire, and no use whatsoever apart. Drag them together.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -74,8 +74,8 @@
     {
       "id": "cookbook_intro",
       "task": "Open the Cookbook",
-      "speaker": "laurah",
-      "text": "Your first recipe! Every merge you discover is inscribed in the Emberkeep Cookbook. Tap the book to see your first page.",
+      "speaker": "eleanor",
+      "text": "There. Your first recipe. Everything you discover gets written into the Emberkeep Cookbook, whether I remember to or not. Tap the book.",
       "gate": {
         "type": "event",
         "event": "ui:cookbook_opened"
@@ -90,8 +90,8 @@
     {
       "id": "cookbook_close",
       "task": "Close the Cookbook",
-      "speaker": "laurah",
-      "text": "The Dragon Ruby recipe — your first page! Tap the ✕ to close the book, and let us wake that egg.",
+      "speaker": "eleanor",
+      "text": "The Dragon Ruby, page one. Tap the ✕ to close it — that egg isn't going to wake itself.",
       "gate": {
         "type": "event",
         "event": "ui:cookbook_closed"
@@ -106,8 +106,8 @@
     {
       "id": "dragon_hatch",
       "task": "Hatch the Red Dragon",
-      "speaker": "laurah",
-      "text": "A Red Egg! Two more have appeared. Drag all three together — the Red Dragon stirs inside!",
+      "speaker": "eleanor",
+      "text": "A Red Egg. And two more, because eggs are like that. Drag all three together — something is stirring in there.",
       "gate": {
         "type": "event",
         "event": "item:hatched",
@@ -156,8 +156,8 @@
     {
       "id": "emerald_tap",
       "task": "Tap the Crystal for an Emerald",
-      "speaker": "laurah",
-      "text": "The Red Dragon! And look — the Crystal glows! Tap it to claim an Emerald. You already have two — merge all three to forge a Green Egg!",
+      "speaker": "eleanor",
+      "text": "The Red Dragon. And the Crystal has noticed — tap it for an Emerald. You already have two, so merge all three into a Green Egg.",
       "gate": {
         "type": "event",
         "event": "item:harvested",
@@ -185,8 +185,8 @@
     {
       "id": "emerald_egg_merge",
       "task": "Merge 3 Emeralds into a Green Egg",
-      "speaker": "laurah",
-      "text": "Three Emeralds! Drag them all together — they will forge a Green Egg.",
+      "speaker": "eleanor",
+      "text": "Three Emeralds. Drag them together and they'll forge a Green Egg.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -231,8 +231,8 @@
     {
       "id": "green_dragon_hatch",
       "task": "Make the Green Dragon appear",
-      "speaker": "laurah",
-      "text": "A Green Egg! Two more have appeared. Drag all three together — the Green Dragon stirs inside!",
+      "speaker": "eleanor",
+      "text": "A Green Egg, and two friends. Drag all three together — the Green Dragon is already stirring.",
       "gate": {
         "type": "event",
         "event": "item:hatched",
@@ -287,8 +287,8 @@
     {
       "id": "chest",
       "task": "Open the Treasure Chest",
-      "speaker": "laurah",
-      "text": "A Treasure Chest! The isle rewards brave Keepers. Tap it to claim what is inside.",
+      "speaker": "eleanor",
+      "text": "A Treasure Chest. The isle does keep score, in its way. Tap it and take what's yours.",
       "gate": {
         "type": "event",
         "event": "chest:open"
@@ -328,8 +328,8 @@
     },
     {
       "id": "levelup",
-      "speaker": "laurah",
-      "text": "Keeper Level 2! The isle stirs — a new stretch of land has woken to the west. Tap to see!",
+      "speaker": "eleanor",
+      "text": "Keeper Level 2. The isle noticed — a new stretch of land has woken to the west. Tap to look.",
       "gate": {
         "type": "tap"
       },
@@ -343,8 +343,8 @@
     {
       "id": "key_unlock",
       "task": "Burn the fog with a Stone Key",
-      "speaker": "laurah",
-      "text": "Your dragons gifted you a Stone Key! See that clouded strip? Tap it to burn the fog away.",
+      "speaker": "eleanor",
+      "text": "Your dragons left you a Stone Key. That clouded strip? Tap it and burn the fog off.",
       "gate": {
         "type": "event",
         "event": "region:unlocked"
@@ -364,8 +364,8 @@
     {
       "id": "emberberry_tap",
       "task": "Pick an Emberberry sprout",
-      "speaker": "laurah",
-      "text": "A wild Emberberry patch grew in the opened land! It feeds you for FREE — tapping it never costs Warmth. Tap the patch to pick a sprout.",
+      "speaker": "eleanor",
+      "text": "A wild Emberberry patch, growing where the land opened. It costs no Warmth, ever — the one free thing here. Tap it and pick a sprout.",
       "gate": {
         "type": "event",
         "event": "item:harvested",
@@ -395,8 +395,8 @@
     {
       "id": "emberberry_merge",
       "task": "Merge 3 sprouts into an Emberberry Bush",
-      "speaker": "laurah",
-      "text": "Two more sprouts sprang up beside yours! Merge all three into a bush — the patch regrows forever, so you will never run out of things to merge.",
+      "speaker": "eleanor",
+      "text": "Two more sprouts came up beside yours. Merge all three into a bush. The patch regrows forever, so you will never run out of things to merge.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -451,8 +451,8 @@
     {
       "id": "bush_merge",
       "task": "Merge 3 Bushes into a House",
-      "speaker": "laurah",
-      "text": "Those Bushes in the opened land can become shelter! Merge the three Bushes to raise a House — it earns coins while you rest.",
+      "speaker": "eleanor",
+      "text": "Those Bushes can be shelter, with some persuading. Merge the three into a House — it earns coins while you rest.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -494,8 +494,8 @@
     {
       "id": "dragon_work",
       "task": "Set a dragon to work the House",
-      "speaker": "laurah",
-      "text": "Dragons can speed the House! Drag your dragon and drop it directly onto the House tile. Each working dragon doubles the speed — ×2 with one, ×4 with two!",
+      "speaker": "eleanor",
+      "text": "Dragons will hurry the House along. Drag one and drop it right onto the House tile. Each working dragon doubles the speed — ×2 with one, ×4 with two.",
       "gate": {
         "type": "event",
         "event": "dragon:working"
@@ -534,8 +534,8 @@
     },
     {
       "id": "dragon_rest",
-      "speaker": "laurah",
-      "text": "Hard work tires even dragons! After 3 minutes they need rest — watch, your dragon just nodded off and flew home to recover.",
+      "speaker": "eleanor",
+      "text": "Even dragons tire. After three minutes they need rest — look, yours has just nodded off and flown home.",
       "gate": {
         "type": "tap"
       },
@@ -549,8 +549,8 @@
     {
       "id": "buy_energy",
       "task": "Claim your free Ember Spark",
-      "speaker": "laurah",
-      "text": "Warmth (⚡) is what the keep runs on, and yours is burning low. Your first Ember Spark is free! Tap the ⚡ + button at the top to open the Emporium and claim it. Just this once!",
+      "speaker": "eleanor",
+      "text": "Warmth (⚡) is what the keep runs on, and yours is nearly out. Your first Ember Spark is on me. Tap the ⚡ + button at the top to open the Emporium and claim it. Once. Don't get used to it.",
       "gate": {
         "type": "event",
         "event": "marketplace:purchased"
@@ -564,8 +564,8 @@
     },
     {
       "id": "golden_tease",
-      "speaker": "laurah",
-      "text": "One more thing, Keeper — look west. A GOLDEN egg sleeps on the old altar. It has slept there since the Great Flame was lost… and see, it stirs at your coming. Cindra guards its story.",
+      "speaker": "eleanor",
+      "text": "One more thing — look west. A GOLDEN egg sleeps on the old altar. It has slept there since the Great Flame was lost, and it has never once stirred. It is stirring now. Cindra guards that story.",
       "gate": {
         "type": "tap"
       },
@@ -573,8 +573,8 @@
     },
     {
       "id": "free_play",
-      "speaker": "laurah",
-      "text": "Emberkeep is yours now, Keeper! Fill Cindra's Ledger — she guards something golden — and reach Keeper Level 3… they say something waits past the southern ash.",
+      "speaker": "eleanor",
+      "text": "Emberkeep is yours, Keeper. Fill Cindra's Ledger — she's holding something golden back — and reach Keeper Level 3. They say something waits past the southern ash.",
       "gate": {
         "type": "tap"
       },

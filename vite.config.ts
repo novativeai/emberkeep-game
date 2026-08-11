@@ -237,6 +237,36 @@ const pruneDistArt = (): Plugin => ({
       }
     };
     dropPngMasters(path.join(dist, 'sprites'));
+    // The VFX bank is a WORKSPACE of nine flipbook sheets; the game loads four.
+    // Ship `ramps.png` plus the `_pack`/`_mv` pair of everything in `SHIPPED`, and
+    // nothing else — the full bank is ~19.8 MB. The keep-list is read from
+    // src/render/vfxBank.ts itself, so widening SHIPPED widens the ship with no
+    // second place to remember. Absent bank = nothing to prune, not an error: this
+    // build only ever loads what it finds.
+    const bankDir = path.join(dist, 'vfx-bank');
+    if (existsSync(bankDir)) {
+      const src = readFileSync(path.resolve(__dirname, 'src/render/vfxBank.ts'), 'utf8');
+      const decl = /export const SHIPPED\s*=\s*\[([^\]]*)\]/.exec(src);
+      if (!decl) throw new Error('[prune-dist-art] could not read SHIPPED from src/render/vfxBank.ts');
+      const keep = new Set(['ramps.png']);
+      for (const m of decl[1]!.matchAll(/'([^']+)'/g)) {
+        keep.add(`flipbooks/${m[1]}_pack.png`);
+        keep.add(`flipbooks/${m[1]}_mv.png`);
+      }
+      const sweep = (dir: string): void => {
+        for (const f of readdirSync(dir)) {
+          const p = path.join(dir, f);
+          if (statSync(p).isDirectory()) {
+            sweep(p);
+          } else if (!keep.has(path.relative(bankDir, p).split(path.sep).join('/'))) {
+            bytes += statSync(p).size;
+            rmSync(p);
+            removed++;
+          }
+        }
+      };
+      sweep(bankDir);
+    }
     console.log(
       `[prune-dist-art] removed ${removed} source-art entries (${(bytes / 1048576).toFixed(1)}MB) from dist`
     );

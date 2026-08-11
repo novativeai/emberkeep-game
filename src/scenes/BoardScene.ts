@@ -27,6 +27,7 @@ import {
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
+  POWER,
   SCENES,
   TAP_MAX_DISTANCE_PX,
   TAP_MAX_MS,
@@ -40,6 +41,9 @@ import {
 } from '../core/Constants';
 import { gridToWorld, setProjection, worldToGrid } from '../core/iso';
 import { goldenAwakened, goldenPromiseKept } from '../core/goldenPromise';
+import { POWER_STATE_EVENT, type PowerGovernor, type PowerState } from '../core/PowerGovernor';
+import { FlipbookFX, RAMP_TEXTURE } from '../render/FlipbookFX';
+import { BEATS, sheetOf, type BeatKey } from '../render/vfxBank';
 import { PRIMARY_WORLD } from '../core/GameState';
 import { ensureTextures } from '../core/lazyTextures';
 import { worldItemKeys } from '../core/worldChains';
@@ -226,6 +230,13 @@ export class BoardScene extends Phaser.Scene {
    *  Theme-Crystal generator's look) + any authored 3D-decor placement. */
   private crystal3d?: Crystal3D;
   private crystalTex?: Phaser.Textures.CanvasTexture;
+  /** Battery governor (registry; set in main.ts — absent in bare-scene tests). */
+  private power?: PowerGovernor;
+  private crystalLastRender = 0;
+  /** The always-on ambience gated off in doze: the updrafts + the firefly swarm.
+   *  Only what was actually CREATED lands here — a weak device builds fewer. */
+  private ambientEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  private twinkleTimer?: Phaser.Time.TimerEvent;
   /** Ember-fly ambience: the emit zone tracks the camera's worldView. */
   private fireflyZone?: Phaser.Geom.Rectangle;
   /** Time-of-day sky grade — one screen-space wash over the live world's backdrop. */
@@ -288,6 +299,9 @@ export class BoardScene extends Phaser.Scene {
     this.teaseReturn = null;
     this.finaleRan = false;
     this.finaleStartedMs = 0;
+    this.ambientEmitters = [];
+    this.twinkleTimer = undefined;
+    this.power = this.registry.get('power') as PowerGovernor | undefined;
     void this.loadDragonRigs(); // lazy + fault-tolerant; ready well before the hatch
 
     this.ensureShadowTexture(); // soft radial shadow used by every object
@@ -311,7 +325,16 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.fadeIn(320, 36, 27, 34);
     this.scene.launch(SCENES.ui);
 
+    // Doze = a still painting: ambient emitters stop (live particles fade out over
+    // their own lifespans) and the sky-twinkle allocator pauses. Any input or
+    // gameplay beat flips the governor back and everything resumes.
+    this.game.events.on(POWER_STATE_EVENT, this.onPowerState, this);
+    this.onPowerState(this.power?.state ?? 'active');
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(POWER_STATE_EVENT, this.onPowerState, this);
+      this.ambientEmitters = [];
+      this.twinkleTimer = undefined;
       this.offBus.forEach((off) => off());
       this.offBus = [];
       for (const ld of this.liveDragons.values()) ld.player.destroy();
@@ -322,6 +345,40 @@ export class BoardScene extends Phaser.Scene {
       this.crystal3d = undefined;
       this.crystalTex = undefined;
     });
+  }
+
+  /**
+   * Play a bank flipbook for a named beat at a world point.
+   *
+   * Purely additive garnish on top of the particle bursts that were always there —
+   * if the bank was not deployed (weak devices never load it, see PreloadScene), or
+   * the governor has dozed the scene, this is a no-op and the beat looks exactly as
+   * it did before. Nothing downstream may depend on the returned object existing.
+   *
+   * Sits on DEPTHS.particles (with the bursts) rather than DEPTHS.flash, so the
+   * white glow still reads as the brightest thing in the frame.
+   */
+  private playBeatFX(beat: BeatKey, x: number, y: number): FlipbookFX | undefined {
+    if (this.power?.state === 'doze') return undefined;
+    const spec = BEATS[beat];
+    const sheet = sheetOf(spec.sheet);
+    if (!sheet || !this.textures.exists(`${sheet.key}_pack`) || !this.textures.exists(RAMP_TEXTURE)) {
+      return undefined; // bank not deployed — the particle beat carries it alone
+    }
+    const fx = new FlipbookFX(this, sheet, x, y + spec.dy, () => this.ctx.clock.now(), spec.opts);
+    // Width drives the size; height follows the cell aspect so a tall flame sheet
+    // is never squashed into a square.
+    fx.setDisplaySize(spec.size, (spec.size * sheet.cellH) / sheet.cellW);
+    fx.setDepth(DEPTHS.particles);
+    this.add.existing(fx);
+    return fx;
+  }
+
+  /** Doze stills the ambience; anything else lets it run. Idempotent. */
+  private onPowerState(state: PowerState): void {
+    const doze = state === 'doze';
+    for (const emitter of this.ambientEmitters) emitter.emitting = !doze;
+    if (this.twinkleTimer) this.twinkleTimer.paused = doze;
   }
 
   override update(time: number, delta: number): void {
@@ -339,8 +396,16 @@ export class BoardScene extends Phaser.Scene {
       this.skyGrade.setPosition(v.x, v.y).setSize(v.width, v.height);
     }
     if (this.crystal3d && this.crystalTex) {
-      this.crystal3d.update(time); // spin + render the live emerald
-      this.crystalTex.refresh(); // re-upload to the GPU for this frame
+      // The spin is decorative and the render + GPU readback + texture re-upload is
+      // the single most expensive idle cost in the game — run it on the governor's
+      // cadence (paused outright in doze). The rotation derives from ABSOLUTE time,
+      // so a skipped frame never desyncs the motion, it only coarsens it.
+      const interval = this.power?.crystalIntervalMs() ?? POWER.crystalMs.active;
+      if (time - this.crystalLastRender >= interval) {
+        this.crystalLastRender = time;
+        this.crystal3d.update(time); // spin + render the live emerald
+        this.crystalTex.refresh(); // re-upload to the GPU for this frame
+      }
     }
     this.updateDrag(delta);
     this.updateLiveDragons(delta);
@@ -1020,6 +1085,7 @@ export class BoardScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
       onComplete: () => {
         this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 1, 2.6);
+        this.playBeatFX('elder', p.x, p.y + 40); // the Elder rises out of gold
         this.shells.explode(12, p.x, p.y + 40);
         this.sparks.explode(40, p.x, p.y + 44);
         this.burst.explode(20, p.x, p.y + 48);
@@ -1168,8 +1234,9 @@ export class BoardScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(DEPTHS.sky + 1);
 
-    // Occasional twinkles in the sky.
-    this.time.addEvent({
+    // Occasional twinkles in the sky. Kept so the governor can pause the allocator
+    // in doze — an untouched board should not keep minting stars.
+    this.twinkleTimer = this.time.addEvent({
       delay: 1700,
       loop: true,
       callback: () => {
@@ -1664,34 +1731,41 @@ export class BoardScene extends Phaser.Scene {
     // authored world (screenY reaches ~5100), not just the start terrace, so
     // every zone the camera frames has updrafts.
     const world = this.cameras.main.getBounds();
-    this.add
-      .particles(0, 0, 'fx_ember', {
-        x: { min: world.x + 80, max: world.right - 80 },
-        y: { min: 1240, max: Math.max(1520, world.bottom - 400) },
-        speedY: { min: EMBER_MOTES.maxSpeedY, max: EMBER_MOTES.minSpeedY },
-        speedX: { min: -EMBER_MOTES.driftX, max: EMBER_MOTES.driftX },
-        lifespan: EMBER_MOTES.lifespanMs,
-        scale: { start: EMBER_MOTES.minScale, end: 0 },
-        alpha: { start: EMBER_MOTES.alpha * 0.8, end: 0 },
-        frequency: 420,
-        blendMode: Phaser.BlendModes.ADD
-      })
-      .setDepth(DEPTHS.cliffs + 1);
-    // The second (slower) updraft layer is pure ambience — skip it on weak devices.
-    if (!IS_LOW_END) {
+    // Registered as ambience so the governor can stop it emitting in doze. The two
+    // policies compose and neither replaces the other: `IS_LOW_END` decides whether
+    // a layer is CREATED at all, the governor decides whether a created one RUNS.
+    this.ambientEmitters.push(
       this.add
         .particles(0, 0, 'fx_ember', {
-          x: { min: world.x + 60, max: world.right - 60 },
-          y: { min: 1400, max: Math.max(1580, world.bottom - 300) },
-          speedY: { min: -64, max: -36 },
-          speedX: { min: -20, max: 20 },
+          x: { min: world.x + 80, max: world.right - 80 },
+          y: { min: 1240, max: Math.max(1520, world.bottom - 400) },
+          speedY: { min: EMBER_MOTES.maxSpeedY, max: EMBER_MOTES.minSpeedY },
+          speedX: { min: -EMBER_MOTES.driftX, max: EMBER_MOTES.driftX },
           lifespan: EMBER_MOTES.lifespanMs,
-          scale: { start: EMBER_MOTES.maxScale, end: 0 },
-          alpha: { start: EMBER_MOTES.alpha * 0.55, end: 0 },
-          frequency: 900,
+          scale: { start: EMBER_MOTES.minScale, end: 0 },
+          alpha: { start: EMBER_MOTES.alpha * 0.8, end: 0 },
+          frequency: 420,
           blendMode: Phaser.BlendModes.ADD
         })
-        .setDepth(DEPTHS.particles);
+        .setDepth(DEPTHS.cliffs + 1)
+    );
+    // The second (slower) updraft layer is pure ambience — skip it on weak devices.
+    if (!IS_LOW_END) {
+      this.ambientEmitters.push(
+        this.add
+          .particles(0, 0, 'fx_ember', {
+            x: { min: world.x + 60, max: world.right - 60 },
+            y: { min: 1400, max: Math.max(1580, world.bottom - 300) },
+            speedY: { min: -64, max: -36 },
+            speedX: { min: -20, max: 20 },
+            lifespan: EMBER_MOTES.lifespanMs,
+            scale: { start: EMBER_MOTES.maxScale, end: 0 },
+            alpha: { start: EMBER_MOTES.alpha * 0.55, end: 0 },
+            frequency: 900,
+            blendMode: Phaser.BlendModes.ADD
+          })
+          .setDepth(DEPTHS.particles)
+      );
     }
   }
 
@@ -1714,20 +1788,22 @@ export class BoardScene extends Phaser.Scene {
     // Ember-flies run a per-particle Math.sin() alpha callback every frame over a
     // whole-view ADD swarm — pure ambience. Skip it entirely on weak devices.
     if (!IS_LOW_END) {
-      this.add
-        .particles(0, 0, 'fx_ember', {
-          emitZone: { type: 'random', source: this.fireflyZone, quantity: 1 },
-          lifespan: A.fireflies.lifespanMs,
-          speed: { min: A.fireflies.speedMin, max: A.fireflies.speedMax },
-          angle: { min: 0, max: 360 },
-          scale: { min: A.fireflies.scaleMin, max: A.fireflies.scaleMax },
-          // Sine bell over the life: 0 → peak → 0 — a slow twinkle, never a pop.
-          alpha: { onUpdate: (_p, _k, t) => Math.sin(Math.PI * t) * A.fireflies.alphaPeak },
-          tint: A.fireflies.tint,
-          frequency: A.fireflies.frequency,
-          blendMode: Phaser.BlendModes.ADD
-        })
-        .setDepth(DEPTHS.particles);
+      this.ambientEmitters.push(
+        this.add
+          .particles(0, 0, 'fx_ember', {
+            emitZone: { type: 'random', source: this.fireflyZone, quantity: 1 },
+            lifespan: A.fireflies.lifespanMs,
+            speed: { min: A.fireflies.speedMin, max: A.fireflies.speedMax },
+            angle: { min: 0, max: 360 },
+            scale: { min: A.fireflies.scaleMin, max: A.fireflies.scaleMax },
+            // Sine bell over the life: 0 → peak → 0 — a slow twinkle, never a pop.
+            alpha: { onUpdate: (_p, _k, t) => Math.sin(Math.PI * t) * A.fireflies.alphaPeak },
+            tint: A.fireflies.tint,
+            frequency: A.fireflies.frequency,
+            blendMode: Phaser.BlendModes.ADD
+          })
+          .setDepth(DEPTHS.particles)
+      );
     }
 
     // --- mid-far: low clouds drifting beneath the platforms (altitude!).
@@ -3319,6 +3395,7 @@ export class BoardScene extends Phaser.Scene {
       this.burst.explode(16, drop.x, drop.y - 36);
       this.glowFlash(drop.x, drop.y - 28, PALETTE.goldAccent, 0.55, 1.1);
       if (isHatch) return; // item:hatched runs the special ceremony
+      this.playBeatFX('merge', drop.x, drop.y); // ash puff under the pop-in
       payload.outputs.forEach((output, i) => {
         this.time.delayedCall(60 + i * 90, () => {
           // popIn's Back.easeOut overshoot IS the pop — never stack a second
@@ -3365,6 +3442,7 @@ export class BoardScene extends Phaser.Scene {
     });
     this.time.delayedCall(TIMINGS.hatchShake, () => {      ghost.destroy();
       this.glowFlash(x, y - 52, PALETTE.white, 0.95, 1.7);
+      this.playBeatFX('hatch', x, y); // fireburst over the shell debris
       this.shells.explode(7, x, y - 52);
       this.sparks.explode(24, x, y - 48);
       this.burst.explode(12, x, y - 44);
@@ -3446,6 +3524,7 @@ export class BoardScene extends Phaser.Scene {
       const chest = this.itemSprites.get(chestId);
       if (!chest || !chest.active) return;
       scalePulse(this, chest, 1.28, 240);
+      this.playBeatFX('chest', chest.x, chest.y); // gold dust off the lid
       this.burst.explode(12, chest.x, chest.y - 52);
       this.sparks.explode(18, chest.x, chest.y - 52);
       this.glowFlash(chest.x, chest.y - 46, PALETTE.goldAccent, 0.6, 1.15);

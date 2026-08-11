@@ -5,6 +5,7 @@ import { GameContext } from './core/Context';
 import { GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
 import { createGameConfig } from './core/GameConfig';
 import { MapEditor } from './editor/mapEditor';
+import { PowerGovernor } from './core/PowerGovernor';
 import { gridToWorld } from './core/iso';
 import { msUntilPhase } from './core/dayCycle';
 import { printSaveAudit, type SaveAudit } from './core/saveAudit';
@@ -57,6 +58,8 @@ declare global {
       /** Save-integrity report: every world's board measured against the ground it
        *  actually offers. Prints a table and returns the raw findings. */
       audit: () => SaveAudit;
+      /** Battery-governor diagnostics: current state + real rendered step rate. */
+      power: () => { state: string; fpsLimit: number; renderedFps: number };
       reset: () => void;
       saveKey: string;
       game: Phaser.Game;
@@ -94,6 +97,25 @@ const game = new Phaser.Game({
 
 // In-game Map Editor (dev level tool) — opened from Settings via `editor:open`.
 new MapEditor(game, ctx);
+
+// Battery governor: throttles the loop (and, via power:state, the ambient FX)
+// whenever the board sits untouched. Scenes read it from the registry.
+const power = new PowerGovernor(game, ctx.bus);
+game.registry.set('power', power);
+
+// Host-page bridge: the EmberGames hub reports when the game's iframe is
+// scrolled out of view — sleep the whole loop (tab-hidden is Phaser built-in).
+window.addEventListener('message', (event: MessageEvent) => {
+  if (event.origin !== window.location.origin) return;
+  const data = event.data as { type?: string; visible?: boolean } | null;
+  if (!data || data.type !== 'embergames:visibility') return;
+  if (data.visible) {
+    game.loop.wake();
+    power.notifyActivity(2000);
+  } else {
+    game.loop.sleep();
+  }
+});
 
 // GPU safety net: a weak or overloaded device can drop the WebGL context. Without
 // preventDefault() the browser permanently kills the canvas — the visible "crash".
@@ -248,6 +270,13 @@ window.__emberkeep = {
   // actually offers, plus the cross-world facts that no single world can check —
   // chiefly "the Golden dragon stands in exactly one place". See core/saveAudit.
   audit: () => printSaveAudit(ctx.state, editorStore.baseHidden),
+  // Battery-governor diagnostics: which state the loop is in, the cap it applied,
+  // and the rate actually rendered (game.loop.actualFps tracks rAF, not steps).
+  power: () => ({
+    state: power.state,
+    fpsLimit: game.loop.fpsLimit,
+    renderedFps: Math.round(power.renderedFps())
+  }),
   // Dev/diagnostic: wipe the save and hard-reload, so a fresh newGame() runs and
   // any change to startingItems/startingDecor (e.g. the L1 dragon) shows again.
   // A loaded save otherwise masks new-game seeding.

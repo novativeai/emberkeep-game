@@ -2,7 +2,7 @@
   "steps": [
     {
       "id": "borealis_arrival",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Borealis. The Golden Elder came north to sleep where the cold keeps things whole — and here, everything is cold but the fire.",
       "gate": {
         "type": "tap"
@@ -14,7 +14,7 @@
     },
     {
       "id": "borealis_driftwood",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Rimewood washes up frozen. Three planks make a bundle — the same craft your hands already know.",
       "task": "Merge 3 Frozen Planks",
       "gate": {
@@ -72,7 +72,7 @@
     },
     {
       "id": "borealis_pile",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Two more bundles, and you have a pile worth lighting. Fire is not scenery here — it is the only thing that is scarce.",
       "task": "Build the Kindled Pile",
       "gate": {
@@ -130,7 +130,7 @@
     },
     {
       "id": "borealis_tarknot",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Let it burn down and it leaves a Pitch Stone in the ash. Tap the pile — this is how the north makes heat it can carry.",
       "task": "Tap the Kindled Pile for a Pitch Stone",
       "gate": {
@@ -169,7 +169,7 @@
     },
     {
       "id": "borealis_press",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Three stones press into one Tarknot. In Emberkeep you merge to make more; up here you merge to make it LAST.",
       "task": "Press 3 Pitch Stones into a Tarknot",
       "gate": {
@@ -228,7 +228,7 @@
     },
     {
       "id": "borealis_rimebloom",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "A Rimebloom. It grows back on its own — the cold costs nothing here, which is exactly why it buys nothing.",
       "task": "Tap the Rimebloom for a Frost Star",
       "gate": {
@@ -275,7 +275,7 @@
     },
     {
       "id": "borealis_frostsilk",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Frostsilk is spun, not grown. Wind three spools into a skein — and remember it: a made thing is never a meal.",
       "task": "Wind 3 Silk Spools into a Skein",
       "gate": {
@@ -334,7 +334,7 @@
     },
     {
       "id": "borealis_free",
-      "speaker": "laurah",
+      "speaker": "eleanor",
       "text": "Wood, pitch, rime and silk — that is the whole north. Keep the fire going, Keeper, and she will wake to something warm.",
       "gate": {
         "type": "tap"

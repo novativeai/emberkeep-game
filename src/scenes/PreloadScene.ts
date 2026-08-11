@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
+import { GAME_WIDTH, IS_LOW_END, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
+import { discTextureFor } from '../entities/PortraitAnimator';
+import { preloadFlipbooks } from '../render/FlipbookFX';
+import { BANK_BASE, shippedSheets } from '../render/vfxBank';
 import { BUILTIN_SEQUENCES, builtinSequence, builtinSequenceFiles, type BuiltinSequence } from '../render/sequenceCatalog';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { applyUiReplacements, sequenceFrameKey, uiRegistry, uploadKey } from '../ui/theme';
@@ -98,6 +101,22 @@ export class PreloadScene extends Phaser.Scene {
       frameWidth: 300,
       frameHeight: 400
     });
+    // Eleanor's, from main — same idea, her own cell size. Phaser derives the
+    // frame COUNT from the image, so a re-baked atlas with more banks needs no
+    // change here; only the cell geometry is fixed (bake-portrait-disc.py).
+    this.load.spritesheet(discTextureFor('eleanor'), 'sprites/eleanor-merge/disc-atlas.webp', {
+      frameWidth: 270,
+      frameHeight: 360
+    });
+    // VFX bank flipbooks — the payoff beats (hatch / Elder / merge / chest). Only
+    // the four sheets in `SHIPPED`; see src/render/vfxBank.ts for the VRAM budget.
+    //
+    // NOT on weak devices. That is a departure from where this came from, and it is
+    // deliberate: the bank is ~10.8 MB of texture memory for pure garnish, and this
+    // build's whole low-end tier exists because that class of device dies of GPU
+    // memory. Every beat is additive — BoardScene's `playBeatFX` finds no sheet and
+    // the particle burst carries it alone, exactly as it did before.
+    if (!IS_LOW_END) preloadFlipbooks(this.load, shippedSheets(), BANK_BASE);
     // UI Builder uploads (ui-theme.json `assets`, self-contained data URLs).
     for (const [name, uri] of Object.entries(uiRegistry.doc.assets)) {
       if (!this.textures.exists(uploadKey(name))) this.load.image(uploadKey(name), uri);

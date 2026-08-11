@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
+import { GAME_WIDTH, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE, POWER } from './Constants';
 import { renderScale } from './render-scale';
 import { BoardScene } from '../scenes/BoardScene';
 import { BootScene } from '../scenes/BootScene';
@@ -40,7 +40,22 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   // tab from the "A problem repeatedly occurred" / blank-screen crash.
   const floor = IS_LOW_END ? 0.34 : IS_MOBILE ? 0.75 : 1;
   const cap = IS_LOW_END ? 1 : 1.5;
-  renderScale.value = Phaser.Math.Clamp(Math.round(need * 8) / 8, floor, cap);
+  // …and a HARD driver ceiling on top of both. An old GPU's MAX_TEXTURE_SIZE is
+  // 4096, and a backing axis past it is silently CLIPPED by the driver: the canvas
+  // renders partial or blank while the DOM logo still shows, which reads as "the
+  // Play button disappeared". Portrait is the tall axis (LIVE_GAME_HEIGHT up to
+  // 2.4×2560 = 6144 game-units; ×0.75 floor = 4608 > 4096 on 20:9 phones), so the
+  // floor itself has to yield to it. Quantised DOWN to 1/8 so the backing stays
+  // integral; desktop (1600 tall) never reaches it.
+  //
+  // This is a DIFFERENT protection from IS_LOW_END above, not a replacement: a weak
+  // device can sit under 4096 and still run out of VRAM. Both apply, strictest wins.
+  const gpuCap = Math.floor((4096 / Math.max(GAME_WIDTH, LIVE_GAME_HEIGHT)) * 8) / 8;
+  renderScale.value = Phaser.Math.Clamp(
+    Math.round(need * 8) / 8,
+    Math.min(floor, gpuCap),
+    Math.min(cap, gpuCap)
+  );
 
   return {
     type: Phaser.AUTO,
@@ -53,6 +68,12 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     transparent: true,
     backgroundColor: num(PALETTE.tealDeep),
     banner: false,
+    // Boot WITH a limit so TimeStep binds its limit-aware step: PowerGovernor
+    // retunes the cap live (62 active / 30 idle / 15 doze) to spare batteries.
+    // 62 (not 60) so a 60 Hz display renders every vsync — see POWER.
+    fps: {
+      limit: POWER.activeFps
+    },
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH
