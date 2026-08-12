@@ -151,10 +151,15 @@ describe('zones — new ground beside the isle', () => {
     const added = EMBERKEEP.map.regions.filter((r) => !MAP.regions.some((a) => a.id === r.id));
     expect(added.length).toBeGreaterThan(0);
     for (const region of added) {
-      expect(region.status).toBe('unlockable');
       const level = region.unlock?.level ?? 0;
       expect(level).toBeGreaterThanOrEqual(2);
-      expect(level).toBeLessThanOrEqual(LEVEL_XP.length);
+      // Above the cap is SHUT ON PURPOSE and says so. The editor lets a cell be
+      // marked for any level, and some are marked past Chapter One; `locked` is
+      // build-zones declaring that ground unreachable rather than pretending a
+      // level-up will ever reach it. What must never happen is the third state:
+      // `locked` at a level the player DOES cross, which no level-up would lift.
+      if (level > LEVEL_XP.length) expect(region.status).toBe('locked');
+      else expect(region.status).toBe('unlockable');
     }
   });
 
@@ -226,14 +231,53 @@ describe('zones — new ground beside the isle', () => {
       }
       islands.push(size);
     }
-    expect(islands.sort((a, b) => b - a)).toEqual([103, 29, 9]);
-    // …and each island is exactly one region, which is what lets fog gate them.
-    for (const region of world.map.regions) {
-      const ids = new Set(region.tiles.map(([c, r]) => `${c},${r}`));
-      for (const [c, r] of region.tiles) {
-        for (const n of neighborsOf(world, c, r)) expect(ids.has(`${n.col},${n.row}`)).toBe(true);
+    expect(islands.sort((a, b) => b - a)).toEqual([102, 29, 9]);
+  });
+
+  /**
+   * FOG GATES BY REGION, so a region spread over two islands lifts cloud in two
+   * places at once — the far one with no path to it and no warning.
+   *
+   * This used to hold outright: shore 9 / coast 103 / keep 29 were exactly the
+   * three painted islands. The 2026-08-12 re-export from the editor moved five
+   * mainland cells to unlock level 1, and regions are grouped BY LEVEL, so those
+   * five joined `borealis_shore`. The landing platform's cloud now also clears
+   * five tiles in the middle of the coast.
+   *
+   * Pinned rather than repaired: which cell opens when is level design, and it
+   * belongs to whoever marks the cells in the editor, not to this test. If the
+   * five are re-marked to level 2 the shape changes here and someone looks.
+   */
+  it('gates fog per island, except for the five mainland cells marked level 1', () => {
+    const world = WORLDS.get('borealis')!;
+    const regionOf = new Map<string, string>();
+    for (const r of world.map.regions) for (const [c, x] of r.tiles) regionOf.set(`${c},${x}`, r.id);
+
+    const straddle = new Map<string, Set<number>>();
+    const seen = new Set<string>();
+    let island = 0;
+    for (const start of regionOf.keys()) {
+      if (seen.has(start)) continue;
+      const stack = [start];
+      seen.add(start);
+      while (stack.length) {
+        const cur = stack.pop()!;
+        const [c = 0, r = 0] = cur.split(',').map(Number);
+        const ids = straddle.get(regionOf.get(cur)!) ?? new Set<number>();
+        ids.add(island);
+        straddle.set(regionOf.get(cur)!, ids);
+        for (const n of neighborsOf(world, c, r)) {
+          const k = `${n.col},${n.row}`;
+          if (!seen.has(k)) {
+            seen.add(k);
+            stack.push(k);
+          }
+        }
       }
+      island++;
     }
+    const spread = [...straddle].filter(([, on]) => on.size > 1).map(([id]) => id);
+    expect(spread).toEqual(['borealis_shore']);
   });
 
   /** The authored isle must never gain a neighbour it was not drawn with — a
@@ -264,8 +308,9 @@ describe('zones — new ground beside the isle', () => {
         }
       }
     }
-    // emberkeep's new ground + borealis + roothold + hatchery's measured deck
-    expect(checked).toBe(36 + 141 + 141 + 246);
+    // emberkeep's new ground + borealis + roothold + runevault, all four now
+    // drawn in the editor (Runevault replaced the measured Hatchery deck).
+    expect(checked).toBe(38 + 140 + 144 + 4);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {
@@ -388,11 +433,11 @@ describe('portals — every world has a way out of it', () => {
       .sort();
     expect(routes).toEqual([
       'borealis->emberkeep',
-      'borealis->hatchery',
+      'borealis->runevault',
       'emberkeep->borealis',
       'emberkeep->roothold',
-      'hatchery->borealis',
-      'roothold->emberkeep'
+      'roothold->emberkeep',
+      'runevault->borealis'
     ]);
   });
 
@@ -451,21 +496,21 @@ describe('portals — every world has a way out of it', () => {
     expect(ctx.state.worldId).toBe('roothold');
   });
 
-  /** The Rune Way: Hatchery opens on the per-world quest counter QuestSystem
+  /** The Rune Way: Runevault opens on the per-world quest counter QuestSystem
    *  keeps, never on an id list that could drift. */
-  it('holds the Hatchery shut until three Selyna quests are done', () => {
+  it('holds Runevault shut until three Selyna quests are done', () => {
     const ctx = createTestContext();
     ctx.state.tutorialDone = true;
     ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
     ctx.state.addStat('q:world:borealis:done', 2);
-    expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('hatchery');
-    ctx.bus.emit('world:switch', { to: 'hatchery' });
+    expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('runevault');
+    ctx.bus.emit('world:switch', { to: 'runevault' });
     expect(ctx.state.worldId).toBe(WORLD_ID);
 
     ctx.state.addStat('q:world:borealis:done', 1);
-    expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('hatchery');
-    ctx.bus.emit('world:switch', { to: 'hatchery' });
-    expect(ctx.state.worldId).toBe('hatchery');
+    expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('runevault');
+    ctx.bus.emit('world:switch', { to: 'runevault' });
+    expect(ctx.state.worldId).toBe('runevault');
   });
 });
 

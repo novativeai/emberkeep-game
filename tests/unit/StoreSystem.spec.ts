@@ -192,3 +192,47 @@ describe("the Keeper's Store shelves (src/data/store.json)", () => {
     expect(Math.min(...gold('legendary'))).toBeGreaterThan(Math.max(...gold('epic')));
   });
 });
+
+/**
+ * Half the catalogue is LOCAL goods: ice cut in Borealis, rune stone under
+ * snow, a dragon nested on the floes. The stall carries them only where they
+ * are made — everywhere else the card is padlocked and says where to find it —
+ * and the gate is enforced in the SYSTEM, not only on the card.
+ */
+describe('goods that are only sold in the world that makes them', () => {
+  const NORTHERN = 'manor_igloo'; // 750 gold, world: borealis
+  const STORE = storeDoc as StoreData;
+
+  it('refuses the purchase and takes nothing while the Keeper is elsewhere', () => {
+    const ctx = createTestContext();
+    fund(ctx, 2000);
+    const failed = capture(ctx.bus, 'store:purchase_failed');
+
+    ctx.bus.emit('ui:store_buy_requested', { itemId: NORTHERN });
+
+    expect(failed.at(-1)).toMatchObject({ itemId: NORTHERN, reason: 'locked' });
+    expect(ctx.state.ownedCosmetics).not.toContain(NORTHERN);
+    expect(ctx.state.coins).toBe(2000);
+  });
+
+  it('sells it once the Keeper is standing in Borealis', () => {
+    const ctx = createTestContext();
+    fund(ctx, 2000);
+    ctx.state.switchWorld('borealis');
+    const before = ctx.state.coins;
+
+    ctx.bus.emit('ui:store_buy_requested', { itemId: NORTHERN });
+
+    expect(ctx.state.ownedCosmetics).toContain(NORTHERN);
+    expect(ctx.state.coins).toBe(before - 750);
+  });
+
+  it('only tags worlds this build actually has', () => {
+    const ctx = createTestContext();
+    const tagged = STORE.sections.flatMap((s) => s.items).filter((i) => i.world);
+    expect(tagged.length).toBeGreaterThan(0);
+    for (const item of tagged) {
+      expect(ctx.state.worlds.has(item.world!), `${item.id} → ${item.world}`).toBe(true);
+    }
+  });
+});

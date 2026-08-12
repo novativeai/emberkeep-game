@@ -118,10 +118,10 @@ pixels off its island.
 
 | id | level | zones | cells | backdrop | role |
 |---|---|---|---|---|---|
-| `emberkeep` | 1 | 1 dense + 17 | 46 authored + 36 | `emberkeep` (nb2 render) | sanctuary |
-| `roothold` | 1 | 19 | 141 | `roothold` | **hub** — Eleanor's home |
-| `borealis` | 3 | 38 | 141 | `borealis` | sanctuary |
-| `hatchery` | 3 | 2 | 223 | `hatchery` | **hub** — Selyna's home |
+| `emberkeep` | 1 | 1 dense + 17 | 42 authored + 38 | `emberkeep` (nb2 render) | sanctuary |
+| `roothold` | 1 | 21 | 144 | `roothold` | **hub** — Eleanor's home |
+| `borealis` | 3 | 38 | 140 | `borealis` | sanctuary |
+| `runevault` | 3 | 4 | 4 | `runevault` | **hub** — Selyna's home |
 
 They come in pairs: a **sanctuary**, where you do things, and its **hub**, where
 you change something about yourself — buy, decorate, read, talk. Each pair is
@@ -131,19 +131,23 @@ The three worlds that are not Emberkeep carry their whole `MapData`, generated
 (all cells `invisible`, because the backdrop already paints the slabs — no new
 tile art needed) and placed with the same backdrop calibration Emberkeep uses.
 
-**Hatchery's ground was measured, not imported.** It is the one world with no
-grid in the map editor's export — only a painting. So `scripts/fit-deck-grid.py`
-recovers the flagstone lattice from the backdrop itself: autocorrelation for the
-tile steps, the Fourier phase for where the stones sit, a stone-vs-forest probe
-and a flood fill for the extent. Out comes `assets/map/hatchery-deck.json` (223
-cells across the deck and its 2×3 outpost, in backdrop px), which
-`build-zones.mjs` puts through the same `artToWorld` every editor zone goes
-through — so a measured world and an authored one land in one coordinate system
-by construction. Re-run it with `--overlay` and the fit is checkable by eye:
+**Runevault replaced Hatchery on 2026-08-12, and its ground is drawn, not
+measured.** Hatchery was the one world with no grid in the editor's export —
+only a painting — so `scripts/fit-deck-grid.py` recovered its flagstone lattice
+from the backdrop itself (autocorrelation for the tile steps, the Fourier phase
+for where the stones sit, a stone-vs-forest probe and a flood fill for the
+extent). The editor has since replaced that map with `runevault` and drawn 33
+grids on it by hand, so this hub comes back down the ordinary editor path and
+the deck fitter is idle — still the right tool the next time a backdrop arrives
+without a grid:
 
 ```
-python3 scripts/fit-deck-grid.py hatchery --overlay /tmp/fit.png
+python3 scripts/fit-deck-grid.py <name> --overlay /tmp/fit.png
 ```
+
+Only **4** of Runevault's 187 drawn cells are marked playable in the editor, so
+that is all the ground it has. Mark the rest in the Edit tab and re-run
+`pnpm worlds:export`.
 
 **Per-world boards.** `GameState` keeps `{ items, grid, nests }` per world; the
 board you leave keeps standing, timers and all, so travel is a change of view and
@@ -216,8 +220,8 @@ a door as tall as the art.
 | `emberkeep` | The North Crossing (by the Golden Altar) | ice blue | `borealis` | the Elder wakes |
 | `roothold` | The Vine Arch | flame red/pink | `emberkeep` | always |
 | `borealis` | The Ash Road (by the landing shore) | flame red/pink | `emberkeep` | always |
-| `borealis` | The Rune Way (the circular inlay, mainland top) | ice blue | `hatchery` | 3 Selyna quests |
-| `hatchery` | The Rune Circle | ice blue | `borealis` | always |
+| `borealis` | The Rune Way (the circular inlay, mainland top) | ice blue | `runevault` | 3 Selyna quests |
+| `runevault` | The Rune Circle | ice blue | `borealis` | always |
 
 **Every door wears a `PortalFX` coloured by its DESTINATION** (Constants
 `PORTAL_TINTS`: flame home, green to Roothold, ice north) — the exception to
@@ -228,7 +232,7 @@ all three keys are save-derivable stats — and `Zones.spec.ts` pins the exact
 six routes, the round trips, and each gate. The North Crossing is
 ceremony-lit (`gate:opened`, Eleanor's lines after the finale); the hubs run
 first-arrival tours (UIScene `tours`: Roothold's Emporium walkthrough unlocks
-the shop button, Hatchery's cauldron lesson). The editor's `teleport` record
+the shop button, Runevault's cauldron lesson). The editor's `teleport` record
 stays registry data only.
 
 Authored in the World Builder (⭘ Portal, `P`) or in `PORTALS` in
@@ -260,9 +264,14 @@ reference grid through `gameOrigin`.
 
 - **Re-export `map.json`** → re-run `scripts/build-zones.mjs`, or the
   `baseSignature` guard silently drops every extra zone.
-- **Regenerate a backdrop** → if a world's ground was MEASURED from it
-  (Hatchery), re-run `scripts/fit-deck-grid.py <name> --overlay …`, then
-  `build-zones.mjs`. A backdrop at a different size or crop moves every cell.
+- **Change anything in the map editor** (a grid, a playable mark, a placed prop,
+  a whole map) → `pnpm worlds:export`. It reads the editor's own project from
+  `asset3d/editor-map.json` and runs export → ingest → build-zones, so nothing
+  waits on somebody having the editor open to press Apply. Then
+  `pnpm audit:ground`: a cell drawn over the sky is ground a piece falls into.
+- **Regenerate a backdrop** → if a world's ground was MEASURED from it, re-run
+  `scripts/fit-deck-grid.py <name> --overlay …`, then `build-zones.mjs`. A
+  backdrop at a different size or crop moves every cell.
 - **Add a world** → `WORLDS` in `build-zones.mjs`, a `background_<id>` entry in
   `assets.json`, and check `PreloadScene`'s backdrop trim still skips it at boot.
   It also needs a **door out** and a door **in** from somewhere already

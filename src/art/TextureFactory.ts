@@ -155,6 +155,7 @@ export class TextureFactory {
       case 'ui_panel': return this.panel(key);
       case 'ui_card': return this.card(key);
       case 'ui_pill': return this.pill(key);
+      case 'ui_icon_lock': return this.lockIcon(key);
       case 'ui_heart': return this.heart(key, true);
       case 'ui_heart_empty': return this.heart(key, false);
       case 'ui_slot': return this.slot(key);
@@ -1485,6 +1486,61 @@ export class TextureFactory {
    * shape, so five of them in a row read as one gauge at a glance instead of as
    * two kinds of icon.
    */
+  /**
+   * The Store's padlock — stamped over a card whose world is still shut.
+   *
+   * Painted rather than sourced because it is CHROME, not art: it has to read
+   * at 40px over both the cream card and the violet foil plate, which a picture
+   * of a lock does not. Same brass-on-night language as the wallet chips, so it
+   * looks like it belongs to the panel and not like a missing texture.
+   */
+  private lockIcon(key: string): void {
+    const S = 64;
+    this.paint(key, S, S, (g) => {
+      // Shackle first, so the body's fill covers where it enters.
+      g.beginPath();
+      g.arc(S / 2, S * 0.4, S * 0.2, Math.PI, 0);
+      g.lineWidth = S * 0.11;
+      g.lineCap = 'round';
+      g.strokeStyle = withAlpha(P.night, 0.4);
+      g.stroke();
+      g.beginPath();
+      g.arc(S / 2, S * 0.38, S * 0.2, Math.PI, 0);
+      g.strokeStyle = P.goldShade;
+      g.stroke();
+
+      const bodyX = S * 0.19;
+      const bodyY = S * 0.42;
+      const bodyW = S * 0.62;
+      const bodyH = S * 0.42;
+      const round = (inset: number): void => {
+        g.beginPath();
+        g.roundRect(bodyX + inset, bodyY + inset, bodyW - inset * 2, bodyH - inset * 2, S * 0.1);
+      };
+      round(-2);
+      g.fillStyle = withAlpha(P.night, 0.42);
+      g.fill();
+      round(0);
+      const grad = g.createLinearGradient(0, bodyY, 0, bodyY + bodyH);
+      grad.addColorStop(0, P.goldAccent);
+      grad.addColorStop(1, P.goldShade);
+      g.fillStyle = grad;
+      g.fill();
+      g.lineWidth = 2.6;
+      g.strokeStyle = withAlpha(P.night, 0.55);
+      g.stroke();
+
+      // Keyhole — a dot and a slot, the shape everyone reads as "shut".
+      g.beginPath();
+      g.arc(S / 2, bodyY + bodyH * 0.4, S * 0.06, 0, Math.PI * 2);
+      g.fillStyle = withAlpha(P.night, 0.75);
+      g.fill();
+      g.beginPath();
+      g.roundRect(S / 2 - S * 0.025, bodyY + bodyH * 0.4, S * 0.05, bodyH * 0.38, S * 0.025);
+      g.fill();
+    });
+  }
+
   private heart(key: string, lit: boolean): void {
     const S = 64;
     this.paint(key, S, S, (g) => {

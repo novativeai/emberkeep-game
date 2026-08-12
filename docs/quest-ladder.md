@@ -404,7 +404,7 @@ The rule lives in `Constants.ts` (`LEGENDARY_EGG_COUNT`) and is enforced by
    up, because a producer behind a fog the audit never lifts is invisible to
    the solver and perfectly real in play.
    **The one sanctioned exception is Selyna's Cauldron** (`src/data/cauldron.json`,
-   the pot in the hatchery hub): a deliberate late-game faucet that BREWS eggs
+   the pot in the Runevault hub): a deliberate late-game faucet that BREWS eggs
    out of the Bag, priced in renewable tier-3 goods so a legendary egg is a
    session-scale project rather than a drop. It trades Bag→Bag only — it can
    never place a piece on a board — which is why it lives outside the audit's

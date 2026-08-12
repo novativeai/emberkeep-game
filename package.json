@@ -21,6 +21,7 @@
     "probe": "tsx scripts/probe-image.ts",
     "bake:dragon": "node scripts/bake-dragon.mjs",
     "map:import": "node scripts/import-map.mjs",
+    "worlds:export": "node scripts/export-editor-worlds.mjs && node scripts/ingest-worlds.mjs && node scripts/build-zones.mjs",
     "optimize:dist": "python3 scripts/shrink-dist.py",
     "verify:lane": "node scripts/verify-lane.mjs"
   },

@@ -11,6 +11,7 @@ import {
   DRAG,
   DRAGON_ANIM,
   DRAGON_RIG_SCALE,
+  CRYSTAL_3D,
   EMBER_MOTES,
   FINALE,
   GATE_FX_HEIGHT,
@@ -69,7 +70,7 @@ import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAl
 import facesJson from '../data/faces.json';
 import { BoardItem } from '../entities/BoardItem';
 import { PortalFX } from '../entities/PortalFX';
-import { Crystal3D } from '../render/Crystal3D';
+import { type Crystal3D, sharedCrystal3D } from '../render/Crystal3D';
 import type { FacesData } from '../render/faceAnimations';
 import { FlipbookFX, RAMP_TEXTURE } from '../render/FlipbookFX';
 import { EMITTER_PRESETS } from '../render/fx/emitterAssets';
@@ -231,6 +232,8 @@ const NO_ALLOW: Required<TutorialAllow> = {
 export class BoardScene extends Phaser.Scene {
   private ctx!: GameContext;
   private itemSprites = new Map<number, BoardItem>();
+  /** Reported once per run — see `reseatFixtures`. */
+  private fixtureDrifted = false;
   private pool: BoardItem[] = [];
   private tiles = new Map<string, Phaser.GameObjects.Image>();
   private fog = new Map<string, Phaser.GameObjects.Image>();
@@ -486,10 +489,13 @@ export class BoardScene extends Phaser.Scene {
       this.liveDragons.clear();
       this.altarElder?.destroy();
       this.altarElder = undefined;
-      this.crystal3d?.dispose();
+      // NOT disposed: the gem is shared across scenes (`sharedCrystal3D`) and
+      // its canvas is registered in the GAME's texture manager, so both survive
+      // this teardown intact. Tearing them down here is what used to leave the
+      // shared key pointing at a dead canvas — and then build a replacement
+      // context on the way back in.
       this.crystal3d = undefined;
       this.crystalTex = undefined;
-      this.restoreCrystalArt(); // the canvas is dead now — hand the key back to the PNG
       for (const id of [...this.itemAuras.keys()]) this.detachItemAura(id);
       this.fx?.destroy();
       this.fx = undefined;
@@ -664,6 +670,13 @@ export class BoardScene extends Phaser.Scene {
     // Both are cheap no-ops when this world has no weather. The aurora usually
     // returns after comparing two numbers (it re-renders 20×/s, not 60); the
     // snow writes four uniforms and does no per-flake work at all.
+    //
+    // Re-fit FIRST: weather is pinned to the screen, and `setScrollFactor(0)`
+    // only pins it against panning — a zoomed camera shrinks it into a box in
+    // the middle (see cameraFit.ts). Both guard on the zoom, so the frames that
+    // did not move the camera — nearly all of them — do nothing here.
+    this.aurora?.fitToCamera(this.cameras.main);
+    this.snow?.fitToCamera(this.cameras.main);
     this.aurora?.update();
     this.snow?.update();
     this.updateDrag(delta);
@@ -707,6 +720,7 @@ export class BoardScene extends Phaser.Scene {
           this.coolBadges.delete(id);
         }
       }
+      this.reseatFixtures();
       for (const sprite of this.itemSprites.values()) {
         if (!sprite.isGenerator) continue;
         const item = this.ctx.state.items.get(sprite.itemId);
@@ -1862,15 +1876,26 @@ export class BoardScene extends Phaser.Scene {
         .setOrigin(cal.anchor.x, cal.anchor.y)
         .setScale(cal.scale * ratio * (DECOR_SCALE[d.name] ?? 1))
         .setDepth(DEPTHS.itemBase + y);
-      // Ground shadow sized to the art, on the cell so the spring lifts off it.
-      this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
+      // Ground shadow under the PROP, not under its cell.
+      //
+      // A prop is drawn at the cell PLUS its calibration offset PLUS the Move
+      // tool's free nudge — `at` in build-zones' DECOR is a point on the
+      // backdrop, and the cell is only the index that point happens to fall in.
+      // Shadowing the cell meant the darkness sat wherever the tile was while
+      // the object stood somewhere else: harmless for the authored isle, whose
+      // decor is nudged by a few px, and a full tile off for Runevault's
+      // cauldron, placed freely in the editor at dx 407. The anchor IS the
+      // ground contact by the calibration's own definition, so the sprite's
+      // position is the right place to put it. Depth still keys off the CELL:
+      // the shadow must sort with the tile it belongs to, not with its own y.
+      this.addGroundShadow(sprite.x, sprite.y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
       // Slow spring-bounce (not a smooth float): lazy spring, staggered, calm.
       this.settleSprite(sprite, (i % 8) * 35); // one-time landing settle
       // The one piece of scenery that IS a screen: Selyna's pot opens the brew
       // panel. Same shape as a world character — map decor with a tap handler.
       if (d.name === CAULDRON_DECOR) {
-        // The Hatchery tour points here ("The cauldron, on the rune — tap it").
-        this.tourTargets.set('hatchery_cauldron', { x: sprite.x, y: baseY - sprite.displayHeight * 0.55 });
+        // The Runevault tour points here ("The cauldron, on the rune — tap it").
+        this.tourTargets.set('runevault_cauldron', { x: sprite.x, y: baseY - sprite.displayHeight * 0.55 });
         sprite.setInteractive({ useHandCursor: true });
         sprite.on(
           'pointerup',
@@ -2423,6 +2448,8 @@ export class BoardScene extends Phaser.Scene {
   private ensureCrystal3D(): void {
     // Whatever the last run left behind, start from real art.
     this.restoreCrystalArt();
+    // The painted grotto is the crystal (see CRYSTAL_3D).
+    if (!CRYSTAL_3D) return;
     // A live three.js render every few frames for one board item. The painted
     // fallback texture is already there, so skipping this costs a highlight.
     if (!graphics.profile.crystal3d) return;
@@ -2434,13 +2461,13 @@ export class BoardScene extends Phaser.Scene {
     const map = this.ctx.state.map;
     const spec = map.decor3d?.find((d) => d.model3d)?.model3d ?? undefined;
     try {
-      const crystal = new Crystal3D(spec ?? {});
+      // ONE renderer per page (`sharedCrystal3D`), not one per scene. The
+      // texture manager is the GAME's, not the scene's, so both the gem and the
+      // key it wears simply outlive every rebuild.
+      const crystal = sharedCrystal3D(spec ?? {});
       this.textures.remove(CRYSTAL_KEY); // the painted art is safe under CRYSTAL_PNG
       this.crystalTex = this.textures.addCanvas(CRYSTAL_KEY, crystal.canvas) ?? undefined;
-      if (!this.crystalTex) {
-        crystal.dispose();
-        return;
-      }
+      if (!this.crystalTex) return;
       this.crystal3d = crystal;
     } catch (err) {
       console.warn('[Crystal3D] WebGL unavailable — keeping the 2D crystal art.', err);
@@ -2482,7 +2509,10 @@ export class BoardScene extends Phaser.Scene {
         .setOrigin(cal.anchor?.x ?? 0.5, cal.anchor?.y ?? 0.72)
         .setScale((cal.scale ?? 1) * ratio)
         .setDepth(DEPTHS.itemBase + y);
-      this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
+      // Under the gem, not under its cell — same rule as `buildMapDecor` above.
+      // The authored emerald carries dx -64 / dy -28, so its shadow used to sit
+      // a third of a tile down-right of the crystal casting it.
+      this.addGroundShadow(sprite.x, sprite.y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
       this.settleSprite(sprite, (i % 8) * 35); // one-time landing settle
     });
   }
@@ -2542,6 +2572,20 @@ export class BoardScene extends Phaser.Scene {
         .setDepth(DEPTHS.itemBase + y + 1000) // above this region's cloud band
         .setAlpha(0)
         .setVisible(false); // earned into view — see syncKeyBadges
+      // The badge SPENDS the key, exactly as tapping the cloud under it does.
+      // It used to be decoration: the one thing on screen shaped like "press me
+      // to open this" did nothing at all, so the gate stayed shut, the key
+      // stayed in the wallet, and the badge came back on every load — which
+      // reads as the game refusing a key it had already taken.
+      badge.setInteractive({ useHandCursor: true });
+      badge.on(
+        'pointerup',
+        (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
+          ev.stopPropagation();
+          this.tapClaimed = true;
+          this.ctx.bus.emit('fog:tapped', { regionId: region.id });
+        }
+      );
       hoverBob(this, badge, 10, 520);
       this.keyBadges.set(region.id, badge);
     }
@@ -2563,11 +2607,16 @@ export class BoardScene extends Phaser.Scene {
    */
   private syncKeyBadges(cinematic: boolean): void {
     for (const [regionId, badge] of this.keyBadges) {
-      const cost =
-        this.ctx.state.map.regions.find((r) => r.id === regionId)?.unlock?.keys ?? 1;
+      const region = this.ctx.state.map.regions.find((r) => r.id === regionId);
+      const cost = region?.unlock?.keys ?? 1;
       // During the tutorial only the key_unlock lesson may show a key at all.
       const gate = this.tutorialDone || this.tutorialStepId === 'key_unlock';
-      const show = gate && this.ctx.state.keys >= cost;
+      // …and the gate must still BE a gate. Keys are Keeper-wide — they follow
+      // the player across worlds — so a key earned for Borealis's fog used to
+      // re-light the badge over an Emberkeep gate that had already been paid
+      // for and had no cloud left on it. A badge is a lock, not a wallet.
+      const locked = !!region && this.ctx.state.regionStatus.get(regionId) !== 'active';
+      const show = gate && locked && this.ctx.state.keys >= cost;
       if (show === (badge.getData('shown') === true)) continue;
       badge.setData('shown', show);
       if (!show) {
@@ -3204,7 +3253,12 @@ export class BoardScene extends Phaser.Scene {
     s.x += (this.dragTarget.x - s.x) * k;
     s.y += (this.dragTarget.y - s.y) * k;
     const cell = this.dropCellUnderDrag();
-    if (!this.ctx.state.isTileActive(cell.col, cell.row)) {
+    // The piece's OWN shadows answer to the same question as the diamond: over
+    // open sky there is no floor to darken, so it carries none (BoardItem
+    // `setOverGround`). One test, one answer, three things obeying it.
+    const live = this.ctx.state.isTileActive(cell.col, cell.row);
+    s.setOverGround(live);
+    if (!live) {
       this.dragCell.setVisible(false);
       return;
     }
@@ -3300,6 +3354,11 @@ export class BoardScene extends Phaser.Scene {
 
   private canDrag(sprite: BoardItem): boolean {
     if (sprite.kind !== 'item') return false;
+    // Map fixtures (the Theme Crystal on its ledge) never lift. MergeSystem
+    // bounces them too, but refusing the drag here is what keeps the gesture
+    // honest: a landmark that follows the finger and then snaps back reads as a
+    // glitch, where one that simply does not move reads as scenery.
+    if (this.ctx.state.isFixture(sprite)) return false;
     if (this.tutorialDone) return true;
     return this.allow.drag.includes('*') || this.allow.drag.includes(sprite.chain);
   }
@@ -3308,6 +3367,42 @@ export class BoardScene extends Phaser.Scene {
    *  of the item on (col,row). Hit zones follow the art, not the tile — art can
    *  sit off the tile point (the wood log's opaque pixels miss the tile centre
    *  entirely), so pointer-driven tests must aim where a player would. */
+  /**
+   * A map fixture stands where the map put it — checked, not assumed.
+   *
+   * The state can no longer move one: `GameState.moveItem` refuses, every
+   * caller refuses before it, and hydration re-seats anything a stale save
+   * carries. What none of that covers is the SPRITE drifting off a cell its
+   * item never left — a tween interrupted, a pooled sprite reused, a drag that
+   * lifted before a guard was live. Those all end the same way for the player:
+   * the Crystal is somewhere it was never put, and only a reload fixes it.
+   *
+   * So the invariant is made continuously true instead of trusted. Runs on the
+   * existing 240 ms housekeeping tick — one map lookup and two comparisons for
+   * the single fixture this build ships — and says so the first time it has to
+   * correct anything, because a silent self-heal hides the cause forever.
+   */
+  private reseatFixtures(): void {
+    for (const sprite of this.itemSprites.values()) {
+      if (!this.ctx.state.isFixture(sprite)) continue;
+      const item = this.ctx.state.items.get(sprite.itemId);
+      if (!item) continue;
+      const home = gridToWorld(item.col, item.row);
+      if (Math.abs(sprite.x - home.x) < 1 && Math.abs(sprite.y - home.y) < 1) continue;
+      if (!this.fixtureDrifted) {
+        this.fixtureDrifted = true;
+        console.warn(
+          `[fixture] ${sprite.chain} drifted from its cell (${item.col},${item.row}): ` +
+            `sprite was at ${Math.round(sprite.x)},${Math.round(sprite.y)}, ` +
+            `expected ${Math.round(home.x)},${Math.round(home.y)} — re-seated.`
+        );
+      }
+      this.tweens.killTweensOf(sprite);
+      sprite.setPosition(home.x, home.y);
+      sprite.setDepth(DEPTHS.itemBase + home.y);
+    }
+  }
+
   itemArtWorldPoint(col: number, row: number): { x: number; y: number } | null {
     for (const s of this.itemSprites.values()) {
       if (!s.active || s.col !== col || s.row !== row) continue;

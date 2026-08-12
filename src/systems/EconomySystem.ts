@@ -36,6 +36,18 @@ export class EconomySystem {
       if (free && this.state.stat('freeSparkUsed') === 0) this.state.addStat('freeSparkUsed', 1);
     });
     bus.on('ui:bag_sell_requested', ({ chain, tier }) => this.sellFromBag(chain, tier));
+    /**
+     * A LOADED save is a wallet that changed, and nothing was saying so.
+     *
+     * Every gauge in the HUD is painted from `economy:changed`; a fresh game got
+     * one from `BoardSystem.newGame`, but a load got none at all — so the pills
+     * kept the zeros they were CONSTRUCTED with while the state underneath held
+     * the player's real gold, keys and XP. It read as "the game lost my
+     * progress", and it made the board and the HUD contradict each other: the
+     * Gold Key badge floats off `state.keys` and correctly appeared over the
+     * gate, beside a wallet insisting there were no keys.
+     */
+    bus.on('state:loaded', () => this.announce());
   }
 
   sellValue(chain: string, tier: number): number {

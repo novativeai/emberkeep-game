@@ -47,6 +47,13 @@ export class StoreSystem {
       this.bus.emit('store:purchase_failed', { itemId, reason: 'owned' });
       return;
     }
+    // Local goods, sold where they are made. The panel already padlocks the
+    // card, but the gate is enforced HERE too: a shelf is data, and the one
+    // thing a purchase must never depend on is the UI having drawn it right.
+    if (entry.item.world && entry.item.world !== this.state.worldId) {
+      this.bus.emit('store:purchase_failed', { itemId, reason: 'locked' });
+      return;
+    }
     if (this.state.coins < entry.item.gold) {
       this.bus.emit('store:purchase_failed', { itemId, reason: 'gold' });
       return;

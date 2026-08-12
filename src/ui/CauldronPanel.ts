@@ -31,7 +31,7 @@ const ING_Y = 150;
 const BREW_Y = 520;
 
 /**
- * Selyna's Cauldron — the brew screen behind the pot in the hatchery hub.
+ * Selyna's Cauldron — the brew screen behind the pot in the Runevault hub.
  *
  * Layout follows the classic alchemy-screen grammar (a recipe ledger on the
  * left, the selected formula explained on the right, its ingredients as cards

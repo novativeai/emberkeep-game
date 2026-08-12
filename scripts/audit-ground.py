@@ -89,14 +89,29 @@ ART_FILE = {"emberkeep": "emberkeep-nb2"}
 #: Cells whose colour is an outlier because of the LIGHT on them, not because
 #: there is nothing there. Each was checked against the overlay before being
 #: written here; the note says what is painted on that tile. Anything not on
-#: this list is a genuine question. Re-check the list whenever a backdrop is
-#: repainted — `--strict` prints them all again.
-ACCEPTED = {
-    ("borealis", 80, 0): "lamplight spill on the ice, left of the magic door",
-    ("borealis", 85, 0): "lamplight spill on the ice, right of the magic door",
-    ("roothold", 30, 0): "the brazier flame stands on this flagstone",
-    ("roothold", 83, 0): "flagstone in the deep shade under the vine arch",
-}
+#: this list is a genuine question. Re-check whenever a backdrop is repainted —
+#: `--strict` prints them all again.
+#:
+#: KEYED BY THE PIXEL, not by (col,row). A cell index is a position in the world's
+#: index space, and that space is re-allocated block by block on every export: the
+#: 2026-08-12 re-export renumbered roothold's brazier from (30,0) to (34,0) without
+#: anything moving on the art. The point on the backdrop is what actually stands
+#: still, so the list is matched by proximity to it.
+ACCEPT_RADIUS = 60  # backdrop px — under half a tile, so two cells never share a note
+ACCEPTED = [
+    ("borealis", 1994, 424, "lamplight spill on the ice, in front of the magic door"),
+    ("borealis", 2063, 461, "lamplight spill on the ice, left of the door"),
+    ("borealis", 2125, 501, "lamplight spill on the ice, right of the door"),
+    ("roothold", 829, 621, "the brazier flame stands on this flagstone"),
+    ("roothold", 1704, 385, "flagstone in the deep shade under the vine arch"),
+]
+
+
+def accepted_note(world_id, x, y):
+    for wid, ax, ay, note in ACCEPTED:
+        if wid == world_id and math.hypot(x - ax, y - ay) <= ACCEPT_RADIUS:
+            return note
+    return None
 
 
 def read(rel):
@@ -243,7 +258,7 @@ def audit(world, authored, overlay_dir, strict):
     # silence about a known oddity is how the note rots away from the art.
     known, unknown = [], []
     for c, why in flagged:
-        note = None if strict else ACCEPTED.get((world["id"], c[0], c[1]))
+        note = None if strict else accepted_note(world["id"], c[2], c[3])
         (known if note else unknown).append((c, why, note))
 
     verdict = "all on painted rock" if not unknown else "to look at"

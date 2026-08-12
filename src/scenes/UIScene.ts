@@ -195,7 +195,7 @@ export class UIScene extends Phaser.Scene {
     this.store = new StorePanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.store, this.ctx);
     this.store.setDepth(DEPTH_PANEL + 7);
 
-    // Selyna's Cauldron — opened by tapping the pot decor in the hatchery hub.
+    // Selyna's Cauldron — opened by tapping the pot decor in the Runevault hub.
     this.cauldron = new CauldronPanel(this, this.ctx.bus, this.ctx);
     this.cauldron.setDepth(DEPTH_PANEL + 7);
     this.offBus.push(this.ctx.bus.on('ui:cauldron_tapped', () => this.cauldron.open()));
@@ -307,7 +307,8 @@ export class UIScene extends Phaser.Scene {
       this.statusPanel.teardown();
     });
 
-    // If resuming from a completed-tutorial save, key pill is permanently hidden.
+    // Resuming past the tutorial: the key LESSON is over, but the pill still
+    // follows the wallet (Hud.syncKeyPill) — Borealis buys its fog with keys.
     if (this.ctx.state.tutorialDone) this.hud.setKeyVisible(false);
 
     // Tool-authored components (ui-theme.json `custom`) — part of the real UI.
@@ -1241,8 +1242,8 @@ export class UIScene extends Phaser.Scene {
     if (worldId === 'roothold' && this.ctx.state.stat('tour:roothold') === 0) {
       this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runRootholdTour());
     }
-    if (worldId === 'hatchery' && this.ctx.state.stat('tour:hatchery') === 0) {
-      this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runHatcheryTour());
+    if (worldId === 'runevault' && this.ctx.state.stat('tour:runevault') === 0) {
+      this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runRunevaultTour());
     }
   }
 
@@ -1291,12 +1292,12 @@ export class UIScene extends Phaser.Scene {
     this.offBus.push(offClose);
   }
 
-  private runHatcheryTour(): void {
-    const t = this.ctx.data.dialogue.tours?.hatchery;
+  private runRunevaultTour(): void {
+    const t = this.ctx.data.dialogue.tours?.runevault;
     if (!t) return;
     const bus = this.ctx.bus;
     this.bubble.sequence('selyna', t.intro, () => {
-      bus.emit('tour:point', { target: 'hatchery_cauldron' });
+      bus.emit('tour:point', { target: 'runevault_cauldron' });
       this.bubble.say('selyna', t.cauldron, 120000);
       const offOpen = bus.on('ui:cauldron_toggled', ({ open }) => {
         if (!open) return;
@@ -1309,8 +1310,8 @@ export class UIScene extends Phaser.Scene {
           if (o) return;
           offClose();
           this.clearUiPointer();
-          this.ctx.state.addStat('tour:hatchery', 1);
-          this.ctx.bus.emit('tour:completed', { id: 'hatchery' });
+          this.ctx.state.addStat('tour:runevault', 1);
+          this.ctx.bus.emit('tour:completed', { id: 'runevault' });
         });
         this.offBus.push(offClose);
       });

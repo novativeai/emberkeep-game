@@ -503,14 +503,16 @@ const PORTALS = {
     // the first nine tiles the player owns in the north.
     { id: 'borealis_shore_gate', to: 'emberkeep', label: 'The Ash Road', art: [1440, 1150, 150, 210] },
     // Over the circular inlay at the top-left of the mainland deck.
-    { id: 'borealis_rune_gate', to: 'hatchery', label: 'The Rune Way', art: [365, 235, 175, 205] }
+    { id: 'borealis_rune_gate', to: 'runevault', label: 'The Rune Way', art: [365, 235, 175, 205] }
   ],
-  hatchery: [
-    // The gold rune circle inlaid in the middle of the deck. It sits ON playable
+  runevault: [
+    // The gold rune circle inlaid in the plateau's west half — the same door the
+    // Hatchery deck carried, read off the new painting. It sits ON playable
     // ground, which is exactly right and costs nothing: a portal is the lowest
     // interactive band on the board, so a piece standing on the circle takes the
-    // tap and only bare stone travels.
-    { id: 'hatchery_circle', to: 'borealis', label: 'The Rune Circle', art: [1335, 605, 415, 275] }
+    // tap and only bare stone travels. The cauldron stands on it too, for the
+    // same reason it stood on Hatchery's.
+    { id: 'runevault_circle', to: 'borealis', label: 'The Rune Circle', art: [411, 418, 600, 378] }
   ]
 };
 
@@ -528,15 +530,69 @@ const PORTALS = {
  * sit at the contact ellipse's vertical centre, the front foot at its bottom).
  */
 const DECOR = {
-  hatchery: [
+  runevault: [
     {
       name: 'pink_cauldron',
-      at: [1542.5, 742.5], // the gold rune circle's centre
-      anchor: { x: 0.5, y: 0.845 },
-      scale: 1
+      // WHERE THE EDITOR PUT IT. `at`/`scale` are filled in below from the
+      // placed asset in `assets/map/nionja-worlds.json`, so moving the pot in
+      // the editor and re-exporting moves it in the game — it is no longer a
+      // point somebody read off the art by hand and typed here.
+      fromEditorAsset: 'pink_cauldron',
+      // Measured on the art itself and NOT the editor's business: the
+      // horizontal centre of the foot ring, and the height of the two side feet
+      // (in a 2:1 iso view the side feet sit at the contact ellipse's vertical
+      // centre, the front foot at its bottom).
+      anchor: { x: 0.5, y: 0.845 }
     }
   ]
 };
+
+/**
+ * Pixel size of a WebP, from its header — no image library in this script.
+ *
+ * Needed because the editor scales the asset against the file IT was handed
+ * (`art.w` in the export) and the game scales the copy in `assets/sprites`. They
+ * are the same picture, but a re-encode can leave them different sizes, and a 5%
+ * error on a prop the player taps is a prop that no longer sits on its own
+ * shadow. Reading both means the conversion is exact instead of nearly right.
+ */
+function webpWidth(rel) {
+  const b = readFileSync(resolve(ROOT, rel));
+  if (b.toString('ascii', 0, 4) !== 'RIFF' || b.toString('ascii', 8, 12) !== 'WEBP') return null;
+  const fourcc = b.toString('ascii', 12, 16);
+  if (fourcc === 'VP8X') return 1 + b.readUIntLE(24, 3);
+  if (fourcc === 'VP8 ') return b.readUInt16LE(26) & 0x3fff;
+  if (fourcc === 'VP8L') {
+    const bits = b.readUInt32LE(21);
+    return (bits & 0x3fff) + 1;
+  }
+  return null;
+}
+
+/**
+ * An editor-placed asset → the `at`/`scale` the decor loop below wants.
+ *
+ * `scale` unwinds three changes of unit between the two programs, and there is
+ * no fourth: the editor draws `art.w × asset.scale` in EDITOR px; dividing by
+ * the fitted editor→backdrop scale gives backdrop px; the renderer multiplies
+ * its own `cal.scale` by `ratio` against the GAME file's width, and the backdrop
+ * itself is drawn at `unit` world px per backdrop px. `unit / ratio` is exactly
+ * the backdrop's calibration scale, so the whole thing collapses to a factor of
+ * two and a pair of measured widths.
+ */
+function editorDecor(spec, d) {
+  const src = source.worlds.find((w) => w.map === spec.editorMap);
+  const placed = (src?.assets ?? []).find((a) => a.name === d.fromEditorAsset && a.world);
+  if (!placed) {
+    throw new Error(
+      `build-zones: ${spec.id} wants the editor's "${d.fromEditorAsset}", but the export has no placed asset by that name with a world point — re-run scripts/export-editor-worlds.mjs`
+    );
+  }
+  const art = editorToArt(placed.world);
+  const gameW = webpWidth(`assets/sprites/environment/map/decor/${d.name}.webp`) ?? placed.art?.w;
+  const scale = (2 * placed.scale * (placed.art?.w ?? gameW)) / (FIT.scale * gameW);
+  return { ...d, at: [round2(art.x), round2(art.y)], scale: round2(scale), flipX: placed.flipX === true };
+}
 
 /** One authored door, in the world pixels the runtime hit-tests against. */
 function portalOf(p) {
@@ -607,19 +663,27 @@ const WORLDS = [
     regionPrefix: 'roothold'
   },
   {
-    id: 'hatchery',
-    name: 'Hatchery',
+    id: 'runevault',
+    name: 'Runevault',
     // Borealis's hub, so it opens with Borealis: a hub the player cannot reach
     // from the sanctuary it serves is a shop with the lights off.
     level: 3,
-    // No editor grid exists for this world — its ground is MEASURED out of the
-    // backdrop by scripts/fit-deck-grid.py. See `deckZone`.
-    deck: 'hatchery',
-    backdrop: 'hatchery',
+    /**
+     * WAS `hatchery`, MEASURED. This world had no editor grid, so its ground was
+     * recovered from the painting by scripts/fit-deck-grid.py (`deck:`) — the
+     * right answer while the only thing that existed was the art.
+     *
+     * On 2026-08-12 the editor replaced that map with `runevault` and drew 33
+     * grids on it by hand, so the ground is authored again and comes back down
+     * the ordinary editor path. The deck fitter stays in the tree: it is still
+     * how a backdrop with no grid gets a board.
+     */
+    editorMap: 'runevault',
+    backdrop: 'runevault',
     extendsAuthoredMap: false,
     skipOnAuthoredIsle: false,
     levelOf: plainLevel,
-    regionPrefix: 'hatchery'
+    regionPrefix: 'runevault'
   }
 ];
 
@@ -771,7 +835,8 @@ for (const spec of WORLDS) {
   // ground shadow (drawn on the cell) under the prop.
   const mapDecor = [];
   const decorCalibration = {};
-  for (const d of DECOR[spec.id] ?? []) {
+  for (const raw of DECOR[spec.id] ?? []) {
+    const d = raw.fromEditorAsset ? editorDecor(spec, raw) : raw;
     const target = artToWorld(d.at[0], d.at[1]);
     let home;
     for (const z of zones) {

@@ -35,7 +35,7 @@ export class BoardSystem {
     const item = [...this.state.items.values()].find(
       (i) => i.kind === 'item' && i.chain === chain && i.tier === tier
     );
-    if (!item) return;
+    if (!item || this.state.isFixture(item)) return; // scenery stays where the map put it
     let [col, row] = to;
     if (!this.state.isTileActive(col, row) || this.state.itemIdAt(col, row) !== null) {
       const free = this.state.freeActiveTilesNear(col, row)[0];

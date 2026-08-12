@@ -42,6 +42,8 @@ export class Hud {
   private energyPill: Pill;
   private coinPill?: Pill;
   private keyPill: Pill;
+  /** The tutorial's `key_unlock` beat is running — see `syncKeyPill`. */
+  private keyLesson = false;
   private regenLabel: Phaser.GameObjects.Text;
   private xpFill: Phaser.GameObjects.Graphics;
   private levelText: Phaser.GameObjects.Text;
@@ -241,6 +243,10 @@ export class Hud {
     this.offBus.push(
       bus.on('energy:changed', ({ current }) => this.refreshEnergy(current)),
       bus.on('economy:changed', () => this.refreshEconomy()),
+      // The other half of "is a key useful here": the last gate on this world
+      // being paid for, and standing somewhere with different gates.
+      bus.on('region:unlocked', () => this.syncKeyPill()),
+      bus.on('world:switched', () => this.syncKeyPill()),
       bus.on('order:progress', ({ orderId, deliverable }) => {
         this.deliverableByOrder.set(orderId, deliverable);
         this.refreshLedgerDot();
@@ -252,8 +258,8 @@ export class Hud {
       bus.on('item:harvest_failed', ({ reason }) => { if (reason === 'energy') this.shakeEnergy(); })
     );
 
-    // Key pill hidden until the tutorial unlock step makes it relevant.
-    this.keyPill.container.setVisible(false);
+    // Key pill hidden until the tutorial unlock step — or a key — makes it real.
+    this.syncKeyPill();
   }
 
   /** Unsubscribe all bus listeners — call on scene shutdown to prevent stale handlers. */
@@ -262,9 +268,28 @@ export class Hud {
     this.offBus.length = 0;
   }
 
-  /** Show or hide the key pill (hidden after tutorial in demo mode). */
+  /** The tutorial's key lesson forces the pill on for its one beat. */
   setKeyVisible(visible: boolean): void {
-    this.keyPill.container.setVisible(visible);
+    this.keyLesson = visible;
+    this.syncKeyPill();
+  }
+
+  /**
+   * The key gauge is on screen only when a key would DO something here: the
+   * Keeper holds at least one AND this world still has a door for it. Plus the
+   * tutorial's key lesson, which is where the idea is taught.
+   *
+   * Two wrong answers were tried before this one. Hidden permanently after the
+   * tutorial: the board still floated a Gold Key over its gates, so it promised
+   * a currency the HUD flatly denied having. Shown whenever the Keeper holds
+   * one: a key banked for Borealis's fog then sat in the wallet over an
+   * Emberkeep with nothing left to unlock, which reads as a gauge that will not
+   * go away. The badge on the board asks the same two questions
+   * (`syncKeyBadges`), so the two always agree.
+   */
+  private syncKeyPill(): void {
+    const useful = this.state.keys > 0 && this.state.hasKeyGate();
+    this.keyPill.container.setVisible(this.keyLesson || useful);
   }
 
   private refreshLedgerDot(): void {
@@ -437,6 +462,7 @@ export class Hud {
   private refreshEconomy(): void {
     this.coinPill?.value.setText(`${this.state.coins}`);
     this.keyPill.value.setText(`${this.state.keys}`);
+    this.syncKeyPill();
     this.levelText.setText(`${this.state.level}`);
     const atCap = this.state.level >= LEVEL_XP.length;
     const [gained, span] = this.state.levelProgress;

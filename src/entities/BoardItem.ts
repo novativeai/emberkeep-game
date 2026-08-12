@@ -39,6 +39,12 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** The art's own scale, so the breath can modulate it without drifting. */
   private artBaseX = 1;
   private artBaseY = 1;
+  /** Is the piece being carried over ground it could actually be put down on?
+   *  Both shadows answer to this while dragging (see `setOverGround`). */
+  private overGround = true;
+  /** Whether the soft shadow was showing before the lift, so restoring it after
+   *  a pass over the void cannot light one under a rig host that had hidden it. */
+  private groundShadowBeforeLift = true;
   private cooling = false;
   /** Art hidden behind a live rig — cooldown/ready visuals are suppressed
    *  (they'd render UNDER the rig); BoardScene floats a badge instead. */
@@ -161,6 +167,9 @@ export class BoardItem extends Phaser.GameObjects.Container {
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
     this.groundShadow.setDisplaySize(w, w * 0.42);
     this.groundShadow.setVisible(true);
+    // A pooled item may have been released mid-flight over the void.
+    this.overGround = true;
+    this.groundShadowBeforeLift = true;
     this.sprite.clearTint();
     this.readyStar.setVisible(false);
     this.cooldownLabel.setVisible(false);
@@ -305,9 +314,40 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.groundShadow.setVisible(visible);
   }
 
+  /**
+   * A SHADOW IS A CLAIM THAT THERE IS A FLOOR.
+   *
+   * Carried out past the island's edge there is nothing under the piece to
+   * darken, and both of its shadows — the hard contact ellipse the lift fades
+   * in, and the soft one it always wears — were still being drawn on the open
+   * sky. Two shadows floating on clouds read as ground that isn't there, which
+   * is the same lie the drop-target diamond used to tell before it learned to
+   * hide (BoardScene.updateDrag, the one place that knows whether the cell
+   * under the drag is real). This is that answer reaching the piece itself.
+   *
+   * Written STRAIGHT, not tweened. A fade here would be a third animation on the
+   * same alpha, racing the lift's own fade-in and the settle's fade-out, and the
+   * two of them already own that property either side of this. Snapping is also
+   * the honest reading: the floor is there or it is not, and the edge the piece
+   * crosses is a hard one.
+   *
+   * Driven every frame, so it is guarded — this must stay cheap.
+   */
+  setOverGround(on: boolean): void {
+    if (on === this.overGround) return;
+    this.overGround = on;
+    this.groundShadow.setVisible(on && this.groundShadowBeforeLift);
+    this.scene.tweens.killTweensOf(this.shadow);
+    this.shadow.setAlpha(on ? DRAG.shadowAlpha : 0);
+  }
+
   liftForDrag(): void {
     this.bobPaused = true;
     this.setDepth(DEPTHS.dragged);
+    // Remembered, not assumed: a rig host carries its art (and this shadow)
+    // hidden, and coming back over ground must not light one up for it.
+    this.groundShadowBeforeLift = this.groundShadow.visible;
+    this.overGround = true;
     this.scene.tweens.killTweensOf(this.shadow);
     this.scene.tweens.add({
       targets: this,
@@ -330,6 +370,9 @@ export class BoardItem extends Phaser.GameObjects.Container {
   }
 
   settleFromDrag(): void {
+    // Home again — whether it landed or bounced back, it is over ground now.
+    this.overGround = true;
+    this.groundShadow.setVisible(this.groundShadowBeforeLift);
     this.scene.tweens.add({
       targets: this,
       scale: 1,

@@ -156,3 +156,26 @@ describe('SaveSystem', () => {
     expect(ctx.running).toBe(false);
   });
 });
+
+/**
+ * The HUD paints every gauge from `economy:changed`. A fresh game gets one from
+ * `BoardSystem.newGame`; a LOAD used to get none at all, so the pills kept the
+ * zeros they were constructed with while the state under them held the player's
+ * real gold, keys and XP — it read as a wiped save.
+ */
+describe('loading a save announces the wallet', () => {
+  it('emits economy:changed with the loaded coins, keys and xp', () => {
+    const storage = new MemoryStorage();
+    const first = createTestContext(storage);
+    first.systems.board.newGame();
+    first.bus.emit('economy:add', { coins: 340, xp: 12, reason: 'test' });
+    first.state.keys = 2;
+    first.systems.save.save();
+
+    const reloaded = createTestContext(storage);
+    const seen = capture(reloaded.bus, 'economy:changed');
+    reloaded.beginRun();
+
+    expect(seen.at(-1)).toMatchObject({ coins: 340, keys: 2, xp: 12 });
+  });
+});

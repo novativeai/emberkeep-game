@@ -37,6 +37,7 @@ import {
   type SnowQuality
 } from './snowConfig';
 import { ensureSnowPipeline, SNOW_PIPELINE, type SnowPipelineData } from './snowShader';
+import { unzoomedRect } from './cameraFit';
 
 // Re-exported so callers have one import for the whole effect.
 export * from './snowConfig';
@@ -84,6 +85,13 @@ export class SnowFX {
 
   private width: number;
   private height: number;
+  /** The rect this field is meant to cover ON SCREEN, in game px. The quad's own
+   *  position and size drift away from it with the camera zoom (`fitToCamera`). */
+  private screenX: number;
+  private screenY: number;
+  /** The zoom the quad is currently fitted to — the guard that keeps the re-fit
+   *  off every frame that did not move the camera. */
+  private fitZoom = 1;
   private tier: FxTier;
   private quality: SnowQuality;
   private data: SnowPipelineData;
@@ -113,6 +121,8 @@ export class SnowFX {
     this.lastMs = this.startMs;
 
     this.data = this.buildData();
+    this.screenX = opts.x ?? 0;
+    this.screenY = opts.y ?? 0;
 
     // A 1×1 white frame is all the pipeline needs: every pixel comes from the
     // shader, and outTexCoord spans the quad regardless of texture size.
@@ -177,11 +187,35 @@ export class SnowFX {
   }
 
   setBand(x: number, y: number, width: number, height: number): this {
+    this.screenX = x;
+    this.screenY = y;
     this.width = width;
     this.height = height;
     this.view.setPosition(x, y).setDisplaySize(width, height);
     this.data.aspect = width / Math.max(1, height);
     this.data.resY = height;
+    this.fitZoom = 1;
+    return this;
+  }
+
+  /**
+   * Keep covering the whole viewport however far the board camera is zoomed.
+   *
+   * `scrollFactor 0` stops the field sliding when the board pans but not when it
+   * zooms, so the snow used to shrink into a rectangle in the middle of the
+   * screen exactly when the player pinched out to see more sky (`cameraFit.ts`
+   * has the measurements). Only the QUAD moves: `aspect` and `resY` stay on the
+   * screen rect, because the flake size is in UV and the antialias width is in
+   * real pixels — both of which the zoom already takes care of.
+   *
+   * Guarded on the zoom, so the common frame does nothing at all.
+   */
+  fitToCamera(cam: Phaser.Cameras.Scene2D.Camera): this {
+    const zoom = cam.zoom || 1;
+    if (zoom === this.fitZoom) return this;
+    this.fitZoom = zoom;
+    const r = unzoomedRect(cam, this.screenX, this.screenY, this.width, this.height);
+    this.view.setPosition(r.x, r.y).setDisplaySize(r.width, r.height);
     return this;
   }
 

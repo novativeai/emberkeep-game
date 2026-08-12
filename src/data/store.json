@@ -32,7 +32,8 @@
           "name": "The Igloo",
           "blurb": "Cut from Borealis ice, hauled south, and still not melting.",
           "art": "skin_manor_igloo",
-          "gold": 750
+          "gold": 750,
+          "world": "borealis"
         }
       ]
     },
@@ -75,28 +76,32 @@
           "name": "Ice Lantern",
           "blurb": "A flame kept inside ice. Someone north of here does this.",
           "art": "decor_ice_lantern",
-          "gold": 300
+          "gold": 300,
+          "world": "borealis"
         },
         {
           "id": "frozen_spill",
           "name": "Frozen Spill",
           "blurb": "A waterfall that stopped mid-fall and has not moved since.",
           "art": "decor_frozen_spill",
-          "gold": 340
+          "gold": 340,
+          "world": "borealis"
         },
         {
           "id": "rune_pad",
           "name": "Rune Pad",
           "blurb": "Moon-order line-work under snow. It still glows. Nobody lit it.",
           "art": "decor_rune_pad",
-          "gold": 380
+          "gold": 380,
+          "world": "borealis"
         },
         {
           "id": "drift_cairn",
           "name": "Drift Cairn",
           "blurb": "Stones, a driftwood spar, a ribbon of spun light. A greeting.",
           "art": "decor_drift_cairn",
-          "gold": 420
+          "gold": 420,
+          "world": "borealis"
         },
         {
           "id": "keeper_statue",
@@ -149,7 +154,8 @@
           "gold": 2400,
           "dragon": "ember_dragon",
           "rarity": "legendary",
-          "hero": true
+          "hero": true,
+          "world": "borealis"
         },
         {
           "id": "storm",

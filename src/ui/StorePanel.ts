@@ -167,6 +167,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
     this.offBus.push(bus.on('store:purchased', () => this.isOpen && this.refresh()));
     this.offBus.push(bus.on('store:skin_changed', () => this.isOpen && this.refresh()));
     this.offBus.push(bus.on('store:dragon_skin_changed', () => this.isOpen && this.refresh()));
+    // Travelling changes the STOCK: local goods are on the shelf only in the
+    // world that makes them, so the same stall carries a different catalogue
+    // in Borealis than it does here.
+    this.offBus.push(bus.on('world:switched', () => this.isOpen && this.refresh()));
     this.offBus.push(
       bus.on('store:purchase_failed', ({ itemId, reason }) => this.refuse(itemId, reason))
     );
@@ -272,9 +276,27 @@ export class StorePanel extends Phaser.GameObjects.Container {
     this.buildBody();
   }
 
+  /**
+   * Is this thing sold somewhere else? A card tagged with a `world` is LOCAL
+   * goods — Borealis ice is cut in Borealis — so it is on the shelf only while
+   * the Keeper is standing in that world, and padlocked everywhere else.
+   *
+   * Deliberately the CURRENT world and not "has that world's door opened":
+   * travelling has to change what the stall carries, or the four hubs sell one
+   * identical catalogue and being somewhere means nothing.
+   */
+  private isLocked(item: StoreItem): boolean {
+    return !!item.world && item.world !== this.gameState.worldId;
+  }
+
+  /** Where a padlocked card is sold, as the player would name it. */
+  private lockedIn(item: StoreItem): string {
+    return this.gameState.worlds.get(item.world ?? '')?.name ?? 'another world';
+  }
+
   /** Shake + redden the refused price, so a denial is felt on the card the
    *  player tapped rather than announced somewhere else on screen. */
-  private refuse(itemId: string, reason: 'gold' | 'owned' | 'no_room'): void {
+  private refuse(itemId: string, reason: 'gold' | 'owned' | 'no_room' | 'locked'): void {
     const label = this.priceLabels.get(itemId);
     const card = this.cardsById.get(itemId);
     if (!label || !card) return;
@@ -515,6 +537,31 @@ export class StorePanel extends Phaser.GameObjects.Container {
    * The one control on a card. It says exactly one of: a price, WEAR, WORN,
    * OWNED — and it is interactive only when tapping it would do something.
    */
+  /**
+   * The padlock a shut world's card wears: a brass lock over the art, and the
+   * card's own words dimmed under it.
+   *
+   * The art stays VISIBLE, only darkened. A locked card whose picture is hidden
+   * is an advertisement for nothing; the whole job here is to make the player
+   * want the thing and know where it lives.
+   */
+  private addLockOverlay(
+    card: Phaser.GameObjects.Container,
+    art: Phaser.GameObjects.Image | null,
+    y: number,
+    size: number
+  ): void {
+    art?.setTint(0x6f7d92).setAlpha(0.72);
+    // A soft disc under the lock: brass on a bright card is brass on nothing.
+    const disc = this.scene.add.graphics();
+    disc.fillStyle(num(INK.scrim), 0.42);
+    disc.fillCircle(0, y, size * 0.62);
+    card.add(disc);
+    const lock = this.scene.add.image(0, y, 'ui_icon_lock');
+    lock.setScale(size / Math.max(lock.width, lock.height));
+    card.add(lock);
+  }
+
   private makeAction(
     item: StoreItem,
     section: StoreSection,
@@ -525,6 +572,28 @@ export class StorePanel extends Phaser.GameObjects.Container {
     fontPx: number
   ): Phaser.GameObjects.Container {
     const btn = this.scene.add.container(0, y);
+    // A shut world's plate names the place instead of a price, and does nothing
+    // when tapped. It is checked BEFORE owned/worn on purpose: nothing behind a
+    // locked door can have been bought, so no other state can be true here.
+    if (this.isLocked(item)) {
+      const plate = this.scene.add.image(0, 0, 'ui_btn_free').setScale(scale).setAlpha(0.9);
+      const label = this.scene.add
+        .text(0, -6, `Only in ${this.lockedIn(item)}`, {
+          fontFamily: FONT.ui,
+          fontSize: `${Math.round(fontPx * 0.62)}px`,
+          fontStyle: 'bold',
+          color: INK.onPlate
+        })
+        .setOrigin(0.5);
+      const lock = this.scene.add.image(0, -4, 'ui_icon_lock');
+      lock.setScale((fontPx * 0.8) / Math.max(lock.width, lock.height));
+      const total = lock.displayWidth + 10 + label.width;
+      lock.setX(-total / 2 + lock.displayWidth / 2);
+      label.setX(total / 2 - label.width / 2);
+      btn.add([plate, lock, label]);
+      this.priceLabels.set(item.id, label);
+      return btn;
+    }
     const skinAction = (section.kind === 'skin' || section.kind === 'dragon_skin') && owned && !worn;
     const isPrice = !worn && !owned;
     const text = worn ? 'WORN' : owned ? (skinAction ? 'WEAR' : 'OWNED') : `${item.gold}`;
@@ -591,8 +660,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
       worn ? INK.ember : undefined
     );
     card.add(plate.under);
+    let art: Phaser.GameObjects.Image | null = null;
     if (this.scene.textures.exists(item.art)) {
-      card.add(this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h));
+      art = this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h);
+      card.add(art);
     }
     card.add(addScrim(this.scene, inner.w, inner.h / 2 - 30, 30));
     // The sheen crosses the ART as well as the plate — a foil card whose gloss
@@ -620,6 +691,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
         .setOrigin(0.5, 0)
         .setShadow(0, 3, 'rgba(36,27,34,0.7)', 5)
     );
+    if (this.isLocked(item)) this.addLockOverlay(card, art, -HERO_H * 0.16, 132);
     card.add(this.makeAction(item, section, owned, worn, HERO_H / 2 - 84, 0.92, 46));
     return card;
   }
@@ -670,10 +742,12 @@ export class StorePanel extends Phaser.GameObjects.Container {
       rim.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
     }
 
+    let art: Phaser.GameObjects.Image | null = null;
     if (this.scene.textures.exists(item.art)) {
       if (bleed) {
         const inner = { w: CARD_W - PLATE_INSET * 2, h: CARD_H - PLATE_INSET * 2 };
-        card.add(this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h));
+        art = this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h);
+        card.add(art);
         // Scrim under everything the player must read — from just above the
         // name down to the plate's foot, same treatment as the hero.
         card.add(addScrim(this.scene, inner.w, inner.h / 2 - 12, -12));
@@ -681,7 +755,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
         // Contain-fit into the card's stage so a tall Manor and a squat rune
         // pad both sit inside the same rectangle, capped at 188 tall: the
         // blurb is the reason anyone reads a card twice, and it needs lines.
-        const art = this.scene.add.image(0, -122, item.art);
+        art = this.scene.add.image(0, -122, item.art);
         art.setScale(Math.min(300 / art.width, 188 / art.height));
         card.add(art);
       }
@@ -715,6 +789,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
       .setAlpha(bleed || foil ? 1 : 0.9);
     if (bleed) blurb.setShadow(0, 3, 'rgba(36,27,34,0.7)', 5);
     card.add(blurb);
+    if (this.isLocked(item)) this.addLockOverlay(card, art, bleed ? -60 : -122, 88);
     card.add(this.makeAction(item, section, owned, worn, CARD_H / 2 - 62, 0.74, 38));
     return card;
   }

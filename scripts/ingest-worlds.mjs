@@ -93,21 +93,35 @@ const worlds = doc.worlds.map((w) => {
 });
 
 const t = doc.teleport ?? {};
+/**
+ * The export carries the teleport in ONE OF TWO shapes and both are legitimate.
+ *
+ * The editor's Teleport tab writes its own (`enabled`, `triggerChain`,
+ * `triggerTier`) and that is what gets translated below. But `buildExportDoc`
+ * fills the field from `worldsRegistry.teleport` — this file's OWN previous
+ * output — so an export made while the tab was untouched arrives already
+ * translated, with no `enabled` and a resolved `toWorld`. Reading only the first
+ * shape silently returned `teleport: null` and unhooked the hatch that sends the
+ * player north.
+ */
+const teleport = t.enabled
+  ? {
+      trigger: t.trigger,
+      chain: t.triggerChain ?? null,
+      tier: t.triggerTier ?? null,
+      dragonChain: t.dragonChain ?? null,
+      toWorld: slug(t.toWorld)
+    }
+  : t.toWorld
+    ? { trigger: t.trigger ?? null, chain: t.chain ?? null, tier: t.tier ?? null, dragonChain: t.dragonChain ?? null, toWorld: slug(t.toWorld) }
+    : null;
 const out = {
   format: 'emberkeep-worlds',
   version: 1,
   source: inPath,
   generatedBy: doc.generatedBy ?? 'Emberkeep Map Editor',
   primary: worlds.find((w) => w.primary)?.id ?? worlds[0]?.id ?? null,
-  teleport: t.enabled
-    ? {
-        trigger: t.trigger,
-        chain: t.triggerChain ?? null,
-        tier: t.triggerTier ?? null,
-        dragonChain: t.dragonChain ?? null,
-        toWorld: slug(t.toWorld)
-      }
-    : null,
+  teleport,
   worlds
 };
 

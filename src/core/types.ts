@@ -317,7 +317,7 @@ export interface DialogueData {
    *  button (`shop:unlocked`). */
   tours: {
     roothold: { intro: string[]; house: string; sections: string[]; close: string; outro: string };
-    hatchery: { intro: string[]; cauldron: string; explain: string; close: string };
+    runevault: { intro: string[]; cauldron: string; explain: string; close: string };
   };
   /** The Elder's line when Order 1 completes AFTER Level 3 — the late awakening. */
   lateAwakening: string;
@@ -485,6 +485,20 @@ export interface StoreItem {
    *  it always sorts first. At most one per section — the panel takes the first
    *  it finds and treats the rest as ordinary cards. */
   hero?: boolean;
+  /**
+   * The world this thing is MADE in — and therefore the only one it is sold in.
+   * Absent = stock every stall carries.
+   *
+   * Half the catalogue is northern: ice cut in Borealis, rune stone under snow,
+   * a dragon nested on the floes. Set this and the card is on the shelf only
+   * while the Keeper stands in that world; everywhere else it wears a padlock
+   * reading "Only in Borealis". Deliberately the CURRENT world rather than
+   * "that world's door has opened" — travelling has to change what the stall
+   * carries, or four hubs sell one identical catalogue and being somewhere
+   * means nothing. A real gate, not a label: StoreSystem refuses the purchase
+   * too, so it can never depend on the panel having drawn the card right.
+   */
+  world?: string;
 }
 
 export interface StoreSection {
@@ -510,7 +524,7 @@ export interface TasksData {
 
 /** One brew: consume `inputs` out of the Bag, bank `output` into it. The
  *  cauldron trades in the Bag ONLY — it never touches a board, which is what
- *  lets it live in the hatchery hub and still spend goods gathered anywhere. */
+ *  lets it live in the Runevault hub and still spend goods gathered anywhere. */
 export interface CauldronRecipeConfig {
   id: string;
   output: { chain: string; tier: number; count: number };
@@ -1091,7 +1105,7 @@ export interface EventMap {
   /** The Emberkeep Cookbook panel opened/closed (tutorial gates + analytics). */
   'ui:cookbook_opened': { discovered: number };
   'ui:cookbook_closed': { discovered: number };
-  /** Intent: the cauldron decor in the hatchery hub was tapped. */
+  /** Intent: the cauldron decor in the Runevault hub was tapped. */
   'ui:cauldron_tapped': Record<string, never>;
   /** The Cauldron panel opened/closed. */
   'ui:cauldron_toggled': { open: boolean };
@@ -1115,7 +1129,7 @@ export interface EventMap {
   /** Fact: a cosmetic was bought (gold already spent). */
   'store:purchased': { itemId: string; kind: StoreKind; gold: number };
   /** Fact: the purchase was refused — the panel shakes the price. */
-  'store:purchase_failed': { itemId: string; reason: 'gold' | 'owned' | 'no_room' };
+  'store:purchase_failed': { itemId: string; reason: 'gold' | 'owned' | 'no_room' | 'locked' };
   /** Fact: the Manor now wears this skin (null = the authored art). BoardScene
    *  re-textures every lumber_4 on the board. */
   'store:skin_changed': { itemId: string | null };
@@ -1457,7 +1471,7 @@ export interface EventMap {
   'ui:emporium_requested': Record<string, never>;
   /** Tour pointer over a BOARD landmark. BoardScene resolves the target's own
    *  world position (only it knows them) and bounces an arrow there. */
-  'tour:point': { target: 'roothold_house' | 'hatchery_cauldron' };
+  'tour:point': { target: 'roothold_house' | 'runevault_cauldron' };
   'tour:unpoint': Record<string, never>;
   /** Fact: a world tour finished and its latch is set — a save point. */
   'tour:completed': { id: string };

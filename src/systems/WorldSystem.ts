@@ -1,7 +1,7 @@
-import { GOLDEN_ALTAR, HATCHERY_QUESTS_NEEDED } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { WorldRuntime } from '../core/world';
+import { storyOpen, worldOpen } from '../core/worldGates';
 
 /**
  * WORLD TRAVEL — which world the board is showing.
@@ -32,32 +32,13 @@ export class WorldSystem {
     bus.on('world:switch', ({ to }) => this.switchTo(to));
   }
 
-  /** Worlds the Keeper may travel to right now, in the order they open. */
+  /** Worlds the Keeper may travel to right now, in the order they open. The
+   *  rule itself lives in `core/worldGates` — the Store shelves read the same
+   *  one, so the goods of a place unlock exactly when the place does. */
   available(): WorldRuntime[] {
     return [...this.state.worlds.values()]
-      .filter(
-        (w) => this.state.tutorialDone && this.state.level >= w.level && this.storyOpen(w.id)
-      )
+      .filter((w) => worldOpen(this.state, w.id))
       .sort((a, b) => a.level - b.level);
-  }
-
-  /**
-   * Every door beyond Emberkeep opens on the STORY, never on a number a player
-   * crosses mid-merge. All three keys are save-derivable stats, so a reload
-   * finds each gate exactly as open as it was:
-   *
-   *   roothold — Eleanor's first delivered order (the tutorial delivers it, so
-   *              her hub opens the moment the game hands over);
-   *   borealis — the Golden Elder awake (`q:done:keepers_hoard`, the same
-   *              latch the altar derives her presence from);
-   *   hatchery — HATCHERY_QUESTS_NEEDED of Selyna's quests done, read off the
-   *              per-world counter QuestSystem keeps (`q:world:borealis:done`).
-   */
-  private storyOpen(worldId: string): boolean {
-    if (worldId === 'roothold') return this.state.completedOrderIds.includes('eleanor_brazier');
-    if (worldId === 'borealis') return this.state.stat(`q:done:${GOLDEN_ALTAR.awakenQuestId}`) > 0;
-    if (worldId === 'hatchery') return this.state.stat('q:world:borealis:done') >= HATCHERY_QUESTS_NEEDED;
-    return true;
   }
 
   private switchTo(to: string): void {
@@ -78,7 +59,7 @@ export class WorldSystem {
       this.bus.emit('world:switch_failed', { to, reason: 'level' });
       return;
     }
-    if (!this.storyOpen(to)) {
+    if (!storyOpen(this.state, to)) {
       this.bus.emit('world:switch_failed', { to, reason: 'story' });
       return;
     }

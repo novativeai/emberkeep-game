@@ -154,6 +154,25 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushSave();
 });
 
+/**
+ * Coming BACK is not the same as reloading, and the difference was visible.
+ *
+ * Leaving the site and returning through history restores the page from the
+ * back/forward cache: the whole JS heap comes back as it was, so nothing loads
+ * — no `hydrate`, none of the repairs hydration runs (map fixtures re-seated,
+ * regions settled), and a `GameClock` that has been frozen since `pagehide`
+ * while real time kept going. The board the player sees is the one they left
+ * plus however long they were away, un-reconciled. Pressing F5 fixed it, which
+ * is exactly the shape of the complaint: "I leave and it's wrong, I refresh and
+ * it's fine."
+ *
+ * A restored page therefore reloads for real. The state is already on disk —
+ * `pagehide` flushed it on the way out — so this costs a boot, not a save.
+ */
+window.addEventListener('pageshow', (event: PageTransitionEvent) => {
+  if (event.persisted) window.location.reload();
+});
+
 /* ------------------- agent instrumentation (spec §5) ------------------ */
 
 window.advanceTime = (ms: number) => {

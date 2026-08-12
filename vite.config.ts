@@ -785,10 +785,11 @@ const copyRuntimeArt = (): Plugin => ({
       // Superseded / never-referenced art, each verified against the reference
       // graph (`node scripts/audit-art.mjs`) rather than by eye:
       'sprites/background/emberkeep.jpg', //  background_emberkeep points at emberkeep-nb2.webp
-      // (hatchery.webp used to sit here as "worlds.json-only, not a zone". It is
-      //  a zone now — Borealis's hub, ground measured out of this very file by
-      //  scripts/fit-deck-grid.py — so it ships like any other backdrop.)
-      'sprites/background/runevault.webp', //  worlds.json-only; not a zone, so nothing can load it
+      // The two hub backdrops swapped places on 2026-08-12: the editor replaced
+      // its Hatchery map with Runevault and drew a grid on it, so Runevault is
+      // the world Borealis's Rune Way now opens onto and ships like any other
+      // backdrop, while hatchery.webp has nothing left that can ask for it.
+      'sprites/background/hatchery.webp', //  no world, no zone, no assets.json key
       'sprites/environment/full-water-bg',
       'sprites/environment/level-blocker', //  superseded by sprites/environment/blockers/
       'sprites/environment/blockers/cloud/cloud-cropped', // cloud_tile is the shipped one

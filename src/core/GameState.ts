@@ -21,6 +21,7 @@ import type {
   ItemKind,
   ItemSnapshot,
   MapData,
+  MapItemPlacement,
   NestState,
   RegionStatus,
   SaveDataV1,
@@ -29,6 +30,26 @@ import type {
 } from './types';
 
 const tileKey = (col: number, row: number): string => `${col},${row}`;
+
+/**
+ * The map's FIXTURES: a `startingItems` placement on a cell that belongs to NO
+ * REGION.
+ *
+ * Regions are how ground becomes reachable — they unlock, they hold spawns,
+ * they are what `isTileActive` answers about. A starting piece the map put
+ * outside every one of them is therefore not opening board state at all: it is
+ * scenery, standing where the backdrop painted something for it to stand on.
+ * The Theme Crystal is the one this build ships, on its ledge below the isle.
+ *
+ * That distinction has to be ENFORCED, not merely implied by where the piece
+ * starts. Every mover on the board — drag, snap-merge, the tutorial's scripted
+ * relocations — only ever asked whether the DESTINATION was active ground, so
+ * nothing stopped a fixture being dragged off its ledge onto the isle; and once
+ * there, the save kept it there for good. A landmark the player can pick up and
+ * has no legal way to put back is a bug however carefully it was placed.
+ */
+const authoredFixtures = (world: WorldRuntime): MapItemPlacement[] =>
+  (world.map.startingItems ?? []).filter((p) => !world.tileRegion.has(tileKey(p.at[0], p.at[1])));
 
 /**
  * One world's board. Everything here is addressed by a `(col,row)` that only
@@ -325,6 +346,56 @@ export class GameState {
       const moved = regridded ? this.relocateKey(world, k, saved.nestPlaces?.[k]) : k;
       if (moved) board.nests[moved] = { ...value };
     }
+    this.restoreFixtures(world, board);
+  }
+
+  /**
+   * Put the map's fixtures back on the cells the map authored for them.
+   *
+   * The guards above stop a fixture from ever being moved again, but they
+   * cannot un-move the ones already sitting in saved games — and a landmark
+   * that wandered is not something a player can drag home, because its ledge is
+   * not a legal drop target. So every load walks the world's own
+   * `startingItems` and re-seats anything that drifted.
+   *
+   * The authored cell is taken back UNCONDITIONALLY. It used to give up when
+   * something else was standing there, and that was the last hole: the piece
+   * squatting on a fixture's cell is itself a piece that only got there by the
+   * same accident, so the polite version could leave the landmark stranded
+   * forever with no way for anyone to notice. The squatter is not destroyed —
+   * it takes the nearest free ground, or the satchel.
+   */
+  private restoreFixtures(world: WorldRuntime, board: WorldBoard): void {
+    for (const placement of authoredFixtures(world)) {
+      const [col = 0, row = 0] = placement.at;
+      if (!hasCell(world, col, row)) continue;
+      const item =
+        [...board.items.values()].find(
+          (i) => i.kind === 'item' && i.chain === placement.chain && i.tier === placement.tier
+        ) ?? [...board.items.values()].find((i) => i.kind === 'item' && i.chain === placement.chain);
+      if (!item || (item.col === col && item.row === row)) continue;
+      const sitting = board.grid[row]?.[col] ?? null;
+      if (sitting !== null && sitting !== item.id) {
+        const squatter = board.items.get(sitting);
+        board.grid[row]![col] = null;
+        if (squatter) {
+          const home = zoneAt(world, col, row) ?? world.fallback;
+          const free = this.nearestFree(world, board, col, row, true, home);
+          if (free) {
+            squatter.col = free.col;
+            squatter.row = free.row;
+            board.grid[free.row]![free.col] = squatter.id;
+          } else {
+            board.items.delete(squatter.id);
+            this.stashDisplaced(squatter);
+          }
+        }
+      }
+      board.grid[item.row]![item.col] = null;
+      board.grid[row]![col] = item.id;
+      item.col = col;
+      item.row = row;
+    }
   }
 
   /** One world's board, in the shape the save carries it. */
@@ -444,6 +515,12 @@ export class GameState {
   moveItem(id: number, to: TilePos): void {
     const item = this.items.get(id);
     if (!item) throw new Error(`moveItem: unknown item ${id}`);
+    // A map fixture is immovable, and this is the SINGLE funnel every mover
+    // goes through — MergeSystem, BoardSystem, DragonLifeSystem all end here.
+    // The callers check too (so they can bounce the piece and tell the player),
+    // but the guard belongs here as well: the Theme Crystal was lost precisely
+    // because the rule lived in the callers, and a caller can be added.
+    if (this.isFixture(item)) return;
     if (!this.inBounds(to.col, to.row)) throw new Error(`moveItem out of bounds`);
     const occupant = this.grid[to.row]![to.col];
     if (occupant !== null && occupant !== id) {
@@ -625,6 +702,31 @@ export class GameState {
 
   isTileActive(col: number, row: number): boolean {
     return this.inBounds(col, row) && this.regionStatusAt(col, row) === 'active';
+  }
+
+  /**
+   * Is this piece a FIXTURE of the map rather than a piece of the board?
+   *
+   * Matched on chain: a fixture is authored once, is the only piece of its
+   * chain the board ever holds, and — being outside `playable` — cannot be told
+   * apart by its cell once something has already moved it. Everything that
+   * relocates a piece asks this first, so the answer stays the same whether the
+   * mover is a drag, a snap-merge or a scripted tutorial beat.
+   */
+  isFixture(item: { chain: string; kind: ItemKind }): boolean {
+    return item.kind === 'item' && authoredFixtures(this.world).some((p) => p.chain === item.chain);
+  }
+
+  /**
+   * Does the world the Keeper is standing on still hold a door a Gold Key
+   * opens? Keys are Keeper-wide — they follow the player across worlds — so
+   * "do I have one" is never the same question as "is there anything here to
+   * spend it on", and only the second one is worth putting on screen.
+   */
+  hasKeyGate(): boolean {
+    return this.map.regions.some(
+      (r) => r.unlock?.keys !== undefined && this.regionStatus.get(r.id) !== 'active'
+    );
   }
 
   itemIdAt(col: number, row: number): number | null {

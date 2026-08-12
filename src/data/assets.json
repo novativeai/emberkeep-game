@@ -446,6 +446,11 @@
       "file": "sprites/items/coin.webp"
     },
     {
+      "key": "ui_icon_lock",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
       "key": "ui_icon_key",
       "source": "file",
       "generator": "icon",
@@ -929,10 +934,10 @@
       "file": "sprites/background/roothold.webp"
     },
     {
-      "key": "background_hatchery",
+      "key": "background_runevault",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/background/hatchery.webp"
+      "file": "sprites/background/runevault.webp"
     },
     {
       "key": "decor_pink_cauldron",

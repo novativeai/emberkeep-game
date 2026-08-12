@@ -53,8 +53,12 @@ export class MergeSystem {
       return;
     }
 
+    // A fixture is part of the map, not of the board. It stands outside the
+    // playable set, so only the DESTINATION test ever ran on it — and that test
+    // happily accepted any active tile, which is how the Theme Crystal could be
+    // dragged off its ledge into the middle of the isle and stay there.
     const sameTile = to.col === from.col && to.row === from.row;
-    if (sameTile || !this.state.isTileActive(to.col, to.row)) {
+    if (this.state.isFixture(item) || sameTile || !this.state.isTileActive(to.col, to.row)) {
       this.bus.emit('item:move_bounced', { itemId, at: from });
       return;
     }

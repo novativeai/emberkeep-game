@@ -7,7 +7,7 @@ import type { CauldronData, CauldronRecipeConfig } from '../core/types';
  * Selyna's Cauldron — brew new pieces out of the Bag.
  *
  * The cauldron trades in the Bag ONLY. It never spawns to a board and never
- * consumes off one: the pot stands in the hatchery hub, but the goods it wants
+ * consumes off one: the pot stands in the Runevault hub, but the goods it wants
  * are gathered on every world, and the Bag is the one container that follows
  * the Keeper across all of them. That also keeps this system board-free — no
  * placement rules, no overflow, no world checks.

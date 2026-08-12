@@ -41,6 +41,7 @@ import {
 } from './auroraConfig';
 import type { FxTier } from './emitterTypes';
 import { hexToInt } from './fxSignals';
+import { unzoomedRect } from './cameraFit';
 
 // Re-exported so callers have one import for the whole effect.
 export * from './auroraConfig';
@@ -80,6 +81,12 @@ export class AuroraFX {
 
   private width: number;
   private height: number;
+  /** The band this sky is meant to cover ON SCREEN, in game px; the quad itself
+   *  drifts off it with the camera zoom (`fitToCamera`). */
+  private screenX = 0;
+  private screenY = 0;
+  /** The zoom the quad is fitted to — guards the re-fit off the common frame. */
+  private fitZoom = 1;
   private tier: FxTier;
   private quality: AuroraQuality;
   private startMs: number;
@@ -97,6 +104,8 @@ export class AuroraFX {
     this.quality = AURORA_QUALITY[this.tier];
     this.startMs = opts.now();
     this.textureKey = `aurora_rt_${Math.round(opts.now()) % 1e6}_${scene.scene.key}`;
+    this.screenX = opts.x ?? 0;
+    this.screenY = opts.y ?? 0;
 
     const [tw, th] = this.targetSize();
     this.target = scene.textures.addDynamicTexture(this.textureKey, tw, th)!;
@@ -164,10 +173,32 @@ export class AuroraFX {
   }
 
   setBand(x: number, y: number, width: number, height: number): this {
+    this.screenX = x;
+    this.screenY = y;
     this.width = width;
     this.height = height;
     this.view.setPosition(x, y).setDisplaySize(width, height);
     this.resizeTarget();
+    this.fitZoom = 1;
+    return this;
+  }
+
+  /**
+   * Keep the sky band pinned to the top of the VIEWPORT however far the board
+   * camera is zoomed — the same correction the snow needs, and for the same
+   * reason: `scrollFactor 0` survives a pan but not a zoom (`cameraFit.ts`).
+   * Left alone, pinching out slid the aurora down into the middle of the screen
+   * and shrank it, so the sky stopped being at the top of the sky.
+   *
+   * Only the quad moves. The render target keeps its own resolution, so this
+   * costs nothing per frame and nothing in memory.
+   */
+  fitToCamera(cam: Phaser.Cameras.Scene2D.Camera): this {
+    const zoom = cam.zoom || 1;
+    if (zoom === this.fitZoom) return this;
+    this.fitZoom = zoom;
+    const r = unzoomedRect(cam, this.screenX, this.screenY, this.width, this.height);
+    this.view.setPosition(r.x, r.y).setDisplaySize(r.width, r.height);
     return this;
   }
 

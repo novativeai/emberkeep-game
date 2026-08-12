@@ -28,7 +28,7 @@ describe('worlds registry — the ingest loses nothing', () => {
     const sourceZones = SOURCE.worlds.reduce((n, w) => n + w.grids.length, 0);
     expect(zones).toBe(sourceZones);
     expect(WORLDS.worlds.flatMap(worldCells)).toHaveLength(sourceCells.length);
-    expect(sourceCells.length).toBe(357); // the shipped level design, pinned
+    expect(sourceCells.length).toBe(367); // the shipped level design, pinned
   });
 
   it('keeps each cell at the exact world point the editor placed it', () => {
@@ -69,7 +69,7 @@ describe('worlds registry — the ingest loses nothing', () => {
         }
       }
     }
-    expect(collapsed).toBe(147); // 41% of 357 — borealis alone loses 71 of 141
+    expect(collapsed).toBe(149); // 41% of 367 — borealis alone loses 70 of 140
     // …whereas the world points we DO key off are unique per world.
     for (const w of WORLDS.worlds) {
       const pts = worldCells(w).map(({ cell }) => `${cell.x},${cell.y}`);
@@ -123,7 +123,7 @@ describe('zone geometry — we can reproduce the editor, so a renderer can trust
         }
       }
     }
-    expect(checked).toBe(357);
+    expect(checked).toBe(367);
     // The export rounds its world points to whole pixels, so agreement to within
     // a pixel IS exact agreement. Anything larger would mean we had misread the
     // basis, the pivot or the rotation convention.

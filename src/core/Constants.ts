@@ -1401,7 +1401,7 @@ export const PORTAL_TINTS: Record<string, PortalTints> = {
     sparks: [0xe8fbff, 0xa9e7ff, 0x5fb8f0],
     motes: [0xa9e7ff, 0x6fc0f0]
   },
-  hatchery: {
+  runevault: {
     glow: 0x2f7fd6,
     core: 0x6fd0ff,
     heart: 0xeafaff,
@@ -1411,10 +1411,10 @@ export const PORTAL_TINTS: Record<string, PortalTints> = {
   }
 };
 
-/** Selyna quests that must be DONE before the Rune Way (Borealis → Hatchery)
+/** Selyna quests that must be DONE before the Rune Way (Borealis → Runevault)
  *  opens — counted off the per-world `q:world:borealis:done` stat, so the gate
  *  never keeps a quest-id list that could drift. */
-export const HATCHERY_QUESTS_NEEDED = 3;
+export const RUNEVAULT_QUESTS_NEEDED = 3;
 
 /** The Roothold house — the Emporium's painted storefront — as a world-px
  *  rect: roothold.webp [755, 205, 330, 340] through the shared art→world
@@ -1479,7 +1479,7 @@ export const DRAG = {
 } as const;
 
 /** The authored decor piece (zones.json `decor` name) that opens Selyna's
- *  Cauldron when tapped. It stands in the hatchery hub; the panel itself is
+ *  Cauldron when tapped. It stands in the Runevault hub; the panel itself is
  *  world-agnostic because the cauldron trades only in the Bag. */
 export const CAULDRON_DECOR = 'pink_cauldron';
 
@@ -1640,9 +1640,28 @@ export const POWER = {
   /** Gameplay bus events hold ACTIVE this long (finale beats hold longer). */
   eventHoldMs: 10_000,
   finaleHoldMs: 45_000,
-  /** Crystal3D re-render cadence per state; it PAUSES entirely in doze. */
-  crystalMs: { active: 33, idle: 100 }
+  /**
+   * Crystal3D re-render cadence per state; it PAUSES entirely in doze.
+   *
+   * Each tick is a three.js render, a GPU→CPU readback of the gem's canvas, and
+   * a full re-upload of that canvas as a Phaser texture — 2.9 MB a frame, by
+   * far the most expensive idle cost in the game. It used to run at 33 ms (30
+   * fps, ~87 MB/s of texture traffic) for one decoration. The gem turns at
+   * 50°/s, so 66 ms is 3.3° a step: still a smooth turn, half the traffic.
+   */
+  crystalMs: { active: 66, idle: 200 }
 } as const;
+
+/**
+ * Graft the live three.js emerald over `item_crystal_1`?
+ *
+ * ON — the spinning cel-shaded gem is the Theme Crystal, and the flag exists
+ * only so a run can fall back to the painted grotto without touching code.
+ * What the gem must never do is MOVE: it is a fixture of the map (see
+ * `authoredFixtures` in GameState), so no drag, no scripted beat and no reload
+ * can take it off the cell map.json authored for it.
+ */
+export const CRYSTAL_3D = true;
 
 /** Save. Bump SAVE_VERSION whenever the map/chains change incompatibly, so old
  *  localStorage saves are discarded on load (Context.beginRun → newGame) instead

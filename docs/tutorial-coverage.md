@@ -87,7 +87,7 @@ Eleanor herself are all rows: they are live from the first frame.
 | The golden egg on the altar | authored decor, frame 1 (west) | `golden_tease` | aura starts once the tease has played |
 | Two grown dragons make an Elder | post-tutorial | `twoDragons` | contextual recipe hint + hand |
 | Two Houses make a Manor | post-tutorial | `twoHouses` | contextual recipe hint + hand |
-| **Selyna's Cauldron** — brew from the Bag | the pot decor in the hatchery hub, post-tutorial | self-teaching on first tap | unreachable during the tutorial (the hub opens off borealis, worlds after Chapter One), so it carries no beat. The panel is its own lesson: recipe ledger left, the selected formula's ingredient cards right, have-counts in red when the Bag falls short, and the BREW button asleep until they don't |
+| **Selyna's Cauldron** — brew from the Bag | the pot decor in the Runevault hub, post-tutorial | self-teaching on first tap | unreachable during the tutorial (the hub opens off borealis, worlds after Chapter One), so it carries no beat. The panel is its own lesson: recipe ledger left, the selected formula's ingredient cards right, have-counts in red when the Bag falls short, and the BREW button asleep until they don't |
 | The egg stirs near Level 3 | post-tutorial | `eggTrembles` | requires `eleanor_brazier` delivered — which the tutorial now does |
 
 ## Deliberately not in Chapter One

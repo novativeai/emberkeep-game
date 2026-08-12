@@ -424,7 +424,7 @@ edit. **[L1]**
 
 ## 11b. Selyna's Cauldron — brewing **[L1]**
 
-The pot standing in the **hatchery hub** opens a brew screen on tap
+The pot standing in the **Runevault hub** opens a brew screen on tap
 (`ui:cauldron_tapped` → `CauldronPanel`). Recipes live in
 `src/data/cauldron.json`; `CauldronSystem` owns the trade.
 

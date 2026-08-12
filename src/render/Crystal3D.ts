@@ -121,7 +121,42 @@ export class Crystal3D {
     this.ctx2d.drawImage(this.renderer.domElement, 0, 0);
   }
 
+  /**
+   * Give the GL context back, not just three's own objects.
+   *
+   * `WebGLRenderer.dispose()` frees three's buffers and programs and leaves the
+   * CONTEXT alive until the canvas is collected — and a browser hard-caps how
+   * many a page may hold (~16 in Chrome), silently killing the OLDEST when a
+   * new one is asked for. That is what made the gem "come back broken" on every
+   * change: each scene rebuild (a quality change, travel, a Vite hot update)
+   * built another renderer, and once past the cap the browser took a live
+   * context away — sometimes Phaser's own. `forceContextLoss` is the only call
+   * that releases it deterministically.
+   */
   dispose(): void {
+    this.renderer.forceContextLoss();
     this.renderer.dispose();
   }
+}
+
+/** The one live gem this page may hold — see `sharedCrystal3D`. */
+let shared: { crystal: Crystal3D; key: string } | undefined;
+
+/**
+ * The Theme Crystal's renderer, created ONCE per page and reused.
+ *
+ * A second WebGL context beside Phaser's is the most expensive object in the
+ * game, and BoardScene is rebuilt often — travel, a graphics-quality change,
+ * and every hot update while the game is being worked on. Building one per
+ * scene meant the count only ever went up. It is a decoration: one is plenty,
+ * and it outlives the scene that first asked for it.
+ *
+ * Keyed by the spec so a world authoring a different gem still gets its own.
+ */
+export function sharedCrystal3D(spec: Model3DSpec): Crystal3D {
+  const key = JSON.stringify(spec);
+  if (shared?.key === key) return shared.crystal;
+  shared?.crystal.dispose();
+  shared = { crystal: new Crystal3D(spec), key };
+  return shared.crystal;
 }
