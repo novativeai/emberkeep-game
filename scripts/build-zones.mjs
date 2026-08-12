@@ -161,35 +161,94 @@ const artToCell = (x, y) => {
  * doc already calls exact — the cell's `world` pixel. Iterated closest point:
  * with a transform in hand, each editor point names the lattice cell it is
  * nearest; with those cells, least squares re-solves the transform; two rounds
- * converge because the answer never moves far. The seed is the transform the
- * last build measured (zones.json), or the value it has held all along.
+ * converge because the answer never moves far.
  *
  * The result no longer depends on who wrote the export or on what the editor
  * happened to be showing when they pressed the button.
  */
-/** What the transform has measured out to on every honest export since the
- *  editor's world space was set up — the seed for a fresh clone, and the
- *  sanity band the stored one has to fall inside to be believed. */
-const FALLBACK_FIT = { scale: 1.22453, offsetX: -16.26, offsetY: -46.9 };
-
-const SEED_FIT = (() => {
-  const prev = existsSync(resolve(ROOT, 'src/data/zones.json'))
-    ? read('src/data/zones.json').editorToArt
-    : undefined;
-  const ok = prev && Number.isFinite(prev.scale) && prev.scale > 0.5 && prev.scale < 3;
-  return ok ? { scale: prev.scale, offsetX: prev.offsetX, offsetY: prev.offsetY } : FALLBACK_FIT;
-})();
+/**
+ * THE SEED IS A CONSTANT IN THIS FILE, AND DELIBERATELY NOT THE LAST BUILD'S ANSWER.
+ *
+ * Seeding from `zones.json` was the obvious thing — let the fit track the editor
+ * if its world space is ever genuinely re-scaled — and it is the reason a single
+ * bad build could not be undone by re-running the good one. ICP needs a
+ * transform to derive its correspondences with; if that transform is yesterday's
+ * mistake, today derives the same wrong cells and re-measures the same wrong
+ * answer. The error had become the input.
+ *
+ * There is no scoring trick that rescues it either. Every "is this fit better"
+ * measure available here is either scale-dependent (residual in editor px falls
+ * as the scale shrinks) or saturates (distance to the NEAREST lattice cell is
+ * bounded by half a cell whatever the scale), so a wrong fit can look as good as
+ * a right one.
+ *
+ * A constant is both simpler and stronger. ICP's basin of convergence around
+ * this value covers any plausible drift, and a change big enough to fall outside
+ * it is a change somebody should make HERE, on purpose, in a diff — not one that
+ * seeps in through a generated file nobody reads.
+ */
+const SEED_FIT = { scale: 1.22453, offsetX: -16.26, offsetY: -46.9 };
 
 /**
  * Least squares for `editor = scale·art + offset`, one uniform scale.
  *
- * `gameCell` is still USED when it is a lattice address, because it is the
+ * `gameCell` is still USED where it IS a lattice address, because it is the
  * editor's own answer and measurably the better one: on a clean export it fits
- * to 352/367 against the derived assignment's 339. It is only distrusted when it
- * is demonstrably not a lattice address at all — the derived cells are the
- * check, and disagreeing with them wholesale is the signature of an export
- * written while the game was running on zones.
+ * to 352/367 against the derived assignment's 339. The check is per SAMPLE, not
+ * per FILE, and that distinction is the whole lesson of 2026-08-13.
+ *
+ * A file-wide vote was tried first — trust the column if 80% of it agrees with
+ * the derived cells — and it does catch the export that is corrupt end to end.
+ * It does not catch the one that matters, because the corruption is PARTIAL:
+ * only the grids the running game had already adopted as zones come back as
+ * zone addresses. That day 356 of 367 gameCells were honest and 11 were not, the
+ * vote passed at 97%, and those 11 went into the sum of squares naming cells
+ * thousands of pixels from where they sit — (1,4) offered as (14,0). Least
+ * squares has no defence against that: it is the SQUARE of the error, so eleven
+ * gross outliers outweighed three hundred and fifty-six good points and pulled
+ * the scale from 1.22453 to 1.1175. Every zone in every world moved, and the
+ * only visible symptom was a map that no longer sat on its painting.
+ *
+ * So no sample is trusted on its neighbours' behalf. A gameCell that disagrees
+ * with the pixel is simply not used — the derived cell stands in for it — and
+ * whatever survives that is trimmed again on its own residual. Corruption of
+ * eleven cells now costs eleven cells.
  */
+const OUTLIER_TRIM = 4; // × the median residual — a sample past this is not fitted
+
+/** ICP from one seed: assign, trim, re-solve. Two rounds; a third moves nothing. */
+function fitFrom(seed, cells, points) {
+  let fit = seed;
+  let kept = 0;
+  let vetoed = 0;
+  let trimmed = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    // What the transform in hand says each point's cell is, independent of the
+    // file — both the stand-in for a rejected gameCell and the test of every
+    // other one.
+    const derived = points.map((ed) => artToCell((ed.x - fit.offsetX) / fit.scale, (ed.y - fit.offsetY) / fit.scale));
+    const samples = cells.map((c, i) => {
+      // NEIGHBOURING, not identical. A cell centre can legitimately fall just
+      // the wrong side of a boundary and derive as the cell next door, and
+      // rejecting those loses the very samples that make `gameCell` the better
+      // answer. A zone address is not off by one — the eleven that broke the
+      // build named cells three to eight columns away.
+      const honest = c.gameCell && Math.max(Math.abs(c.gameCell.col - derived[i].col), Math.abs(c.gameCell.row - derived[i].row)) <= 1;
+      return { ed: c.world, cell: honest ? c.gameCell : derived[i], honest };
+    });
+    vetoed = samples.filter((s) => !s.honest).length;
+    // Residual trim: whatever assignment a sample ended up with, a point that
+    // still lands far from the lattice it is supposed to name is not evidence.
+    const res = samples.map((s) => residual(s, fit));
+    const med = median(res) || 1;
+    const fitted = samples.filter((_, i) => res[i] <= med * OUTLIER_TRIM);
+    trimmed = samples.length - fitted.length;
+    kept = fitted.length;
+    fit = solve(fitted, fit);
+  }
+  return { fit, kept, vetoed, trimmed };
+}
+
 function fitEditorToArt() {
   const cells = [];
   for (const w of source.worlds) {
@@ -199,34 +258,35 @@ function fitEditorToArt() {
   }
   const points = cells.map((c) => c.world);
 
-  // What the seed transform says each point's cell is, independent of the file.
-  const derived = points.map((ed) =>
-    artToCell((ed.x - SEED_FIT.offsetX) / SEED_FIT.scale, (ed.y - SEED_FIT.offsetY) / SEED_FIT.scale)
-  );
-  const agree = cells.filter(
-    (c, i) => c.gameCell && c.gameCell.col === derived[i].col && c.gameCell.row === derived[i].row
-  ).length;
-  const trustGameCell = agree >= points.length * 0.8;
-  if (!trustGameCell) {
+  const best = fitFrom(SEED_FIT, cells, points);
+  if (best.vetoed) {
     console.warn(
-      `build-zones: the export's gameCells match the game lattice for only ${agree}/${points.length} cells — ` +
-        `they are zone addresses, not lattice ones (an export written by the editor's Apply while the game was ` +
-        `running on zones). Deriving the correspondence from each cell's world pixel instead.`
+      `build-zones: ${best.vetoed}/${points.length} of the export's gameCells are zone addresses rather than lattice ` +
+        `ones — the signature of an Apply pressed while the game was running on zones. Those cells were derived from ` +
+        `their world pixel instead, so the fit is sound; the count is only worth watching if it climbs.`
     );
   }
-
-  let fit = SEED_FIT;
-  // Two rounds: assign each editor point to a lattice cell, then re-solve. A
-  // third changes nothing measured.
-  for (let pass = 0; pass < 2; pass++) {
-    fit = solve(
-      cells.map((c, i) => ({ ed: c.world, cell: trustGameCell ? c.gameCell : derived[i] })),
-      fit
-    );
-    if (trustGameCell) break; // the assignment is given, so one solve is exact
-  }
-  return { ...fit, samples: points.length, source: trustGameCell ? 'editor gameCells' : 'derived from world px' };
+  return {
+    ...best.fit,
+    samples: points.length,
+    fitted: best.kept,
+    source:
+      best.vetoed || best.trimmed
+        ? `${best.kept}/${points.length} samples (${best.vetoed} veto, ${best.trimmed} trim)`
+        : 'editor gameCells'
+  };
 }
+
+/** How far a sample's editor point lands from the cell it claims, in editor px. */
+function residual({ ed, cell }, fit) {
+  const art = { x: A0.x + cell.col * AU.x + cell.row * AV.x, y: A0.y + cell.col * AU.y + cell.row * AV.y };
+  return Math.hypot(ed.x - (art.x * fit.scale + fit.offsetX), ed.y - (art.y * fit.scale + fit.offsetY));
+}
+
+const median = (xs) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s.length ? s[s.length >> 1] : 0;
+};
 
 /** One round: re-assign any cell left open, then close-form the transform. */
 function solve(samples, fit) {
@@ -275,7 +335,15 @@ function solve(samples, fit) {
 const FIT = fitEditorToArt();
 const editorToArt = (p) => ({ x: (p.x - FIT.offsetX) / FIT.scale, y: (p.y - FIT.offsetY) / FIT.scale });
 
-/** How faithfully the fit reproduces the editor's own cell assignment. */
+/**
+ * How faithfully the fit reproduces the editor's own cell assignment.
+ *
+ * `worst` is measured against the cell each point is NEAREST, not against the
+ * `gameCell` the export names, so a poisoned column cannot report itself as a
+ * catastrophe (nor a good fit as a bad one). The gameCell agreement is still the
+ * headline — it is the editor's answer and it should be the same as ours — but
+ * it is a count, and the distance is what says the deck sits on the lattice.
+ */
 function fitAccuracy() {
   let hit = 0;
   let total = 0;
@@ -287,8 +355,8 @@ function fitAccuracy() {
         const cell = artToCell(a.x, a.y);
         total++;
         if (cell.col === c.gameCell.col && cell.row === c.gameCell.row) hit++;
-        const dx = a.x - (A0.x + c.gameCell.col * AU.x + c.gameCell.row * AV.x);
-        const dy = a.y - (A0.y + c.gameCell.col * AU.y + c.gameCell.row * AV.y);
+        const dx = a.x - (A0.x + cell.col * AU.x + cell.row * AV.x);
+        const dy = a.y - (A0.y + cell.col * AU.y + cell.row * AV.y);
         worst = Math.max(worst, Math.hypot(dx, dy));
       }
     }
@@ -670,9 +738,44 @@ function webpWidth(rel) {
  * the backdrop's calibration scale, so the whole thing collapses to a factor of
  * two and a pair of measured widths.
  */
+/**
+ * THE PLACED ASSET, FROM WHICHEVER BUTTON WROTE THE EXPORT.
+ *
+ * There are two writers for `nionja-worlds.json` and they do not agree on what
+ * an asset is. `scripts/export-editor-worlds.mjs` writes the pixel the editor
+ * dropped it on (`world`), its source size (`art`) and its mirroring (`flipX`).
+ * The editor's own Apply button — the one actually to hand while placing
+ * things — writes none of the three: its asset row is `x`/`y` (a game CELL,
+ * far too coarse to stand a pot on) plus `scale` and an `onGrid` pin.
+ *
+ * Requiring `world` therefore made the pot's survival depend on which button
+ * was pressed, and pressing the near one silently deleted it — a warning in a
+ * build log, and a cauldron missing from the game.
+ *
+ * Both writers do embed the RAW project (`project.assets[worldId]`), and that
+ * is where the editor keeps the truth: `wx`/`wy` is the exact drop point,
+ * `w`/`h` the source size. So read the pixel from there whenever the row itself
+ * has not got it. The pot lands in the same place either way, which is the only
+ * acceptable answer — the editor is where he puts it, not a staging area for a
+ * second command he has to remember.
+ */
+function placedAsset(src, name) {
+  const row = (src?.assets ?? []).find((a) => a.name === name);
+  if (row?.world) return row;
+  const raw = (source.project?.assets?.[src?.id] ?? []).find((a) => a.name === name);
+  if (!raw || !Number.isFinite(raw.wx) || !Number.isFinite(raw.wy)) return null;
+  return {
+    ...(row ?? {}),
+    scale: Number(raw.scale ?? row?.scale ?? 1),
+    world: { x: Math.round(raw.wx), y: Math.round(raw.wy) },
+    art: { w: raw.w, h: raw.h },
+    flipX: raw.flipX === true
+  };
+}
+
 function editorDecor(spec, d) {
   const src = source.worlds.find((w) => w.map === spec.editorMap);
-  const placed = (src?.assets ?? []).find((a) => a.name === d.fromEditorAsset && a.world);
+  const placed = placedAsset(src, d.fromEditorAsset);
   if (!placed) {
     // WARN, do not throw. A prop that is not in the export is a prop somebody
     // has to go and place again, and it is worth being loud about — but the
@@ -681,7 +784,9 @@ function editorDecor(spec, d) {
     // of that because a pot is missing takes a cosmetic loss and turns it into
     // no game at all.
     console.warn(
-      `build-zones: ${spec.id} wants the editor's "${d.fromEditorAsset}", but the export has no placed asset by that name with a world point — building the world WITHOUT it. Place it in the editor and re-run scripts/export-editor-worlds.mjs.`
+      `build-zones: ${spec.id} wants the editor's "${d.fromEditorAsset}", but neither the export's asset rows nor its ` +
+        `embedded project has one by that name with a drop point — building the world WITHOUT it. Place it in the ` +
+        `editor on the ${spec.editorMap} map and re-export.`
     );
     return null;
   }
@@ -939,10 +1044,19 @@ for (const spec of WORLDS) {
     let home;
     for (const z of zones) {
       for (const [i, j] of z.cells) {
-        const p = {
-          x: z.origin[0] + i * z.u[0] + j * z.v[0],
-          y: z.origin[1] + i * z.u[1] + j * z.v[1]
-        };
+        // Through the zone's ROTATION, the same way `worldPointOf` will at
+        // runtime. dx/dy is the gap between this point and the prop, so a point
+        // computed the other way puts the pot back by exactly the rotation the
+        // runtime then applies. Every zone drawn so far happens to sit at 0°,
+        // which is the only reason the flat version was ever right.
+        const p = rotate(
+          {
+            x: z.origin[0] + i * z.u[0] + j * z.v[0],
+            y: z.origin[1] + i * z.u[1] + j * z.v[1]
+          },
+          { x: z.pivot[0], y: z.pivot[1] },
+          z.rotation
+        );
         const dist = Math.hypot(p.x - target.x, p.y - target.y);
         if (!home || dist < home.dist) home = { dist, col: z.block[0] + i, row: z.block[1] + j, p };
       }

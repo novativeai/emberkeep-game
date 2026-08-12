@@ -341,6 +341,20 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.shadow.setAlpha(on ? DRAG.shadowAlpha : 0);
   }
 
+  /**
+   * Is there floor under this piece right now?
+   *
+   * Read by anything that draws a shadow for the item but does NOT belong to it.
+   * A dragon is the case: its shadow is the RIG's (BoardScene `LiveDragon.shadow`,
+   * sized to the rig rather than to the hidden placeholder art), so the two
+   * shadows `setOverGround` owns are both already hidden for it and hiding them
+   * again over the void changed nothing on screen. The dragon was the one piece
+   * in the game that kept its shadow out over the clouds.
+   */
+  get onGround(): boolean {
+    return this.overGround;
+  }
+
   liftForDrag(): void {
     this.bobPaused = true;
     this.setDepth(DEPTHS.dragged);

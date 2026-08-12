@@ -252,7 +252,24 @@ export const DECOR_SCALE: Record<string, number> = {
   broken_arch: 0.4, // 725x900 — the widest of them; the base sets the cap
   ember_beacon: 0.62, // 461x709 -> 440 tall, the tallest silhouette
   elder_bones: 0.34, // 900x665 — a low, WIDE mound; width is the constraint
-  tethered_isle: 0.44 // 458x898 — floats, so its mooring block is the footprint
+  tethered_isle: 0.44, // 458x898 — floats, so its mooring block is the footprint
+  /**
+   * SELYNA'S POT, TRIMMED BY 65% — an authored call, not a correction.
+   *
+   * The editor→game size conversion is exact and stays that way: the pot he
+   * placed at 0.4 of a 993px source measures 324 backdrop px, and build-zones
+   * hands the renderer the calibration that reproduces exactly that against the
+   * painting. But exact is not the same as right. At full size it stands 1.55
+   * tiles wide, half again as wide as the cell it is meant to sit on and wider
+   * than the whelps that walk past it, so Runevault's one interactive fixture
+   * read as scenery the plateau was built around.
+   *
+   * 0.35 lands it at ~139 units, a little over half a tile. Raise it here rather
+   * than in the editor — the editor's number is WHERE and HOW BIG on the
+   * PAINTING, which is the frame he places in; this is what the board makes of
+   * it, which is the frame the dragons are in.
+   */
+  pink_cauldron: 0.35
 };
 
 /**

@@ -56,6 +56,15 @@ describe('worlds registry — the ingest loses nothing', () => {
    * `gameCell` — each cell projected onto the game's single coarse lattice — and
    * it is tempting because it plugs straight into today's engine. It is also
    * lossy enough to delete two-fifths of the level design without a warning.
+   *
+   * A FRACTION, not a count. The exact number was pinned at 149 and it is not a
+   * stable property of the level design: `gameCell` is filled from whatever
+   * projection the editor had ambient when the export was written, so the two
+   * writers disagree about a handful of cells and the collisions shift with them
+   * (149 from `scripts/export-editor-worlds.mjs`, 144 from the editor's own
+   * Apply, same 367 cells either way). Pinning the count made this test a report
+   * on which button was pressed. The claim being made is that the collapse is
+   * CATASTROPHIC, and that is true of both.
    */
   it('proves `gameCell` is lossy, which is why the registry keys off world pixels', () => {
     let collapsed = 0;
@@ -69,7 +78,7 @@ describe('worlds registry — the ingest loses nothing', () => {
         }
       }
     }
-    expect(collapsed).toBe(149); // 41% of 367 — borealis alone loses 70 of 140
+    expect(collapsed / sourceCells.length).toBeGreaterThan(0.3); // ~40% — borealis alone loses about half
     // …whereas the world points we DO key off are unique per world.
     for (const w of WORLDS.worlds) {
       const pts = worldCells(w).map(({ cell }) => `${cell.x},${cell.y}`);
