@@ -561,6 +561,10 @@ describe('world art — visiting a world never leaves the others worse off', () 
     // on departure with the ground she stands on, never separately.
     expect(worldArtKeys(ctx, 'borealis').sort()).toEqual([
       'background_borealis',
+      'canim_selyna_blinking',
+      'canim_selyna_cast',
+      'canim_selyna_idle',
+      'canim_selyna_talking',
       'selyna_world_cast',
       'selyna_world_idle'
     ]);
@@ -568,8 +572,9 @@ describe('world art — visiting a world never leaves the others worse off', () 
     // world's to release, and releasing it would break the world we are ON.
     for (const id of ctx.state.worlds.keys()) {
       for (const key of worldArtKeys(ctx, id)) {
-        // Backdrop, standee banks, and (since the Hatchery cauldron) map decor.
-        expect(key).toMatch(/^(background_|decor_|[a-z]+_world_)/);
+        // Backdrop, standee banks, Align-Studio atlas idles, and (since the
+        // Hatchery cauldron) map decor.
+        expect(key).toMatch(/^(background_|decor_|canim_|[a-z]+_world_)/);
       }
     }
   });

@@ -306,13 +306,14 @@ export const ITEM_SCALE: Record<string, number> = {
   sleep_ember_dragon_3: 0.134, // curled whelp, alpha bbox 1193 → 160 units
   sleep_ember_dragon_4: 0.216, // curled adult, 1602 → 346 units
   bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
-  // The Fir loop — what the Ancient Tree drops as it is worked, and what that
-  // grows back into. Sized so the three steps READ as growth at a glance:
-  // 66 → 88 → 140 units, the last of which is the Ancient Tree's own size,
-  // because tier 3 IS a working tree (same art, same produce, same bonus).
-  firgrain_1: 0.183, // Fir Grain, alpha bbox 291×360 → 66 units
-  firgrain_2: 0.116, // Small Fir Tree, 617×758 → 88 units
-  firgrain_3: 0.17, // shares bigtree.webp with the landmark bigtree_1
+  // The Fir loop. Retuned on playtest: the three steps must read as SEED →
+  // SAPLING → LANDMARK at a glance, and at 66/88/140 the grain out-bulked a
+  // berry while the trees under-read. Now 43 → 120 → 181 units — the grain is
+  // pocket-sized, the Small Fir is a real sapling, and the Fir Tree reads as
+  // the landmark it is (the only tree Chapter One has).
+  firgrain_1: 0.12, // Fir Grain, alpha bbox 291×360 → 43 units
+  firgrain_2: 0.158, // Small Fir Tree, 617×758 → 120 units
+  firgrain_3: 0.22, // Fir Tree — shares bigtree.webp (823px → 181 units)
   chest_1: 0.19, // a treasure chest (chest.png) — reduced again on request (0.24 → 0.19)
   // The Emberberry plant, redrawn so its fruit IS the shipped Emberberry (cut
   // from assets/raw/merge-chains/emberberry_plant-seedream-pro.png). Each scale
@@ -324,12 +325,12 @@ export const ITEM_SCALE: Record<string, number> = {
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
   // Emberbark Stump (emberbark.png 620×520) — low wide landmark, ~200 units.
-  // Its anchor (anchors.json) is 0.8, NOT the 0.9 it shipped with, and the
-  // number comes from the SILHOUETTE, not the bbox: the wide dark base ends at
-  // 0.83 of the canvas and only thin root tips reach the 0.927 alpha bottom.
-  // Anchoring off the bbox bottom left that whole visual base ABOVE the tile
-  // origin — the stump hovered over its shadow with just a root grazing it.
-  // At 0.8 the base sits ~5 units below the origin and the roots ~21, planted.
+  // Its anchor (anchors.json) is 0.66, set by RENDERING the sprite over its
+  // own ground shadow and looking, after two failed passes derived from
+  // numbers: the bbox bottom (0.927) is thin root tips and even the "wide
+  // base" line (0.83) reads high, because an isometric object's visual ground
+  // contact is where its mass meets the shadow's centre, not where its alpha
+  // ends. When a landmark floats, composite art-over-shadow and EYEBALL it.
   emberbark_1: 0.32,
   emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
@@ -376,6 +377,33 @@ export const ITEM_SCALE: Record<string, number> = {
   nightbloom_1: 0.21, // Night Bud, 235×314 — the tall one, matched on height
   nightbloom_2: 0.263, // Night Bloom, 335×304
   nightbloom_3: 0.224, // Cooling Wreath, 501×426
+  // The five Borealis farms. Same 66 → 88 ladder as every other chain at tiers
+  // 1–2, but their tier 3 is a WORKING FIXTURE — a standing stone, a cask, a
+  // lamp post, a cairn, an instrument on its block — so it goes to 118 rather
+  // than 112: it has to read as something standing on the land, not as the
+  // biggest of three collectibles.
+  //
+  // One number for all fifteen, because the cut step now RESAMPLES each cell to
+  // exactly six times its on-board size (gen-borealis-chains.py, `TARGET * 6`)
+  // instead of leaving whatever the sheet happened to return. The scale is
+  // therefore 1/6 by construction, and a re-cut can never silently resize a
+  // piece on the board. Older chains above still carry per-piece values because
+  // their art was cut before that rule existed.
+  runestone_1: 0.1667, // Rune Shard
+  runestone_2: 0.1667, // Carved Stone
+  runestone_3: 0.1667, // Runestone
+  emberdram_1: 0.1667, // Dram Vial
+  emberdram_2: 0.1667, // Cordial Flask
+  emberdram_3: 0.1667, // Cordial Cask
+  hearthlamp_1: 0.1667, // Oil Lamp
+  hearthlamp_2: 0.1667, // Storm Lantern
+  hearthlamp_3: 0.1667, // Hearthlamp
+  manastone_1: 0.1667, // Mana Pebble
+  manastone_2: 0.1667, // Mana Nodule
+  manastone_3: 0.1667, // Manastone Cairn
+  wayfinder_1: 0.1667, // Lodestone
+  wayfinder_2: 0.1667, // Boxed Needle
+  wayfinder_3: 0.1667, // The Wayfinder
   quartz_1: 0.20,
   quartz_2: 0.19,
   quartz_3: 0.21,
@@ -470,7 +498,20 @@ export const HIDDEN_CHAINS = new Set<string>([
   // would sit in the Cookbook as permanent "· · ·" rows. They turn on with the
   // nest chapter, alongside the farms that will supply them.
   'stormcap',
-  'nightbloom'
+  'nightbloom',
+  // The five new Borealis farms, here for a DIFFERENT reason from everything
+  // above them, and the difference matters: those wait on a CHAPTER, these wait
+  // on their SEEDS. Their tier-3s are working generators and two of them reseed
+  // themselves, but a farm still has to start somewhere, and the first tier-1 of
+  // each is authored region contents — `zones.json` is GENERATED, so placing
+  // them is a world-editor pass plus `build-zones`, not an edit here. Until that
+  // lands they would be fifteen permanent "· · ·" rows in the north's Cookbook.
+  // Delete these five lines the moment the seeds are placed.
+  'runestone',
+  'emberdram',
+  'hearthlamp',
+  'manastone',
+  'wayfinder'
   // Selyna's Borealis roster USED to sit here. It does not belong here: this set
   // is "not this CHAPTER", and those four are "not this WORLD". They now carry
   // `world: "borealis"` in chains.json, which withholds them from Emberkeep and
@@ -714,6 +755,27 @@ export const STANDEE_BREATH = {
   periodMs: 4200,
   phaseSpread: 1.7,
   startDelayMs: 460
+} as const;
+
+/**
+ * Cadence of the Align-Studio BLINK clip during a standee's atlas idle: the
+ * blinking clip is a full idle segment with a blink in it (~3 s), not a
+ * 100 ms eyelid frame, so it plays far less often than a rig blink would.
+ */
+export const STANDEE_CLIP_BLINK = {
+  minMs: 7000,
+  maxMs: 14000
+} as const;
+
+/**
+ * Portrait-ring atlas clips (the bust-framed talking/blinking sets): how long
+ * the TALKING loop holds per spoken line before settling back onto the
+ * blinking rest loop. Mirrors the disc animator's read-length feel.
+ */
+export const PORTRAIT_CLIP_TALK = {
+  msPerChar: 55,
+  minMs: 1400,
+  maxMs: 6500
 } as const;
 
 /**
@@ -1466,12 +1528,11 @@ export const DRAG = {
   settleMs: 150,
   /** Exponential-smoothing time constant (ms): lower = snappier follow. */
   followTau: 70,
-  /** Ground shadow under a lifted item. */
-  shadowRX: 58,
-  shadowRY: 22,
-  shadowY: 30,
-  shadowAlpha: 0.28,
-  shadowColor: 0x1a0f14,
+  /** How much the item's own SOFT ground shadow swells while it is held.
+   *  There is deliberately no second drag-only shadow shape: the old sharp
+   *  ellipse under a lifted piece read as a rendering bug next to the soft
+   *  one every item already casts. One shadow, and lifting makes it grow. */
+  shadowGrow: 1.32,
   shadowFadeMs: 130,
   /** Highlight diamond on the cell under the dragged item. */
   cellHighlightAlpha: 0.5,
@@ -1530,7 +1591,16 @@ export const DRAGON_ANIM = {
   /** Worker harvest (Phase 3): the dragon flies to a tapped plant, works, returns. */
   flyToMs: 520, // glide out to the plant
   workMs: 700, // breathing magic onto the plant before the loot drops
-  flyBackMs: 480 // glide home
+  flyBackMs: 480, // glide home
+  // How far BEFORE a journey's touchdown the fly clip's landing phase starts —
+  // the wings fold through the touchdown and finish on the tile, so a landing
+  // never plays out mid-air and a touchdown never happens mid-cruise.
+  landingLeadMs: 650,
+  /** Ambient bellow: after every 3–5 full idle-clip loops (rolled fresh each
+   *  time the idle starts), the roar clip plays once and hands back to idle.
+   *  The idle loop runs ~8s, so a bellow lands every ~24–40s of stillness. */
+  idleRoarMinLoops: 3,
+  idleRoarMaxLoops: 5
 } as const;
 
 /** Per-dragon-chain rig scale factor so different art reads at the SAME on-board
@@ -1547,6 +1617,51 @@ export const DRAGON_RIG_SCALE: Record<string, number> = {
   'emerald:4': 0.93
   // (The Golden Elder is NOT a board dragon — her altar scale lives in
   //  GOLDEN_ALTAR.elderScale.)
+};
+
+/**
+ * The dark keyline the dragon rigs wear, added at DRAW TIME (src/render/rigInkShader.ts).
+ *
+ * The board's item art carries its keyline in the file, put there by
+ * `scripts/unify-keyline.py`. A rig cannot: it is 6-8 separately posed layers, so
+ * ink baked into the art would draw a line along every internal seam the moment a
+ * limb moved. The rigs are therefore outlined by a shader instead — and the
+ * measured fact that forced it is that the dragon layer art has NO keyline at all
+ * (0.5px, i.e. nothing, on every whelp and adult layer), so the full width is
+ * added rather than topped up.
+ *
+ * THE WIDTH RULE IS THE ITEMS' RULE. Thickness is quoted in on-board units (the
+ * hi-res 2560x1600 space, so post-rig-scale), because that is the only thickness
+ * the player sees — rig art is ~666-1054px of source for a 221-unit whelp:
+ *
+ *     units = refUnits * (onboardSize / refSize) ** exponent
+ *
+ * `refUnits`/`refSize`/`exponent` MUST match the constants at the top of
+ * scripts/unify-keyline.py, or the dragons will not match the board they stand on.
+ * As shipped that puts the whelp (221 units) on a 2.70-unit line and the adult
+ * (358 units) on 3.04.
+ */
+export const DRAGON_OUTLINE = {
+  enabled: true,
+  /** Anchored on emberberry_1, the piece whose native line is the art direction. */
+  refUnits: 2.0,
+  refSize: 66.8,
+  exponent: 0.25,
+  /**
+   * THE canonical keyline ink for the whole game, and never flat black.
+   *
+   * Sampled from the keyline of `assets/sprites/items/chains/emberberry_plant_1.png`
+   * — the piece the board's outline pass is calibrated on. Its line is a dark warm
+   * brown-grey, (39,29,28) at V 0.153, holding that value consistently from one
+   * texel deep to eight. Anything that draws an outline reads this.
+   */
+  ink: 0x271d1c,
+  /** Per-character override, so a frost breed could take a colder line than a red
+   *  one. Empty on purpose: the canonical ink above is the art direction. */
+  inkByCharacter: {} as Record<string, number>,
+  /** Sanity ceiling on the dilation radius in texels — a mis-derived scale must
+   *  cost a fat line, not a shader that samples half a layer per pixel. */
+  maxRadiusTexels: 40
 };
 
 /**

@@ -291,6 +291,50 @@ for byte, which is what makes a dragon skin visible on the board at all.
   `pnpm build && pnpm exec vite preview`) — spawns a live dragon, freezes one
   pose and screenshots base/blink/talk faces; the head must not move or resize.
 
+## Merge-item art — the house style (`scripts/merge_style.py`)
+
+**Import the style block; never retype it.** Every merge-item sheet in the game
+is drawn with the blocks in `scripts/merge_style.py` — `HEAD` (reference +
+STYLE + SHADING + CAMERA + LAYOUT), a `TAIL_*` for the key colour, and
+`SNOW_WORLD` when the piece stands on ice. `style_ref()` builds Image 1 by
+compositing the two pieces that DEFINE the look — `emberberry_3` (the jam jar)
+and `moonwater_3` (the moon bottle) — onto the key colour, so the reference can
+never drift from the shipped art.
+
+The look, in one line: a premium merge-game icon — one heavy near-black keyline
+around the whole silhouette, a few large colour masses with smooth gradients
+inside them, glossy painted highlights, and light coming from INSIDE anything
+that holds light.
+
+Every clause in there is a failure somebody already paid for, and the two times a
+generation script paraphrased the block instead of importing it, the same
+failures came straight back:
+
+| Clause dropped | What came back |
+| --- | --- |
+| `Hand-painted, NOT a photograph, no ray-traced reflections, no studio product lighting` | ray-traced studio product renders — `tarknot`, then `amberfall` |
+| `almost complete absence of small internal detail` | a shrub made of forty individual leaves that turns to mush at 66 px — `firethorn` |
+| the separate `STYLE —` label (folded into the reference paragraph) | the keyline thinned out across every sheet |
+
+Seedream weights **labelled blocks**: the reference paragraph and the `STYLE`
+block are two instructions, and merging them into one costs you the second.
+
+Two more rules the roster earns its way to:
+- **A tier 1 must be a solid compact shape.** It is drawn at 66 units. Thin
+  stems, lonely filaments and scattered pieces vanish (`frostsilk`'s first
+  tier-1 was a loose thread; it became a wound bobbin so it had mass).
+- **The key colour is MEASURED off each return, never assumed** (`measured_key`).
+  A sheet asked for `#FF00FF` comes back anywhere from `#FE17C9` to `#FF2BFF`,
+  and keying on the nominal colour leaves a rim the width of the feather. Use
+  `TAIL_GREEN` when the subject itself is pink or violet — a magenta key eats it.
+
+Cells are split on **column gaps at a high alpha threshold** (~140): a prop's
+soft outer glow keys to a low alpha that bridges the gap to its neighbour, and
+the sheet then reads as one cluster instead of three. The cut resamples each cell
+to exactly **six times** its on-board size, which is why every piece cut this way
+carries `ITEM_SCALE` = `0.1667` rather than a hand-tuned number — a re-cut can
+never silently resize a piece on the board.
+
 ## The dragon reveal card
 
 - `scripts/gen-reveal-and-decor.py` (briefs + generation) →
@@ -710,6 +754,116 @@ full argument. In short:
   burnt in at `assets/sprites/characters/<id>/world-standee/qc-registration.png`.
 - Paste the printed JSON block into `STANDEE_BANKS` (`src/core/Constants.ts`) —
   frame size, anchor, body box and `scale` all come from the bake.
+
+## Align Studio (Sprite Studio /align) — character animation atlases
+
+The character-animation satellite app is **Sprite Studio**
+(`~/Documents/Dev/Helper/SmartGrid/sprite-studio`, `pnpm dev` → `/align`), the
+same Next.js/Electron tool that produced the head-frame mask sheets. Its Align
+page registers the WebP animation atlases in `assets/raw/new-animations/`
+(RedWhelp `fly`/`tosleep`, Eleanor ×6, Selyna ×4 — grid metadata in each
+folder's `atlas.json`) onto the characters' IN-GAME rest poses:
+
+- The canvas superposes, on one anchor: the **in-game reference** (standee
+  frame 0 drawn with the `STANDEE_BANKS` feet anchor at bank scale × trim, or
+  the red whelp's rig rest pose composed from `dragon-red.rig.json` at
+  `whelpScale × DRAGON_RIG_SCALE`), the **idle ghost**, and the live clip.
+  Move (drag) and Scale (drag vertically, anchored at the feet) author a
+  per-clip `{scale, dx, dy}`: scale is game px per atlas px, dx/dy move the
+  frame's bottom-centre off the anchor.
+- **Auto-align** runs server-side (`scripts/anim-align.py`): the idle's alpha
+  silhouette is solved against the reference (feet/centre/top strategy per
+  clip — `fly` is airborne, Selyna's talking/blinking are bust-framed), every
+  other clip against the aligned idle. It is a first pass; the canvas is for
+  the final say.
+- **Push to game** stages the sheets into `assets/sprites/anims/<char>/`
+  (downscaling frame-exactly past the 4096 old-device ceiling — `fly` ships at
+  4096×3210 with its scale compensated) and writes
+  `src/data/character-anims.json`, which the game bundles.
+
+- **Video ingest** (`scripts/anim-ingest.py`) is the stage UPSTREAM of all of
+  that: raw mp4 footage (e.g. `assets/raw/new-animations/raw-mp4/`) → keyed
+  frames → a packed WebP atlas in the character's raw workspace. It implements
+  the technique documented in `raw-mp4/ATLAS_TUTO.md` — read that for the WHY:
+  ffmpeg decimation at 24fps (12 is invisible on breathing but NOT on wing
+  beats — the idle clip has a ~6 Hz flutter), plate detection by MEASURING the
+  border (green key on greenness, black key on CONNECTIVITY — enclosed dark
+  art like pupils is protected by construction; enclosed dark pockets that
+  really are background die only when large AND colour-neutral), colour bleed
+  before every resize, union-bbox crop, and a near-square grid scaled to fit
+  the 4096 ceiling so a fresh ingest ships verbatim. `--trim-loop` cuts a
+  loopable clip at the frame (searched over the back third) that best matches
+  frame 0 — a cleaner close and a smaller sheet. The report includes
+  `loopSeamRmse` — is this clip honestly loopable?
+
+Dev endpoints (vite.config.ts, same contract as the worldbuilder's):
+
+    GET  /__animalign/state   tool state: atlases + references + current doc
+    POST /__animalign/auto    {character?, anim?, write?} — write:true applies
+    POST /__animalign/align   push a tool alignment doc (validate/stage/write)
+    POST /__animalign/ingest  {character, clip, video, fps?, height?, loop?,
+                              trimLoop?, write?} — video → keyed atlas; with
+                              write:true the character re-aligns + applies too
+
+One curl aligns and applies everything:
+`curl -X POST localhost:5173/__animalign/auto -d '{"write":true}'`, or offline
+`node scripts/apply-anim-align.mjs auto --write`. One command goes from footage
+to a wired in-game animation:
+`node scripts/apply-anim-align.mjs ingest redwhelp roar raw.mp4 --no-loop --write`
+(write re-aligns the WHOLE character — every non-idle clip registers against
+the idle, so a re-ingested idle moves its siblings). The roster (which
+character maps to which raw atlas and reference) lives in
+`scripts/apply-anim-align.mjs`; a new clip id only needs its `clipInfo` entry
+there — the tool, loader and tests pick it up from the data.
+
+Runtime: `src/core/characterAnims.ts` (Phaser-free, unit-tested —
+`tests/unit/CharacterAnims.spec.ts`). IN-GAME (board) and DIALOGUE BUBBLE are
+two different surfaces and every clip belongs to exactly one of them. Where an
+older animation answered the same beat, the atlas clip is the DEFINITIVE one —
+the old path survives only as the no-atlas fallback, never underneath it:
+
+| clip | surface | trigger | supersedes |
+|---|---|---|---|
+| eleanor/selyna `idle` | board | rest loop (`applyStandeeRest`) | bake still + `STANDEE_BREATH` squash |
+| eleanor/selyna `cast` | board | `character:action_used` (`playStandeeCast`) | the bank's cast one-shot |
+| eleanor `happy` | board | `regard:gift_accepted` | — |
+| eleanor `laugh` | board | `regard:heart` | — |
+| eleanor/selyna `talking` | bubble ring | while her line shows (length-scaled hold) | the disc-atlas talk banks |
+| eleanor/selyna `blinking` | bubble ring | the rest loop between/after lines | the disc-atlas rest/blink |
+| redwhelp `idle` | board | grounded rest (`dragonIdle` — attach, wake, post-roar, every touchdown) | the rig's `idle` preset |
+| redwhelp `fly` | board | every flight, phased `takeoff [0,61) → loop [61,136) → landing [192,240)` | the rig's `hover` preset |
+| redwhelp `roar` | board | every bellow (`playRoarClip`): the hungry `DRAGON_ROAR_EVERY_MS` cadence, the newborn intro's arrival, AND the ambient cadence — one bellow after every 3–5 idle loops (`armIdleRoar`, `DRAGON_ANIM.idleRoar*Loops`) | the rig's `roar`/`hover` presets + face flap |
+| redwhelp `tosleep` | board | `dragon:mood` asleep, once SEATED on a tile; the SLEEP STATE is the clip's own FROZEN LAST FRAME (breathing per `SLEEP_BREATH` in `syncDragon`); reversed on wake | instant painting swap / rig `stretch` — the painting survives only as the no-clip fallback |
+
+(`idle` and `roar` are video-ingested — `raw-mp4/dragon-idle.mp4` /
+`dragon-roar.mp4` through `anim-ingest.py`. The rig presets remain the
+fallback for breeds with no pushed clips. The seated sleep deliberately does
+NOT cut to the separately-authored sleep painting: the transition ends exactly
+where the sleep pose begins, so freezing its final frame is seamless where the
+art swap popped.)
+
+The RING treatment is the guide's split, kept: the frame's BODY copy masked
+BEHIND the gold band, a second synced copy cropped at the NECK drawn ABOVE it —
+per-character framing (`portrait: {height, dy, headCrop}` on the character's
+entry, tuned against live screenshots with `tools/checks/anim-bubble.mjs`).
+`CharacterBubble.trySetAtlasPortrait` owns it; `PortraitAnimator` is inert on
+`canim_` textures by its own `_disc` guard, so the two mouths can never run at
+once.
+
+FLIGHT is phased: `dragonHover(ld, legMs?)` ramps the takeoff (skipped when a
+short leg cannot fit it) into the seamless cruise loop; a journey leg schedules
+the LANDING `DRAGON_ANIM.landingLeadMs` before touchdown so the wings fold
+through it and finish on the tile. A HELD dragon (drag) takes off into the
+loop and lands on release. SLEEP is deferred: `dragon:mood` asleep while
+airborne only records the mood — `dragonIdle` is the one door onto the tile
+and seats the curl-up (`seatDragonSleep`, `sleepState` none→transition→seated)
+there, so a dragon can never fall asleep in the air, and the wake path only
+undoes a sleep that actually seated (the old cleanup killed an in-flight
+transition's completion and left the dragon fully invisible).
+
+Registration is padding-invariant by construction (verified): re-canvasing a
+clip's frames (bigger transparent padding, same pixels) auto-aligns to the same
+in-game placement — scale is solved from content, dx/dy absorb the canvas.
 
 ## Island extraction (scripts/island-extract.py) — backdrop → cut-outs + plate
 

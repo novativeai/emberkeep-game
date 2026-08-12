@@ -5,6 +5,7 @@
  * about which world may hold which texture is a rule the unit tests can check
  * rather than something only a browser can tell you.
  */
+import { clipKey, clipsFor } from './characterAnims';
 import { STANDEE_BANKS, WORLD_ID } from './Constants';
 import type { GameContext } from './Context';
 
@@ -23,8 +24,13 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
   const keys = (world?.map.backgrounds ?? []).map((b) => `background_${b.name}`);
   for (const cfg of ctx.data.characters.characters) {
     if (cfg.world !== worldId) continue;
-    const bank = STANDEE_BANKS[cfg.art ?? cfg.id];
+    const art = cfg.art ?? cfg.id;
+    const bank = STANDEE_BANKS[art];
     if (bank) keys.push(...Object.values(bank.keys));
+    // Her Align-Studio atlas clips (character-anims.json) are world art like
+    // her banks: fetched at the same door, released from the same list. Board
+    // DRAGON clip sets are absent by construction — they ride the boot preload.
+    for (const clipId of Object.keys(clipsFor(art))) keys.push(clipKey(art, clipId));
   }
   // The map's own decor (the Hatchery cauldron, and whatever a world stands
   // up next). Boot only preloads the ACTIVE map's decor, so a travelling

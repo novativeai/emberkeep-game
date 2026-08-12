@@ -722,6 +722,90 @@ const worldbuilderIslandEndpoint = (): Plugin => ({
 });
 
 /**
+ * Dev-only endpoints for the Align Studio (Sprite Studio's /align page — the
+ * character-animation satellite app) and for agents driving the same route
+ * from the CLI:
+ *   GET  /__animalign/state → atlas metadata + in-game rest-pose references +
+ *                             the current alignment (raw-frame terms)
+ *   POST /__animalign/auto  → run scripts/anim-align.py over the roster
+ *                             { character?, anim?, write? } — with write:true
+ *                             the result is applied (staged + written) at once,
+ *                             so one curl gets everything right in-game
+ *   POST /__animalign/align → PUSH TO GAME: validate the tool's alignment doc,
+ *                             stage the sheets into assets/sprites/anims/ and
+ *                             write src/data/character-anims.json
+ *   POST /__animalign/ingest→ VIDEO → GAME: key an mp4 (scripts/anim-ingest.py,
+ *                             the ATLAS_TUTO.md technique) into the character's
+ *                             raw atlas workspace; { character, clip, video,
+ *                             fps?, height?, loop?, write? } — write:true
+ *                             chains auto-align + apply, so one curl goes from
+ *                             footage to a wired in-game animation
+ * All heavy lifting lives in scripts/apply-anim-align.mjs — the same contract
+ * the worldbuilder's characters endpoint has with apply-characters.mjs.
+ */
+const animAlignEndpoint = (): Plugin => ({
+  name: 'emberkeep-anim-align',
+  configureServer(server: ViteDevServer) {
+    server.middlewares.use('/__animalign', (req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      const route = (req.url ?? '').split('?')[0];
+      const answer = (fn: () => Promise<unknown>) => {
+        void fn()
+          .then((out) => res.end(JSON.stringify(out)))
+          .catch((e) => {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+          });
+      };
+      if (req.method === 'GET' && route === '/state') {
+        answer(async () => {
+          const { stateDoc } = await import('./scripts/apply-anim-align.mjs');
+          return stateDoc(__dirname);
+        });
+        return;
+      }
+      if (req.method === 'POST' && (route === '/auto' || route === '/align' || route === '/ingest')) {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          answer(async () => {
+            const { autoAlign, applyAnimAlign, ingestClip } = await import('./scripts/apply-anim-align.mjs');
+            const doc = JSON.parse(body || '{}') as Record<string, unknown>;
+            if (route === '/ingest') {
+              return ingestClip(__dirname, doc as never);
+            }
+            if (route === '/align') {
+              const summary = applyAnimAlign(doc as never, __dirname);
+              return { ok: true, summary };
+            }
+            const out = autoAlign(__dirname, {
+              character: typeof doc.character === 'string' ? doc.character : undefined,
+              anim: typeof doc.anim === 'string' ? doc.anim : undefined
+            });
+            if (doc.write === true) {
+              const summary = applyAnimAlign(out.alignment, __dirname);
+              return { ...out, summary };
+            }
+            return out;
+          });
+        });
+        return;
+      }
+      res.statusCode = req.method === 'GET' || req.method === 'POST' ? 404 : 405;
+      res.end(JSON.stringify({ ok: false, error: `no such route ${req.method} ${route}` }));
+    });
+  }
+});
+
+/**
  * Deploy slimming: `assets/` (the publicDir) doubles as the art WORKSPACE —
  * AE frame sources, reference shots, uncropped masters and the PNG originals of
  * webp-converted sprites live there for future editing but are never requested
@@ -1124,6 +1208,7 @@ export default defineConfig({
     worldbuilderMapEndpoint(),
     worldbuilderZonesEndpoint(),
     worldbuilderIslandEndpoint(),
+    animAlignEndpoint(),
     watchGuard(),
     copyRuntimeArt()
   ],

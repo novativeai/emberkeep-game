@@ -209,6 +209,84 @@ which axis is expensive.
 brick · tied bale · sphere on a stand · round flask · **stacked woodpile** ·
 **glowing black nodule** · **coral bloom** · **upright spindle**. No collisions.
 
+#### 2.4.1b The two monocultures, and the five farms that fix them
+
+**Colour.** Composited over the Borealis backdrop at their real on-board scale,
+**15 of the north's 20 shipped pieces sit in the same narrow band as the ice they
+stand on** — bleached driftwood, bleached wreck timber, white rime crystals, a
+white ice font, a white ice whelp, all on pale blue-grey snow-capped stone. Only
+`tarknot` reads at a glance, and it reads because it is much DARKER, not because
+it is wood or not wood.
+
+That is measurable, so it is a rule with a number behind it
+(`tests/unit/BorealisRoster.spec.ts`):
+
+> **The ice band** is saturation 0.30–0.51 AND value 0.54–0.78. A northern piece
+> must escape it — saturated (≥0.55), dark (≤0.52) or bright (≥0.80).
+
+The shipped pale roster is grandfathered by name rather than skipped, so the list
+of offenders stays visible and cannot quietly grow.
+
+**Shape.** Colour was only half of it. A heap of wood, a heap of crystals and a
+heap of salt are all THE SAME KIND OF THING: raw material in a pile. Nothing in
+the north had a shape a player could name. The first draft of these five kept
+that habit — kelp, a berry bush, a pool, a resin cascade, a salt column — five
+more materials in five more piles.
+
+So the five are **made objects** instead, each with a silhouette you can identify
+from across the board and say out loud. The north is the right world for it:
+nothing grows here and the sea gives things back, so the things worth having are
+the things people BROUGHT and lost — instruments, glass, iron, carved stone.
+
+| Chain | Colour it brings | T1 → T2 → **T3 generator** | Produces | For |
+| --- | --- | --- | --- | --- |
+| `runestone` | rust orange, hot gold carvings | Rune Shard → Carved Stone → **Runestone** | `tarknot_1` / 150 s | dragons — the north's pitch supply |
+| `emberdram` | deep rose in glass | Dram Vial → Cordial Flask → **Cordial Cask** | itself / 180 s | dragons — the north's second FUEL |
+| `hearthlamp` | warm brass and gold light | Oil Lamp → Storm Lantern → **Hearthlamp** | **Warmth** / 7 min | the Keeper |
+| `manastone` | turquoise / light green | Mana Pebble → Mana Nodule → **Manastone Cairn** | itself / 5 min | **Selyna** |
+| `wayfinder` | ivory rim, rose dial, gold | Lodestone → Boxed Needle → **The Wayfinder** | `coin_1` / 4 min | **Selyna** + the north's gold |
+
+**Roles are inherited, not invented.** Each takes over the exact generator,
+cooldown, sell and XP of the plant chain it replaced, so `chains.json` is the
+only place the swap is visible and the supply graph is unchanged.
+
+**Why each earns its place, not just its hue.**
+
+- **`runestone` is heat that predates the ice.** Before the freeze, people here
+  cut heat-runes into stone to keep a fire alive through the dark half of the
+  year. The stones still work, and a lit one warms the ground under it until the
+  buried tar runs — which is why a carved stone is what feeds the north its
+  `tarknot`.
+- **`emberdram` is the south, bottled.** Firefruit cordial brought north in
+  glass: it keeps forever, it is the one warm thing to drink up here, and a
+  dragon will take it. It is the north's second dragon fuel — which matters,
+  because the inverted diet axis had exactly one source and a dragon that
+  refused `tarknot` was stranded. That is asserted, not remembered.
+- **`hearthlamp` is warmth off the wrecks.** In a world with no sun for half the
+  year a lamp is not decoration, and this is still the only generator in the
+  game that pays **Warmth** rather than an item.
+- **`manastone` is Selyna's, and it is her verb.** Eleanor catches light and
+  holds it in glass; Selyna reads what the ice KEPT. The ice caught raw magic
+  the way it caught everything else and pressed it into the stone.
+- **`wayfinder` is the north's money because of what it does.** It does not
+  point north — it points at whatever the ice is still holding, which in a world
+  built on salvage is worth more than coin. So the instrument is what mints
+  `coin` up there, instead of a boat.
+
+**Silhouette check** (§2.3), the five new tier-3s: **upright rounded-top slab ·
+round belly in a cradle · hook post with a hanging lamp · tapering stack of flat
+plates · thick ring on a block.** No collisions with the eleven already standing
+— and `manastone` was re-drawn once because its first pass read as an ovoid
+cracking open, which in a game about dragon eggs is a collision that matters
+more than any silhouette rule.
+
+**What is NOT done:** their seeds. Each tier-3 is a working generator and three
+of them reseed themselves, but a farm has to start somewhere and the first tier-1
+of each is authored region contents. `zones.json` is GENERATED, so that is a
+world-editor pass plus `build-zones` — until it lands the five sit in
+`HIDDEN_CHAINS` so the north's Cookbook does not carry fifteen rows nobody can
+finish.
+
 #### 2.4.2 What the north got when it was actually built
 
 Two farms and two goods is a closed loop but not an economy: nothing produced

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
+import { boardClipCharacters, clipKey, clipsFor } from '../core/characterAnims';
 import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES, STANDEE_BANKS } from '../core/Constants';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
@@ -133,6 +134,34 @@ export class PreloadScene extends Phaser.Scene {
         this.load.spritesheet(key, `sprites/${id}/world-${bank}.webp`, {
           frameWidth: seq.frameWidth,
           frameHeight: seq.frameHeight
+        });
+      }
+    }
+    // Align-Studio atlas clips (src/data/character-anims.json): every clip of
+    // anyone standing in THIS world — idle/talk/cast/reactions for the board,
+    // bust clips for the dialogue ring. Same fetch discipline as the standee
+    // banks above — a character the board cannot show costs nothing, and
+    // travel fetches the destination's at the door (fetchWorldArt).
+    for (const c of ctx.data.characters.characters) {
+      if (c.world !== ctx.state.worldId) continue;
+      const art = c.art ?? c.id;
+      for (const [clipId, clip] of Object.entries(clipsFor(art))) {
+        if (this.textures.exists(clipKey(art, clipId))) continue;
+        this.load.spritesheet(clipKey(art, clipId), clip.file, {
+          frameWidth: clip.frameWidth,
+          frameHeight: clip.frameHeight
+        });
+      }
+    }
+    // …and the BOARD-DRAGON clip sets (fly / tosleep): dragons are merge pieces
+    // that can stand on any world's board, so their clips ride the boot
+    // preload rather than any one world's art list.
+    for (const id of boardClipCharacters()) {
+      for (const [clipId, clip] of Object.entries(clipsFor(id))) {
+        if (this.textures.exists(clipKey(id, clipId))) continue;
+        this.load.spritesheet(clipKey(id, clipId), clip.file, {
+          frameWidth: clip.frameWidth,
+          frameHeight: clip.frameHeight
         });
       }
     }

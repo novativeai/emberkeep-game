@@ -33,9 +33,13 @@ PAD = 6
 #: so these are authored ~2-3x that and scaled down on the board by DECOR_SCALE.
 DECOR_LONG_SIDE = 900
 #: The reveal plate's on-screen height is set by the overlay, so the texture
-#: only has to be big enough for the tallest it is ever drawn (~1180 units) with
-#: a little headroom, and small enough to stay inside the old-device budget.
-REVEAL_LONG_SIDE = 1400
+#: only has to be big enough for the tallest it is ever DRAWN. On desktop that
+#: is `plateHeightFrac` x 1600 = 1056 units; on mobile the width cap bites first
+#: and a phone maps the whole 2560-wide space onto a few hundred CSS px, so the
+#: plate never resolves past this either. 1400 was 60% more pixels than any
+#: screen asks for, across twelve plates — which is real weight in a `dist` that
+#: is now budgeted.
+REVEAL_LONG_SIDE = 1100
 
 SHEETS = {
     'landmarks_a': ['keeper_statue', 'PLACEHOLDER', 'ember_beacon'],

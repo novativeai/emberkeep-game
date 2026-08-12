@@ -1097,6 +1097,81 @@
       "file": "sprites/items/chains/firepine_2.webp"
     },
     {
+      "key": "item_runestone_1",
+      "source": "file",
+      "file": "sprites/items/chains/runestone_1.webp"
+    },
+    {
+      "key": "item_runestone_2",
+      "source": "file",
+      "file": "sprites/items/chains/runestone_2.webp"
+    },
+    {
+      "key": "item_runestone_3",
+      "source": "file",
+      "file": "sprites/items/chains/runestone_3.webp"
+    },
+    {
+      "key": "item_emberdram_1",
+      "source": "file",
+      "file": "sprites/items/chains/emberdram_1.webp"
+    },
+    {
+      "key": "item_emberdram_2",
+      "source": "file",
+      "file": "sprites/items/chains/emberdram_2.webp"
+    },
+    {
+      "key": "item_emberdram_3",
+      "source": "file",
+      "file": "sprites/items/chains/emberdram_3.webp"
+    },
+    {
+      "key": "item_hearthlamp_1",
+      "source": "file",
+      "file": "sprites/items/chains/hearthlamp_1.webp"
+    },
+    {
+      "key": "item_hearthlamp_2",
+      "source": "file",
+      "file": "sprites/items/chains/hearthlamp_2.webp"
+    },
+    {
+      "key": "item_hearthlamp_3",
+      "source": "file",
+      "file": "sprites/items/chains/hearthlamp_3.webp"
+    },
+    {
+      "key": "item_manastone_1",
+      "source": "file",
+      "file": "sprites/items/chains/manastone_1.webp"
+    },
+    {
+      "key": "item_manastone_2",
+      "source": "file",
+      "file": "sprites/items/chains/manastone_2.webp"
+    },
+    {
+      "key": "item_manastone_3",
+      "source": "file",
+      "file": "sprites/items/chains/manastone_3.webp"
+    },
+    {
+      "key": "item_wayfinder_1",
+      "source": "file",
+      "file": "sprites/items/chains/wayfinder_1.webp"
+    },
+    {
+      "key": "item_wayfinder_2",
+      "source": "file",
+      "file": "sprites/items/chains/wayfinder_2.webp"
+    },
+    {
+      "key": "item_wayfinder_3",
+      "source": "file",
+      "file": "sprites/items/chains/wayfinder_3.webp"
+    },
+    {
       "key": "item_frostsilk_1",
       "source": "file",
       "generator": "item",

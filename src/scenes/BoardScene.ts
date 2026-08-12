@@ -35,7 +35,9 @@ import {
   skipWarmthCost,
   STANDEE_BANKS,
   STANDEE_BREATH,
+  STANDEE_CLIP_BLINK,
   STANDEE_SCALE_TRIM,
+  DRAGON_OUTLINE,
   DRAGON_ROAR_EVERY_MS,
   DRAGON_ROAR_MS,
   DRAGON_SLEEP_SCALE,
@@ -45,6 +47,7 @@ import {
   PRODUCE_BADGE_LIFT,
   PRODUCE_BADGE_R,
   REVEAL_HOLD_BACK_MAX_MS,
+  SLEEP_BREATH,
   STANDEE_SHADOW_DX,
   STANDEE_SHADOW_DY,
   STANDEE_SHADOW_SQUASH,
@@ -57,6 +60,15 @@ import {
   WORLD_ID
 } from '../core/Constants';
 import { FONT as FONT_FAMILIES } from '../art/design';
+import {
+  type CharacterClip,
+  clipFor,
+  clipKey,
+  clipsFor,
+  clipTextureRect,
+  dragonClipCharacter,
+  originFor
+} from '../core/characterAnims';
 import { gridToWorld, worldToGrid } from '../core/iso';
 import { ensureTextures } from '../core/lazyTextures';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
@@ -87,6 +99,8 @@ import weatherJson from '../data/weather.json';
 import emittersJson from '../data/emitters.json';
 import { BEATS, sheetOf, type BeatKey } from '../render/vfxBank';
 import { RigPlayer } from '../render/RigPlayer';
+import { keylineUnits } from '../render/rigInkGeometry';
+import { attachSpriteInk, hideSpriteInk, syncSpriteInk } from '../render/SpriteInk';
 import type { RigDoc } from '../render/rigTypes';
 import { hopTo, hoverBob, popIn, scalePulse } from '../ui/tweens';
 import { isDragonFood } from '../systems/DragonSystem';
@@ -111,6 +125,15 @@ interface LiveDragon {
    *  it with the host (a sleeping dragon can still be dragged) while the drift
    *  tween animates the text INSIDE it, in host-local space. */
   zzz?: Phaser.GameObjects.Container;
+  /** The Align-Studio clip sprite (fly loop / tosleep transition) standing in
+   *  for the rig while it plays — created lazily, carried by `syncDragon`. */
+  clipOverlay?: Phaser.GameObjects.Sprite;
+  /** Where the fly clip is in its arc — null when grounded (rig showing). */
+  flightPhase: 'takeoff' | 'loop' | 'landing' | null;
+  /** Whether the curled sleep art is on the tile. Sleep is DEFERRED while the
+   *  dragon is airborne — falling asleep mid-flight is how it once slept in
+   *  the air (and how a cleared transition once left it fully invisible). */
+  sleepState: 'none' | 'transition' | 'seated';
 }
 
 /** Where the camera sits to frame a given Keeper level (world centre + zoom). */
@@ -260,6 +283,8 @@ export class BoardScene extends Phaser.Scene {
   /** World-character standees, by character id. Not BoardItems — never pooled,
    *  never in `state.items`. */
   private characterSprites = new Map<string, Phaser.GameObjects.Sprite>();
+  /** Standees mid one-shot reaction (cast/happy/laugh). */
+  private standeeReacting = new Set<string>();
   /** Her five hearts, floating over her. On the PERSON, never in a menu: the
    *  relationship belongs to her, and a gauge tucked behind a panel button is a
    *  gauge nobody watches move. Keyed by character id. */
@@ -388,6 +413,7 @@ export class BoardScene extends Phaser.Scene {
     // character pointing at a destroyed sprite — and `characterMarkerPoint` /
     // `playStandeeCast` would answer for someone who is not on this map.
     this.characterSprites.clear();
+    this.standeeReacting.clear();
     this.highlights = [];
     this.pendingGive = null;
     this.giveTweens = [];
@@ -436,6 +462,11 @@ export class BoardScene extends Phaser.Scene {
     // She answered — raise the scepter. The system has already done the work;
     // this is the only place the player SEES her do it.
     this.ctx.bus.on('character:action_used', ({ characterId }) => this.playStandeeCast(characterId));
+    // The Align-Studio reaction clips (character-anims.json) — each event has
+    // exactly ONE animation answering it: a landed gift, a filled heart.
+    // (Talking/blinking are the dialogue BUBBLE's, never the board's.)
+    this.ctx.bus.on('regard:gift_accepted', ({ characterId }) => this.playStandeeReaction(characterId, 'happy'));
+    this.ctx.bus.on('regard:heart', ({ characterId }) => this.playStandeeReaction(characterId, 'laugh'));
     this.buildFog();
     this.buildSouthPromise();
     this.buildKeyBadges();
@@ -476,7 +507,10 @@ export class BoardScene extends Phaser.Scene {
       this.twinkleTimer = undefined;
       this.offBus.forEach((off) => off());
       this.offBus = [];
-      for (const ld of this.liveDragons.values()) ld.player.destroy();
+      for (const ld of this.liveDragons.values()) {
+        ld.clipOverlay?.destroy();
+        ld.player.destroy();
+      }
       this.liveDragons.clear();
       this.altarElder?.destroy();
       this.altarElder = undefined;
@@ -632,6 +666,7 @@ export class BoardScene extends Phaser.Scene {
       if (!b.sprite.active) continue;
       const t = (time / STANDEE_BREATH.periodMs) * Math.PI * 2 + b.phase;
       b.sprite.scaleY = b.sprite.scaleX * (1 + STANDEE_BREATH.amount * Math.sin(t));
+      syncSpriteInk(b.sprite); // the breath is a per-frame scale — the line rides it
     }
     // Ember-flies live wherever the player is looking — track the view.
     if (this.fireflyZone) {
@@ -827,8 +862,8 @@ export class BoardScene extends Phaser.Scene {
     });
     const face = FACES[rig.character];
     if (face) player.attachFace(this, face, faceTextureKey(rig.character));
-    player.setFacing('left').play(intro ? 'hover' : 'idle'); // rig's original (un-mirrored) orientation
-    if (intro) player.playFace(2); // the newborn roars its arrival (~2.1s of mouth flap)
+    player.setFacing('left'); // rig's original (un-mirrored) orientation
+    if (!intro) player.play('idle');
     host.setArtVisible(false); // host is now just the invisible hit-target + bob anchor
     // Ground shadow proportional to the rig (666px pieces × scale).
     const shadow = this.addGroundShadow(host.x, host.y, 666 * scale, host.depth - 0.5);
@@ -841,14 +876,32 @@ export class BoardScene extends Phaser.Scene {
       busy: false,
       calm,
       mood: 'awake',
-      roarInMs: DRAGON_ROAR_EVERY_MS
+      roarInMs: DRAGON_ROAR_EVERY_MS,
+      flightPhase: null,
+      sleepState: 'none'
     };
     this.liveDragons.set(host.itemId, ld);
     this.syncDragon(ld);
+    // The atlas idle (video-ingested) is the definitive rest from the first
+    // frame — never a stint of rig idle before the first ambient roll swaps.
+    if (!intro) this.dragonIdle(ld);
     if (intro) {
-      player.container.setAlpha(0);
+      // The newborn roars its arrival: the ingested roar clip when pushed
+      // (same bellow as the hungry cadence), the rig hover + ~2.1s of mouth
+      // flap without it. Whichever plays is what fades in.
+      let target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container;
+      if (this.playRoarClip(ld) && ld.clipOverlay) {
+        target = ld.clipOverlay;
+      } else {
+        player.play('hover');
+        player.playFace(2);
+        ld.mode = 'hover';
+        ld.remainMs = DRAGON_ANIM.introCelebrateMs;
+        target = player.container;
+      }
+      target.setAlpha(0);
       this.tweens.add({
-        targets: player.container,
+        targets: target,
         alpha: 1,
         duration: DRAGON_ANIM.fadeInMs,
         ease: 'Sine.easeOut'
@@ -873,17 +926,60 @@ export class BoardScene extends Phaser.Scene {
     ld.player.container.setDepth(ld.host.depth + 0.5);
     ld.shadow.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth - 0.5);
     ld.zzz?.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth + 4);
+    if (ld.clipOverlay?.visible) {
+      // The Align-Studio clip rides the host at the rig's own anchor and depth,
+      // mirroring with the rig's facing (source art faces left; dx mirrors too,
+      // so the registration lands where the flipped rig's would).
+      const clip = ld.clipOverlay.getData('clip') as CharacterClip | undefined;
+      const flip = ld.player.container.scaleX < 0;
+      ld.clipOverlay
+        .setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift)
+        .setDepth(ld.host.depth + 0.5)
+        .setFlipX(flip);
+      if (clip) {
+        const origin = originFor(clip, flip);
+        ld.clipOverlay.setOrigin(origin.x, origin.y).setScale(clip.scale);
+        if (ld.sleepState === 'seated') {
+          // The frozen tosleep frame breathes exactly as the sleep painting
+          // did (BoardItem.applyBob): ribcage rises, body widens a little
+          // less, phase hashed off the item id so neighbours never inhale
+          // together. Bottom-anchored origin keeps the belly planted.
+          const phase = ((((ld.host.itemId * 2654435761) >>> 0) % 1000) / 1000) * Math.PI * 2;
+          const k = Math.sin((this.time.now / SLEEP_BREATH.periodMs) * Math.PI * 2 + phase);
+          ld.clipOverlay.setScale(
+            clip.scale * (1 - SLEEP_BREATH.amount * 0.45 * k),
+            clip.scale * (1 + SLEEP_BREATH.amount * k)
+          );
+        }
+      }
+      // Last, so the keyline picks up every transform written above — including the
+      // sleeper's breathing scale, which changes every frame.
+      syncSpriteInk(ld.clipOverlay);
+    } else if (ld.clipOverlay) {
+      hideSpriteInk(ld.clipOverlay);
+    }
   }
 
   private updateLiveDragons(delta: number): void {
     for (const ld of this.liveDragons.values()) {
       this.syncDragon(ld);
       ld.player.update(delta);
-      if (ld.busy) continue; // flying/working: hold its current animation
+      if (ld.busy || ld.host.getData('dragged')) continue; // flying/working/held: hold its animation
       // A sleeping dragon does not fidget: the rig is hidden behind the curled
       // sleep art, so rolling idle/hover under it would animate nothing and
       // wake it the instant the mood lifted mid-burst.
-      if (ld.mood === 'asleep') continue;
+      if (ld.mood === 'asleep') {
+        // Self-heal: a grounded sleeper must always END UP seated. Any race
+        // that knocked the seat over (a flight ordered over the sleeper, a
+        // transition whose completion got wiped) would otherwise freeze an
+        // awake-LOOKING dragon for the whole nap or night — this loop is the
+        // only thing still running for it, so this is where it re-seats.
+        // "Airborne" must mean VISIBLY flying — a stale flightPhase whose
+        // animation already ended is a wedge, not a flight.
+        const airborne = ld.flightPhase !== null && ld.clipOverlay?.anims.isPlaying === true;
+        if (ld.sleepState === 'none' && !airborne) this.seatDragonSleep(ld);
+        continue;
+      }
       // Hungry: a roar every DRAGON_ROAR_EVERY_MS, and nothing else changes.
       // It is a mood, not a state machine — the dragon carries on producing,
       // working and idling exactly as it always did.
@@ -903,11 +999,11 @@ export class BoardScene extends Phaser.Scene {
       if (ld.mode === 'idle' && Math.random() < chance) {
         ld.mode = 'hover';
         ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
-        ld.player.play('hover');
+        this.dragonHover(ld);
       } else {
         ld.mode = 'idle';
         ld.remainMs = this.idleSpanMs(ld.calm);
-        ld.player.play('idle');
+        this.dragonLand(ld); // fold the wings before standing — never a hard cut
       }
     }
   }
@@ -975,6 +1071,7 @@ export class BoardScene extends Phaser.Scene {
     const ld = this.liveDragons.get(itemId);
     if (!ld) return;
     ld.zzz?.destroy();
+    ld.clipOverlay?.destroy();
     ld.player.destroy();
     ld.shadow.destroy();
     this.liveDragons.delete(itemId);
@@ -982,18 +1079,47 @@ export class BoardScene extends Phaser.Scene {
 
   /* ------------------------- ambient life ---------------------------- */
 
-  /** One hungry roar: the rig rears back, the face opens, and a puff of smoke
-   *  leaves the nostrils. Purely a mood — nothing in the economy hears it. */
-  private roarOnce(ld: LiveDragon): void {
-    ld.player.play('roar');
-    ld.player.playFace(2); // wide mouth for the length of the bellow
+  /** Play the video-ingested roar clip on the overlay — the definitive bellow
+   *  wherever a dragon roars (hungry cadence AND the newborn intro): one-shot,
+   *  the idle roll held to the clip's real length, then back through
+   *  dragonIdle. False when this breed has no pushed roar. */
+  private playRoarClip(ld: LiveDragon): boolean {
+    const roar = this.dragonClip(ld, 'roar');
+    if (!roar) return false;
+    const overlay = this.dressOverlay(ld, roar);
+    ld.flightPhase = null;
+    ld.sleepState = 'none'; // a bellowing dragon is not curled on a tile
+    overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    overlay.setVisible(true);
+    ld.player.container.setVisible(false);
+    overlay.play(roar.key);
     ld.mode = 'idle';
-    ld.remainMs = DRAGON_ROAR_MS;
-    this.time.delayedCall(DRAGON_ROAR_MS, () => {
+    ld.remainMs = (roar.clip.frames / roar.clip.fps) * 1000;
+    overlay.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       if (this.liveDragons.get(ld.host.itemId) === ld && ld.mood !== 'asleep') {
-        ld.player.play('idle');
+        this.dragonIdle(ld);
       }
     });
+    return true;
+  }
+
+  /** One hungry roar. The ingested roar clip when pushed; without it the rig
+   *  rears back with the wide-mouth face, exactly as before. Purely a mood —
+   *  nothing in the economy hears it. */
+  private roarOnce(ld: LiveDragon): void {
+    if (!this.playRoarClip(ld)) {
+      this.clearDragonOverlay(ld); // the bellow is the rig's — never under a fly loop
+      ld.player.container.setVisible(true);
+      ld.player.play('roar');
+      ld.player.playFace(2); // wide mouth for the length of the bellow
+      ld.mode = 'idle';
+      ld.remainMs = DRAGON_ROAR_MS;
+      this.time.delayedCall(DRAGON_ROAR_MS, () => {
+        if (this.liveDragons.get(ld.host.itemId) === ld && ld.mood !== 'asleep') {
+          this.dragonIdle(ld);
+        }
+      });
+    }
     this.sparks.explode(5, ld.host.x, ld.host.y - 90);
     this.floatText(ld.host.x, ld.host.y - 170, 'Hungry!', PALETTE.lavaHighlight);
   }
@@ -1006,6 +1132,342 @@ export class BoardScene extends Phaser.Scene {
    * A breed with no sleep art simply dims and shows the 💤 — the behaviour is
    * the same for every dragon, only the red one has its portrait for it.
    */
+  /**
+   * The Align-Studio clip dressing this dragon (character-anims.json `board`
+   * key, e.g. 'ember_dragon:3' → redwhelp), with its Phaser anim registered.
+   * Null when this breed/tier has no pushed clips or the sheet is not resident.
+   */
+  private dragonClip(ld: LiveDragon, clipId: string): { clip: CharacterClip; key: string } | null {
+    const id = dragonClipCharacter(ld.host.chain, ld.host.tier);
+    if (!id) return null;
+    const clip = clipFor(id, clipId);
+    const key = clipKey(id, clipId);
+    if (!clip || !this.textures.exists(key)) return null;
+    if (!this.anims.exists(key)) {
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+        frameRate: clip.fps,
+        repeat: clip.loop ? -1 : 0
+      });
+    }
+    return { clip, key };
+  }
+
+  /** The overlay sprite that stands in for the rig while a clip plays. */
+  private dragonOverlay(ld: LiveDragon, key: string): Phaser.GameObjects.Sprite {
+    if (!ld.clipOverlay) {
+      ld.clipOverlay = this.add.sprite(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift, key).setVisible(false);
+      // A clip HIDES the rig, and with it the rig's keyline, so the stand-in has to
+      // carry its own — at the rig's exact width, since the handover happens
+      // mid-animation and a line that changed weight across it would read as a
+      // flinch. See src/render/SpriteInk.ts.
+      attachSpriteInk(this, ld.clipOverlay, { units: ld.player.outlineUnits });
+    }
+    return ld.clipOverlay;
+  }
+
+  /**
+   * Bind a clip to the overlay and dress it NOW — origin, scale, flip,
+   * position, depth. `syncDragon` re-applies all of this every frame, but a
+   * clip SWITCH must never wait for it: mood events land in the
+   * `time:advanced` tail of update(), AFTER updateLiveDragons already ran, so
+   * the new texture would render once wearing the previous clip's transform —
+   * a tosleep frame at the fly clip's scale is a giant dragon flashing for
+   * one frame. A freshly created overlay (scale 1, centre origin) has the
+   * same window.
+   */
+  private dressOverlay(ld: LiveDragon, c: { clip: CharacterClip; key: string }): Phaser.GameObjects.Sprite {
+    const overlay = this.dragonOverlay(ld, c.key);
+    overlay.setData('clip', c.clip);
+    const flip = ld.player.container.scaleX < 0;
+    const origin = originFor(c.clip, flip);
+    overlay
+      .setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift)
+      .setDepth(ld.host.depth + 0.5)
+      .setFlipX(flip)
+      .setOrigin(origin.x, origin.y)
+      .setScale(c.clip.scale);
+    return overlay;
+  }
+
+  private clearDragonOverlay(ld: LiveDragon): void {
+    ld.flightPhase = null;
+    if (!ld.clipOverlay) return;
+    ld.clipOverlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    ld.clipOverlay.stop();
+    ld.clipOverlay.setVisible(false);
+  }
+
+  /** Segment anim key for a phased clip (takeoff / loop / landing). */
+  private segKey(base: string, seg: string): string {
+    return `${base}_${seg}`;
+  }
+
+  /** Register the fly clip's phase anims (idempotent); null without segments. */
+  private flySegments(ld: LiveDragon): { clip: CharacterClip; key: string } | null {
+    const f = this.dragonClip(ld, 'fly');
+    if (!f?.clip.segments) return null;
+    for (const [seg, [start, end]] of Object.entries(f.clip.segments)) {
+      const key = this.segKey(f.key, seg);
+      if (this.anims.exists(key)) continue;
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(f.key, { start, end: end - 1 }),
+        frameRate: f.clip.fps,
+        repeat: seg === 'loop' ? -1 : 0
+      });
+    }
+    return f;
+  }
+
+  /** ms a segment takes at the clip's own frame rate. */
+  private segMs(clip: CharacterClip, seg: string): number {
+    const range = clip.segments?.[seg];
+    return range ? ((range[1] - range[0]) / clip.fps) * 1000 : 0;
+  }
+
+  /**
+   * AIRBORNE. The Align-Studio fly clip is the definitive flight when this
+   * breed has it pushed: takeoff ramps once, then the seamless cruise loop —
+   * the rig steps aside (hidden, so one dragon never wears two animations).
+   *
+   * `durationMs` (a tweened journey leg) also schedules the LANDING so it
+   * begins `landingLeadMs` BEFORE touchdown and folds its wings on the tile —
+   * never a landing played in the air, never a touchdown still mid-cruise. A
+   * leg too short for the full ramp skips the takeoff and cruises at once.
+   * No duration = hold the loop until `dragonLand` (drag release, burst end).
+   */
+  private dragonHover(ld: LiveDragon, durationMs?: number): void {
+    // A dragon taking wing is by definition not curled on a tile. A flight
+    // ordered over a sleeper (work drop, wander race) used to strand
+    // `sleepState` at seated/transition, and every later seatDragonSleep
+    // no-opped on the stale guard — the frozen-dragon bug.
+    ld.sleepState = 'none';
+    const f = this.flySegments(ld);
+    if (!f) {
+      // No phased clip: the whole-loop overlay, else the rig's hover preset
+      // (clearing any idle overlay a partial push may have left standing in).
+      const whole = this.dragonClip(ld, 'fly');
+      if (!whole) {
+        this.clearDragonOverlay(ld);
+        ld.player.container.setVisible(true);
+        ld.player.play('hover');
+        return;
+      }
+      const overlay = this.dressOverlay(ld, whole);
+      overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+      overlay.setVisible(true);
+      overlay.play(whole.key, true);
+      ld.player.container.setVisible(false);
+      return;
+    }
+    const overlay = this.dressOverlay(ld, f);
+    overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    overlay.setVisible(true);
+    ld.player.container.setVisible(false);
+    const airborne = ld.flightPhase === 'takeoff' || ld.flightPhase === 'loop';
+    if (!airborne) {
+      const rampFits = durationMs === undefined || durationMs > this.segMs(f.clip, 'takeoff') + DRAGON_ANIM.landingLeadMs;
+      if (rampFits) {
+        ld.flightPhase = 'takeoff';
+        overlay.play(this.segKey(f.key, 'takeoff'));
+        overlay.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+          if (ld.flightPhase !== 'takeoff') return;
+          ld.flightPhase = 'loop';
+          overlay.play(this.segKey(f.key, 'loop'));
+        });
+      } else {
+        ld.flightPhase = 'loop';
+        overlay.play(this.segKey(f.key, 'loop'));
+      }
+    }
+    if (durationMs !== undefined) {
+      const lead = Math.min(DRAGON_ANIM.landingLeadMs, durationMs * 0.6);
+      this.time.delayedCall(Math.max(0, durationMs - lead), () => {
+        if (this.liveDragons.get(ld.host.itemId) === ld) this.dragonLand(ld);
+      });
+    }
+  }
+
+  /**
+   * Touch down: the landing phase (wing fold, authored frames 192→end) plays
+   * once and hands back to the rig's idle — or straight to the curled sleep
+   * seat when the mood went `asleep` mid-air (sleep is deferred to HERE).
+   */
+  private dragonLand(ld: LiveDragon): void {
+    const f = ld.clipOverlay?.visible ? this.flySegments(ld) : null;
+    if (!f || ld.flightPhase === null || ld.flightPhase === 'landing') {
+      if (ld.flightPhase !== 'landing') this.dragonIdle(ld);
+      return;
+    }
+    const overlay = this.dragonOverlay(ld, f.key);
+    ld.flightPhase = 'landing';
+    overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    overlay.play(this.segKey(f.key, 'landing'));
+    overlay.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      if (this.liveDragons.get(ld.host.itemId) === ld) this.dragonIdle(ld);
+    });
+  }
+
+  /** GROUNDED: if the mood is asleep, the deferred sleep finally seats (this
+   *  is the one door). Otherwise the video-ingested idle clip is the
+   *  definitive rest when pushed — the rig stays hidden behind it; without it
+   *  the overlay steps aside and the rig's idle preset returns. */
+  private dragonIdle(ld: LiveDragon): void {
+    ld.flightPhase = null;
+    if (ld.mood === 'asleep') {
+      if (ld.sleepState === 'none') this.seatDragonSleep(ld);
+      return;
+    }
+    // Awake and grounded: any leftover seat bookkeeping is stale by
+    // definition (it would otherwise pin the breath scale to this clip and
+    // no-op the NEXT night's seatDragonSleep).
+    ld.sleepState = 'none';
+    const idle = this.dragonClip(ld, 'idle');
+    if (idle) {
+      const overlay = this.dressOverlay(ld, idle);
+      overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+      overlay.setVisible(true);
+      ld.player.container.setVisible(false);
+      // An idle roll landing on idle again must not restart the breath cycle.
+      if (overlay.anims.currentAnim?.key !== idle.key || !overlay.anims.isPlaying) {
+        overlay.play(idle.key);
+        this.armIdleRoar(ld, overlay, idle.key);
+      }
+      return;
+    }
+    this.clearDragonOverlay(ld);
+    ld.player.container.setVisible(true);
+    ld.player.play('idle');
+  }
+
+  /**
+   * Ambient bellow cadence: after every 3–5 full idle loops (rolled fresh
+   * each time the idle starts) the roar clip plays once — no sparks, no
+   * "Hungry!", just the animal clearing its throat — and its completion
+   * returns through dragonIdle, which re-arms with a new roll. Counted off
+   * ANIMATION_REPEAT so only WATCHED stillness accrues: flights, sleeps and
+   * bursts reset the count by restarting the idle.
+   */
+  private armIdleRoar(ld: LiveDragon, overlay: Phaser.GameObjects.Sprite, idleKey: string): void {
+    let loops = Phaser.Math.Between(DRAGON_ANIM.idleRoarMinLoops, DRAGON_ANIM.idleRoarMaxLoops);
+    overlay.off(Phaser.Animations.Events.ANIMATION_REPEAT);
+    overlay.on(Phaser.Animations.Events.ANIMATION_REPEAT, (anim: Phaser.Animations.Animation) => {
+      if (anim.key !== idleKey || this.liveDragons.get(ld.host.itemId) !== ld) return;
+      if (ld.busy || ld.mood === 'asleep' || ld.flightPhase !== null || ld.host.getData('dragged')) return;
+      if (--loops > 0) return;
+      overlay.off(Phaser.Animations.Events.ANIMATION_REPEAT);
+      this.playRoarClip(ld);
+    });
+  }
+
+  /**
+   * The TOSLEEP transition (one-shot; reversed to wake — the clip is authored
+   * idle→sleep). The rig and the host art both step aside for its 2 s; `done`
+   * seats whatever the destination state shows.
+   */
+  private playDragonTransition(
+    ld: LiveDragon,
+    t: { clip: CharacterClip; key: string },
+    reverse: boolean,
+    done: () => void
+  ): void {
+    const overlay = this.dressOverlay(ld, t);
+    overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    overlay.stop();
+    overlay.setVisible(true);
+    ld.player.container.setVisible(false);
+    ld.host.setArtVisible(false);
+    overlay.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      overlay.setVisible(false);
+      done();
+    });
+    if (reverse) overlay.playReverse(t.key);
+    else overlay.play(t.key);
+  }
+
+  /**
+   * Curl up ON THE TILE: the TOSLEEP transition (when pushed) then the sleep
+   * painting + breath + 💤. Only ever called with the dragon grounded —
+   * applyDragonMood defers to dragonIdle while it flies. Idempotent via
+   * `sleepState`, so a landing chain cannot double-seat.
+   */
+  private seatDragonSleep(ld: LiveDragon): void {
+    if (ld.sleepState !== 'none') return;
+    const seatSleep = (): void => {
+      ld.sleepState = 'seated';
+      const sleepKey = `sleep_${ld.host.chain}_${ld.host.tier}`;
+      if (!this.textures.exists(sleepKey)) {
+        ld.player.container.setVisible(true).setAlpha(0.65);
+        return;
+      }
+      // The rig steps aside and the painting takes the tile — but the rig's
+      // GROUND SHADOW stays exactly where it was. The curled art's anchor is
+      // its own alpha-bbox floor line (anchors.json), so its belly lands on
+      // the tile origin, which is the same line `syncDragon` puts that shadow
+      // on: the dragon lies down ON its shadow rather than hovering over a
+      // second one the item would otherwise light beneath itself.
+      ld.player.container.setVisible(false);
+      ld.host.setArtTexture(sleepKey, this.ctx.data.anchors);
+      ld.host.setArtScale(ITEM_SCALE[sleepKey] ?? DRAGON_SLEEP_SCALE);
+      ld.host.setArtVisible(true);
+      ld.host.setGroundShadowVisible(false);
+      // A still frame reads as a dead sprite, so the painting BREATHES.
+      // Phase is hashed off the item id — two dragons asleep side by side
+      // must not inhale together. The groundLift drop seats the belly on the
+      // exact floor line the rig's feet stood on — the line its kept shadow
+      // was tuned to — instead of the container origin 20px above it.
+      ld.host.setSleepBreath(
+        true,
+        (((ld.host.itemId * 2654435761) >>> 0) % 1000 / 1000) * Math.PI * 2,
+        -DRAGON_ANIM.groundLift
+      );
+    };
+    // The Align-Studio TOSLEEP transition is the definitive way down when
+    // pushed: the whelp curls up over ~2 s and then SLEEPS ON THE CLIP'S OWN
+    // LAST FRAME — the transition ends exactly where the sleep pose begins,
+    // so freezing that frame is seamless where the old swap to the
+    // separately-authored painting popped. Without the clip, the painting
+    // lands at once, exactly as before.
+    const t = this.dragonClip(ld, 'tosleep');
+    if (t) {
+      ld.sleepState = 'transition';
+      ld.flightPhase = null;
+      this.playDragonTransition(ld, t, false, () => {
+        const overlay = this.dressOverlay(ld, t);
+        overlay.setFrame(t.clip.frames - 1);
+        overlay.setVisible(true);
+        ld.sleepState = 'seated'; // syncDragon breathes the frozen frame
+      });
+    } else {
+      this.clearDragonOverlay(ld); // a lingering fly overlay must not cover the painting
+      seatSleep();
+    }
+    // A dragon sleeping off a SHIFT already wears the rest badge, and that
+    // badge is a 💤 with the countdown on it. A second 💤 beside it reads as
+    // a bug rather than as emphasis.
+    const resting = this.ctx.systems.jobs.restRemaining(ld.host.itemId) > 0;
+    ld.zzz?.destroy();
+    ld.zzz = undefined;
+    if (!resting) {
+      const puff = this.add.text(0, -150, '💤', { fontSize: '46px' }).setOrigin(0.5);
+      ld.zzz = this.add
+        .container(ld.host.x, ld.host.y, [puff])
+        .setDepth(DEPTHS.itemBase + ld.host.y + 4);
+      // The drift tweens the TEXT inside the container, so the container is
+      // free to follow the host — a dragged sleeper takes its 💤 along.
+      this.tweens.add({
+        targets: puff,
+        y: -210,
+        alpha: { from: 0.9, to: 0.15 },
+        duration: 3400,
+        repeat: -1,
+        ease: 'Sine.easeOut'
+      });
+    }
+  }
+
   private applyDragonMood(itemId: number, mood: 'awake' | 'hungry' | 'asleep'): void {
     const ld = this.liveDragons.get(itemId);
     if (!ld) return;
@@ -1015,60 +1477,26 @@ export class BoardScene extends Phaser.Scene {
     if (was === mood) return;
 
     if (mood === 'asleep') {
-      const sleepKey = `sleep_${ld.host.chain}_${ld.host.tier}`;
-      if (this.textures.exists(sleepKey)) {
-        // The rig steps aside and the painting takes the tile — but the rig's
-        // GROUND SHADOW stays exactly where it was. The curled art's anchor is
-        // its own alpha-bbox floor line (anchors.json), so its belly lands on
-        // the tile origin, which is the same line `syncDragon` puts that shadow
-        // on: the dragon lies down ON its shadow rather than hovering over a
-        // second one the item would otherwise light beneath itself.
-        ld.player.container.setVisible(false);
-        ld.host.setArtTexture(sleepKey, this.ctx.data.anchors);
-        ld.host.setArtScale(ITEM_SCALE[sleepKey] ?? DRAGON_SLEEP_SCALE);
-        ld.host.setArtVisible(true);
-        ld.host.setGroundShadowVisible(false);
-        // A still frame reads as a dead sprite, so the painting BREATHES.
-        // Phase is hashed off the item id — two dragons asleep side by side
-        // must not inhale together. The groundLift drop seats the belly on the
-        // exact floor line the rig's feet stood on — the line its kept shadow
-        // was tuned to — instead of the container origin 20px above it.
-        ld.host.setSleepBreath(
-          true,
-          (((ld.host.itemId * 2654435761) >>> 0) % 1000 / 1000) * Math.PI * 2,
-          -DRAGON_ANIM.groundLift
-        );
-      } else {
-        ld.player.container.setAlpha(0.65);
-      }
-      // A dragon sleeping off a SHIFT already wears the rest badge, and that
-      // badge is a 💤 with the countdown on it. A second 💤 beside it reads as
-      // a bug rather than as emphasis.
-      const resting = this.ctx.systems.jobs.restRemaining(itemId) > 0;
-      ld.zzz?.destroy();
-      ld.zzz = undefined;
-      if (!resting) {
-        const puff = this.add.text(0, -150, '💤', { fontSize: '46px' }).setOrigin(0.5);
-        ld.zzz = this.add
-          .container(ld.host.x, ld.host.y, [puff])
-          .setDepth(DEPTHS.itemBase + ld.host.y + 4);
-        // The drift tweens the TEXT inside the container, so the container is
-        // free to follow the host — a dragged sleeper takes its 💤 along.
-        this.tweens.add({
-          targets: puff,
-          y: -210,
-          alpha: { from: 0.9, to: 0.15 },
-          duration: 3400,
-          repeat: -1,
-          ease: 'Sine.easeOut'
-        });
-      }
+      // AIRBORNE dragons do not fall asleep in the air. The mood is recorded
+      // (idle rolls already stop on it) but the curl-up waits for the flight
+      // to touch down — dragonIdle() is the one door onto the tile, and it
+      // seats the deferred sleep the moment the dragon is actually standing.
+      const airborne = ld.busy || ld.flightPhase !== null;
+      if (!airborne) this.seatDragonSleep(ld);
       return;
     }
 
-    // Waking up: put the rig back, and let it stretch before it stands.
+    // Waking up. Only a sleep that actually SEATED has anything to undo — a
+    // deferred sleep (mood flipped back mid-flight) changed nothing on screen,
+    // and a hungry↔awake change never touches what is drawn.
+    if (was !== 'asleep') return;
     ld.zzz?.destroy();
     ld.zzz = undefined;
+    const seated = ld.sleepState === 'seated';
+    const midTransition = ld.sleepState === 'transition';
+    ld.sleepState = 'none';
+    if (!seated && !midTransition) return; // never seated — it is still flying or standing
+    this.clearDragonOverlay(ld); // a mood flip mid-transition never strands the clip
     ld.host.setSleepBreath(false);
     // Restore the STANDING art under the rig. The host is invisible while the
     // rig stands in, but a pooled item that is released still carrying the
@@ -1080,13 +1508,24 @@ export class BoardScene extends Phaser.Scene {
       ld.host.setArtScale(ITEM_SCALE[`${ld.host.chain}_${ld.host.tier}`] ?? 1);
     }
     ld.host.setArtVisible(false);
-    ld.player.container.setVisible(true).setAlpha(1);
     ld.shadow.setVisible(true);
-    if (was === 'asleep') {
-      ld.player.play('stretch');
+    // The TOSLEEP clip played in REVERSE is the definitive wake when pushed —
+    // the whelp uncurls, then the rig stands. Without it, the rig returns at
+    // once and stretches, exactly as before.
+    const t = seated ? this.dragonClip(ld, 'tosleep') : null;
+    if (t) {
       ld.mode = 'idle';
       ld.remainMs = DRAGON_WAKE_MS;
+      this.playDragonTransition(ld, t, true, () => {
+        ld.player.container.setAlpha(1);
+        this.dragonIdle(ld); // the atlas idle when pushed, the rig otherwise
+      });
+      return;
     }
+    ld.player.container.setVisible(true).setAlpha(1);
+    ld.player.play('stretch');
+    ld.mode = 'idle';
+    ld.remainMs = DRAGON_WAKE_MS;
   }
 
   /**
@@ -1107,7 +1546,7 @@ export class BoardScene extends Phaser.Scene {
     if (ld) {
       ld.busy = true;
       ld.player.setFacing(dest.x <= sprite.x ? 'left' : 'right');
-      ld.player.play('hover');
+      this.dragonHover(ld, DRAGON_WANDER_FLIGHT_MS);
     }
     // Two tweens rather than a curve: x eases the whole way while y hops up and
     // back down, which reads as a glide with a lift in the middle of it. Depth
@@ -1138,7 +1577,7 @@ export class BoardScene extends Phaser.Scene {
             ld.busy = false;
             ld.mode = 'idle';
             ld.remainMs = this.idleSpanMs(ld.calm);
-            if (ld.mood !== 'asleep') ld.player.play('idle');
+            this.dragonLand(ld); // no-op if the led landing is already folding
           }
         });
       }
@@ -1882,16 +2321,31 @@ export class BoardScene extends Phaser.Scene {
         sprite.setOrigin(0.5, 1);
       }
       if (animated) {
-        // She RESTS on idle frame 0 — the bake's still — and the idle bank is
-        // never played. Her standing life is the breath in `update`; the frame
-        // sequence read as a fidget next to it, and two idles running at once
-        // read as two different people. The bank stays loaded because the cast
-        // hands back to its first frame.
+        // Register the one-shot cast whether or not an atlas idle takes over —
+        // the scepter answer still plays off the bank.
         this.ensureStandeeAnims(art, bank!);
-        sprite.setFrame(0);
       }
+      // An Align-Studio atlas idle (character-anims.json) supersedes the bake's
+      // still + breath: it IS an authored idle loop, registered onto the same
+      // feet anchor by the pushed transform. Without one, she rests on the
+      // bank's frame 0 and her standing life stays the breath in `update`.
+      const clipIdle = this.applyStandeeRest(art, sprite);
+      if (!clipIdle && animated) sprite.setFrame(0);
       // Arm/disarm pulses read this instead of assuming 1.
       sprite.setData('baseScale', sprite.scale);
+      // Her keyline. Width comes from the BANK's geometry, not the clip's, because
+      // her clips are authored at different scales (idle 0.5671, cast 0.61371) and
+      // deriving it per clip would change the weight of her outline the moment she
+      // raised her scepter. Frames re-dress themselves; see SpriteInk.
+      attachSpriteInk(this, sprite, {
+        units: keylineUnits(
+          bank
+            ? Math.max(bank.frameWidth, bank.frameHeight) * standeeScale
+            : Math.max(sprite.displayWidth, sprite.displayHeight),
+          DRAGON_OUTLINE
+        )
+      });
+      syncSpriteInk(sprite);
       // The ground shadow that plants her: sized to her BODY, never the frame
       // (the frame also spans the cast's ember bolt, which would throw a shadow
       // for a spell she is not casting). Just under her, so the breath lifts off
@@ -1913,15 +2367,33 @@ export class BoardScene extends Phaser.Scene {
       // scepter blaze and the ember bolt, and neither is her. Texture space (so
       // `setScale` does not shift it), and origin does not either.
       const b = bank?.body ?? { x: 0, y: 0, width: sprite.width, height: sprite.height };
-      sprite.setData('bodyBox', b);
-      sprite.setInteractive(characterHitRect(b, false), Phaser.Geom.Rectangle.Contains);
+      // With an atlas idle under her, texture space changed: carry the bank's
+      // BODY box through game space into the clip's frame so the hit area still
+      // covers her lower body and nothing else.
+      const idleClip = clipIdle ? clipFor(art, 'idle') : null;
+      const box =
+        idleClip && bank
+          ? clipTextureRect(idleClip, {
+              x: (b.x - bank.anchorX * bank.frameWidth) * standeeScale,
+              y: (b.y - bank.anchorY * bank.frameHeight) * standeeScale,
+              width: b.width * standeeScale,
+              height: b.height * standeeScale
+            })
+          : b;
+      sprite.setData('bodyBox', box);
+      sprite.setInteractive(characterHitRect(box, false), Phaser.Geom.Rectangle.Contains);
       this.input.setDraggable(sprite, false);
       // Identity is the WARDROBE key: Eleanor-at-home is Eleanor — one Regard
       // gauge, one dialogue bank, one action cooldown, wherever she stands.
       sprite.on('pointerup', () => this.onCharacterTapped(art, sprite));
       this.characterSprites.set(art, sprite);
       this.settleSprite(sprite, 120);
-      this.startBreathing(art, sprite);
+      // The atlas idle already breathes — a squash on top would double it.
+      if (!clipIdle) this.startBreathing(art, sprite);
+      // …and it blinks: rare full-segment blink one-shots over the idle loop.
+      if (clipIdle && clipFor(art, 'blinking')?.stage !== 'portrait' && clipFor(art, 'blinking')) {
+        this.scheduleStandeeBlink(art, sprite);
+      }
     }
   }
 
@@ -1940,7 +2412,10 @@ export class BoardScene extends Phaser.Scene {
   characterMarkerPoint(characterId: string): { x: number; y: number; bottom: number } | null {
     const sprite = this.characterSprites.get(characterId);
     if (!sprite) return null;
-    const body = STANDEE_BANKS[characterId]?.body;
+    // The LIVE body box: buildWorldCharacters computes it for whichever texture
+    // she is actually wearing (bank frame or Align-Studio atlas frame), so the
+    // marker maths below hold in either texture space.
+    const body = sprite.getData('bodyBox') as { x: number; y: number; width: number; height: number } | undefined;
     if (!body) {
       return { x: sprite.x, y: sprite.getTopCenter().y, bottom: sprite.getBottomCenter().y };
     }
@@ -1982,6 +2457,96 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /**
+   * Register (idempotently) a BOARD-stage Align-Studio clip's Phaser animation
+   * and hand back its data — null when the clip does not exist, is portrait
+   * framing (the bubble's, never the board's), or its sheet is not resident.
+   */
+  private ensureClipAnim(art: string, clipId: string): CharacterClip | null {
+    const clip = clipFor(art, clipId);
+    const key = clipKey(art, clipId);
+    if (!clip || clip.stage === 'portrait' || !this.textures.exists(key)) return null;
+    if (!this.anims.exists(key)) {
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+        frameRate: clip.fps,
+        repeat: clip.loop ? -1 : 0
+      });
+    }
+    return clip;
+  }
+
+  /** Seat a clip's pushed registration under the sprite: texture, feet-anchored
+   *  origin, game-px scale — the exact transform the Align Studio authored. */
+  private seatStandeeClip(sprite: Phaser.GameObjects.Sprite, art: string, clipId: string, clip: CharacterClip): void {
+    const origin = originFor(clip);
+    sprite.setTexture(clipKey(art, clipId), 0);
+    sprite.setOrigin(origin.x, origin.y);
+    sprite.setScale(clip.scale);
+    sprite.setData('baseScale', clip.scale);
+  }
+
+  /**
+   * Put the character's RESTING look under her: the Align-Studio idle loop.
+   * Returns false when she has no atlas idle, leaving the caller the bank's
+   * frame-0 still.
+   */
+  private applyStandeeRest(art: string, sprite: Phaser.GameObjects.Sprite): boolean {
+    const clip = this.ensureClipAnim(art, 'idle');
+    if (!clip) return false;
+    this.seatStandeeClip(sprite, art, 'idle', clip);
+    sprite.play(clipKey(art, 'idle'));
+    return true;
+  }
+
+  /** The bank's frame-0 still with bank geometry — the pre-atlas resting look. */
+  private restoreBankStill(art: string, sprite: Phaser.GameObjects.Sprite): void {
+    const bank = STANDEE_BANKS[art];
+    if (!bank || !this.textures.exists(bank.keys.idle)) return;
+    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1);
+    sprite.setOrigin(bank.anchorX, bank.anchorY);
+    sprite.setScale(standeeScale);
+    sprite.setData('baseScale', standeeScale);
+    sprite.setTexture(bank.keys.idle, 0);
+  }
+
+  /**
+   * Play a ONE-SHOT reaction clip (cast / happy / laugh / a blink segment) and
+   * settle back onto the rest look. The latest reaction wins — a second event
+   * mid-flight replaces the first rather than queueing a stale emotion.
+   */
+  private playStandeeReaction(art: string, clipId: string): void {
+    const sprite = this.characterSprites.get(art);
+    if (!sprite?.active) return;
+    const clip = this.ensureClipAnim(art, clipId);
+    if (!clip) return;
+    sprite.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    this.standeeReacting.add(art);
+    this.seatStandeeClip(sprite, art, clipId, clip);
+    sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      this.standeeReacting.delete(art);
+      if (!sprite.active) return;
+      sprite.stop();
+      if (!this.applyStandeeRest(art, sprite)) this.restoreBankStill(art, sprite);
+    });
+    sprite.play(clipKey(art, clipId));
+  }
+
+  /**
+   * The atlas idle blinks on its own cadence: the BLINKING clip is a full idle
+   * segment (~3 s) with the blink inside it, played as a rare one-shot so rest
+   * never reads as a metronome. Scene-clock timer — cosmetic, not gameplay.
+   */
+  private scheduleStandeeBlink(art: string, sprite: Phaser.GameObjects.Sprite): void {
+    const delay = STANDEE_CLIP_BLINK.minMs + Math.random() * (STANDEE_CLIP_BLINK.maxMs - STANDEE_CLIP_BLINK.minMs);
+    this.time.delayedCall(delay, () => {
+      if (!sprite.active) return;
+      if (!this.standeeReacting.has(art)) this.playStandeeReaction(art, 'blinking');
+      this.scheduleStandeeBlink(art, sprite);
+    });
+  }
+
+  /**
    * Register the one-shot CAST. The idle bank is deliberately not registered:
    * standing still is the breath (`update`), and playing a frame loop underneath
    * it made her fidget. Idempotent — the scene instance is reused across restarts
@@ -2009,14 +2574,30 @@ export class BoardScene extends Phaser.Scene {
    * the IDLE texture's frame 0 under her again — not replaying an idle loop.
    */
   private playStandeeCast(characterId: string): void {
+    // The Align-Studio CAST is the definitive answer to `character:action_used`
+    // when pushed — the bank one-shot never doubles under it (one event, one
+    // animation). The bank path below survives as the no-atlas fallback.
+    if (this.characterSprites.get(characterId)?.active && this.ensureClipAnim(characterId, 'cast')) {
+      this.playStandeeReaction(characterId, 'cast');
+      return;
+    }
     const sprite = this.characterSprites.get(characterId);
     const bank = STANDEE_BANKS[characterId];
     if (!sprite || !bank || !this.anims.exists(this.standeeAnimKey(characterId, 'cast'))) return;
     sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       if (!sprite.active) return;
       sprite.stop();
+      // Rest is the Align-Studio idle loop when pushed; the bake's still if not.
+      if (this.applyStandeeRest(characterId, sprite)) return;
       if (this.textures.exists(bank.keys.idle)) sprite.setTexture(bank.keys.idle, 0);
     });
+    // The cast sheet shares the BANK's frame box, so restore the bank geometry
+    // for the one-shot — the resting look may be the atlas idle, whose frame,
+    // origin and scale are its own.
+    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[characterId] ?? 1);
+    sprite.setOrigin(bank.anchorX, bank.anchorY);
+    sprite.setScale(standeeScale);
+    sprite.setData('baseScale', standeeScale);
     sprite.play(this.standeeAnimKey(characterId, 'cast'));
   }
 
@@ -3094,7 +3675,7 @@ export class BoardScene extends Phaser.Scene {
     if (ld?.mood === 'asleep') {
       this.stirSleeper(ld); // fed in her sleep — the painting answers, not the rig
     } else if (ld && !ld.busy) {
-      ld.player.play('hover');
+      this.dragonHover(ld);
       ld.player.playFace(1); // a chirp for the meal
       ld.mode = 'hover';
       const span = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
@@ -3172,6 +3753,27 @@ export class BoardScene extends Phaser.Scene {
      * Object handlers run BEFORE this (processUpEvents dispatches to game
      * objects, then emits the scene event), so a claim is always in by now.
      */
+    // A HELD dragon flies: takeoff into the cruise loop on pick-up, the
+    // wing-fold landing on release. Registered AFTER the main DRAG_END handler
+    // so a drop that starts a work flight (busy) keeps its own arc instead of
+    // landing into it. A sleeping dragon is dragged as its curled painting —
+    // no flight. Runs on the same events, so no new input concepts.
+    this.input.on(
+      Phaser.Input.Events.DRAG_START,
+      (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+        if (!(obj instanceof BoardItem)) return;
+        const ld = this.liveDragons.get(obj.itemId);
+        if (ld && !ld.busy && ld.mood !== 'asleep') this.dragonHover(ld);
+      }
+    );
+    this.input.on(
+      Phaser.Input.Events.DRAG_END,
+      (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+        if (!(obj instanceof BoardItem)) return;
+        const ld = this.liveDragons.get(obj.itemId);
+        if (ld && !ld.busy && ld.flightPhase !== null) this.dragonLand(ld);
+      }
+    );
     this.input.on(Phaser.Input.Events.POINTER_UP, () => {
       if (this.pendingGive && !this.tapClaimed) this.cancelGive();
       this.tapClaimed = false;
@@ -3750,7 +4352,7 @@ export class BoardScene extends Phaser.Scene {
     if (ld) {
       ld.busy = true;
       ld.player.setFacing(landX <= plant.x ? 'right' : 'left');
-      ld.player.play('hover');
+      this.dragonHover(ld, DRAGON_ANIM.flyToMs);
     }
     const land = (): void => {
       this.glowFlash(plant.x, plant.y - 36, PALETTE.goldAccent, 0.6, 1.2);
@@ -3761,7 +4363,7 @@ export class BoardScene extends Phaser.Scene {
       dragon.settleDepth();
       if (ld) {
         ld.busy = false;
-        ld.player.play('idle');
+        this.dragonLand(ld); // no-op if the led landing is already folding
         ld.mode = 'idle';
         ld.remainMs = this.idleSpanMs(ld.calm);
       }
@@ -3785,6 +4387,10 @@ export class BoardScene extends Phaser.Scene {
           delay: DRAGON_ANIM.workMs,
           duration: DRAGON_ANIM.flyBackMs,
           ease: 'Sine.easeInOut',
+          onStart: () => {
+            const l = this.liveDragons.get(dragon.itemId);
+            if (l) this.dragonHover(l, DRAGON_ANIM.flyBackMs); // the return leg's own arc
+          },
           onUpdate: () => dragon.settleDepth(),
           onComplete: done
         });
@@ -3926,7 +4532,7 @@ export class BoardScene extends Phaser.Scene {
     if (ld) {
       ld.busy = true;
       ld.player.setFacing('left');
-      ld.player.play('hover');
+      this.dragonHover(ld, DRAGON_ANIM.flyToMs);
     }
     // Same beat as the harvest flourish: fly over, breathe a brief burst of
     // work-magic onto the building, and come STRAIGHT home. The job itself
@@ -3950,13 +4556,16 @@ export class BoardScene extends Phaser.Scene {
           delay: DRAGON_ANIM.workMs,
           duration: DRAGON_ANIM.flyBackMs,
           ease: 'Sine.easeInOut',
+          onStart: () => {
+            if (ld) this.dragonHover(ld, DRAGON_ANIM.flyBackMs); // the return leg's own arc
+          },
           onUpdate: () => sprite.settleDepth(),
           onComplete: () => {
             sprite.settleDepth();
             this.busyDragons.delete(sprite.itemId);
             if (ld) {
               ld.busy = false;
-              ld.player.play('idle');
+              this.dragonLand(ld); // no-op if the led landing is already folding
               ld.mode = 'idle';
               ld.remainMs = this.idleSpanMs(ld.calm);
             }
@@ -4123,7 +4732,7 @@ export class BoardScene extends Phaser.Scene {
     this.floatText(sprite.x, sprite.y - 150, 'Refreshed!', PALETTE.goldAccent);
     const ld = this.liveDragons.get(dragonId);
     if (ld) {
-      ld.player.play('hover');
+      this.dragonHover(ld);
       ld.player.playFace(1); // a refreshed chirp
       ld.mode = 'hover';
       ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
@@ -4169,6 +4778,16 @@ export class BoardScene extends Phaser.Scene {
       // The wardrobe key (`art ?? id`) names both the bank and its files —
       // Eleanor-at-home fetches Eleanor's own sheets.
       const art = cfg.art ?? cfg.id;
+      // Her Align-Studio atlas clips travel with her banks — same door, same
+      // loader run, and worldArtKeys lists them for the matching eviction.
+      for (const [clipId, clip] of Object.entries(clipsFor(art))) {
+        if (this.textures.exists(clipKey(art, clipId))) continue;
+        this.load.spritesheet(clipKey(art, clipId), clip.file, {
+          frameWidth: clip.frameWidth,
+          frameHeight: clip.frameHeight
+        });
+        queued++;
+      }
       const bank = STANDEE_BANKS[art];
       if (!bank) continue;
       for (const [name, key] of Object.entries(bank.keys)) {
@@ -4662,7 +5281,7 @@ export class BoardScene extends Phaser.Scene {
     }
     ld.mode = 'hover';
     ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
-    ld.player.play('hover');
+    this.dragonHover(ld);
     ld.player.playFace(1); // one happy mouth-flap as the gift pops out
   }
 
@@ -4824,7 +5443,10 @@ export class BoardScene extends Phaser.Scene {
 
   /** Rebuild everything visual from current state (after a save load). */
   private fullResync(): void {
-    for (const ld of this.liveDragons.values()) ld.player.destroy();
+    for (const ld of this.liveDragons.values()) {
+      ld.clipOverlay?.destroy();
+      ld.player.destroy();
+    }
     this.liveDragons.clear();
     for (const id of [...this.itemAuras.keys()]) this.detachItemAura(id);
     for (const sprite of this.itemSprites.values()) sprite.release();

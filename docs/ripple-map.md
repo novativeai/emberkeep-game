@@ -313,6 +313,44 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   loaded — fell into the static-medallion branch and her bust floated above the ring
   (centre-position maths under a bottom-anchored origin). A new speaker needs: the
   `ANIMATED_SPEAKERS` entry, a disc bake, the Preload spritesheet — and nothing here.
+  Since the Align Studio: a speaker with PORTRAIT-stage clips in
+  `character-anims.json` (talking/blinking — Eleanor AND Selyna) bypasses the disc
+  path entirely: `trySetAtlasPortrait` owns the ring with the SAME split (body copy
+  masked behind the band, neck-cropped head copy above it — `portrait:
+  {height, dy, headCrop}` per character), `layout()` keys the branch on `canim_`,
+  and `PortraitAnimator` stays inert by its `_disc` guard. Talking/blinking are
+  BUBBLE-ONLY — the board never plays them; the board's clips are idle/cast (+
+  Eleanor's happy/laugh reactions).
+- **TOUCH a dragon flight/sleep beat, or a standee cast/reaction → RULE the
+  Align-Studio clip is the DEFINITIVE animation for its event when pushed.**
+  Flight is PHASED (`dragonHover`/`dragonLand`/`dragonIdle`): takeoff → seamless
+  cruise loop → landing, with a journey's landing led `DRAGON_ANIM.landingLeadMs`
+  before touchdown, and drag hold/release mapping to loop/landing. SLEEP NEVER
+  HAPPENS IN THE AIR: `dragon:mood` asleep while busy/airborne only records the
+  mood, and `dragonIdle` — the one door onto the tile — seats the curl-up
+  (`seatDragonSleep`, `sleepState`); the wake path only undoes a SEATED sleep.
+  The dragon's grounded REST is the video-ingested `idle` clip (`dragonIdle`
+  plays it on attach, wake, post-roar and every touchdown — the rig idle only
+  without it) and EVERY bellow is the `roar` clip (`playRoarClip`: the hungry
+  cadence, the newborn intro's arrival, and the AMBIENT cadence — one bellow
+  after every 3–5 idle loops, `armIdleRoar` counting ANIMATION_REPEAT so only
+  watched stillness accrues; one-shot, `remainMs` held to the clip's real
+  length). The seated SLEEP is the tosleep clip's frozen LAST
+  frame breathing in `syncDragon` — the sleep painting is only the no-clip
+  fallback, never a cut after the transition. TWO INVARIANTS guard the machine:
+  (1) every clip SWITCH goes through `dressOverlay` (transform applied
+  synchronously) — mood events land in update()'s `time:advanced` tail AFTER
+  updateLiveDragons ran, so waiting for syncDragon renders one frame of the
+  new texture in the old clip's scale (the giant-flash bug); (2) `sleepState`
+  resets whenever a flight/bellow takes the overlay, and `updateLiveDragons`
+  re-seats any grounded sleeper whose seat got knocked over — a stale
+  seated/transition once no-opped every later seatDragonSleep and froze the
+  dragon in rig idle for a whole nap/night. `playStandeeCast` prefers the
+  atlas cast over the bank one-shot; `regard:gift_accepted`/`regard:heart` play
+  happy/laugh. The pre-atlas paths all survive as no-clip fallbacks — never in
+  parallel. Clip roster + triggers: `scripts/apply-anim-align.mjs` (ROSTER),
+  wiring table in docs/pipelines.md; video → atlas ingest:
+  `scripts/anim-ingest.py` (technique: assets/raw/new-animations/raw-mp4/ATLAS_TUTO.md).
 - **TOUCH the Ledger's face/title, or author orders for a new world → RULE the Ledger
   belongs to whoever keeps it HERE.** `OrderSystem.giverHere` derives the host from the
   orders data (first order whose `world` matches); `LedgerPanel.refresh` sets the tab

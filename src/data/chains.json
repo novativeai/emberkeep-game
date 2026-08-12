@@ -894,6 +894,211 @@
       ]
     },
     {
+      "id": "runestone",
+      "name": "Runestone",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "runestone_1",
+          "name": "Rune Shard",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "runestone_2",
+          "name": "Carved Stone",
+          "sell": 6,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "runestone_3",
+          "name": "Runestone",
+          "sell": 16,
+          "xp": 17,
+          "generator": {
+            "produces": {
+              "chain": "tarknot",
+              "tier": 1
+            },
+            "cooldownMs": 150000,
+            "energyCost": 1,
+            "passiveMs": 150000,
+            "tappable": true,
+            "bonus": {
+              "every": 10,
+              "produces": {
+                "chain": "runestone",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "emberdram",
+      "name": "Emberdram",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "emberdram_1",
+          "name": "Dram Vial",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "emberdram_2",
+          "name": "Cordial Flask",
+          "sell": 7,
+          "xp": 8
+        },
+        {
+          "tier": 3,
+          "id": "emberdram_3",
+          "name": "Cordial Cask",
+          "sell": 18,
+          "xp": 18,
+          "generator": {
+            "produces": {
+              "chain": "emberdram",
+              "tier": 1
+            },
+            "cooldownMs": 180000,
+            "energyCost": 1,
+            "passiveMs": 180000,
+            "tappable": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "hearthlamp",
+      "name": "Hearthlamp",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "hearthlamp_1",
+          "name": "Oil Lamp",
+          "sell": 1,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "hearthlamp_2",
+          "name": "Storm Lantern",
+          "sell": 4,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "hearthlamp_3",
+          "name": "Hearthlamp",
+          "sell": 0,
+          "xp": 18,
+          "sellable": false,
+          "generator": {
+            "reward": {
+              "energy": 3
+            },
+            "cooldownMs": 420000,
+            "energyCost": 0,
+            "passiveMs": 420000,
+            "tappable": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "manastone",
+      "name": "Manastone",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "manastone_1",
+          "name": "Mana Pebble",
+          "sell": 3,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "manastone_2",
+          "name": "Mana Nodule",
+          "sell": 10,
+          "xp": 9
+        },
+        {
+          "tier": 3,
+          "id": "manastone_3",
+          "name": "Manastone Cairn",
+          "sell": 26,
+          "xp": 20,
+          "generator": {
+            "produces": {
+              "chain": "manastone",
+              "tier": 1
+            },
+            "cooldownMs": 300000,
+            "energyCost": 1,
+            "passiveMs": 300000,
+            "tappable": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "wayfinder",
+      "name": "Wayfinder",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "wayfinder_1",
+          "name": "Lodestone",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "wayfinder_2",
+          "name": "Boxed Needle",
+          "sell": 6,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "wayfinder_3",
+          "name": "The Wayfinder",
+          "sell": 0,
+          "xp": 18,
+          "sellable": false,
+          "generator": {
+            "produces": {
+              "chain": "coin",
+              "tier": 1
+            },
+            "cooldownMs": 240000,
+            "energyCost": 1,
+            "passiveMs": 240000,
+            "tappable": true,
+            "bonus": {
+              "every": 8,
+              "produces": {
+                "chain": "wayfinder",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "id": "wrackline",
       "name": "The Wrack Line",
       "world": "borealis",

@@ -155,6 +155,27 @@ Every file that lands in `assets/raw/` gets a line here: source, license, date.
   violet head to tail and keys green — the same call the face banks and the
   human portraits make. Trimmed to a 1400px long side. SynthID-watermarked.
   2026-08-06.
+- **Five new Borealis farm chains** (`sprites/items/chains/{runestone,emberdram,
+  hearthlamp,manastone,wayfinder}_{1,2,3}.webp`) — Runestone, Emberdram,
+  Hearthlamp, Manastone and Wayfinder. Briefed on two measurements at once: over
+  the Borealis backdrop, 15 of the north's 20 shipped pieces sat in the same
+  saturation/value band as the ice, AND they were all the same KIND of thing (a
+  heap of material), so these five are made objects — a carved standing stone, a
+  cordial cask, a lamp on a hook post, a mana cairn, a ship's compass — each in a
+  hue the north did not own. One 3-across sheet each, AI-generated in-house via
+  `.claude/skills/nano-banana/` (`artgen.py character`) on **ByteDance Seedream
+  5.0 Pro** on fal.ai at 2048×1152. Style-referenced on a plate composited from
+  the game's own `emberberry_3` and `moonwater_3` (`scripts/merge_style.py`,
+  `style_ref()`) — RENDERING TECHNIQUE ONLY, colours and subjects forbidden.
+  Two needed a second pass, both for reasons worth keeping: **Manastone** first
+  came back as ovoids cracking open, which in a game about dragon eggs is a
+  collision no silhouette rule covers, and was re-specified as flat sawn discs
+  and a cairn; **Emberdram** measured sat 0.54 against the ice band's 0.55 floor
+  because its cream cloth and pale cradle diluted the rose, and was re-rolled
+  deeper. Keyed on magenta except **Emberdram** and **Wayfinder**, which are
+  rose-pink and therefore key green. Prompts, sheets and the colour measurements
+  are in `raw/merge-chains/borealis/`; reproducible with
+  `scripts/gen-borealis-chains.py gen|cut`. SynthID-watermarked. 2026-08-12.
 - **Timber chain tiers 1–2** (`sprites/items/chains/lumber_{1,2}.webp`) — Cut
   Wood and Plank Set, the two new steps below the shipped House. Same route and
   same shadow fix as above, style-referenced on `sprites/items/house.png` (so the

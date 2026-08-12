@@ -386,16 +386,18 @@ const BOREALIS_PLAN = {
     status: 'unlockable',
     unlock: { keys: 1 },
     // 103 cells — the mainland, the second step of the south→north march and
-    // one signal-fire key away: the first door already puts five generators in
-    // the player's hands (shore Wrack Line + two more + two Hoarfrost Fonts
-    // here), and its six Broken Strakes fund the frames order without waiting
-    // on the Wrack Line's every-third-haul bonus.
+    // one signal-fire key away. GENERATORS ONLY, and each on its own side: the
+    // first key buys the player five working fixtures spread around the
+    // island's rim (perimeter layout below), and the whole open middle is
+    // theirs to farm into. No loose pieces — everything the coast asks for
+    // comes off these: driftwood + a Broken Strake every third haul from the
+    // Wrack Lines, rimebloom from the Fonts, and the chest's own gift table
+    // (which pays Strakes too), so the frames order funds itself without a
+    // scatter of freebies undercutting the farms.
+    layout: 'perimeter',
     seeds: [
       ['wrackline', 1, 2],
       ['frostfont', 1, 2],
-      ['driftwood', 1, 5],
-      ['rimebloom', 1, 5],
-      ['keel', 1, 6],
       ['chest', 1, 1]
     ]
   }
@@ -410,18 +412,51 @@ const BOREALIS_PLAN = {
  * puts the producers where their output has somewhere to land, which is the
  * only thing the choice actually has to get right.
  */
-function seedRegion(cells, seeds, taken) {
+function seedRegion(cells, seeds, taken, layout) {
   if (!seeds?.length || !cells.length) return [];
   const cx = cells.reduce((n, c) => n + c.at.x, 0) / cells.length;
   const cy = cells.reduce((n, c) => n + c.at.y, 0) / cells.length;
   // A world character stands ON a cell (characters.json anchors), and she is
   // scenery rather than a board item — so nothing stops a Hoarfrost Font from
   // being dropped through her. Leave her cell alone.
-  const order = [...cells]
-    .filter((c) => !taken.has(`${c.col},${c.row}`))
-    .sort(
-      (a, b) => Math.hypot(a.at.x - cx, a.at.y - cy) - Math.hypot(b.at.x - cx, b.at.y - cy)
-    );
+  const free = cells.filter((c) => !taken.has(`${c.col},${c.row}`));
+
+  // PERIMETER layout: each seed on its own side of the island. Seed k gets the
+  // compass direction k·(2π/N), and takes the free cell that reaches FURTHEST
+  // from the centroid in that direction (max dot product) — which is the rim by
+  // construction, derived from the cells like everything else here, so a
+  // re-export moves the ring with the island. Generators belong on the rim:
+  // laid mid-out they wall off the exact tiles their own produce needs.
+  if (layout === 'perimeter') {
+    const total = seeds.reduce((n, [, , count]) => n + count, 0);
+    const used = new Set();
+    const out = [];
+    let k = 0;
+    for (const [chain, tier, count] of seeds) {
+      for (let i = 0; i < count; i++, k++) {
+        const th = (k / total) * Math.PI * 2 - Math.PI / 2; // start north, go clockwise
+        const dir = { x: Math.cos(th), y: Math.sin(th) };
+        let best;
+        let bestD = -Infinity;
+        for (const c of free) {
+          if (used.has(c)) continue;
+          const d = (c.at.x - cx) * dir.x + (c.at.y - cy) * dir.y;
+          if (d > bestD) {
+            bestD = d;
+            best = c;
+          }
+        }
+        if (!best) throw new Error(`build-zones: ${chain} has no room — island holds ${cells.length}`);
+        used.add(best);
+        out.push({ chain, tier, at: [best.col, best.row] });
+      }
+    }
+    return out;
+  }
+
+  const order = [...free].sort(
+    (a, b) => Math.hypot(a.at.x - cx, a.at.y - cy) - Math.hypot(b.at.x - cx, b.at.y - cy)
+  );
   const out = [];
   let n = 0;
   for (const [chain, tier, count] of seeds) {
@@ -662,7 +697,7 @@ for (const spec of WORLDS) {
       const tiles = cells.map((c) => [c.col, c.row]);
       const planned = spec.plan?.[lvl];
       if (planned) {
-        const contents = seedRegion(cells, planned.seeds, standing);
+        const contents = seedRegion(cells, planned.seeds, standing, planned.layout);
         return {
           id: planned.id,
           status: planned.status,

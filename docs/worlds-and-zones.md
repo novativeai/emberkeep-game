@@ -121,7 +121,7 @@ pixels off its island.
 | `emberkeep` | 1 | 1 dense + 17 | 46 authored + 36 | `emberkeep` (nb2 render) | sanctuary |
 | `roothold` | 1 | 19 | 141 | `roothold` | **hub** — Eleanor's home |
 | `borealis` | 3 | 38 | 141 | `borealis` | sanctuary |
-| `hatchery` | 3 | 2 | 223 | `hatchery` | **hub** — Selyna's home |
+| `hatchery` | 3 | 2 | 246 | `hatchery` | **hub** — Selyna's home |
 
 They come in pairs: a **sanctuary**, where you do things, and its **hub**, where
 you change something about yourself — buy, decorate, read, talk. Each pair is
@@ -135,7 +135,7 @@ tile art needed) and placed with the same backdrop calibration Emberkeep uses.
 grid in the map editor's export — only a painting. So `scripts/fit-deck-grid.py`
 recovers the flagstone lattice from the backdrop itself: autocorrelation for the
 tile steps, the Fourier phase for where the stones sit, a stone-vs-forest probe
-and a flood fill for the extent. Out comes `assets/map/hatchery-deck.json` (223
+and a flood fill for the extent. Out comes `assets/map/hatchery-deck.json` (246
 cells across the deck and its 2×3 outpost, in backdrop px), which
 `build-zones.mjs` puts through the same `artToWorld` every editor zone goes
 through — so a measured world and an authored one land in one coordinate system

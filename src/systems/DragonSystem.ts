@@ -24,9 +24,13 @@ import type { BoardItemState, ChainsData, Companion, DragonCare } from '../core/
  *  a dragon's meal cannot be spent on Eleanor, and NOTHING of hers is ever food.
  *  Quartz and moonwater are her chains end to end — no tier of either feeds a
  *  dragon, not even the raw pebble. */
-const FUEL = ['emberberry', 'resin', 'tarknot', 'stormcap'];
+const FUEL = ['emberberry', 'resin', 'tarknot', 'stormcap', 'emberdram'];
 const GREEN = ['ashmoss', 'nightbloom'];
-const MAGE_ONLY = ['quartz', 'moonwater'];
+// Recipient-locked to a named character, and therefore never dragon food.
+// Eleanor catches light and holds it in GLASS; Selyna reads what the ice kept,
+// so hers are the things that remember: spun light, raw mana and the needle
+// that points at what is still down there.
+const MAGE_ONLY = ['quartz', 'moonwater', 'frostsilk', 'manastone', 'wayfinder'];
 
 /**
  * Chains a dragon standing in `world` can ever be handed. A Borealis chain is
