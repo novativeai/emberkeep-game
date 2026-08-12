@@ -1213,9 +1213,37 @@ export class BoardScene extends Phaser.Scene {
       });
       queued++;
     }
+    if (!queued) return;
+    // AND TELL THE DRAGON WHEN THEY ARRIVE.
+    //
+    // The sheets land a second or two after the dragon does, and nothing was
+    // listening for them: the whelp kept the rig preset it was given at spawn
+    // until the next ambient roll happened to call `dragonIdle` again — 9 to
+    // 15 s of cozy cadence away. On a board rebuilt by every reload that is
+    // most of what the player sees, and the `fly` clip is missing for all of
+    // it, so a dragon picked up in those first seconds hovered on the rig
+    // instead of taking wing.
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => this.dressBreedClips(id));
     // `load.start()` on an already-running loader is a no-op that would drop the
     // queue on the floor; Phaser folds new files into the run instead.
-    if (queued && !this.load.isLoading()) this.load.start();
+    if (!this.load.isLoading()) this.load.start();
+  }
+
+  /**
+   * Hand every live dragon of a breed to its freshly-arrived clip set.
+   *
+   * Only dragons that are doing NOTHING are touched — one mid-flight, mid-nap,
+   * mid-celebration or in the player's hand is in the middle of something the
+   * rig is perfectly able to finish, and cutting it to an idle to gain a nicer
+   * idle is a worse trade than waiting for the beat to end.
+   */
+  private dressBreedClips(id: string): void {
+    for (const ld of this.liveDragons.values()) {
+      if (dragonClipCharacter(ld.host.chain, ld.host.tier) !== id) continue;
+      if (ld.busy || ld.mood === 'asleep' || ld.mode === 'hover') continue;
+      if (ld.flightPhase !== null || ld.host.getData('dragged')) continue;
+      this.dragonIdle(ld);
+    }
   }
 
   /** Breeds whose clips have been asked for, so the fetch runs once each. */
@@ -1247,6 +1275,12 @@ export class BoardScene extends Phaser.Scene {
   private dressOverlay(ld: LiveDragon, c: { clip: CharacterClip; key: string }): Phaser.GameObjects.Sprite {
     const overlay = this.dragonOverlay(ld, c.key);
     overlay.setData('clip', c.clip);
+    // One overlay serves every clip, so a rate set for a gesture (the quick
+    // wings-open of a pick-up) would otherwise still be on the sprite when the
+    // idle, the roar or the curl-up plays next. Cleared HERE because this is
+    // the one door every clip goes through; the phases that want a rate set it
+    // again immediately after.
+    overlay.anims.timeScale = 1;
     const flip = ld.player.container.scaleX < 0;
     const origin = originFor(c.clip, flip);
     overlay
@@ -1335,13 +1369,23 @@ export class BoardScene extends Phaser.Scene {
     ld.player.container.setVisible(false);
     const airborne = ld.flightPhase === 'takeoff' || ld.flightPhase === 'loop';
     if (!airborne) {
-      const rampFits = durationMs === undefined || durationMs > this.segMs(f.clip, 'takeoff') + DRAGON_ANIM.landingLeadMs;
+      // Measured against the SCREEN length of the ramp, not the authored one:
+      // the takeoff is played at `takeoffRate`, so a leg that could not fit the
+      // 2.5 s cinematic ramp can still fit the 1.4 s one and gets its wings-open
+      // instead of cutting straight to the cruise.
+      const takeoffMs = this.segMs(f.clip, 'takeoff') / DRAGON_ANIM.takeoffRate;
+      const rampFits = durationMs === undefined || durationMs > takeoffMs + DRAGON_ANIM.landingLeadMs;
       if (rampFits) {
         ld.flightPhase = 'takeoff';
+        overlay.anims.timeScale = DRAGON_ANIM.takeoffRate;
         overlay.play(this.segKey(f.key, 'takeoff'));
         overlay.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
           if (ld.flightPhase !== 'takeoff') return;
           ld.flightPhase = 'loop';
+          // The CRUISE is authored at the rate it should beat at — only the
+          // ramp into it is hurried, so the flight settles the moment it is
+          // airborne rather than staying fast for as long as it is held.
+          overlay.anims.timeScale = 1;
           overlay.play(this.segKey(f.key, 'loop'));
         });
       } else {
@@ -1371,6 +1415,7 @@ export class BoardScene extends Phaser.Scene {
     const overlay = this.dragonOverlay(ld, f.key);
     ld.flightPhase = 'landing';
     overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    overlay.anims.timeScale = DRAGON_ANIM.landingRate;
     overlay.play(this.segKey(f.key, 'landing'));
     overlay.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       if (this.liveDragons.get(ld.host.itemId) === ld) this.dragonIdle(ld);
@@ -3797,6 +3842,67 @@ export class BoardScene extends Phaser.Scene {
         this.time.delayedCall(60, () => obj.setData('dragged', false));
       }
     );
+
+    /**
+     * A HELD DRAGON FLIES: the wings open on the pick-up, the cruise loop runs
+     * for as long as it is held, the wing-fold plays it down onto the tile.
+     *
+     * Registered HERE, after the two handlers above, and that ordering is the
+     * whole reason this block is at the end of `wireInput` rather than in the
+     * camera wiring where the merge first put it. Both directions depend on it:
+     * a drop that starts a WORK flight has already set `busy` by the time this
+     * runs, so the dragon keeps its own outbound arc instead of being landed
+     * into it; and `item:moved` has already been emitted, which is what lets
+     * the settle read "this dragon is in the air" and glide it home.
+     *
+     * A sleeping dragon is dragged as its curled painting — no flight — and
+     * `dragonLand` is called unconditionally on release rather than only when a
+     * phase is running, because a breed with no pushed fly clip flew on the
+     * rig's hover preset and had nothing to bring it back to rest.
+     */
+    this.input.on(
+      Phaser.Input.Events.DRAG_START,
+      (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+        if (!(obj instanceof BoardItem)) return;
+        const ld = this.liveDragons.get(obj.itemId);
+        if (ld && !ld.busy && ld.mood !== 'asleep') this.dragonHover(ld);
+      }
+    );
+    this.input.on(
+      Phaser.Input.Events.DRAG_END,
+      (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+        if (!(obj instanceof BoardItem)) return;
+        const ld = this.liveDragons.get(obj.itemId);
+        if (ld && !ld.busy && ld.mood !== 'asleep') this.dragonLand(ld);
+      }
+    );
+  }
+
+  /**
+   * Put a released piece back on its cell — and a released DRAGON down.
+   *
+   * An inanimate piece snaps home with the overshoot that sells its weight. An
+   * animal that is still beating its wings must not: it would arrive before the
+   * fold had started and finish the animation standing on the tile, which reads
+   * as flapping AFTER landing rather than landing. So a dragon in the air
+   * glides instead — over `dropGlideMs`, on a Sine ease, no overshoot, because
+   * a bounce at the end of a descent is a stumble.
+   *
+   * The two motions are timed against each other, not merely both slowed: the
+   * fold (~1.3 s at `landingRate`) starts on the release and the glide (~0.85 s)
+   * ends inside it, so the wings are still closing as the feet touch down.
+   */
+  private settleAfterDrag(sprite: BoardItem, x: number, y: number): void {
+    const airborne = this.liveDragons.get(sprite.itemId)?.flightPhase != null;
+    this.tweens.add({
+      targets: sprite,
+      x,
+      y,
+      duration: airborne ? DRAGON_ANIM.dropGlideMs : TIMINGS.dragReturn,
+      ease: airborne ? 'Sine.easeInOut' : 'Back.easeOut',
+      onComplete: () => sprite.settleDepth()
+    });
+    sprite.settleFromDrag();
   }
 
   /**
@@ -3987,27 +4093,6 @@ export class BoardScene extends Phaser.Scene {
      * Object handlers run BEFORE this (processUpEvents dispatches to game
      * objects, then emits the scene event), so a claim is always in by now.
      */
-    // A HELD dragon flies: takeoff into the cruise loop on pick-up, the
-    // wing-fold landing on release. Registered AFTER the main DRAG_END handler
-    // so a drop that starts a work flight (busy) keeps its own arc instead of
-    // landing into it. A sleeping dragon is dragged as its curled painting —
-    // no flight. Runs on the same events, so no new input concepts.
-    this.input.on(
-      Phaser.Input.Events.DRAG_START,
-      (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
-        if (!(obj instanceof BoardItem)) return;
-        const ld = this.liveDragons.get(obj.itemId);
-        if (ld && !ld.busy && ld.mood !== 'asleep') this.dragonHover(ld);
-      }
-    );
-    this.input.on(
-      Phaser.Input.Events.DRAG_END,
-      (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
-        if (!(obj instanceof BoardItem)) return;
-        const ld = this.liveDragons.get(obj.itemId);
-        if (ld && !ld.busy && ld.flightPhase !== null) this.dragonLand(ld);
-      }
-    );
     this.input.on(Phaser.Input.Events.POINTER_UP, () => {
       // Never on the same gesture that ARMED it (see armGive) — only a later,
       // separate tap on empty ground reads as "changed my mind".
@@ -5141,29 +5226,13 @@ export class BoardScene extends Phaser.Scene {
         sprite.col = to.col;
         sprite.row = to.row;
         const { x, y } = gridToWorld(to.col, to.row);
-        this.tweens.add({
-          targets: sprite,
-          x,
-          y,
-          duration: TIMINGS.dragReturn,
-          ease: 'Back.easeOut',
-          onComplete: () => sprite.settleDepth()
-        });
-        sprite.settleFromDrag();
+        this.settleAfterDrag(sprite, x, y);
       }),
       bus.on('item:move_bounced', ({ itemId, at }) => {
         const sprite = this.itemSprites.get(itemId);
         if (!sprite) return;
         const { x, y } = gridToWorld(at.col, at.row);
-        this.tweens.add({
-          targets: sprite,
-          x,
-          y,
-          duration: TIMINGS.dragReturn,
-          ease: 'Back.easeOut',
-          onComplete: () => sprite.settleDepth()
-        });
-        sprite.settleFromDrag();
+        this.settleAfterDrag(sprite, x, y);
       }),
       bus.on('item:merged', (payload) => this.onMerged(payload)),
       bus.on('item:hatched', ({ item }) => this.hatchSequence(item)),

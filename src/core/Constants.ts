@@ -1532,13 +1532,18 @@ export const DRAGON_ANIM = {
   celebrateMs: 3000, // one unhurried low-flight during the alternation
   idleMinMs: 9000,
   idleMaxMs: 15000,
-  celebrateChance: 0.1, // P(low flight) per cycle → ~93% of the time at rest
+  // P(low flight) per cycle. At 0.1 the cadence was cozy to the point of
+  // hiding the fly clip: one flight per ~9 idle rolls is over two minutes of
+  // stillness between wing-beats, and a player watching the board for a while
+  // could reasonably conclude their dragon does not fly. Raised so a flight
+  // lands every ~70-80s — still ~85% of the time at rest.
+  celebrateChance: 0.15,
   /** ADULT dragons (the tier-4 Red Adult, the Golden Elder) are calm, wise
    *  elders: the same idle + low-flight repertoire, but rolled far less often,
    *  held longer, and played slower — a whelp fidgets, an elder breathes. */
   adultIdleMinMs: 16000,
   adultIdleMaxMs: 26000,
-  adultCelebrateChance: 0.05,
+  adultCelebrateChance: 0.08,
   adultCelebrateMs: 3800, // a single unhurried low-flight when it does happen
   adultSpeed: 0.55, // preset playback rate (breathing/wing-beat cadence)
   /** …and the whelp is slowed too. At 1.0 its wing-beat was the fastest thing
@@ -1556,6 +1561,29 @@ export const DRAGON_ANIM = {
   // the wings fold through the touchdown and finish on the tile, so a landing
   // never plays out mid-air and a touchdown never happens mid-cruise.
   landingLeadMs: 650,
+  /**
+   * HOW FAST THE WINGS OPEN AND FOLD — and why it is not the authored rate.
+   *
+   * The fly clip is authored as one cinematic ramp at 24 fps: ~2.5 s to open
+   * the wings, ~2 s to fold them. That is right for a scripted journey the
+   * player only watches, and wrong for a piece the player is HOLDING — the
+   * hand moves a full second before the animal does, so a pick-up reads as a
+   * dragon being slid around rather than one taking off. Played faster on the
+   * gesture, the wings answer the finger.
+   *
+   * A rate, never a re-cut: the frames stay the authored ones, so the takeoff
+   * still ends exactly where the cruise loop begins and the fold still ends on
+   * the pose the idle starts from. Nothing about the clip's continuity moves.
+   */
+  takeoffRate: 1.8, // 61 frames → ~1.4 s of wings-open
+  landingRate: 1.5, // 48 frames → ~1.3 s of wing-fold
+  /**
+   * A RELEASED dragon glides to its cell instead of snapping to it like an
+   * inanimate piece. Long enough that the fold and the descent are one motion
+   * (the wings are still closing as it touches down), short enough that moving
+   * a dragon around the board still feels like moving a piece.
+   */
+  dropGlideMs: 850,
   /** Ambient bellow: after every 3–5 full idle-clip loops (rolled fresh each
    *  time the idle starts), the roar clip plays once and hands back to idle.
    *  The idle loop runs ~8s, so a bellow lands every ~24–40s of stillness. */
