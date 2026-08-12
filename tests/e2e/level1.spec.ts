@@ -1,11 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Drives the full scripted tutorial:
- *   lore × 2 → rubies merge (red egg) → 3 eggs merge (red dragon) →
- *   crystal tap → 3 emeralds merge (green egg) → 3 green eggs merge (green dragon) →
- *   chest → level-up → key+fog → bushes merge → dragon-work → dragon-rest →
- *   marketplace → free-play → level-3 finale (Elder wakes, play continues)
+ * Drives the full scripted tutorial (the shipped 57-beat cut):
+ *   arrival ×7 → stump harvest → moss merge → cookbook → rubies → red dragon →
+ *   naming → moss feed → crystal/quartz ladder → ball pocketed/given (bag) →
+ *   hearts → chest → level-up → key+fog → emberberries → wood/planks → tree
+ *   grain → pocket/sell → moonwater → dragon work/rest → resin → hearth cake
+ *   fed (favourite) → commission → house skip → Eleanor helps → marketplace →
+ *   gem harvest → ledger/deliver → golden tease → free play → level-3 finale.
  *
  * Cells are located dynamically via window.render_game_to_text() and
  * __emberkeep.gridToPage(); game-space coordinates are ÷2 for CSS clicks.
@@ -115,7 +117,7 @@ const count = (s: GameText, chain: string, tier: number): number =>
   s.inventory[`${chain}:${tier}`] ?? 0;
 
 test.describe('Level 1 — Emberkeep tutorial', () => {
-  test('lore → rubies → cookbook → red egg → red dragon → crystal → emeralds → green eggs → green dragon → chest → level-up → fog → emberberries → bushes → dragon-work → rest → marketplace → golden-tease → level-3-end', async ({
+  test('lore → stump → moss → rubies → red dragon → naming → quartz → gift → chest → level-up → fog → berries → wood → grain → pockets → moonwater → work/rest → resin cake → commission → marketplace → gems → ledger → golden-tease → level-3-end', async ({
     page
   }) => {
     const consoleErrors: string[] = [];
@@ -168,14 +170,33 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     }
     await page.screenshot({ path: shot('03-arrival-ask') });
 
-    // ---------- Ash Moss: the GREEN, and the first thing the player ever does ----------
-    // Her ask names "the warmth, the green, and whatever's still asleep"; the
-    // green is what the isle gives back first, so the game's opening merge is
-    // moss rather than rubies.
+    // ---------- Emberbark Stump: the game's FIRST interaction is a harvest ----------
+    // She names the burned tree dressing itself in moss; tapping it gathers the
+    // first tuft. Reliability path: emit item:tapped on the stump — the same
+    // GeneratorSystem + TutorialDirector gate path a real tap takes.
     await tapBubble(page);
+    await waitStep(page, 'moss_stump');
+    state = await gameText(page);
+    expect(count(state, 'emberbark', 1)).toBe(1); // the stump stands from frame one
+    expect(count(state, 'ashmoss', 1)).toBe(0);
+    await page.screenshot({ path: shot('03b-moss-stump') });
+    await page.evaluate(() => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        state: { items: Map<number, { chain: string; kind: string }> };
+        bus: { emit: (event: string, payload: unknown) => void };
+      };
+      for (const [id, item] of ctx.state.items.entries()) {
+        if (item.chain === 'emberbark' && item.kind === 'item') {
+          ctx.bus.emit('item:tapped', { itemId: id });
+          return;
+        }
+      }
+    });
+
+    // ---------- Ash Moss: the GREEN — the harvested tuft plus two spawned ----------
     await waitStep(page, 'ash_green');
     state = await gameText(page);
-    expect(count(state, 'ashmoss', 1)).toBe(3);
+    expect(count(state, 'ashmoss', 1)).toBe(3); // 1 harvested + 2 spawned at the stump
     await page.screenshot({ path: shot('04-ash-green') });
 
     const tufts = await findCells(page, (c) => c.chain === 'ashmoss' && c.tier === 1);
@@ -217,19 +238,71 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(count(state, 'ember_dragon', 2)).toBe(3); // 1 red egg + 2 spawned by step effects
     await page.screenshot({ path: shot('05-red-egg') });
 
-    // ---------- Dragon hatch: merge 3 Red Eggs → Red Dragon ----------
+    // ---------- Dragon hatch: merge 3 Red Eggs → the Red Dragon (reveal card) ----------
     const redEggs = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 2);
     expect(redEggs.length).toBe(3);
     await dragTile(page, redEggs[2]!, redEggs[0]!);
-    await waitStep(page, 'emerald_tap');
+    // The reveal card holds the stage before the hatch ceremony hands back.
+    await page.waitForTimeout(4600);
+    await waitStep(page, 'name_intro');
     state = await gameText(page);
     expect(count(state, 'ember_dragon', 2)).toBe(0);
-    expect(count(state, 'ember_dragon', 3)).toBe(1); // Red Dragon
-    expect(count(state, 'emerald', 1)).toBe(2); // 2 Emeralds from step effect
+    expect(count(state, 'ember_dragon', 3)).toBe(1); // the Red Dragon
     await page.screenshot({ path: shot('06-red-dragon') });
 
-    // ---------- Emerald tap: tap the permanent crystal fixture at [8,11] ----------
-    await waitStep(page, 'emerald_tap');
+    // ---------- Naming: the panel opens on the beat, a name is chosen out of it ----------
+    await tapBubble(page);
+    await waitStep(page, 'name_choose');
+    await page.waitForTimeout(600); // the panel pops in
+    await page.screenshot({ path: shot('06b-name-panel') });
+    // The REAL path: the panel parks a focusable <input> behind the canvas and
+    // focuses it on open — type the name, then press its own Choose button
+    // (position read live; the suggestion cards reroll, the button does not).
+    await page.keyboard.type('Cinder');
+    await page.waitForTimeout(250);
+    const choosePos = await page.evaluate(() => {
+      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+        naming: { confirmBtn: { getWorldTransformMatrix: () => { tx: number; ty: number } } };
+      };
+      const m = ui.naming.confirmBtn.getWorldTransformMatrix();
+      return { x: m.tx, y: m.ty };
+    });
+    await page.mouse.click(choosePos.x / 2, choosePos.y / 2);
+    await page.waitForTimeout(500);
+    if ((await gameText(page)).tutorial.step === 'name_choose') {
+      // Flake fallback: drive the panel's own confirm() with the typed name.
+      await page.evaluate(() => {
+        const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+          naming: { chosen: string; confirm: () => void };
+        };
+        ui.naming.chosen = 'Cinder';
+        ui.naming.confirm();
+      });
+    }
+    await waitStep(page, 'name_said');
+    await tapBubble(page);
+
+    // ---------- Moss feed: the Green Bale goes to the dragon by drag ----------
+    // The beat retiered the Moss Bundle to a Bale; dragging it onto the dragon
+    // is the feeding gesture the whole husbandry loop rides.
+    await waitStep(page, 'moss_feed');
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const bale = await findCells(page, (c) => c.chain === 'ashmoss' && c.tier === 3);
+      const dragon = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 3);
+      if (!bale.length || !dragon.length) break;
+      await page.evaluate(
+        ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
+        [dragon[0]![0], dragon[0]![1]]
+      );
+      await page.waitForTimeout(400);
+      await dragTile(page, bale[0]!, dragon[0]!);
+      await page.waitForTimeout(600);
+      if ((await gameText(page)).tutorial.step !== 'moss_feed') break;
+    }
+    await waitStep(page, 'crystal_tap');
+    await page.screenshot({ path: shot('06c-moss-fed') });
+
+    // ---------- Crystal tap: the Theme Crystal sheds Quartz ----------
     // The crystal is a permanent startingItem at [8,11] (non-active tile —
     // invisible in the board grid but present in state.items). Emit item:tapped
     // directly; same GeneratorSystem + TutorialDirector gate path as a real tap.
@@ -245,31 +318,102 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
         }
       }
     });
-    await waitStep(page, 'emerald_egg_merge');
+    await waitStep(page, 'quartz_merge');
     state = await gameText(page);
-    expect(count(state, 'emerald', 1)).toBe(3); // 2 spawned + 1 from crystal tap
-    await page.screenshot({ path: shot('07-3emeralds') });
+    expect(count(state, 'quartz', 1)).toBe(3); // 1 shed + 2 shaken loose by the step
+    await page.screenshot({ path: shot('07-3quartz') });
 
-    // ---------- Emerald merge: drag 3 Emeralds → 1 Green Egg ----------
-    const emeralds = await findCells(page, (c) => c.chain === 'emerald' && c.tier === 1);
-    expect(emeralds.length).toBe(3);
-    await dragTile(page, emeralds[2]!, emeralds[0]!);
-    await waitStep(page, 'green_dragon_hatch');
+    // ---------- Quartz ladder: pebbles → Cut Crystal → the Crystal Ball ----------
+    const mergeChain = async (chain: string, tier: number, until: string): Promise<void> => {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const pieces = await findCells(page, (c) => c.chain === chain && c.tier === tier);
+        if (pieces.length < 3) break;
+        await page.evaluate(
+          ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
+          [pieces[0]![0], pieces[0]![1]]
+        );
+        await page.waitForTimeout(400);
+        await dragTile(page, pieces[2]!, pieces[0]!);
+        await page.waitForTimeout(500);
+        if ((await gameText(page)).tutorial.step === until) break;
+      }
+    };
+    await mergeChain('quartz', 1, 'quartz_ball');
+    await waitStep(page, 'quartz_ball');
     state = await gameText(page);
-    expect(count(state, 'emerald', 1)).toBe(0);
-    expect(count(state, 'emerald', 2)).toBe(3); // 1 from merge + 2 spawned
-    await page.screenshot({ path: shot('08-3green-eggs') });
+    expect(count(state, 'quartz', 2)).toBe(3); // 1 cut + 2 spawned
+    await mergeChain('quartz', 2, 'ball_pocket');
+    await waitStep(page, 'ball_pocket');
+    state = await gameText(page);
+    expect(count(state, 'quartz', 3)).toBe(1); // the Crystal Ball
+    await page.screenshot({ path: shot('07b-crystal-ball') });
 
-    // ---------- Green egg merge: drag 3 Green Eggs → Green Dragon ----------
-    const greenEggs = await findCells(page, (c) => c.chain === 'emerald' && c.tier === 2);
-    expect(greenEggs.length).toBe(3);
-    await dragTile(page, greenEggs[2]!, greenEggs[0]!);
+    // ---------- Pocket the ball (tap-to-store), then GIVE it from the satchel ----------
+    await page.evaluate(() => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        state: { items: Map<number, { id: number; chain: string; tier: number }> };
+        bus: { emit: (event: string, payload: unknown) => void };
+      };
+      const ball = [...ctx.state.items.values()].find((i) => i.chain === 'quartz' && i.tier === 3);
+      if (ball) ctx.bus.emit('ui:store_requested', { itemId: ball.id });
+    });
+    await waitStep(page, 'ball_give');
+    const giveBagPos = await page.evaluate(() => {
+      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+        hud: { getBagPos: () => { x: number; y: number } };
+      };
+      return ui.hud.getBagPos();
+    });
+    await page.mouse.click(giveBagPos.x / 2, giveBagPos.y / 2);
+    await page.waitForTimeout(450);
+    const giveSlotPos = await page.evaluate(() => {
+      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+        bag: { isOpen: boolean; slots: Array<{ length: number; getWorldTransformMatrix: () => { tx: number; ty: number } }> };
+      };
+      if (!ui.bag?.isOpen) return null;
+      const filled = ui.bag.slots.find((s) => s.length > 1);
+      if (!filled) return null;
+      const m = filled.getWorldTransformMatrix();
+      return { x: m.tx, y: m.ty };
+    });
+    expect(giveSlotPos).not.toBeNull();
+    await page.mouse.click(giveSlotPos!.x / 2, giveSlotPos!.y / 2);
+    await page.waitForTimeout(350);
+    const givePos = await page.evaluate(() => {
+      const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+        bag: { getGivePos: () => { x: number; y: number } | null };
+      };
+      return ui.bag.getGivePos();
+    });
+    expect(givePos).not.toBeNull(); // the chooser really opened
+    await page.screenshot({ path: shot('07c-bag-give') });
+    await page.mouse.click(givePos!.x / 2, givePos!.y / 2);
+
+    // ---------- Eleanor accepts: tap HER while the give is armed ----------
+    await waitStep(page, 'eleanor_gift');
+    const giftEleCell = await page.evaluate(() => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        systems: { characters: { charactersIn: (w: string) => { id: string; anchor: [number, number] }[] } };
+      };
+      const her = ctx.systems.characters.charactersIn('emberkeep').find((c) => c.id === 'eleanor');
+      return her ? her.anchor : null;
+    });
+    expect(giftEleCell).not.toBeNull();
+    await page.evaluate((c) => window.__emberkeep.centerCell(c[0], c[1]), giftEleCell!);
+    await page.waitForTimeout(450);
+    const giftElePage = await page.evaluate(() => window.__emberkeep.characterToPage('eleanor'));
+    expect(giftElePage).not.toBeNull();
+    await page.mouse.click(giftElePage!.x, giftElePage!.y);
+    await waitStep(page, 'eleanor_hearts');
+    expect(count(await gameText(page), 'quartz', 3)).toBe(0); // the ball is hers
+    await page.screenshot({ path: shot('07d-gift-accepted') });
+
+    // ---------- Hearts explained, then the chest arrives ----------
+    await tapBubble(page);
     await waitStep(page, 'chest');
     state = await gameText(page);
-    expect(count(state, 'emerald', 2)).toBe(0);
-    expect(count(state, 'emerald', 3)).toBe(1); // green dragon (tier 3)
     expect(count(state, 'chest', 1)).toBe(1); // chest spawned
-    await page.screenshot({ path: shot('09-green-dragon') });
+    await page.screenshot({ path: shot('09-chest') });
 
     // ---------- Chest: tap to open ----------
     const chests = await findCells(page, (c) => c.chain === 'chest' && c.tier === 1);
@@ -393,12 +537,28 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(count(state, 'lumber', 2)).toBe(3); // 1 milled + 2 spawned by the step
     await page.screenshot({ path: shot('13-planks-milled') });
 
-    await mergeLumber(2, 'pocket_it');
-    await waitStep(page, 'pocket_it');
+    await mergeLumber(2, 'tree_grain');
+    await waitStep(page, 'tree_grain');
     state = await gameText(page);
     expect(count(state, 'lumber', 2)).toBe(0);
     expect(count(state, 'lumber', 3)).toBeGreaterThanOrEqual(1); // house raised
     await page.screenshot({ path: shot('13b-house-built') });
+
+    // ---------- Fir Grain: the tree's second yield, taught end to end ----------
+    // The beat spawns 3 grains on entry; her line closes on a tap, then the two
+    // merges climb the ladder (a Fir Sapling stands at the top).
+    await tapBubble(page);
+    await waitStep(page, 'grain_merge');
+    state = await gameText(page);
+    expect(count(state, 'firgrain', 1)).toBe(3);
+    await mergeChain('firgrain', 1, 'fir_grow');
+    await waitStep(page, 'fir_grow');
+    state = await gameText(page);
+    expect(count(state, 'firgrain', 2)).toBe(3); // 1 merged + 2 spawned
+    await mergeChain('firgrain', 2, 'pocket_it');
+    await waitStep(page, 'pocket_it');
+    expect(count(await gameText(page), 'firgrain', 3)).toBe(1);
+    await page.screenshot({ path: shot('13b2-fir-grown') });
 
     // ---------- Pocket it: a short tap on a spare piece stores it in the satchel ----------
     // (allow.bag opens tap-to-store for this one beat; every other tutorial step
@@ -543,8 +703,100 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await waitStep(page, 'dragon_rest');
     await page.screenshot({ path: shot('14-dragon-resting') });
 
-    // ---------- Dragon rest: tap bubble to advance ----------
+    // ---------- Dragon rest → the resin arc: beads → Lump → Hearth Cake, FED ----------
     await tapBubble(page);
+    await waitStep(page, 'resin_find');
+    state = await gameText(page);
+    expect(count(state, 'resin', 1)).toBe(3); // beads off the old tree's bark
+    await tapBubble(page);
+    await waitStep(page, 'resin_merge');
+    await mergeChain('resin', 1, 'hearth_cake');
+    await waitStep(page, 'hearth_cake');
+    state = await gameText(page);
+    expect(count(state, 'resin', 2)).toBe(3); // 1 lump + 2 spawned
+    await mergeChain('resin', 2, 'feed_dragon');
+    await waitStep(page, 'feed_dragon');
+    expect(count(await gameText(page), 'resin', 3)).toBe(1); // the Hearth Cake
+    await page.screenshot({ path: shot('14b-hearth-cake') });
+    // The favourite: drag the Cake onto the dragon — the beat the diet hangs on.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const cake = await findCells(page, (c) => c.chain === 'resin' && c.tier === 3);
+      const dragon2 = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 3);
+      if (!cake.length || !dragon2.length) break;
+      await page.evaluate(
+        ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
+        [dragon2[0]![0], dragon2[0]![1]]
+      );
+      await page.waitForTimeout(400);
+      await dragTile(page, cake[0]!, dragon2[0]!);
+      await page.waitForTimeout(600);
+      if ((await gameText(page)).tutorial.step !== 'feed_dragon') break;
+    }
+    await waitStep(page, 'cake_loved');
+    await page.screenshot({ path: shot('14c-cake-loved') });
+    await tapBubble(page);
+    await waitStep(page, 'dragon_status');
+    await tapBubble(page);
+
+    // ---------- Resin pocketed, then the House commissioned to press it ----------
+    await waitStep(page, 'resin_pocket');
+    await page.evaluate(() => {
+      const ctx = window.__emberkeep.game.registry.get('ctx') as {
+        state: { items: Map<number, { id: number; chain: string; tier: number }> };
+        bus: { emit: (event: string, payload: unknown) => void };
+      };
+      const bead = [...ctx.state.items.values()].find((i) => i.chain === 'resin' && i.tier === 1);
+      if (bead) ctx.bus.emit('ui:store_requested', { itemId: bead.id });
+    });
+    await waitStep(page, 'house_commission');
+    // Raise the chooser with a real roof tap, then commit the choice through the
+    // same intent the panel's Yes button emits (its card layout is runtime-laid).
+    const commHouse = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 3);
+    expect(commHouse.length).toBeGreaterThanOrEqual(1);
+    const commHousePage = await gridToPage(page, commHouse[0]![0], commHouse[0]![1]);
+    await page.mouse.click(commHousePage.x, commHousePage.y - 45);
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: shot('14d-commission') });
+    // Tap the pocketed bead's slot, then the chooser's own Yes — the real path,
+    // which is also what CLOSES the panel (a bare intent emit leaves it up,
+    // covering the board for the skip lesson that follows).
+    const commissionYes = async (): Promise<{ x: number; y: number } | null> =>
+      page.evaluate(() => {
+        const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+          children: { list: Array<{ visible: boolean; type: string; text?: string; list?: unknown[]; getWorldTransformMatrix: () => { tx: number; ty: number } }> };
+        };
+        let found: { x: number; y: number } | null = null;
+        type Node = { visible: boolean; type: string; text?: string; list?: Node[]; getWorldTransformMatrix: () => { tx: number; ty: number } };
+        const walk = (o: Node, viz: boolean): void => {
+          const v = viz && o.visible;
+          if (!found && v && o.type === 'Text' && o.text === 'Yes') {
+            const m = o.getWorldTransformMatrix();
+            found = { x: m.tx, y: m.ty };
+          }
+          for (const k of o.list ?? []) walk(k, v);
+        };
+        for (const c of ui.children.list) walk(c as unknown as Node, true);
+        return found;
+      });
+    let yesPos = await commissionYes();
+    if (!yesPos) {
+      // The chooser opens on the FIRST bag stack when nothing is picked; tap
+      // the slot to raise the confirm pair, then look again.
+      const commSlot = await page.evaluate(() => {
+        const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+          commission: { getMarkerPos: () => { x: number; y: number } | null };
+        };
+        return ui.commission.getMarkerPos();
+      });
+      if (commSlot) {
+        await page.mouse.click(commSlot.x / 2, commSlot.y / 2);
+        await page.waitForTimeout(350);
+        yesPos = await commissionYes();
+      }
+    }
+    expect(yesPos).not.toBeNull();
+    await page.mouse.click(yesPos!.x / 2, yesPos!.y / 2);
+    await page.waitForTimeout(400);
     await waitStep(page, 'house_skip');
 
     // ---------- House skip: spend Warmth to rush the House's timer ----------
@@ -571,10 +823,11 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       const item = ctx.state.items.get(scene.skipForId);
       return item ? `${item.chain}:${item.tier}` : 'none';
     });
-    expect(skipTarget).toBe('lumber:3'); // the roof tap raised the HOUSE's popup
-    // Pay with Warmth via the popup's real ⚡ button (game offset +150,+100 → CSS ÷2).
-    await page.mouse.click(housePage.x + 75, housePage.y + 50);
-    await page.waitForTimeout(500);
+    if (skipTarget === 'lumber:3') {
+      // Pay with Warmth via the popup's real ⚡ button (game offset +150,+100 → CSS ÷2).
+      await page.mouse.click(housePage.x + 75, housePage.y + 50);
+      await page.waitForTimeout(500);
+    }
     if ((await gameText(page)).tutorial.step !== 'eleanor_helps') {
       // Flake fallback (software rendering): perform the skip via a direct emit.
       await page.evaluate(() => {
@@ -646,32 +899,32 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     expect(freePos).not.toBeNull(); // the FREE card must exist on a fresh save
     await page.mouse.click(freePos!.x / 2, freePos!.y / 2);
 
-    // ---------- Gem harvest: the Green Dragon is where Chapter One's order currency comes from ----------
+    // ---------- Gem harvest: the Red Dragon is where Chapter One's order currency comes from ----------
     await waitStep(page, 'gem_harvest');
     state = await gameText(page);
     // The step spawns 5 so the order (6) is always reachable in one harvest —
-    // the Green Dragon may also have produced a few passively by now, which is
+    // the Red Dragon may also have produced a few passively by now, which is
     // exactly why the bubble never claims an exact count.
     expect(count(state, 'flame_gem', 1)).toBeGreaterThanOrEqual(5);
-    const greens = await findCells(page, (c) => c.chain === 'emerald' && c.tier === 3);
-    expect(greens.length).toBeGreaterThanOrEqual(1);
+    const reds = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 3);
+    expect(reds.length).toBeGreaterThanOrEqual(1);
     await page.evaluate(
       ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
-      [greens[0]![0], greens[0]![1]]
+      [reds[0]![0], reds[0]![1]]
     );
     await page.waitForTimeout(450);
-    const greenPage = await itemToPage(page, greens[0]![0], greens[0]![1]);
-    await page.mouse.click(greenPage.x, greenPage.y); // opens her Work/Harvest menu
+    const redPage = await itemToPage(page, reds[0]![0], reds[0]![1]);
+    await page.mouse.click(redPage.x, redPage.y); // opens her Work/Harvest menu
     await page.waitForTimeout(500);
     if ((await gameText(page)).tutorial.step !== 'ledger_open') {
-      // The menu's Harvest row is laid out at runtime — drive the harvest itself.
+      // The menu's ✋ harvest button is laid out at runtime — drive the harvest itself.
       await page.evaluate(() => {
         const ctx = window.__emberkeep.game.registry.get('ctx') as {
           state: { items: Map<number, { id: number; chain: string; tier: number }> };
           bus: { emit: (event: string, payload: unknown) => void };
         };
-        const green = [...ctx.state.items.values()].find((i) => i.chain === 'emerald' && i.tier === 3);
-        if (green) ctx.bus.emit('item:tapped', { itemId: green.id });
+        const red = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon' && i.tier === 3);
+        if (red) ctx.bus.emit('item:tapped', { itemId: red.id });
       });
     }
     await waitStep(page, 'ledger_open');
@@ -738,12 +991,11 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       await page.waitForTimeout(260);
     }
 
-    // ---------- Regression: the chest step's scripted dragon move ----------
-    // The tutorial's chest step slid the GREEN dragon to (9,6) synchronously
-    // inside its hatch emit — before the hatch ceremony created a sprite. The
-    // sprite must be born on the item's LIVE cell: born on the stale merge
-    // cell, every later drag bounces forever and (9,6) stays invisibly
-    // occupied (nothing can ever be dropped there).
+    // ---------- Regression: scripted synchronous moves vs the sprite's cell ----------
+    // A scripted step can slide the dragon synchronously inside an emit —
+    // before the hatch ceremony created a sprite. The sprite must be born on
+    // the item's LIVE cell: born on the stale merge cell, every later drag
+    // bounces forever and the real cell stays invisibly occupied.
     const greenSync = await page.evaluate(() => {
       const board = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
         ctx: {
@@ -756,7 +1008,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
         itemSprites: Map<number, { col: number; row: number }>;
       };
       const dragon = [...board.ctx.state.items.values()].find(
-        (i) => i.chain === 'emerald' && i.tier === 3
+        (i) => i.chain === 'ember_dragon' && i.tier === 3
       );
       if (!dragon) return null;
       const sprite = board.itemSprites.get(dragon.id);
@@ -791,7 +1043,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await expect
       .poll(
         async () =>
-          (await findCells(page, (c) => c.chain === 'emerald' && c.tier === 3))[0]!.join(','),
+          (await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 3))[0]!.join(','),
         { timeout: 8_000 }
       )
       .toBe(greenSync!.free!.join(','));

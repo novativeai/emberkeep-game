@@ -309,6 +309,8 @@ export class BoardScene extends Phaser.Scene {
    * should find the piece still in the bag, which it does.
    */
   private pendingGive: { chain: string; tier: number } | null = null;
+  /** When the give was armed — the arming click's own POINTER_UP must not cancel it. */
+  private giveArmedAtMs = 0;
   /**
    * Did anything on the board claim the tap in progress?
    *
@@ -2702,6 +2704,12 @@ export class BoardScene extends Phaser.Scene {
   /** Hold a pocketed piece out and wait for the player to say who it is for. */
   private armGive(chain: string, tier: number): void {
     this.pendingGive = { chain, tier };
+    // The click that pressed GIVE in the bag is still in flight: BoardScene's
+    // own POINTER_UP fires for it too, sees "no board object claimed this" and
+    // would cancel the give in the same breath it was armed — after which the
+    // tap on Eleanor fell through to arming her CAST instead of handing over.
+    // Stamp the arm time; the cancel path ignores that first, same-gesture up.
+    this.giveArmedAtMs = this.time.now;
     const cam = this.cameras.main;
     this.floatText(cam.midPoint.x, cam.midPoint.y - 260, 'Tap who it is for', PALETTE.goldAccent);
     this.pulseGiveTargets(true);
@@ -3775,7 +3783,11 @@ export class BoardScene extends Phaser.Scene {
       }
     );
     this.input.on(Phaser.Input.Events.POINTER_UP, () => {
-      if (this.pendingGive && !this.tapClaimed) this.cancelGive();
+      // Never on the same gesture that ARMED it (see armGive) — only a later,
+      // separate tap on empty ground reads as "changed my mind".
+      if (this.pendingGive && !this.tapClaimed && this.time.now - this.giveArmedAtMs > 400) {
+        this.cancelGive();
+      }
       this.tapClaimed = false;
     });
     this.input.on(Phaser.Input.Events.POINTER_UP, endPan);
