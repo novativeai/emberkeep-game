@@ -289,6 +289,32 @@ export class StorePanel extends Phaser.GameObjects.Container {
     return !!item.world && item.world !== this.gameState.worldId;
   }
 
+  /**
+   * Fill a card's plate with its art WITHOUT squashing it.
+   *
+   * `setDisplaySize(w, h)` was doing the filling, and it distorts by
+   * construction: the four ordinary dragon cards are 900×506 key art — 16:9,
+   * landscape — and the plate they bleed into is 452×460, very nearly square.
+   * That is a 1.8× horizontal squeeze, and a squeezed dragon is the one thing a
+   * card whose whole job is the picture cannot afford.
+   *
+   * So: scale to COVER, then crop the overflow in texture space. A crop leaves
+   * the object centred on its own origin, so what survives is the middle of the
+   * art — no mask, no second draw, and the plate is still filled edge to edge.
+   * (The hero card is authored at the hero slot's own ratio, so it comes
+   * through this untouched.)
+   */
+  private coverFit(art: Phaser.GameObjects.Image, boxW: number, boxH: number): void {
+    const tw = art.width;
+    const th = art.height;
+    if (tw <= 0 || th <= 0) return;
+    const scale = Math.max(boxW / tw, boxH / th);
+    const cropW = Math.min(tw, boxW / scale);
+    const cropH = Math.min(th, boxH / scale);
+    art.setScale(scale);
+    art.setCrop((tw - cropW) / 2, (th - cropH) / 2, cropW, cropH);
+  }
+
   /** Where a padlocked card is sold, as the player would name it. */
   private lockedIn(item: StoreItem): string {
     return this.gameState.worlds.get(item.world ?? '')?.name ?? 'another world';
@@ -662,7 +688,8 @@ export class StorePanel extends Phaser.GameObjects.Container {
     card.add(plate.under);
     let art: Phaser.GameObjects.Image | null = null;
     if (this.scene.textures.exists(item.art)) {
-      art = this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h);
+      art = this.scene.add.image(0, 0, item.art);
+      this.coverFit(art, inner.w, inner.h);
       card.add(art);
     }
     card.add(addScrim(this.scene, inner.w, inner.h / 2 - 30, 30));
@@ -746,7 +773,8 @@ export class StorePanel extends Phaser.GameObjects.Container {
     if (this.scene.textures.exists(item.art)) {
       if (bleed) {
         const inner = { w: CARD_W - PLATE_INSET * 2, h: CARD_H - PLATE_INSET * 2 };
-        art = this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h);
+        art = this.scene.add.image(0, 0, item.art);
+        this.coverFit(art, inner.w, inner.h);
         card.add(art);
         // Scrim under everything the player must read — from just above the
         // name down to the plate's foot, same treatment as the hero.

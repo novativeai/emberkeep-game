@@ -950,7 +950,13 @@ export class BoardScene extends Phaser.Scene {
   private syncDragon(ld: LiveDragon): void {
     ld.player.container.setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift);
     ld.player.container.setDepth(ld.host.depth + 0.5);
-    ld.shadow.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth - 0.5);
+    // Visibility, not just position: the rig's shadow is the ONLY one a dragon
+    // shows (the host's own pair is hidden the moment the rig stands in for its
+    // art), so it is the one that has to answer `setOverGround`'s question. It
+    // is written every frame because the position beside it already is, and
+    // because the host is the single owner of the answer — a second copy of
+    // "is it over ground" kept here is a second thing to get wrong.
+    ld.shadow.setVisible(ld.host.onGround).setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth - 0.5);
     ld.zzz?.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth + 4);
     if (ld.clipOverlay?.visible) {
       // The Align-Studio clip rides the host at the rig's own anchor and depth,
@@ -1942,11 +1948,32 @@ export class BoardScene extends Phaser.Scene {
       this.altarElder = player;
       this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs(true) };
     } else if (!this.altarElderFallback) {
+      /**
+       * A PLACEHOLDER, and deliberately an invisible one.
+       *
+       * The Elder's rig loads asynchronously, so for the few seconds before it
+       * arrives this stood in for her — wearing `item_golden_egg_2`, which
+       * assets.json maps to `red-dragon-baked.webp`. That is another creature
+       * entirely: the chapter's one irreversible story beat opened with a RED
+       * dragon on the golden altar, which then turned gold when the real rig
+       * landed. Better to show nothing for those seconds than the wrong dragon.
+       *
+       * The object itself stays, because three other places read it — the
+       * commune tap, its bob, and `showAltarEgg`'s "is anyone already here?"
+       * guard — and they are all still right about her being here. Only the
+       * painting is withheld. (The tap target is `ensureAltarZone`, its own
+       * object, so hiding this costs no interaction.)
+       *
+       * The data gap behind it stands: `item_golden_egg_2` points at the red
+       * dragon, and this build ships no full-body Golden Elder art to point it
+       * at — only her bust (`sprites/golden-elder/rest.webp`) and her rig.
+       */
       this.altarElderFallback = this.add
         .image(p.x, eggBottom, `item_${GOLDEN_CHAIN}_${GOLDEN_ELDER_TIER}`)
         .setOrigin(0.5, 0.88)
         .setScale(0.21)
         .setTint(GOLDEN_TINT)
+        .setVisible(false)
         .setDepth(DEPTHS.itemBase + p.y + 1);
     }
     this.addGroundShadow(p.x, eggBottom, 170, DEPTHS.itemBase + p.y);
@@ -5727,6 +5754,13 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.centerOn(frame.x, frame.y);
     this.tutorialDone = this.ctx.state.tutorialDone;
     this.syncKeyBadges(false); // a load restores a STATE — no cinematic replay
+    // The doors, for the same reason the badges are here: `buildPortals` runs
+    // in create(), which is BEFORE UIScene calls beginRun, so every story gate
+    // was asked "are you open?" against a state with no orders and no quest
+    // latches in it — and all of them answered no. The North Crossing then
+    // stayed dark on every reload until a round trip through another world
+    // restarted the scene. A load restores a STATE, so no bloom.
+    this.syncPortalFx(false);
     this.syncGoldenAltar();
   }
 
