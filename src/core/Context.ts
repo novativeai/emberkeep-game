@@ -185,6 +185,29 @@ export class GameContext {
       tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial)
     };
     this.bus.on('game:reset_requested', () => this.resetGame());
+
+    /**
+     * WHERE THE KEEPER WAS STANDING — answered here, before a single scene runs.
+     *
+     * The save has always carried `activeWorld`, and `hydrate` has always
+     * restored it. The trouble was WHEN: the boot order is PreloadScene →
+     * BoardScene → UIScene, and it is UIScene that calls `beginRun`. So the
+     * board was fully BUILT for the authored world — its ground, its backdrop,
+     * its fog, its portals — and only then did the save quietly move the state
+     * to Borealis. Nothing rebuilds a scene for a switch that never went
+     * through WorldSystem, so the player came home to Emberkeep's board with
+     * Borealis's name on the state: the wrong doors, fog over ground they had
+     * already bought, and only a round trip through another world (which DOES
+     * go through WorldSystem, and restarts the scene) put it right.
+     *
+     * `peek` is the same version-checked read `load` uses, so a save this build
+     * would discard restores nothing, and a fresh `newGame` resets the active
+     * world anyway. This costs one JSON parse at boot and makes every scene
+     * downstream — the backdrop PreloadScene fetches included — build the world
+     * the player actually left.
+     */
+    const wasOn = save.peek()?.activeWorld;
+    if (wasOn) this.state.switchWorld(wasOn);
   }
 
   /** Called once the gameplay scenes are subscribed: load the save or start fresh. */
