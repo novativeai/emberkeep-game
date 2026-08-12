@@ -58,6 +58,12 @@ export class MapEditor {
   ) {
     editorStore.load(); // localStorage (fast, in-session)
     this.diskReady = this.loadDiskProject(); // asset3d/editor-map.json — the baked-in default
+    // Placing a prop is a change to the PROJECT, so it goes to the project file.
+    // It used to reach localStorage only, where the size budget could silently
+    // drop it — the prop was on screen, absent from the save, and gone on the
+    // next reload. Debounced because dragging one emits a change per frame and
+    // the project is megabytes of embedded art.
+    editorStore.onAssetsChanged = () => this.bakeProjectSoon();
     this.dom = new EditorDom(
       (file) => importAsset(this.boardScene()!, file),
       () => this.exportJson(),
@@ -96,6 +102,23 @@ export class MapEditor {
 
   private boardScene(): Phaser.Scene | undefined {
     return this.game.scene.getScene(SCENES.board) ?? undefined;
+  }
+
+  /** Pending debounce for the project bake (see `onAssetsChanged`). */
+  private bakeTimer?: ReturnType<typeof setTimeout>;
+
+  /**
+   * Write the project to `asset3d/editor-map.json`, coalescing a burst of changes
+   * into one write. The wait is long enough to cover a drag and short enough that
+   * closing the tab straight after placing something still catches it — and Save,
+   * Apply and the map operations bake synchronously anyway, so this is the safety
+   * net for the edits nobody thought to press a button after.
+   */
+  private bakeProjectSoon(): void {
+    clearTimeout(this.bakeTimer);
+    this.bakeTimer = setTimeout(() => {
+      void saveEditorMap(editorStore.serializeProject());
+    }, 800);
   }
 
   /**
@@ -280,7 +303,21 @@ export class MapEditor {
         console.warn('[MapEditor] 3D model rebuild failed — using the static snapshot.', e);
       }
     }
-    if (a.dataUrl && !scene.textures.exists(a.textureKey)) await restoreTexture(scene, a.textureKey, a.dataUrl);
+    if (a.dataUrl && !scene.textures.exists(a.textureKey)) {
+      await restoreTexture(scene, a.textureKey, a.dataUrl);
+      return;
+    }
+    // A 2D prop whose base64 did not fit the localStorage budget: the file is
+    // still in asset3d/, which is where it was uploaded to in the first place.
+    // 3D has always had this fallback; without it for 2D, a stripped record came
+    // back as a placement with no picture — and the prop looked deleted.
+    if (a.file2d) {
+      // `restoreTexture` reports a failed load as a 1×1, it does not throw.
+      const got = await restoreTexture(scene, a.textureKey, `/asset3d/${encodeURIComponent(a.file2d)}`);
+      if (got.w <= 1 && got.h <= 1) {
+        console.warn(`[MapEditor] asset3d/${a.file2d} would not load — "${a.name}" is placed but has no art.`);
+      }
+    }
   }
 
   /** Delete a placed asset AND, if no other placement still uses it, its file in

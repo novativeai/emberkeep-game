@@ -142,25 +142,103 @@ const artToCell = (x, y) => {
 };
 
 /* ------------------------------------------------------------------ */
-/* 2. fit the editor→backdrop transform from the editor's own gameCells  */
+/* 2. fit the editor→backdrop transform                                  */
 /* ------------------------------------------------------------------ */
 
-/** Least squares for `editor = scale·art + offset`, one uniform scale. */
+/**
+ * THE EXPORT'S `gameCell` IS NOT EVIDENCE, AND TRUSTING IT ONCE COST EVERY WORLD.
+ *
+ * The editor fills that field from the AMBIENT `worldToGrid` — the projection of
+ * whatever the game is showing behind the editor window. Once the game runs on
+ * the very zones this script writes, that projector is zone-aware, so `gameCell`
+ * comes back as a ZONE BLOCK ADDRESS (grid 1's cell 0,1 → col 14) rather than a
+ * position on the game lattice. Fitting to those is fitting to this script's own
+ * previous output, and the loop diverges: on 2026-08-12 an export written by the
+ * editor's Apply button drove the fit from 1.22453 to 0.21583, reproducing 0 of
+ * 367 cells and moving every zone in every world.
+ *
+ * So the correspondence is DERIVED here instead, from the one address the ingest
+ * doc already calls exact — the cell's `world` pixel. Iterated closest point:
+ * with a transform in hand, each editor point names the lattice cell it is
+ * nearest; with those cells, least squares re-solves the transform; two rounds
+ * converge because the answer never moves far. The seed is the transform the
+ * last build measured (zones.json), or the value it has held all along.
+ *
+ * The result no longer depends on who wrote the export or on what the editor
+ * happened to be showing when they pressed the button.
+ */
+/** What the transform has measured out to on every honest export since the
+ *  editor's world space was set up — the seed for a fresh clone, and the
+ *  sanity band the stored one has to fall inside to be believed. */
+const FALLBACK_FIT = { scale: 1.22453, offsetX: -16.26, offsetY: -46.9 };
+
+const SEED_FIT = (() => {
+  const prev = existsSync(resolve(ROOT, 'src/data/zones.json'))
+    ? read('src/data/zones.json').editorToArt
+    : undefined;
+  const ok = prev && Number.isFinite(prev.scale) && prev.scale > 0.5 && prev.scale < 3;
+  return ok ? { scale: prev.scale, offsetX: prev.offsetX, offsetY: prev.offsetY } : FALLBACK_FIT;
+})();
+
+/**
+ * Least squares for `editor = scale·art + offset`, one uniform scale.
+ *
+ * `gameCell` is still USED when it is a lattice address, because it is the
+ * editor's own answer and measurably the better one: on a clean export it fits
+ * to 352/367 against the derived assignment's 339. It is only distrusted when it
+ * is demonstrably not a lattice address at all — the derived cells are the
+ * check, and disagreeing with them wholesale is the signature of an export
+ * written while the game was running on zones.
+ */
 function fitEditorToArt() {
-  const rows = [];
+  const cells = [];
   for (const w of source.worlds) {
     for (const g of w.grids ?? []) {
-      for (const c of g.cells ?? []) {
-        rows.push({
-          art: {
-            x: A0.x + c.gameCell.col * AU.x + c.gameCell.row * AV.x,
-            y: A0.y + c.gameCell.col * AU.y + c.gameCell.row * AV.y
-          },
-          ed: c.world
-        });
-      }
+      for (const c of g.cells ?? []) cells.push(c);
     }
   }
+  const points = cells.map((c) => c.world);
+
+  // What the seed transform says each point's cell is, independent of the file.
+  const derived = points.map((ed) =>
+    artToCell((ed.x - SEED_FIT.offsetX) / SEED_FIT.scale, (ed.y - SEED_FIT.offsetY) / SEED_FIT.scale)
+  );
+  const agree = cells.filter(
+    (c, i) => c.gameCell && c.gameCell.col === derived[i].col && c.gameCell.row === derived[i].row
+  ).length;
+  const trustGameCell = agree >= points.length * 0.8;
+  if (!trustGameCell) {
+    console.warn(
+      `build-zones: the export's gameCells match the game lattice for only ${agree}/${points.length} cells — ` +
+        `they are zone addresses, not lattice ones (an export written by the editor's Apply while the game was ` +
+        `running on zones). Deriving the correspondence from each cell's world pixel instead.`
+    );
+  }
+
+  let fit = SEED_FIT;
+  // Two rounds: assign each editor point to a lattice cell, then re-solve. A
+  // third changes nothing measured.
+  for (let pass = 0; pass < 2; pass++) {
+    fit = solve(
+      cells.map((c, i) => ({ ed: c.world, cell: trustGameCell ? c.gameCell : derived[i] })),
+      fit
+    );
+    if (trustGameCell) break; // the assignment is given, so one solve is exact
+  }
+  return { ...fit, samples: points.length, source: trustGameCell ? 'editor gameCells' : 'derived from world px' };
+}
+
+/** One round: re-assign any cell left open, then close-form the transform. */
+function solve(samples, fit) {
+  const rows = samples.map(({ ed, cell }) => {
+    const c =
+      cell ??
+      artToCell((ed.x - fit.offsetX) / fit.scale, (ed.y - fit.offsetY) / fit.scale);
+    return {
+      art: { x: A0.x + c.col * AU.x + c.row * AV.x, y: A0.y + c.col * AU.y + c.row * AV.y },
+      ed
+    };
+  });
   let sAA = 0, sAx = 0, sAy = 0, sAex = 0, sAey = 0, sEx = 0, sEy = 0;
   for (const r of rows) {
     sAA += r.art.x * r.art.x + r.art.y * r.art.y;
@@ -191,7 +269,7 @@ function fitEditorToArt() {
       b[k] -= f * b[i];
     }
   }
-  return { scale: b[0] / M[0][0], offsetX: b[1] / M[1][1], offsetY: b[2] / M[2][2], samples: n };
+  return { scale: b[0] / M[0][0], offsetX: b[1] / M[1][1], offsetY: b[2] / M[2][2] };
 }
 
 const FIT = fitEditorToArt();
@@ -506,13 +584,25 @@ const PORTALS = {
     { id: 'borealis_rune_gate', to: 'runevault', label: 'The Rune Way', art: [365, 235, 175, 205] }
   ],
   runevault: [
-    // The gold rune circle inlaid in the plateau's west half — the same door the
-    // Hatchery deck carried, read off the new painting. It sits ON playable
-    // ground, which is exactly right and costs nothing: a portal is the lowest
-    // interactive band on the board, so a piece standing on the circle takes the
-    // tap and only bare stone travels. The cauldron stands on it too, for the
-    // same reason it stood on Hatchery's.
-    { id: 'runevault_circle', to: 'borealis', label: 'The Rune Circle', art: [411, 418, 600, 378] }
+    // THE STAIRCASE, which is where the way down belongs — not the rune circle
+    // inlaid in the plateau's west half (the spot Hatchery's door carried over),
+    // which read as floor decoration rather than an exit and stood in the
+    // cauldron's own light.
+    //
+    // ON THE UPPER STEPS, and that part is provisional. The step the editor
+    // actually marks out is the lantern landing at the FOOT of the stair —
+    // `Grille 16`, the only 1×1 grid on the map, centred on backdrop
+    // (1140, 1441). A door there is 742 world px from the nearest playable cell,
+    // because Runevault has 4 of its 187 drawn cells marked and all 4 are up on
+    // the plateau: the board camera frames those four, the landing is off the
+    // bottom of the screen, and the only way out of the world cannot be reached.
+    // `Zones.spec.ts` fails on exactly that, which is the invariant doing its job
+    // rather than an inconvenience.
+    //
+    // So the door sits partway up the steps, 486 px from ground that exists
+    // today. Mark the staircase in the editor (Grille 14, 15 and 16) and this
+    // becomes `[1055, 1240, 170, 230]` — the landing, between the two lanterns.
+    { id: 'runevault_circle', to: 'borealis', label: 'The Rune Stair', art: [910, 1105, 180, 300] }
   ]
 };
 
@@ -584,9 +674,16 @@ function editorDecor(spec, d) {
   const src = source.worlds.find((w) => w.map === spec.editorMap);
   const placed = (src?.assets ?? []).find((a) => a.name === d.fromEditorAsset && a.world);
   if (!placed) {
-    throw new Error(
-      `build-zones: ${spec.id} wants the editor's "${d.fromEditorAsset}", but the export has no placed asset by that name with a world point — re-run scripts/export-editor-worlds.mjs`
+    // WARN, do not throw. A prop that is not in the export is a prop somebody
+    // has to go and place again, and it is worth being loud about — but the
+    // world it stands on is still the ground the player walks, the doors they
+    // travel through and the cells their pieces sit on. Refusing to build any
+    // of that because a pot is missing takes a cosmetic loss and turns it into
+    // no game at all.
+    console.warn(
+      `build-zones: ${spec.id} wants the editor's "${d.fromEditorAsset}", but the export has no placed asset by that name with a world point — building the world WITHOUT it. Place it in the editor and re-run scripts/export-editor-worlds.mjs.`
     );
+    return null;
   }
   const art = editorToArt(placed.world);
   const gameW = webpWidth(`assets/sprites/environment/map/decor/${d.name}.webp`) ?? placed.art?.w;
@@ -837,6 +934,7 @@ for (const spec of WORLDS) {
   const decorCalibration = {};
   for (const raw of DECOR[spec.id] ?? []) {
     const d = raw.fromEditorAsset ? editorDecor(spec, raw) : raw;
+    if (!d) continue; // the editor has not placed it (warned above)
     const target = artToWorld(d.at[0], d.at[1]);
     let home;
     for (const z of zones) {

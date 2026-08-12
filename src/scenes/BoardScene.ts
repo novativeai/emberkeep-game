@@ -874,6 +874,9 @@ export class BoardScene extends Phaser.Scene {
   private attachDragon(host: BoardItem, intro: boolean): boolean {
     const rig = this.dragonRigs.get(rigKeyFor(host.chain, host.tier));
     if (!rig) return false;
+    // A dragon of this breed is about to be on screen: this is the moment its
+    // clip sheets are worth their video memory, and the first moment they are.
+    this.ensureDragonClips(host.chain, host.tier);
     this.removeDragonRig(host.itemId);
     const scale =
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
@@ -1176,6 +1179,41 @@ export class BoardScene extends Phaser.Scene {
     }
     return { clip, key };
   }
+
+  /**
+   * Fetch a breed's Align-Studio clips the first time one of its dragons stands
+   * on the board — never at boot.
+   *
+   * These are the heaviest textures the game has, and it is frame COUNT that
+   * does it: the red whelp's `fly` is 240 frames of 256×214, uploaded as one
+   * 4096×3210 sheet — 50 MB of video memory. With `idle`, `tosleep` and `roar`
+   * the breed costs 126 MB, and it used to be resident from the title screen of
+   * a session that might never hatch anything. Every breed added multiplied it.
+   *
+   * Nothing waits on the result: `dragonClip` returns null while a sheet is
+   * missing and the dragon animates with its rig, which is how it moved before
+   * these clips existed. They take over on the frame they arrive.
+   */
+  private ensureDragonClips(chain: string, tier: number): void {
+    const id = dragonClipCharacter(chain, tier);
+    if (!id || this.dragonClipsAsked.has(id)) return;
+    this.dragonClipsAsked.add(id);
+    let queued = 0;
+    for (const [clipId, clip] of Object.entries(clipsFor(id))) {
+      if (this.textures.exists(clipKey(id, clipId))) continue;
+      this.load.spritesheet(clipKey(id, clipId), clip.file, {
+        frameWidth: clip.frameWidth,
+        frameHeight: clip.frameHeight
+      });
+      queued++;
+    }
+    // `load.start()` on an already-running loader is a no-op that would drop the
+    // queue on the floor; Phaser folds new files into the run instead.
+    if (queued && !this.load.isLoading()) this.load.start();
+  }
+
+  /** Breeds whose clips have been asked for, so the fetch runs once each. */
+  private dragonClipsAsked = new Set<string>();
 
   /** The overlay sprite that stands in for the rig while a clip plays. */
   private dragonOverlay(ld: LiveDragon, key: string): Phaser.GameObjects.Sprite {
@@ -5115,6 +5153,13 @@ export class BoardScene extends Phaser.Scene {
       bus.on('dragon:rested', ({ dragonId }) => this.wakeDragon(dragonId)),
       bus.on('item:harvest_failed', ({ generatorId, reason }) => {
         const sprite = this.itemSprites.get(generatorId);
+        // A sleeping dragon is not REFUSING — it is asleep. The red denial
+        // flash reads as "you did something wrong"; a drifting 💤 reads as
+        // "come back later", which is the whole of what happened.
+        if (reason === 'asleep') {
+          if (sprite) this.floatText(sprite.x, sprite.y - 150, '💤', PALETTE.cream);
+          return;
+        }
         if (sprite) sprite.flashDenied();
         if (reason === 'no_space' && sprite) {
           this.floatText(sprite.x, sprite.y - 140, 'No room!', PALETTE.cream);

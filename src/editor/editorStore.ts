@@ -1369,34 +1369,72 @@ class EditorStore {
 
   /* ------------------------- placed assets (persist) ------------------------ */
   private ASSETS_KEY = 'emberkeep_editor_assets';
-  /** Persist placed assets PER MAP (data-URLs, budget-capped) so they survive a reload. */
+  /**
+   * Persist placed assets PER MAP so they survive a reload.
+   *
+   * THE PLACEMENT IS NEVER THE THING THAT GETS DROPPED. localStorage holds about
+   * 5 MB and one placed prop can be a megabyte of base64, so a budget is
+   * unavoidable — but the budget must fall on the PICTURE, not on the record.
+   * Where the prop stands, how big it is, which file it came from: a couple of
+   * hundred bytes, and the only part the pipeline reads. The picture is already
+   * on disk in `asset3d/<fileName>` and is re-loadable from there.
+   *
+   * It used to drop whole assets: the third prop you placed simply was not in
+   * the saved record, so it sat there on screen looking placed and was gone on
+   * reload — "it's there but it isn't really added". Now a prop too big for the
+   * remaining budget is stored WITHOUT its base64, and says so.
+   */
   persistAssets(): void {
-    try {
-      const out: Record<string, PlacedAsset[]> = {};
-      let budget = 4_500_000; // ~4.5MB of base64 across ALL maps' assets + model sources
-      for (const [id, s] of this.mapStates) {
-        if (!s.placedAssets.length) continue;
-        const slim: PlacedAsset[] = [];
-        for (const a of s.placedAssets) {
-          const still = (a.dataUrl ?? '').length;
-          const full = still + (a.modelSrc ?? '').length;
-          if (full < budget) {
-            slim.push({ ...a }); // keep the animated source too
-            budget -= full;
-          } else if (still < budget) {
-            const copy = { ...a };
-            delete copy.modelSrc; // too big to persist the source — keep the static snapshot only
-            slim.push(copy);
-            budget -= still;
-          }
+    const out: Record<string, PlacedAsset[]> = {};
+    let budget = 4_500_000; // ~4.5MB of base64 across ALL maps' assets + model sources
+    const stripped: string[] = [];
+    for (const [id, s] of this.mapStates) {
+      if (!s.placedAssets.length) continue;
+      const slim: PlacedAsset[] = [];
+      for (const a of s.placedAssets) {
+        const still = (a.dataUrl ?? '').length;
+        const full = still + (a.modelSrc ?? '').length;
+        if (full < budget) {
+          slim.push({ ...a }); // keep the animated source too
+          budget -= full;
+        } else if (still < budget) {
+          const copy = { ...a };
+          delete copy.modelSrc; // too big to persist the source — keep the static snapshot only
+          slim.push(copy);
+          budget -= still;
+        } else {
+          // Record only. `ensureAssetTexture` re-reads the art from asset3d/.
+          const copy = { ...a };
+          delete copy.modelSrc;
+          delete copy.dataUrl;
+          slim.push(copy);
+          stripped.push(a.name);
         }
-        if (slim.length) out[id] = slim;
       }
+      if (slim.length) out[id] = slim;
+    }
+    if (stripped.length) {
+      console.info(
+        `[MapEditor] over the localStorage budget: kept the placement of ${stripped.join(', ')} but not the embedded image — it reloads from asset3d/.`
+      );
+    }
+    try {
       window.localStorage.setItem(this.ASSETS_KEY, JSON.stringify(out));
     } catch {
-      /* quota / unavailable — assets still live in-session */
+      // Quota, or no localStorage at all. Not fatal and no longer load-bearing:
+      // the durable copy is the project baked to `asset3d/editor-map.json`.
+      console.warn('[MapEditor] localStorage refused the placed assets — the disk project is the copy that counts.');
     }
+    this.onAssetsChanged?.();
   }
+
+  /**
+   * Called after every change to the placed assets, so the orchestrator can bake
+   * the project to disk. localStorage alone was never enough: it is capped, it is
+   * per-browser, and clearing cookies wipes it — while `asset3d/editor-map.json`
+   * is what the export pipeline actually reads.
+   */
+  onAssetsChanged?: () => void;
   /** Saved asset records per map id (textures re-created by the orchestrator on open). */
   savedAssetsAll(): Record<string, PlacedAsset[]> {
     try {

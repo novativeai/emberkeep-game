@@ -1225,7 +1225,10 @@ export interface EventMap {
    *  writes a new page (MergeSystem emits once per chain:fromTier>resultTier). */
   'cookbook:discovered': { chain: string; fromTier: number; resultTier: number };
   'item:harvested': { generatorId: number; output: ItemSnapshot };
-  'item:harvest_failed': { generatorId: number; reason: 'cooldown' | 'energy' | 'no_space' };
+  'item:harvest_failed': {
+    generatorId: number;
+    reason: 'cooldown' | 'energy' | 'no_space' | 'asleep';
+  };
   /** A generator passively gifted an item (no tap, no energy). */
   'item:produced': { generatorId: number; output: ItemSnapshot };
   /** A reward generator (the house) paid out currency/energy on its timer. */

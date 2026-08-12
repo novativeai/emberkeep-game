@@ -8228,8 +8228,27 @@
             ]
           }
         ],
-        "mapDecor": [],
-        "decorCalibration": {},
+        "mapDecor": [
+          {
+            "name": "pink_cauldron",
+            "col": 9,
+            "row": 0,
+            "z": 0,
+            "dx": 124.14,
+            "dy": 233.55
+          }
+        ],
+        "decorCalibration": {
+          "pink_cauldron": {
+            "offsetX": 0,
+            "offsetY": 0,
+            "scale": 0.7,
+            "anchor": {
+              "x": 0.5,
+              "y": 0.845
+            }
+          }
+        },
         "startingItems": [],
         "tile": {
           "width": 420,
@@ -8413,12 +8432,12 @@
         {
           "id": "runevault_circle",
           "to": "borealis",
-          "label": "The Rune Circle",
+          "label": "The Rune Stair",
           "rect": [
-            494.93,
-            468.99,
-            731.43,
-            460.8
+            1103.24,
+            1306.48,
+            219.43,
+            365.71
           ]
         }
       ]

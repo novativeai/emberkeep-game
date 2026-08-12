@@ -223,3 +223,64 @@ describe('energy gain (energy:add)', () => {
     expect(ctx.state.energyCurrent).toBe(ENERGY_MAX);
   });
 });
+
+/**
+ * A sleeping dragon is not a generator with a condition on it — it is an
+ * animal that is not available. Tapping one used to hand over the gem anyway,
+ * which made the whole sleep read as decoration.
+ */
+describe('a sleeping dragon gives nothing', () => {
+  const sleep = (ctx: ReturnType<typeof createTestContext>, itemId: number): void => {
+    ctx.bus.emit('dragon:mood', { itemId, mood: 'asleep', from: 'awake' });
+  };
+
+  it('refuses the tap, spends nothing and arms no cooldown', () => {
+    const ctx = createTestContext();
+    ctx.systems.board.spawn('ember_dragon', 3, 2, 2, 'init');
+    const dragon = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon')!;
+    const harvested = capture(ctx.bus, 'item:harvested');
+    const failed = capture(ctx.bus, 'item:harvest_failed');
+    ctx.state.energyCurrent = ctx.state.energyMax;
+    const energyBefore = ctx.state.energyCurrent;
+
+    sleep(ctx, dragon.id);
+    ctx.bus.emit('item:tapped', { itemId: dragon.id });
+
+    expect(harvested).toHaveLength(0);
+    expect(failed.at(-1)).toMatchObject({ generatorId: dragon.id, reason: 'asleep' });
+    expect(ctx.state.energyCurrent).toBe(energyBefore);
+    // No cooldown either: refusing is not the same as harvesting for nothing.
+    expect(dragon.readyAt).toBeUndefined();
+  });
+
+  it('refuses a paid skip — buying that cooldown away would buy nothing', () => {
+    const ctx = createTestContext();
+    ctx.systems.board.spawn('ember_dragon', 3, 2, 2, 'init');
+    const dragon = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon')!;
+    ctx.bus.emit('economy:add', { coins: 500, reason: 'test' });
+    ctx.bus.emit('time:advanced', { ms: 0 }); // arm the passive timer
+    const coinsBefore = ctx.state.coins;
+
+    sleep(ctx, dragon.id);
+    ctx.bus.emit('generator:skip', { itemId: dragon.id, currency: 'gold' });
+
+    expect(ctx.state.coins).toBe(coinsBefore);
+  });
+
+  it('hands the gem over again the moment it wakes', () => {
+    const ctx = createTestContext();
+    ctx.systems.board.spawn('ember_dragon', 3, 2, 2, 'init');
+    const dragon = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon')!;
+    const harvested = capture(ctx.bus, 'item:harvested');
+    ctx.state.energyCurrent = ctx.state.energyMax;
+
+    sleep(ctx, dragon.id);
+    ctx.bus.emit('item:tapped', { itemId: dragon.id });
+    expect(harvested).toHaveLength(0);
+
+    ctx.bus.emit('dragon:mood', { itemId: dragon.id, mood: 'awake', from: 'asleep' });
+    ctx.bus.emit('item:tapped', { itemId: dragon.id });
+
+    expect(harvested).toHaveLength(1);
+  });
+});

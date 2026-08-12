@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
-import { boardClipCharacters, clipKey, clipsFor } from '../core/characterAnims';
+import { clipKey, clipsFor } from '../core/characterAnims';
 import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES, STANDEE_BANKS } from '../core/Constants';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
@@ -153,18 +153,20 @@ export class PreloadScene extends Phaser.Scene {
         });
       }
     }
-    // …and the BOARD-DRAGON clip sets (fly / tosleep): dragons are merge pieces
-    // that can stand on any world's board, so their clips ride the boot
-    // preload rather than any one world's art list.
-    for (const id of boardClipCharacters()) {
-      for (const [clipId, clip] of Object.entries(clipsFor(id))) {
-        if (this.textures.exists(clipKey(id, clipId))) continue;
-        this.load.spritesheet(clipKey(id, clipId), clip.file, {
-          frameWidth: clip.frameWidth,
-          frameHeight: clip.frameHeight
-        });
-      }
-    }
+    // BOARD-DRAGON clip sets are NOT preloaded — BoardScene fetches a breed's
+    // when a dragon of that breed first stands on the board.
+    //
+    // They are the heaviest textures in the game by a distance, and it is frame
+    // COUNT rather than frame size: the red whelp's `fly` is 240 frames of
+    // 256×214, which Phaser uploads as one 4096×3210 sheet — 50 MB of video
+    // memory. With `idle` (194 frames, 32 MB), `tosleep` (29 MB) and `roar`
+    // (14 MB) that is 126 MB resident from the title screen, for ONE breed, in
+    // a session that may never hatch anything. Every breed added multiplies it.
+    //
+    // Deferring is safe by construction rather than by care: `dragonClip`
+    // already returns null when a sheet is not resident, and the dragon animates
+    // with its rig — which is how it moved before these clips existed at all.
+    // The clips take over the moment they land.
     // VFX bank flipbooks for the payoff beats (hatch / finale / merge / chest).
     // Only the sheets in `SHIPPED` — see src/render/vfxBank.ts for the VRAM
     // reasoning. Each is a channel-packed frame sheet plus its motion vectors;

@@ -184,6 +184,10 @@ export async function importAsset(scene: Phaser.Scene, file: File): Promise<Impo
 }
 
 /** Re-create a Phaser texture from a persisted data-URL (restoring saved maps). */
+/** `src` is a data-URL or an ordinary URL (`/asset3d/<file>`) — an `<img>` takes
+ *  either, which is what lets a placement whose base64 was dropped come back
+ *  from the file on disk. A failed load resolves as 1×1 rather than throwing;
+ *  callers that care check the size. */
 export function restoreTexture(scene: Phaser.Scene, key: string, dataUrl: string): Promise<{ w: number; h: number }> {
   return new Promise((resolve) => {
     const img = new Image();

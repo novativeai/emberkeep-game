@@ -31,6 +31,10 @@ export class GeneratorSystem {
    *  "While you were away" card reads it right after load. */
   lastOfflineGifts = 0;
 
+  /** Board dragons currently asleep (`dragon:mood`). A sleeping animal is not
+   *  a vending machine: tapping one wakes nothing and yields nothing. */
+  private sleeping = new Set<number>();
+
   /**
    * Is a scripted tutorial step on screen right now?
    *
@@ -50,6 +54,14 @@ export class GeneratorSystem {
     private chains: ChainsData
   ) {
     bus.on('item:tapped', ({ itemId }) => this.onTapped(itemId));
+    // Who is asleep, learned as a FACT off the bus rather than by asking
+    // DragonLifeSystem — mood is derived there from the day clock, the job
+    // rota and the care record, and none of that is this system's business.
+    bus.on('dragon:mood', ({ itemId, mood }) => {
+      if (mood === 'asleep') this.sleeping.add(itemId);
+      else this.sleeping.delete(itemId);
+    });
+    bus.on('item:removed', ({ itemId }) => this.sleeping.delete(itemId));
     bus.on('generator:skip', ({ itemId, currency }) => this.onSkip(itemId, currency));
     bus.on('time:advanced', () => this.tickPassive());
     bus.on('generator:set_timer', ({ chain, tier, remainingMs }) =>
@@ -187,6 +199,13 @@ export class GeneratorSystem {
     if (!item || item.kind !== 'item') return;
     const cfg = this.generatorConfig(item.chain, item.tier);
     if (!cfg) return;
+    // Same rule as the tap, and it matters more here: skipping costs Gold or
+    // Warmth, and buying a sleeping dragon's cooldown away buys nothing —
+    // the harvest at the end of it would be refused too.
+    if (this.sleeping.has(itemId)) {
+      this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'asleep' });
+      return;
+    }
     const now = this.clock.now();
     const timer = this.activeTimer(item, cfg, now);
     if (!timer) return; // already ready
@@ -228,6 +247,15 @@ export class GeneratorSystem {
     if (!generator) return; // not a generator; tooltip handling lives in UI
     if (generator.tappable === false) return; // passive-only: tap only skips (board-side)
 
+    // Asleep BEFORE the cooldown and the wallet: a sleeping dragon is not a
+    // generator with a condition on it, it is an animal that is not available.
+    // Nothing is spent, no cooldown is armed, nothing is produced — the answer
+    // is simply "later". (Its PASSIVE gift is untouched: ambience must never
+    // cost the player anything, which is the same rule that lets it nap at all.)
+    if (this.sleeping.has(itemId)) {
+      this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'asleep' });
+      return;
+    }
     const now = this.clock.now();
     if (item.readyAt !== undefined && now < item.readyAt) {
       this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'cooldown' });
