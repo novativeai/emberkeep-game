@@ -624,11 +624,19 @@ describe('world art — visiting a world never leaves the others worse off', () 
   it('scopes a world’s art to that world and nothing shared', () => {
     const ctx = new GameContext(new MemoryStorage());
     expect(worldArtKeys(ctx, 'emberkeep')).toContain('background_emberkeep');
-    // Borealis is Selyna's: its art is the backdrop AND her standee banks, which
-    // is the whole point of the one list — she is fetched on arrival and freed
-    // on departure with the ground she stands on, never separately.
+    // Borealis is Selyna's: its art is the backdrop AND everything she is drawn
+    // with — her standee banks and her Align-Studio clips. That is the whole
+    // point of the one list: she is fetched on arrival and freed on departure
+    // with the ground she stands on, never separately. The clips are the
+    // expensive half (a frame sheet is held DECODED — hers are ~104 MB of video
+    // memory from 4.8 MB of WebP), so leaving them off the list meant travel
+    // only ever added.
     expect(worldArtKeys(ctx, 'borealis').sort()).toEqual([
       'background_borealis',
+      'canim_selyna_blinking',
+      'canim_selyna_cast',
+      'canim_selyna_idle',
+      'canim_selyna_talking',
       'selyna_world_cast',
       'selyna_world_idle'
     ]);
@@ -636,8 +644,9 @@ describe('world art — visiting a world never leaves the others worse off', () 
     // world's to release, and releasing it would break the world we are ON.
     for (const id of ctx.state.worlds.keys()) {
       for (const key of worldArtKeys(ctx, id)) {
-        // Backdrop, standee banks, and (since the Hatchery cauldron) map decor.
-        expect(key).toMatch(/^(background_|decor_|[a-z]+_world_)/);
+        // Backdrop, standee banks, character clips, and (since the Hatchery
+        // cauldron) map decor.
+        expect(key).toMatch(/^(background_|decor_|canim_|[a-z]+_world_)/);
       }
     }
   });

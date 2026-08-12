@@ -5,6 +5,7 @@
  * about which world may hold which texture is a rule the unit tests can check
  * rather than something only a browser can tell you.
  */
+import { clipKey, clipsFor } from './characterAnims';
 import { STANDEE_BANKS, WORLD_ID } from './Constants';
 import type { GameContext } from './Context';
 
@@ -23,8 +24,15 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
   const keys = (world?.map.backgrounds ?? []).map((b) => `background_${b.name}`);
   for (const cfg of ctx.data.characters.characters) {
     if (cfg.world !== worldId) continue;
-    const bank = STANDEE_BANKS[cfg.art ?? cfg.id];
+    const art = cfg.art ?? cfg.id;
+    const bank = STANDEE_BANKS[art];
     if (bank) keys.push(...Object.values(bank.keys));
+    // …and her Align-Studio clips, which are by far the heaviest thing a
+    // character brings: a frame sheet is stored DECODED, so Selyna's four
+    // clips are ~104 MB of video memory from 4.8 MB of WebP. PreloadScene
+    // fetches the arriving world's; without them listed here nothing ever
+    // handed the departing world's back, and travel only ever added.
+    for (const clipId of Object.keys(clipsFor(art))) keys.push(clipKey(art, clipId));
   }
   // The map's own decor (the Hatchery cauldron, and whatever a world stands
   // up next). Boot only preloads the ACTIVE map's decor, so a travelling
