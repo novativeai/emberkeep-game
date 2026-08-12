@@ -1551,7 +1551,16 @@ export const DRAGON_ANIM = {
   /** Worker harvest (Phase 3): the dragon flies to a tapped plant, works, returns. */
   flyToMs: 520, // glide out to the plant
   workMs: 700, // breathing magic onto the plant before the loot drops
-  flyBackMs: 480 // glide home
+  flyBackMs: 480, // glide home
+  // How far BEFORE a journey's touchdown the fly clip's landing phase starts —
+  // the wings fold through the touchdown and finish on the tile, so a landing
+  // never plays out mid-air and a touchdown never happens mid-cruise.
+  landingLeadMs: 650,
+  /** Ambient bellow: after every 3–5 full idle-clip loops (rolled fresh each
+   *  time the idle starts), the roar clip plays once and hands back to idle.
+   *  The idle loop runs ~8s, so a bellow lands every ~24–40s of stillness. */
+  idleRoarMinLoops: 3,
+  idleRoarMaxLoops: 5
 } as const;
 
 /** Per-dragon-chain rig scale factor so different art reads at the SAME on-board
