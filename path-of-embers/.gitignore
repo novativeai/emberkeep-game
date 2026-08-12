@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.next-stale-prodmix/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.DS_Store
+.vercel
+.env
+.env.local
+data/

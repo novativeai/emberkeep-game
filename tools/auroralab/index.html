@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emberkeep — Aurora Lab</title>
+<style>
+  :root { --ink:#EAF4FF; --dim:#8FA3BE; --mint:#6DF5A8; --violet:#8B5CD6;
+          --panel:#0E1420; --line:#1E2A3D; --field:#161F2E; }
+  html,body { margin:0; height:100%; background:#060A12; color:var(--ink);
+              font:12px "Trebuchet MS", Verdana, sans-serif; overflow:hidden; }
+  #wrap { display:flex; height:100%; }
+  #stage { flex:1; position:relative; min-width:0; }
+  #game { position:absolute; inset:0; }
+  #hud { position:absolute; left:12px; bottom:10px; pointer-events:none; color:var(--dim);
+         text-shadow:0 1px 3px #000; line-height:1.7; }
+  #hud b { color:var(--mint); }
+  #hud .warn { color:#FFB86B; }
+
+  #panel { width:376px; flex:none; background:var(--panel); border-left:1px solid var(--line);
+           overflow-y:auto; padding-bottom:40px; }
+  h1 { font-size:13px; margin:0; padding:12px 14px; letter-spacing:.08em; text-transform:uppercase;
+       color:var(--mint); border-bottom:1px solid var(--line); position:sticky; top:0;
+       background:var(--panel); z-index:3; }
+  h1 small { float:right; color:var(--dim); text-transform:none; letter-spacing:0; font-weight:normal; }
+  .sec { border-bottom:1px solid var(--line); padding:10px 14px; }
+  .sec > h2 { font-size:11px; margin:0 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.1em; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button { flex:1; min-width:74px; }
+  button { background:var(--field); color:var(--ink); border:1px solid var(--line); border-radius:4px;
+           padding:5px 8px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--mint); }
+  button.on { background:var(--mint); color:#08131C; border-color:var(--mint); font-weight:bold; }
+  .row { display:grid; grid-template-columns:100px 1fr 54px; align-items:center; gap:6px; margin:3px 0; }
+  .row label { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row input[type=range] { width:100%; accent-color:var(--violet); }
+  .row output { text-align:right; font-variant-numeric:tabular-nums; }
+  .stops { display:flex; gap:4px; padding:2px 0 6px; }
+  .stops div { flex:1; text-align:center; }
+  .stops input { width:100%; height:26px; padding:0; border:1px solid var(--line);
+                 border-radius:3px; background:none; }
+  .stops span { display:block; font-size:9px; color:var(--dim); padding-top:2px; }
+  .layer { border:1px solid var(--line); border-radius:5px; margin:7px 0; overflow:hidden; }
+  .layer > header { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#141D2B; cursor:pointer; }
+  .layer > header b { flex:1; }
+  .layer .body { padding:5px 8px; display:none; }
+  .layer.open .body { display:block; }
+  .note { color:var(--dim); line-height:1.55; margin:0 0 8px; }
+  .bar { display:flex; gap:6px; }
+  .bar button { flex:1; }
+  #status { padding:6px 14px; color:var(--dim); min-height:15px; }
+  #status.err { color:#FF7B7B; } #status.ok { color:var(--mint); }
+  table.cost { width:100%; border-collapse:collapse; font-size:11px; }
+  table.cost td { padding:2px 0; color:var(--dim); }
+  table.cost td:last-child { text-align:right; color:var(--ink); font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage"><div id="game"></div><div id="hud"></div></div>
+  <div id="panel">
+    <h1>Aurora Lab <small id="tierRead"></small></h1>
+
+    <div class="sec">
+      <h2>Preset</h2>
+      <div class="tabs" id="presetTabs"></div>
+      <p class="note" id="presetNote" style="margin-top:8px"></p>
+    </div>
+
+    <div class="sec">
+      <h2>Quality tier <small></small></h2>
+      <div class="tabs" id="tierTabs"></div>
+      <p class="note" style="margin-top:8px">The governor drives this: active&nbsp;→&nbsp;high, idle&nbsp;→&nbsp;medium, doze&nbsp;→&nbsp;the sky freezes on its last frame.</p>
+      <table class="cost" id="costTable"></table>
+    </div>
+
+    <div class="sec">
+      <h2>Backdrop</h2>
+      <div class="tabs">
+        <button id="bgArt" class="on">borealis art</button>
+        <button id="bgNight">flat night</button>
+        <button id="bgBlack">black</button>
+      </div>
+      <div class="bar" style="margin-top:6px">
+        <button id="btnFreeze">freeze</button>
+        <button id="btnStep">+2s</button>
+        <button id="btnBand">band ½ / ⅔</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>Curtain colour — bottom → top</h2>
+      <div class="stops" id="rampRow"></div>
+      <p class="note">Indexed by height <b>inside</b> the curtain, so a fold carries its violet fringe with it. Bottom is the nitrogen fringe, the middle is oxygen green, the top fades to red-violet.</p>
+    </div>
+
+    <div class="sec" id="globalSec"><h2>Display</h2></div>
+    <div class="sec" id="layersSec"></div>
+
+    <div class="sec">
+      <div class="bar">
+        <button id="btnSave">save → src/data</button>
+        <button id="btnCopy">copy JSON</button>
+        <button id="btnReset">reload</button>
+      </div>
+      <div id="status"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import Phaser from 'phaser';
+import { AuroraFX, AURORA_QUALITY, costEstimate, validateAuroraFile } from '/src/render/fx/AuroraFX.ts';
+import { RAMP_STOPS } from '/src/render/fx/auroraShader.ts';
+
+/* --------------------------------------------------------------- clock --- */
+let FROZEN = false, FREEZE_AT = 0, VOFF = 0;
+const now = () => (FROZEN ? FREEZE_AT : performance.now() + VOFF);
+window.__setT = (ms) => { FROZEN = true; FREEZE_AT = ms; };
+window.__advance = (ms) => { if (FROZEN) FREEZE_AT += ms; else VOFF += ms; };
+window.__live = () => { FROZEN = false; };
+
+/* --------------------------------------------------------------- state --- */
+const DOC = await (await fetch('/__auroralab/presets')).json();
+const PRISTINE = JSON.parse(JSON.stringify(DOC));
+window.__doc = DOC;
+
+const state = { preset: Object.keys(DOC.presets)[0], tier: 'high', bg: 'art', bandFrac: 0.5, open: new Set(['0']) };
+window.__state = state;
+
+const RAMP_LABELS = ['fringe', 'lower', 'core', 'upper', 'top'];
+const GLOBALS = [
+  ['intensity', 0, 2.5, 0.01, 'master gain'],
+  ['octaves', 1, 5, 1, 'fBm detail — the single biggest cost lever'],
+  ['dither', 0, 4, 0.1, 'sub-LSB noise that kills 8-bit banding'],
+  ['fadeBottom', 0.02, 0.6, 0.01, 'where the band dissolves into the sky'],
+  ['surgeSpeed', 0, 0.2, 0.001, 'brightness travelling along the curtain'],
+  ['surgeWidth', 0.02, 0.5, 0.01, 'how wide that surge is'],
+  ['surgeGain', 0, 2, 0.01, 'how much brighter the surge gets']
+];
+const LAYER_FIELDS = [
+  ['baseY', 0, 1, 0.01, 'height of the curtain’s lower border'],
+  ['thickness', 0.05, 1.2, 0.01, 'vertical extent'],
+  ['rayFreq', 1, 40, 0.5, 'ray density across the sky'],
+  ['foldAmp', 0, 0.4, 0.005, 'how far the lower border folds'],
+  ['brightness', 0, 2, 0.01, ''],
+  ['drift', 0, 0.2, 0.001, 'horizontal travel of the rays'],
+  ['shimmer', 0, 0.5, 0.002, 'how fast the rays shimmer in place'],
+  ['seed', 0, 99, 0.1, 'decorrelates this curtain from its siblings']
+];
+
+/* --------------------------------------------------------------- scene --- */
+const W = 2560, H = 1600;   // the game's canvas, so sizes read as game px
+
+class Lab extends Phaser.Scene {
+  preload() {
+    this.load.image('borealis', '/sprites/background/borealis.webp');
+    this.load.on('loaderror', (f) => { window.__loadErr = f.key; });
+  }
+  create() {
+    this.cameras.main.setBackgroundColor('#060A12');
+    this.bgArt = this.add.image(0, 0, 'borealis').setOrigin(0, 0).setDepth(0);
+    const s = Math.max(W / this.bgArt.width, H / this.bgArt.height);
+    this.bgArt.setDisplaySize(this.bgArt.width * s, this.bgArt.height * s);
+    this.bgNight = this.add.rectangle(0, 0, W, H, 0x0b1430).setOrigin(0, 0).setDepth(0).setVisible(false);
+    window.__scene = this;
+    rebuild();
+    applyBackdrop();
+    window.__ready = true;
+  }
+  update() {
+    window.__aurora?.update();
+    hud();
+  }
+}
+
+let fps = 0, frames = 0, fpsAt = 0;
+function hud() {
+  frames++;
+  const t = performance.now();
+  if (t - fpsAt >= 500) { fps = (frames * 1000) / (t - fpsAt); frames = 0; fpsAt = t; }
+  const a = window.__aurora;
+  const q = AURORA_QUALITY[state.tier];
+  const el = document.getElementById('hud');
+  if (!a) { el.textContent = ''; return; }
+  const c = a.cost(60);
+  el.innerHTML =
+    `<b>${fps.toFixed(0)}</b> fps &nbsp;·&nbsp; aurora re-renders <b>${q.fps}/s</b> at <b>1/${q.scale}</b> resolution ` +
+    `(${Math.round(W / q.scale)}×${Math.round((H * state.bandFrac) / q.scale)}) &nbsp;·&nbsp; ` +
+    `shader work <b>${(c.relativeToNaive * 100).toFixed(1)}%</b> of the naive full-res version` +
+    (window.__idle?.().capped
+      ? ' &nbsp;·&nbsp; <span class="warn">idle — capped to 10 fps, move the mouse</span>'
+      : fps < 45 ? ' <span class="warn">— frame rate is down</span>' : '');
+}
+
+function rebuild() {
+  const sc = window.__scene;
+  if (!sc) return;
+  window.__aurora?.destroy();
+  const preset = DOC.presets[state.preset];
+  window.__aurora = new AuroraFX(sc, preset, {
+    now, width: W, height: H * state.bandFrac, x: 0, y: 0, depth: 10, tier: state.tier
+  });
+  paintCost();
+}
+
+function applyBackdrop() {
+  const sc = window.__scene;
+  if (!sc) return;
+  sc.bgArt.setVisible(state.bg === 'art');
+  sc.bgNight.setVisible(state.bg === 'night');
+  sc.cameras.main.setBackgroundColor(state.bg === 'black' ? '#000000' : '#060A12');
+}
+
+/* ------------------------------------------------------------- controls --- */
+const el = (parent, tag = 'div', cls) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  parent.appendChild(n);
+  return n;
+};
+const fmt = (v, step) => (step >= 1 ? String(Math.round(v)) : v.toFixed(step >= 0.01 ? 2 : 3));
+
+let pending = 0;
+const apply = () => {
+  clearTimeout(pending);
+  pending = setTimeout(() => {
+    const errs = validateAuroraFile(DOC);
+    setStatus(errs.length ? errs[0] : '', errs.length ? 'err' : '');
+    // Retune the LIVE effect — no rebuild, so the sky never restarts under you.
+    window.__aurora?.refresh();
+    paintCost();
+  }, 40);
+};
+function setStatus(text, cls = '') {
+  const s = document.getElementById('status');
+  s.textContent = text; s.className = cls;
+}
+
+function slider(parent, obj, key, min, max, step, title) {
+  const row = el(parent, 'div', 'row');
+  const lab = el(row, 'label');
+  lab.textContent = key;
+  if (title) lab.title = title;
+  const input = el(row, 'input');
+  input.type = 'range'; input.min = min; input.max = max; input.step = step; input.value = obj[key];
+  const out = el(row, 'output');
+  out.textContent = fmt(obj[key], step);
+  input.oninput = () => { obj[key] = +input.value; out.textContent = fmt(obj[key], step); apply(); };
+}
+
+function tabs(host, items, get, set) {
+  host.innerHTML = '';
+  for (const it of items) {
+    const b = el(host, 'button');
+    b.textContent = it.label ?? it;
+    b.className = get() === (it.id ?? it) ? 'on' : '';
+    b.onclick = () => { set(it.id ?? it); paint(); };
+  }
+}
+
+function paintCost() {
+  const t = document.getElementById('costTable');
+  const p = DOC.presets[state.preset];
+  t.innerHTML = '';
+  for (const tier of ['high', 'medium', 'low']) {
+    const q = AURORA_QUALITY[tier];
+    const c = costEstimate(W, H * state.bandFrac, q, p.octaves, 60);
+    const tr = el(t, 'tr');
+    el(tr, 'td').textContent = `${tier} — 1/${q.scale} @ ${q.fps}/s, ${Math.min(p.octaves, q.maxOctaves)} oct`;
+    el(tr, 'td').textContent = `${(c.relativeToNaive * 100).toFixed(1)}%`;
+  }
+}
+
+function paint() {
+  tabs(document.getElementById('presetTabs'),
+    Object.keys(DOC.presets).map((id) => ({ id, label: DOC.presets[id].label.split('—')[0].trim() })),
+    () => state.preset, (v) => { state.preset = v; rebuild(); });
+  tabs(document.getElementById('tierTabs'), ['high', 'medium', 'low'],
+    () => state.tier, (v) => { state.tier = v; window.__aurora?.setTier(v); paintCost(); });
+
+  const p = DOC.presets[state.preset];
+  document.getElementById('tierRead').textContent = `${state.preset} · ${state.tier}`;
+  document.getElementById('presetNote').textContent = p.note ?? '';
+
+  const rr = document.getElementById('rampRow');
+  rr.innerHTML = '';
+  for (let i = 0; i < RAMP_STOPS; i++) {
+    const cell = el(rr, 'div');
+    const input = el(cell, 'input');
+    input.type = 'color'; input.value = p.ramp[i];
+    input.oninput = () => { p.ramp[i] = input.value.toUpperCase(); apply(); };
+    el(cell, 'span').textContent = RAMP_LABELS[i];
+  }
+
+  const gs = document.getElementById('globalSec');
+  gs.innerHTML = '<h2>Display</h2>';
+  for (const [key, min, max, step, title] of GLOBALS) slider(gs, p, key, min, max, step, title);
+
+  const ls = document.getElementById('layersSec');
+  ls.innerHTML = '<h2>Curtains — far to near</h2>';
+  p.layers.forEach((l, i) => {
+    const card = el(ls, 'div', 'layer' + (state.open.has(String(i)) ? ' open' : ''));
+    const head = el(card, 'header');
+    el(head, 'b').textContent = `curtain ${i + 1}`;
+    const meta = el(head, 'span');
+    meta.style.cssText = 'color:var(--dim); font-size:10px';
+    meta.textContent = `base ${l.baseY.toFixed(2)} · rays ${l.rayFreq}`;
+    head.onclick = () => {
+      state.open.has(String(i)) ? state.open.delete(String(i)) : state.open.add(String(i));
+      paint();
+    };
+    const body = el(card, 'div', 'body');
+    for (const [key, min, max, step, title] of LAYER_FIELDS) slider(body, l, key, min, max, step, title);
+  });
+  paintCost();
+}
+
+/* Hooks for tools/checks/auroratest.mjs — the lab's state is module-scoped, and
+ * a harness that cannot reach it can only check that pixels changed. */
+window.__rebuildAurora = rebuild;
+window.__paintPreset = paint;
+
+document.getElementById('bgArt').onclick = (e) => setBg('art', e.target);
+document.getElementById('bgNight').onclick = (e) => setBg('night', e.target);
+document.getElementById('bgBlack').onclick = (e) => setBg('black', e.target);
+function setBg(v, btn) {
+  state.bg = v;
+  for (const id of ['bgArt', 'bgNight', 'bgBlack']) document.getElementById(id).className = '';
+  btn.className = 'on';
+  applyBackdrop();
+}
+document.getElementById('btnFreeze').onclick = (e) => {
+  FROZEN = !FROZEN;
+  if (FROZEN) FREEZE_AT = performance.now() + VOFF;
+  e.target.className = FROZEN ? 'on' : '';
+};
+document.getElementById('btnStep').onclick = () => { window.__advance(2000); window.__aurora?.update(); };
+document.getElementById('btnBand').onclick = () => {
+  state.bandFrac = state.bandFrac === 0.5 ? 0.667 : 0.5;
+  rebuild();
+  setStatus(`band = top ${Math.round(state.bandFrac * 100)}% of the screen`, 'ok');
+};
+document.getElementById('btnCopy').onclick = async () => {
+  await navigator.clipboard.writeText(JSON.stringify(DOC, null, 2));
+  setStatus('aurora JSON copied', 'ok');
+};
+document.getElementById('btnReset').onclick = () => {
+  Object.assign(DOC, JSON.parse(JSON.stringify(PRISTINE)));
+  paint(); rebuild();
+  setStatus('reloaded from disk', 'ok');
+};
+document.getElementById('btnSave').onclick = async () => {
+  const errs = validateAuroraFile(DOC);
+  if (errs.length) { setStatus(errs[0], 'err'); return; }
+  const r = await fetch('/__auroralab/presets', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DOC, null, 2)
+  });
+  const j = await r.json();
+  setStatus(j.ok ? 'saved → src/data/aurora.json' : j.error, j.ok ? 'ok' : 'err');
+};
+
+/* ---------------------------------------------------------------- boot --- */
+const game = new Phaser.Game({
+  type: Phaser.WEBGL,
+  parent: 'game',
+  width: W, height: H,
+  backgroundColor: '#060A12',
+  scene: Lab,
+  render: { antialias: true },
+  // Phaser binds its limit-aware step ONCE at boot: without an fps limit here
+  // the idle guard below has nothing to retune.
+  fps: { limit: 60 },
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
+});
+window.__game = game;
+
+/* ---------------------------------------------------------- idle guard --- */
+/* A tuning lab left open is a shader running at 60fps on someone's laptop for
+ * as long as the tab is visible. Phaser already sleeps the loop when the tab is
+ * HIDDEN; this covers the other case — visible but unattended. */
+let idleAt = performance.now();
+let capped = false;
+const setCap = (fps) => {
+  game.loop.fpsLimit = fps;
+  game.loop._limitRate = 1000 / fps;   // derived only at construction; retune it too
+};
+const wake = () => {
+  idleAt = performance.now();
+  if (capped) { capped = false; setCap(60); }
+};
+for (const t of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart']) {
+  window.addEventListener(t, wake, { passive: true, capture: true });
+}
+const idleTimer = setInterval(() => {
+  if (!capped && performance.now() - idleAt > 20000) { capped = true; setCap(10); }
+}, 2000);
+window.__idle = () => ({ capped, fpsLimit: game.loop.fpsLimit });
+/* The headless harnesses never move a mouse, so without this the guard throttles
+ * them to 10fps mid-measurement and every pixel reading goes stale. */
+window.__keepAwake = () => { clearInterval(idleTimer); wake(); };
+window.__forceIdle = () => { idleAt = performance.now() - 21000; };
+window.__errors = [];
+window.addEventListener('error', (e) => window.__errors.push(String(e.message)));
+game.events.once('ready', () => paint());
+</script>
+</body>
+</html>

@@ -1,25 +1,225 @@
 {
-  "orderComplete": [
-    "“So it burns again. Perhaps you ARE a Keeper.” — Cindra",
-    "“Hmph. The old court would have taken twice as long.” — Cindra",
-    "“Warmer already. Don't let it go to your head.” — Cindra",
-    "“The Flame remembers hands like yours.” — Cindra"
-  ],
-  "goldenEgg": {
-    "early": ["It's warm…", "Something ANCIENT stirs within…", "It hums an old, old song."],
-    "mid": ["It's getting warmer!", "Was that… a heartbeat?", "It remembers the Great Flame…"],
-    "near": ["It's trembling!", "The gold burns bright — she is almost awake!"]
+  "orderComplete": {
+    "1": [
+      "“Delivered, and early. I'd ask how, but I've decided not to look a gift Keeper in the mouth.” — Eleanor",
+      "“Warmer. Not warm. But warmer, and I'll take the comparative.” — Eleanor",
+      "“That's the ledger square for today. Rest — it doesn't run off if you stop.” — Eleanor",
+      "“Good. Do that again tomorrow and I'll start believing it.” — Eleanor"
+    ],
+    "2": [
+      "“Something upslope lifted its head just then. I don't know which one. It felt that.” — Eleanor",
+      "“Another one down. The isle is keeping count even if you aren't.” — Eleanor",
+      "“You work like someone who's done this before. You haven't — I checked.” — Eleanor"
+    ],
+    "3": [
+      "“Thank you. Genuinely. I'm short of things to say today that aren't hedged.” — Eleanor",
+      "“Take the gold and buy something pointless with it. That's an instruction.” — Eleanor",
+      "“It's going faster than it should. Not a complaint — it's true, and it frightens me slightly.” — Eleanor"
+    ],
+    "4": [
+      "“Delivered. And you're still here, which I notice every single time.” — Eleanor",
+      "“I keep expecting to look up and find you gone. Ignore that. Next one's on the shelf.” — Eleanor",
+      "“You have a better hand for this than I ever did. That isn't modesty, it's arithmetic. I've watched you do it.” — Eleanor"
+    ],
+    "5": [
+      "“She watches you work, you know. She doesn't watch me.” — Eleanor",
+      "“Whatever you decided about me, you're still filling my ledger. I've stopped trying to work out what that means.” — Eleanor",
+      "“Thank you, Keeper. I've started being able to say the word.” — Eleanor"
+    ],
+    "6": [
+      "“My sister will call this inefficient. My sister says that about weather.” — Eleanor",
+      "“Cold work. Different craft up here — hold it, don't hand it back. I'm out of my depth and enjoying it, which is new.” — Eleanor"
+    ]
   },
-  "finaleCindra": "So the Elder wakes for YOU. Keeper… the Great Flame didn't die — it was TAKEN. Rest now. At dawn, we follow her past the southern ash.",
-  "finaleCindraProphecy": "The old altar stirs, Keeper — finish my first request, and what sleeps there will wake for you. And the Great Flame? It didn't die. It was TAKEN.",
-  "goldenArrival": "“The old altar ANSWERS you, Keeper. So the stories about that egg were true.” — Cindra",
-  "lateAwakening": "At last — she waited for YOU, Keeper. The Elder rises, just as the stories promised.",
+  "goldenEgg": {
+    "early": [
+      "It's warm…",
+      "Something ANCIENT stirs within…",
+      "It hums an old, old song."
+    ],
+    "mid": [
+      "It's getting warmer!",
+      "Was that… a heartbeat?",
+      "It remembers the Great Flame…"
+    ],
+    "near": [
+      "It's trembling!",
+      "The gold burns bright — she is almost awake!"
+    ]
+  },
+  "finaleElder": "…Keeper. I have slept an age, and I woke to YOUR hands. So hear it from the only one still living who SAW: the Great Flame did not die. It was TAKEN. And it was carried NORTH. There is a woman on that ice who kept a light burning while the rest of us slept — she will not be glad to see you. Go anyway.",
+  "finaleElderProphecy": "…Keeper. I stir, but I do not rise — the altar is still cold, and Eleanor's first request goes unanswered. Finish it, and I will tell you what no one else living can: the Great Flame did not die. It was TAKEN.",
+  "goldenArrival": "“The old altar ANSWERS you, Keeper. So the stories about that egg were true.” — Eleanor",
+  "gateOpens": {
+    "speaker": "eleanor",
+    "lines": [
+      "…Do you feel that? Beside her altar — the air is standing open. She woke, and the way north woke with her.",
+      "It goes to the ice. My sister keeps that shore. Selyna. Sharper than me, and alone far longer than sixty years.",
+      "Her fire opened it, so it is yours to walk through. Whenever you are ready, Keeper — I will keep the isle warm."
+    ]
+  },
+  "tours": {
+    "roothold": {
+      "intro": [
+        "So this is what I could not show you before. Roothold — my home, and the last roof the fire never reached.",
+        "Sixty years I kept shop up here alone. From today, the door stands open for you."
+      ],
+      "house": "That house is my Emporium — everything I kept safe from the old court. Tap it.",
+      "sections": [
+        "Manor skins. The Keep wears what you choose — walls remember being looked after.",
+        "Decorations. Small things, but small things are how ground becomes yours.",
+        "Dragon skins. My needle, their scales. They do preen, you know."
+      ],
+      "close": "That is the whole of it. The ✕ up there closes the shop — go on.",
+      "outro": "And now it travels with you: the shop button, bottom right, wherever you stand. My shelves are always open, Keeper."
+    },
+    "hatchery": {
+      "intro": [
+        "The Hatchery. Mine before it was anyone's — every dragon the north still has hatched inside that circle.",
+        "You will not be shown all of it today. One thing first."
+      ],
+      "cauldron": "The cauldron, on the rune. Tap it.",
+      "explain": "It trades from your satchel: the right things in, and it gives back what no board can grow. The circle decides what is right.",
+      "close": "The ✕ shuts it. That is all I am showing you until I trust you with more."
+    }
+  },
+  "lateAwakening": "…At last. I waited for YOU, Keeper — not for her. The Elder rises, just as the stories promised.",
   "hints": {
     "zeroWarmth": "Out of Warmth? Rest by the fire — it returns on its own. The emberberry patch never needs any!",
-    "boardFull": "The board is crowded! Sell a spare piece, or deliver to Cindra's Ledger to make room.",
+    "boardFull": "The board is crowded! Sell a spare piece, or deliver to my Ledger to make room.",
     "eggTrembles": "Keeper — the egg! Look at the egg on the old altar, it's TREMBLING!",
     "twoDragons": "TWO grown Red Dragons?! Keeper, bring them together — when two flames meet, an ELDER rises!",
-    "twoHouses": "Two Houses standing… join them! Emberkeep folk raise a MANOR when hearths unite — grander gold within."
+    "twoHouses": "Two Houses standing… join them! Emberkeep folk raise a MANOR when hearths unite — grander gold within.",
+    "goldSkip": "Two ways past a wait, Keeper: gold or Warmth. Gold is the cheaper of the two — and patience is cheaper still, for both prices fall as the timer runs down.",
+    "houseCommission": "A House is a workshop, Keeper — pick ONE thing from your bag and it will make that, and only that, forever. Want a second? Build a second House."
   },
-  "tasksComplete": "“Every task, done. The Keep hasn't been this warm in an age… you've earned your rest, Keeper.” — Cindra"
+  "tasksComplete": "“Every task, done. The Keep hasn't been this warm in an age… you've earned your rest, Keeper.” — Eleanor",
+  "regard": {
+    "eleanor": {
+      "giftAccepted": [
+        "Oh — for me? I'll find somewhere to put it. Somewhere I can see it from the desk.",
+        "Thank you. I'm keeping this one, so don't ask for it back in a fortnight.",
+        "You didn't have to. I've written that down, which is what I do instead of saying it.",
+        "Right. Yes. Good. …I'm going to stop talking now, before I say something sincere."
+      ],
+      "giftDeclined": [
+        "That's kind, but it isn't what I need. Ask me — I'll tell you plainly.",
+        "Hold on to that one. I've nowhere to put it and nothing to do with it.",
+        "No. Not because I don't want it — because you'll want it more than I will."
+      ],
+      "hearts": {
+        "1": {
+          "speaker": "eleanor",
+          "lines": [
+            "Stop a moment. You've been at this longer than most people last on this isle.",
+            "The last three came for the stories, saw the ash, and went home before the second morning. I'm not saying that to be grim. I'm saying I'd stopped counting, and I've started again."
+          ]
+        },
+        "2": {
+          "speaker": "eleanor",
+          "lines": [
+            "I've been keeping the ledger since I was eleven. That isn't a boast, it's an accident — there was nobody else, and the book doesn't care how old you are.",
+            "So when I hand you a page, understand what I'm handing over. It's the only thing I've ever been allowed to be in charge of."
+          ]
+        },
+        "3": {
+          "speaker": "eleanor",
+          "lines": [
+            "I caught myself saying our ledger this morning. To a goat. There was nobody else awake.",
+            "I'm not going to correct it. It's been mine for thirty years and I have not enjoyed a single one of them, and now it's ours and I find I do."
+          ]
+        },
+        "4": {
+          "speaker": "eleanor",
+          "lines": [
+            "I want to say a true thing and then not discuss it.",
+            "I wasn't keeping this place warm. I was keeping it *ready*. For somebody. I didn't know who, and I'd have denied it if you'd asked me last spring.",
+            "That's the whole confession. Don't be kind about it, I'll come apart."
+          ]
+        },
+        "5": {
+          "speaker": "eleanor",
+          "lines": [
+            "There you are. And your dragons — I know all their names now, which I did not intend to learn and could not now forget.",
+            "Whatever comes south of here, and something is coming, you should know you're not doing it as a stranger. Not to me.",
+            "That's all. Go on. The book will keep."
+          ]
+        }
+      }
+    },
+    "selyna": {
+      "giftAccepted": [
+        "…Fine. I'll take it. Don't make a thing of it.",
+        "Useful. That's the highest word I have and you've had it now, so don't wait for another.",
+        "You bring what I ask for and nothing else. That is rarer up here than you'd think.",
+        "Set it down. …Thank you. There. It didn't kill me."
+      ],
+      "giftDeclined": [
+        "I didn't ask for that. I ask for exactly what I want, southerner, and never more.",
+        "No. Take it back before the cold gets into it.",
+        "That's a gift, and I don't know what to do with those. Bring me what's on the list."
+      ],
+      "hearts": {
+        "1": {
+          "speaker": "selyna",
+          "lines": [
+            "You came back. People don't, usually. The crossing sorts them out.",
+            "I'm not warming to you. I'm noting a pattern. There's a difference and I intend to keep it."
+          ]
+        },
+        "2": {
+          "speaker": "selyna",
+          "lines": [
+            "You can walk the shingle without me watching you do it. That's not affection. It's that I've other things to watch.",
+            "The animals decided about you first, incidentally. They usually do. I've been told it's the one thing I trust more than my own judgement, and I've never found the argument against it."
+          ]
+        },
+        "3": {
+          "speaker": "selyna",
+          "lines": [
+            "She sends you with the good rope and the careful instructions and she never once writes to ask how I am.",
+            "I'm not asking you to take a side. I'm telling you there's a shape to it, and you've been standing inside the shape for a while now without noticing."
+          ]
+        },
+        "4": {
+          "speaker": "selyna",
+          "lines": [
+            "You're being careful with me.",
+            "Nobody's careful with me who hasn't been told to be. So either she told you — and I don't think she did — or you worked it out, which is worse, because it means it shows."
+          ]
+        },
+        "5": {
+          "speaker": "selyna",
+          "lines": [
+            "Sit down. I'm going to say this once and at the speed I say things.",
+            "I have spent my life holding a thing nobody came for. You came. That is the entire difference between this year and the last forty, and I would like it on the record that I noticed.",
+            "…Right. That's enough of that. The dragons want feeding."
+          ]
+        }
+      }
+    }
+  },
+  "chapters": {
+    "2": {
+      "speaker": "eleanor",
+      "lines": [
+        "That's the first thing anyone has given back to this place in sixty years. I would like to be composed about it. I'm not going to manage it.",
+        "You should know what you're working for. My craft isn't a large one. I can catch a thing, hold it, and give it back. That's the whole of it.",
+        "The moon does the same trick every night. Takes light it was never given, hands it back cooler. Nobody calls that a miracle. They call it evening.",
+        "So when I ask you for moonwater, understand that I'm not making anything. Everything I do, somebody else lit first."
+      ]
+    }
+  },
+  "arrivals": {
+    "borealis": {
+      "speaker": "selyna",
+      "lines": [
+        "So you're the one she found.",
+        "Don't come any closer yet — the ice between us is thinner than it looks, and I have not decided anything about you.",
+        "You'll want to know what I have. Don't ask me that yet.",
+        "Nine feet of shingle and whatever the tide left on it. That is the whole of your holding, Keeper. Nothing grows here — every stick of wood you see arrived on the water.",
+        "Bind two faggots of it and I'll light a fire you can steer by. That buys you the coast, Keeper — the door comes when I say it does."
+      ]
+    }
+  }
 }

@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
+import { FONT } from '../art/design';
 import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
 
-const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
 /**
  * Start screen: the logo (from /logo) COVERS the whole screen — nothing else.
@@ -41,7 +41,7 @@ export class TitleScene extends Phaser.Scene {
       // Fallback wordmark on the (transparent) canvas if the DOM logo is absent.
       this.add
         .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 120, 'EMBERKEEP', {
-          fontFamily: FONT,
+          fontFamily: FONT.ui,
           fontSize: '192px',
           fontStyle: 'bold',
           color: PALETTE.cream

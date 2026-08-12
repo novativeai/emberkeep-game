@@ -7,6 +7,27 @@
 >
 > Design goal in one sentence: **the player should finish wanting the next
 > chapter, not wondering if there was one.**
+>
+> ---
+>
+> ## ✅ STATUS: SHIPPED (this plan was built)
+>
+> All five build-order waves in §8 are done. Read this document as the
+> **authoring intent** behind the demo, not as a to-do list. Where the build
+> diverged from the plan, the build won and this file has been corrected — the
+> notable deltas:
+>
+> | Plan said | Shipped as |
+> | --- | --- |
+> | a **Golden Whelp** hatches and runs to the terrace | a **Golden Elder** *awakens* at the scenic **Golden Altar** west of the isle (`GOLDEN_ALTAR`); the camera flies to the terrace, she stays at her altar |
+> | Whelp follows the player's taps in Act V | the Elder stands at the altar for **communing taps** (`elder:tapped`) |
+> | tasks: "fill the board's moss", "make the Whelp dance" | tasks: **merge 30×**, **commune with the Elder 10×** (`tasks.json`) |
+> | dragon cooldown / passive 25 s / 120 s | **45 s / 180 s** at tier 3, 30 s / 120 s for Adults |
+> | "the existing 16-step tutorial" | the tutorial is **21 steps** |
+>
+> The finale timeline is now a single shared constant (`FINALE` in
+> `Constants.ts`) driving BoardScene and UIScene in step. Live numbers:
+> [GDD-L1.md](GDD-L1.md).
 
 ---
 
@@ -60,7 +81,7 @@ order, an unlock, a chest, a bloom). The audit found the current build has a
 
 ### ACT I — The Tutorial (0–7 min) · keep as-is, two touches
 
-The existing 16-step tutorial is the demo's strongest asset. Keep it. Add:
+The existing (now 21-step) tutorial is the demo's strongest asset. Keep it. Add:
 
 - **T1. Plant the far promise. [data + reuse]** During the `levelup` camera
   moment, let the fly-over *linger one beat* on the south terrace (`level_5`
@@ -138,11 +159,13 @@ The player now knows the loop; give them *choices* instead of a queue:
 A scripted ~40-second sequence (**[med]** — one choreographed UIScene/BoardScene
 sequence; every individual effect already exists):
 
-1. **The level-up fires** — but instead of the standard banner, the screen
-   holds… the Golden Egg cracks. **Golden hatch ceremony** (existing shell
-   FX, gold-tinted): a **Golden Whelp** — a breed the player has never seen.
-2. **It runs to the south terrace edge** and cries at the fog. The camera
-   follows (the zone-fly already built — the game's best moment, reused).
+1. **The level-up fires** — but instead of the standard banner, the camera
+   glides west to the **Golden Altar** and the Golden Egg cracks. **Golden
+   awakening ceremony** (existing shell FX, gold-tinted): the **Golden Elder** —
+   a legendary dragon asleep since the Flame was taken, a breed the player has
+   never seen.
+2. **The camera flies to the south terrace.** (The zone-fly already built — the
+   game's best moment, reused.)
 3. **The fog parts *halfway*** (fog-lift stagger, stopped at 50%): a 2-second
    glimpse — warm light, silhouettes of a shrine and two unfamiliar dragon
    shapes (static silhouette sprites, cheap) — then the ash settles back.
@@ -165,16 +188,16 @@ pauses, not because the content ran out.
 
 ### ACT V — The Encore (open-ended) · for players who stay
 
-"Keep Playing" returns to the board with the Golden Whelp following the
-player's taps (cosmetic companion — it never works, it's a baby):
+"Keep Playing" returns to the board with the Golden Elder standing at her
+altar, tappable for communing (cosmetic — she never works, she's a legend):
 
 - **Order 4 becomes "Cindra's Hoard — an encore request"** [data] plus a
   small **repeatable order template** (N× gems, scaling N — [small]) so the
   Ledger never dead-ends.
 - **Keeper's Tasks** [small]: a 5-item chapter checklist replacing daily
   quests (a demo shouldn't ask for a calendar — it should ask for one more
-  session): *hatch 4 dragons · complete 5 orders · fill the board's moss ·
-  earn 500 gold · make the Whelp dance (tap it 10×)*. Finishing all five:
+  session): *hatch 4 dragons · complete 5 orders · merge 30 times ·
+  earn 500 gold · commune with the Golden Elder (tap her 10×)*. Finishing all five:
   a golden chest rain + one last Cindra line. Lives as the second tab of
   Cindra's Ledger (one quest board, not two menus); the tab appears when the
   tutorial ends.
@@ -191,7 +214,7 @@ player's taps (cosmetic companion — it never works, it's a baby):
 | Cindra never speaks | whole demo | ★ One line at finale | Story spine |
 | "The Flame was **taken**" | ★ Finale | No — the cliffhanger | Campaign mystery |
 | Silhouette cards (breed/terrace) | Chapter card | No | Content roadmap |
-| Golden Whelp (baby, can't work yet) | Act V | Companion only | Grows into a worker |
+| Golden Elder (awake, but she won't work) | Act V | Communing taps only | Her own chain & the Flame's return |
 
 Principle: **pay 3 of 6 threads inside the demo** so the player trusts that
 promises get kept — that trust is what converts the unpaid three into desire
@@ -203,7 +226,7 @@ instead of frustration.
 
 | Knob | Ship value for demo | Why |
 | --- | --- | --- |
-| Dragon cooldown / passive | 25 s / 120 s | Act II must be active play |
+| Dragon cooldown / passive | 45 s / 180 s (t3) · 30 s / 120 s (Adult) | Act II must be active play |
 | ENERGY_REGEN_MS / MAX | 60 s / 30 | session gate, not a wall |
 | Crystal / Chest interval | 300 s / 300 s | dragon #2 + rhythm beats |
 | Order 1 | 6× t1, +25 gold | 3-minute first win |
@@ -235,7 +258,7 @@ still work unchanged. Bump `SAVE_VERSION` for Keeper's-Tasks state.
 
 - **No daily quests / login streaks** — wrong tool for a demo; the Keeper's
   Tasks checklist and the cliffhanger do the retention work.
-- **No new art-heavy content** — the Golden Whelp can be a gold-tinted
+- **No new art-heavy content** — the Golden Elder can be a gold-tinted
   existing rig; terrace silhouettes are static sprites; everything else is
   re-choreographed existing FX.
 - **No economy depth** (gold sinks, key ladders, shop rework) beyond the
@@ -252,7 +275,7 @@ still work unchanged. Bump `SAVE_VERSION` for Keeper's-Tasks state.
 3. **Finale** [med, 2–3 days]: the 5-step L3 sequence + chapter card (replaces
    `EndScreen('level3')`), fog half-glimpse, Cindra's line.
 4. **Encore** [small, ~1 day]: repeatable order template, Keeper's Tasks,
-   Whelp companion, welcome-back card.
+   Elder communing, welcome-back card.
 5. **Verify** : `pnpm verify` + extend e2e through the finale; then a real
    10-person playtest measuring §9.
 

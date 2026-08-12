@@ -1,0 +1,316 @@
+{
+  "character": "eleanor",
+  "sequence": "the-ember-never-truly-went-out",
+  "fps": 12,
+  "width": 550,
+  "height": 768,
+  "frameCount": 51,
+  "frames": [
+    {
+      "index": 0,
+      "file": "eleanor_the-ember-never-truly-went-out_00000.png",
+      "durationMs": 68,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "eleanor_the-ember-never-truly-went-out_00001.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 2,
+      "file": "eleanor_the-ember-never-truly-went-out_00002.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "eleanor_the-ember-never-truly-went-out_00003.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 4,
+      "file": "eleanor_the-ember-never-truly-went-out_00004.png",
+      "durationMs": 70,
+      "blend": false
+    },
+    {
+      "index": 5,
+      "file": "eleanor_the-ember-never-truly-went-out_00005.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 6,
+      "file": "eleanor_the-ember-never-truly-went-out_00006.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 7,
+      "file": "eleanor_the-ember-never-truly-went-out_00007.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 8,
+      "file": "eleanor_the-ember-never-truly-went-out_00008.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 9,
+      "file": "eleanor_the-ember-never-truly-went-out_00009.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 10,
+      "file": "eleanor_the-ember-never-truly-went-out_00010.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 11,
+      "file": "eleanor_the-ember-never-truly-went-out_00011.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 12,
+      "file": "eleanor_the-ember-never-truly-went-out_00012.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 13,
+      "file": "eleanor_the-ember-never-truly-went-out_00013.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 14,
+      "file": "eleanor_the-ember-never-truly-went-out_00014.png",
+      "durationMs": 95,
+      "blend": false
+    },
+    {
+      "index": 15,
+      "file": "eleanor_the-ember-never-truly-went-out_00015.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 16,
+      "file": "eleanor_the-ember-never-truly-went-out_00016.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 17,
+      "file": "eleanor_the-ember-never-truly-went-out_00017.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 18,
+      "file": "eleanor_the-ember-never-truly-went-out_00018.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 19,
+      "file": "eleanor_the-ember-never-truly-went-out_00019.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 20,
+      "file": "eleanor_the-ember-never-truly-went-out_00020.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 21,
+      "file": "eleanor_the-ember-never-truly-went-out_00021.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 22,
+      "file": "eleanor_the-ember-never-truly-went-out_00022.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 23,
+      "file": "eleanor_the-ember-never-truly-went-out_00023.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 24,
+      "file": "eleanor_the-ember-never-truly-went-out_00024.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 25,
+      "file": "eleanor_the-ember-never-truly-went-out_00025.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 26,
+      "file": "eleanor_the-ember-never-truly-went-out_00026.png",
+      "durationMs": 95,
+      "blend": false
+    },
+    {
+      "index": 27,
+      "file": "eleanor_the-ember-never-truly-went-out_00027.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 28,
+      "file": "eleanor_the-ember-never-truly-went-out_00028.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 29,
+      "file": "eleanor_the-ember-never-truly-went-out_00029.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 30,
+      "file": "eleanor_the-ember-never-truly-went-out_00030.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 31,
+      "file": "eleanor_the-ember-never-truly-went-out_00031.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 32,
+      "file": "eleanor_the-ember-never-truly-went-out_00032.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 33,
+      "file": "eleanor_the-ember-never-truly-went-out_00033.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 34,
+      "file": "eleanor_the-ember-never-truly-went-out_00034.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 35,
+      "file": "eleanor_the-ember-never-truly-went-out_00035.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 36,
+      "file": "eleanor_the-ember-never-truly-went-out_00036.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 37,
+      "file": "eleanor_the-ember-never-truly-went-out_00037.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 38,
+      "file": "eleanor_the-ember-never-truly-went-out_00038.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 39,
+      "file": "eleanor_the-ember-never-truly-went-out_00039.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 40,
+      "file": "eleanor_the-ember-never-truly-went-out_00040.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 41,
+      "file": "eleanor_the-ember-never-truly-went-out_00041.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 42,
+      "file": "eleanor_the-ember-never-truly-went-out_00042.png",
+      "durationMs": 115,
+      "blend": false
+    },
+    {
+      "index": 43,
+      "file": "eleanor_the-ember-never-truly-went-out_00043.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 44,
+      "file": "eleanor_the-ember-never-truly-went-out_00044.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 45,
+      "file": "eleanor_the-ember-never-truly-went-out_00045.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 46,
+      "file": "eleanor_the-ember-never-truly-went-out_00046.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 47,
+      "file": "eleanor_the-ember-never-truly-went-out_00047.png",
+      "durationMs": 70,
+      "blend": true
+    },
+    {
+      "index": 48,
+      "file": "eleanor_the-ember-never-truly-went-out_00048.png",
+      "durationMs": 103,
+      "blend": false
+    },
+    {
+      "index": 49,
+      "file": "eleanor_the-ember-never-truly-went-out_00049.png",
+      "durationMs": 45,
+      "blend": true
+    },
+    {
+      "index": 50,
+      "file": "eleanor_the-ember-never-truly-went-out_00050.png",
+      "durationMs": 68,
+      "blend": false
+    }
+  ]
+}

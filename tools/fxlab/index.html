@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emberkeep — FX Lab</title>
+<style>
+  :root {
+    --ink:#FFF6E8; --dim:#9b8d99; --gold:#FFD84D; --lava:#E8503C;
+    --panel:#181119; --line:#2e2230; --field:#221826;
+  }
+  html,body { margin:0; height:100%; background:#100b14; color:var(--ink);
+              font:12px "Trebuchet MS", Verdana, sans-serif; overflow:hidden; }
+  #wrap { display:flex; height:100%; }
+  #stage { flex:1; position:relative; min-width:0; }
+  #game { position:absolute; inset:0; }
+  #hud { position:absolute; left:10px; bottom:10px; pointer-events:none;
+         color:var(--dim); text-shadow:0 1px 3px #000; line-height:1.6; }
+  #hud b { color:var(--gold); }
+
+  #panel { width:392px; flex:none; background:var(--panel); border-left:1px solid var(--line);
+           overflow-y:auto; padding:0 0 40px; }
+  h1 { font-size:13px; margin:0; padding:12px 14px; letter-spacing:.08em; text-transform:uppercase;
+       color:var(--gold); border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel); z-index:3; }
+  h1 small { float:right; color:var(--dim); text-transform:none; letter-spacing:0; font-weight:normal; }
+  .sec { border-bottom:1px solid var(--line); padding:10px 14px; }
+  .sec > h2 { font-size:11px; margin:0 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.1em; }
+  .tabs { display:flex; gap:6px; }
+  .tabs button { flex:1; }
+  button { background:var(--field); color:var(--ink); border:1px solid var(--line); border-radius:4px;
+           padding:5px 8px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--gold); }
+  button.on { background:var(--gold); color:#20161f; border-color:var(--gold); font-weight:bold; }
+  button.warn.on { background:var(--lava); color:#fff; border-color:var(--lava); }
+
+  .row { display:grid; grid-template-columns:104px 1fr 52px; align-items:center; gap:6px; margin:3px 0; }
+  .row label { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row input[type=range] { width:100%; accent-color:var(--lava); }
+  .row output { text-align:right; font-variant-numeric:tabular-nums; color:var(--ink); }
+  .row select, .row input[type=text] { grid-column:2 / span 2; background:var(--field); color:var(--ink);
+           border:1px solid var(--line); border-radius:3px; padding:3px; font:inherit; }
+  .row input[type=color] { grid-column:2 / span 2; width:100%; height:22px; background:none;
+           border:1px solid var(--line); border-radius:3px; padding:0; }
+  .pair { display:grid; grid-template-columns:104px 1fr 1fr; gap:6px; align-items:center; margin:3px 0; }
+  .pair label { color:var(--dim); }
+  .pair input { width:100%; background:var(--field); color:var(--ink); border:1px solid var(--line);
+                border-radius:3px; padding:3px; font:inherit; font-variant-numeric:tabular-nums; }
+  .stops { display:flex; gap:3px; grid-column:2 / span 2; }
+  .stops input { flex:1; height:22px; padding:0; border:1px solid var(--line); border-radius:3px; background:none; }
+
+  .layer { border:1px solid var(--line); border-radius:5px; margin:7px 0; overflow:hidden; }
+  .layer > header { display:flex; align-items:center; gap:6px; padding:6px 8px; background:#1e1520; cursor:pointer; }
+  .layer > header .k { color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+  .layer > header .id { font-weight:bold; flex:1; }
+  .layer > header button { padding:1px 6px; font-size:10px; }
+  .layer .body { padding:6px 8px; display:none; }
+  .layer.open .body { display:block; }
+  .layer.muted { opacity:.42; }
+  .note { color:var(--dim); line-height:1.5; margin:0 0 8px; }
+  .bar { display:flex; gap:6px; }
+  .bar button { flex:1; }
+  #status { padding:6px 14px; color:var(--dim); min-height:15px; }
+  #status.err { color:var(--lava); }
+  #status.ok { color:#7ECB4F; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage"><div id="game"></div><div id="hud"></div></div>
+  <div id="panel">
+    <h1>FX Lab <small id="tierRead"></small></h1>
+    <div class="sec">
+      <h2>Scene</h2>
+      <div class="tabs" id="sceneTabs"></div>
+      <div class="bar" style="margin-top:6px">
+        <button id="btnGrid" class="on">iso grid</button>
+        <button id="btnFreeze">freeze</button>
+        <button id="btnStep">+250ms</button>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Quality tier <small></small></h2>
+      <div class="tabs" id="tierTabs"></div>
+      <p class="note" style="margin-top:8px">The power governor caps this: active&nbsp;→&nbsp;high, idle&nbsp;→&nbsp;medium, doze&nbsp;→&nbsp;off. Layers are dropped, not dimmed.</p>
+    </div>
+    <div class="sec" id="windSec"><h2>World wind</h2></div>
+    <div class="sec">
+      <h2>Preset</h2>
+      <div class="tabs" id="presetTabs"></div>
+      <p class="note" id="presetNote" style="margin-top:8px"></p>
+    </div>
+    <div class="sec" id="presetSec"></div>
+    <div class="sec" id="layersSec"></div>
+    <div class="sec">
+      <div class="bar">
+        <button id="btnSave">save → src/data</button>
+        <button id="btnCopy">copy JSON</button>
+        <button id="btnReset">reload</button>
+      </div>
+      <div id="status"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import Phaser from 'phaser';
+import { FxEmitterRig } from '/src/render/fx/EmitterFX.ts';
+import { validatePresetFile } from '/src/render/fx/emitterTypes.ts';
+import { DEFAULT_WIND, sampleWind } from '/src/render/fx/fxWind.ts';
+import { assignTiers } from '/src/render/fx/fxBudget.ts';
+import { preloadFlipbooks, RAMP_V } from '/src/render/FlipbookFX.ts';
+import { sheetOf } from '/src/render/vfxBank.ts';
+
+/* ------------------------------------------------------------------ clock --
+ * Real time by default (you cannot tune a flame you cannot see move), with a
+ * virtual override so the headless check parks on an exact instant. */
+let FROZEN = false, FREEZE_AT = 0, VOFF = 0;
+const now = () => (FROZEN ? FREEZE_AT : performance.now() + VOFF);
+window.__setT = (ms) => { FROZEN = true; FREEZE_AT = ms; };
+window.__advance = (ms) => { if (FROZEN) FREEZE_AT += ms; else VOFF += ms; };
+window.__live = () => { FROZEN = false; };
+
+/* ------------------------------------------------------------------ state - */
+const DOC = await (await fetch('/__fxlab/presets')).json();
+const PRISTINE = JSON.parse(JSON.stringify(DOC));
+window.__doc = DOC;
+
+const RAMPS = Object.keys(RAMP_V);
+const EASES = ['Linear', 'linear', 'sine.out', 'sine.in', 'quad.out', 'quad.in', 'cubic.out', 'expo.out'];
+
+const SCENES = [
+  { id: 'both', label: 'campfire', rigs: ['fire', 'smokeEmbers'] },
+  { id: 'fire', label: 'fire', rigs: ['fire'] },
+  { id: 'smokeEmbers', label: 'smoke', rigs: ['smokeEmbers'] },
+  { id: 'field', label: 'field ×6', rigs: null }
+];
+
+const state = {
+  scene: 'both',
+  preset: 'fire',
+  tier: 'high',
+  grid: true,
+  wind: { ...DEFAULT_WIND },
+  solo: null,
+  muted: new Set(),
+  open: new Set(['bodyOuter', 'smoke'])
+};
+window.__state = state;
+
+/* ------------------------------------------------------------------ scene - */
+const TILE_W = 256, TILE_H = 128;
+
+class Lab extends Phaser.Scene {
+  preload() {
+    const base = '/vfx-bank/';
+    for (const [key, file] of Object.entries(DOC.textures)) this.load.image(key, base + file);
+    const sheets = DOC.sheets.map(sheetOf).filter(Boolean);
+    preloadFlipbooks(this.load, sheets, base);
+    this.load.on('loaderror', (f) => (window.__loadErrors ??= []).push(f.key));
+  }
+
+  create() {
+    this.cameras.main.setBackgroundColor('#0d0910');
+    this.gridG = this.add.graphics().setDepth(1);
+    this.rigs = [];
+    window.__scene = this;
+    this.drawGround();
+    rebuild();
+    window.__ready = true;
+  }
+
+  /** A patch of iso ground, so squash and ground contact are judgeable. A
+   *  light pool that looks round here is wrong; it must be a 2:1 ellipse. */
+  drawGround() {
+    const g = this.gridG;
+    g.clear();
+    if (!state.grid) return;
+    const { width, height } = this.scale.gameSize;
+    const cx = width / 2, cy = height * 0.72;
+    // TRUE tile size (256×128 game px). Drawing it at half scale would make
+    // every emitter look twice the size it will be in the game, which is the
+    // one thing a scale reference must never do.
+    g.lineStyle(1, 0x4A3845, 0.55);
+    for (let r = -7; r <= 7; r++) {
+      for (let c = -7; c <= 7; c++) {
+        const x = cx + (c - r) * (TILE_W / 2);
+        const y = cy + (c + r) * (TILE_H / 2);
+        if (Math.abs(x - cx) > width * 0.62 || Math.abs(y - cy) > height * 0.55) continue;
+        g.beginPath();
+        g.moveTo(x, y - TILE_H / 2);
+        g.lineTo(x + TILE_W / 2, y);
+        g.lineTo(x, y + TILE_H / 2);
+        g.lineTo(x - TILE_W / 2, y);
+        g.closePath();
+        g.strokePath();
+      }
+    }
+  }
+
+  update() {
+    const t = now();
+    const view = this.cameras.main.worldView;
+    const tiers = assignTiers(
+      this.rigs.map((r) => ({ x: r.position.x, y: r.position.y, radius: r.radius })),
+      view,
+      { highSlots: 3, mediumSlots: 2, cullPadPx: 420, ceiling: state.tier }
+    );
+    for (let i = 0; i < this.rigs.length; i++) {
+      const r = this.rigs[i];
+      const w = sampleWind(state.wind, t, r.position.x, r.position.y);
+      // The field is per-position on purpose; the "field ×6" scene is where a
+      // gust visibly sweeps across the row instead of hitting all at once.
+      r.update(t, w, state.scene === 'field' ? tiers[i] : state.tier);
+    }
+    const w = sampleWind(state.wind, t, 0, 0);
+    document.getElementById('hud').innerHTML =
+      `wind <b>${w.speed.toFixed(2)}</b> @ <b>${w.dirDeg.toFixed(0)}°</b> &nbsp;·&nbsp; ` +
+      `screen drift <b>${w.x.toFixed(2)}, ${w.y.toFixed(2)}</b> &nbsp;·&nbsp; ` +
+      `rigs <b>${this.rigs.length}</b> · tier <b>${state.tier}</b>` +
+      (window.__missing?.length ? `<br><span style="color:#E8503C">missing art: ${window.__missing.join(', ')}</span>` : '');
+  }
+}
+
+/** Rebuild every rig from the live document. Cheap enough to do on each edit,
+ *  and far less error-prone than trying to patch a running stack in place. */
+function rebuild() {
+  const sc = window.__scene;
+  if (!sc) return;
+  for (const r of sc.rigs) r.destroy();
+  sc.rigs = [];
+  window.__missing = [];
+
+  const { width, height } = sc.scale.gameSize;
+  const groundY = height * 0.72;
+  const spawn = (id, x, y, scale = 1) => {
+    const preset = viewOf(DOC.presets[id]);
+    if (!preset) return;
+    const rig = new FxEmitterRig(sc, preset, x, y, {
+      now, depth: 100 + y, scale, seed: Math.round(x * 13 + y * 7)
+    });
+    window.__missing.push(...rig.missing);
+    sc.rigs.push(rig);
+  };
+
+  const def = SCENES.find((s) => s.id === state.scene);
+  if (def.rigs) {
+    for (const id of def.rigs) spawn(id, width / 2, groundY);
+  } else {
+    // Six braziers across the world: the layout that exposes rigs flickering
+    // in unison, gusts arriving everywhere at once, and the tier budget.
+    for (let i = 0; i < 6; i++) {
+      const x = width * (0.14 + 0.145 * i);
+      const y = groundY - 150 + (i % 3) * 130;
+      spawn('fire', x, y, 0.62);
+      spawn('smokeEmbers', x, y, 0.62);
+    }
+  }
+  sc.rigs.sort((a, b) => a.position.y - b.position.y);
+}
+// Exposed for tools/checks/fxlabtest.mjs, which switches scenes headlessly.
+window.__rebuild = rebuild;
+
+/** The document with solo/mute applied — tuning one layer means seeing it
+ *  alone, which is the fastest way to find what a layer is actually doing. */
+function viewOf(preset) {
+  if (!preset) return preset;
+  const clone = JSON.parse(JSON.stringify(preset));
+  clone.layers = clone.layers.filter((l) =>
+    state.solo ? l.id === state.solo : !state.muted.has(l.id)
+  );
+  return clone.layers.length ? clone : { ...clone, layers: preset.layers };
+}
+
+/* ------------------------------------------------------------- inspector -- *
+ * Controls are GENERATED from the preset object, so a field added to the
+ * schema is editable here with no panel work. */
+
+/* Most specific first — the fallback at the bottom is only a safety net. Two
+ * traps live here: `flickerPhase` is an offset into the noise field (0..12),
+ * NOT the 0..1 loop fraction `phase` is, and `speed` means one thing on the
+ * wind (0..3) and another on a particle (±800). */
+const RULES = [
+  [/^lod$/, 0, 2, 1],
+  [/^z$/, -20, 20, 1],
+  [/^(dx|dy)$/, -400, 400, 1],
+  [/^flickerPhase$/, 0, 12, 0.1],
+  [/^emissive$/, 0, 3, 0.05],
+  [/^tail$/, 0.2, 4, 0.05],
+  [/^pool$/, 1, 24, 1],
+  [/^lagMs$/, 0, 400, 5],
+  [/^gustHz$/, 0.01, 2, 0.01],
+  [/^speed$/, 0, 3, 0.05],
+  [/Gain$/, 0, 200, 1],
+  [/(alpha|amp|peak|peakAt|rise|breathe|influence|squash|start|end|phase|gust|flatten)$/i, 0, 1, 0.01],
+  [/(Ms|lifespan)$/i, 0, 8000, 10],
+  [/Deg$/i, -180, 180, 1],
+  [/^(fps|twinkleHz|hz|cycles)$/i, 0, 40, 0.1],
+  [/(width|Px)$/i, 0, 1500, 1],
+  [/^(frequency|quantity)$/i, 0, 2000, 1],
+  [/(speed|acceleration|gravity)/i, -800, 800, 1]
+];
+
+function rangeFor(key, value) {
+  for (const [re, min, max, step] of RULES) if (re.test(key)) return [min, max, step];
+  const m = Math.max(1, Math.abs(value) * 3);
+  return [Math.min(0, -m), m, m / 200];
+}
+
+function slider(parent, key, obj, prop, onChange) {
+  const [min, max, step] = rangeFor(key, obj[prop]);
+  const row = el(parent, 'div', 'row');
+  el(row, 'label').textContent = key;
+  const input = el(row, 'input');
+  input.type = 'range'; input.min = min; input.max = max; input.step = step; input.value = obj[prop];
+  const out = el(row, 'output');
+  out.textContent = fmt(obj[prop]);
+  input.oninput = () => { obj[prop] = +input.value; out.textContent = fmt(obj[prop]); onChange(); };
+}
+
+function pair(parent, key, arr, onChange) {
+  const [min, max, step] = rangeFor(key, arr[1]);
+  const row = el(parent, 'div', 'pair');
+  el(row, 'label').textContent = key;
+  for (let i = 0; i < 2; i++) {
+    const input = el(row, 'input');
+    input.type = 'number'; input.min = min; input.max = max; input.step = step; input.value = arr[i];
+    input.oninput = () => { arr[i] = +input.value; onChange(); };
+  }
+}
+
+function select(parent, key, obj, prop, options, onChange) {
+  const row = el(parent, 'div', 'row');
+  el(row, 'label').textContent = key;
+  const sel = el(row, 'select');
+  for (const o of options) {
+    const opt = el(sel, 'option');
+    opt.value = o; opt.textContent = o;
+    if (obj[prop] === o) opt.selected = true;
+  }
+  sel.onchange = () => { obj[prop] = sel.value; onChange(); };
+}
+
+function colour(parent, key, obj, prop, onChange) {
+  const row = el(parent, 'div', 'row');
+  el(row, 'label').textContent = key;
+  const input = el(row, 'input');
+  input.type = 'color'; input.value = obj[prop];
+  input.oninput = () => { obj[prop] = input.value.toUpperCase(); onChange(); };
+}
+
+function stops(parent, key, arr, onChange) {
+  const row = el(parent, 'div', 'row');
+  el(row, 'label').textContent = key;
+  const box = el(row, 'div', 'stops');
+  arr.forEach((hex, i) => {
+    const input = el(box, 'input');
+    input.type = 'color'; input.value = hex; input.title = `stop ${i}`;
+    input.oninput = () => { arr[i] = input.value.toUpperCase(); onChange(); };
+  });
+}
+
+const ENUMS = { ramp: RAMPS, blend: ['add', 'normal'], anchor: ['base', 'center'], ease: EASES, colorEase: EASES };
+
+/** Walk any plain object and emit a control per field. */
+function inspect(parent, obj, onChange, path = '') {
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === 'id' || key === 'kind' || key.startsWith('_')) continue;
+    if (typeof value === 'number') slider(parent, key, obj, key, onChange);
+    else if (typeof value === 'string' && value.startsWith('#')) colour(parent, key, obj, key, onChange);
+    else if (typeof value === 'string' && ENUMS[key]) select(parent, key, obj, key, ENUMS[key], onChange);
+    else if (typeof value === 'string') textField(parent, key, obj, key, onChange);
+    else if (Array.isArray(value) && value.length === 2 && typeof value[0] === 'number') pair(parent, key, value, onChange);
+    else if (Array.isArray(value) && typeof value[0] === 'string' && value[0].startsWith('#')) stops(parent, key, value, onChange);
+    else if (Array.isArray(value)) sub(parent, key, value, onChange, path);
+    else if (value && typeof value === 'object') sub(parent, key, value, onChange, path);
+  }
+}
+
+function sub(parent, key, value, onChange, path) {
+  const box = el(parent, 'div');
+  box.style.cssText = 'border-left:2px solid var(--line); margin:5px 0 5px 6px; padding-left:7px';
+  const h = el(box, 'div');
+  h.style.cssText = 'color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.08em';
+  h.textContent = key;
+  if (Array.isArray(value)) value.forEach((v, i) => (typeof v === 'object' ? inspect(box, v, onChange, `${path}.${key}[${i}]`) : null));
+  else inspect(box, value, onChange, `${path}.${key}`);
+}
+
+function textField(parent, key, obj, prop, onChange) {
+  const row = el(parent, 'div', 'row');
+  el(row, 'label').textContent = key;
+  const input = el(row, 'input');
+  input.type = 'text'; input.value = obj[prop];
+  input.onchange = () => { obj[prop] = input.value; onChange(); };
+}
+
+/* ------------------------------------------------------------------ panel - */
+const el = (parent, tag = 'div', cls) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  parent.appendChild(n);
+  return n;
+};
+const fmt = (v) => (Math.abs(v) >= 100 || Number.isInteger(v) ? String(Math.round(v)) : v.toFixed(2));
+
+let pending = 0;
+const apply = () => {
+  clearTimeout(pending);
+  pending = setTimeout(() => {
+    const errs = validatePresetFile(DOC);
+    setStatus(errs.length ? errs[0] : '', errs.length ? 'err' : '');
+    rebuild();
+  }, 60);
+};
+
+function setStatus(text, cls = '') {
+  const s = document.getElementById('status');
+  s.textContent = text;
+  s.className = cls;
+}
+
+function tabs(host, items, get, set) {
+  host.innerHTML = '';
+  for (const it of items) {
+    const b = el(host, 'button');
+    b.textContent = it.label ?? it;
+    b.className = get() === (it.id ?? it) ? 'on' : '';
+    b.onclick = () => { set(it.id ?? it); paint(); };
+  }
+}
+
+function paint() {
+  tabs(document.getElementById('sceneTabs'), SCENES, () => state.scene, (v) => { state.scene = v; rebuild(); });
+  tabs(document.getElementById('tierTabs'), ['high', 'medium', 'low', 'off'], () => state.tier, (v) => (state.tier = v));
+  tabs(document.getElementById('presetTabs'),
+    Object.keys(DOC.presets).map((id) => ({ id, label: DOC.presets[id].label })),
+    () => state.preset, (v) => { state.preset = v; state.solo = null; });
+
+  document.getElementById('tierRead').textContent = `${state.preset} · ${state.tier}`;
+  document.getElementById('presetNote').textContent = DOC.presets[state.preset].note ?? '';
+
+  const windSec = document.getElementById('windSec');
+  windSec.innerHTML = '<h2>World wind</h2>';
+  inspect(windSec, state.wind, () => {});
+
+  const preset = DOC.presets[state.preset];
+  const ps = document.getElementById('presetSec');
+  ps.innerHTML = '<h2>Emitter</h2>';
+  for (const key of ['windInfluence', 'radiusPx']) slider(ps, key, preset, key, apply);
+  const fh = el(ps, 'div');
+  fh.style.cssText = 'color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-top:6px';
+  fh.textContent = 'flicker octaves (keep the ratios irrational)';
+  preset.flicker.octaves.forEach((o, i) => {
+    const box = el(ps, 'div');
+    box.style.cssText = 'border-left:2px solid var(--line); margin:3px 0 3px 6px; padding-left:7px';
+    slider(box, `hz ${i}`, o, 'hz', apply);
+    slider(box, `amp ${i}`, o, 'amp', apply);
+  });
+
+  const ls = document.getElementById('layersSec');
+  ls.innerHTML = '<h2>Layers — back to front</h2>';
+  for (const layer of [...preset.layers].sort((a, b) => a.z - b.z)) {
+    const card = el(ls, 'div', 'layer' + (state.open.has(layer.id) ? ' open' : '') + (state.muted.has(layer.id) ? ' muted' : ''));
+    const head = el(card, 'header');
+    el(head, 'span', 'k').textContent = layer.kind;
+    el(head, 'span', 'id').textContent = layer.id;
+    const lod = el(head, 'span', 'k');
+    lod.textContent = 'lod ' + (layer.lod ?? 0);
+    const solo = el(head, 'button', state.solo === layer.id ? 'on' : '');
+    solo.textContent = 'S';
+    solo.title = 'solo this layer';
+    const mute = el(head, 'button', 'warn' + (state.muted.has(layer.id) ? ' on' : ''));
+    mute.textContent = 'M';
+    mute.title = 'mute this layer';
+    head.onclick = (e) => {
+      if (e.target === solo) { state.solo = state.solo === layer.id ? null : layer.id; state.muted.clear(); }
+      else if (e.target === mute) { state.solo = null; state.muted.has(layer.id) ? state.muted.delete(layer.id) : state.muted.add(layer.id); }
+      else { state.open.has(layer.id) ? state.open.delete(layer.id) : state.open.add(layer.id); paint(); return; }
+      paint();
+      rebuild();
+    };
+    inspect(el(card, 'div', 'body'), layer, apply);
+  }
+}
+
+document.getElementById('btnGrid').onclick = (e) => {
+  state.grid = !state.grid;
+  e.target.className = state.grid ? 'on' : '';
+  window.__scene.drawGround();
+};
+document.getElementById('btnFreeze').onclick = (e) => {
+  FROZEN = !FROZEN;
+  if (FROZEN) FREEZE_AT = performance.now() + VOFF;
+  e.target.className = FROZEN ? 'on' : '';
+};
+document.getElementById('btnStep').onclick = () => window.__advance(250);
+document.getElementById('btnCopy').onclick = async () => {
+  await navigator.clipboard.writeText(JSON.stringify(DOC, null, 2));
+  setStatus('preset JSON copied', 'ok');
+};
+document.getElementById('btnReset').onclick = () => {
+  Object.assign(DOC, JSON.parse(JSON.stringify(PRISTINE)));
+  paint();
+  rebuild();
+  setStatus('reloaded from disk', 'ok');
+};
+document.getElementById('btnSave').onclick = async () => {
+  const errs = validatePresetFile(DOC);
+  if (errs.length) { setStatus(errs[0], 'err'); return; }
+  const r = await fetch('/__fxlab/presets', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DOC, null, 2)
+  });
+  const j = await r.json();
+  setStatus(j.ok ? 'saved → src/data/fx-emitters.json' : j.error, j.ok ? 'ok' : 'err');
+};
+
+/* ------------------------------------------------------------------- boot - */
+const stage = document.getElementById('stage');
+const game = new Phaser.Game({
+  type: Phaser.WEBGL,
+  parent: 'game',
+  width: stage.clientWidth,
+  height: stage.clientHeight,
+  backgroundColor: '#0d0910',
+  scene: Lab,
+  render: { antialias: true },
+  scale: { mode: Phaser.Scale.RESIZE }
+});
+window.__game = game;
+window.__errors = [];
+window.addEventListener('error', (e) => window.__errors.push(String(e.message)));
+game.events.once('ready', () => paint());
+window.addEventListener('resize', () => {
+  setTimeout(() => { window.__scene?.drawGround(); rebuild(); }, 120);
+});
+</script>
+</body>
+</html>

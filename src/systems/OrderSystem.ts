@@ -1,13 +1,14 @@
+import { WORLD_ID } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
-import type { OrderConfig, OrderOption, OrdersData } from '../core/types';
+import type { OrderConfig, OrdersData } from '../core/types';
 
 /** How many orders the Ledger surfaces at once (MECHANICS §11 says 3–4 in the
  *  full game; two gives the demo its choose-what-to-chase agency). */
 export const VISIBLE_ORDERS = 2;
 
 /**
- * Cindra's Ledger. Up to VISIBLE_ORDERS uncompleted orders are active at once:
+ * Eleanor's Ledger. Up to VISIBLE_ORDERS uncompleted orders are active at once:
  * first the scripted list, then an endless encore queue synthesised from the
  * `repeatable` templates (ids `encore_1`, `encore_2`, …) so the Ledger never
  * dead-ends. Progress derives from live board counts; delivery consumes
@@ -19,29 +20,51 @@ export class OrderSystem {
     private bus: EventBus,
     private orders: OrdersData
   ) {
-    bus.on('ui:deliver_requested', ({ orderId, optionIndex }) => this.deliver(orderId, optionIndex));
+    bus.on('ui:deliver_requested', ({ orderId }) => this.deliver(orderId));
     bus.on('item:spawned', () => this.announceProgress());
     bus.on('item:merged', () => this.announceProgress());
     bus.on('item:produced', () => this.announceProgress());
     bus.on('item:removed', () => this.announceProgress());
     bus.on('region:unlocked', () => this.announceProgress());
     bus.on('state:loaded', () => this.announceProgress());
+    // Travel changes BOTH the list and the board it is counted against, so the
+    // Ledger has to re-announce or the north opens showing the south's tallies.
+    bus.on('world:switched', () => this.announceProgress());
+  }
+
+  /** Is this order's giver standing where the Keeper is? */
+  private here(order: { world?: string }): boolean {
+    return (order.world ?? WORLD_ID) === this.state.worldId;
+  }
+
+  /**
+   * Encore ids, namespaced per world past the authored one.
+   *
+   * `completedOrderIds` is one global list, so two worlds both minting
+   * `encore_1` would have the north's first encore struck off by the south's.
+   * Emberkeep keeps the bare form it has always written, because every save in
+   * the wild has those ids in it and a rename would silently restart its Ledger.
+   */
+  private encoreId(n: number): string {
+    return this.state.worldId === WORLD_ID
+      ? `encore_${n}`
+      : `encore_${this.state.worldId}_${n}`;
   }
 
   /** The nth not-yet-completed order: scripted first, then encore templates. */
   private orderAt(offset: number): OrderConfig | undefined {
     const remaining = this.orders.orders.filter(
-      (o) => !this.state.completedOrderIds.includes(o.id)
+      (o) => this.here(o) && !this.state.completedOrderIds.includes(o.id)
     );
     if (offset < remaining.length) return remaining[offset];
 
-    const pool = this.orders.repeatable ?? [];
+    const pool = (this.orders.repeatable ?? []).filter((o) => this.here(o));
     if (pool.length === 0) return undefined;
     // Walk the encore sequence, skipping ids already delivered (either visible
     // encore may complete first, so skip by id — not by count).
     let skip = offset - remaining.length;
     for (let n = 0; n < this.state.completedOrderIds.length + skip + 1; n++) {
-      const id = `encore_${n + 1}`;
+      const id = this.encoreId(n + 1);
       if (this.state.completedOrderIds.includes(id)) continue;
       if (skip === 0) return { ...pool[n % pool.length]!, id };
       skip--;
@@ -52,6 +75,33 @@ export class OrderSystem {
   /** The primary (first) active order — kept for the e2e text render. */
   get activeOrder(): OrderConfig | undefined {
     return this.orderAt(0);
+  }
+
+  /** The authored, once-only orders in ladder order. Read-only: QuestSystem and
+   *  the availability audit resolve an order id through this rather than
+   *  re-importing orders.json, so there is one definition of the scripted list. */
+  get scripted(): readonly OrderConfig[] {
+    return this.orders.orders;
+  }
+
+  /** The encore templates, with their synthesised-id shape stripped. The tail of
+   *  the quest ladder tracks whichever of these the Ledger is showing, so its
+   *  reachability audit has to cover EVERY template, not just the visible one. */
+  get encorePool(): readonly Omit<OrderConfig, 'id'>[] {
+    return this.orders.repeatable ?? [];
+  }
+
+  /**
+   * Whose Ledger this is, in the world the Keeper is standing in — the giver of
+   * this world's authored orders (Selyna in Borealis, Eleanor at home).
+   * Data-derived so a third world with a third host needs no code change; the
+   * fallback only matters for a world with no orders at all.
+   */
+  get giverHere(): string {
+    const owned = [...this.orders.orders, ...(this.orders.repeatable ?? [])].find((o) =>
+      this.here(o)
+    );
+    return owned?.giver ?? 'eleanor';
   }
 
   /** The orders the Ledger shows, in priority order. */
@@ -82,61 +132,9 @@ export class OrderSystem {
     }
   }
 
-  /** True if this option can be delivered right now (items on the board and/or
-   *  enough coins in the purse). */
-  optionDeliverable(opt: OrderOption): boolean {
-    if (opt.requires) {
-      for (const req of opt.requires) {
-        if (this.state.countItems(req.chain, req.tier) < req.count) return false;
-      }
-    }
-    if (opt.costCoins != null && this.state.coins < opt.costCoins) return false;
-    return true;
-  }
-
-  private deliver(orderId: string, optionIndex?: number): void {
-    // Locate the order among ALL visible ones (main's multi-order Ledger), then
-    // honour nionja's multi-OPTION path when the order defines options.
+  private deliver(orderId: string): void {
     const order = this.activeOrders.find((o) => o.id === orderId);
     if (!order) return;
-
-    // Multi-option order: fulfil the chosen option (items and/or coins) and
-    // complete the whole order — the player only ever picks one path.
-    if (order.options && order.options.length > 0) {
-      const opt = order.options[optionIndex ?? 0];
-      if (!opt || !this.optionDeliverable(opt)) return;
-      if (opt.requires) {
-        const consumeIds: number[] = [];
-        for (const req of opt.requires) {
-          const matches = this.state
-            .itemsMatching(req.chain, req.tier)
-            .sort((a, b) => a.id - b.id)
-            .slice(0, req.count);
-          consumeIds.push(...matches.map((m) => m.id));
-        }
-        if (consumeIds.length > 0) {
-          this.bus.emit('board:consume_items', { itemIds: consumeIds, reason: 'delivered' });
-        }
-      }
-      // Pay the reward net of any coin cost, in one economy op (so the cost and
-      // the payout settle atomically and a coins-only reward can't level up).
-      this.bus.emit('economy:add', {
-        coins: (opt.rewards.coins ?? 0) - (opt.costCoins ?? 0),
-        keys: opt.rewards.keys ?? 0,
-        xp: opt.rewards.xp,
-        reason: `order:${order.id}:${optionIndex ?? 0}`
-      });
-      if (opt.rewards.spawn) {
-        this.bus.emit('board:spawn', { ...opt.rewards.spawn });
-      }
-      this.completeOrder(order, {
-        coins: opt.rewards.coins ?? 0,
-        keys: opt.rewards.keys ?? 0,
-        xp: opt.rewards.xp
-      });
-      return;
-    }
-
     const { deliverable } = this.progressFor(order);
     if (!deliverable) return;
 
@@ -158,16 +156,8 @@ export class OrderSystem {
     if (order.rewards.spawn) {
       this.bus.emit('board:spawn', { ...order.rewards.spawn });
     }
-    this.completeOrder(order, order.rewards);
-  }
-
-  /** Shared completion tail: record, announce, advance to the next order. */
-  private completeOrder(
-    order: OrderConfig,
-    rewards: { coins: number; keys: number; xp?: number }
-  ): void {
     this.state.completedOrderIds.push(order.id);
-    this.bus.emit('order:completed', { orderId: order.id, rewards });
+    this.bus.emit('order:completed', { orderId: order.id, rewards: order.rewards });
     if (!this.activeOrder) {
       this.bus.emit('order:all_done', {}); // only possible with an empty repeatable pool
     } else {

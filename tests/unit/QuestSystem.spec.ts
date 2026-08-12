@@ -1,28 +1,219 @@
 import { describe, expect, it } from 'vitest';
+import type { GameContext } from '../../src/core/Context';
 import { capture, createTestContext } from './helpers';
 
-describe('QuestSystem', () => {
-  it('exposes the MAIN teleport quest + tutorial-step sub-quests that tick with progress', () => {
+/** Put `count` pieces on the board and let the systems see them. */
+function place(ctx: GameContext, chain: string, tier: number, count = 1): void {
+  ctx.bus.emit('board:spawn', { chain, tier, count });
+}
+
+/** The brazier's first subquest is a merge count — dragons are rare now, so no
+ *  quest asks the player to hatch one (quests.json `brazier_merges`). */
+function merges(ctx: GameContext, count: number): void {
+  for (let i = 0; i < count; i++) {
+    ctx.bus.emit('item:merged', {
+      chain: 'ashmoss',
+      fromTier: 1,
+      resultTier: 2,
+      at: { col: 0, row: 0 },
+      consumedIds: [],
+      consumedAt: [],
+      outputs: [],
+      xp: 0
+    });
+  }
+}
+
+/** Hand the state the tutorial would have left, without running it. */
+function afterTutorial(ctx: GameContext): void {
+  ctx.state.tutorialDone = true;
+  ctx.bus.emit('state:loaded', { offlineMs: 0, energyRecovered: 0 });
+}
+
+describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
+  it('starts on the first quest and reports its subquests, in order', () => {
     const ctx = createTestContext();
-    const changes = capture(ctx.bus, 'quest:changed');
-    const q = (id: string) => changes.at(-1)!.quests.find((x) => x.id === id)!;
+    const quest = ctx.systems.quests.activeQuest!;
 
-    ctx.systems.quest.announce();
-    // The teleport is the MAIN quest; each tutorial action step is a SUB quest.
-    expect(q('teleport_lair').kind).toBe('main');
-    expect(q('ruby_merge').kind).toBe('sub');
-    expect(q('green_dragon_hatch').kind).toBe('sub');
-    expect(q('teleport_lair').done).toBe(false);
-    expect(q('ruby_merge').done).toBe(false);
+    expect(quest.id).toBe('rekindle_brazier');
+    expect(quest.steps.map((s) => s.id)).toEqual([
+      'brazier_merges',
+      'brazier_shards',
+      'brazier_deliver'
+    ]);
+    expect(ctx.systems.quests.titleFor(quest)).toBe('Light the Brazier');
+  });
 
-    // Advancing the director past a step ticks its sub-quest.
-    ctx.state.tutorialIndex = 99;
-    ctx.systems.quest.announce();
-    expect(q('ruby_merge').done).toBe(true);
+  it('a `have` goal reads the live board and LATCHES, so delivering cannot un-do it', () => {
+    const ctx = createTestContext();
+    const shards = ctx.systems.quests.activeQuest!.steps.find((s) => s.id === 'brazier_shards')!;
 
-    // A real world switch (the teleport) completes the MAIN quest.
-    expect(q('teleport_lair').done).toBe(false);
-    ctx.bus.emit('world:switched', { toWorld: 'roothold' });
-    expect(q('teleport_lair').done).toBe(true);
+    expect(ctx.systems.quests.progressFor(shards).done).toBe(false);
+    place(ctx, 'flame_gem', 1, 6);
+    expect(ctx.systems.quests.progressFor(shards)).toMatchObject({ have: 6, need: 6, done: true });
+
+    // The order eats them. The step stays done — it happened.
+    for (const item of ctx.state.itemsMatching('flame_gem', 1)) ctx.state.removeItem(item.id);
+    ctx.bus.emit('item:removed', { itemId: 0, at: { col: 0, row: 0 }, reason: 'delivered' });
+    expect(ctx.systems.quests.progressFor(shards).done).toBe(true);
+  });
+
+  it('completes a quest only when every step is, then advances the ladder', () => {
+    const ctx = createTestContext();
+    const completed = capture(ctx.bus, 'quest:completed');
+    const stepDone = capture(ctx.bus, 'quest:step_completed');
+
+    merges(ctx, 10);
+    place(ctx, 'flame_gem', 1, 6);
+    expect(stepDone.map((s) => s.stepId)).toEqual(
+      expect.arrayContaining(['brazier_merges', 'brazier_shards'])
+    );
+    expect(ctx.systems.quests.activeQuest!.id).toBe('rekindle_brazier'); // delivery outstanding
+
+    ctx.state.completedOrderIds.push('eleanor_brazier');
+    ctx.bus.emit('order:completed', {
+      orderId: 'eleanor_brazier',
+      rewards: { coins: 25, keys: 0, xp: 30 }
+    });
+
+    expect(completed.map((q) => q.questId)).toContain('rekindle_brazier');
+    expect(ctx.systems.quests.activeQuest!.id).toBe('warm_the_hearth');
+  });
+
+  it('skips a quest the player satisfied out of order (the Ledger shows two at once)', () => {
+    const ctx = createTestContext();
+    // Order 3 is deliverable before Order 2 — both cost nine shards.
+    ctx.state.completedOrderIds.push('eleanor_brazier', 'eleanor_centerpiece');
+    place(ctx, 'flame_gem', 1, 6);
+    place(ctx, 'flame_gem', 3, 1);
+    merges(ctx, 10);
+
+    // Quest 3 is complete, so the ladder stops on quest 2 and will jump past it.
+    expect(ctx.systems.quests.activeQuest!.id).toBe('warm_the_hearth');
+    place(ctx, 'flame_gem', 2, 3);
+    ctx.state.completedOrderIds.push('eleanor_hearth');
+    ctx.bus.emit('order:completed', {
+      orderId: 'eleanor_hearth',
+      rewards: { coins: 75, keys: 0, xp: 35 }
+    });
+    expect(ctx.systems.quests.activeQuest!.id).toBe('keepers_hoard');
+  });
+
+  it("mirrors the Keeper's Tasks from tasks.json — one definition, two readouts", () => {
+    const ctx = createTestContext();
+    const tasksQuest = ctx.systems.quests.all.find((q) => q.id === 'keepers_tasks')!;
+    const elder = tasksQuest.steps.find((s) => s.id === 'tasks_elder')!;
+
+    // Label and target come from the task, never from quests.json.
+    expect(ctx.systems.quests.progressFor(elder)).toMatchObject({
+      label: 'Tap the Golden Elder 10 times',
+      need: 10,
+      locked: true
+    });
+
+    ctx.state.completedOrderIds.push('eleanor_brazier');
+    ctx.state.xp = 220; // Keeper Level 3
+    expect(ctx.systems.quests.progressFor(elder).locked).toBe(false);
+  });
+
+  it('never dead-ends: the tail tracks whatever the Ledger is currently asking', () => {
+    const ctx = createTestContext();
+    afterTutorial(ctx);
+    for (const quest of ctx.systems.quests.all) {
+      for (const step of quest.steps) {
+        if (step.goal.kind !== 'active_order') ctx.state.addStat(`q:${step.id}`, 1);
+      }
+    }
+    const tail = ctx.systems.quests.activeQuest!;
+    expect(tail.id).toBe('keep_the_ledger');
+    // Its title and its single step's wording both come from the live order.
+    expect(ctx.systems.quests.titleFor(tail)).toBe(ctx.systems.order.activeOrders[0]!.title);
+    // Derived from whatever the Ledger is showing, so it cannot rot when the
+    // order list is retuned — and it says the verb, the count and the recipient.
+    const live = ctx.systems.order.activeOrders[0]!;
+    expect(ctx.systems.quests.progressFor(tail.steps[0]!).label).toBe(
+      `Deliver ${live.requires[0]!.count} × Gem Shard to Eleanor`
+    );
+    expect(ctx.systems.quests.progressFor(tail.steps[0]!).done).toBe(false);
+  });
+
+  it('a load re-derives the ladder silently — no replayed completion beats', () => {
+    const ctx = createTestContext();
+    ctx.state.completedOrderIds.push('eleanor_brazier');
+    ctx.state.addStat('merges', 10);
+    place(ctx, 'flame_gem', 1, 6);
+
+    const ctx2 = createTestContext();
+    const completed = capture(ctx2.bus, 'quest:completed');
+    const stepDone = capture(ctx2.bus, 'quest:step_completed');
+    ctx2.state.completedOrderIds.push('eleanor_brazier');
+    ctx2.state.addStat('merges', 10);
+    ctx2.bus.emit('state:loaded', { offlineMs: 0, energyRecovered: 0 });
+
+    expect(completed).toHaveLength(0);
+    expect(stepDone).toHaveLength(0);
+    expect(ctx2.state.stat('q:brazier_merges')).toBe(1); // latched, just not announced
   });
 });
+
+describe('quest rewards — the legendary egg arrives, once, and cannot be lost', () => {
+  /** Drive the first Emberkeep egg quest (`warm_the_hearth`) to completion. */
+  const finishHearth = (ctx: ReturnType<typeof createTestContext>): void => {
+    // Its two steps: hold 3 Flame Gems, then deliver the order.
+    for (let i = 0; i < 3; i++) {
+      ctx.state.addItem({ chain: 'flame_gem', tier: 2, col: i, row: 0, kind: 'item' });
+    }
+    ctx.bus.emit('item:spawned', {
+      item: { id: 0, chain: 'flame_gem', tier: 2, col: 0, row: 0, kind: 'item' },
+      cause: 'init'
+    });
+    ctx.state.completedOrderIds.push('eleanor_brazier', 'eleanor_hearth');
+    ctx.bus.emit('order:completed', { orderId: 'eleanor_hearth', rewards: { coins: 0, keys: 0 } });
+  };
+
+  it('pays the egg on completion, exactly once, no matter how often state moves', () => {
+    const ctx = createTestContext();
+    finishHearth(ctx);
+    const eggs = (): number => ctx.state.countItems('ashdrake', 1) + bagCount(ctx, 'ashdrake', 1);
+    expect(eggs()).toBe(1);
+
+    // Every subsequent fact re-evaluates the whole ladder; none may pay again.
+    for (let i = 0; i < 5; i++) ctx.bus.emit('economy:changed', { coins: 0, keys: 0, xp: 0, level: 1 });
+    ctx.bus.emit('state:loaded', { offlineMs: 0, energyRecovered: 0 });
+    expect(eggs()).toBe(1);
+  });
+
+  it('banks the egg when the board is full, rather than swallowing it', () => {
+    const ctx = createTestContext();
+    // Fill every active tile, so `board:spawn` has nowhere to put anything.
+    for (let row = 0; row < ctx.state.rows; row++) {
+      for (let col = 0; col < ctx.state.cols; col++) {
+        if (!ctx.state.isTileActive(col, row) || ctx.state.itemIdAt(col, row) !== null) continue;
+        ctx.state.addItem({ chain: 'lumber', tier: 1, col, row, kind: 'item' });
+      }
+    }
+    finishHearth(ctx);
+    // Nowhere on the board — so it is in the satchel, not gone. A legendary egg
+    // exists three times in a zone; losing one costs the dragon for good.
+    expect(ctx.state.countItems('ashdrake', 1)).toBe(0);
+    expect(bagCount(ctx, 'ashdrake', 1)).toBe(1);
+  });
+
+  it('a quest with no rewards pays nothing', () => {
+    const ctx = createTestContext();
+    const paid = capture(ctx.bus, 'economy:add');
+    ctx.bus.emit('item:merged', {
+      chain: 'flame_gem', fromTier: 1, resultTier: 2, at: { col: 0, row: 0 },
+      consumedIds: [], consumedAt: [], outputs: [], xp: 0
+    });
+    expect(paid.filter((p) => p.reason?.startsWith('quest:'))).toEqual([]);
+  });
+});
+
+function bagCount(
+  ctx: ReturnType<typeof createTestContext>,
+  chain: string,
+  tier: number
+): number {
+  return ctx.state.bag.find((s) => s.chain === chain && s.tier === tier)?.count ?? 0;
+}

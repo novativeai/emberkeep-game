@@ -26,6 +26,41 @@ export const CHARACTER_RIGS: Record<string, { url: string; label: string; thumbT
     url: 'sprites/characters/dragon/golden-dragon/rig-adult/golden-dragon.rig.json',
     label: 'Golden Dragon',
     thumbTexture: 'item_golden_egg_2'
+  },
+  // The dragon-forge breeds, both stages. They have no merge chain yet, so
+  // BoardScene never reaches them — but they are fully rigged and fully
+  // face-calibrated, and this catalog is the character-centric view: the UI
+  // Builder's composer can place and animate them today, which is also how
+  // their blink and roar get looked at without waiting on gameplay.
+  'dragon-frost': {
+    url: 'sprites/characters/dragon/frost-dragon/rig/dragon-frost.rig.json',
+    label: 'Frost Whelp',
+    thumbTexture: 'skin_frost_3'
+  },
+  'dragon-frost-adult': {
+    url: 'sprites/characters/dragon/frost-dragon/rig-adult/frost-dragon.rig.json',
+    label: 'Frost Dragon',
+    thumbTexture: 'skin_frost_4'
+  },
+  'dragon-storm': {
+    url: 'sprites/characters/dragon/storm-dragon/rig/dragon-storm.rig.json',
+    label: 'Storm Whelp',
+    thumbTexture: 'skin_storm_3'
+  },
+  'dragon-storm-adult': {
+    url: 'sprites/characters/dragon/storm-dragon/rig-adult/storm-dragon.rig.json',
+    label: 'Storm Dragon',
+    thumbTexture: 'skin_storm_4'
+  },
+  'dragon-moonwhisker': {
+    url: 'sprites/characters/dragon/moonwhisker-dragon/rig/dragon-moonwhisker.rig.json',
+    label: 'Moonwhisker Whelp',
+    thumbTexture: 'skin_moonwhisker_3'
+  },
+  'dragon-moonwhisker-adult': {
+    url: 'sprites/characters/dragon/moonwhisker-dragon/rig-adult/moonwhisker-dragon.rig.json',
+    label: 'Moonwhisker Dragon',
+    thumbTexture: 'skin_moonwhisker_4'
   }
 };
 

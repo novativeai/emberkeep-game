@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEPTHS, TILE_H, TILE_W } from '../core/Constants';
 import type { GameContext } from '../core/Context';
 import { gridToWorld, projHalfH, projHalfW, worldToGrid } from '../core/iso';
+import { projectIn, unprojectIn, type Lattice } from './lattice';
 import type { RegionStatus } from '../core/types';
 import {
   cellKey,
@@ -15,6 +16,7 @@ import {
   gridOutline,
   gridRotateHandle,
   gridSnap,
+  latticeFor,
   type GridDef,
   type PlacedAsset
 } from './editorStore';
@@ -260,7 +262,7 @@ export class BoardEditor {
       [this.cols - 1, 0],
       [0, this.rows - 1],
       [this.cols - 1, this.rows - 1]
-    ].map(([c, r]) => gridToWorld(c!, r!));
+    ].map(([c, r]) => this.toWorld(c!, r!));
     const xs = pts.map((p) => p.x);
     const ys = pts.map((p) => p.y);
     const x = Math.min(...xs) - TILE_W;
@@ -276,7 +278,7 @@ export class BoardEditor {
       [r.x + r.w, r.y],
       [r.x, r.y + r.h],
       [r.x + r.w, r.y + r.h]
-    ].map(([x, y]) => worldToGrid(x!, y!));
+    ].map(([x, y]) => this.toGrid(x!, y!));
     const cs = corners.map((c) => c.col);
     const rs = corners.map((c) => c.row);
     this.gMinC = Math.min(...cs) - 1; // +1 cell of margin so edges fully cover
@@ -290,7 +292,7 @@ export class BoardEditor {
 
   private cellUnder(pointer: Phaser.Input.Pointer): { col: number; row: number } | null {
     const wp = this.worldOf(pointer);
-    const { col, row } = worldToGrid(wp.x, wp.y);
+    const { col, row } = this.toGrid(wp.x, wp.y);
     if (col < this.gMinC || col > this.gMaxC || row < this.gMinR || row > this.gMaxR) return null;
     return { col, row };
   }
@@ -633,7 +635,7 @@ export class BoardEditor {
     const gi = Math.max(0, Math.min(g.cols - 1, Math.round(i)));
     const gj = Math.max(0, Math.min(g.rows - 1, Math.round(j)));
     const c = gridCellCenter(g, gi, gj);
-    const { col, row } = worldToGrid(c.x, c.y);
+    const { col, row } = this.toGrid(c.x, c.y);
     return { gi, gj, col, row };
   }
 
@@ -645,7 +647,7 @@ export class BoardEditor {
       if (g) return gridCellCenter(g, a.gi, a.gj);
     }
     if (a.wx !== undefined && a.wy !== undefined) return { x: a.wx, y: a.wy }; // baked pin — survives an unresolved grid
-    return gridToWorld(a.col, a.row);
+    return this.toWorld(a.col, a.row);
   }
 
   /** Pick the placed asset under a world point. Test the rendered SPRITE's display
@@ -746,17 +748,59 @@ export class BoardEditor {
     ];
   }
 
+  /* ------------------------- the PAGE's own lattice ------------------------- */
+
+  /**
+   * Every map is edited at ITS OWN pitch.
+   *
+   * A map's grids were hand-drawn on that map's backdrop art, at whatever scale
+   * that art is painted — so reading them through the running world's projection
+   * puts the cell overlay somewhere the drawn grids are not, which is exactly the
+   * "the editor doesn't follow my grid any more" symptom. `latticeFor` recovers the
+   * page's pitch from its own grids and returns null for a page it cannot represent
+   * (rotated or ortho grids), which falls back to the ambient projection.
+   *
+   * LOCAL on purpose. The old build re-pointed the engine's ONE global lattice
+   * (`setLattice`) whenever the editor paged, which moved the running game's
+   * coordinates under it. The engine now holds a world as independently placed
+   * zones and owns its own projection; this is a VIEW, and it stays in the view.
+   */
+  private lattice: Lattice | null = null;
+
+  private refreshLattice(): void {
+    this.lattice = latticeFor(editorStore.grids);
+  }
+
+  /** Cell → world pixel, in the page's lattice when it has one. */
+  private toWorld(col: number, row: number): { x: number; y: number } {
+    return this.lattice ? projectIn(this.lattice, col, row) : gridToWorld(col, row);
+  }
+
+  /** World pixel → cell, the inverse of `toWorld`. */
+  private toGrid(x: number, y: number): { col: number; row: number } {
+    return this.lattice ? unprojectIn(this.lattice, x, y) : worldToGrid(x, y);
+  }
+
+  private halfW(): number {
+    return this.lattice ? this.lattice.halfW : projHalfW();
+  }
+
+  private halfH(): number {
+    return this.lattice ? this.lattice.halfH : projHalfH();
+  }
+
   /* ----------------------------- drawing ------------------------------ */
 
   private diamond(col: number, row: number): number[] {
-    const { x, y } = gridToWorld(col, row);
-    const hw = projHalfW(); // 128 (tile-width reference)
-    const hh = projHalfH(); // the projection's true vertical pitch — tiles seamlessly
+    const { x, y } = this.toWorld(col, row);
+    const hw = this.halfW(); // the page's tile-width reference
+    const hh = this.halfH(); // its true vertical pitch — tiles seamlessly
     return [x, y - hh, x + hw, y, x, y + hh, x - hw, y];
   }
 
   private redraw(): void {
     if (!this.active) return;
+    this.refreshLattice(); // the page may have changed under us
     this.blackCover.setVisible(editorStore.blackout); // only the manual "Fond noir" — a deleted default is replaced by the imported map, not black
     // Full mesh only when something structural changed; hover overlay every move.
     if (editorStore.rev !== this.lastRev) {
@@ -784,7 +828,7 @@ export class BoardEditor {
     const hover = editorStore.hoverCell;
     // 1) The cell under the cursor a pending/selected asset will land on (gold).
     if ((editorStore.pendingAsset || editorStore.selectedAssetId) && hover) {
-      const hw = gridToWorld(hover.col, hover.row);
+      const hw = this.toWorld(hover.col, hover.row);
       const gd = this.gridUnder(hw);
       if (gd) {
         const s = this.snapAssetToGrid(gd, hw);
@@ -819,6 +863,18 @@ export class BoardEditor {
     }
     if (!editorStore.showGrid) {
       // Grid removed (Carte tab): clean art for zone-drawing — no mesh/badges/labels.
+      this.clearCellBadges();
+      for (const t of this.regionLabels) t.setVisible(false);
+      return;
+    }
+
+    // NO FOREIGN MESH. This mesh is the CELL grid, and a cell only means something
+    // in a lattice. The page has one when its own grids define it (`this.lattice`);
+    // failing that, only the page the game is actually running can borrow the
+    // engine's. Drawing the running world's mesh over another map's art is what
+    // made the editor look like it had stopped following the grid — so on a page
+    // that can't speak for itself, the hand-drawn grids are shown alone.
+    if (!this.lattice && editorStore.currentMapId !== editorStore.activeGameWorldId) {
       this.clearCellBadges();
       for (const t of this.regionLabels) t.setVisible(false);
       return;
@@ -860,7 +916,7 @@ export class BoardEditor {
     for (const [key, lvl] of editorStore.allocations) {
       if (lvl <= 1) continue;
       const [bc, br] = key.split(',').map(Number) as [number, number];
-      const { x, y } = gridToWorld(bc, br);
+      const { x, y } = this.toWorld(bc, br);
       this.cellBadges.push(
         this.scene.add
           .text(x, y, `L${lvl}`, {

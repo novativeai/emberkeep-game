@@ -1,20 +1,39 @@
 import Phaser from 'phaser';
-import { SCENES, WORLD_TELEPORT } from '../core/Constants';
+import { SCENES } from '../core/Constants';
 import type { GameContext } from '../core/Context';
 import type { BoardScene } from '../scenes/BoardScene';
 import { importAsset, recreateModel, recreateModelFromUrl, restoreTexture } from './assetImport';
-import { deleteAsset3dFile, listAsset3dFiles, loadEditorMap, saveEditorMap } from './asset3dFs';
+import { deleteAsset3dFile, listAsset3dFiles, loadEditorMap, publishWorlds, saveEditorMap } from './asset3dFs';
 import { BoardEditor } from './BoardEditor';
 import { EditorDom } from './EditorDom';
-import { setLattice, setProjection, worldToGrid } from '../core/iso';
-import { PRIMARY_WORLD } from '../core/GameState';
-import { editorStore, gridBBox, gridCellCenter, latticeFor, type GridDef, type MapLayer, type MapZone, type PlacedAsset, type PositionEntry } from './editorStore';
+import { worldToGrid } from '../core/iso';
+import worldsRegistry from '../data/worlds.json';
+import { editorStore, gridBBox, gridCellCenter, type GridDef, type MapLayer, type MapZone, type PlacedAsset, type PositionEntry } from './editorStore';
 
 /**
  * Map Editor orchestrator: ties the DOM chrome, the Phaser board layer and the
  * running game together. Opened from Settings (`editor:open`). It also owns the
  * cross-domain glue the DOM can't reach on its own — the Position list (live game
  * objects + placed assets), focusing, and the JSON export. Created once at boot.
+ *
+ * HOW "APPLY" REACHES THE GAME
+ * ----------------------------
+ * It used to poke the running board directly — tile overrides on `GameState`, a
+ * decor payload on `BoardScene`, one global cell lattice it could re-point per
+ * world. The engine no longer works that way: a world is a registry of
+ * independently placed ZONES (`core/world.ts`, built from `src/data/zones.json`),
+ * each with its own tile size, origin and rotation — which is this editor's own
+ * grid model, adopted by the engine.
+ *
+ * So the editor authors, and the pipeline applies:
+ *
+ *   Apply → assets/map/nionja-worlds.json → ingest-worlds.mjs → src/data/worlds.json
+ *                                         → build-zones.mjs   → src/data/zones.json
+ *
+ * `build-zones.mjs` owns the editor→art transform (it FITS one scale + offset
+ * against every cell's measured `gameCell`), so recomputing it in the browser
+ * would be a second implementation of the one thing that must not drift. The dev
+ * server runs the real scripts and Vite reloads the game onto the new zones.
  */
 export class MapEditor {
   private boardEditor?: BoardEditor;
@@ -28,6 +47,10 @@ export class MapEditor {
    *  always uses the authoritative disk data — no race with a stale localStorage
    *  snapshot (which was the "wrong on reopen, right on refresh" asset bug). */
   private diskReady: Promise<void>;
+  /** The map whose art is currently previewed on the board, so paging repaints
+   *  only when the page actually changed. */
+  private shownMapId: string | null = null;
+  private offPage?: () => void;
 
   constructor(
     private game: Phaser.Game,
@@ -49,181 +72,67 @@ export class MapEditor {
     );
     this.dom.previewProvider = (key) => this.textureURL(key);
     ctx.bus.on('editor:open', () => this.open());
-    // Re-apply the saved playable zones AND re-render the placed assets once the
-    // board is live (game:started fires on BOTH load and new-game, AFTER hydrate so
-    // overrides aren't wiped) — so the map (cells + 3D/decor) survives a reload
-    // without re-opening the editor, and the 3D keeps animating.
+    // Re-hydrate the editor's OWN view once the board is live: the disk default is
+    // the authoritative design, so wait for it and restore exactly once — never a
+    // concurrent second restore off a stale localStorage snapshot (that race was the
+    // "wrong on reopen, right on refresh" asset bug).
     //
-    // Await the disk default FIRST so there is exactly ONE restore, driven by the
-    // authoritative on-disk data — never a concurrent second restore off a stale
-    // localStorage snapshot that could win the race and paint the wrong assets.
-    //
-    // It runs as `beginRun`'s world PREPARER: the save is hydrated, then this is
-    // awaited, and only then is anything announced — so the playable zones, the
-    // backdrop and above all the cell LATTICE are live before a single system reads a
-    // coordinate. Everything the game saves is (col,row); this project is what those
-    // numbers mean.
-    ctx.worldPreparer = (activeWorld) => this.onGameStarted(activeWorld);
-    // Fallback for a boot where nothing wired the preparer, so the restore can never
-    // be skipped outright. `prepared` stops it from doubling up on the normal path.
-    ctx.bus.on('game:started', () => {
-      if (!this.prepared) void this.onGameStarted(this.ctx.state.activeWorld);
+    // It no longer restores anything INTO the game. The world the game runs is
+    // `zones.json`, rebuilt by Apply through the pipeline; re-applying a second,
+    // browser-side version of the same design on every boot is exactly the drift
+    // this merge removed.
+    ctx.bus.on('world:ready', () => {
+      if (!this.prepared) void this.hydrate();
     });
-    // A teleport (BoardScene, mid-cinematic) asks to switch the live game world.
-    ctx.bus.on('world:switch', ({ toWorld }) => void this.switchToWorld(toWorld));
-    // The return button asks to go back to the primary world (Level 1).
-    ctx.bus.on('world:return', () => void this.returnToPrimary());
   }
 
-  /** The single boot/reload restore: wait for the on-disk default to load, then
-   *  re-apply World 1's zones + assets exactly once. */
-  private async onGameStarted(live: string): Promise<void> {
+  /** The single boot restore of the EDITOR's own state: wait for the on-disk
+   *  default, then bring back the textures its canvas draws with. */
+  private async hydrate(): Promise<void> {
     this.prepared = true;
     await this.diskReady;
     await this.restoreToGame();
-    await this.applyActiveBackdrop();
-    // Reloading INSIDE a sub-world: the save knows which world was live (it holds
-    // that world's board), the editor's runtime override does not — it always came
-    // back pointing at the primary map. So the lair's pieces were drawn on the
-    // isle's backdrop, on the isle's cells, at the isle's pitch. Re-enter the world
-    // the save is standing in, through the one path that sets all three.
-    if (live !== PRIMARY_WORLD && editorStore.mapByName(live)) await this.switchToWorld(live);
-    // The isle gets the same check every other world gets: `board:reconcile` records
-    // the units its coordinates are written in, and re-projects them if a build ever
-    // ships a different authored tile. Its stranded-piece repair is gated on
-    // `worldAuthorsItsCells`, which the isle never sets — so the Theme Crystal, a
-    // landmark parked off the playable zone on purpose, is left exactly where it is.
-    else this.ctx.bus.emit('board:reconcile', {});
-  }
-
-  /** Draw the ACTIVE world's map as the GAME's backdrop: the authored one for
-   *  '__base__', else the imported map's texture (primary map or a teleport target).
-   *  So gameplay shows your improved / switched map instead of the authored one. */
-  private async applyActiveBackdrop(): Promise<void> {
-    const scene = this.boardScene() as BoardScene | undefined;
-    if (!scene) return;
-    const id = editorStore.activeGameWorldId;
-    if (id === '__base__') {
-      scene.applyWorldBackdrop(null); // the authored map is the world
-      return;
-    }
-    const map = [...editorStore.maps, ...editorStore.resolvedSavedMaps()].find((m) => m.id === id && m.dataUrl);
-    if (!map?.dataUrl) return;
-    try {
-      if (!scene.textures.exists(map.textureKey)) await restoreTexture(scene, map.textureKey, map.dataUrl);
-      scene.applyWorldBackdrop(map.textureKey);
-    } catch (e) {
-      console.warn('[MapEditor] could not apply the world backdrop', e);
-    }
-  }
-
-  /** Switch the live game to another editor world (a `world:switch` teleport target):
-   *  swap the backdrop, re-apply that world's playable cells + decor. */
-  private async switchToWorld(mapName: string): Promise<void> {
-    const map = editorStore.mapByName(mapName);
-    if (!map) {
-      console.warn('[MapEditor] world:switch — no map named', mapName);
-      return;
-    }
-    editorStore.activeWorldId = map.id;
-    // Adopt the world's OWN cell pitch. Its grids were hand-drawn on its own backdrop
-    // art, at whatever scale that art is painted; folding them through the authored
-    // lattice collapses several drawn cells onto one game cell — measured at 53% of
-    // roothold's cells and 51% of borealis'. `latticeFor` returns null for a world it
-    // cannot represent (rotated or ortho grids), and that world simply keeps the
-    // authored lattice.
-    //
-    // This MUST come before applyBaseToGame, which projects every drawn cell through
-    // the live lattice to decide which game cells are playable.
-    //
-    // It was held back for a long time because it moves the ONE global projection and
-    // the game kept ONE item store for every world, so re-pitching roothold relocated
-    // nb2's pieces too. Worlds own their boards now, and the live world is saved —
-    // nothing outside this world is projected while it is live. See docs/worlds.md.
-    const lattice = latticeFor(editorStore.gridsFor(map.id));
-    if (lattice) setLattice(lattice);
-    await this.applyActiveBackdrop();
-    this.applyBaseToGame(); // the new world's playable cells (state-only)
-    const scene = this.boardScene() as BoardScene | undefined;
-    if (!scene) return;
-    const assets = editorStore.assetsFor(map.id);
-    for (const a of assets) {
-      try {
-        await this.ensureAssetTexture(scene, a);
-      } catch (e) {
-        console.warn('[MapEditor] world:switch asset', a.name, e);
-      }
-    }
-    scene.applyEditorState(
-      assets.filter((a) => scene.textures.exists(a.textureKey)).map((a) => this.assetPayload(a, map.id))
-    );
-    // A real switch happened (the world exists) → let the UI show a "return" button
-    // and the tutorial stand down. Never fires when the target world is absent.
-    this.ctx.bus.emit('world:switched', { toWorld: mapName });
-  }
-
-  /** Return the live game to the PRIMARY world ("Level 1"): clear the runtime world
-   *  override, restore its backdrop + playable cells + decor. */
-  private async returnToPrimary(): Promise<void> {
-    editorStore.activeWorldId = null;
-    // Hand the authored lattice back — the primary world's grids were drawn at the
-    // game's own pitch (74 of 75 cells survive it), so a median pitch would LOSE
-    // cells here. Only the sub-worlds adopt one of their own.
-    setProjection(this.ctx.data.map.tile);
-    await this.applyActiveBackdrop();
-    this.applyBaseToGame();
-    const scene = this.boardScene() as BoardScene | undefined;
-    if (!scene) return;
-    const id = editorStore.activeGameWorldId;
-    const assets = editorStore.assetsFor(id);
-    for (const a of assets) {
-      try {
-        await this.ensureAssetTexture(scene, a);
-      } catch (e) {
-        console.warn('[MapEditor] world:return asset', a.name, e);
-      }
-    }
-    scene.applyEditorState(
-      assets.filter((a) => scene.textures.exists(a.textureKey)).map((a) => this.assetPayload(a, id))
-    );
-    // Home, with the authored lattice and the isle's own cells both back in place —
-    // the one moment on this path where a reconcile can read the truth. BoardScene
-    // deliberately does NOT emit one from its own `world:return` handler: that runs
-    // synchronously, a tick before `applyBaseToGame` above lowers the lair's
-    // "I draw all my own ground" flag, and the repair then walked the isle's
-    // out-of-zone fixtures onto the nearest tile on every single trip home.
-    this.ctx.bus.emit('board:reconcile', {});
   }
 
   private boardScene(): Phaser.Scene | undefined {
     return this.game.scene.getScene(SCENES.board) ?? undefined;
   }
 
-  /** Editor asset → the BoardScene decor payload. When pinned to a custom grid cell,
-   *  include its EXACT world position (wx/wy) so it lands ON the grid in-game too —
-   *  the game world has no notion of custom grids, so col/row alone would only
-   *  approximate it to the nearest game cell. */
-  private assetPayload(
-    a: PlacedAsset,
-    worldId: string
-  ): { id: string; movable?: boolean; rot?: number; flipX?: boolean; flipY?: boolean; frameCount?: number; frameRate?: number; textureKey: string; col: number; row: number; z?: number; w: number; h: number; scale: number; wx?: number; wy?: number } {
-    const base = { id: a.id, movable: a.movable, rot: a.rot, flipX: a.flipX, flipY: a.flipY, frameCount: a.frameCount, frameRate: a.frameRate, textureKey: a.textureKey, col: a.col, row: a.row, z: a.z, w: a.w, h: a.h, scale: a.scale };
-    if (a.gridId && a.gi !== undefined && a.gj !== undefined) {
-      const g = editorStore.gridsFor(worldId).find((x) => x.id === a.gridId);
-      if (g) {
-        const c = gridCellCenter(g, a.gi, a.gj);
-        return { ...base, wx: c.x, wy: c.y };
-      }
+  /**
+   * Paint the PAGED map's art where the authored backdrop sits, so the grids drawn
+   * on that art line up with what is on screen. Editor-view only (BoardScene
+   * restores the authored image on close) — the running world is untouched.
+   */
+  private async applyPageBackdrop(): Promise<void> {
+    const scene = this.boardScene() as BoardScene | undefined;
+    if (!scene) return;
+    const id = editorStore.currentMapId;
+    const map = [...editorStore.maps, ...editorStore.resolvedSavedMaps()].find((m) => m.id === id);
+    if (!map?.dataUrl) {
+      scene.applyWorldBackdrop(null); // the authored map is its own art
+      return;
     }
-    if (a.wx !== undefined && a.wy !== undefined) return { ...base, wx: a.wx, wy: a.wy }; // baked pin — survives an unresolved grid
-    return base;
+    try {
+      if (!scene.textures.exists(map.textureKey)) await restoreTexture(scene, map.textureKey, map.dataUrl);
+      scene.applyWorldBackdrop(map.textureKey);
+    } catch (e) {
+      console.warn('[MapEditor] could not preview the page backdrop', e);
+    }
   }
 
   open(): void {
     const scene = this.boardScene();
     if (!scene || !scene.scene.isActive()) return;
     if (!this.boardEditor) this.boardEditor = new BoardEditor(scene, this.ctx);
-    void this.restoreMaps(scene);
+    void this.restoreMaps(scene).then(() => this.applyPageBackdrop());
+    // Paging to another map re-paints its art under the grids it was drawn on.
+    this.offPage ??= editorStore.on('change', () => {
+      if (!editorStore.open) return;
+      const id = editorStore.currentMapId;
+      if (id === this.shownMapId) return;
+      this.shownMapId = id;
+      void this.applyPageBackdrop();
+    });
     const ui = this.game.scene.getScene(SCENES.ui);
     if (ui) {
       ui.scene.setVisible(false);
@@ -236,6 +145,9 @@ export class MapEditor {
   close(): void {
     this.boardEditor?.exit(); // restores the exact game content it hid (nothing destroyed now)
     editorStore.setOpen(false);
+    // Give the running world its own art back — the preview was the editor's view.
+    (this.boardScene() as BoardScene | undefined)?.applyWorldBackdrop(null);
+    this.shownMapId = null;
     const ui = this.game.scene.getScene(SCENES.ui);
     if (ui) {
       ui.scene.setVisible(true);
@@ -244,95 +156,47 @@ export class MapEditor {
   }
 
   /**
-   * "Apply": push the editor's work into the LIVE game. Every allocated cell that
-   * sits inside the game's grid becomes habitable (GameState override → drops
-   * succeed there); placed assets are painted as board decor. Then save + close
-   * so the player is back in the game and can move dragons into the new cells.
+   * "Apply" / "Save": publish this design to the world pipeline.
    *
-   * Push ONLY the BASE map (= World 1, the live game) into the game's tile
-   * overrides. Other paged maps are SEPARATE worlds (reached later via a portal) —
-   * their zones must NEVER touch the current game. State-only (no fog/decor), so
-   * it's safe on boot too. Each call is a clean slate.
+   * Every grid keeps its OWN pitch here. That is not a detail — folding a
+   * hand-drawn grid through one global game lattice collapsed several drawn cells
+   * onto the same cell and silently lost all but the last (measured: barely half
+   * of roothold's and borealis' cells survived). Zones ended that: a zone owns its
+   * tile size, origin and rotation, so a drawn cell is a real cell. Nothing to
+   * warn about any more, and nothing to audit around.
+   *
+   * Returns what to tell the user — the endpoint only exists in dev, and a
+   * production build must say so rather than look applied.
    */
-  private applyBaseToGame(): void {
-    this.ctx.state.clearEditorTileOverrides();
-    const id = editorStore.activeGameWorldId; // primary world, or the teleport target
-    // A teleport target draws ALL of its own ground: its hand-drawn grids ARE the
-    // lair floor, so a cell it never drew is void there. Otherwise the authored
-    // isle's regions showed through from underneath — both worlds use the same
-    // coordinates, so roothold inherited nb2's playable cells. The primary world
-    // keeps the authored regions as its base and layers overrides on top.
-    this.ctx.state.setCellsFullyAuthored(editorStore.activeWorldId !== null);
-    // 1) Cell allocations already in game (col,row) space.
-    for (const [key, lvl] of editorStore.allocationsFor(id)) {
-      const [c, r] = key.split(',').map(Number) as [number, number];
-      if (lvl > 0) {
-        this.ctx.state.expandBoardTo(c, r);
-        this.ctx.state.setEditorTileOverride(c, r, lvl); // opens at level `lvl` (1 = now)
-      } else {
-        this.ctx.state.setEditorTileOverride(c, r, 0); // blocked
-      }
-    }
-    // 2) Custom-grid PLAYABLE cells → the game cell each one covers (world centre →
-    //    worldToGrid). This is how a hand-drawn grid's marked cells become habitable.
-    // The game has ONE lattice (setProjection runs once, from the AUTHORED map), so a
-    // grid drawn at a different pitch folds several of its cells onto the same game
-    // cell — and every one but the last is silently lost: it looks allocated in the
-    // editor and can never hold a piece. Count them and say so, loudly. Audit the
-    // whole project with `node scripts/audit-grids.mjs`.
-    const claimed = new Map<string, string>();
-    let collapsed = 0;
-    for (const g of editorStore.gridsFor(id)) {
-      if (!g.alloc) continue;
-      for (const [cell, lvl] of Object.entries(g.alloc)) {
-        if (lvl <= 0) continue;
-        const [i, j] = cell.split(',').map(Number) as [number, number];
-        const w = gridCellCenter(g, i, j);
-        const { col, row } = worldToGrid(w.x, w.y);
-        const key = `${col},${row}`;
-        const prev = claimed.get(key);
-        if (prev) collapsed++;
-        else claimed.set(key, `${g.name ?? g.id}[${i},${j}]`);
-        this.ctx.state.expandBoardTo(col, row);
-        this.ctx.state.setEditorTileOverride(col, row, lvl);
-      }
-    }
-    if (collapsed > 0) {
-      console.warn(
-        `[MapEditor] ${collapsed} cellule(s) dessinée(s) écrasée(s) sur une case déjà prise ` +
-          `(monde ${id}). Une grille n'est sans perte que si son pas vaut celui du jeu — ` +
-          `voir scripts/audit-grids.mjs.`
-      );
-    }
+  private async publish(): Promise<string> {
+    const res = await publishWorlds(this.buildExportDoc());
+    if (res === null) return "Serveur de dev absent — l'export a été enregistré, mais zones.json n'a pas été régénéré.";
+    if (!res.ok) return `Échec: ${res.error ?? 'inconnu'}`;
+    return 'Appliqué — worlds.json + zones.json régénérés.';
   }
 
-  private pushToGame(): void {
+  private async pushToGame(): Promise<string> {
     // Commit the current selection into the CURRENT map's design (saved PER map).
     if (editorStore.selectedCells.size) {
       for (const key of editorStore.selectedCells) editorStore.allocations.set(key, editorStore.allocLevel);
       editorStore.markChanged();
     }
-    // Apply ONLY the primary world to the live game — never the other worlds' zones/decor.
-    this.applyBaseToGame();
-    const scene = this.boardScene() as BoardScene | undefined;
-    scene?.applyEditorState(
-      editorStore.assetsFor(editorStore.activeGameWorldId).map((a) => this.assetPayload(a, editorStore.activeGameWorldId))
-    );
+    return this.publish();
   }
 
-  /** Save button: persist to localStorage AND apply to the game (stay in editor).
-   *  Save and Apply BOTH push to the game — so whichever you press, your zones
-   *  become playable; Apply additionally closes the editor to go play. */
+  /** Save button: persist to localStorage + disk AND publish to the pipeline (stay
+   *  in the editor). Save and Apply BOTH publish — so whichever you press, your
+   *  zones become the ones the game runs; Apply additionally closes to go play. */
   private save(): void {
-    this.pushToGame();
     editorStore.saveAll();
     void saveEditorMap(editorStore.serializeProject()); // bake to disk (survives cookie wipe)
+    void this.pushToGame().then((msg) => console.info('[MapEditor]', msg));
   }
 
   private apply(): void {
-    this.pushToGame();
     editorStore.saveAll();
     void saveEditorMap(editorStore.serializeProject());
+    void this.pushToGame().then((msg) => console.info('[MapEditor]', msg));
     this.close();
   }
 
@@ -431,20 +295,20 @@ export class MapEditor {
   }
 
   /**
-   * Boot/reload: re-apply ONLY World 1 (the base map) — its playable zones stay
-   * droppable after reopening — then re-paint its assets as decor. applyBaseToGame
-   * is state-only and the decor paint no longer lifts fog, so the clouds stay as
-   * designed. Other paged maps are separate worlds and never touch this game.
+   * Boot/reload: bring the placed assets' TEXTURES back, so reopening the editor
+   * shows the design it saved rather than a page of blanks.
+   *
+   * It no longer paints anything into the game. The ground the game stands on is
+   * `zones.json` and its decor is the map data — both regenerated by Apply. A
+   * browser-side re-apply on every boot was a second, divergent copy of the same
+   * design, and it is exactly what made a reload disagree with a refresh.
    */
   private async restoreToGame(): Promise<void> {
-    // Re-apply World 1 (base) zones FIRST and ALWAYS — the live game is ONLY the
-    // base map; other worlds' zones must never leak in.
-    this.applyBaseToGame();
     const scene = this.boardScene() as BoardScene | undefined;
     if (!scene) return;
     const id = editorStore.activeGameWorldId; // the live game world (default, imported primary, or teleport target)
     const saved = editorStore.assetsFor(id); // from mapStates (disk default OR localStorage)
-    if (!saved.length) return; // zones already re-applied above; no assets to paint
+    if (!saved.length) return; // nothing placed on this map
     // Two-way sync: drop assets whose file was deleted from asset3d/ (null = no dev
     // store → don't prune, keep everything via fallbacks).
     const disk = await listAsset3dFiles();
@@ -458,10 +322,6 @@ export class MapEditor {
     }
     editorStore.restoreAssetsFor(id, records.map((a) => ({ ...a })));
     if (records.length !== saved.length) editorStore.persistAssets(); // forget folder-deleted ones
-    // Decor ONLY — render just the assets whose texture came back (never magenta).
-    scene.applyEditorState(
-      records.filter((a) => scene.textures.exists(a.textureKey)).map((a) => this.assetPayload(a, id))
-    );
   }
 
   /** Load the on-disk DEFAULT design (asset3d/editor-map.json) — the baked-in map
@@ -528,7 +388,9 @@ export class MapEditor {
    * move when it works"). Captures allocations, placed assets and every object's
    * position + rank.
    */
-  private exportJson(): void {
+  /** The project export — the EXACT document `assets/map/nionja-worlds.json` holds
+   *  and `scripts/ingest-worlds.mjs` reads. Downloaded by Export, published by Apply. */
+  private buildExportDoc(): Record<string, unknown> {
     // A COMPLETE manifest across every world (the authored default + every imported
     // map). Each world names its map, lists every grid in full (position + size +
     // perspective + rotation + matrix + which level it sits on + its playable cells,
@@ -612,7 +474,7 @@ export class MapEditor {
       defaultMapDeleted: editorStore.baseHidden, // true = an imported map is primary
       primaryWorldId: editorStore.primaryMapId,
       liveGameWorldId: editorStore.activeGameWorldId,
-      teleport: WORLD_TELEPORT, // the ruby → Demon → world-switch wiring (Constants)
+      teleport: worldsRegistry.teleport, // the hatch → world-switch wiring (src/data/worlds.json)
       gameObjects: this.objects(), // live game items (dragons, house…) with x/y/z + rank
       worlds,
       // The RAW, re-importable project (grids/zones/assets/allocations/maps + baseHidden)
@@ -628,7 +490,13 @@ export class MapEditor {
         zones: 'Hand-drawn polygons (world px) tracing the art. "gridId" = the grid each was laid out on.'
       }
     };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    return data;
+  }
+
+  private exportJson(): void {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(this.buildExportDoc(), null, 2)], { type: 'application/json' })
+    );
     const a = document.createElement('a');
     a.href = url;
     a.download = 'emberkeep-map.json';
@@ -669,7 +537,6 @@ export class MapEditor {
       if (scene) await this.restoreMaps(scene);
       void saveEditorMap(editorStore.serializeProject()); // bake to disk (survives a wipe)
       await this.restoreToGame();
-      await this.applyActiveBackdrop();
       editorStore.markChanged(); // repaint the editor board
 
       // Which referenced asset3d/ files are NOT on disk yet? (disk === null → no dev store.)

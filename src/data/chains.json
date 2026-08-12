@@ -10,17 +10,47 @@
       "id": "sparkweed",
       "name": "Sparkweed",
       "tiers": [
-        { "tier": 1, "id": "sparkweed_1", "name": "Spark Weed", "sell": 1, "xp": 0 },
-        { "tier": 2, "id": "sparkweed_2", "name": "Ember Bloom", "sell": 3, "xp": 6 },
-        { "tier": 3, "id": "sparkweed_3", "name": "Flame Lily", "sell": 8, "xp": 14 }
+        {
+          "tier": 1,
+          "id": "sparkweed_1",
+          "name": "Spark Weed",
+          "sell": 1,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "sparkweed_2",
+          "name": "Ember Bloom",
+          "sell": 3,
+          "xp": 6
+        },
+        {
+          "tier": 3,
+          "id": "sparkweed_3",
+          "name": "Flame Lily",
+          "sell": 8,
+          "xp": 14
+        }
       ]
     },
     {
       "id": "strawberry",
       "name": "Emberberry Plants",
       "tiers": [
-        { "tier": 1, "id": "strawberry_1", "name": "Emberberry Sprout", "sell": 1, "xp": 0 },
-        { "tier": 2, "id": "strawberry_2", "name": "Emberberry Bush", "sell": 3, "xp": 6 },
+        {
+          "tier": 1,
+          "id": "strawberry_1",
+          "name": "Emberberry Sprout",
+          "sell": 1,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "strawberry_2",
+          "name": "Emberberry Bush",
+          "sell": 3,
+          "xp": 6
+        },
         {
           "tier": 3,
           "id": "strawberry_3",
@@ -28,10 +58,20 @@
           "sell": 8,
           "xp": 14,
           "generator": {
-            "produces": { "chain": "strawberry", "tier": 1 },
+            "produces": {
+              "chain": "emberberry",
+              "tier": 1
+            },
             "cooldownMs": 20000,
             "energyCost": 0,
-            "passiveMs": 600000
+            "passiveMs": 240000,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "strawberry",
+                "tier": 1
+              }
+            }
           }
         }
       ]
@@ -41,7 +81,13 @@
       "name": "Ember Dragons",
       "hatchAtTier": 3,
       "tiers": [
-        { "tier": 1, "id": "ember_dragon_1", "name": "Dragon Ruby", "sell": 2, "xp": 0 },
+        {
+          "tier": 1,
+          "id": "ember_dragon_1",
+          "name": "Dragon Ruby",
+          "sell": 2,
+          "xp": 0
+        },
         {
           "tier": 2,
           "id": "ember_dragon_2",
@@ -55,12 +101,18 @@
           "name": "Red Dragon",
           "sell": 25,
           "xp": 26,
-          "merge": { "group": 2, "outputs": 1 },
+          "merge": {
+            "group": 2,
+            "outputs": 1
+          },
           "generator": {
-            "produces": { "chain": "ember_dragon", "tier": 1 },
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
             "cooldownMs": 45000,
             "energyCost": 1,
-            "passiveMs": 180000
+            "passiveMs": 120000
           }
         },
         {
@@ -70,10 +122,13 @@
           "sell": 60,
           "xp": 40,
           "generator": {
-            "produces": { "chain": "ember_dragon", "tier": 1 },
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
             "cooldownMs": 30000,
             "energyCost": 1,
-            "passiveMs": 120000
+            "passiveMs": 90000
           }
         }
       ]
@@ -82,25 +137,63 @@
       "id": "flame_gem",
       "name": "Flame Gems",
       "tiers": [
-        { "tier": 1, "id": "flame_gem_1", "name": "Gem Shard", "sell": 1, "xp": 0 },
-        { "tier": 2, "id": "flame_gem_2", "name": "Flame Gem", "sell": 5, "xp": 8 },
-        { "tier": 3, "id": "flame_gem_3", "name": "Radiant Gem", "sell": 15, "xp": 18 }
+        {
+          "tier": 1,
+          "id": "flame_gem_1",
+          "name": "Gem Shard",
+          "sell": 1,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "flame_gem_2",
+          "name": "Flame Gem",
+          "sell": 5,
+          "xp": 8
+        },
+        {
+          "tier": 3,
+          "id": "flame_gem_3",
+          "name": "Radiant Gem",
+          "sell": 15,
+          "xp": 18
+        }
       ]
     },
     {
       "id": "lumber",
       "name": "Timber",
       "tiers": [
-        { "tier": 1, "id": "lumber_1", "name": "Bush", "sell": 1, "xp": 0 },
+        {
+          "tier": 1,
+          "id": "lumber_1",
+          "name": "Cut Wood",
+          "sell": 1,
+          "xp": 0
+        },
         {
           "tier": 2,
           "id": "lumber_2",
+          "name": "Plank Set",
+          "sell": 3,
+          "xp": 4
+        },
+        {
+          "tier": 3,
+          "id": "lumber_3",
           "name": "House",
           "sell": 0,
           "xp": 0,
-          "merge": { "group": 2, "outputs": 1 },
+          "chooseProduce": true,
+          "merge": {
+            "group": 2,
+            "outputs": 1
+          },
           "generator": {
-            "produces": { "chain": "coin", "tier": 1 },
+            "produces": {
+              "chain": "coin",
+              "tier": 1
+            },
             "cooldownMs": 210000,
             "energyCost": 0,
             "passiveMs": 210000,
@@ -108,13 +201,16 @@
           }
         },
         {
-          "tier": 3,
-          "id": "lumber_3",
+          "tier": 4,
+          "id": "lumber_4",
           "name": "Manor",
           "sell": 0,
           "xp": 20,
           "generator": {
-            "produces": { "chain": "coin", "tier": 2 },
+            "produces": {
+              "chain": "coin",
+              "tier": 2
+            },
             "cooldownMs": 210000,
             "energyCost": 0,
             "passiveMs": 210000,
@@ -134,11 +230,65 @@
           "sell": 0,
           "xp": 0,
           "generator": {
-            "produces": { "chain": "lumber", "tier": 1 },
+            "produces": {
+              "chain": "lumber",
+              "tier": 1
+            },
             "cooldownMs": 300000,
             "energyCost": 0,
             "passiveMs": 300000,
-            "tappable": false
+            "tappable": false,
+            "bonus": {
+              "every": 10,
+              "produces": {
+                "chain": "firgrain",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "firgrain",
+      "name": "Fir",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "firgrain_1",
+          "name": "Fir Grain",
+          "sell": 2,
+          "xp": 3
+        },
+        {
+          "tier": 2,
+          "id": "firgrain_2",
+          "name": "Small Fir Tree",
+          "sell": 7,
+          "xp": 8
+        },
+        {
+          "tier": 3,
+          "id": "firgrain_3",
+          "name": "Fir Tree",
+          "sell": 0,
+          "xp": 24,
+          "generator": {
+            "produces": {
+              "chain": "lumber",
+              "tier": 1
+            },
+            "cooldownMs": 300000,
+            "energyCost": 0,
+            "passiveMs": 300000,
+            "tappable": false,
+            "bonus": {
+              "every": 10,
+              "produces": {
+                "chain": "firgrain",
+                "tier": 1
+              }
+            }
           }
         }
       ]
@@ -154,10 +304,14 @@
           "sell": 0,
           "xp": 0,
           "generator": {
-            "produces": { "chain": "emerald", "tier": 1 },
+            "produces": {
+              "chain": "quartz",
+              "tier": 1
+            },
             "cooldownMs": 300000,
             "energyCost": 0,
-            "tappable": true
+            "tappable": true,
+            "skipMaxGold": 60
           }
         }
       ]
@@ -166,8 +320,20 @@
       "id": "coin",
       "name": "Gold",
       "tiers": [
-        { "tier": 1, "id": "coin_1", "name": "Gold Coin", "sell": 0, "xp": 0 },
-        { "tier": 2, "id": "coin_2", "name": "Gold Pouch", "sell": 5, "xp": 60 }
+        {
+          "tier": 1,
+          "id": "coin_1",
+          "name": "Gold Coin",
+          "sell": 0,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "coin_2",
+          "name": "Gold Pouch",
+          "sell": 5,
+          "xp": 60
+        }
       ]
     },
     {
@@ -175,17 +341,35 @@
       "name": "Emerald Dragons",
       "hatchAtTier": 3,
       "tiers": [
-        { "tier": 1, "id": "emerald_1", "name": "Emerald", "sell": 2, "xp": 0 },
-        { "tier": 2, "id": "emerald_2", "name": "Green Egg", "sell": 10, "xp": 0 },
+        {
+          "tier": 1,
+          "id": "emerald_1",
+          "name": "Emerald",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "emerald_2",
+          "name": "Green Egg",
+          "sell": 10,
+          "xp": 0
+        },
         {
           "tier": 3,
           "id": "emerald_3",
           "name": "Green Dragon",
           "sell": 20,
           "xp": 24,
-          "merge": { "group": 2, "outputs": 1 },
+          "merge": {
+            "group": 2,
+            "outputs": 1
+          },
           "generator": {
-            "produces": { "chain": "flame_gem", "tier": 1 },
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
             "cooldownMs": 45000,
             "energyCost": 1,
             "passiveMs": 180000
@@ -198,7 +382,10 @@
           "sell": 50,
           "xp": 36,
           "generator": {
-            "produces": { "chain": "flame_gem", "tier": 1 },
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
             "cooldownMs": 30000,
             "energyCost": 1,
             "passiveMs": 120000
@@ -211,82 +398,107 @@
       "name": "Golden Dragons",
       "hatchAtTier": 2,
       "tiers": [
-        { "tier": 1, "id": "golden_egg_1", "name": "Golden Egg", "sell": 0, "xp": 0, "sellable": false },
-        { "tier": 2, "id": "golden_egg_2", "name": "Golden Elder", "sell": 0, "xp": 0, "sellable": false }
+        {
+          "tier": 1,
+          "id": "golden_egg_1",
+          "name": "Golden Egg",
+          "sell": 0,
+          "xp": 0,
+          "sellable": false
+        },
+        {
+          "tier": 2,
+          "id": "golden_egg_2",
+          "name": "Golden Elder",
+          "sell": 0,
+          "xp": 0,
+          "sellable": false
+        }
       ]
     },
     {
       "id": "chest",
       "name": "Treasure Chest",
       "tiers": [
-        { "tier": 1, "id": "chest_1", "name": "Treasure Chest", "sell": 0, "xp": 0 }
+        {
+          "tier": 1,
+          "id": "chest_1",
+          "name": "Treasure Chest",
+          "sell": 0,
+          "xp": 0
+        }
       ]
     },
     {
-      "id": "driftwood",
-      "name": "Rimewood",
-      "world": "borealis",
+      "id": "firepine",
+      "name": "Firepine",
       "tiers": [
-        { "tier": 1, "id": "driftwood_1", "name": "Frozen Plank", "sell": 1, "xp": 0 },
-        { "tier": 2, "id": "driftwood_2", "name": "Bound Bundle", "sell": 3, "xp": 4 },
+        {
+          "tier": 1,
+          "id": "firepine_1",
+          "name": "Firepine Seedling",
+          "sell": 3,
+          "xp": 4
+        },
+        {
+          "tier": 2,
+          "id": "firepine_2",
+          "name": "Firepine Sapling",
+          "sell": 9,
+          "xp": 8
+        },
         {
           "tier": 3,
-          "id": "driftwood_3",
-          "name": "Kindled Pile",
+          "id": "firepine_3",
+          "name": "Firepine",
           "sell": 0,
-          "xp": 10,
-          "sellable": false,
+          "xp": 16,
           "generator": {
-            "produces": { "chain": "tarknot", "tier": 1 },
+            "produces": {
+              "chain": "resin",
+              "tier": 1
+            },
             "cooldownMs": 90000,
             "energyCost": 0,
-            "tappable": true
+            "passiveMs": 90000
           }
         }
       ]
     },
     {
-      "id": "tarknot",
-      "name": "Tarknot",
-      "world": "borealis",
+      "id": "cinder_vein",
+      "name": "Cinder Vein",
       "tiers": [
-        { "tier": 1, "id": "tarknot_1", "name": "Pitch Stone", "sell": 2, "xp": 0 },
-        { "tier": 2, "id": "tarknot_2", "name": "Pressed Tarknot", "sell": 6, "xp": 6 },
-        { "tier": 3, "id": "tarknot_3", "name": "Burning Heart", "sell": 16, "xp": 14 }
-      ]
-    },
-    {
-      "id": "rimebloom",
-      "name": "Rimebloom",
-      "world": "borealis",
-      "tiers": [
-        { "tier": 1, "id": "rimebloom_1", "name": "Frost Star", "sell": 1, "xp": 0 },
-        { "tier": 2, "id": "rimebloom_2", "name": "Rime Cluster", "sell": 3, "xp": 6 },
+        {
+          "tier": 1,
+          "id": "cinder_vein_1",
+          "name": "Cracked Stone",
+          "sell": 3,
+          "xp": 4
+        },
+        {
+          "tier": 2,
+          "id": "cinder_vein_2",
+          "name": "Cinder Seam",
+          "sell": 9,
+          "xp": 8
+        },
         {
           "tier": 3,
-          "id": "rimebloom_3",
-          "name": "Rimebloom",
+          "id": "cinder_vein_3",
+          "name": "Cinder Vein",
           "sell": 0,
-          "xp": 14,
-          "sellable": false,
+          "xp": 16,
           "generator": {
-            "produces": { "chain": "rimebloom", "tier": 1 },
-            "cooldownMs": 120000,
+            "produces": {
+              "chain": "quartz",
+              "tier": 1
+            },
+            "cooldownMs": 480000,
             "energyCost": 0,
-            "passiveMs": 600000,
-            "tappable": true
+            "passiveMs": 480000
           }
         }
-      ]
-    },
-    {
-      "id": "frostsilk",
-      "name": "Frostsilk",
-      "world": "borealis",
-      "tiers": [
-        { "tier": 1, "id": "frostsilk_1", "name": "Silk Spool", "sell": 2, "xp": 0 },
-        { "tier": 2, "id": "frostsilk_2", "name": "Frostsilk Skein", "sell": 6, "xp": 6 },
-        { "tier": 3, "id": "frostsilk_3", "name": "Loaded Spindle", "sell": 18, "xp": 14 }
       ]
     },
     {
@@ -296,17 +508,573 @@
         {
           "tier": 1,
           "id": "dew_basin_1",
+          "name": "Hollow Stone",
+          "sell": 3,
+          "xp": 4
+        },
+        {
+          "tier": 2,
+          "id": "dew_basin_2",
+          "name": "Dew Hollow",
+          "sell": 9,
+          "xp": 8
+        },
+        {
+          "tier": 3,
+          "id": "dew_basin_3",
           "name": "Dew Basin",
+          "sell": 0,
+          "xp": 16,
+          "generator": {
+            "produces": {
+              "chain": "moonwater",
+              "tier": 1
+            },
+            "cooldownMs": 240000,
+            "energyCost": 0,
+            "passiveMs": 240000
+          }
+        }
+      ]
+    },
+    {
+      "id": "emberberry",
+      "name": "Emberberry",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "emberberry_1",
+          "name": "Emberberry",
+          "sell": 2,
+          "xp": 3
+        },
+        {
+          "tier": 2,
+          "id": "emberberry_2",
+          "name": "Emberberry Basket",
+          "sell": 7,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "emberberry_3",
+          "name": "Emberberry Preserve",
+          "sell": 22,
+          "xp": 15
+        }
+      ]
+    },
+    {
+      "id": "resin",
+      "name": "Resin",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "resin_1",
+          "name": "Resin Bead",
+          "sell": 2,
+          "xp": 3
+        },
+        {
+          "tier": 2,
+          "id": "resin_2",
+          "name": "Resin Lump",
+          "sell": 7,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "resin_3",
+          "name": "Hearth Cake",
+          "sell": 22,
+          "xp": 15
+        }
+      ]
+    },
+    {
+      "id": "ashmoss",
+      "name": "Ash Moss",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "ashmoss_1",
+          "name": "Moss Tuft",
+          "sell": 2,
+          "xp": 3
+        },
+        {
+          "tier": 2,
+          "id": "ashmoss_2",
+          "name": "Moss Bundle",
+          "sell": 7,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "ashmoss_3",
+          "name": "Green Bale",
+          "sell": 22,
+          "xp": 15
+        }
+      ]
+    },
+    {
+      "id": "emberbark",
+      "name": "Emberbark Stump",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "emberbark_1",
+          "name": "Emberbark Stump",
+          "sell": 0,
+          "xp": 0,
+          "generator": {
+            "produces": {
+              "chain": "ashmoss",
+              "tier": 1
+            },
+            "cooldownMs": 120000,
+            "energyCost": 0,
+            "tappable": true,
+            "skipMaxGold": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "stormcap",
+      "name": "Stormcap",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "stormcap_1",
+          "name": "Storm Cap",
+          "sell": 2,
+          "xp": 3
+        },
+        {
+          "tier": 2,
+          "id": "stormcap_2",
+          "name": "Cap Cluster",
+          "sell": 7,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "stormcap_3",
+          "name": "Charged Cap",
+          "sell": 22,
+          "xp": 15
+        }
+      ]
+    },
+    {
+      "id": "nightbloom",
+      "name": "Nightbloom",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "nightbloom_1",
+          "name": "Night Bud",
+          "sell": 2,
+          "xp": 3
+        },
+        {
+          "tier": 2,
+          "id": "nightbloom_2",
+          "name": "Night Bloom",
+          "sell": 7,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "nightbloom_3",
+          "name": "Cooling Wreath",
+          "sell": 22,
+          "xp": 15
+        }
+      ]
+    },
+    {
+      "id": "quartz",
+      "name": "Quartz",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "quartz_1",
+          "name": "Quartz Pebble",
+          "sell": 2,
+          "xp": 3
+        },
+        {
+          "tier": 2,
+          "id": "quartz_2",
+          "name": "Cut Crystal",
+          "sell": 7,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "quartz_3",
+          "name": "Crystal Ball",
+          "sell": 22,
+          "xp": 15
+        }
+      ]
+    },
+    {
+      "id": "moonwater",
+      "name": "Moonwater",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "moonwater_1",
+          "name": "Dew Drop",
+          "sell": 2,
+          "xp": 3
+        },
+        {
+          "tier": 2,
+          "id": "moonwater_2",
+          "name": "Dew Vial",
+          "sell": 7,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "moonwater_3",
+          "name": "Moonwater",
+          "sell": 22,
+          "xp": 15
+        }
+      ]
+    },
+    {
+      "id": "nest",
+      "name": "Cold Nest",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "nest_1",
+          "name": "Cold Nest",
+          "sell": 0,
+          "xp": 0,
+          "sellable": false
+        }
+      ]
+    },
+    {
+      "id": "driftwood",
+      "name": "Driftwood",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "driftwood_1",
+          "name": "Drift Spar",
+          "sell": 1,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "driftwood_2",
+          "name": "Bound Faggot",
+          "sell": 3,
+          "xp": 6
+        },
+        {
+          "tier": 3,
+          "id": "driftwood_3",
+          "name": "Drift Stack",
+          "sell": 9,
+          "xp": 16,
+          "generator": {
+            "produces": {
+              "chain": "tarknot",
+              "tier": 1
+            },
+            "cooldownMs": 120000,
+            "energyCost": 0,
+            "passiveMs": 120000
+          }
+        }
+      ]
+    },
+    {
+      "id": "rimebloom",
+      "name": "Rime Bloom",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "rimebloom_1",
+          "name": "Frost Flower",
+          "sell": 1,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "rimebloom_2",
+          "name": "Rime Cluster",
+          "sell": 4,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "rimebloom_3",
+          "name": "Rime Bloom",
+          "sell": 11,
+          "xp": 18,
+          "generator": {
+            "produces": {
+              "chain": "frostsilk",
+              "tier": 1
+            },
+            "cooldownMs": 300000,
+            "energyCost": 0,
+            "passiveMs": 300000
+          }
+        }
+      ]
+    },
+    {
+      "id": "tarknot",
+      "name": "Pitch",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "tarknot_1",
+          "name": "Tar Knot",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "tarknot_2",
+          "name": "Pitch Cake",
+          "sell": 7,
+          "xp": 9
+        },
+        {
+          "tier": 3,
+          "id": "tarknot_3",
+          "name": "Black Ember",
+          "sell": 20,
+          "xp": 20
+        }
+      ]
+    },
+    {
+      "id": "frostsilk",
+      "name": "Frostsilk",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "frostsilk_1",
+          "name": "Frost Thread",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "frostsilk_2",
+          "name": "Spun Skein",
+          "sell": 8,
+          "xp": 10
+        },
+        {
+          "tier": 3,
+          "id": "frostsilk_3",
+          "name": "Light-Fast Spindle",
+          "sell": 24,
+          "xp": 22
+        }
+      ]
+    },
+    {
+      "id": "wrackline",
+      "name": "The Wrack Line",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "wrackline_1",
+          "name": "The Wrack Line",
           "sell": 0,
           "xp": 0,
           "sellable": false,
           "generator": {
-            "produces": { "chain": "strawberry", "tier": 1 },
-            "cooldownMs": 240000,
+            "produces": {
+              "chain": "driftwood",
+              "tier": 1
+            },
+            "bonus": {
+              "every": 3,
+              "produces": {
+                "chain": "keel",
+                "tier": 1
+              }
+            },
+            "cooldownMs": 300000,
             "energyCost": 0,
-            "passiveMs": 240000,
-            "tappable": false,
-            "phases": ["night"]
+            "passiveMs": 300000,
+            "tappable": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "frostfont",
+      "name": "Hoarfrost Font",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "frostfont_1",
+          "name": "Hoarfrost Font",
+          "sell": 0,
+          "xp": 0,
+          "sellable": false,
+          "generator": {
+            "produces": {
+              "chain": "rimebloom",
+              "tier": 1
+            },
+            "cooldownMs": 300000,
+            "energyCost": 0,
+            "passiveMs": 300000,
+            "tappable": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "keel",
+      "name": "Wreck Timber",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "keel_1",
+          "name": "Broken Strake",
+          "sell": 1,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "keel_2",
+          "name": "Lashed Frame",
+          "sell": 3,
+          "xp": 5
+        },
+        {
+          "tier": 3,
+          "id": "keel_3",
+          "name": "Upturned Hull",
+          "sell": 0,
+          "xp": 0,
+          "merge": {
+            "group": 2,
+            "outputs": 1
+          },
+          "generator": {
+            "produces": {
+              "chain": "coin",
+              "tier": 1
+            },
+            "cooldownMs": 210000,
+            "energyCost": 0,
+            "passiveMs": 210000,
+            "tappable": false
+          }
+        },
+        {
+          "tier": 4,
+          "id": "keel_4",
+          "name": "Longhall",
+          "sell": 0,
+          "xp": 20,
+          "generator": {
+            "produces": {
+              "chain": "coin",
+              "tier": 2
+            },
+            "cooldownMs": 210000,
+            "energyCost": 0,
+            "passiveMs": 210000,
+            "tappable": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "ashdrake",
+      "name": "Ashdrake",
+      "world": "emberkeep",
+      "legendary": true,
+      "hatchAtTier": 2,
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "ashdrake_1",
+          "name": "Ashdrake Egg",
+          "sell": 0,
+          "xp": 0,
+          "sellable": false
+        },
+        {
+          "tier": 2,
+          "id": "ashdrake_2",
+          "name": "Ashdrake",
+          "sell": 0,
+          "xp": 60,
+          "sellable": false,
+          "generator": {
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 2
+            },
+            "cooldownMs": 120000,
+            "energyCost": 0,
+            "passiveMs": 120000,
+            "tappable": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "rimewyrm",
+      "name": "Rimewyrm",
+      "world": "borealis",
+      "legendary": true,
+      "hatchAtTier": 2,
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "rimewyrm_1",
+          "name": "Rimewyrm Egg",
+          "sell": 0,
+          "xp": 0,
+          "sellable": false
+        },
+        {
+          "tier": 2,
+          "id": "rimewyrm_2",
+          "name": "Rimewyrm",
+          "sell": 0,
+          "xp": 60,
+          "sellable": false,
+          "generator": {
+            "produces": {
+              "chain": "frostsilk",
+              "tier": 1
+            },
+            "cooldownMs": 120000,
+            "energyCost": 0,
+            "passiveMs": 120000,
+            "tappable": true
           }
         }
       ]

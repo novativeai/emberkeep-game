@@ -1,54 +1,6 @@
 {
   "images": [
     {
-      "key": "duel_rock_red",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/duel/duel_rock_red.png"
-    },
-    {
-      "key": "duel_paper_red",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/duel/duel_paper_red.png"
-    },
-    {
-      "key": "duel_scissors_red",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/duel/duel_scissors_red.png"
-    },
-    {
-      "key": "duel_rock_green",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/duel/duel_rock_green.png"
-    },
-    {
-      "key": "duel_paper_green",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/duel/duel_paper_green.png"
-    },
-    {
-      "key": "duel_scissors_green",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/duel/duel_scissors_green.png"
-    },
-    {
-      "key": "duel_face_red",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-head.png"
-    },
-    {
-      "key": "duel_face_green",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/characters/dragon/emerald-dragon/sprite/emerald-dragon-head.png"
-    },
-    {
       "key": "tile_ash",
       "source": "file",
       "generator": "tile",
@@ -214,7 +166,7 @@
       "key": "item_lumber_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/wood.png"
+      "file": "sprites/items/chains/lumber_1.webp"
     },
     {
       "key": "item_chest_1",
@@ -223,22 +175,16 @@
       "file": "sprites/items/chest.webp"
     },
     {
-      "key": "item_dew_basin_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/dew_basin_3.webp"
-    },
-    {
       "key": "item_lumber_2",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/house.png"
+      "file": "sprites/items/chains/lumber_2.webp"
     },
     {
       "key": "item_lumber_3",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/manor.png"
+      "file": "sprites/items/house.webp"
     },
     {
       "key": "item_bigtree_1",
@@ -253,99 +199,28 @@
       "file": "sprites/items/crystal.webp"
     },
     {
+      "key": "item_emberbark_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/emberbark.webp"
+    },
+    {
       "key": "item_coin_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/coin.png"
+      "file": "sprites/items/coin.webp"
     },
     {
       "key": "item_coin_2",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/coin_pouch.png"
+      "file": "sprites/items/coin_pouch.webp"
     },
     {
       "key": "item_diamond_1",
       "source": "file",
       "generator": "item",
       "file": "sprites/items/diamond.webp"
-    },
-    {
-      "key": "fx_snow",
-      "source": "placeholder",
-      "generator": "fx"
-    },
-    {
-      "key": "item_driftwood_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/driftwood_1.webp"
-    },
-    {
-      "key": "item_driftwood_2",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/driftwood_2.webp"
-    },
-    {
-      "key": "item_driftwood_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/driftwood_3.webp"
-    },
-    {
-      "key": "item_tarknot_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/tarknot_1.webp"
-    },
-    {
-      "key": "item_tarknot_2",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/tarknot_2.webp"
-    },
-    {
-      "key": "item_tarknot_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/tarknot_3.webp"
-    },
-    {
-      "key": "item_rimebloom_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/rimebloom_1.webp"
-    },
-    {
-      "key": "item_rimebloom_2",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/rimebloom_2.webp"
-    },
-    {
-      "key": "item_rimebloom_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/rimebloom_3.webp"
-    },
-    {
-      "key": "item_frostsilk_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/frostsilk_1.webp"
-    },
-    {
-      "key": "item_frostsilk_2",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/frostsilk_2.webp"
-    },
-    {
-      "key": "item_frostsilk_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/frostsilk_3.webp"
     },
     {
       "key": "decor_nest",
@@ -375,7 +250,7 @@
       "key": "icon_key_bronze",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/items/key-icon.png"
+      "file": "sprites/items/key-icon.webp"
     },
     {
       "key": "fx_ember",
@@ -388,6 +263,11 @@
       "source": "placeholder",
       "generator": "fx",
       "file": "raw/ai/fx_spark.png"
+    },
+    {
+      "key": "fx_confetti",
+      "source": "placeholder",
+      "generator": "fx"
     },
     {
       "key": "fx_glow",
@@ -405,31 +285,19 @@
       "key": "ui_hand",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/pointer/gauntlet-pointer.png"
+      "file": "sprites/pointer/gauntlet-pointer.webp"
     },
     {
       "key": "ui_arrow",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/items/arrow.png"
-    },
-    {
-      "key": "portrait_laurah",
-      "source": "file",
-      "generator": "portrait",
-      "file": "sprites/guide-characters/laurah-dragonMaster/guide-character-bubble-icon.png"
-    },
-    {
-      "key": "portrait_cindra",
-      "source": "file",
-      "generator": "portrait",
-      "file": "sprites/guide-characters/cindra/cindra-bubble-icon.png"
+      "file": "sprites/items/arrow.webp"
     },
     {
       "key": "portrait_ring",
       "source": "file",
       "generator": "portrait",
-      "file": "sprites/guide-characters/laurah-dragonMaster/portrait-ring.png"
+      "file": "sprites/ui/portrait-ring.webp"
     },
     {
       "key": "ui_tile_highlight",
@@ -486,12 +354,57 @@
       "file": "raw/ai/ui_slot.png"
     },
     {
+      "key": "ui_store_panel",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_quest_panel",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
       "key": "ui_shop_panel",
       "source": "placeholder",
       "generator": "ui"
     },
     {
       "key": "ui_shop_card",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_card_hot",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_price",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_tab",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_tab_on",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_plaque",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_wallet",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_close",
       "source": "placeholder",
       "generator": "ui"
     },
@@ -530,25 +443,13 @@
       "key": "ui_icon_coin",
       "source": "file",
       "generator": "icon",
-      "file": "sprites/items/coin.png"
+      "file": "sprites/items/coin.webp"
     },
     {
       "key": "ui_icon_key",
       "source": "file",
       "generator": "icon",
-      "file": "sprites/items/keyprin.png"
-    },
-    {
-      "key": "ui_levelup_emblem",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/ui/honeur.png"
-    },
-    {
-      "key": "ui_gift",
-      "source": "file",
-      "generator": "icon",
-      "file": "sprites/ui/gifts.png"
+      "file": "sprites/items/key-icon.webp"
     },
     {
       "key": "ui_icon_gear",
@@ -558,201 +459,200 @@
     },
     {
       "key": "ui_icon_scroll",
-      "source": "placeholder",
-      "generator": "icon",
-      "file": "raw/ai/ui_icon_scroll.png"
+      "source": "file",
+      "file": "sprites/ui/icon_quests.webp"
     },
     {
       "key": "grass_1",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-1.png"
+      "file": "sprites/environment/map/border-grass/border-grass-1.webp"
     },
     {
       "key": "grass_2",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-2.png"
+      "file": "sprites/environment/map/border-grass/border-grass-2.webp"
     },
     {
       "key": "grass_3",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-3.png"
+      "file": "sprites/environment/map/border-grass/border-grass-3.webp"
     },
     {
       "key": "grass_4",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-4.png"
+      "file": "sprites/environment/map/border-grass/border-grass-4.webp"
     },
     {
       "key": "grass_5",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-5.png"
+      "file": "sprites/environment/map/border-grass/border-grass-5.webp"
     },
     {
       "key": "grass_6",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-6.png"
+      "file": "sprites/environment/map/border-grass/border-grass-6.webp"
     },
     {
       "key": "grass_7",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-7.png"
+      "file": "sprites/environment/map/border-grass/border-grass-7.webp"
     },
     {
       "key": "grass_8",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-8.png"
+      "file": "sprites/environment/map/border-grass/border-grass-8.webp"
     },
     {
       "key": "grass_9",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-9.png"
+      "file": "sprites/environment/map/border-grass/border-grass-9.webp"
     },
     {
       "key": "grass_10",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-10.png"
+      "file": "sprites/environment/map/border-grass/border-grass-10.webp"
     },
     {
       "key": "grass_11",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-11.png"
+      "file": "sprites/environment/map/border-grass/border-grass-11.webp"
     },
     {
       "key": "grass_12",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-12.png"
+      "file": "sprites/environment/map/border-grass/border-grass-12.webp"
     },
     {
       "key": "grass_13",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-13.png"
+      "file": "sprites/environment/map/border-grass/border-grass-13.webp"
     },
     {
       "key": "grass_14",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-14.png"
+      "file": "sprites/environment/map/border-grass/border-grass-14.webp"
     },
     {
       "key": "grass_15",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-15.png"
+      "file": "sprites/environment/map/border-grass/border-grass-15.webp"
     },
     {
       "key": "grass_16",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/border-grass/border-grass-16.png"
+      "file": "sprites/environment/map/border-grass/border-grass-16.webp"
     },
     {
       "key": "cloud_tile",
       "source": "file",
       "generator": "fog",
-      "file": "sprites/environment/blockers/cloud/cloud-tile.png"
+      "file": "sprites/environment/blockers/cloud/cloud-tile.webp"
     },
     {
       "key": "tile_border-fgreen",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fgreen.png"
+      "file": "sprites/environment/map/flower-tiles/border-fgreen.webp"
     },
     {
       "key": "tile_border-fgreenyellow",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fgreenyellow.png"
+      "file": "sprites/environment/map/flower-tiles/border-fgreenyellow.webp"
     },
     {
       "key": "tile_border-fpink",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fpink.png"
+      "file": "sprites/environment/map/flower-tiles/border-fpink.webp"
     },
     {
       "key": "tile_border-fpink2",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fpink2.png"
+      "file": "sprites/environment/map/flower-tiles/border-fpink2.webp"
     },
     {
       "key": "tile_border-fpinkwhite",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fpinkwhite.png"
+      "file": "sprites/environment/map/flower-tiles/border-fpinkwhite.webp"
     },
     {
       "key": "tile_border-fpinkwhite2",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fpinkwhite2.png"
+      "file": "sprites/environment/map/flower-tiles/border-fpinkwhite2.webp"
     },
     {
       "key": "tile_border-fpurple",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fpurple.png"
+      "file": "sprites/environment/map/flower-tiles/border-fpurple.webp"
     },
     {
       "key": "tile_border-fwhite",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fwhite.png"
+      "file": "sprites/environment/map/flower-tiles/border-fwhite.webp"
     },
     {
       "key": "tile_border-fwhite2",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fwhite2.png"
+      "file": "sprites/environment/map/flower-tiles/border-fwhite2.webp"
     },
     {
       "key": "tile_border-fwhitegreen",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fwhitegreen.png"
+      "file": "sprites/environment/map/flower-tiles/border-fwhitegreen.webp"
     },
     {
       "key": "tile_border-fwhitegreen2",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fwhitegreen2.png"
+      "file": "sprites/environment/map/flower-tiles/border-fwhitegreen2.webp"
     },
     {
       "key": "tile_border-fwhiteyellow",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fwhiteyellow.png"
+      "file": "sprites/environment/map/flower-tiles/border-fwhiteyellow.webp"
     },
     {
       "key": "tile_border-fwhiteyellow2",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fwhiteyellow2.png"
+      "file": "sprites/environment/map/flower-tiles/border-fwhiteyellow2.webp"
     },
     {
       "key": "tile_border-fyellow",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fyellow.png"
+      "file": "sprites/environment/map/flower-tiles/border-fyellow.webp"
     },
     {
       "key": "tile_border-fyellowgreen",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/border-fyellowgreen.png"
+      "file": "sprites/environment/map/flower-tiles/border-fyellowgreen.webp"
     },
     {
       "key": "tile_architectures-to-delete-bg_002",
@@ -770,7 +670,7 @@
       "key": "tile_tree-1",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/tree-1.png"
+      "file": "sprites/environment/map/flower-tiles/tree-1.webp"
     },
     {
       "key": "tile_tree-3",
@@ -782,7 +682,7 @@
       "key": "tile_tree-2",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/tree-2.png"
+      "file": "sprites/environment/map/flower-tiles/tree-2.webp"
     },
     {
       "key": "tile_tree-4",
@@ -812,7 +712,7 @@
       "key": "decor_hut_houses_transparent_001",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/environment/map/decor/hut_houses_transparent_001.png"
+      "file": "sprites/environment/map/decor/hut_houses_transparent_001.webp"
     },
     {
       "key": "tile_Tiles-out_016",
@@ -824,7 +724,7 @@
       "key": "tile_Tiles-out_017",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/Tiles-out_017.png"
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_017.webp"
     },
     {
       "key": "tile_Tiles-out_018",
@@ -836,13 +736,13 @@
       "key": "tile_Tiles-out_019",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/Tiles-out_019.png"
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_019.webp"
     },
     {
       "key": "tile_Tiles-out_020",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/Tiles-out_020.png"
+      "file": "sprites/environment/map/flower-tiles/Tiles-out_020.webp"
     },
     {
       "key": "tile_Tiles-out_021",
@@ -854,37 +754,37 @@
       "key": "tile_water-tile",
       "source": "file",
       "generator": "tile",
-      "file": "sprites/environment/map/flower-tiles/water-tile.png"
+      "file": "sprites/environment/map/flower-tiles/water-tile.webp"
     },
     {
       "key": "decor_tree_2",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/environment/map/decor/tree_2.png"
+      "file": "sprites/environment/map/decor/tree_2.webp"
     },
     {
       "key": "decor_plant_1",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/environment/map/decor/plant_1.png"
+      "file": "sprites/environment/map/decor/plant_1.webp"
     },
     {
       "key": "decor_flower_1",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/environment/map/decor/flower_1.png"
+      "file": "sprites/environment/map/decor/flower_1.webp"
     },
     {
       "key": "decor_rose_2",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/environment/map/decor/rose_2.png"
+      "file": "sprites/environment/map/decor/rose_2.webp"
     },
     {
       "key": "decor_warning",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/environment/map/decor/warning.png"
+      "file": "sprites/environment/map/decor/warning.webp"
     },
     {
       "key": "decor_space_rose",
@@ -914,7 +814,7 @@
       "key": "ui_teaser_breed",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/ui/chapter2/teaser_breed.png"
+      "file": "sprites/ui/chapter2/teaser_breed.webp"
     },
     {
       "key": "ui_teaser_flame",
@@ -926,31 +826,65 @@
       "key": "fx_glimpse_shrine",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/finale/glimpse_shrine.png"
+      "file": "sprites/finale/glimpse_shrine.webp"
     },
     {
       "key": "fx_glimpse_dragon_a",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/finale/glimpse_dragon_a.png"
+      "file": "sprites/finale/glimpse_dragon_a.webp"
     },
     {
       "key": "fx_glimpse_dragon_b",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/finale/glimpse_dragon_b.png"
+      "file": "sprites/finale/glimpse_dragon_b.webp"
     },
     {
       "key": "ui_icon_tasks",
       "source": "file",
       "generator": "icon",
-      "file": "sprites/ui/icon_tasks.png"
+      "file": "sprites/ui/icon_tasks.webp"
     },
     {
       "key": "ui_icon_cookbook",
       "source": "file",
       "generator": "icon",
-      "file": "sprites/ui/icon_cookbook.png"
+      "file": "sprites/ui/icon_cookbook.webp"
+    },
+    {
+      "key": "ui_icon_bag",
+      "source": "file",
+      "file": "sprites/ui/icon_bag.webp"
+    },
+    {
+      "key": "ui_icon_shop",
+      "source": "file",
+      "file": "sprites/ui/icon_shop.webp"
+    },
+    {
+      "key": "item_ashdrake_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/ashdrake-egg.webp"
+    },
+    {
+      "key": "item_rimewyrm_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/rimewyrm-egg.webp"
+    },
+    {
+      "key": "item_ashdrake_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/ashdrake/ashdrake-young.webp"
+    },
+    {
+      "key": "item_rimewyrm_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/rimewyrm/rimewyrm-young.webp"
     },
     {
       "key": "item_emerald_1",
@@ -980,7 +914,31 @@
       "key": "background_emberkeep",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/background/emberkeep.jpg"
+      "file": "sprites/background/emberkeep-nb2.webp"
+    },
+    {
+      "key": "background_borealis",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/background/borealis.webp"
+    },
+    {
+      "key": "background_roothold",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/background/roothold.webp"
+    },
+    {
+      "key": "background_hatchery",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/background/hatchery.webp"
+    },
+    {
+      "key": "decor_pink_cauldron",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/pink_cauldron.webp"
     },
     {
       "key": "trailer_world_ice",
@@ -998,31 +956,633 @@
       "key": "trailer_legend_frost",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/ui/chapter2/trailer/legend_frost.png"
+      "file": "sprites/ui/chapter2/trailer/legend_frost.webp"
     },
     {
       "key": "trailer_legend_crystal",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/ui/chapter2/trailer/legend_crystal.png"
+      "file": "sprites/ui/chapter2/trailer/legend_crystal.webp"
     },
     {
       "key": "trailer_legend_storm",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/ui/chapter2/trailer/legend_storm.png"
+      "file": "sprites/ui/chapter2/trailer/legend_storm.webp"
     },
     {
       "key": "trailer_legend_tide",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/ui/chapter2/trailer/legend_tide.png"
+      "file": "sprites/ui/chapter2/trailer/legend_tide.webp"
     },
     {
       "key": "trailer_legend_shadow",
       "source": "file",
       "generator": "ui",
-      "file": "sprites/ui/chapter2/trailer/legend_shadow.png"
+      "file": "sprites/ui/chapter2/trailer/legend_shadow.webp"
+    },
+    {
+      "key": "item_firgrain_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/firgrain_1.webp"
+    },
+    {
+      "key": "item_firgrain_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/firgrain_2.webp"
+    },
+    {
+      "key": "item_firgrain_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/bigtree.webp"
+    },
+    {
+      "key": "item_ashmoss_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/ashmoss_1.webp"
+    },
+    {
+      "key": "item_ashmoss_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/ashmoss_2.webp"
+    },
+    {
+      "key": "item_ashmoss_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/ashmoss_3.webp"
+    },
+    {
+      "key": "item_cinder_vein_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/cinder_vein_1.webp"
+    },
+    {
+      "key": "item_cinder_vein_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/cinder_vein_2.webp"
+    },
+    {
+      "key": "item_dew_basin_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/dew_basin_1.webp"
+    },
+    {
+      "key": "item_dew_basin_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/dew_basin_2.webp"
+    },
+    {
+      "key": "item_dew_basin_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/dew_basin_3.webp"
+    },
+    {
+      "key": "item_driftwood_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/driftwood_1.webp"
+    },
+    {
+      "key": "item_driftwood_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/driftwood_2.webp"
+    },
+    {
+      "key": "item_driftwood_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/driftwood_3.webp"
+    },
+    {
+      "key": "item_emberberry_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/emberberry_1.webp"
+    },
+    {
+      "key": "item_emberberry_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/emberberry_2.webp"
+    },
+    {
+      "key": "item_emberberry_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/emberberry_3.webp"
+    },
+    {
+      "key": "item_firepine_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/firepine_1.webp"
+    },
+    {
+      "key": "item_firepine_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/firepine_2.webp"
+    },
+    {
+      "key": "item_frostsilk_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/frostsilk_1.webp"
+    },
+    {
+      "key": "item_frostsilk_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/frostsilk_2.webp"
+    },
+    {
+      "key": "item_frostsilk_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/frostsilk_3.webp"
+    },
+    {
+      "key": "item_moonwater_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/moonwater_1.webp"
+    },
+    {
+      "key": "item_moonwater_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/moonwater_2.webp"
+    },
+    {
+      "key": "item_moonwater_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/moonwater_3.webp"
+    },
+    {
+      "key": "item_nest_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/nest_1.webp"
+    },
+    {
+      "key": "item_nightbloom_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/nightbloom_1.webp"
+    },
+    {
+      "key": "item_nightbloom_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/nightbloom_2.webp"
+    },
+    {
+      "key": "item_nightbloom_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/nightbloom_3.webp"
+    },
+    {
+      "key": "item_quartz_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/quartz_1.webp"
+    },
+    {
+      "key": "item_quartz_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/quartz_2.webp"
+    },
+    {
+      "key": "item_quartz_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/quartz_3.webp"
+    },
+    {
+      "key": "item_resin_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/resin_1.webp"
+    },
+    {
+      "key": "item_resin_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/resin_2.webp"
+    },
+    {
+      "key": "item_resin_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/resin_3.webp"
+    },
+    {
+      "key": "item_rimebloom_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/rimebloom_1.webp"
+    },
+    {
+      "key": "item_rimebloom_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/rimebloom_2.webp"
+    },
+    {
+      "key": "item_rimebloom_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/rimebloom_3.webp"
+    },
+    {
+      "key": "item_stormcap_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/stormcap_1.webp"
+    },
+    {
+      "key": "item_stormcap_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/stormcap_2.webp"
+    },
+    {
+      "key": "item_stormcap_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/stormcap_3.webp"
+    },
+    {
+      "key": "item_tarknot_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/tarknot_1.webp"
+    },
+    {
+      "key": "item_tarknot_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/tarknot_2.webp"
+    },
+    {
+      "key": "item_tarknot_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/tarknot_3.webp"
+    },
+    {
+      "key": "item_firepine_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/bigtree.webp"
+    },
+    {
+      "key": "item_cinder_vein_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/crystal.webp"
+    },
+    {
+      "key": "item_lumber_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/manor.webp"
+    },
+    {
+      "key": "card_frost",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/store/card-frost.webp"
+    },
+    {
+      "key": "card_storm",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/store/card-storm.webp"
+    },
+    {
+      "key": "card_moonwhisker",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/store/card-moonwhisker.webp"
+    },
+    {
+      "key": "card_ashglass",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/store/card-ashglass.webp"
+    },
+    {
+      "key": "card_porcelain",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/store/card-porcelain.webp"
+    },
+    {
+      "key": "skin_manor_mushroom",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/manor_mushroom.webp"
+    },
+    {
+      "key": "skin_manor_windmill",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/manor_windmill.webp"
+    },
+    {
+      "key": "skin_manor_treehouse",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/manor_treehouse.webp"
+    },
+    {
+      "key": "skin_manor_igloo",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/manor_igloo.webp"
+    },
+    {
+      "key": "skin_frost_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/dragons/frost_3.webp"
+    },
+    {
+      "key": "skin_frost_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/dragons/frost_4.webp"
+    },
+    {
+      "key": "skin_storm_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/dragons/storm_3.webp"
+    },
+    {
+      "key": "skin_storm_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/dragons/storm_4.webp"
+    },
+    {
+      "key": "skin_moonwhisker_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/dragons/moonwhisker_3.webp"
+    },
+    {
+      "key": "skin_moonwhisker_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/skins/dragons/moonwhisker_4.webp"
+    },
+    {
+      "key": "skin_ashglass_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/sprite-ashglass/red-dragon-baked.webp"
+    },
+    {
+      "key": "skin_ashglass_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/sprite-adult-ashglass/red-dragon-adult-baked.webp"
+    },
+    {
+      "key": "skin_porcelain_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/emerald-dragon/sprite-porcelain/emerald-dragon-baked.webp"
+    },
+    {
+      "key": "skin_porcelain_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/emerald-dragon/sprite-adult-porcelain/emerald-dragon-adult-baked.webp"
+    },
+    {
+      "key": "decor_keeper_statue",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/keeper_statue.webp"
+    },
+    {
+      "key": "decor_broken_arch",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/broken_arch.webp"
+    },
+    {
+      "key": "decor_ember_beacon",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/ember_beacon.webp"
+    },
+    {
+      "key": "decor_elder_bones",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/elder_bones.webp"
+    },
+    {
+      "key": "decor_tethered_isle",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/tethered_isle.webp"
+    },
+    {
+      "key": "reveal_ember",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/ember.webp"
+    },
+    {
+      "key": "reveal_ember_adult",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/ember_adult.webp"
+    },
+    {
+      "key": "reveal_emerald",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/emerald.webp"
+    },
+    {
+      "key": "reveal_emerald_adult",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/emerald_adult.webp"
+    },
+    {
+      "key": "reveal_golden",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/golden.webp"
+    },
+    {
+      "key": "reveal_golden_adult",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/golden_adult.webp"
+    },
+    {
+      "key": "reveal_frost",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/frost.webp"
+    },
+    {
+      "key": "reveal_frost_adult",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/frost_adult.webp"
+    },
+    {
+      "key": "reveal_storm",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/storm.webp"
+    },
+    {
+      "key": "reveal_storm_adult",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/storm_adult.webp"
+    },
+    {
+      "key": "reveal_ashdrake",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/ashdrake.webp"
+    },
+    {
+      "key": "reveal_rimewyrm",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/rimewyrm.webp"
+    },
+    {
+      "key": "reveal_moonwhisker",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/moonwhisker.webp"
+    },
+    {
+      "key": "reveal_moonwhisker_adult",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/moonwhisker_adult.webp"
+    },
+    {
+      "key": "decor_ash_urn",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/ash_urn.webp"
+    },
+    {
+      "key": "decor_watch_bell",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/watch_bell.webp"
+    },
+    {
+      "key": "decor_rekindled_step",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/rekindled_step.webp"
+    },
+    {
+      "key": "decor_chain_anchor",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/chain_anchor.webp"
+    },
+    {
+      "key": "decor_ice_lantern",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/ice_lantern.webp"
+    },
+    {
+      "key": "decor_frozen_spill",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/frozen_spill.webp"
+    },
+    {
+      "key": "decor_rune_pad",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/rune_pad.webp"
+    },
+    {
+      "key": "decor_drift_cairn",
+      "source": "file",
+      "generator": "decor",
+      "file": "sprites/environment/map/decor/drift_cairn.webp"
+    },
+    {
+      "key": "ui_heart",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_heart_empty",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "sleep_ember_dragon_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/sleep/red_whelp_sleep.webp"
+    },
+    {
+      "key": "sleep_ember_dragon_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/characters/dragon/red-dragon/sleep/red_adult_sleep.webp"
+    },
+    {
+      "key": "item_wrackline_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/wrackline_1.webp"
+    },
+    {
+      "key": "item_frostfont_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/frostfont_1.webp"
+    },
+    {
+      "key": "item_keel_1",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/keel_1.webp"
+    },
+    {
+      "key": "item_keel_2",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/keel_2.webp"
+    },
+    {
+      "key": "item_keel_3",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/keel_3.webp"
+    },
+    {
+      "key": "item_keel_4",
+      "source": "file",
+      "generator": "item",
+      "file": "sprites/items/chains/keel_4.webp"
     }
   ]
 }

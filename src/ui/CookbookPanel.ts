@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
+import { FONT } from '../art/design';
+import { chainHiddenIn, GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
+import { reachableRecipeKeys, type AuditData } from '../core/availability';
 import type { ChainsData } from '../core/types';
 import { uiRegistry } from './theme';
 
-const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
 /** One merge recipe the book can hold: N× (chain, fromTier) → (chain, toTier). */
 interface Recipe {
@@ -35,13 +36,29 @@ interface RecipeRow {
 // books scale rows down UNIFORMLY instead of letting chips overlap).
 // Two page columns; up to six recipes per page render at full size.
 const COL_X = 310;
-const ROW_TOP = -238;
-const ROW_BOTTOM = 322; // last row centre must stay above the counter line
-const ROW_GAP = 102;
-const CHIP = 78;
-const CHIP_FROM_X = -196;
-const CHIP_TO_X = 158;
-const ICON_FIT = 56;
+/**
+ * A recipe is drawn at ONE size and the page scrolls.
+ *
+ * It used to squeeze instead: with more than six rows per column the gap
+ * shrank and every row scaled down with it, so a full 24-recipe book rendered
+ * at roughly half scale and nothing on it could be read. A book has pages —
+ * shrinking the type until it all fits is the one thing a book never does.
+ */
+const ROW_GAP = 140;
+const CHIP = 96;
+const CHIP_FROM_X = -212;
+const CHIP_TO_X = 188;
+const ICON_FIT = 72;
+
+/** The scrolling window, in panel space: under the subtitle, above the count. */
+const VIEW_TOP = -278;
+const VIEW_H = 612;
+/** Centre of that window — where the viewport container sits. */
+const VIEW_MID = VIEW_TOP + VIEW_H / 2;
+/** First row's centre inside the scrolling content. */
+const ROW_TOP = -VIEW_H / 2 + ROW_GAP / 2;
+/** Past this much drag the gesture is a scroll, not a tap. */
+const DRAG_SLOP = 12;
 
 /**
  * The Emberkeep Cookbook — a discovery log of every merge recipe performed at
@@ -55,6 +72,13 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   isOpen = false;
   private readonly offBus: Array<() => void> = [];
   private rows: RecipeRow[] = [];
+  private viewport!: Phaser.GameObjects.Container;
+  private rowsGroup!: Phaser.GameObjects.Container;
+  private pageMask!: Phaser.GameObjects.Graphics;
+  private scrollY = 0;
+  private maxScroll = 0;
+  private dragFrom: number | null = null;
+  private dragScrollFrom = 0;
   private counter: Phaser.GameObjects.Text;
   /** Open/rest scale — >1 on mobile so the frame fills the portrait width. */
   private baseScale = 1;
@@ -63,9 +87,10 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     scene: Phaser.Scene,
     private bus: EventBus,
     private gameState: GameState,
-    chains: ChainsData
+    data: AuditData
   ) {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    const chains = data.chains;
 
     const dim = scene.add
       .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
@@ -86,7 +111,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.add(lozenge);
     const title = scene.add
       .text(0, -384, 'Emberkeep Cookbook', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '48px',
         fontStyle: 'bold',
         color: PALETTE.textBrown
@@ -98,7 +123,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.add(
       scene.add
         .text(0, -302, 'Every merge you discover is inscribed here', {
-          fontFamily: FONT,
+          fontFamily: FONT.ui,
           fontSize: '26px',
           fontStyle: 'italic',
           color: '#8A6248'
@@ -110,14 +135,14 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // The book's centre seam — the panel reads as an open two-page spread.
     const seam = scene.add.graphics();
     seam.lineStyle(3, num(PALETTE.goldShade), 0.25);
-    seam.lineBetween(0, -268, 0, 330);
+    seam.lineBetween(0, VIEW_TOP, 0, VIEW_TOP + VIEW_H);
     this.add(seam);
 
     // Close button.
     const closeButton = scene.add.container(592, -392);
     const closeBg = scene.add.circle(0, 0, 42, num(PALETTE.lava)).setStrokeStyle(6, num(PALETTE.cream));
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: PALETTE.cream })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: PALETTE.goldAccent })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
     closeButton.setSize(96, 96);
@@ -125,27 +150,52 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     closeButton.on('pointerup', () => this.requestClose());
     this.add(closeButton);
 
+    // Scene-level input, gated on `isOpen`: a Zone big enough to catch the drag
+    // would sit over the whole spread and swallow the close button's taps.
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
+    scene.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
+    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp, this);
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      scene.input.off(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
+      scene.input.off(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
+      scene.input.off(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
+      scene.input.off(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
+      scene.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp, this);
+      this.pageMask.destroy();
+    });
+
     // ---- Recipe rows: every mergeable tier pair, chains.json order. Two
     // columns split evenly; with more than 6 rows per column the gap squeezes
     // so the last row never collides with the counter line below. ----
-    const recipes = this.enumerateRecipes(chains);
-    const half = Math.ceil(recipes.length / 2);
-    // Crowded book: shrink the gap to spread rows across the page, and shrink
-    // each ROW by the same ratio so chips/captions can never overlap.
-    const gap = half <= 6 ? ROW_GAP : Math.floor((ROW_BOTTOM - ROW_TOP) / (half - 1));
-    const rowScale = Math.min(1, gap / ROW_GAP);
+    const recipes = this.enumerateRecipes(chains, reachableRecipeKeys(data));
+    this.viewport = scene.add.container(0, VIEW_MID);
+    this.rowsGroup = scene.add.container(0, 0);
+    this.viewport.add(this.rowsGroup);
+    this.add(this.viewport);
+    // A geometry mask is drawn in WORLD space, so it is re-seated from the
+    // viewport's own world transform whenever the panel opens or scales.
+    this.pageMask = scene.make.graphics();
+    this.rowsGroup.setMask(this.pageMask.createGeometryMask());
+
+    // Row-major, left then right: scrolling then reveals recipes IN ORDER.
+    // Filling column one before column two put recipe 1 beside recipe 13, and
+    // a scroll moved both by twelve places at once.
     recipes.forEach((recipe, i) => {
-      const x = (i < half ? -1 : 1) * COL_X;
-      const y = ROW_TOP + (i % half) * gap;
-      this.rows.push(this.buildRow(scene, recipe, x, y, rowScale));
+      const x = (i % 2 === 0 ? -1 : 1) * COL_X;
+      const y = ROW_TOP + Math.floor(i / 2) * ROW_GAP;
+      this.rows.push(this.buildRow(scene, recipe, x, y));
     });
+    const contentH = Math.ceil(recipes.length / 2) * ROW_GAP;
+    this.maxScroll = Math.max(0, contentH - VIEW_H);
 
     this.counter = scene.add
       .text(0, 384, '', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '28px',
         fontStyle: 'bold',
-        color: PALETTE.goldShade
+        color: PALETTE.goldAccent
       })
       .setOrigin(0.5);
     this.add(this.counter);
@@ -161,15 +211,29 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.offBus.push(bus.on('cookbook:discovered', () => this.isOpen && this.refresh()));
   }
 
-  /** All merge recipes the game holds: chain tiers with a next tier. The
-   *  Golden chain is lore (altar fixture, never board-merged) — skipped. */
-  private enumerateRecipes(chains: ChainsData): Recipe[] {
+  /**
+   * The recipes this book is allowed to promise: chain tiers with a next tier,
+   * minus the Golden chain (lore — an altar fixture, never board-merged), minus
+   * every chain withheld from this world, and minus any pair this chapter
+   * cannot actually produce.
+   *
+   * A row the player can never fill sits as a permanent "· · ·" and caps
+   * `n / N` below its own total, which reads as a bug rather than as content
+   * not yet reached. `chainHiddenIn` covers a whole chain — wrong chapter
+   * (HIDDEN_CHAINS) or wrong world (chains.json `world`); `discoverable`
+   * (availability.reachableRecipeKeys) covers the partial ones — the two
+   * Cracked Stones that are a prop rather than a chain, and Moonwater's third
+   * tier, whose Dew Basin belongs to a later chapter. The book counts what is
+   * reachable, and now it computes that instead of assuming it.
+   */
+  private enumerateRecipes(chains: ChainsData, discoverable: Set<string>): Recipe[] {
     const out: Recipe[] = [];
     for (const chain of chains.chains) {
-      if (chain.id === 'golden_egg') continue;
+      if (chain.id === 'golden_egg' || chainHiddenIn(chain, this.gameState.worldId)) continue;
       for (const tier of chain.tiers) {
         const next = chain.tiers.find((t) => t.tier === tier.tier + 1);
         if (!next) continue;
+        if (!discoverable.has(`${chain.id}:${tier.tier}>${next.tier}`)) continue;
         // Per-TIER recipe override first (2 Houses → Manor, 2 Dragons → Adult),
         // then the chain-level one, then the global rule.
         const count = tier.merge?.group ?? chain.merge?.group ?? chains.mergeRule.minGroup;
@@ -188,12 +252,10 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   }
 
   /** One cookbook line: [chip ×N] ──▶ [chip], caption beneath the arrow.
-   *  Everything is ROW-LOCAL inside one container scaled by `rowScale`, so a
-   *  crowded book shrinks rows uniformly instead of overlapping them. */
-  private buildRow(scene: Phaser.Scene, recipe: Recipe, x: number, y: number, rowScale: number): RecipeRow {
+   *  Everything is ROW-LOCAL, so a row can be seated anywhere on the page. */
+  private buildRow(scene: Phaser.Scene, recipe: Recipe, x: number, y: number): RecipeRow {
     const rowC = scene.add.container(x, y);
-    rowC.setScale(rowScale);
-    this.add(rowC);
+    this.rowsGroup.add(rowC);
 
     const fromChip = scene.add.graphics();
     const toChip = scene.add.graphics();
@@ -217,8 +279,8 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     const mkMark = (cx: number): Phaser.GameObjects.Text => {
       const mark = scene.add
         .text(cx, -8, '?', {
-          fontFamily: FONT,
-          fontSize: '44px',
+          fontFamily: FONT.ui,
+          fontSize: '54px',
           fontStyle: 'bold',
           color: PALETTE.goldAccent
         })
@@ -233,9 +295,9 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // One caption per row, written in the chip-free gap under the arrow —
     // "Dragon Ruby → Red Egg". Rows never collide vertically this way.
     const caption = scene.add
-      .text((CHIP_FROM_X + CHIP_TO_X) / 2, 14, '', {
-        fontFamily: FONT,
-        fontSize: '18px',
+      .text((CHIP_FROM_X + CHIP_TO_X) / 2, 26, '', {
+        fontFamily: FONT.ui,
+        fontSize: '24px',
         fontStyle: 'bold',
         color: PALETTE.textBrown
       })
@@ -243,16 +305,16 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     rowC.add(caption);
 
     // ×N badge riding the input chip's bottom edge.
-    const badge = scene.add.container(CHIP_FROM_X + 26, 26);
+    const badge = scene.add.container(CHIP_FROM_X + 34, 34);
     const badgeBg = scene.add.graphics();
     badgeBg.fillStyle(num(PALETTE.gold), 1);
-    badgeBg.fillRoundedRect(-27, -15, 54, 30, 15);
+    badgeBg.fillRoundedRect(-33, -19, 66, 38, 19);
     badgeBg.lineStyle(3, num(PALETTE.cream), 0.9);
-    badgeBg.strokeRoundedRect(-27, -15, 54, 30, 15);
+    badgeBg.strokeRoundedRect(-33, -19, 66, 38, 19);
     const badgeText = scene.add
       .text(0, -1, `×${recipe.count}`, {
-        fontFamily: FONT,
-        fontSize: '22px',
+        fontFamily: FONT.ui,
+        fontSize: '28px',
         fontStyle: 'bold',
         color: PALETTE.textBrown
       })
@@ -332,13 +394,65 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     if (this.isOpen) return;
     this.isOpen = true;
     this.refresh();
+    this.setScroll(0);
     this.scene.tweens.killTweensOf(this);
     this.setVisible(true).setAlpha(0).setScale(this.baseScale * 0.92);
-    this.scene.tweens.add({ targets: this, alpha: 1, scale: this.baseScale, duration: 200, ease: 'Back.easeOut' });
+    this.seatMask();
+    this.scene.tweens.add({
+      targets: this,
+      alpha: 1,
+      scale: this.baseScale,
+      duration: 200,
+      ease: 'Back.easeOut',
+      onUpdate: () => this.seatMask()
+    });
     this.bus.emit('ui:cookbook_opened', {
       discovered: this.gameState.discoveredRecipes.length
     });
   }
+
+  /* ------------------------------- scrolling ------------------------------ */
+
+  private setScroll(y: number): void {
+    this.scrollY = Phaser.Math.Clamp(y, 0, this.maxScroll);
+    this.rowsGroup.setY(-this.scrollY);
+  }
+
+  /** Re-seat the clip rect from the viewport's live WORLD transform — the panel
+   *  is centred, scaled by `panelMobileScale` and scaled again by its own
+   *  open tween, and a mask in local units clips the wrong band through all
+   *  three. Both page columns share one window, so one rect covers the spread. */
+  private seatMask(): void {
+    const m = this.viewport.getWorldTransformMatrix();
+    const h = VIEW_H * m.scaleY;
+    const w = GAME_WIDTH * m.scaleX; // only Y clips here
+    this.pageMask.clear();
+    this.pageMask.fillStyle(0xffffff, 1);
+    this.pageMask.fillRect(m.tx - w / 2, m.ty - h / 2, w, h);
+  }
+
+  private onWheel = (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number): void => {
+    if (!this.isOpen || this.maxScroll <= 0) return;
+    this.setScroll(this.scrollY + dy);
+  };
+
+  private onPointerDown = (p: Phaser.Input.Pointer): void => {
+    if (!this.isOpen) return;
+    this.dragFrom = p.y;
+    this.dragScrollFrom = this.scrollY;
+  };
+
+  private onPointerMove = (p: Phaser.Input.Pointer): void => {
+    if (this.dragFrom === null || this.maxScroll <= 0) return;
+    const dy = p.y - this.dragFrom;
+    if (Math.abs(dy) <= DRAG_SLOP) return;
+    const scale = this.viewport.getWorldTransformMatrix().scaleY || 1;
+    this.setScroll(this.dragScrollFrom - dy / scale);
+  };
+
+  private onPointerUp = (): void => {
+    this.dragFrom = null;
+  };
 
   requestClose(): void {
     if (!this.isOpen) return;

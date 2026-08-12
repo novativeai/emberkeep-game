@@ -1,0 +1,67 @@
+{
+  "grid": [
+    5,
+    2
+  ],
+  "cell": [
+    1101,
+    1536
+  ],
+  "source": "selyna-talk.png",
+  "visemes": [
+    {
+      "id": "A",
+      "label": "Closed",
+      "sounds": "P \u00b7 B \u00b7 M",
+      "file": "selyna_A-closed.png"
+    },
+    {
+      "id": "B",
+      "label": "Teeth",
+      "sounds": "T \u00b7 D \u00b7 S \u00b7 K \u00b7 N \u00b7 most consonants",
+      "file": "selyna_B-teeth.png"
+    },
+    {
+      "id": "C",
+      "label": "Open-mid",
+      "sounds": "EH \u00b7 AE \u00b7 I \u00b7 EE \u00b7 Y",
+      "file": "selyna_C-open-mid.png"
+    },
+    {
+      "id": "D",
+      "label": "Wide open",
+      "sounds": "AA \u00b7 AH",
+      "file": "selyna_D-wide-open.png"
+    },
+    {
+      "id": "E",
+      "label": "Rounded",
+      "sounds": "AO \u00b7 ER \u00b7 O \u00b7 R",
+      "file": "selyna_E-rounded.png"
+    },
+    {
+      "id": "F",
+      "label": "Puckered (o/w)",
+      "sounds": "W \u00b7 OO \u00b7 U \u00b7 Q",
+      "file": "selyna_F-puckered-o-w.png"
+    },
+    {
+      "id": "G",
+      "label": "Lip bite",
+      "sounds": "F \u00b7 V \u00b7 PH",
+      "file": "selyna_G-lip-bite.png"
+    },
+    {
+      "id": "H",
+      "label": "Tongue",
+      "sounds": "L \u00b7 TH",
+      "file": "selyna_H-tongue.png"
+    },
+    {
+      "id": "X",
+      "label": "Rest",
+      "sounds": "silence / pauses",
+      "file": "selyna_X-rest.png"
+    }
+  ]
+}

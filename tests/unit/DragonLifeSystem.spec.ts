@@ -1,0 +1,232 @@
+import { describe, expect, it } from 'vitest';
+import {
+  DAY_MS,
+  DRAGON_HUNGER_GRACE_MS,
+  DRAGON_NAP_CYCLE_MS,
+  DRAGON_REST_MS,
+  DRAGON_WORK_MS,
+  DRAGON_WANDER_EVERY_MS,
+  DRAGON_WANDER_MIN_DIST,
+  DRAGON_WANDER_SPREAD_MS,
+  PHASE_MS
+} from '../../src/core/Constants';
+import { capture, createTestContext } from './helpers';
+
+type Ctx = ReturnType<typeof createTestContext>;
+
+/** Long enough that every dragon's staggered wander slot has come round. */
+const A_WHILE = DRAGON_WANDER_EVERY_MS + DRAGON_WANDER_SPREAD_MS + 1000;
+
+function tick(ctx: Ctx, ms: number): void {
+  ctx.clock.advance(ms);
+  ctx.bus.emit('time:advanced', { ms });
+}
+
+/** A board dragon standing at (col,row) on a handed-over (post-tutorial) game. */
+function dragonAt(ctx: Ctx, col: number, row: number, tier = 3) {
+  ctx.state.tutorialDone = true;
+  return ctx.state.addItem({ chain: 'ember_dragon', tier, col, row, kind: 'item' });
+}
+
+/** Park the clock at the start of a phase, so a test never straddles dusk. */
+function atPhase(ctx: Ctx, index: number): void {
+  const now = ctx.clock.now();
+  const dayStart = Math.floor(now / DAY_MS) * DAY_MS;
+  ctx.clock.advance(dayStart + DAY_MS + index * PHASE_MS + 1000 - now);
+}
+
+describe('DragonLifeSystem — a dragon that lives on the isle', () => {
+  it('wanders to a tile far enough away to read as a journey', () => {
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    const wandered = capture(ctx.bus, 'dragon:wandered');
+
+    tick(ctx, 0); // first sight: schedule only, never an instant departure
+    expect(wandered).toHaveLength(0);
+
+    tick(ctx, A_WHILE);
+    expect(wandered).toHaveLength(1);
+    const move = wandered[0]!;
+    const dist = Math.abs(move.to.col - move.from.col) + Math.abs(move.to.row - move.from.row);
+    expect(dist).toBeGreaterThanOrEqual(DRAGON_WANDER_MIN_DIST);
+    // The MOVE is already applied — the scene only has to animate it.
+    expect(ctx.state.items.get(dragon.id)).toMatchObject({ col: move.to.col, row: move.to.row });
+    expect(ctx.state.itemIdAt(move.to.col, move.to.row)).toBe(dragon.id);
+    expect(ctx.state.itemIdAt(move.from.col, move.from.row)).toBeNull();
+  });
+
+  it('NEVER walks out of a group the player could merge', () => {
+    const ctx = createTestContext();
+    dragonAt(ctx, 1, 1);
+    dragonAt(ctx, 2, 1); // its own kind, orthogonally adjacent
+    const wandered = capture(ctx.bus, 'dragon:wandered');
+
+    tick(ctx, 0);
+    tick(ctx, A_WHILE * 3);
+    expect(wandered).toHaveLength(0);
+  });
+
+  it('stays put for the whole tutorial — the board is the script’s stage', () => {
+    const ctx = createTestContext();
+    const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.state.tutorialDone = false;
+    const wandered = capture(ctx.bus, 'dragon:wandered');
+    tick(ctx, 0);
+    tick(ctx, A_WHILE * 3);
+    expect(wandered).toHaveLength(0);
+    expect(ctx.state.items.get(dragon.id)).toMatchObject({ col: 1, row: 1 });
+  });
+
+  it('is reproducible: the same clock lands the same dragon on the same tile', () => {
+    const run = (): string => {
+      const ctx = createTestContext();
+      dragonAt(ctx, 1, 1);
+      const wandered = capture(ctx.bus, 'dragon:wandered');
+      tick(ctx, 0);
+      tick(ctx, A_WHILE);
+      return JSON.stringify(wandered.map((w) => w.to));
+    };
+    // Nothing here may read Math.random(): `window.advanceTime(ms)` has to
+    // reproduce the same board, or a piece moving on its own makes the e2e
+    // suite flaky in a way that is very hard to trace back to here.
+    expect(run()).toBe(run());
+  });
+
+  it('sleeps at night and wakes with the light', () => {
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    const moods = capture(ctx.bus, 'dragon:mood');
+    // Fed, so hunger cannot outrank sleep in this test.
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+
+    atPhase(ctx, 3); // night
+    tick(ctx, 0);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+    expect(moods.at(-1)).toMatchObject({ mood: 'asleep' });
+
+    // Morning: it wakes. Bounded loop rather than a single tick, because an
+    // ambient nap can legitimately follow the night and this test is about the
+    // NIGHT ending, not about the nap never happening.
+    atPhase(ctx, 0);
+    let woke = false;
+    for (let i = 0; i < 60 && !woke; i++) {
+      tick(ctx, DRAGON_NAP_CYCLE_MS / 60);
+      ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+      if (ctx.systems.dragonLife.moodOf(dragon.id) === 'awake') woke = true;
+    }
+    expect(woke).toBe(true);
+  });
+
+  it('a dragon nobody fed is HUNGRY, and hunger outranks sleep', () => {
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+
+    // Grace first: a hatchling that roars the instant it lands reads as a bug.
+    // Asserted as "not hungry yet" rather than "awake": the clock is seeded from
+    // real time, so an unpinned moment can legitimately be night or a nap, and a
+    // test that demanded `awake` here would fail depending on the hour it ran.
+    tick(ctx, 0);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).not.toBe('hungry');
+
+    tick(ctx, DRAGON_HUNGER_GRACE_MS + 1000);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('hungry');
+
+    // …even at night. The isle goes quiet except for the one nobody fed.
+    atPhase(ctx, 3);
+    tick(ctx, 0);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('hungry');
+
+    // Feeding settles it at once — the mood reads the SAME care record the
+    // hunger gauge draws, so the two can never disagree.
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).not.toBe('hungry');
+  });
+
+  it('sleeps off a work shift — the same sleep, at any hour', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 4, row: 4, kind: 'item' });
+    // Broad daylight and fed — so fatigue is the ONLY thing that could put it to
+    // sleep here. Fed AFTER the jump: `atPhase` lands on the next DAY, and the
+    // care record rolls its meal tally over on a new day.
+    atPhase(ctx, 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+    tick(ctx, 0);
+    // On the job it is awake, whatever else is true.
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+
+    // Work it to exhaustion; it flies home and sleeps it off.
+    tick(ctx, DRAGON_WORK_MS + 1000);
+    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBeGreaterThan(0);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+
+    // …and it is up again once it is rested. Asserted as "wakes within a nap
+    // cycle" rather than "is awake on the tick the rest ends": a dragon coming
+    // off a shift can legitimately walk straight into an ambient nap, and a
+    // test that forbade that would be testing the clock, not the behaviour.
+    tick(ctx, DRAGON_REST_MS + 1000);
+    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBe(0);
+    let woke = false;
+    for (let i = 0; i < 60 && !woke; i++) {
+      tick(ctx, DRAGON_NAP_CYCLE_MS / 60);
+      // Keep it fed — hunger outranks sleep, and this test is about fatigue.
+      ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+      if (ctx.systems.dragonLife.moodOf(dragon.id) === 'awake') woke = true;
+    }
+    expect(woke).toBe(true);
+  });
+
+  it('naps of its own accord, and two dragons never doze in lockstep', () => {
+    const ctx = createTestContext();
+    const a = dragonAt(ctx, 1, 1);
+    const b = dragonAt(ctx, 5, 5);
+    atPhase(ctx, 1); // daylight, so only a NAP can close its eyes
+    for (const d of [a, b]) {
+      ctx.bus.emit('ui:feed_dragon_requested', { itemId: d.id, chain: 'emberberry', tier: 3 });
+    }
+
+    // Walk a whole nap cycle in slices and record when each one sleeps.
+    const seen = { a: 0, b: 0, together: 0 };
+    const slice = DRAGON_NAP_CYCLE_MS / 60;
+    for (let i = 0; i < 60; i++) {
+      tick(ctx, slice);
+      const sa = ctx.systems.dragonLife.moodOf(a.id) === 'asleep';
+      const sb = ctx.systems.dragonLife.moodOf(b.id) === 'asleep';
+      if (sa) seen.a++;
+      if (sb) seen.b++;
+      if (sa && sb) seen.together++;
+    }
+    expect(seen.a).toBeGreaterThan(0); // it does nap
+    expect(seen.b).toBeGreaterThan(0);
+    // The whole point of hashing the offset off the id: their windows differ.
+    expect(seen.together).toBeLessThan(Math.min(seen.a, seen.b));
+  });
+
+  it('announces a mood once per change, not once per tick', () => {
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    const moods = capture(ctx.bus, 'dragon:mood');
+    tick(ctx, 0); // first sight stamps the grace window
+    tick(ctx, DRAGON_HUNGER_GRACE_MS + 1000);
+    const afterFirst = moods.length;
+    expect(moods.at(-1)).toMatchObject({ itemId: dragon.id, mood: 'hungry' });
+    tick(ctx, 1000);
+    tick(ctx, 1000);
+    expect(moods).toHaveLength(afterFirst);
+  });
+
+  it('leaves everything that is not a dragon exactly where it stands', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    const gem = ctx.state.addItem({ chain: 'flame_gem', tier: 1, col: 1, row: 1, kind: 'item' });
+    const egg = ctx.state.addItem({ chain: 'ember_dragon', tier: 2, col: 3, row: 3, kind: 'item' });
+    const wandered = capture(ctx.bus, 'dragon:wandered');
+    tick(ctx, 0);
+    tick(ctx, A_WHILE * 3);
+    expect(wandered).toHaveLength(0);
+    expect(ctx.state.items.get(gem.id)).toMatchObject({ col: 1, row: 1 });
+    expect(ctx.state.items.get(egg.id)).toMatchObject({ col: 3, row: 3 });
+  });
+});

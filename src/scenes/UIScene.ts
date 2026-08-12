@@ -2,54 +2,51 @@ import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
   ATMOSPHERE,
-  DRAGON_FEED,
   ENERGY_REGEN_MS,
   FINALE,
+  FINALE_ENDS_MS,
   GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_TREMBLE_PROGRESS,
-  HUD_WIDGETS,
-  LEVELUP_REWARD,
+  HUD_COLUMN_X,
+  hudColumnY,
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
+  OPENING_HOLD_MS,
   SCENES,
-  IS_MOBILE,
+  TILE_W,
+  TIMINGS,
   UI_SCALE,
-  WELCOME_BACK_MIN_MS,
-  WORLD_TELEPORT,
-  WORLD_TELEPORT_BOREALIS,
-  WORLD_WEATHER
+  WELCOME_BACK_MIN_MS
 } from '../core/Constants';
-import { editorStore } from '../editor/editorStore';
-import { goldenPromiseKept } from '../core/goldenPromise';
+import { FONT } from '../art/design';
+import { iapBridge } from '../core/iapBridge';
 import { gridToWorld } from '../core/iso';
-import { ensureTextures } from '../core/lazyTextures';
-import type { ResolvedArrow, ResolvedHand, TilePos, TutorialStepEvent } from '../core/types';
+import type { EventMap, ResolvedArrow, ResolvedHand, SpeakerId, TilePos, TutorialStepEvent } from '../core/types';
+import type { BoardScene } from './BoardScene';
 import { CharacterBubble } from '../entities/CharacterBubble';
-import { BeyondDemoPanel } from '../ui/BeyondDemoPanel';
+import { BagPanel } from '../ui/BagPanel';
+import { CommissionPanel } from '../ui/CommissionPanel';
+import { CauldronPanel } from '../ui/CauldronPanel';
+import { StorePanel } from '../ui/StorePanel';
 import { CookbookPanel } from '../ui/CookbookPanel';
-import { QuestPanel } from '../ui/QuestPanel';
-import { Snowfall } from '../render/Snowfall';
-import { EndScreen } from '../ui/EndScreen';
 import { Hud } from '../ui/Hud';
+import { NamePanel } from '../ui/NamePanel';
+import { TravelPrompt } from '../ui/TravelPrompt';
 import { LedgerPanel } from '../ui/LedgerPanel';
-import { MilestoneGift } from '../ui/MilestoneGift';
-import { DragonGauges } from '../ui/DragonGauges';
-import { DuelButton } from '../ui/DuelButton';
-import { DuelPanel } from '../ui/DuelPanel';
+import { QuestTracker } from '../ui/QuestTracker';
+import { StatusPanel } from '../ui/StatusPanel';
 import { ShopPanel } from '../ui/ShopPanel';
-import { StokeMeter } from '../ui/StokeMeter';
 import { renderScale } from '../core/render-scale';
+import { GRAPHICS_QUALITIES } from '../core/graphics';
+import { GRAPHICS_EVENT, GRAPHICS_PROFILES, graphics } from '../core/graphicsState';
 import { getMusicMuted, setMusicMuted } from '../audio/musicPref';
 import { CustomUiManager } from '../ui/customUi';
 import { uiRegistry } from '../ui/theme';
+import { DragonReveal } from '../ui/DragonReveal';
 import { Tooltip } from '../ui/Tooltip';
 
-const FONT = 'Trebuchet MS, Verdana, sans-serif';
-/** Ambient weather sits above the whole board (UIScene renders after BoardScene)
- *  and below every HUD element — snow must never fall in front of a button. */
-const DEPTH_WEATHER = 5;
 const DEPTH_HUD = 10;
 const DEPTH_PANEL = 60;
 const DEPTH_TUTORIAL = 100;
@@ -60,43 +57,40 @@ const HAND_MARKER_H = 172;
 const ARROW_MARKER_H = 148;
 
 /**
- * Runs in parallel above BoardScene: HUD, tooltip, Cindra's Ledger, the
- * tutorial presentation layer (Pip/Cindra bubble, guiding hand, bouncing
+ * Runs in parallel above BoardScene: HUD, tooltip, Eleanor's Ledger, the
+ * tutorial presentation layer (dialogue bubble, guiding hand, bouncing
  * arrow) and the reset-confirm dialog. Pure subscriber + intent emitter.
  */
 export class UIScene extends Phaser.Scene {
   private ctx!: GameContext;
   private regenAccum = 0;
   private hud!: Hud;
+  private reveal!: DragonReveal;
   private tooltip!: Tooltip;
   private ledger!: LedgerPanel;
   private shop!: ShopPanel;
-  private milestoneGift?: MilestoneGift; // hidden via HUD_WIDGETS (code kept)
-  private stokeMeter?: StokeMeter;
-  private duelButton?: DuelButton;
-  private duelPanel?: DuelPanel;
-  private dragonGauges?: DragonGauges; // fixed HUD — off (gauges now show per-dragon on tap)
+  private bag!: BagPanel;
+  /** "What shall it make?" — a finished House's one-time commission. */
+  private commission!: CommissionPanel;
+  private store!: StorePanel;
+  private cauldron!: CauldronPanel;
+  private tourUiArrow?: Phaser.GameObjects.Image;
+  /** Self-driven: opens on `nest:hatched`. Held so it stays on the display
+   *  list and the UI Builder can style it; never read back. */
+  private naming!: NamePanel;
   private cookbook!: CookbookPanel;
+  private questTracker!: QuestTracker;
+  /** Who the player is looking at — under the tracker, same plate-free look. */
+  private statusPanel!: StatusPanel;
+  /** Has the tutorial reached the beat that teaches the readout? Latched — see
+   *  where it is set. Re-created with the scene, so a reset clears it. */
+  private statusTaught = false;
   private cookbookButton!: Phaser.GameObjects.Container;
-  private returnButton?: Phaser.GameObjects.Container; // "⟵ Niveau 1" — only after a world switch
-  private weather?: Snowfall; // borealis' snow — built on first arrival, never before
-  private questPanel!: QuestPanel; // objective tracker (top-right)
-  private lairPreview?: Phaser.GameObjects.Container; // roothold thumbnail (travel back to the lair)
-  private borealisPreview?: Phaser.GameObjects.Container; // borealis thumbnail (travel back to the aurora world)
-  private borealisPreviewImg?: Phaser.GameObjects.Image;
-  // Top feed HUD (shown in the lair): the dragon's fullness + the Emberberry stock,
-  // built as HUD PILLS so they read as the same instrument as Warmth and Gold.
-  private feedHud?: Phaser.GameObjects.Container;
-  private feedEnergyVal?: Phaser.GameObjects.Text;
-  private feedBerryVal?: Phaser.GameObjects.Text;
-  private feedAccumMs = 0;
-  private questArrow?: Phaser.GameObjects.Container; // one-off "open your quest" pointer
-  private questArrowShown = false;
   private cookbookDot!: Phaser.GameObjects.Arc;
   private bubble!: CharacterBubble;
-  /** The Level-3 finale is running — suppress competing banners. */
+  /** The awakening finale is running — suppress competing banners. */
   private finaleActive = false;
-  /** One-shot Laurah nudges (per session). */
+  /** One-shot Eleanor nudges (per session). */
   private hintShown = new Set<string>();
   /** Active recipe mini-tutorial (`chain:from>to`), if one is demonstrating. */
   private recipeHint: string | null = null;
@@ -104,8 +98,16 @@ export class UIScene extends Phaser.Scene {
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
   private dialog: Phaser.GameObjects.Container | null = null;
-  private endScreen: EndScreen | null = null;
+  /** Real-money purchase dialog (confirm, then the waiting card). */
+  private iapDialog: Phaser.GameObjects.Container | null = null;
+  /** The travelling curtain, while a destination world's art loads. */
+  private travelVeil?: Phaser.GameObjects.Container;
   private lastStep: TutorialStepEvent | null = null;
+  /** Heart milestones banked while the tutorial owns the bubble (see playRegardBeats). */
+  private pendingHearts: Array<{ characterId: string; hearts: number }> = [];
+  /** The opening's held silence is a one-shot: only the very first step of a
+   *  run waits, and a resumed save never re-holds. */
+  private openingHeld = false;
   private offBus: (() => void)[] = [];
   // Tutorial markers are anchored to BOARD CELLS, not the screen: the board
   // camera pans/zooms over the big map, so each frame we re-project the cell to
@@ -114,7 +116,9 @@ export class UIScene extends Phaser.Scene {
   private handDrag: { from: TilePos; to: TilePos } | null = null;
   private handProg = { t: 0 }; // 0..1 along from→to, driven by a looping tween
   private handPoint: (() => { x: number; y: number } | null) | null = null;
-  private arrowAnchor: (() => { x: number; y: number } | null) | null = null;
+  /** `height` = how far the target extends below the anchor point (0 for a
+   *  button, a full standee for a world character) — see update(). */
+  private arrowAnchor: (() => { x: number; y: number; height?: number } | null) | null = null;
   private arrowLift = 128;
   private arrowBob = { v: 0 };
   private handBob = { v: 0 }; // tap-press offset for the point gesture
@@ -139,135 +143,98 @@ export class UIScene extends Phaser.Scene {
 
     this.hud = new Hud(this, this.ctx.bus, this.ctx.state, {
       onLedger: () => (this.ledger.isOpen ? this.ledger.requestClose() : this.ledger.open()),
-      onGear: () => this.openResetDialog()
+      onGear: () => this.openResetDialog(),
+      // The satchel sits on screen from the first frame. Until its lesson, the
+      // button answers by re-pointing at the current step rather than opening an
+      // empty panel over the board (tutorial-design law 3).
+      onBag: () => {
+        if (!this.bagAllowed()) {
+          this.nudgeMarkers();
+          return;
+        }
+        return this.bag.isOpen ? this.bag.requestClose() : this.bag.open();
+      },
+      // Cosmetics only — nothing in there advances play, so it stays shut for
+      // the whole tutorial rather than competing with the lesson on screen.
+      onStore: () => {
+        if (!this.storeAllowed()) {
+          this.nudgeMarkers();
+          return;
+        }
+        return this.store.isOpen ? this.store.requestClose() : this.store.open();
+      }
     });
     this.hud.ledgerButton.setDepth(DEPTH_HUD);
+    this.hud.bagButton.setDepth(DEPTH_HUD);
+    this.hud.storeButton.setDepth(DEPTH_HUD);
+    this.hud.storeButton.setVisible(this.ctx.state.tutorialDone && this.shopUnlocked());
+    this.hud.setBagCount(this.ctx.state.bag.length);
     this.hud.gearButton.setDepth(DEPTH_HUD);
 
-    this.tooltip = new Tooltip(this, this.ctx.bus, this.ctx.data.chains);
+    this.tooltip = new Tooltip(this, this.ctx.data.chains);
     this.tooltip.setDepth(DEPTH_PANEL - 5);
 
     this.ledger = new LedgerPanel(this, this.ctx.bus, this.ctx.systems.order, this.ctx.systems.tasks, this.ctx.state);
     this.ledger.setDepth(DEPTH_PANEL);
 
+    this.bag = new BagPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
+    // Opens on nest:hatched and cannot be dismissed — the dragon is waiting.
+    this.naming = new NamePanel(this, this.ctx.bus);
+    this.naming.resolveChain = (itemId) => this.ctx.state.items.get(itemId)?.chain;
+    void this.naming;
+    // Answers `ui:travel_requested` from a portal tap; owns its own bus release.
+    new TravelPrompt(this, this.ctx.bus);
+    this.bag.setDepth(DEPTH_PANEL + 6);
+    this.commission = new CommissionPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
+    // Above the Bag: it is asked ABOUT the bag's contents, and the two are never
+    // usefully open at once.
+    this.commission.setDepth(DEPTH_PANEL + 9);
     this.shop = new ShopPanel(this, this.ctx.bus, this.ctx.state);
     this.shop.setDepth(DEPTH_PANEL + 8); // above the ledger
 
-    // Milestone "gift" — a round button on the right edge that unfolds the quest
-    // field to its left. Sits directly ABOVE the Cookbook (gift top / cookbook
-    // bottom, one vertical column). Hidden via HUD_WIDGETS (code kept).
-    if (HUD_WIDGETS.milestoneGift) {
-      this.milestoneGift = new MilestoneGift(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 470);
-      this.milestoneGift.setDepth(DEPTH_HUD);
-    }
+    this.store = new StorePanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.store, this.ctx);
+    this.store.setDepth(DEPTH_PANEL + 7);
 
-    // The Emberfont "Spark Well" — a round orb parked in the bottom-left corner.
-    // Hidden until the tutorial finishes (the well wakes post-tutorial).
-    if (HUD_WIDGETS.sparkWell) {
-      this.stokeMeter = new StokeMeter(this, this.ctx.bus, 132, LIVE_GAME_HEIGHT - 300);
-      this.stokeMeter.setDepth(DEPTH_HUD);
-    }
+    // Selyna's Cauldron — opened by tapping the pot decor in the hatchery hub.
+    this.cauldron = new CauldronPanel(this, this.ctx.bus, this.ctx);
+    this.cauldron.setDepth(DEPTH_PANEL + 7);
+    this.offBus.push(this.ctx.bus.on('ui:cauldron_tapped', () => this.cauldron.open()));
 
-    // Dragon Duel arena — the modal + a round ✌️ launcher just above the gift.
-    if (HUD_WIDGETS.dragonDuel) {
-      this.duelPanel = new DuelPanel(this, this.ctx.bus);
-      this.duelPanel.setDepth(DEPTH_PANEL + 20);
-      this.duelButton = new DuelButton(this, this.ctx.bus, GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 610, () =>
-        // Duel throw art is lazy (off boot) — load it, then open the panel.
-        ensureTextures(
-          this,
-          this.ctx,
-          ['duel_rock_red', 'duel_paper_red', 'duel_scissors_red', 'duel_rock_green', 'duel_paper_green', 'duel_scissors_green'],
-          () => this.duelPanel?.open()
-        )
-      );
-      this.duelButton.setDepth(DEPTH_HUD);
-    }
-
-    // The two dragons' duel gauges as a fixed bottom-left HUD — OFF: they now appear
-    // per-dragon, floated above the dragon when you tap it (BoardScene.addDragonGauge),
-    // and hide when you tap away. Code kept behind the flag.
-    if (HUD_WIDGETS.dragonGauges) {
-      this.dragonGauges = new DragonGauges(this, this.ctx.bus, 176, LIVE_GAME_HEIGHT - 250);
-      this.dragonGauges.setDepth(DEPTH_HUD);
-    }
-
-    // Cindra's Cookbook — the recipe/discovery panel + its HUD button (main).
-    this.cookbook = new CookbookPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
+    this.cookbook = new CookbookPanel(this, this.ctx.bus, this.ctx.state, {
+      ...this.ctx.data,
+      worldId: this.ctx.state.worldId
+    });
     this.cookbook.setDepth(DEPTH_PANEL + 4);
     this.cookbookButton = this.buildCookbookButton();
 
-    // "⟵ Niveau 1" — appears only after a REAL world switch (the dev's Level-3 world);
-    // tapping returns the game to the primary world. Hidden in the base game.
-    this.returnButton = this.buildReturnButton();
-    this.ctx.bus.on('world:switched', () => this.returnButton?.setVisible(true));
-    this.ctx.bus.on('world:return', () => this.returnButton?.setVisible(false));
+    // On-screen quest readout, top-right. Backgroundless HUD summary of the
+    // quest ladder — the active quest over its own ordered subquests.
+    this.questTracker = new QuestTracker(this, this.ctx.bus, this.ctx.systems.quests);
+    this.questTracker.setDepth(DEPTH_HUD);
+    this.questTracker.setStoryVisible(this.ctx.state.tutorialDone);
+    this.questTracker.setTasksVisible(this.ctx.state.tutorialDone);
 
-    // Ambient weather (borealis' snow). Behind every HUD element, in front of the
-    // whole board — UIScene renders above BoardScene, so DEPTH_WEATHER only has to
-    // beat nothing here and stay under the HUD. It follows the world you are in, and
-    // a save reopened in the north brings it back (state:loaded, after hydrate).
-    this.weather = new Snowfall(this, DEPTH_WEATHER);
-    const weatherFor = (world: string): void => {
-      if (WORLD_WEATHER[world] === 'snow') this.weather?.start();
-      else this.weather?.stop();
-    };
-    this.ctx.bus.on('world:switched', ({ toWorld }) => weatherFor(toWorld));
-    this.ctx.bus.on('world:return', () => this.weather?.stop());
-    this.ctx.bus.on('state:loaded', () => weatherFor(this.ctx.state.activeWorld));
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.weather?.destroy());
+    // Directly under the quest cluster: who the player is looking at, and how
+    // that person or animal feels about them. Same backgroundless language.
+    this.statusPanel = new StatusPanel(
+      this,
+      this.ctx.bus,
+      this.ctx.state,
+      this.ctx.data.chains,
+      this.ctx.systems.regard,
+      this.ctx.systems.dragons
+    );
+    this.statusPanel.setDepth(DEPTH_HUD);
+    // Field initialisers run once per scene INSTANCE, and this scene is reused
+    // across a restart — so the latch is seated here, where a resumed save gets
+    // it from the one fact that survives: a mid-tutorial reload replays its
+    // step, which re-latches on its own if that beat has been reached.
+    this.statusTaught = this.ctx.state.tutorialDone;
+    this.statusPanel.setEnabled(this.statusTaught);
 
-    // The objective tracker (top-right): main + side quest cards. Populate it now.
-    // Built either way — QuestSystem keeps score and the tutorial's sub-quests keep
-    // completing — but HIDDEN behind HUD_WIDGETS.questPanel, which is off to match
-    // main's barer top bar. Hiding, not removing: one flag brings it back whole.
-    this.questPanel = new QuestPanel(this, this.ctx.bus).setDepth(DEPTH_HUD + 4);
-    this.questPanel.setVisible(HUD_WIDGETS.questPanel);
-    this.ctx.systems.quest.announce();
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.questPanel.destroy());
-
-    // A small roothold (lair) map PREVIEW on the LEFT of the primary world — tap to
-    // travel back to the lair (to merge sprouts + feed the dragon). Appears only after
-    // the first teleport; hidden while you're already in the lair.
-    this.lairPreview = this.buildWorldPreview(WORLD_TELEPORT.toWorld, '↩ The Lair', LIVE_GAME_HEIGHT / 2, (img) => (this.lairPreviewImg = img));
-    // A second preview below it for BOREALIS — the Golden dragon's aurora world, unlocked
-    // once the Golden Egg has burst (Cindra's golden order delivered).
-    this.borealisPreview = this.buildWorldPreview(WORLD_TELEPORT_BOREALIS.toWorld, '↩ Borealis', LIVE_GAME_HEIGHT / 2 + 128, (img) => (this.borealisPreviewImg = img));
-    const refreshPreviews = (): void => {
-      this.refreshLairPreviewVisibility();
-      this.refreshBorealisPreviewVisibility();
-    };
-    this.ctx.bus.on('world:switched', () => {
-      this.lairPreview?.setVisible(false);
-      this.borealisPreview?.setVisible(false);
-    });
-    this.ctx.bus.on('world:return', refreshPreviews);
-    // Persist across reloads: the previews show in nb2 off SAVED state (tutorialDone /
-    // the delivered golden order), not session flags.
-    this.ctx.bus.on('state:loaded', refreshPreviews);
-    this.ctx.bus.on('game:started', refreshPreviews);
-    this.ctx.bus.on('golden:awakened', () => this.refreshBorealisPreviewVisibility()); // the burst opens borealis
-    // A "▶ ENTER" tap on a BeyondDemoPanel world card asks to travel into that world.
-    this.events.on('beyond:pick_world', (worldName: string) => this.ctx.bus.emit('world:switch', { toWorld: worldName }));
-
-    // Top-centre feed HUD (Energy + Emberberry Bush) — persistent while in the lair.
-    this.feedHud = this.buildFeedHud();
-    this.ctx.bus.on('world:switched', () => {
-      this.feedHud?.setVisible(true);
-      this.refreshFeedHud();
-    });
-    this.ctx.bus.on('world:return', () => this.feedHud?.setVisible(false));
-    this.ctx.bus.on('dragon:fed', () => this.refreshFeedHud());
-    // The Level-3 lair coach (and any one-off line) speaks through the bubble.
-    this.ctx.bus.on('character:say', ({ speaker, text, holdMs }) => this.bubble.say(speaker, text, holdMs));
-    // After the dragon is invoked (assembled) → a guiding arrow points at the quest
-    // log so the player opens it and sees the objective. Delayed past the teleport.
-    this.ctx.bus.on('item:hatched', ({ item }) => {
-      if (item.chain === WORLD_TELEPORT.dragonChain && !this.questArrowShown) {
-        this.questArrowShown = true;
-        this.time.delayedCall(2200, () => this.showQuestArrow());
-      }
-    });
+    // The reveal card. It plays wherever it is earned, tutorial or not — the
+    // one thing it must never do is arrive long after the moment it is about.
+    this.reveal = new DragonReveal(this, this.ctx.bus);
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
@@ -275,6 +242,26 @@ export class UIScene extends Phaser.Scene {
     this.bubble.setPosition(GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
     this.bubble.setDepth(DEPTH_TUTORIAL);
     this.bubble.registerUi();
+    // GIVE is a two-part act: the bag arms it, the board delivers it. The panel
+    // has to get out of the way in between, or the recipient is behind it.
+    //
+    // Tracked in `offBus` because THIS SCENE restarts (Reset → Title → Play): an
+    // untracked handler would still be listening on the next run, and a second
+    // copy of this one would arm the same gift twice.
+    this.offBus.push(
+      this.ctx.bus.on('ui:bag_give_requested', ({ chain, tier }) => {
+        this.bag.requestClose();
+        this.ctx.bus.emit('bag:give_armed', { chain, tier });
+      })
+    );
+    // `{dragon}` in any authored line resolves to what the player called her,
+    // and the bubble paints it in lava. Seeded from state so a resumed save
+    // speaks her name too, then kept live off the naming fact.
+    const named = this.ctx.systems.dragons.firstNamed();
+    if (named) this.bubble.setToken('dragon', named.name);
+    this.offBus.push(
+      this.ctx.bus.on('dragon:named', ({ name }) => this.bubble.setToken('dragon', name))
+    );
 
     this.hand = this.add.image(0, 0, 'ui_hand').setDepth(DEPTH_TUTORIAL + 2).setVisible(false);
     // A replaced hand/arrow (UI Builder upload) may carry its own anchor so the
@@ -314,6 +301,10 @@ export class UIScene extends Phaser.Scene {
       this.hud.teardown();
       this.ledger.teardown();
       this.cookbook.teardown();
+      this.shop.teardown();
+      this.commission.teardown();
+      this.questTracker.teardown();
+      this.statusPanel.teardown();
     });
 
     // If resuming from a completed-tutorial save, key pill is permanently hidden.
@@ -323,13 +314,11 @@ export class UIScene extends Phaser.Scene {
     new CustomUiManager(this).buildAll();
 
     // Everything is wired: load the save (or start fresh) and roll the tutorial.
-    // Async — it restores the world the save is standing in (cells + lattice) before
-    // announcing anything. Nothing here waits on it: the scenes are already built and
-    // every one of them reacts to `state:loaded` when it lands.
-    void this.ctx.beginRun();
+    this.ctx.beginRun();
   }
 
   override update(_time: number, delta: number): void {
+    this.reveal.tick(delta);
     // Re-project board-anchored tutorial markers EVERY frame so they stay glued
     // to their cell as the board camera pans/zooms (they live on the UI scene's
     // own fixed camera, so without this they'd appear stuck to the screen).
@@ -359,19 +348,12 @@ export class UIScene extends Phaser.Scene {
         this.arrow.setPosition(
           a.x,
           nearTop
-            ? a.y + 18 + this.arrow.displayHeight + this.arrowBob.v
+            // `a.height` is how far the target extends BELOW its anchor point —
+            // 0 for a button, but a whole standee for a world character. Without
+            // it the flipped arrow is drawn across the thing it is pointing at.
+            ? a.y + (a.height ?? 0) + 18 + this.arrow.displayHeight + this.arrowBob.v
             : a.y - this.arrowLift + this.arrowBob.v
         );
-      }
-    }
-
-    // Feed HUD energy drains continuously — repaint it a couple times a second while
-    // it's on-screen (in the lair). Kept before the regen early-return below.
-    if (this.feedHud?.visible) {
-      this.feedAccumMs += delta;
-      if (this.feedAccumMs >= 450) {
-        this.feedAccumMs = 0;
-        this.refreshFeedHud();
       }
     }
 
@@ -395,6 +377,40 @@ export class UIScene extends Phaser.Scene {
     const bus = this.ctx.bus;
     this.offBus.push(
       bus.on('tutorial:step', (step) => this.onTutorialStep(step)),
+      bus.on('dragon:revealed', (card) => this.reveal.play(card)),
+      bus.on('story:chapter', ({ chapter }) => this.playChapterBeats(chapter)),
+      bus.on('story:arrival', ({ worldId }) => this.playArrivalBeats(worldId)),
+      // The House's commission. The board decides WHEN to ask; the panel is the
+      // UI's, so neither reaches into the other.
+      bus.on('ui:commission_requested', ({ itemId }) => {
+        this.commission.openFor(itemId);
+        // Once ever: the panel says WHAT it wants, she says why it matters —
+        // that the choice cannot be taken back, which is the part a title bar
+        // cannot carry.
+        this.showHint('houseCommission', 6500);
+      }),
+      bus.on('generator:produce_set', ({ chain, tier }) =>
+        this.floatWarning(`This house now makes ${this.pieceName(chain, tier)}.`)
+      ),
+      bus.on('generator:produce_refused', ({ reason }) =>
+        this.floatWarning(
+          reason === 'not_in_bag'
+            ? 'Pocket one first — a house can only make what you carry.'
+            : reason === 'already_set'
+              ? 'This house is already spoken for. Build another.'
+              : 'That cannot be commissioned.'
+        )
+      ),
+      // ---- Regard: the five hearts. She speaks for herself in all three cases;
+      // a relationship gauge that only ever moved a row of icons would be a
+      // scoreboard, and the icons are the LEAST of what is meant to change.
+      bus.on('regard:gift_accepted', ({ characterId, chain, tier }) =>
+        this.sayGiftLine(characterId, true, tier + chain.length)
+      ),
+      bus.on('regard:gift_declined', ({ characterId, chain, tier }) =>
+        this.sayGiftLine(characterId, false, tier + chain.length)
+      ),
+      bus.on('regard:heart', ({ characterId, hearts }) => this.playRegardBeats(characterId, hearts)),
       bus.on('ui:ledger_toggled', () => {
         // applyMarkers() below wipes ALL markers — retire an active recipe
         // demonstration cleanly rather than leaving its state half-cleared.
@@ -420,15 +436,61 @@ export class UIScene extends Phaser.Scene {
         this.time.delayedCall(700, () => this.checkRecipeHints());
       }),
       bus.on('gold:collected', ({ at, coins }) => this.flyCoinToGold(at, coins ?? 1)),
-      // A banked berry flies to the feed gauge exactly as Gold flies to the purse.
-      bus.on('dragon:stock_changed', ({ at }) => {
-        if (at) this.flyBerryToStock(at);
-        this.refreshFeedHud();
+      bus.on('bag:stored', ({ chain, tier, at }) => this.flyItemToBag(chain, tier, at)),
+      bus.on('bag:changed', ({ used }) => this.hud.setBagCount(used)),
+      bus.on('bag:store_failed', ({ reason }) =>
+        this.floatWarning(reason === 'full' ? 'Bag is full!' : 'No room on the board!')
+      ),
+      // A character's refusal is never silent. `not_mine` is the story one:
+      // she cannot wake what is sleeping, and saying so every time is what
+      // teaches the mystery long before chapter 8 explains it.
+      // Husbandry feedback — a nest that refuses, a dragon that grows up.
+      bus.on('nest:offer_refused', ({ reason }) =>
+        this.floatWarning(
+          reason === 'daily_cap'
+            ? 'It has taken all it will today.'
+            : 'It will not eat that.'
+        )
+      ),
+      bus.on('nest:warmed', ({ points, required }) =>
+        this.floatWarning(`The nest is warmer.  ${points} / ${required}`)
+      ),
+      bus.on('companion:named', ({ name }) => this.floatWarning(`${name}.  That's a real one, then.`)),
+      bus.on('companion:refused', ({ companionId }) => {
+        const c = this.ctx.systems.dragons.find(companionId);
+        this.floatWarning(`${c?.name || 'It'} turns its head away.`);
       }),
+      bus.on('companion:gave', ({ companionId, kind }) => {
+        const c = this.ctx.systems.dragons.find(companionId);
+        this.floatWarning(
+          kind === 'dug' ? `${c?.name || 'It'} dug this up for you.` : `${c?.name || 'It'} brought you something.`
+        );
+      }),
+      bus.on('companion:grew', ({ companionId }) => {
+        const c = this.ctx.systems.dragons.find(companionId);
+        this.floatWarning(`${c?.name || 'It'} has grown.`);
+      }),
+      bus.on('character:action_failed', ({ reason }) =>
+        this.floatWarning(
+          reason === 'cooldown'
+            ? 'She needs to rest first.'
+            : reason === 'not_mine'
+              ? '“That one\u2019s yours.”'
+              : 'Nothing there she can hurry.'
+        )
+      ),
       bus.on('ui:shop_requested', ({ currency }) => {
         if (!(this.lastStep?.done || (this.lastStep?.allow.marketplace ?? false))) return;
         this.shop.open(currency);
       }),
+      // Real-money packs: strictly post-tutorial (the buy_energy beat allows
+      // the Emporium, never a checkout — its gate is the free Spark).
+      bus.on('ui:iap_buy_requested', ({ packId }) => {
+        if (!this.lastStep?.done) return;
+        this.openIapConfirmDialog(packId);
+      }),
+      bus.on('iap:completed', (grant) => this.celebratePurchase(grant)),
+      bus.on('iap:failed', ({ reason }) => this.onIapFailed(reason)),
       bus.on('order:completed', ({ orderId, rewards }) => {
         this.time.delayedCall(650, () => {
           if (this.ledger.isOpen && this.lastStep?.gateType === 'tap') this.ledger.requestClose();
@@ -436,6 +498,11 @@ export class UIScene extends Phaser.Scene {
         this.celebrateOrder(orderId, rewards);
       }),
       bus.on('keeper:leveled', ({ level }) => this.celebrateLevelUp(level)),
+      bus.on('quest:completed', ({ questId }) => {
+        // The Golden Elder's awakening — UIScene runs her voice, BoardScene the
+        // camera and the egg, both off this one beat.
+        if (questId === GOLDEN_ALTAR.awakenQuestId) this.time.delayedCall(0, () => this.runFinaleUi());
+      }),
       bus.on('tasks:all_complete', () => this.celebrateTasksComplete()),
       bus.on('energy:changed', ({ current }) => {
         if (current === 0) this.showHint('zeroWarmth');
@@ -463,12 +530,17 @@ export class UIScene extends Phaser.Scene {
       bus.on('tutorial:step', (step) => {
         // Appears for its tutorial introduction, then permanently post-tutorial.
         this.cookbookButton.setVisible(step.done || step.allow.cookbook);
+        this.hud.storeButton.setVisible(step.done && this.shopUnlocked());
         // Safety net only — the cookbook_close step has the player close the
         // book themselves; any later step that disallows it just shuts it.
         if (!step.done && !step.allow.cookbook && this.cookbook.isOpen) {
           this.cookbook.requestClose();
         }
       }),
+      bus.on('tutorial:nudge', () => this.nudgeMarkers()),
+      // The popup offers Gold AND Warmth; the tutorial only ever demonstrated
+      // Warmth on the House, so name the cheaper option the first time it shows.
+      bus.on('ui:skip_offered', () => this.showHint('goldSkip')),
       bus.on('cookbook:discovered', ({ chain, fromTier, resultTier }) => {
         // The demonstrated recipe was performed — retire the guiding hand.
         if (`${chain}:${fromTier}>${resultTier}` === this.recipeHint) this.clearRecipeHint();
@@ -483,213 +555,115 @@ export class UIScene extends Phaser.Scene {
         });
       }),
       bus.on('game:reset', () => {
-        this.endScreen?.destroy();
-        this.endScreen = null;
         this.scene.stop(SCENES.board);
         this.scene.start(SCENES.title);
-      })
+      }),
+      // Travel: the veil goes up when the world flips and comes down when the
+      // new board exists. Between those two the destination's backdrop is coming
+      // over the network — without this the player taps a door and the game
+      // simply does nothing for a second or two.
+      bus.on('world:switched', ({ to }) => this.showTravelVeil(to)),
+      bus.on('world:ready', () => this.hideTravelVeil()),
+      // The Roothold house is the Emporium's storefront — its tap opens the
+      // same panel the (later-unlocked) HUD button does.
+      bus.on('ui:emporium_requested', () => this.store.open()),
+      bus.on('world:switched', ({ to }) => this.maybeStartTour(to))
     );
   }
 
-  /** Return button — a round ICON-ONLY back arrow in the BOTTOM-RIGHT corner. Hidden
-   *  until a real world switch shows it (`world:switched`); tapping emits
-   *  `world:return` (and hides it). */
-  private buildReturnButton(): Phaser.GameObjects.Container {
-    const c = this.add.container(GAME_WIDTH - 292, LIVE_GAME_HEIGHT - 96).setDepth(DEPTH_HUD + 6).setVisible(false);
-    const r = 58;
-    const bg = this.add.graphics();
-    bg.fillStyle(num(PALETTE.night), 0.92);
-    bg.fillCircle(0, 0, r);
-    bg.lineStyle(4, num(PALETTE.gold), 0.9);
-    bg.strokeCircle(0, 0, r);
-    const arrow = this.add
-      .text(-2, -2, '⟵', {
-        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
-        fontSize: '58px',
+  /**
+   * The travelling curtain: a scrim over the board while the destination loads.
+   *
+   * It lives in UIScene rather than on the board because the board is exactly
+   * what is being torn down and rebuilt — a veil parented to it would be
+   * destroyed at the moment it is needed most. UIScene's camera is fixed and its
+   * scene never restarts, so the curtain is the one thing on screen that spans
+   * the whole journey.
+   */
+  private showTravelVeil(worldId: string): void {
+    this.hideTravelVeil();
+    const name = this.ctx.state.worlds.get(worldId)?.name ?? worldId;
+    const c = this.add.container(0, 0).setDepth(DEPTH_DIALOG + 50);
+    // Interactive so a tap during the load cannot reach the board underneath —
+    // the board it would reach is the one being replaced.
+    const scrim = this.add
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.97)
+      .setOrigin(0)
+      .setInteractive();
+    const label = this.add
+      .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 30, name, {
+        fontFamily: FONT.ui,
+        fontSize: '64px',
         fontStyle: 'bold',
-        color: PALETTE.goldAccent,
-        stroke: PALETTE.night,
-        strokeThickness: 5
+        color: PALETTE.cream
       })
       .setOrigin(0.5);
-    c.add([bg, arrow]);
-    // Size-derived (centred) hit area, padded past the drawn circle — a centred
-    // custom geom drifts off due to the container displayOrigin (CLAUDE.md gotcha).
-    c.setSize((r + 26) * 2, (r + 26) * 2);
-    c.setInteractive({ useHandCursor: true });
-    c.on('pointerover', () => c.setScale(1.07));
-    c.on('pointerout', () => c.setScale(1));
-    c.on('pointerup', () => this.ctx.bus.emit('world:return', {}));
-    return c;
+    c.add([scrim, label]);
+    // Three breathing embers rather than a progress bar: the loader reports
+    // bytes, not the scene rebuild that follows it, so a bar would fill and then
+    // sit at full while the board was still being built — worse than no bar.
+    // Drawn as circles, not `fx_glow`: that texture is a wide soft falloff (the
+    // sun haze uses it at scale 7) and three of them this close smear into one
+    // blob rather than reading as a count.
+    for (let i = 0; i < 3; i++) {
+      const dot = this.add
+        .circle(GAME_WIDTH / 2 + (i - 1) * 74, LIVE_GAME_HEIGHT / 2 + 74, 13, num(PALETTE.goldAccent))
+        .setAlpha(0.22);
+      this.tweens.add({
+        targets: dot,
+        alpha: 1,
+        scale: 1.35,
+        duration: 460,
+        delay: i * 160,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+      c.add(dot);
+    }
+    c.setAlpha(0);
+    this.tweens.add({ targets: c, alpha: 1, duration: 180, ease: 'Sine.easeOut' });
+    this.travelVeil = c;
   }
 
-  /** A small world-map PREVIEW on the LEFT of nb2 — tap to travel to that world. Hidden
-   *  until unlocked; its thumbnail uses that world's backdrop texture (loaded on the
-   *  first teleport). Shared by the lair (roothold) and borealis previews. */
-  private lairPreviewImg?: Phaser.GameObjects.Image;
-  private buildWorldPreview(worldName: string, labelText: string, cy: number, setImg: (img: Phaser.GameObjects.Image) => void): Phaser.GameObjects.Container {
-    const W = 208;
-    const H = 148;
-    const c = this.add.container(112, cy).setDepth(DEPTH_HUD + 6).setVisible(false);
-    const frame = this.add.graphics();
-    frame.fillStyle(num(PALETTE.night), 0.92);
-    frame.fillRoundedRect(-W / 2 - 8, -H / 2 - 8, W + 16, H + 58, 18);
-    frame.lineStyle(4, num(PALETTE.gold), 0.9);
-    frame.strokeRoundedRect(-W / 2 - 8, -H / 2 - 8, W + 16, H + 58, 18);
-    const key = editorStore.mapByName(worldName)?.textureKey;
-    const img = this.add.image(0, -6, key && this.textures.exists(key) ? key : '__DEFAULT').setDisplaySize(W, H);
-    setImg(img);
-    const label = this.add
-      .text(0, H / 2 + 20, labelText, {
-        fontFamily: FONT,
-        fontSize: '26px',
-        fontStyle: 'bold',
-        color: PALETTE.goldAccent,
-        stroke: PALETTE.night,
-        strokeThickness: 4
-      })
-      .setOrigin(0.5);
-    c.add([frame, img, label]);
-    // Size-derived (centred) hit area — a centred custom geom drifts off due to the
-    // container displayOrigin (CLAUDE.md gotcha), which made it hard to tap.
-    c.setSize(W + 16, H + 58);
-    c.setInteractive({ useHandCursor: true });
-    // Half-size (user: "faites qu'il rétrécisse de 50%"); hover nudges relative to that.
-    const S = 0.5;
-    c.setScale(S);
-    c.on('pointerover', () => c.setScale(S * 1.05));
-    c.on('pointerout', () => c.setScale(S));
-    c.on('pointerup', () => this.ctx.bus.emit('world:switch', { toWorld: worldName }));
-    return c;
-  }
-
-  /** Point a preview thumbnail at its (now-loaded) world backdrop texture. */
-  private refreshWorldPreview(worldName: string, img?: Phaser.GameObjects.Image): void {
-    const key = editorStore.mapByName(worldName)?.textureKey;
-    if (key && this.textures.exists(key) && img) img.setTexture(key).setDisplaySize(208, 148);
-  }
-
-  /** Show the lair-travel preview in nb2 whenever the tutorial is DONE (you've reached
-   *  the lair) and the lair world exists — and you're not currently in a sub-world.
-   *  Driven off the SAVED `tutorialDone`, so it survives a reload. */
-  private refreshLairPreviewVisibility(): void {
-    const show = this.ctx.state.tutorialDone && !editorStore.activeWorldId && !!editorStore.mapByName(WORLD_TELEPORT.toWorld);
-    if (show) this.refreshWorldPreview(WORLD_TELEPORT.toWorld, this.lairPreviewImg);
-    this.lairPreview?.setVisible(show);
-  }
-
-  /** Show the borealis-travel preview once the Golden Egg has burst (Cindra's golden
-   *  order delivered — a SAVED flag, so it survives a reload) and the borealis world
-   *  exists, while you're in nb2. */
-  private refreshBorealisPreviewVisibility(): void {
-    // Unlocked by delivering Cindra's golden order — OR, in a custom world (where that
-    // order isn't reachable), by hitting Level 3 (the finale that bursts the egg). Both
-    // are SAVED, so the preview survives a reload.
-    const unlocked = goldenPromiseKept(this.ctx.state, editorStore.baseHidden);
-    const show = unlocked && !editorStore.activeWorldId && !!editorStore.mapByName(WORLD_TELEPORT_BOREALIS.toWorld);
-    if (show) this.refreshWorldPreview(WORLD_TELEPORT_BOREALIS.toWorld, this.borealisPreviewImg);
-    this.borealisPreview?.setVisible(show);
-  }
-
-  /** The persistent top-centre feed HUD: ⚡ Energy (the dragon's fullness — full right
-   *  after a feed, drains over DRAGON_FEED.hungerMs, "Feed me!" when low) and
-   *  🍓 Emberberry Bush (food in stock). Static frame here; `refreshFeedHud` paints the
-   *  live fills. Sits between the top-left pills and the top-right buttons; shown in
-   *  the lair (world:switched), hidden on return. */
-  private buildFeedHud(): Phaser.GameObjects.Container {
-    // Built from the SAME parts as the Warmth / Gold gauges (Hud.pill): the `ui_pill`
-    // plate at scale (0.95, 0.9), the icon at x −116, the value in 42px cream at x +20,
-    // and the HUD's own 348 px pitch (its pills sit at 224 / 572 / 920). Same row, same
-    // baseline — the lair's two readings are gauges of the same instrument, not a
-    // second widget with its own dialect.
-    const PITCH = 348;
-    // Desktop: the same row as Warmth/Gold/Keys, in the gap between the pill row
-    // (which ends at 920 + 167 = 1087) and the top-right buttons (~2234). Mobile
-    // magnifies the pills ×1.5 and spreads them to a 600 pitch, so that row already
-    // reaches 1781 — there the pair drops to a second, centred row instead of
-    // colliding with the Keys pill.
-    const c = this.add
-      .container(IS_MOBILE ? GAME_WIDTH / 2 : 1640, IS_MOBILE ? 360 : 88)
-      .setScale(UI_SCALE)
-      .setDepth(DEPTH_HUD + 2)
-      .setVisible(false);
-
-    const pill = (x: number, icon: string, iconScale: number): Phaser.GameObjects.Text => {
-      const bg = this.add.image(x, 0, 'ui_pill').setScale(0.95, 0.9);
-      const ic = this.add.image(x - 116, 0, icon).setScale(iconScale);
-      const t = this.add
-        .text(x + 20, 0, '', { fontFamily: FONT, fontSize: '42px', fontStyle: 'bold', color: PALETTE.cream })
-        .setOrigin(0.5);
-      c.add([bg, ic, t]);
-      return t;
-    };
-    // The bolt is the Keeper's own Warmth icon — here it reads the DRAGON's fullness,
-    // the same quantity the old caption called "Energy". The berry art is 240², so it
-    // takes 0.25 to land on the ~60 px the coin icon occupies at its 0.14.
-    this.feedEnergyVal = pill(-PITCH / 2, 'ui_icon_bolt', 0.92);
-    this.feedBerryVal = pill(PITCH / 2, 'item_strawberry_2', 0.25);
-    this.refreshFeedHud();
-    return c;
-  }
-
-  /** Repaint the feed HUD's two values from live state. */
-  private refreshFeedHud(): void {
-    if (!this.feedEnergyVal || !this.feedBerryVal) return;
-    const now = this.ctx.clock.now();
-    const stat = this.ctx.state.dragonStat(WORLD_TELEPORT.dragonChain);
-    const eFrac = stat.fedAt === undefined ? 0 : Math.max(0, Math.min(1, 1 - (now - stat.fedAt) / DRAGON_FEED.hungerMs));
-    // The LARDER, not a headcount of the board: a bush is banked by tapping it, and
-    // feeding spends from here. One number, one place a berry can be.
-    const food = this.ctx.state.berryStock;
-    const eLow = eFrac <= 0.34;
-    // A pill carries a VALUE, not a bar — so hunger speaks through the colour the way
-    // the board already does: cream while she is fed, lava when she is asking.
-    this.feedEnergyVal.setText(eLow ? 'Feed me!' : `${Math.round(eFrac * 100)}%`);
-    this.feedEnergyVal.setColor(eLow ? PALETTE.lavaHighlight : PALETTE.cream);
-    this.feedBerryVal.setText(`×${food}`);
-  }
-
-  /** A one-off bouncing arrow under the quest-log icon (top-right) — nudges the
-   *  player to open the quest after the dragon is invoked. Auto-clears after a few s. */
-  private showQuestArrow(): void {
-    this.questArrow?.destroy();
-    const x = GAME_WIDTH - 236; // under the quest-log toggle
-    const y = 210;
-    const c = this.add.container(x, y).setDepth(DEPTH_HUD + 10);
-    const arrow = this.add
-      .text(0, 0, '⬆', { fontFamily: FONT, fontSize: '74px', fontStyle: 'bold', color: '#ffd84d', stroke: PALETTE.night, strokeThickness: 7 })
-      .setOrigin(0.5);
-    const label = this.add
-      .text(0, 58, 'Your quest!', { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color: PALETTE.goldAccent, stroke: PALETTE.night, strokeThickness: 5 })
-      .setOrigin(0.5);
-    c.add([arrow, label]);
-    this.questArrow = c;
-    this.tweens.add({ targets: c, y: y - 20, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.time.delayedCall(7000, () => {
-      this.questArrow?.destroy();
-      this.questArrow = undefined;
+  private hideTravelVeil(): void {
+    const veil = this.travelVeil;
+    if (!veil) return;
+    this.travelVeil = undefined;
+    // Held a beat past `world:ready`: the board camera runs its own 320ms fade-in
+    // on create, and lifting the curtain first would show the new world arriving
+    // out of black instead of simply being there.
+    this.tweens.add({
+      targets: veil,
+      alpha: 0,
+      delay: 200,
+      duration: 260,
+      ease: 'Sine.easeIn',
+      onComplete: () => veil.destroy()
     });
   }
 
-  /** Emberkeep Cookbook button — sits directly above the Ledger (quest)
-   *  button; hidden during the tutorial. The lava dot marks new pages. */
+  /** Emberkeep Cookbook button — bottom-right column, above the Bag; hidden
+   *  during the tutorial. The lava dot marks new pages. */
   private buildCookbookButton(): Phaser.GameObjects.Container {
-    // Directly BELOW the milestone gift (gift top / cookbook bottom), same
-    // right-edge column; magnified on mobile.
+    // Slot 2 of the shared column (Ledger 0, Bag 1) — its own offsets used to sit
+    // 36 units from the Bag's, so the satchel covered this button entirely.
     const button = this.add
-      .container(GAME_WIDTH - 96, LIVE_GAME_HEIGHT - 330)
+      .container(HUD_COLUMN_X, hudColumnY(2))
       .setScale(UI_SCALE)
       .setDepth(DEPTH_HUD);
-    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.05);
+    // Plate, icon and dot all at the column's shared 1.5 — this button used to be
+    // built at 1.05 and read as a runt beside the Bag and the Ledger.
+    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.5);
     const icon = this.textures.exists('ui_icon_cookbook')
-      ? this.add.image(0, -6, 'ui_icon_cookbook').setDisplaySize(100, 100)
-      : this.add.text(0, -8, '📖', { fontSize: '56px' }).setOrigin(0.5);
+      ? this.add.image(0, -12, 'ui_icon_cookbook').setDisplaySize(125, 125)
+      : this.add.text(0, -12, '📖', { fontSize: '76px' }).setOrigin(0.5);
     this.cookbookDot = this.add
-      .circle(46, -46, 16, num(PALETTE.lava))
+      .circle(68, -68, 18, num(PALETTE.lava))
       .setStrokeStyle(5, num(PALETTE.cream))
       .setVisible(false);
     button.add([bg, icon, this.cookbookDot]);
-    button.setSize(134, 134);
+    button.setSize(192, 192);
     button.setInteractive({ useHandCursor: true });
     button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
     button.on('pointerout', () => button.setScale(UI_SCALE));
@@ -746,6 +720,72 @@ export class UIScene extends Phaser.Scene {
   /** Tapped Gold arcs from its board cell up to the Gold gauge — one coin
    *  sprite per banked coin (the Pouch sends 3), staggered so each arrival
    *  lands separately and pulses the gauge on impact. */
+  /**
+   * The store beat: the piece leaves its tile, arcs to the satchel and the
+   * button pulses as it lands. Deliberately the SAME motion as the coin flight
+   * below — one curved hop, shrinking as it goes — so storing feels like
+   * something the player already knows rather than a new mechanic.
+   */
+  private flyItemToBag(chain: string, tier: number, at: TilePos): void {
+    const key = `item_${chain}_${tier}`;
+    const start = this.cellToScreen(at.col, at.row);
+    const end = this.hud.getBagPos();
+    if (!this.textures.exists(key)) {
+      this.hud.bumpBag();
+      return;
+    }
+    const art = this.add.image(start.x, start.y - 30, key).setDepth(DEPTH_PANEL + 5);
+    // Normalise: item art ranges from ~190px to ~760px, so a fixed scale would
+    // send a moss tuft and a resin lump off at wildly different sizes.
+    const fit = 96 / Math.max(art.width, art.height);
+    art.setScale(fit * 0.6);
+    this.tweens.add({ targets: art, scale: fit, duration: 140, ease: 'Back.easeOut' });
+    const proxy = { t: 0 };
+    this.tweens.add({
+      targets: proxy,
+      t: 1,
+      duration: 520,
+      delay: 120,
+      ease: 'Sine.easeIn',
+      onUpdate: () => {
+        const t = proxy.t;
+        art.x = Phaser.Math.Linear(start.x, end.x, t);
+        art.y = Phaser.Math.Linear(start.y - 30, end.y, t) - Math.sin(Math.PI * t) * 140;
+        art.rotation = t * Math.PI * 0.6;
+        art.setScale(fit * (1 - 0.55 * t));
+        art.setAlpha(1 - 0.25 * t);
+      },
+      onComplete: () => {
+        art.destroy();
+        this.hud.bumpBag();
+      }
+    });
+  }
+
+  /** A short cream line that rises and fades over the board — used when a store
+   *  or a retrieval could not happen, so the tap is never silently ignored. */
+  private floatWarning(text: string): void {
+    const label = this.add
+      .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.62, text, {
+        fontFamily: FONT.display,
+        fontSize: '54px',
+        fontStyle: 'bold',
+        color: PALETTE.cream,
+        stroke: PALETTE.night,
+        strokeThickness: 8
+      })
+      .setOrigin(0.5)
+      .setDepth(DEPTH_PANEL + 20);
+    this.tweens.add({
+      targets: label,
+      y: label.y - 90,
+      alpha: 0,
+      duration: 1100,
+      ease: 'Sine.easeOut',
+      onComplete: () => label.destroy()
+    });
+  }
+
   private flyCoinToGold(at: TilePos, count = 1): void {
     const start = this.cellToScreen(at.col, at.row);
     const end = this.hud.getCoinPos();
@@ -778,136 +818,82 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
-  /** A banked Emberberry bush arcs from its tile up to the feed gauge — the same
-   *  motion as `flyCoinToGold`, because it is the same promise: what you tapped is
-   *  really in the larder now. Silent no-op while the feed HUD is hidden (nb2). */
-  private flyBerryToStock(at: TilePos): void {
-    if (!this.feedBerryVal || !this.feedHud?.visible) return;
-    const start = this.cellToScreen(at.col, at.row);
-    const end = { x: this.feedHud.x + this.feedBerryVal.x * this.feedHud.scaleX, y: this.feedHud.y };
-    const berry = this.add
-      .image(start.x, start.y - 30, 'item_strawberry_2')
-      .setScale(0.16)
-      .setDepth(DEPTH_PANEL + 5);
-    const proxy = { t: 0 };
-    this.tweens.add({
-      targets: proxy,
-      t: 1,
-      duration: 560,
-      ease: 'Sine.easeIn',
-      onUpdate: () => {
-        const t = proxy.t;
-        berry.x = Phaser.Math.Linear(start.x, end.x, t);
-        berry.y = Phaser.Math.Linear(start.y - 30, end.y, t) - Math.sin(Math.PI * t) * 120;
-        berry.rotation = t * Math.PI;
-        berry.setScale(0.16 * (1 - 0.45 * t));
-      },
-      onComplete: () => {
-        berry.destroy();
-        // One pulse on arrival, so the number is seen to change.
-        const val = this.feedBerryVal;
-        if (val) this.tweens.add({ targets: val, scale: 1.35, duration: 110, yoyo: true, ease: 'Sine.easeOut' });
-      }
-    });
-  }
-
   /** The level-up reward beat: a warm banner — Warmth refilled + Gold. Deferred a
    *  frame: keeper:leveled can fire mid bus-emit (even from an external trigger),
    *  and allocating Text/particles right then can hit a not-yet-ready canvas.
-   *  Level 3 takes the FINALE path instead (no banner — the screen holds while
-   *  the Golden Egg cracks; DEMO-PLAN §THE FINALE). */
+   *  EVERY level gets the banner now — Level 3 used to be swallowed by the
+   *  finale, which has moved onto `GOLDEN_ALTAR.awakenQuestId`. */
   private celebrateLevelUp(level: number): void {
-    if (level >= 3) {
-      this.time.delayedCall(0, () => this.runFinaleUi());
-      return;
-    }
-    // The emblem is lazy (off boot) — load it, THEN build the banner (no fallback flash).
-    this.time.delayedCall(0, () =>
-      ensureTextures(this, this.ctx, ['ui_levelup_emblem'], () => this.buildLevelUpBanner(level))
-    );
+    this.time.delayedCall(0, () => this.buildLevelUpBanner(level));
   }
 
   /**
-   * UIScene's half of the Level-3 finale timeline (BoardScene runs the board
-   * half off the same keeper:leveled beat): Cindra speaks — for the first time
-   * in the entire demo — then the Chapter One card.
+   * UIScene's half of the finale timeline (BoardScene runs the board half off
+   * the same `quest:completed` beat): the Golden Elder speaks, for the first
+   * time in the whole game — and that is the end of it.
+   *
+   * Nothing follows her. The finale used to close on a "Beyond the demo"
+   * roadmap and a Chapter One card offering Keep Playing / Play Again; both were
+   * demo furniture, and a modal that interrupts a player to ask whether they
+   * would like to keep playing is the wrong last thing a chapter says. Her line
+   * lands, the camera comes home, and play continues uninterrupted.
    */
   private runFinaleUi(): void {
-    if (this.finaleActive || this.endScreen) return;
+    if (this.finaleActive) return;
     this.finaleActive = true;
-    // Kick off the end-screen art now (lazy off boot) so it's resident by the time
-    // the Chapter-One card + "Beyond the demo" panel build a few seconds later.
-    ensureTextures(
-      this,
-      this.ctx,
-      [
-        'trailer_world_ice',
-        'trailer_world_crystal',
-        'trailer_legend_frost',
-        'trailer_legend_crystal',
-        'trailer_legend_storm',
-        'trailer_legend_tide',
-        'trailer_legend_shadow',
-        'ui_teaser_terrace',
-        'ui_teaser_breed',
-        'ui_teaser_flame'
-      ],
-      () => {}
-    );
     this.clearRecipeHint(); // the finale owns the stage — no competing pointers
     this.ledger.requestClose();
     this.shop.requestClose();
     this.cookbook.requestClose();
-    this.time.delayedCall(FINALE.cindraAtMs, () => {
+    this.time.delayedCall(FINALE.elderAtMs, () => {
       // No egg earned (Order 1 skipped)? Her line reads as PROPHECY — selling
       // the promise the player hasn't collected yet, never claiming an
       // awakening that didn't happen.
       const eggEarned = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
       this.bubble.say(
-        'cindra',
-        eggEarned ? this.ctx.data.dialogue.finaleCindra : this.ctx.data.dialogue.finaleCindraProphecy,
-        FINALE.cindraHoldMs
+        'golden_elder',
+        eggEarned ? this.ctx.data.dialogue.finaleElder : this.ctx.data.dialogue.finaleElderProphecy,
+        FINALE.elderHoldMs
       );
     });
-    this.time.delayedCall(FINALE.cardAtMs, () => {
+    // The stage is released when her line does, not when a panel is dismissed.
+    this.time.delayedCall(FINALE_ENDS_MS, () => {
       this.finaleActive = false;
-      if (this.endScreen) return;
-      const showCard = (): void => {
-        if (this.endScreen || !this.scene.isActive()) return;
-        this.endScreen = new EndScreen(this, 'chapter');
-        this.add.existing(this.endScreen);
-        this.endScreen.setDepth(DEPTH_DIALOG + 50);
-        this.endScreen.once(Phaser.GameObjects.Events.DESTROY, () => {
-          this.endScreen = null;
+      // The Gate ceremony rides the finale's tail: Eleanor speaks the arch
+      // open (tap-advanced, STORY_BEAT_HOLD_MS backstop — it cannot strand),
+      // and the last line blooming into `gate:opened` is what turns the
+      // portal FX on and the door live. A reload after the finale skips the
+      // ceremony: BoardScene derives the open Gate from the q:done latch.
+      const beats = this.ctx.data.dialogue.gateOpens;
+      if (beats?.lines.length) {
+        this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+          this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () =>
+            this.ctx.bus.emit('gate:opened', {})
+          );
         });
-      };
-      // "Beyond the demo" is the ending's HEADLINE — it leads, unprompted, so
-      // no session finishes without seeing it; the Chapter One card (its home,
-      // which keeps the reopen button) follows when the player closes it.
-      // Without the trailer art there is nothing to headline — straight to card.
-      if (this.textures.exists('trailer_world_ice') || this.textures.exists('trailer_legend_frost')) {
-        const panel = new BeyondDemoPanel(this);
-        panel.setDepth(DEPTH_DIALOG + 50);
-        panel.once(Phaser.GameObjects.Events.DESTROY, showCard);
       } else {
-        showCard();
+        this.ctx.bus.emit('gate:opened', {});
       }
     });
   }
 
   /** Order completion — the demo's primary reward beat — now celebrates at
-   *  level-up parity: banner + spark burst + a rotating Cindra quote stamped on
+   *  level-up parity: banner + spark burst + a rotating Eleanor quote stamped on
    *  the card (her VOICE stays reserved for the finale). The golden order gets
    *  its own beats: a dedicated arrival quote, and — delivered after Level 3 —
-   *  Cindra SPEAKS over the late awakening playing out at the altar. */
+   *  The Golden Elder SPEAKS over the late awakening playing out at the altar. */
   private celebrateOrder(orderId: string, rewards: { coins: number; keys: number; xp?: number }): void {
     if (this.finaleActive || !this.ctx.state.tutorialDone) return;
     const golden = orderId === GOLDEN_ALTAR.orderId;
     this.time.delayedCall(0, () => {
-      const quotes = this.ctx.data.dialogue.orderComplete;
+      // Her banter is banked by story stage, so the Ledger says something new
+      // as the campaign moves (docs/script-chapters.md, Part II).
+      const quotes = this.ctx.systems.story.orderCompleteBank();
       const quote = golden
         ? this.ctx.data.dialogue.goldenArrival
-        : quotes[(this.ctx.state.completedOrderIds.length - 1) % quotes.length] ?? '';
+        : quotes.length
+          ? quotes[(this.ctx.state.completedOrderIds.length - 1) % quotes.length] ?? ''
+          : '';
       const parts: string[] = [];
       if (rewards.coins) parts.push(`◎ +${rewards.coins} Gold`);
       if (rewards.xp) parts.push(`✦ +${rewards.xp} XP`);
@@ -917,7 +903,7 @@ export class UIScene extends Phaser.Scene {
       // BoardScene's lateGoldenAwakening cracks the egg at ~2.4s — her line
       // lands right as the Elder rises.
       this.time.delayedCall(3200, () => {
-        this.bubble.say('cindra', this.ctx.data.dialogue.lateAwakening, 4600);
+        this.bubble.say('golden_elder', this.ctx.data.dialogue.lateAwakening, 4600);
       });
     }
   }
@@ -925,7 +911,7 @@ export class UIScene extends Phaser.Scene {
   private celebrateTasksComplete(): void {
     this.time.delayedCall(0, () => {
       this.buildCelebrationBanner('EVERY TASK COMPLETE', '◎ Gold  ⚡ Warmth — a golden thank-you', '');
-      this.bubble.say('cindra', this.ctx.data.dialogue.tasksComplete, 5200);
+      this.bubble.say('eleanor', this.ctx.data.dialogue.tasksComplete, 5200);
     });
   }
 
@@ -945,13 +931,13 @@ export class UIScene extends Phaser.Scene {
     g.fillRoundedRect(-378, -height / 2 + 12, 756, height - 24, 24);
     const ribbon = this.add
       .text(0, -height / 2 + 58, title, {
-        fontFamily: FONT, fontSize: '48px', fontStyle: 'bold', color: PALETTE.textBrown
+        fontFamily: FONT.ui, fontSize: '46px', fontStyle: 'bold', color: PALETTE.cream
       })
       .setOrigin(0.5)
       .setStroke(PALETTE.cream, 5);
     const sub = this.add
       .text(0, -height / 2 + 122, rewardLine, {
-        fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: PALETTE.goldShade
+        fontFamily: FONT.ui, fontSize: '30px', fontStyle: 'bold', color: PALETTE.goldShade
       })
       .setOrigin(0.5);
     c.add([g, ribbon, sub]);
@@ -959,7 +945,7 @@ export class UIScene extends Phaser.Scene {
       c.add(
         this.add
           .text(0, -height / 2 + 182, quote, {
-            fontFamily: FONT, fontSize: '26px', fontStyle: 'italic', color: '#8A6248',
+            fontFamily: FONT.ui, fontSize: '26px', fontStyle: 'italic', color: '#8A6248',
             wordWrap: { width: 700 }, align: 'center'
           })
           .setOrigin(0.5)
@@ -1013,7 +999,7 @@ export class UIScene extends Phaser.Scene {
       .setDepth(DEPTH_HUD - 1); // over the board render, under every UI element
   }
 
-  /** One-shot Laurah nudge (post-tutorial guidance without a second tutorial). */
+  /** One-shot Eleanor nudge (post-tutorial guidance without a second tutorial). */
   private showHint(key: keyof GameContext['data']['dialogue']['hints'], holdMs = 5200): void {
     if (!this.ctx.state.tutorialDone || this.finaleActive || this.hintShown.has(key)) return;
     this.hintShown.add(key);
@@ -1023,7 +1009,7 @@ export class UIScene extends Phaser.Scene {
   /**
    * Contextual recipe mini-tutorials: the moment the board first holds the TWO
    * pieces of a 2→1 recipe (two Red Dragons → Adult, two Houses → Manor),
-   * Laurah teases the merge and the guiding gauntlet demonstrates the drag
+   * Eleanor teases the merge and the guiding gauntlet demonstrates the drag
    * between the actual pieces. Purely presentational — nothing is gated, no
    * input is blocked; it clears itself on discovery, timeout, or the finale.
    */
@@ -1031,7 +1017,7 @@ export class UIScene extends Phaser.Scene {
     if (!this.ctx.state.tutorialDone || this.finaleActive || this.recipeHint) return;
     const candidates = [
       { key: 'twoDragons', recipe: 'ember_dragon:3>4', chain: 'ember_dragon', tier: 3 },
-      { key: 'twoHouses', recipe: 'lumber:2>3', chain: 'lumber', tier: 2 }
+      { key: 'twoHouses', recipe: 'lumber:3>4', chain: 'lumber', tier: 3 }
     ] as const;
     for (const c of candidates) {
       if (this.hintShown.has(c.key)) continue;
@@ -1100,49 +1086,25 @@ export class UIScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT * 0.34;
     const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);
-    const coins = LEVELUP_REWARD.coinsBase + level * LEVELUP_REWARD.coinsPerLevel;
-
-    if (this.textures.exists('ui_levelup_emblem')) {
-      // Winged-medal emblem (honeur.png): the level number sits in the medal, the
-      // prize in the "Prix:" banner baked into the art.
-      const emblem = this.add.image(0, 0, 'ui_levelup_emblem').setScale(0.62);
-      const levelNum = this.add
-        .text(0, -12, `${level}`, {
-          fontFamily: FONT, fontSize: '150px', fontStyle: 'bold', color: PALETTE.textBrown
-        })
-        .setOrigin(0.5)
-        .setStroke('#fff7e0', 8);
-      // Sit the reward ON the baked "Price:" ribbon, right after the word (its
-      // right edge is ~x62,y208 in this container at the emblem's 0.62 scale) —
-      // reads inline "Price: 🪙55 ⚡", not stacked below. (Level-up pays Gold +
-      // a full Warmth refill, so ⚡ is a refill icon, not a fixed number.)
-      const prize = this.add
-        .text(82, 208, `🪙 ${coins}  ⚡`, {
-          fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: '#ffffff'
-        })
-        .setOrigin(0, 0.5)
-        .setStroke(PALETTE.plumShade, 6);
-      c.add([emblem, levelNum, prize]);
-    } else {
-      // Fallback (emblem art missing): the plain gold banner.
-      const g = this.add.graphics();
-      g.fillStyle(num(PALETTE.gold), 1);
-      g.fillRoundedRect(-360, -96, 720, 192, 30);
-      g.fillStyle(0xfffdf6, 1);
-      g.fillRoundedRect(-348, -84, 696, 168, 24);
-      const ribbon = this.add
-        .text(0, -46, `KEEPER LEVEL ${level}`, {
-          fontFamily: FONT, fontSize: '60px', fontStyle: 'bold', color: PALETTE.textBrown
-        })
-        .setOrigin(0.5)
-        .setStroke(PALETTE.cream, 6);
-      const sub = this.add
-        .text(0, 34, `⚡ Warmth refilled    🪙 ${coins}`, {
-          fontFamily: FONT, fontSize: '34px', fontStyle: 'bold', color: PALETTE.goldShade
-        })
-        .setOrigin(0.5);
-      c.add([g, ribbon, sub]);
-    }
+    const g = this.add.graphics();
+    g.fillStyle(num(PALETTE.night), 0.22);
+    g.fillRoundedRect(-360, -96 + 10, 720, 192, 30);
+    g.fillStyle(num(PALETTE.gold), 1);
+    g.fillRoundedRect(-360, -96, 720, 192, 30);
+    g.fillStyle(0xfffdf6, 1);
+    g.fillRoundedRect(-348, -84, 696, 168, 24);
+    const ribbon = this.add
+      .text(0, -46, `KEEPER LEVEL ${level}`, {
+        fontFamily: FONT.ui, fontSize: '64px', fontStyle: 'bold', color: PALETTE.cream
+      })
+      .setOrigin(0.5)
+      .setStroke(PALETTE.cream, 6);
+    const sub = this.add
+      .text(0, 34, '⚡ Warmth refilled    ◎ Gold reward', {
+        fontFamily: FONT.ui, fontSize: '34px', fontStyle: 'bold', color: PALETTE.goldShade
+      })
+      .setOrigin(0.5);
+    c.add([g, ribbon, sub]);
     // burst of sparks behind the banner.
     this.add
       .particles(cx, cy, 'fx_spark', {
@@ -1157,13 +1119,45 @@ export class UIScene extends Phaser.Scene {
       targets: c, alpha: 0, scale: 1.04, delay: 1500, duration: 360, ease: 'Sine.easeIn',
       onComplete: () => c.destroy()
     });
-    // (Level 3 never reaches here — celebrateLevelUp routes it to the finale.)
   }
 
   private onTutorialStep(step: TutorialStepEvent): void {
     this.lastStep = step;
+    if (step.done && this.pendingHearts.length) {
+      for (const beat of this.pendingHearts.splice(0)) {
+        this.playRegardBeats(beat.characterId, beat.hearts);
+      }
+    }
     this.hud.setLedgerEnabled(step.done || step.allow.ledger);
+    // The tracker is a readout of the Ledger, so BOTH halves ride the same gate
+    // as the Ledger button.
+    //
+    // The sub-rows used to wait for `step.done`, which made quest one's
+    // subquests dead UI: the tutorial delivers Eleanor's first order itself, so
+    // that quest was already finished by the time the rows were allowed to
+    // appear, and the player's first sight of the tracker was a bare title over
+    // a number with nothing explaining what the number counted. Showing them on
+    // the Ledger beats instead means the widget introduces itself at the moment
+    // the tutorial is pointing at the Ledger anyway — one row, reading
+    // "Deliver 6 Gem Shards to Eleanor", which is exactly the instruction.
+    const ledgerBeat = step.done || step.allow.ledger;
+    this.questTracker.setStoryVisible(ledgerBeat);
+    this.questTracker.setTasksVisible(ledgerBeat);
     this.ledger.setDeliverAllowed(step.done || step.allow.deliver);
+    this.bag.setSellAllowed(step.done || step.allow.sell);
+    this.bag.setGiveAllowed(step.done || step.allow.give);
+    // The status readout debuts on the beat that teaches feeding — it is the
+    // surface that lesson's payoff is READ on — and then LATCHES for the rest of
+    // the script. Every other `allow` flag is a permission that a later beat is
+    // right to take back; this one is a concept that has been taught, and a
+    // gauge that vanished again three beats later would read as a bug. The latch
+    // also means the beats after it do not each have to remember `feed: true`.
+    if (step.allow.status) this.statusTaught = true;
+    this.statusPanel.setEnabled(step.done || this.statusTaught);
+    // Safety net, same shape as the Cookbook's: a beat that does not allow the
+    // satchel shuts it, so the panel's dim can never swallow the tap the next
+    // step is waiting on (`sell_it` leaves the bag open behind it).
+    if (!step.done && !step.allow.bag && this.bag.isOpen) this.bag.requestClose();
     // Show key pill only during the key_unlock step; hide it otherwise.
     this.hud.setKeyVisible(!step.done && step.id === 'key_unlock');
     // A step that no longer involves the Ledger closes it, so its dim never
@@ -1174,21 +1168,222 @@ export class UIScene extends Phaser.Scene {
       this.clearMarkers();
       return;
     }
+    // Beat 0 of the opening: the board is visible and SILENT before her first
+    // line, so the player sees the ash before anyone frames it. Staging only —
+    // the director has already emitted the step (docs/opening-scene.md).
+    if (step.index === 0 && !this.openingHeld) {
+      this.openingHeld = true;
+      this.clearMarkers();
+      this.time.delayedCall(OPENING_HOLD_MS, () => {
+        if (this.lastStep?.id !== step.id) return;
+        this.bubble.show(step);
+        this.applyMarkers(step);
+      });
+      return;
+    }
     this.bubble.show(step);
     this.applyMarkers(step);
+  }
+
+  /** A chapter turned: play its beats, tap by tap. Fires once per chapter — the
+   *  pointer is persisted, so a reload never replays them. */
+  private playChapterBeats(chapter: number): void {
+    const beats = this.ctx.systems.story.beatsFor(chapter);
+    if (!beats) return;
+    // Let the order-complete celebration land first; her reaction is TO it.
+    this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () => {
+        this.ctx.bus.emit('story:beats_finished', { chapter });
+      });
+    });
+  }
+
+  /** A piece's authored name, for a line that has to say WHICH piece. Falls
+   *  back to the key rather than to "item", so a missing name is debuggable. */
+  private pieceName(chain: string, tier: number): string {
+    return (
+      this.ctx.data.chains.chains.find((c) => c.id === chain)?.tiers.find((t) => t.tier === tier)
+        ?.name ?? `${chain} T${tier}`
+    );
+  }
+
+  /**
+   * A gift changed hands (or did not). One line, in her voice, immediately —
+   * this is feedback on a gesture the player just made, so it does not queue
+   * behind anything the way a chapter beat does.
+   */
+  private sayGiftLine(characterId: string, accepted: boolean, seed: number): void {
+    // The tutorial owns the bubble until it's done — `say()` wipes the tap
+    // gate, and the scripted gift beat already answers in her voice
+    // (`eleanor_hearts` IS the thank-you). Overwriting it soft-locked the
+    // tutorial on that step.
+    if (!this.ctx.state.tutorialDone) return;
+    const line = this.ctx.systems.story.giftLine(characterId, accepted, seed);
+    if (!line) return;
+    this.bubble.say(characterId as SpeakerId, line, accepted ? 3600 : 3000);
+  }
+
+  /**
+   * A whole heart filled. The milestone scene, played once ever.
+   *
+   * Delayed by the same beat a chapter is: the gift's own line is on screen and
+   * her reaction is TO it, not over it.
+   */
+  /**
+   * The hub tours — Eleanor walks Roothold's Emporium, Selyna the Hatchery's
+   * cauldron, each ONCE ever (stats `tour:<world>`, save-derivable). Not
+   * TutorialDirector beats: the tutorial is long over, nothing here gates
+   * input, and every wait state is armed on an event that stays live — a
+   * player who wanders off mid-tour is never stuck, and an unfinished tour
+   * simply re-runs on the next arrival.
+   */
+  private maybeStartTour(worldId: string): void {
+    if (worldId === 'roothold' && this.ctx.state.stat('tour:roothold') === 0) {
+      this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runRootholdTour());
+    }
+    if (worldId === 'hatchery' && this.ctx.state.stat('tour:hatchery') === 0) {
+      this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runHatcheryTour());
+    }
+  }
+
+  private runRootholdTour(): void {
+    const t = this.ctx.data.dialogue.tours?.roothold;
+    if (!t) return;
+    const bus = this.ctx.bus;
+    this.bubble.sequence('eleanor', t.intro, () => {
+      bus.emit('tour:point', { target: 'roothold_house' });
+      this.bubble.say('eleanor', t.house, 120000);
+      const offOpen = bus.on('ui:store_toggled', ({ open }) => {
+        if (!open) return;
+        offOpen();
+        bus.emit('tour:unpoint', {});
+        this.runShopWalkthrough(t);
+      });
+      this.offBus.push(offOpen);
+    });
+  }
+
+  /** The 3 sections with the pointer moving between them, then the ✕. The
+   *  arrow rides the LINE (sequence onLine), and the panel shows the section
+   *  she is naming, so eye, pointer and shelf agree. */
+  private runShopWalkthrough(t: { sections: string[]; close: string; outro: string }): void {
+    this.bubble.sequence('eleanor', [...t.sections, t.close], undefined, (i) => {
+      if (i < t.sections.length) {
+        this.store.showSection(i);
+        this.pointUi(this.store.getTabPos(i));
+      } else {
+        this.pointUi(this.store.getClosePos());
+      }
+    });
+    const offClose = this.ctx.bus.on('ui:store_toggled', ({ open }) => {
+      if (open) return;
+      offClose();
+      this.clearUiPointer();
+      // Only AFTER the shop closes does she hand over the button — and only
+      // after her line does it appear. Before this moment it never has.
+      this.bubble.sequence('eleanor', [t.outro], () => {
+        this.ctx.state.addStat('shop:unlocked', 1);
+        this.ctx.state.addStat('tour:roothold', 1);
+        this.hud.storeButton.setVisible(this.ctx.state.tutorialDone && this.shopUnlocked());
+        this.ctx.bus.emit('tour:completed', { id: 'roothold' });
+      });
+    });
+    this.offBus.push(offClose);
+  }
+
+  private runHatcheryTour(): void {
+    const t = this.ctx.data.dialogue.tours?.hatchery;
+    if (!t) return;
+    const bus = this.ctx.bus;
+    this.bubble.sequence('selyna', t.intro, () => {
+      bus.emit('tour:point', { target: 'hatchery_cauldron' });
+      this.bubble.say('selyna', t.cauldron, 120000);
+      const offOpen = bus.on('ui:cauldron_toggled', ({ open }) => {
+        if (!open) return;
+        offOpen();
+        bus.emit('tour:unpoint', {});
+        this.bubble.sequence('selyna', [t.explain, t.close], undefined, (i) => {
+          if (i === 1) this.pointUi(this.cauldron.getClosePos());
+        });
+        const offClose = bus.on('ui:cauldron_toggled', ({ open: o }) => {
+          if (o) return;
+          offClose();
+          this.clearUiPointer();
+          this.ctx.state.addStat('tour:hatchery', 1);
+          this.ctx.bus.emit('tour:completed', { id: 'hatchery' });
+        });
+        this.offBus.push(offClose);
+      });
+      this.offBus.push(offOpen);
+    });
+  }
+
+  private shopUnlocked(): boolean {
+    return this.ctx.state.stat('shop:unlocked') > 0;
+  }
+
+  /** The tours' UI-space pointer (panel tabs, close buttons). */
+  private pointUi(pos: { x: number; y: number } | null): void {
+    this.clearUiPointer();
+    if (!pos) return;
+    const arrow = this.add.image(pos.x, pos.y - 96, 'ui_arrow').setScale(0.42).setDepth(DEPTH_TUTORIAL - 1);
+    this.tweens.add({
+      targets: arrow,
+      y: pos.y - 62,
+      duration: 420,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    this.tourUiArrow = arrow;
+  }
+
+  private clearUiPointer(): void {
+    if (!this.tourUiArrow) return;
+    this.tweens.killTweensOf(this.tourUiArrow);
+    this.tourUiArrow.destroy();
+    this.tourUiArrow = undefined;
+  }
+
+  private playRegardBeats(characterId: string, hearts: number): void {
+    // Mid-tutorial (the Crystal Ball pays exactly one heart) the sequence
+    // would seize the bubble and end on hide(), stranding the tap-gated step
+    // it interrupted. The milestone plays once ever, so it is deferred, not
+    // dropped: `onTutorialStep` flushes the queue on the done beat.
+    if (!this.ctx.state.tutorialDone) {
+      this.pendingHearts.push({ characterId, hearts });
+      return;
+    }
+    const beats = this.ctx.systems.story.regardBeats(characterId, hearts);
+    if (!beats) return;
+    this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      this.bubble.sequence(beats.speaker as SpeakerId, beats.lines);
+    });
+  }
+
+  /** A world entered for the first time: whoever lives there speaks. Waits out
+   *  the travelling curtain — she is not talking over a black screen. */
+  private playArrivalBeats(worldId: string): void {
+    const beats = this.ctx.systems.story.arrivalBeats(worldId);
+    if (!beats) return;
+    this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      this.bubble.sequence(beats.speaker as SpeakerId, beats.lines);
+    });
   }
 
   private maybeShowTooltip(itemId: number): void {
     const item = this.ctx.state.items.get(itemId);
     if (!item || item.kind !== 'item') return;
     if (item.readyAt !== undefined) return; // generators harvest instead
-    // Story items (Golden Egg/Elder) are unsellable — no tooltip; the board
+    // Story items (Golden Egg/Elder) are not merchandise — no card; the board
     // plays their own tap beat instead.
     const tier = this.ctx.data.chains.chains
       .find((c) => c.id === item.chain)
       ?.tiers.find((t) => t.tier === item.tier);
     if (tier?.sellable === false) return;
-    if (!this.ctx.state.tutorialDone && !(this.lastStep?.allow.sell ?? false)) return;
+    // The card is the inspect half of the same gesture pair as tap-to-pocket, so
+    // it rides the same permission rather than the retired board-sell one.
+    if (!this.bagAllowed()) return;
     const { x, y } = this.cellToScreen(item.col, item.row);
     this.tooltip.openFor(itemId, item.chain, item.tier, x, y - 116);
   }
@@ -1215,6 +1410,40 @@ export class UIScene extends Phaser.Scene {
       };
     }
     return { x: wx, y: wy };
+  }
+
+  /**
+   * The player touched something this step doesn't allow. Rather than swallow
+   * it, re-point: a quick pop on whichever guidance marker is live, and a bump
+   * on the bubble that says what the step wants. Purely additive — the marker's
+   * own looping tween keeps running underneath (tutorial-design law 3).
+   */
+  /** The satchel is usable once the tutorial has taught it, and always after. */
+  /** The Store is cosmetics — it opens the moment the tutorial is over and
+   *  never during it. There is no `allow.store`: no beat teaches it, because
+   *  nothing in it is a rule. */
+  private storeAllowed(): boolean {
+    return this.lastStep?.done ?? this.ctx.state.tutorialDone;
+  }
+
+
+  private bagAllowed(): boolean {
+    return (this.lastStep?.done ?? this.ctx.state.tutorialDone) || (this.lastStep?.allow.bag ?? false);
+  }
+
+  private nudgeMarkers(): void {
+    if (this.lastStep?.done) return;
+    const live = [this.hand, this.arrow].filter((m) => m.visible);
+    for (const marker of live) {
+      const base = marker === this.hand ? this.handBaseScale : this.arrowBaseScale;
+      this.tweens.add({
+        targets: marker,
+        scale: { from: base * 1.28, to: base },
+        duration: 220,
+        ease: 'Back.easeOut'
+      });
+    }
+    this.bubble.bump();
   }
 
   private clearMarkers(): void {
@@ -1262,17 +1491,63 @@ export class UIScene extends Phaser.Scene {
     else if (step.arrow) this.placeArrow(step.arrow);
   }
 
-  private uiTarget(ref: { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' } | { fogRegion: string }): { x: number; y: number } | null {
+  private uiTarget(
+    ref:
+      | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+      | { fogRegion: string }
+      | { character: string }
+  ): { x: number; y: number; height?: number } | null {
+    if ('character' in ref) {
+      // Ask the board for her LIVE standee — she is authored in the World
+      // Builder, so nothing here may remember where she stands.
+      const board = this.scene.get(SCENES.board) as BoardScene | undefined;
+      const point = board?.characterMarkerPoint?.(ref.character);
+      if (point) {
+        const head = this.worldToScreen(point.x, point.y);
+        return { ...head, height: this.worldToScreen(point.x, point.bottom).y - head.y };
+      }
+      // Her art failed to load, so there is no standee to point at — fall back
+      // to the cell + nudge she WOULD stand on, computed the same way the board
+      // computes it, so the arrow still lands on the right patch of ground.
+      const cfg = this.ctx.systems.characters.get(ref.character);
+      if (!cfg) return null;
+      const cell = gridToWorld(cfg.anchor[0], cfg.anchor[1]);
+      const ratio = TILE_W / (this.ctx.state.map.tile?.width ?? TILE_W);
+      return this.worldToScreen(cell.x + (cfg.dx ?? 0) * ratio, cell.y + (cfg.dy ?? 0) * ratio);
+    }
     if ('ui' in ref) {
       // The ⚡+ button until the Emporium opens, then the FREE! card inside it —
       // handPoint/arrowAnchor re-evaluate each frame, so the marker follows live.
       if (ref.ui === 'marketplace') return this.shop.getFreeButtonPos() ?? this.hud.getEnergyPlusPos();
       if (ref.ui === 'ledger') return this.hud.getLedgerPos();
+      // The status readout is a HUD block, not a button: the marker wants its
+      // whole height so the arrow can sit clear of it rather than across the
+      // hearts it is pointing at (same `height` contract the standee uses).
+      if (ref.ui === 'status') return this.statusPanel.getMarkerPos();
       if (ref.ui === 'cookbook') return { x: this.cookbookButton.x, y: this.cookbookButton.y };
       if (ref.ui === 'cookbook_close') return this.cookbook.isOpen ? this.cookbook.getClosePos() : null;
+      // Same smart-target shape as `marketplace`: the satchel button until the
+      // bag is open, then the chosen slot's Sell plate inside it. Re-evaluated
+      // every frame, so the arrow walks the player through open → tap → Sell
+      // instead of pointing at a button that is no longer the next thing to do.
+      if (ref.ui === 'bag') return this.bag.getSellPos() ?? this.hud.getBagPos();
+      // Same walk-the-player-through shape as `bag`, aimed at the third verb:
+      // the satchel button until the bag is open, then the Give plate inside the
+      // chosen slot's chooser.
+      if (ref.ui === 'bag_give') return this.bag.getGivePos() ?? this.hud.getBagPos();
+      if (ref.ui === 'commission') {
+        // Panel up → the piece to pick, then its confirm. Panel shut → the
+        // House itself, found live so the arrow survives the House moving.
+        const inPanel = this.commission.getMarkerPos();
+        if (inPanel) return inPanel;
+        const house = [...this.ctx.state.items.values()].find(
+          (i) => i.kind === 'item' && i.chain === 'lumber' && i.tier === 3
+        );
+        return house ? this.cellToScreen(house.col, house.row) : null;
+      }
       return this.ledger.isOpen ? this.ledger.getDeliverPos() : null;
     }
-    const region = this.ctx.data.map.regions.find((r) => r.id === ref.fogRegion);
+    const region = this.ctx.state.map.regions.find((r) => r.id === ref.fogRegion);
     if (!region) return null;
     const tiles: TilePos[] = region.tiles.map(([c, r]) => ({ col: c, row: r }));
     let sx = 0;
@@ -1377,7 +1652,10 @@ export class UIScene extends Phaser.Scene {
       this.arrowLift = 156;
     } else {
       this.arrowAnchor = () => this.uiTarget(arrow);
-      this.arrowLift = 'ui' in arrow ? 116 : 192;
+      // A character anchor is already the top of her head, so it wants the
+      // smallest gap of the three; a fog region resolves to the middle of a
+      // whole strip and wants the largest.
+      this.arrowLift = 'character' in arrow ? 84 : 'ui' in arrow ? 116 : 192;
     }
     const target = this.arrowAnchor();
     if (!target) {
@@ -1430,37 +1708,39 @@ export class UIScene extends Phaser.Scene {
       .setInteractive();
     const panel = this.add.graphics();
     panel.fillStyle(num(PALETTE.night), 0.25);
-    panel.fillRoundedRect(-450, -310 + 16, 900, 620, 52);
+    panel.fillRoundedRect(-450, -368 + 16, 900, 736, 52);
     panel.fillStyle(num(PALETTE.cream), 1);
-    panel.fillRoundedRect(-450, -310, 900, 620, 52);
+    panel.fillRoundedRect(-450, -368, 900, 736, 52);
     panel.lineStyle(8, num(PALETTE.lava), 1);
-    panel.strokeRoundedRect(-450, -310, 900, 620, 52);
+    panel.strokeRoundedRect(-450, -368, 900, 736, 52);
     const title = this.add
-      .text(0, -244, 'Settings', {
-        fontFamily: FONT,
+      .text(0, -320, 'Settings', {
+        fontFamily: FONT.ui,
         fontSize: '54px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown
+        // NOT PALETTE.cream — the panel is filled cream, so a cream heading is
+        // invisible on it (it always was; nobody had reason to look).
+        color: PALETTE.night
       })
       .setOrigin(0.5);
 
     // Background-music toggle (persists; the AudioManager applies it via the bus).
     const musicLabel = (): string => (getMusicMuted() ? 'Music: Off' : 'Music: On');
-    const musicBtn = this.add.container(-206, -148);
+    const musicBtn = this.add.container(0, -232);
     const musicBg = this.add
       .image(0, 0, getMusicMuted() ? 'ui_btn_play' : 'ui_btn_green')
-      .setScale(0.72, 0.8);
+      .setScale(1.05, 0.8);
     const musicText = this.add
       .text(0, -10, musicLabel(), {
-        fontFamily: FONT,
-        fontSize: '34px',
+        fontFamily: FONT.ui,
+        fontSize: '40px',
         fontStyle: 'bold',
         color: '#FFFFFF'
       })
       .setOrigin(0.5)
       .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
     musicBtn.add([musicBg, musicText]);
-    musicBtn.setSize(380 * 0.72, 118).setInteractive({ useHandCursor: true });
+    musicBtn.setSize(380 * 1.05, 118).setInteractive({ useHandCursor: true });
     musicBtn.on('pointerup', () => {
       const muted = !getMusicMuted();
       setMusicMuted(muted);
@@ -1469,18 +1749,60 @@ export class UIScene extends Phaser.Scene {
       musicBg.setTexture(muted ? 'ui_btn_play' : 'ui_btn_green');
     });
 
-    const divider = this.add.rectangle(0, -76, 760, 3, num(PALETTE.lava), 0.22);
+    // Graphics quality. Cycles Auto → High → Balanced → Low. `high` is the
+    // engine unchanged, so nothing here can cost a capable device anything —
+    // the lower tiers only ever subtract.
+    const gfxBtn = this.add.container(0, -104);
+    const gfxBg = this.add.image(0, 0, 'ui_btn_green').setScale(1.05, 0.8);
+    const gfxText = this.add
+      .text(0, -10, graphics.label, {
+        fontFamily: FONT.ui,
+        fontSize: '36px',
+        fontStyle: 'bold',
+        color: '#FFFFFF'
+      })
+      .setOrigin(0.5)
+      .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
+    gfxBtn.add([gfxBg, gfxText]);
+    gfxBtn.setSize(380 * 1.05, 118).setInteractive({ useHandCursor: true });
+    const gfxNote = this.add
+      .text(0, -30, GRAPHICS_PROFILES[graphics.tier].note, {
+        fontFamily: FONT.ui,
+        fontSize: '26px',
+        color: '#8A6248',
+        align: 'center',
+        lineSpacing: 6,
+        wordWrap: { width: 780 }
+      })
+      .setOrigin(0.5, 0);
+    gfxBtn.on('pointerup', () => {
+      const order = GRAPHICS_QUALITIES;
+      const next = order[(order.indexOf(graphics.quality) + 1) % order.length];
+      const needsReload = graphics.set(next);
+      gfxText.setText(graphics.label);
+      gfxNote.setText(
+        needsReload
+          ? `${GRAPHICS_PROFILES[graphics.tier].note}\nReload the page to resize the canvas.`
+          : GRAPHICS_PROFILES[graphics.tier].note
+      );
+      (this.registry.get('power') as { refreshFps?: () => void } | undefined)?.refreshFps?.();
+      // Weather, the crystal and the ambient counts are decided when the board
+      // is built, so the board rebuilds rather than half-applying.
+      this.game.events.emit(GRAPHICS_EVENT);
+    });
+
+    const divider = this.add.rectangle(0, 46, 760, 3, num(PALETTE.lava), 0.22);
     const resetTitle = this.add
-      .text(0, -22, 'Reset Cinder Hollow?', {
-        fontFamily: FONT,
+      .text(0, 88, 'Reset Cinder Hollow?', {
+        fontFamily: FONT.ui,
         fontSize: '40px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown
+        color: PALETTE.night
       })
       .setOrigin(0.5);
     const body = this.add
-      .text(0, 48, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
-        fontFamily: FONT,
+      .text(0, 150, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
+        fontFamily: FONT.ui,
         fontSize: '30px',
         color: '#8A6248',
         align: 'center',
@@ -1495,12 +1817,12 @@ export class UIScene extends Phaser.Scene {
       scaleX: number,
       onTap: () => void
     ): Phaser.GameObjects.Container => {
-      const button = this.add.container(x, 190);
+      const button = this.add.container(x, 272);
       const bg = this.add.image(0, 0, texture).setScale(scaleX, 0.78);
       const text = this.add
         .text(0, -10, label, {
-          fontFamily: FONT,
-          fontSize: '42px',
+          fontFamily: FONT.ui,
+          fontSize: '40px',
           fontStyle: 'bold',
           color: '#FFFFFF'
         })
@@ -1513,6 +1835,15 @@ export class UIScene extends Phaser.Scene {
       return button;
     };
 
+    // Map Editor — the tool that authors the zone registry the engine runs
+    // (`src/editor/`). Parked on the title row so it never crowds the reset copy.
+    // It only emits the intent; the editor lives outside the scene tree entirely.
+    const editorButton = makeButton(292, 'Map Editor', 'ui_btn_green', 0.68, () => {
+      this.closeResetDialog();
+      this.ctx.bus.emit('editor:open', {});
+    });
+    editorButton.setY(-320);
+
     const resetButton = makeButton(-210, 'Reset', 'ui_btn_play', 0.72, () => {
       this.closeResetDialog();
       this.ctx.bus.emit('game:reset_requested', {});
@@ -1521,14 +1852,7 @@ export class UIScene extends Phaser.Scene {
       this.closeResetDialog()
     );
 
-    // Map Editor (dev level tool) — shares the top row with the Music toggle.
-    const editorButton = makeButton(206, 'Editor', 'ui_btn_play', 0.72, () => {
-      this.closeResetDialog();
-      this.ctx.bus.emit('editor:open', {});
-    });
-    editorButton.setY(-148);
-
-    container.add([dim, panel, title, musicBtn, editorButton, divider, resetTitle, body, resetButton, keepButton]);
+    container.add([dim, panel, title, editorButton, musicBtn, gfxBtn, gfxNote, divider, resetTitle, body, resetButton, keepButton]);
     container.setAlpha(0);
     container.setScale(0.94);
     this.tweens.add({ targets: container, alpha: 1, scale: 1, duration: 170, ease: 'Back.easeOut' });
@@ -1538,5 +1862,202 @@ export class UIScene extends Phaser.Scene {
   private closeResetDialog(): void {
     this.dialog?.destroy();
     this.dialog = null;
+  }
+
+  /* ------------------------- real-money packs ------------------------ */
+
+  /** Shared chrome for the purchase dialogs — cream card, gold keyline. */
+  private iapCard(height: number): Phaser.GameObjects.Container {
+    const container = this.add.container(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
+    const dim = this.add
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
+      .setInteractive();
+    const panel = this.add.graphics();
+    panel.fillStyle(num(PALETTE.night), 0.25);
+    panel.fillRoundedRect(-450, -height / 2 + 16, 900, height, 52);
+    panel.fillStyle(num(PALETTE.cream), 1);
+    panel.fillRoundedRect(-450, -height / 2, 900, height, 52);
+    panel.lineStyle(8, num(PALETTE.gold), 1);
+    panel.strokeRoundedRect(-450, -height / 2, 900, height, 52);
+    container.add([dim, panel]);
+    container.setAlpha(0).setScale(0.94);
+    this.tweens.add({ targets: container, alpha: 1, scale: 1, duration: 170, ease: 'Back.easeOut' });
+    return container;
+  }
+
+  private iapButton(
+    x: number,
+    y: number,
+    label: string,
+    texture: string,
+    scaleX: number,
+    onTap: () => void
+  ): Phaser.GameObjects.Container {
+    const button = this.add.container(x, y);
+    const bg = this.add.image(0, 0, texture).setScale(scaleX, 0.78);
+    const text = this.add
+      .text(0, -10, label, { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: '#FFFFFF' })
+      .setOrigin(0.5)
+      .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
+    button.add([bg, text]);
+    button.setSize(380 * scaleX, 112).setInteractive({ useHandCursor: true });
+    button.on('pointerup', onTap);
+    return button;
+  }
+
+  private static describeGrant(grant: { coins: number; keys: number; energy: number }): string {
+    const parts: string[] = [];
+    if (grant.coins > 0) parts.push(`◎ +${grant.coins.toLocaleString()} Gold`);
+    if (grant.keys > 0) parts.push(`🗝 +${grant.keys} Gold Key${grant.keys > 1 ? 's' : ''}`);
+    if (grant.energy > 0) parts.push(`⚡ +${grant.energy} Warmth`);
+    return parts.join('    ');
+  }
+
+  /**
+   * VALIDATION BEFORE MONEY MOVES: exactly what the pack contains, exactly
+   * what it costs, and where the payment will happen — Buy or Cancel. The Buy
+   * tap itself opens the checkout window (it must: the popup needs the tap's
+   * transient activation to clear the blocker).
+   */
+  private openIapConfirmDialog(packId: string): void {
+    if (this.dialog || this.iapDialog) return;
+    const pack = iapBridge.pack(packId);
+    if (!pack) return;
+
+    const card = this.iapCard(660);
+    card.add(
+      this.add
+        .text(0, -262, 'CONFIRM PURCHASE', {
+          fontFamily: FONT.ui, fontSize: '48px', fontStyle: 'bold', color: PALETTE.night
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.add
+        .text(0, -168, pack.name, {
+          fontFamily: FONT.ui, fontSize: '54px', fontStyle: 'bold', color: '#8A6248'
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.add
+        .text(0, -92, UIScene.describeGrant(pack), {
+          fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: PALETTE.goldShade
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.add
+        .text(0, -6, `€${pack.amountEur.toFixed(2)}`, {
+          fontFamily: FONT.ui, fontSize: '64px', fontStyle: 'bold', color: PALETTE.night
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.add
+        .text(0, 96, 'Payment opens in a secure checkout window.\nYour pack is delivered the moment it completes.', {
+          fontFamily: FONT.ui, fontSize: '28px', color: '#8A6248', align: 'center', lineSpacing: 8
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.iapButton(-210, 240, 'Cancel', 'ui_btn_play', 0.72, () => this.closeIapDialog())
+    );
+    card.add(
+      this.iapButton(210, 240, `Buy €${pack.amountEur.toFixed(2)}`, 'ui_btn_green', 0.95, () => {
+        // Synchronous, inside the tap: the checkout window opens now.
+        const started = iapBridge.beginCheckout(pack.id);
+        this.closeIapDialog();
+        if (started) this.openIapWaitingDialog();
+        else this.floatWarning('Purchases are available on the EmberGames page.');
+      })
+    );
+    this.iapDialog = card;
+  }
+
+  /** The checkout is in flight in its own window; the board stays playable. */
+  private openIapWaitingDialog(): void {
+    if (this.iapDialog) return;
+    const card = this.iapCard(420);
+    const title = this.add
+      .text(0, -120, 'Waiting for payment…', {
+        fontFamily: FONT.ui, fontSize: '48px', fontStyle: 'bold', color: PALETTE.night
+      })
+      .setOrigin(0.5);
+    card.add(title);
+    this.tweens.add({ targets: title, alpha: 0.55, duration: 640, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    card.add(
+      this.add
+        .text(0, -32, 'Finish your purchase in the secure window.\nYour pack arrives here the moment it completes.', {
+          fontFamily: FONT.ui, fontSize: '28px', color: '#8A6248', align: 'center', lineSpacing: 8
+        })
+        .setOrigin(0.5)
+    );
+    card.add(
+      this.iapButton(0, 122, 'Continue playing', 'ui_btn_green', 0.95, () => this.closeIapDialog())
+    );
+    this.iapDialog = card;
+  }
+
+  private closeIapDialog(): void {
+    this.iapDialog?.destroy();
+    this.iapDialog = null;
+  }
+
+  /** CONGRATULATIONS: banner with exactly what was bought, confetti, and the
+   *  purchase fanfare (AudioManager rides the same `iap:completed` fact). */
+  private celebratePurchase(grant: EventMap['iap:completed']): void {
+    this.closeIapDialog();
+    this.buildCelebrationBanner(
+      'PURCHASE COMPLETE!',
+      UIScene.describeGrant(grant),
+      `${grant.name} — thank you, Keeper!`
+    );
+    this.confettiBurst(GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.3);
+  }
+
+  /** Paper-slip confetti in the celebration palette, raining over the banner. */
+  private confettiBurst(cx: number, cy: number): void {
+    const tints = [0xffd75e, 0xe8593a, 0x7fc16a, 0x6fc3e0, 0xfff6e8];
+    tints.forEach((tint, i) => {
+      const burst = this.add
+        .particles(cx, cy - 60, 'fx_confetti', {
+          speed: { min: 280, max: 680 },
+          angle: { min: 235, max: 305 },
+          gravityY: 980,
+          lifespan: { min: 1000, max: 1700 },
+          scale: { start: 1, end: 0.6 },
+          alpha: { start: 1, end: 0 },
+          rotate: { min: 0, max: 720 },
+          tint,
+          quantity: 0,
+          emitting: false
+        })
+        .setDepth(DEPTH_DIALOG - 6);
+      burst.explode(14 + i * 2);
+      this.time.delayedCall(2400, () => burst.destroy());
+    });
+    const sparks = this.add
+      .particles(cx, cy, 'fx_spark', {
+        speed: { min: 220, max: 540 }, angle: { min: 0, max: 360 }, gravityY: 260,
+        lifespan: { min: 500, max: 900 }, scale: { start: 0.9, end: 0 },
+        alpha: { start: 1, end: 0 }, quantity: 0, emitting: false
+      })
+      .setDepth(DEPTH_DIALOG - 6);
+    sparks.explode(26);
+    this.time.delayedCall(1400, () => sparks.destroy());
+  }
+
+  private onIapFailed(reason: EventMap['iap:failed']['reason']): void {
+    this.closeIapDialog();
+    this.floatWarning(
+      reason === 'declined'
+        ? 'The payment was declined — nothing was delivered.'
+        : reason === 'pending'
+          ? 'Payment still processing — your pack arrives once it confirms.'
+          : reason === 'unavailable'
+            ? 'Purchases are available on the EmberGames page.'
+            : 'Payment cancelled — nothing was charged.'
+    );
   }
 }

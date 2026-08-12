@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { EventBus } from './EventBus';
 import { POWER } from './Constants';
+import { graphics } from './graphicsState';
 
 export type PowerState = 'active' | 'idle' | 'doze';
 
@@ -52,7 +53,7 @@ export class PowerGovernor {
     bus.on('keeper:leveled', () => this.notifyActivity(POWER.finaleHoldMs));
 
     game.events.on(Phaser.Core.Events.STEP, this.onStep, this);
-    this.applyFps(POWER.activeFps);
+    this.applyFps(this.fpsFor('active'));
   }
 
   /** Mark the game as actively played for at least `holdMs` from now. */
@@ -87,8 +88,26 @@ export class PowerGovernor {
       sinceActive < 0 ? 'active' : sinceActive < POWER.dozeAfterMs - POWER.idleAfterMs ? 'idle' : 'doze';
     if (next === this.state) return;
     this.state = next;
-    this.applyFps(next === 'active' ? POWER.activeFps : next === 'idle' ? POWER.idleFps : POWER.dozeFps);
+    this.applyFps(this.fpsFor(next));
     this.game.events.emit(POWER_STATE_EVENT, next);
+  }
+
+  /**
+   * The cap for a state, after the graphics profile.
+   *
+   * The profile can only lower it — `high` carries POWER.activeFps unchanged —
+   * and it applies to ACTIVE only: idle and doze are already below any profile
+   * floor, and raising them would be a regression on every device.
+   */
+  private fpsFor(state: PowerState): number {
+    if (state === 'idle') return POWER.idleFps;
+    if (state === 'doze') return POWER.dozeFps;
+    return Math.min(POWER.activeFps, graphics.profile.activeFps);
+  }
+
+  /** Re-apply after a graphics change, without waiting for a state transition. */
+  refreshFps(): void {
+    this.applyFps(this.fpsFor(this.state));
   }
 
   private applyFps(fps: number): void {

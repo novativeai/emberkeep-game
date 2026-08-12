@@ -1,0 +1,59 @@
+{
+  "character": "selyna",
+  "sequence": "idle",
+  "fps": 12,
+  "width": 345,
+  "height": 520,
+  "frameCount": 8,
+  "loop": true,
+  "frames": [
+    {
+      "index": 0,
+      "file": "selyna_idle_00000.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "selyna_idle_00001.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 2,
+      "file": "selyna_idle_00002.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "selyna_idle_00003.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 4,
+      "file": "selyna_idle_00004.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 5,
+      "file": "selyna_idle_00005.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 6,
+      "file": "selyna_idle_00006.png",
+      "durationMs": 83,
+      "blend": false
+    },
+    {
+      "index": 7,
+      "file": "selyna_idle_00007.png",
+      "durationMs": 83,
+      "blend": false
+    }
+  ]
+}

@@ -1,4 +1,7 @@
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import facesJson from '../../src/data/faces.json';
 import {
   BLINK_GAP_CALM,
   BLINK_GAP_EXCITED,
@@ -264,5 +267,58 @@ describe('presets record mouth openness for face-frame rigs', () => {
     expect(mid.mouth ?? 0).toBeGreaterThan(0.45);
     const start = PRESET_BY_KEY['stretch']!.fn(0.05, K);
     expect(start.mouth ?? 0).toBeLessThan(0.12);
+  });
+});
+
+/**
+ * The face banks are generated art referenced by generated calibration, and
+ * both failure modes are invisible until a dragon is on screen: a bank listed
+ * in faces.json whose PNGs are not on disk loads as a missing texture, and a
+ * character calibrated but absent from the catalog can never be played at all.
+ */
+describe('face banks (src/data/faces.json × the art on disk)', () => {
+  const faces = facesJson as Record<string, {
+    layer: string;
+    basePath: string;
+    sets: Record<string, { dir: string; frames: Array<{ file: string; durationMs: number }> }>;
+  }>;
+  const ASSETS = path.resolve(__dirname, '../../assets');
+  // characterCatalog imports Phaser, which wants a `window` these node tests
+  // do not have — so the catalog's ids are read off the source instead of
+  // imported. Crude, and still catches the mistake that matters.
+  const catalogIds = new Set(
+    [
+      ...readFileSync(
+        path.resolve(__dirname, '../../src/render/characterCatalog.ts'),
+        'utf8'
+      ).matchAll(/^\s{2}'([\w-]+)':\s*\{/gm)
+    ].map((m) => m[1]!)
+  );
+
+  it('every calibrated bank has all four frames, on disk, in the right folder', () => {
+    expect(Object.keys(faces).length).toBeGreaterThan(0);
+    for (const [character, doc] of Object.entries(faces)) {
+      expect(doc.layer, `${character} layer`).toBe('head');
+      // Four steps from three drawings — the Sprite Studio preset shape every
+      // bank in the game uses, and what FaceChannel's indices assume.
+      for (const [setName, set] of Object.entries(doc.sets)) {
+        expect(set.frames, `${character}/${setName} frame count`).toHaveLength(4);
+        for (const frame of set.frames) {
+          expect(frame.durationMs, `${character}/${setName} ${frame.file}`).toBeGreaterThan(0);
+          const file = path.join(ASSETS, doc.basePath, set.dir, frame.file);
+          expect(existsSync(file), `missing ${path.relative(ASSETS, file)}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('the forged breeds carry both banks, young and adult', () => {
+    for (const breed of ['frost', 'storm', 'moonwhisker']) {
+      for (const character of [`dragon-${breed}`, `dragon-${breed}-adult`]) {
+        expect(Object.keys(faces[character]?.sets ?? {}).sort()).toEqual(['blink', 'talk']);
+        // Calibrated but not in the catalog = a face nothing can ever play.
+        expect(catalogIds.has(character), `${character} not in the catalog`).toBe(true);
+      }
+    }
   });
 });

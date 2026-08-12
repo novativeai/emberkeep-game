@@ -10,19 +10,19 @@
         "originY": 0.93956,
         "frames": [
           {
-            "file": "red-dragon-eyes-open.png",
+            "file": "red-dragon-eyes-open.webp",
             "durationMs": 2600
           },
           {
-            "file": "red-dragon-eyes-halfOpen.png",
+            "file": "red-dragon-eyes-halfOpen.webp",
             "durationMs": 45
           },
           {
-            "file": "red-dragon-eyes-closed.png",
+            "file": "red-dragon-eyes-closed.webp",
             "durationMs": 70
           },
           {
-            "file": "red-dragon-eyes-halfOpen2.png",
+            "file": "red-dragon-eyes-halfOpen2.webp",
             "durationMs": 55
           }
         ]
@@ -34,19 +34,19 @@
         "originY": 0.92421,
         "frames": [
           {
-            "file": "red-dragon-roar_talk_00000.png",
+            "file": "red-dragon-roar_talk_00000.webp",
             "durationMs": 267
           },
           {
-            "file": "red-dragon-roar_talk_00001.png",
+            "file": "red-dragon-roar_talk_00001.webp",
             "durationMs": 267
           },
           {
-            "file": "red-dragon-roar_talk_00002.png",
+            "file": "red-dragon-roar_talk_00002.webp",
             "durationMs": 267
           },
           {
-            "file": "red-dragon-roar_talk_00003.png",
+            "file": "red-dragon-roar_talk_00003.webp",
             "durationMs": 267
           }
         ]
@@ -64,19 +64,19 @@
         "originY": 0.951,
         "frames": [
           {
-            "file": "red-dragon-adult-eyes-open.png",
+            "file": "red-dragon-adult-eyes-open.webp",
             "durationMs": 2600
           },
           {
-            "file": "red-dragon-adult-eyes-halfOpen.png",
+            "file": "red-dragon-adult-eyes-halfOpen.webp",
             "durationMs": 45
           },
           {
-            "file": "red-dragon-adult-eyes-closed.png",
+            "file": "red-dragon-adult-eyes-closed.webp",
             "durationMs": 70
           },
           {
-            "file": "red-dragon-adult-eyes-halfOpen2.png",
+            "file": "red-dragon-adult-eyes-halfOpen2.webp",
             "durationMs": 55
           }
         ]
@@ -88,19 +88,19 @@
         "originY": 0.951,
         "frames": [
           {
-            "file": "red-dragon-adult-roar_talk_00000.png",
+            "file": "red-dragon-adult-roar_talk_00000.webp",
             "durationMs": 267
           },
           {
-            "file": "red-dragon-adult-roar_talk_00001.png",
+            "file": "red-dragon-adult-roar_talk_00001.webp",
             "durationMs": 267
           },
           {
-            "file": "red-dragon-adult-roar_talk_00002.png",
+            "file": "red-dragon-adult-roar_talk_00002.webp",
             "durationMs": 267
           },
           {
-            "file": "red-dragon-adult-roar_talk_00003.png",
+            "file": "red-dragon-adult-roar_talk_00003.webp",
             "durationMs": 267
           }
         ]
@@ -118,19 +118,19 @@
         "originY": 0.93956,
         "frames": [
           {
-            "file": "emerald-dragon-eyes-open.png",
+            "file": "emerald-dragon-eyes-open.webp",
             "durationMs": 2600
           },
           {
-            "file": "emerald-dragon-eyes-halfOpen.png",
+            "file": "emerald-dragon-eyes-halfOpen.webp",
             "durationMs": 45
           },
           {
-            "file": "emerald-dragon-eyes-closed.png",
+            "file": "emerald-dragon-eyes-closed.webp",
             "durationMs": 70
           },
           {
-            "file": "emerald-dragon-eyes-halfOpen2.png",
+            "file": "emerald-dragon-eyes-halfOpen2.webp",
             "durationMs": 55
           }
         ]
@@ -142,19 +142,19 @@
         "originY": 0.92421,
         "frames": [
           {
-            "file": "emerald-dragon-roar_talk_00000.png",
+            "file": "emerald-dragon-roar_talk_00000.webp",
             "durationMs": 267
           },
           {
-            "file": "emerald-dragon-roar_talk_00001.png",
+            "file": "emerald-dragon-roar_talk_00001.webp",
             "durationMs": 267
           },
           {
-            "file": "emerald-dragon-roar_talk_00002.png",
+            "file": "emerald-dragon-roar_talk_00002.webp",
             "durationMs": 267
           },
           {
-            "file": "emerald-dragon-roar_talk_00003.png",
+            "file": "emerald-dragon-roar_talk_00003.webp",
             "durationMs": 267
           }
         ]
@@ -172,19 +172,19 @@
         "originY": 0.951,
         "frames": [
           {
-            "file": "emerald-dragon-adult-eyes-open.png",
+            "file": "emerald-dragon-adult-eyes-open.webp",
             "durationMs": 2600
           },
           {
-            "file": "emerald-dragon-adult-eyes-halfOpen.png",
+            "file": "emerald-dragon-adult-eyes-halfOpen.webp",
             "durationMs": 45
           },
           {
-            "file": "emerald-dragon-adult-eyes-closed.png",
+            "file": "emerald-dragon-adult-eyes-closed.webp",
             "durationMs": 70
           },
           {
-            "file": "emerald-dragon-adult-eyes-halfOpen2.png",
+            "file": "emerald-dragon-adult-eyes-halfOpen2.webp",
             "durationMs": 55
           }
         ]
@@ -196,19 +196,19 @@
         "originY": 0.951,
         "frames": [
           {
-            "file": "emerald-dragon-adult-roar_talk_00000.png",
+            "file": "emerald-dragon-adult-roar_talk_00000.webp",
             "durationMs": 267
           },
           {
-            "file": "emerald-dragon-adult-roar_talk_00001.png",
+            "file": "emerald-dragon-adult-roar_talk_00001.webp",
             "durationMs": 267
           },
           {
-            "file": "emerald-dragon-adult-roar_talk_00002.png",
+            "file": "emerald-dragon-adult-roar_talk_00002.webp",
             "durationMs": 267
           },
           {
-            "file": "emerald-dragon-adult-roar_talk_00003.png",
+            "file": "emerald-dragon-adult-roar_talk_00003.webp",
             "durationMs": 267
           }
         ]
@@ -226,19 +226,19 @@
         "originY": 0.83769,
         "frames": [
           {
-            "file": "golden-dragon-eyes-open.png",
+            "file": "golden-dragon-eyes-open.webp",
             "durationMs": 2600
           },
           {
-            "file": "golden-dragon-eyes-halfOpen.png",
+            "file": "golden-dragon-eyes-halfOpen.webp",
             "durationMs": 45
           },
           {
-            "file": "golden-dragon-eyes-closed.png",
+            "file": "golden-dragon-eyes-closed.webp",
             "durationMs": 70
           },
           {
-            "file": "golden-dragon-eyes-halfOpen2.png",
+            "file": "golden-dragon-eyes-halfOpen2.webp",
             "durationMs": 55
           }
         ]
@@ -250,19 +250,343 @@
         "originY": 0.78881,
         "frames": [
           {
-            "file": "golden-dragon-roar_talk_00000.png",
+            "file": "golden-dragon-roar_talk_00000.webp",
             "durationMs": 267
           },
           {
-            "file": "golden-dragon-roar_talk_00001.png",
+            "file": "golden-dragon-roar_talk_00001.webp",
             "durationMs": 267
           },
           {
-            "file": "golden-dragon-roar_talk_00002.png",
+            "file": "golden-dragon-roar_talk_00002.webp",
             "durationMs": 267
           },
           {
-            "file": "golden-dragon-roar_talk_00003.png",
+            "file": "golden-dragon-roar_talk_00003.webp",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-frost": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/frost-dragon/head-animation",
+    "sets": {
+      "blink": {
+        "dir": "frost-dragon-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.7778,
+        "frames": [
+          {
+            "file": "frost-dragon-eyes-open.webp",
+            "durationMs": 2600
+          },
+          {
+            "file": "frost-dragon-eyes-halfOpen.webp",
+            "durationMs": 45
+          },
+          {
+            "file": "frost-dragon-eyes-closed.webp",
+            "durationMs": 70
+          },
+          {
+            "file": "frost-dragon-eyes-halfOpen2.webp",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "frost-dragon-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.60687,
+        "frames": [
+          {
+            "file": "frost-dragon-roar_talk_00000.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-roar_talk_00001.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-roar_talk_00002.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-roar_talk_00003.webp",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-frost-adult": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/frost-dragon/head-animation-adult",
+    "sets": {
+      "blink": {
+        "dir": "frost-dragon-adult-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.8886,
+        "frames": [
+          {
+            "file": "frost-dragon-adult-eyes-open.webp",
+            "durationMs": 2600
+          },
+          {
+            "file": "frost-dragon-adult-eyes-halfOpen.webp",
+            "durationMs": 45
+          },
+          {
+            "file": "frost-dragon-adult-eyes-closed.webp",
+            "durationMs": 70
+          },
+          {
+            "file": "frost-dragon-adult-eyes-halfOpen2.webp",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "frost-dragon-adult-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.62903,
+        "frames": [
+          {
+            "file": "frost-dragon-adult-roar_talk_00000.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-adult-roar_talk_00001.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-adult-roar_talk_00002.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "frost-dragon-adult-roar_talk_00003.webp",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-storm": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/storm-dragon/head-animation",
+    "sets": {
+      "blink": {
+        "dir": "storm-dragon-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.7778,
+        "frames": [
+          {
+            "file": "storm-dragon-eyes-open.webp",
+            "durationMs": 2600
+          },
+          {
+            "file": "storm-dragon-eyes-halfOpen.webp",
+            "durationMs": 45
+          },
+          {
+            "file": "storm-dragon-eyes-closed.webp",
+            "durationMs": 70
+          },
+          {
+            "file": "storm-dragon-eyes-halfOpen2.webp",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "storm-dragon-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.60565,
+        "frames": [
+          {
+            "file": "storm-dragon-roar_talk_00000.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-roar_talk_00001.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-roar_talk_00002.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-roar_talk_00003.webp",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-storm-adult": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/storm-dragon/head-animation-adult",
+    "sets": {
+      "blink": {
+        "dir": "storm-dragon-adult-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.8886,
+        "frames": [
+          {
+            "file": "storm-dragon-adult-eyes-open.webp",
+            "durationMs": 2600
+          },
+          {
+            "file": "storm-dragon-adult-eyes-halfOpen.webp",
+            "durationMs": 45
+          },
+          {
+            "file": "storm-dragon-adult-eyes-closed.webp",
+            "durationMs": 70
+          },
+          {
+            "file": "storm-dragon-adult-eyes-halfOpen2.webp",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "storm-dragon-adult-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.62636,
+        "frames": [
+          {
+            "file": "storm-dragon-adult-roar_talk_00000.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-adult-roar_talk_00001.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-adult-roar_talk_00002.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "storm-dragon-adult-roar_talk_00003.webp",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-moonwhisker": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/moonwhisker-dragon/head-animation",
+    "sets": {
+      "blink": {
+        "dir": "moonwhisker-dragon-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.7778,
+        "frames": [
+          {
+            "file": "moonwhisker-dragon-eyes-open.webp",
+            "durationMs": 2600
+          },
+          {
+            "file": "moonwhisker-dragon-eyes-halfOpen.webp",
+            "durationMs": 45
+          },
+          {
+            "file": "moonwhisker-dragon-eyes-closed.webp",
+            "durationMs": 70
+          },
+          {
+            "file": "moonwhisker-dragon-eyes-halfOpen2.webp",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "moonwhisker-dragon-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4806,
+        "originY": 0.60322,
+        "frames": [
+          {
+            "file": "moonwhisker-dragon-roar_talk_00000.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-roar_talk_00001.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-roar_talk_00002.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-roar_talk_00003.webp",
+            "durationMs": 267
+          }
+        ]
+      }
+    }
+  },
+  "dragon-moonwhisker-adult": {
+    "layer": "head",
+    "basePath": "sprites/characters/dragon/moonwhisker-dragon/head-animation-adult",
+    "sets": {
+      "blink": {
+        "dir": "moonwhisker-dragon-adult-blink-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.8886,
+        "frames": [
+          {
+            "file": "moonwhisker-dragon-adult-eyes-open.webp",
+            "durationMs": 2600
+          },
+          {
+            "file": "moonwhisker-dragon-adult-eyes-halfOpen.webp",
+            "durationMs": 45
+          },
+          {
+            "file": "moonwhisker-dragon-adult-eyes-closed.webp",
+            "durationMs": 70
+          },
+          {
+            "file": "moonwhisker-dragon-adult-eyes-halfOpen2.webp",
+            "durationMs": 55
+          }
+        ]
+      },
+      "talk": {
+        "dir": "moonwhisker-dragon-adult-roar_talk-animation",
+        "textureScale": 1,
+        "originX": 0.4349,
+        "originY": 0.62903,
+        "frames": [
+          {
+            "file": "moonwhisker-dragon-adult-roar_talk_00000.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-adult-roar_talk_00001.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-adult-roar_talk_00002.webp",
+            "durationMs": 267
+          },
+          {
+            "file": "moonwhisker-dragon-adult-roar_talk_00003.webp",
             "durationMs": 267
           }
         ]

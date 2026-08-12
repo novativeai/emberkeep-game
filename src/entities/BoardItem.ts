@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { DEPTHS, DRAG, HIT_FORGIVENESS_PX, TIMINGS, num, PALETTE } from '../core/Constants';
+import { FONT } from '../art/design';
+import { DEPTHS, DRAG, HIT_FORGIVENESS_PX, SLEEP_BREATH, TIMINGS, num, PALETTE } from '../core/Constants';
 import { gridToWorld } from '../core/iso';
 import type { AnchorsData, ItemSnapshot } from '../core/types';
 
@@ -27,6 +28,17 @@ export class BoardItem extends Phaser.GameObjects.Container {
   private timePill: Phaser.GameObjects.Image;
   private timeIcon: Phaser.GameObjects.Arc;
   private bobPaused = false;
+  /** Slow ribcage breath while this item is a SLEEPING dragon. Driven from
+   *  `applyBob` (the existing per-frame art hook) off ABSOLUTE time, so the
+   *  power governor's dropped frames slow it down without ever desyncing it —
+   *  the same treatment the standee breath gets. A tween would fight the
+   *  landing squash and the drag lift for the same two properties. */
+  private sleepBreath = false;
+  private breathPhase = 0;
+  private sleepGroundY = 0;
+  /** The art's own scale, so the breath can modulate it without drifting. */
+  private artBaseX = 1;
+  private artBaseY = 1;
   private cooling = false;
   /** Art hidden behind a live rig — cooldown/ready visuals are suppressed
    *  (they'd render UNDER the rig); BoardScene floats a badge instead. */
@@ -61,7 +73,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
       .setVisible(false);
     this.cooldownLabel = scene.add
       .text(8, -122, '', {
-        fontFamily: 'Trebuchet MS, Verdana, sans-serif',
+        fontFamily: FONT.ui,
         fontSize: '34px',
         fontStyle: 'bold',
         color: PALETTE.cream,
@@ -85,6 +97,41 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.setActive(false);
   }
 
+  /**
+   * Swap the art texture in place, keeping position, scale and hit area.
+   *
+   * Used for Manor skins: same item, same tier, different drawing. The anchor
+   * is re-read because a replacement plate may be framed differently, and the
+   * ground shadow is re-fitted to the new art's footprint — a skin with a
+   * taller silhouette would otherwise keep the old one's shadow.
+   */
+  setArtTexture(textureKey: string, anchors?: AnchorsData): void {
+    this.sprite.setTexture(textureKey);
+    if (anchors) {
+      const [ax, ay] = anchors.byKey[textureKey] ?? anchors.default;
+      this.sprite.setOrigin(ax, ay);
+    }
+    const w = Math.max(64, this.sprite.displayWidth * 0.92);
+    this.groundShadow.setDisplaySize(w, w * 0.42);
+  }
+
+  /**
+   * Re-fit the art after a texture swap whose replacement is a different SIZE.
+   *
+   * A skin is drawn to the same frame as the art it replaces, so `setArtTexture`
+   * alone is enough for one. A sleeping dragon is not: it is a different
+   * painting of a different pose at its own resolution, and inheriting the
+   * standing dragon's scale would land it at roughly twice the tile. The ground
+   * shadow is re-fitted here too, because the scale is what decides its width.
+   */
+  setArtScale(artScale: number): void {
+    this.sprite.setScale(artScale);
+    this.artBaseX = artScale;
+    this.artBaseY = artScale;
+    const w = Math.max(64, this.sprite.displayWidth * 0.92);
+    this.groundShadow.setDisplaySize(w, w * 0.42);
+  }
+
   acquire(
     snapshot: ItemSnapshot,
     anchors: AnchorsData,
@@ -105,6 +152,10 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.sprite.setPosition(0, 0);
     // File-based decor art can be far larger than a tile; artScale fits it.
     this.sprite.setScale(artScale);
+    this.artBaseX = artScale;
+    this.artBaseY = artScale;
+    this.sleepBreath = false;
+    this.sleepGroundY = 0;
     this.sprite.setVisible(true); // a pooled item may have been a hidden rig host
     // Soft shadow scaled to the art's footprint (proportional to its size).
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
@@ -221,17 +272,6 @@ export class BoardItem extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Recolour the art while it stands in for missing final art (the Golden Elder
-   * borrows the red dragon's bake — see STANDIN_TINT). Applied after `acquire`,
-   * which clears every tint; the cooling tint still owns generators, and this
-   * chain has none.
-   */
-  setStandInTint(tint: number | undefined): void {
-    if (tint === undefined) this.sprite.clearTint();
-    else this.sprite.setTint(tint);
-  }
-
-  /**
    * Hide the placeholder art while a live RigPlayer stands in for it, WITHOUT
    * touching the container's alpha — `setAlpha(0)`/`setVisible(false)` clear the
    * render flag, which makes Phaser skip the object in hit-tests (so taps and
@@ -251,6 +291,18 @@ export class BoardItem extends Phaser.GameObjects.Container {
       this.timePill.setVisible(false);
       this.timeIcon.setVisible(false);
     }
+  }
+
+  /**
+   * Show the art but NOT its own ground shadow.
+   *
+   * One caller: a sleeping dragon. The curled painting replaces a rig that was
+   * already casting a shadow of its own, in its own place — so the painting
+   * keeps standing on THAT shadow instead of lighting a second one underneath
+   * itself. Two shadows for one animal is the tell that the pose was swapped.
+   */
+  setGroundShadowVisible(visible: boolean): void {
+    this.groundShadow.setVisible(visible);
   }
 
   liftForDrag(): void {
@@ -308,9 +360,45 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** Items no longer float — they sit flat on the ground (a one-time landing
    *  squash on spawn sells the "placed" feel). Kept as a no-op so the per-frame
    *  caller and the drag pause/resume logic stay intact. */
-  applyBob(_timeMs: number): void {
+  applyBob(timeMs: number): void {
     if (this.bobPaused) return;
+    if (this.sleepBreath) {
+      // A sleeping animal's ribcage: it rises and the body widens a little less
+      // than it heightens, so the silhouette breathes instead of pulsing. Slow
+      // on purpose — this is the calmest thing on the board.
+      const t = (timeMs / SLEEP_BREATH.periodMs) * Math.PI * 2 + this.breathPhase;
+      const k = Math.sin(t);
+      this.sprite.setScale(
+        this.artBaseX * (1 - SLEEP_BREATH.amount * 0.45 * k),
+        this.artBaseY * (1 + SLEEP_BREATH.amount * k)
+      );
+      this.sprite.setY(this.sleepGroundY + SLEEP_BREATH.lift * k);
+      return;
+    }
     if (this.sprite.y !== 0) this.sprite.setY(0);
+  }
+
+  /**
+   * Start or stop the sleeping breath.
+   *
+   * `phase` staggers two sleepers so a pair of dragons never inhales in unison
+   * — the same deterministic-per-id trick the standees use, and the reason it
+   * is passed in rather than randomised here.
+   *
+   * `groundY` seats the sleeper: the sleep art's anchor is its own bbox bottom,
+   * which lands the belly on the container origin — but the RIG this painting
+   * replaces stood `groundLift` px lower (its shadow was tuned to feet there),
+   * so the caller passes that drop and the belly lies on the same floor line
+   * the feet used. The breath scales around the anchor, so it never moves.
+   */
+  setSleepBreath(on: boolean, phase = 0, groundY = 0): void {
+    this.sleepBreath = on;
+    this.breathPhase = phase;
+    this.sleepGroundY = on ? groundY : 0;
+    if (!on) {
+      this.sprite.setScale(this.artBaseX, this.artBaseY);
+      this.sprite.setY(0);
+    }
   }
 
   /** A quick squash-and-settle so a newly placed item reads as landing on the
@@ -362,6 +450,22 @@ export class BoardItem extends Phaser.GameObjects.Container {
         ease: 'Sine.easeOut'
       });
     }
+  }
+
+  /**
+   * Force the in-container countdown pill off, whatever `setCooling` decided.
+   *
+   * For a rig-hosted dragon the SCENE's floating badge owns the countdown, and
+   * `artHidden` stops being a safe proxy for "a rig is presenting" the moment
+   * the sleep painting stands in: the art is visible again, so a cooling flip
+   * during sleep re-shows this pill — with a label nothing on the rig path
+   * ever fills. The scene calls this every badge tick; because it runs in the
+   * same frame as the flip, the empty pill never reaches the screen.
+   */
+  hideCountdownPill(): void {
+    this.cooldownLabel.setVisible(false);
+    this.timePill.setVisible(false);
+    this.timeIcon.setVisible(false);
   }
 
   /** Update the countdown text + resize the pill around it: "8s" under a

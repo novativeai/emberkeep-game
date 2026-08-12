@@ -1,0 +1,59 @@
+{
+  "character": "eleanor",
+  "sequence": "cast",
+  "fps": 14,
+  "width": 381,
+  "height": 520,
+  "frameCount": 8,
+  "loop": false,
+  "frames": [
+    {
+      "index": 0,
+      "file": "eleanor_cast_00000.png",
+      "durationMs": 71,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "eleanor_cast_00001.png",
+      "durationMs": 71,
+      "blend": false
+    },
+    {
+      "index": 2,
+      "file": "eleanor_cast_00002.png",
+      "durationMs": 71,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "eleanor_cast_00003.png",
+      "durationMs": 71,
+      "blend": false
+    },
+    {
+      "index": 4,
+      "file": "eleanor_cast_00004.png",
+      "durationMs": 71,
+      "blend": false
+    },
+    {
+      "index": 5,
+      "file": "eleanor_cast_00005.png",
+      "durationMs": 71,
+      "blend": false
+    },
+    {
+      "index": 6,
+      "file": "eleanor_cast_00006.png",
+      "durationMs": 71,
+      "blend": false
+    },
+    {
+      "index": 7,
+      "file": "eleanor_cast_00007.png",
+      "durationMs": 71,
+      "blend": false
+    }
+  ]
+}

@@ -35,7 +35,7 @@ export class EconomySystem {
     bus.on('marketplace:purchased', ({ free }) => {
       if (free && this.state.stat('freeSparkUsed') === 0) this.state.addStat('freeSparkUsed', 1);
     });
-    bus.on('ui:sell_requested', ({ itemId }) => this.sell(itemId));
+    bus.on('ui:bag_sell_requested', ({ chain, tier }) => this.sellFromBag(chain, tier));
   }
 
   sellValue(chain: string, tier: number): number {
@@ -44,18 +44,25 @@ export class EconomySystem {
     );
   }
 
-  private sell(itemId: number): void {
-    const item = this.state.items.get(itemId);
-    if (!item || item.kind !== 'item') return;
+  /**
+   * Sell one piece OUT OF THE BAG. Nothing on the board can be sold: the board's
+   * verbs are drag, merge and pocket, all of them recoverable, and the one
+   * irreversible verb lives behind a deliberate act of putting something aside.
+   * A mis-tap can therefore never cost the player a piece.
+   *
+   * This system owns coins, so it owns selling; the Bag owns the stack, so the
+   * debit goes out as the `bag:consume` command rather than a direct write —
+   * the same split as `board:consume_items` on the board side.
+   */
+  private sellFromBag(chain: string, tier: number): void {
+    if ((this.state.bag.find((s) => s.chain === chain && s.tier === tier)?.count ?? 0) <= 0) return;
     // Story items (the Golden Egg/Elder) are promises, not merchandise.
-    const tier = this.chains.chains
-      .find((c) => c.id === item.chain)
-      ?.tiers.find((t) => t.tier === item.tier);
-    if (tier?.sellable === false) return;
-    const value = this.sellValue(item.chain, item.tier);
-    this.bus.emit('board:consume_items', { itemIds: [itemId], reason: 'sold' });
+    const tierConfig = this.chains.chains.find((c) => c.id === chain)?.tiers.find((t) => t.tier === tier);
+    if (!tierConfig || tierConfig.sellable === false) return;
+    const value = this.sellValue(chain, tier);
+    this.bus.emit('bag:consume', { chain, tier, count: 1 });
     this.state.coins += value;
-    this.bus.emit('item:sold', { itemId, coins: value });
+    this.bus.emit('item:sold', { chain, tier, coins: value });
     this.announce();
   }
 

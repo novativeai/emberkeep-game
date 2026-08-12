@@ -1,0 +1,107 @@
+{
+  "format": "emberkeep-vfx-ramps",
+  "version": 1,
+  "file": "ramps.png",
+  "width": 256,
+  "height": 8,
+  "note": "Row r is sampled at v = (r + 0.5) / height. Look up the packed sheet's R (density) as u. Position 0 is black so the ramp is safe under ADD blending.",
+  "rows": {
+    "ember": {
+      "index": 0,
+      "v": 0.0625,
+      "stops": [
+        "#000000",
+        "#5A1206",
+        "#C73A2E",
+        "#E8503C",
+        "#F7A437",
+        "#FFD84D",
+        "#FFF6E8"
+      ]
+    },
+    "lava": {
+      "index": 1,
+      "v": 0.1875,
+      "stops": [
+        "#000000",
+        "#3A0A04",
+        "#C73A2E",
+        "#E8503C",
+        "#FF8A66",
+        "#FFD84D"
+      ]
+    },
+    "gold": {
+      "index": 2,
+      "v": 0.3125,
+      "stops": [
+        "#000000",
+        "#4A3010",
+        "#D9821F",
+        "#F7A437",
+        "#FFD84D",
+        "#FFF6E8"
+      ]
+    },
+    "ash": {
+      "index": 3,
+      "v": 0.4375,
+      "stops": [
+        "#000000",
+        "#3A2B38",
+        "#6E6A75",
+        "#8E8A93",
+        "#C8C4CC",
+        "#FFF6E8"
+      ]
+    },
+    "smoke": {
+      "index": 4,
+      "v": 0.5625,
+      "stops": [
+        "#000000",
+        "#241B22",
+        "#4A3845",
+        "#6A5468",
+        "#A79CA5",
+        "#FFF6E8"
+      ]
+    },
+    "moss": {
+      "index": 5,
+      "v": 0.6875,
+      "stops": [
+        "#000000",
+        "#12300A",
+        "#5FA63D",
+        "#7ECB4F",
+        "#B6E88A",
+        "#FFF6E8"
+      ]
+    },
+    "teal": {
+      "index": 6,
+      "v": 0.8125,
+      "stops": [
+        "#000000",
+        "#0C2A3A",
+        "#2E7FA6",
+        "#3FA8D9",
+        "#9BE3FF",
+        "#FFF6E8"
+      ]
+    },
+    "plum": {
+      "index": 7,
+      "v": 0.9375,
+      "stops": [
+        "#000000",
+        "#241B22",
+        "#4A3845",
+        "#6A5468",
+        "#B07CF0",
+        "#E3C6FF"
+      ]
+    }
+  }
+}

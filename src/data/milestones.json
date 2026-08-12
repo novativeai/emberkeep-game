@@ -1,7 +1,0 @@
-{
-  "milestones": [
-    { "id": "houses_3", "chain": "lumber", "tier": 2, "count": 3, "coins": 50 },
-    { "id": "gems_10", "chain": "flame_gem", "tier": 1, "count": 10, "coins": 90 },
-    { "id": "dragons_2", "chain": "ember_dragon", "tier": 3, "count": 2, "coins": 160 }
-  ]
-}

@@ -303,7 +303,7 @@ label.inline-file input[type=file]{position:absolute;inset:0;opacity:0;cursor:po
         📁 Upload PNG / JPG / WebP
         <input type="file" accept="image/png,image/jpeg,image/webp" onchange="loadSpriteFile(this)"/>
       </label>
-      <button class="btn secondary" onclick="loadDefault()">⤓ Load Laurah (test sprite)</button>
+      <button class="btn secondary" onclick="loadDefault()">⤓ Load Eleanor (test sprite)</button>
       <div style="margin-top:10px;font-size:12px;color:var(--text2);line-height:1.8;">
         <strong style="color:var(--text);">What to upload:</strong><br>
         • Transparent PNG recommended<br>
@@ -708,8 +708,8 @@ function goStep(n) {
 function loadDefault() {
   const img = new Image(); img.crossOrigin='anonymous';
   img.onload  = ()=> setBaseImage(img,'guide-character-bubble-icon.png');
-  img.onerror = ()=> alert('Default sprite not found at ../../assets/sprites/guide-characters/laurah-dragonMaster/guide-character-bubble-icon.png\nPlease upload manually.');
-  img.src = '../../assets/sprites/guide-characters/laurah-dragonMaster/guide-character-bubble-icon.png';
+  img.onerror = ()=> alert('Default sprite not found at ../../assets/sprites/eleanor/portrait.webp\nPlease upload manually.');
+  img.src = '../../assets/sprites/eleanor/portrait.webp';
 }
 function loadSpriteFile(input) {
   const f=input.files[0]; if(!f) return;

@@ -5,12 +5,6 @@ import type { GameState } from '../core/GameState';
 import type { SaveDataV1 } from '../core/types';
 import { computeRegen } from './EnergySystem';
 
-/** Last save that hydrated cleanly. `peek` falls back to it when the main slot is
- *  unreadable, so one bad read can no longer cost the player their game. */
-const BACKUP_KEY = `${SAVE_KEY}_backup`;
-/** A save we failed to hydrate, set aside instead of deleted — recoverable by hand. */
-const BROKEN_KEY = `${SAVE_KEY}_broken`;
-
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -23,39 +17,57 @@ export interface StorageLike {
  * computeRegen math (EnergySystem also reacts to 'state:loaded').
  */
 export class SaveSystem {
-  /** Mutation notifications that trigger an autosave. */
+  /**
+   * Mutation notifications that trigger an autosave.
+   *
+   * THE RULE: if it changes anything `toSave` writes, it belongs here. There is
+   * no periodic autosave and no save on close beyond the one main.ts installs,
+   * so an event missing from this list is state the player can lose by walking
+   * away — they come back to a board that is not the one they left.
+   *
+   * That is exactly what happened. The list had kept pace with merging and
+   * spending but not with generators or dragons: passive production changed the
+   * board every cycle and wrote nothing, so the timers in the save were stale
+   * too and the offline catch-up re-paid gifts already collected. A name and a
+   * House's commission — both given once and never again — could vanish
+   * outright. Everything that mutates is now on it.
+   */
   private static readonly SAVE_ON = [
     'item:spawned',
     'item:moved',
     'item:merged',
     'item:harvested',
     'item:removed',
-    // A generator's gift. It announces itself as `item:produced` and NOTHING else —
-    // every other spawn on the board goes out as `item:spawned` — so a passive
-    // harvest lived in memory until some unrelated action happened to save. Close the
-    // tab first and the gifts were simply gone: three of them vanished across a
-    // reload in the e2e, and "I leave the site and things are missing" is exactly how
-    // it reads from the outside.
+    // Passive yield: the item AND the generator's next `passiveAt`. Without it
+    // the board drifted forward all session and the save stayed behind.
     'item:produced',
+    // Write-once, and the House cost real play to earn: what it is dedicated to.
+    'generator:produce_set',
     'energy:changed',
     'economy:changed',
+    'bag:changed',
     'order:completed',
+    // A finished hub tour is a latch (`tour:<world>`, `shop:unlocked`) the
+    // player must never re-walk because the tab closed.
+    'tour:completed',
     'region:unlocked',
-    'tutorial:step',
-    // The Emberfont mutates AFTER SaveSystem's item:merged autosave (later
-    // subscriber), so a surge ignited by a merge needs its own save trigger.
-    'emberfont:surge',
-    // Dragon-duel gauge/level changes (energy spend already saves the set start).
-    'duel:match',
-    // The Golden Elder rising is a MOMENT with no board consequence of its own —
-    // nothing else here would write the stat that records it, and the altar reads
-    // that stat on the next boot to know she is gone.
-    'golden:awakened'
+    'story:chapter',
+    'nest:warmed',
+    'companion:named',
+    'companion:fed',
+    // Board dragons: her name, her belly and her trust all live on the item.
+    'dragon:named',
+    'dragon:fed',
+    'dragon:trust_changed',
+    // Regard and the quest ladder's latches both live in state the save carries.
+    'regard:changed',
+    'quest:completed',
+    // Which board the Keeper is standing on (`activeWorld`).
+    'world:switched',
+    'tutorial:step'
   ] as const;
 
   private suspended = false;
-  /** A hydrated save waiting to be announced (see `hydrateOnly`). */
-  private pending: { offlineMs: number; energyRecovered: number } | null = null;
 
   constructor(
     private state: GameState,
@@ -89,105 +101,41 @@ export class SaveSystem {
     return this.peek() !== null;
   }
 
-  /** True when SOMETHING is stored, readable or not — the difference between "new
-   *  player" and "this player has progress we failed to read". */
-  hasRawSave(): boolean {
-    return this.storage.getItem(SAVE_KEY) !== null || this.storage.getItem(BACKUP_KEY) !== null;
-  }
-
-  /**
-   * The MAIN slot only. There is deliberately no fallback to an older copy: silently
-   * resurrecting a previous save is worse than starting fresh, because the player
-   * cannot tell which game they are in. The backup is kept on disk for a human to
-   * restore by hand, never loaded behind your back.
-   */
   peek(): SaveDataV1 | null {
-    return this.parse(this.storage.getItem(SAVE_KEY));
-  }
-
-  private parse(raw: string | null): SaveDataV1 | null {
+    const raw = this.storage.getItem(SAVE_KEY);
     if (!raw) return null;
     try {
-      const parsed = JSON.parse(raw) as Partial<SaveDataV1> & { version?: unknown };
-      const v = parsed.version;
-      // Accept THIS version OR any EARLIER one — `hydrate` fills newer fields with
-      // defaults, so a SAVE_VERSION bump no longer WIPES the player's progress (the
-      // old bug: a mismatched version was discarded → full newGame reset). Only a
-      // save from a NEWER/unknown build, or one missing the core fields, is refused.
-      const ok =
+      const parsed: unknown = JSON.parse(raw);
+      if (
         typeof parsed === 'object' &&
         parsed !== null &&
-        typeof v === 'number' &&
-        v <= SAVE_VERSION &&
-        Array.isArray(parsed.items) &&
-        parsed.energy != null;
-      return ok ? (parsed as SaveDataV1) : null;
+        (parsed as { version?: unknown }).version === SAVE_VERSION
+      ) {
+        return parsed as SaveDataV1;
+      }
+      return null;
     } catch {
       return null;
     }
   }
 
-  /** @returns true when a valid save was hydrated AND announced. */
+  /** @returns true when a valid save was hydrated. */
   load(): boolean {
-    if (!this.hydrateOnly()) return false;
-    this.announceLoaded();
-    return true;
-  }
-
-  /**
-   * Read the save into state WITHOUT announcing it.
-   *
-   * Every system's catch-up hangs off `state:loaded` — offline gifts, energy regen,
-   * the day cycle — and they all read the BOARD. But a board's cells and its lattice
-   * are restored asynchronously, from the editor project, AFTER this. Announcing here
-   * meant the offline harvest ran against whatever ground happened to be loaded:
-   * reopening inside the lair, every one of its generators read as standing on
-   * nothing, and each gift was flung across the isle and autosaved there. Hence the
-   * split — hydrate now, announce once the ground under the coordinates is real.
-   *
-   * @returns true when a valid save was hydrated.
-   */
-  hydrateOnly(): boolean {
     const data = this.peek();
     if (!data) return false;
     const now = this.clock.now();
     const offlineMs = Math.max(0, now - data.savedAt);
     const max = energyMaxForLevel(levelForXp(data.xp ?? 0));
     const regen = computeRegen(data.energy.current, data.energy.lastRegenAt, now, max);
-    try {
-      this.suspend(() => {
-        this.state.hydrate(data);
-      });
-    } catch (e) {
-      // A save we could not read is NOT a save to throw away. It used to be deleted
-      // here, and Context.beginRun then wrote a brand-new game straight over it — one
-      // bad read and weeks of play were gone with no way back. Now it is set aside
-      // under a separate key: the boot can still start fresh, and the bytes survive.
-      console.warn('[SaveSystem] could not hydrate save — kept a copy under', BROKEN_KEY, e);
-      const raw = this.storage.getItem(SAVE_KEY);
-      if (raw) this.storage.setItem(BROKEN_KEY, raw);
-      return false;
-    }
-    // This exact save loaded cleanly — keep it as the last known good one. If the
-    // main slot is ever unreadable, `peek` falls back to this instead of to nothing.
-    const raw = this.storage.getItem(SAVE_KEY);
-    if (raw) this.storage.setItem(BACKUP_KEY, raw);
-    this.pending = { offlineMs, energyRecovered: regen.recovered };
-    return true;
-  }
-
-  /** Announce a save hydrated by `hydrateOnly`. No-op when nothing is pending, so
-   *  calling it twice cannot replay an offline harvest. */
-  announceLoaded(): void {
-    const pending = this.pending;
-    this.pending = null;
-    if (!pending) return;
-    this.bus.emit('state:loaded', pending);
+    this.suspend(() => {
+      this.state.hydrate(data);
+    });
+    this.bus.emit('state:loaded', { offlineMs, energyRecovered: regen.recovered });
     this.save();
+    return true;
   }
 
   clear(): void {
     this.storage.removeItem(SAVE_KEY);
-    this.storage.removeItem(BACKUP_KEY);
   }
 }

@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "preset": "eggAura",
+  "eggs": {
+    "ashdrake_1": {
+      "label": "Ashdrake Egg — the Emberkeep legendary. Ember orange off charcoal.",
+      "palette": [
+        "#A34F0A",
+        "#FC780D",
+        "#FFA45A",
+        "#F1DCCB"
+      ],
+      "weight": 1
+    },
+    "rimewyrm_1": {
+      "label": "Rimewyrm Egg — the Borealis legendary. Glacier cyan.",
+      "palette": [
+        "#128D9B",
+        "#18DBF1",
+        "#71F0FE",
+        "#CBEDF1"
+      ],
+      "weight": 1
+    },
+    "ember_dragon_2": {
+      "label": "Red Egg — an ordinary chain egg. Half the density, half the weight.",
+      "palette": [
+        "#9C2712",
+        "#F23917",
+        "#FE755C",
+        "#F1D1CB"
+      ],
+      "weight": 0.5
+    },
+    "emerald_2": {
+      "label": "Green Egg — an ordinary chain egg. Half the density, half the weight.",
+      "palette": [
+        "#0DA01F",
+        "#10F92D",
+        "#70FF82",
+        "#CBF1CF"
+      ],
+      "weight": 0.5
+    }
+  }
+}

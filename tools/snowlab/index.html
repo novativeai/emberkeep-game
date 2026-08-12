@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emberkeep — Snow Lab</title>
+<style>
+  :root { --ink:#EAF4FF; --dim:#8FA3BE; --ice:#9FD8FF; --violet:#8B5CD6;
+          --panel:#0E1420; --line:#1E2A3D; --field:#161F2E; }
+  html,body { margin:0; height:100%; background:#060A12; color:var(--ink);
+              font:12px "Trebuchet MS", Verdana, sans-serif; overflow:hidden; }
+  #wrap { display:flex; height:100%; }
+  #stage { flex:1; position:relative; min-width:0; }
+  #game { position:absolute; inset:0; }
+  #hud { position:absolute; left:12px; bottom:10px; pointer-events:none; color:var(--dim);
+         text-shadow:0 1px 3px #000; line-height:1.7; }
+  #hud b { color:var(--ice); }
+  #hud .warn { color:#FFB86B; }
+
+  #panel { width:376px; flex:none; background:var(--panel); border-left:1px solid var(--line);
+           overflow-y:auto; padding-bottom:40px; }
+  h1 { font-size:13px; margin:0; padding:12px 14px; letter-spacing:.08em; text-transform:uppercase;
+       color:var(--ice); border-bottom:1px solid var(--line); position:sticky; top:0;
+       background:var(--panel); z-index:3; }
+  h1 small { float:right; color:var(--dim); text-transform:none; letter-spacing:0; font-weight:normal; }
+  .sec { border-bottom:1px solid var(--line); padding:10px 14px; }
+  .sec > h2 { font-size:11px; margin:0 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.1em; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; }
+  .tabs button { flex:1; min-width:74px; }
+  button { background:var(--field); color:var(--ink); border:1px solid var(--line); border-radius:4px;
+           padding:5px 8px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--ice); }
+  button.on { background:var(--ice); color:#08131C; border-color:var(--ice); font-weight:bold; }
+  .row { display:grid; grid-template-columns:82px 1fr 54px; align-items:center; gap:6px; margin:3px 0; }
+  .row label { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row input[type=range] { width:100%; accent-color:var(--ice); }
+  .row output { text-align:right; font-variant-numeric:tabular-nums; }
+  .plane { border:1px solid var(--line); border-radius:5px; margin:7px 0; overflow:hidden; }
+  .plane > header { display:flex; align-items:center; gap:6px; padding:5px 8px; background:#141D2B; cursor:pointer; }
+  .plane > header b { flex:1; }
+  .plane .body { padding:5px 8px; display:none; }
+  .plane.open .body { display:block; }
+  .plane.dead > header { opacity:.42; }
+  .note { color:var(--dim); line-height:1.55; margin:0 0 8px; }
+  .bar { display:flex; gap:6px; }
+  .bar button { flex:1; }
+  #status { padding:6px 14px; color:var(--dim); min-height:15px; }
+  #status.err { color:#FF7B7B; } #status.ok { color:var(--ice); }
+  table.cost { width:100%; border-collapse:collapse; font-size:11px; }
+  table.cost td { padding:2px 0; color:var(--dim); }
+  table.cost td:last-child { text-align:right; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .swatch { width:100%; height:26px; padding:0; border:1px solid var(--line); border-radius:3px; background:none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage"><div id="game"></div><div id="hud"></div></div>
+  <div id="panel">
+    <h1>Snow Lab <small id="tierRead"></small></h1>
+
+    <div class="sec">
+      <h2>Preset</h2>
+      <div class="tabs" id="presetTabs"></div>
+      <p class="note" id="presetNote" style="margin-top:8px"></p>
+    </div>
+
+    <div class="sec">
+      <h2>Quality tier</h2>
+      <div class="tabs" id="tierTabs"></div>
+      <p class="note" style="margin-top:8px">The governor drives this: active&nbsp;→&nbsp;high, idle&nbsp;→&nbsp;medium, doze&nbsp;→&nbsp;the snow fades out. It is never frozen — snow stopped in mid-air reads as a broken game.</p>
+      <table class="cost" id="costTable"></table>
+    </div>
+
+    <div class="sec">
+      <h2>Scene</h2>
+      <div class="tabs">
+        <button id="bgArt" class="on">borealis art</button>
+        <button id="bgNight">flat night</button>
+        <button id="bgBlack">black</button>
+      </div>
+      <div class="bar" style="margin-top:6px">
+        <button id="btnAurora" class="on">+ aurora</button>
+        <button id="btnFreeze">freeze</button>
+        <button id="btnStep">+2s</button>
+        <button id="btnDoze">doze</button>
+      </div>
+      <p class="note" style="margin-top:8px">The aurora is on by default because that is the real composite: this is weather in front of that sky, and the flakes have to read against it.</p>
+    </div>
+
+    <div class="sec" id="globalSec"><h2>Field</h2></div>
+    <div class="sec" id="planesSec"></div>
+
+    <div class="sec">
+      <div class="bar">
+        <button id="btnSave">save → src/data</button>
+        <button id="btnCopy">copy JSON</button>
+        <button id="btnReset">reload</button>
+      </div>
+      <div id="status"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import Phaser from 'phaser';
+import { SnowFX, SNOW_QUALITY, costEstimate, validateSnowFile, activePlanes } from '/src/render/fx/SnowFX.ts';
+import { AuroraFX } from '/src/render/fx/AuroraFX.ts';
+
+/* --------------------------------------------------------------- clock --- */
+let FROZEN = false, FREEZE_AT = 0, VOFF = 0;
+const now = () => (FROZEN ? FREEZE_AT : performance.now() + VOFF);
+window.__setT = (ms) => { FROZEN = true; FREEZE_AT = ms; };
+window.__advance = (ms) => { if (FROZEN) FREEZE_AT += ms; else VOFF += ms; };
+window.__live = () => { FROZEN = false; };
+
+/* --------------------------------------------------------------- state --- */
+const DOC = await (await fetch('/__snowlab/presets')).json();
+const AURORA_DOC = await (await fetch('/__auroralab/presets')).json();
+const PRISTINE = JSON.parse(JSON.stringify(DOC));
+window.__doc = DOC;
+
+const state = { preset: Object.keys(DOC.presets)[0], tier: 'high', bg: 'art', aurora: true, open: new Set(['4']) };
+window.__state = state;
+
+const GLOBALS = [
+  ['intensity', 0, 2, 0.01, 'master gain over the whole field'],
+  ['windScale', 0, 0.2, 0.002, 'how hard the SHARED world wind pushes the snow']
+];
+const PLANE_FIELDS = [
+  ['grid', 4, 60, 0.5, 'cells down the screen — higher is smaller and further away'],
+  ['radius', 0.01, 0.3, 0.002, 'flake radius in cell units'],
+  ['fall', 0.005, 0.8, 0.005, 'screen-heights per second'],
+  ['drift', 0, 0.08, 0.001, 'constant sideways lean, before wind'],
+  ['coverage', 0.02, 1, 0.01, 'fraction of cells holding a flake'],
+  ['brightness', 0, 1.2, 0.01, ''],
+  ['softness', 0, 1, 0.01, '0 = crisp dot · 1 = fully out of focus'],
+  ['sway', 0, 0.15, 0.002, 'sideways flutter amplitude'],
+  ['swayHz', 0, 0.6, 0.005, 'how fast that flutter cycles'],
+  ['tumble', 0, 1, 0.01, 'brightness flash as the plate turns edge-on'],
+  ['stretch', 1, 3, 0.01, 'vertical elongation — motion blur on a fast flake'],
+  ['windGain', 0, 3, 0.05, 'share of the world wind this plane takes']
+];
+
+/* --------------------------------------------------------------- scene --- */
+const W = 2560, H = 1600;   // the game's canvas, so sizes read as game px
+
+class Lab extends Phaser.Scene {
+  preload() {
+    this.load.image('borealis', '/sprites/background/borealis.webp');
+    this.load.on('loaderror', (f) => { window.__loadErr = f.key; });
+  }
+  create() {
+    this.cameras.main.setBackgroundColor('#060A12');
+    this.bgArt = this.add.image(0, 0, 'borealis').setOrigin(0, 0).setDepth(0);
+    const s = Math.max(W / this.bgArt.width, H / this.bgArt.height);
+    this.bgArt.setDisplaySize(this.bgArt.width * s, this.bgArt.height * s);
+    this.bgNight = this.add.rectangle(0, 0, W, H, 0x0b1430).setOrigin(0, 0).setDepth(0).setVisible(false);
+    window.__scene = this;
+    rebuild();
+    applyScene();
+    window.__ready = true;
+  }
+  update() {
+    window.__aurora?.update();
+    window.__snow?.update();
+    hud();
+  }
+}
+
+let fps = 0, frames = 0, fpsAt = 0;
+function hud() {
+  frames++;
+  const t = performance.now();
+  if (t - fpsAt >= 500) { fps = (frames * 1000) / (t - fpsAt); frames = 0; fpsAt = t; }
+  const s = window.__snow;
+  const el = document.getElementById('hud');
+  if (!s) { el.textContent = ''; return; }
+  const c = s.cost(60);
+  el.innerHTML =
+    `<b>${fps.toFixed(0)}</b> fps &nbsp;·&nbsp; <b>${c.flakes.toLocaleString()}</b> flakes across ` +
+    `<b>${c.screenPasses}</b> depth planes &nbsp;·&nbsp; ` +
+    `<b>${(c.spriteUpdatesAvoided / 1000).toFixed(0)}k</b> sprite updates a second not being done` +
+    (window.__idle?.().capped
+      ? ' &nbsp;·&nbsp; <span class="warn">idle — capped to 10 fps, move the mouse</span>'
+      : fps < 45 ? ' <span class="warn">— frame rate is down</span>' : '');
+}
+
+function rebuild() {
+  const sc = window.__scene;
+  if (!sc) return;
+  window.__snow?.destroy();
+  window.__snow = new SnowFX(sc, DOC.presets[state.preset], {
+    now, width: W, height: H, x: 0, y: 0, depth: 20, tier: state.tier
+  });
+  paintCost();
+}
+
+function rebuildAurora() {
+  const sc = window.__scene;
+  if (!sc) return;
+  window.__aurora?.destroy();
+  window.__aurora = null;
+  if (!state.aurora) return;
+  window.__aurora = new AuroraFX(sc, AURORA_DOC.presets.borealis, {
+    now, width: W, height: H * 0.5, x: 0, y: 0, depth: 10, tier: 'high'
+  });
+}
+
+function applyScene() {
+  const sc = window.__scene;
+  if (!sc) return;
+  sc.bgArt.setVisible(state.bg === 'art');
+  sc.bgNight.setVisible(state.bg === 'night');
+  sc.cameras.main.setBackgroundColor(state.bg === 'black' ? '#000000' : '#060A12');
+  rebuildAurora();
+}
+
+/* ------------------------------------------------------------- controls --- */
+const el = (parent, tag = 'div', cls) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  parent.appendChild(n);
+  return n;
+};
+const fmt = (v, step) => (step >= 1 ? String(Math.round(v)) : v.toFixed(step >= 0.01 ? 2 : 3));
+
+let pending = 0;
+const apply = () => {
+  clearTimeout(pending);
+  pending = setTimeout(() => {
+    const errs = validateSnowFile(DOC);
+    setStatus(errs.length ? errs[0] : '', errs.length ? 'err' : '');
+    // Retune the LIVE field — no rebuild, so the snow never restarts under you.
+    window.__snow?.refresh();
+    paintCost();
+  }, 40);
+};
+function setStatus(text, cls = '') {
+  const s = document.getElementById('status');
+  s.textContent = text; s.className = cls;
+}
+
+function slider(parent, obj, key, min, max, step, title) {
+  const row = el(parent, 'div', 'row');
+  const lab = el(row, 'label');
+  lab.textContent = key;
+  if (title) lab.title = title;
+  const input = el(row, 'input');
+  input.type = 'range'; input.min = min; input.max = max; input.step = step; input.value = obj[key];
+  const out = el(row, 'output');
+  out.textContent = fmt(obj[key], step);
+  input.oninput = () => { obj[key] = +input.value; out.textContent = fmt(obj[key], step); apply(); };
+}
+
+function tabs(host, items, get, set) {
+  host.innerHTML = '';
+  for (const it of items) {
+    const b = el(host, 'button');
+    b.textContent = it.label ?? it;
+    b.className = get() === (it.id ?? it) ? 'on' : '';
+    b.onclick = () => { set(it.id ?? it); paint(); };
+  }
+}
+
+function paintCost() {
+  const t = document.getElementById('costTable');
+  const p = DOC.presets[state.preset];
+  t.innerHTML = '';
+  for (const tier of ['high', 'medium', 'low']) {
+    const q = SNOW_QUALITY[tier];
+    const c = costEstimate(W, H, q, p, 60);
+    const tr = el(t, 'tr');
+    el(tr, 'td').textContent = `${tier} — ${c.screenPasses} planes`;
+    el(tr, 'td').textContent = `${c.flakes.toLocaleString()} flakes`;
+  }
+}
+
+function paint() {
+  tabs(document.getElementById('presetTabs'),
+    Object.keys(DOC.presets).map((id) => ({ id, label: DOC.presets[id].label.split('—')[0].trim() })),
+    () => state.preset, (v) => { state.preset = v; rebuild(); });
+  tabs(document.getElementById('tierTabs'), ['high', 'medium', 'low'],
+    () => state.tier, (v) => { state.tier = v; window.__snow?.setTier(v); paintCost(); });
+
+  const p = DOC.presets[state.preset];
+  document.getElementById('tierRead').textContent = `${state.preset} · ${state.tier}`;
+  document.getElementById('presetNote').textContent = p.note ?? '';
+
+  const gs = document.getElementById('globalSec');
+  gs.innerHTML = '<h2>Field</h2>';
+  const tintRow = el(gs, 'div', 'row');
+  el(tintRow, 'label').textContent = 'tint';
+  const tint = el(tintRow, 'input', 'swatch');
+  tint.type = 'color'; tint.value = p.tint;
+  tint.oninput = () => { p.tint = tint.value.toUpperCase(); apply(); };
+  el(tintRow, 'output').textContent = '';
+  for (const [key, min, max, step, title] of GLOBALS) slider(gs, p, key, min, max, step, title);
+
+  const live = activePlanes(p, SNOW_QUALITY[state.tier]).length;
+  const ls = document.getElementById('planesSec');
+  ls.innerHTML = '<h2>Depth planes — far to near</h2>';
+  p.planes.forEach((l, i) => {
+    const dead = i >= live;
+    const card = el(ls, 'div', 'plane' + (state.open.has(String(i)) ? ' open' : '') + (dead ? ' dead' : ''));
+    const head = el(card, 'header');
+    el(head, 'b').textContent = `plane ${i + 1}${i === 0 ? ' · farthest' : i === p.planes.length - 1 ? ' · nearest' : ''}`;
+    const meta = el(head, 'span');
+    meta.style.cssText = 'color:var(--dim); font-size:10px';
+    meta.textContent = dead ? 'dropped at this tier' : `${Math.round(l.grid * l.grid * (W / H) * l.coverage)} flakes`;
+    head.onclick = () => {
+      state.open.has(String(i)) ? state.open.delete(String(i)) : state.open.add(String(i));
+      paint();
+    };
+    const body = el(card, 'div', 'body');
+    for (const [key, min, max, step, title] of PLANE_FIELDS) slider(body, l, key, min, max, step, title);
+  });
+  paintCost();
+}
+
+/* Hooks for tools/checks/snowtest.mjs — the lab's state is module-scoped, and a
+ * harness that cannot reach it can only check that pixels changed. */
+window.__rebuildSnow = rebuild;
+window.__paintPreset = paint;
+window.__SnowFX = SnowFX;   // so the harness can build isolated single-plane fields
+window.__now = now;
+window.__W = W; window.__H = H;
+
+for (const id of ['bgArt', 'bgNight', 'bgBlack']) {
+  document.getElementById(id).onclick = (e) => {
+    state.bg = { bgArt: 'art', bgNight: 'night', bgBlack: 'black' }[id];
+    for (const k of ['bgArt', 'bgNight', 'bgBlack']) document.getElementById(k).className = '';
+    e.target.className = 'on';
+    applyScene();
+  };
+}
+document.getElementById('btnAurora').onclick = (e) => {
+  state.aurora = !state.aurora;
+  e.target.className = state.aurora ? 'on' : '';
+  rebuildAurora();
+};
+document.getElementById('btnFreeze').onclick = (e) => {
+  FROZEN = !FROZEN;
+  if (FROZEN) FREEZE_AT = performance.now() + VOFF;
+  e.target.className = FROZEN ? 'on' : '';
+};
+document.getElementById('btnStep').onclick = () => { window.__advance(2000); window.__snow?.update(); };
+document.getElementById('btnDoze').onclick = (e) => {
+  const dozing = e.target.className !== 'on';
+  e.target.className = dozing ? 'on' : '';
+  window.__snow?.setPowerState(dozing ? 'doze' : 'active');
+  setStatus(dozing ? 'dozing — the field fades out over 600ms' : 'awake', 'ok');
+};
+document.getElementById('btnCopy').onclick = async () => {
+  await navigator.clipboard.writeText(JSON.stringify(DOC, null, 2));
+  setStatus('snow JSON copied', 'ok');
+};
+document.getElementById('btnReset').onclick = () => {
+  Object.assign(DOC, JSON.parse(JSON.stringify(PRISTINE)));
+  paint(); rebuild();
+  setStatus('reloaded from disk', 'ok');
+};
+document.getElementById('btnSave').onclick = async () => {
+  const errs = validateSnowFile(DOC);
+  if (errs.length) { setStatus(errs[0], 'err'); return; }
+  const r = await fetch('/__snowlab/presets', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(DOC, null, 2)
+  });
+  const j = await r.json();
+  setStatus(j.ok ? 'saved → src/data/snow.json' : j.error, j.ok ? 'ok' : 'err');
+};
+
+/* ---------------------------------------------------------------- boot --- */
+const game = new Phaser.Game({
+  type: Phaser.WEBGL,
+  parent: 'game',
+  width: W, height: H,
+  backgroundColor: '#060A12',
+  scene: Lab,
+  render: { antialias: true },
+  // Phaser binds its limit-aware step ONCE at boot: without an fps limit here
+  // the idle guard below has nothing to retune.
+  fps: { limit: 60 },
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
+});
+window.__game = game;
+
+/* ---------------------------------------------------------- idle guard --- */
+/* A tuning lab left open is a full-screen shader running at 60fps on someone's
+ * laptop for as long as the tab is visible. Phaser already sleeps the loop when
+ * the tab is HIDDEN; this covers the other case — visible but unattended.
+ * Same shape as the game's PowerGovernor, minus the states nothing here needs. */
+let idleAt = performance.now();
+let capped = false;
+const setCap = (fps) => {
+  game.loop.fpsLimit = fps;
+  game.loop._limitRate = 1000 / fps;   // derived only at construction; retune it too
+};
+const wake = () => {
+  idleAt = performance.now();
+  if (capped) { capped = false; setCap(60); }
+};
+for (const t of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart']) {
+  window.addEventListener(t, wake, { passive: true, capture: true });
+}
+const idleTimer = setInterval(() => {
+  if (!capped && performance.now() - idleAt > 20000) { capped = true; setCap(10); }
+}, 2000);
+window.__idle = () => ({ capped, fpsLimit: game.loop.fpsLimit });
+/* The headless harnesses never move a mouse, so without this the guard throttles
+ * them to 10fps mid-measurement and every pixel reading goes stale. */
+window.__keepAwake = () => { clearInterval(idleTimer); wake(); };
+window.__forceIdle = () => { idleAt = performance.now() - 21000; };
+window.__errors = [];
+window.addEventListener('error', (e) => window.__errors.push(String(e.message)));
+game.events.once('ready', () => paint());
+</script>
+</body>
+</html>

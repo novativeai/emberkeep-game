@@ -124,7 +124,7 @@ would complete her.
 
 **Wiring on delivery:** add golden to the `CHARACTERS` table in
 `scripts/calibrate-faces.mjs` and re-run it (it self-verifies alignment), then
-`node tools/facetest.mjs` for the visual regression. ~30 minutes.
+`node tools/checks/facetest.mjs` for the visual regression. ~30 minutes.
 
 ---
 

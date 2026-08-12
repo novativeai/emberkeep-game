@@ -8,7 +8,7 @@
  * EventBus and never touches GameState/map.json.
  */
 
-import { projectIn, unprojectIn, type Lattice } from '../core/iso';
+import { projectIn, unprojectIn, type Lattice } from './lattice';
 
 export type EditorTab = 'edit' | 'assets' | 'position' | 'grille' | 'carte';
 export type EditorTool = 'select' | 'multiselect' | 'allocate' | 'deallocate';

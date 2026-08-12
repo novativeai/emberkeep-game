@@ -63,6 +63,27 @@ export async function saveEditorMap(data: unknown): Promise<void> {
   }
 }
 
+/**
+ * "Apply": publish the editor's export to the WORLDS pipeline — the dev server
+ * writes `assets/map/nionja-worlds.json`, then runs `ingest-worlds.mjs` and
+ * `build-zones.mjs`, so `src/data/zones.json` (what the engine actually runs) is
+ * regenerated from this design. Null when the endpoint isn't there (production
+ * build); otherwise the server's verdict, so the editor can say what went wrong
+ * rather than silently looking applied.
+ */
+export async function publishWorlds(doc: unknown): Promise<{ ok: boolean; error?: string } | null> {
+  try {
+    const r = await fetch('/__editor/worlds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(doc)
+    });
+    return (await r.json()) as { ok: boolean; error?: string };
+  } catch {
+    return null;
+  }
+}
+
 /** Load the on-disk default design — null when the dev store is unavailable. */
 export async function loadEditorMap(): Promise<{
   allocations?: Record<string, [string, unknown][]>;

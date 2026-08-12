@@ -1,0 +1,19 @@
+{
+  "character": "eleanor",
+  "frameWidth": 438,
+  "frameHeight": 584,
+  "frameCount": 8,
+  "anchorX": 0.7099,
+  "anchorY": 0.9709,
+  "body": {
+    "x": 128,
+    "y": 52,
+    "width": 293,
+    "height": 515
+  },
+  "scale": 0.4971,
+  "fps": {
+    "idle": 12,
+    "cast": 14
+  }
+}

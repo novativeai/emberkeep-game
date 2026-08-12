@@ -1,6 +1,6 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
-import { PRIMARY_WORLD, type GameState } from '../core/GameState';
+import type { GameState } from '../core/GameState';
 import type {
   ResolvedArrow,
   ResolvedHand,
@@ -8,9 +8,9 @@ import type {
   TilePos,
   TutorialAllow,
   TutorialData,
+  TutorialEffect,
   TutorialStepConfig,
-  TutorialStepEvent,
-  WorldTutorials
+  TutorialStepEvent
 } from '../core/types';
 
 const ALLOW_NOTHING: Required<TutorialAllow> = {
@@ -22,7 +22,13 @@ const ALLOW_NOTHING: Required<TutorialAllow> = {
   sell: false,
   dragonWork: false,
   marketplace: false,
-  cookbook: false
+  cookbook: false,
+  bag: false,
+  character: false,
+  feed: false,
+  commission: false,
+  status: false,
+  give: false
 };
 
 const ALLOW_EVERYTHING: Required<TutorialAllow> = {
@@ -34,7 +40,13 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
   sell: true,
   dragonWork: true,
   marketplace: true,
-  cookbook: true
+  cookbook: true,
+  bag: true,
+  character: true,
+  feed: true,
+  commission: true,
+  status: true,
+  give: true
 };
 
 /**
@@ -43,24 +55,15 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
  * 'tutorial:step' payload carries everything the scenes need (bubble text,
  * speaker, highlights, hand/arrow targets and the input allow-list), so the
  * UI only ever subscribes.
- *
- * A WORLD can own a script of its own (`worldScripts`, borealis' arrival lesson).
- * The director follows the player: it runs the live world's script against that
- * world's saved progress, and a world with no script leaves it silent. Boards are
- * per-world, so a count gate asked in borealis counts borealis' pieces — the
- * lesson can only be answered where it was set.
  */
 export class TutorialDirector {
   private lastHatched: TilePos | null = null;
-  /** Which script is live. Follows the board, not the save. */
-  private world = PRIMARY_WORLD;
 
   constructor(
     private state: GameState,
     private bus: EventBus,
     private clock: GameClock,
-    private data: TutorialData,
-    private worldScripts: WorldTutorials = {}
+    private data: TutorialData
   ) {
     bus.on('item:hatched', ({ item }) => {
       this.lastHatched = { col: item.col, row: item.row };
@@ -71,8 +74,35 @@ export class TutorialDirector {
       this.checkCountGate();
     });
     bus.on('item:harvested', ({ output }) => this.onGateEvent('item:harvested', output.chain));
+    bus.on('bag:stored', ({ chain }) => this.onGateEvent('bag:stored', chain));
+    bus.on('item:sold', () => this.onGateEvent('item:sold'));
+    bus.on('character:action_used', ({ characterId }) =>
+      this.onGateEvent('character:action_used', characterId)
+    );
     bus.on('chest:open', () => this.onGateEvent('chest:open'));
     bus.on('dragon:working', () => this.onGateEvent('dragon:working'));
+    // The feeding lesson gates on the CHAIN eaten, so "give it the Hearth Cake"
+    // cannot be satisfied by handing it a Moss Tuft that happened to be nearby.
+    bus.on('dragon:fed', ({ chain }) => this.onGateEvent('dragon:fed', chain));
+    bus.on('dragon:named', ({ chain }) => this.onGateEvent('dragon:named', chain));
+    // GIVE is two beats, so it has two gates. The first is choosing it in the
+    // satchel — the piece is held out but not yet handed to anybody...
+    bus.on('bag:give_armed', ({ chain }) => this.onGateEvent('bag:give_armed', chain));
+    // ...and the second is the delivery, gated on the CHAIN she accepted, so
+    // "hand her the Crystal Ball" cannot be met with something else she wants.
+    bus.on('regard:gift_accepted', ({ chain }) => this.onGateEvent('regard:gift_accepted', chain));
+    // Tapping a character is the whole verb for reading her — the beat that
+    // teaches the status readout gates on it.
+    bus.on('ui:character_tapped', ({ characterId }) =>
+      this.onGateEvent('ui:character_tapped', characterId)
+    );
+    // The House's commission: the gate is the choice being MADE, not the panel
+    // being opened — a player who opens the chooser and closes it again has not
+    // learned the lesson, and the House is still undecided.
+    bus.on('generator:produce_set', ({ chain }) => this.onGateEvent('generator:produce_set', chain));
+    bus.on('generator:skipped', ({ chain, currency }) =>
+      this.onGateEvent('generator:skipped', chain, currency)
+    );
     bus.on('marketplace:purchased', () => this.onGateEvent('marketplace:purchased'));
     bus.on('order:completed', () => this.onGateEvent('order:completed'));
     bus.on('region:unlocked', () => this.onGateEvent('region:unlocked'));
@@ -89,101 +119,64 @@ export class TutorialDirector {
         this.advance();
       }
     });
-    // A REAL world switch happened (the dev's Level-3 world exists) → the isle's
-    // tutorial stands down: mark it done so the remaining steps don't run for now.
-    // They stay authored in tutorial.json — just not executed. Never fires in
-    // e2e/prod (no world to switch to → no world:switched), so the full tutorial
-    // still plays there. If the world we land in owns a script (borealis), that
-    // script then begins in its place — the player is taught the world they are in.
-    bus.on('world:switched', ({ toWorld }) => {
-      const standingDown = !this.state.tutorialDone;
-      this.state.tutorialDone = true;
-      // enterWorld emits whatever the world we land in has to say — its own first
-      // step, or the "done" allow-everything payload for a world that teaches
-      // nothing. Only a switch that changes nothing (same world twice) needs the
-      // stand-down emitted here.
-      if (this.world === toWorld && standingDown) this.emitDone();
-      this.enterWorld(toWorld);
-    });
-    // Back to the isle: its script is long done, so this only restores the "done"
-    // allow-list the board expects (and never re-opens a finished lesson).
-    bus.on('world:return', () => this.enterWorld(PRIMARY_WORLD));
-    // A save carries the world you were standing in. Follow it BEFORE Context calls
-    // begin(), or a session closed halfway through borealis' lesson reopens on the
-    // isle's finished script and the north is never taught again.
-    bus.on('state:loaded', () => {
-      this.world = this.state.activeWorld;
-      this.lastHatched = null;
-    });
-  }
-
-  /** The script a world owns, if any (the isle's is `data`; borealis' comes from
-   *  `worldScripts`). Undefined = that world teaches nothing. */
-  private scriptFor(worldId: string): TutorialData | undefined {
-    return worldId === PRIMARY_WORLD ? this.data : this.worldScripts[worldId];
-  }
-
-  /** The live world's script, or an empty one so every gate below is a no-op in a
-   *  world with nothing to teach. */
-  private get script(): TutorialData {
-    return this.scriptFor(this.world) ?? { steps: [] };
-  }
-
-  private get index(): number {
-    return this.state.tutorialIndexFor(this.world);
-  }
-
-  private get done(): boolean {
-    // A world with no script has nothing left to teach, ever.
-    return !this.scriptFor(this.world) || this.state.tutorialDoneFor(this.world);
-  }
-
-  /**
-   * Follow the player into a world and pick that world's lesson back up.
-   *
-   * Systems hear `world:switched` before BoardScene does, so the live BOARD is still
-   * the previous world's for the length of this call. A world's opening beat must
-   * therefore not resolve tile refs or gate on a count — borealis' is a bare line,
-   * and the first beat that touches the board comes after the player taps it.
-   */
-  private enterWorld(worldId: string): void {
-    if (this.world === worldId) return;
-    this.world = worldId;
-    this.lastHatched = null; // a tile ref from the world you left points at nothing here
-    this.begin();
   }
 
   get currentStep(): TutorialStepConfig | undefined {
-    if (this.done) return undefined;
-    return this.script.steps[this.index];
+    if (this.state.tutorialDone) return undefined;
+    return this.data.steps[this.state.tutorialIndex];
   }
 
-  /** Emit the current step (fresh game, resume after load, or arrival in a world
-   *  that owns a script of its own). */
+  /** Emit the current step (fresh game or resume after load). */
   begin(): void {
-    if (this.done) {
+    if (this.state.tutorialDone) {
       this.emitDone();
       return;
     }
     this.emitStep();
+    this.replayPrompts(this.currentStep);
     this.checkCountGate();
   }
 
-  isDone(): boolean {
-    return this.done;
+  /**
+   * Re-run the effects of the resumed step that ASK the player something.
+   *
+   * Most effects are grants — a spawn, some XP, a key — and their results are in
+   * the save, which is why `advance()` runs them once and `begin()` does not.
+   * Two are not grants. `nameDragon` opens a prompt, and `wantGift` stages a
+   * want that is deliberately never persisted; neither leaves anything behind
+   * for a reload to find. A step gated on answering a prompt that no longer
+   * exists is a dead save, so those two are re-applied on resume.
+   *
+   * Both are idempotent by construction: `nameDragon` looks for a dragon with no
+   * name yet, and `wantGift` overwrites the single scripted want.
+   */
+  private replayPrompts(step: TutorialStepConfig | undefined): void {
+    for (const effect of step?.effects ?? []) {
+      if (!('nameDragon' in effect) && !('wantGift' in effect)) continue;
+      try {
+        this.applyEffect(effect);
+      } catch (err) {
+        console.error(`[tutorial] prompt replay failed on step '${step?.id}'`, effect, err);
+      }
+    }
   }
 
-  private onGateEvent(event: string, chain?: string): void {
+  isDone(): boolean {
+    return this.state.tutorialDone;
+  }
+
+  private onGateEvent(event: string, chain?: string, currency?: string): void {
     const step = this.currentStep;
     if (!step || step.gate.type !== 'event') return;
     if (step.gate.event !== event) return;
     if (step.gate.chain && step.gate.chain !== chain) return;
+    if (step.gate.currency && step.gate.currency !== currency) return;
     this.advance();
   }
 
   private checkCountGate(): void {
     // Loop: consecutive count gates could already be satisfied.
-    for (let guard = 0; guard < this.script.steps.length; guard++) {
+    for (let guard = 0; guard < this.data.steps.length; guard++) {
       const step = this.currentStep;
       if (!step || step.gate.type !== 'count') return;
       const { chain, tier, count } = step.gate;
@@ -193,16 +186,11 @@ export class TutorialDirector {
   }
 
   private advance(): void {
-    if (this.done) return;
-    const next = this.index + 1;
-    const finished = next >= this.script.steps.length;
-    this.state.setTutorialProgress(this.world, next, finished);
-    if (finished) {
+    if (this.state.tutorialDone) return;
+    this.state.tutorialIndex++;
+    if (this.state.tutorialIndex >= this.data.steps.length) {
+      this.state.tutorialDone = true;
       this.emitDone();
-      // Completion moment ONLY (begin()/resume never fires this). The world it
-      // finished in rides along: the isle's completion drives the lair teleport,
-      // and a sub-world's must not be mistaken for it.
-      this.bus.emit('tutorial:done', { world: this.world });
     } else {
       // Effects fire on the advance INTO a step (once), never on resume — their
       // results live in saved state, so emitStep() on reload must not re-run them.
@@ -211,9 +199,32 @@ export class TutorialDirector {
     }
   }
 
-  /** Run a step's scripted reward beats via bus commands (spawn / ripen / key / xp). */
+  /**
+   * Run a step's scripted reward beats via bus commands (spawn / ripen / key / xp).
+   *
+   * Each effect is ISOLATED. The bus is synchronous and does not catch, so a
+   * throwing subscriber used to unwind all the way out of `advance()` — which
+   * had already incremented `tutorialIndex` but had not yet emitted the new
+   * step. The result was the worst possible failure: the director silently on
+   * step N+1, the bubble still showing step N, and every further tap sending a
+   * stepId that no longer matched. A hard lock with nothing on screen to say so.
+   *
+   * An effect that fails now costs its own reward and nothing else, and says so
+   * in the console. The step still emits, so the player is never stranded by a
+   * view that threw.
+   */
   private applyEffects(step: TutorialStepConfig | undefined): void {
     for (const effect of step?.effects ?? []) {
+      try {
+        this.applyEffect(effect);
+      } catch (err) {
+        console.error(`[tutorial] effect failed on step '${step?.id}'`, effect, err);
+      }
+    }
+  }
+
+  private applyEffect(effect: TutorialEffect): void {
+    {
       if ('spawn' in effect) {
         this.bus.emit('board:spawn', effect.spawn);
       } else if ('retier' in effect) {
@@ -231,6 +242,17 @@ export class TutorialDirector {
         this.bus.emit('board:move', effect.move);
       } else if ('setTimer' in effect) {
         this.bus.emit('generator:set_timer', effect.setTimer);
+      } else if ('wantGift' in effect) {
+        this.bus.emit('tutorial:want_gift', effect.wantGift);
+      } else if ('nameDragon' in effect) {
+        const { chain, tier } = effect.nameDragon;
+        const dragon = [...this.state.items.values()].find(
+          (i) => i.kind === 'item' && i.chain === chain && i.tier === tier && !i.dragonName
+        );
+        // No silent refusal: this step's gate IS the answer to the prompt, so a
+        // beat that asks nobody is a stuck save, and it must say so.
+        if (dragon) this.bus.emit('ui:name_dragon_requested', { itemId: dragon.id });
+        else console.error(`[tutorial] nameDragon found no unnamed ${chain} at tier ${tier}`);
       }
     }
   }
@@ -242,16 +264,12 @@ export class TutorialDirector {
   }
 
   private emitDone(): void {
-    // A world with no script of its own still reports the ISLE's count: this payload
-    // is the "tutorial over" signal the HUD reads, and 0/0 would read as a checklist
-    // that never existed rather than one that is finished.
-    const total = this.script.steps.length || this.data.steps.length;
     const payload: TutorialStepEvent = {
       id: 'done',
-      index: total,
-      total,
+      index: this.data.steps.length,
+      total: this.data.steps.length,
       done: true,
-      speaker: 'laurah',
+      speaker: 'eleanor',
       text: '',
       gateType: 'tap',
       highlight: [],
@@ -290,8 +308,8 @@ export class TutorialDirector {
 
     return {
       id: step.id,
-      index: this.index,
-      total: this.script.steps.length,
+      index: this.state.tutorialIndex,
+      total: this.data.steps.length,
       done: false,
       speaker: step.speaker,
       text: step.text,

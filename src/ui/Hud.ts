@@ -1,10 +1,19 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, IS_MOBILE, LEVEL_XP, LIVE_GAME_HEIGHT, num, PALETTE, UI_SCALE } from '../core/Constants';
+import {
+  GAME_WIDTH,
+  HUD_COLUMN_X,
+  hudColumnY,
+  IS_MOBILE,
+  LEVEL_XP,
+  LIVE_GAME_HEIGHT,
+  num,
+  PALETTE,
+  UI_SCALE
+} from '../core/Constants';
+import { FONT } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import { uiRegistry } from './theme';
-
-const FONT = 'Trebuchet MS, Verdana, sans-serif';
 
 interface Pill {
   container: Phaser.GameObjects.Container;
@@ -16,11 +25,19 @@ interface Pill {
 
 /**
  * Heads-up display: energy / coins / keys pills (top-left), settings gear
- * (top-right), level + XP bar (bottom-left), Cindra's Ledger button
- * (bottom-right, with an attention dot when an order is deliverable).
+ * (top-right), level + XP bar (bottom-left), and the bottom-right button column
+ * — Ledger (with an attention dot when an order is deliverable), Bag, Cookbook
+ * (UIScene builds that one) and Store, stacked by `hudColumnY`.
+ *
+ * There is exactly ONE shop button, and it opens the Store. The Emporium has no
+ * button of its own: it is reached from the "+" on the gauge whose currency it
+ * sells, which is where a player short of Warmth is already looking. A second
+ * stall icon in the column only ever read as a duplicate of this one.
  */
 export class Hud {
   ledgerButton: Phaser.GameObjects.Container;
+  bagButton: Phaser.GameObjects.Container;
+  storeButton: Phaser.GameObjects.Container;
   gearButton: Phaser.GameObjects.Container;
   private energyPill: Pill;
   private coinPill?: Pill;
@@ -29,6 +46,8 @@ export class Hud {
   private xpFill: Phaser.GameObjects.Graphics;
   private levelText: Phaser.GameObjects.Text;
   private xpLabel: Phaser.GameObjects.Text;
+  private bagBadge: Phaser.GameObjects.Container;
+  private bagBadgeText: Phaser.GameObjects.Text;
   private ledgerDot: Phaser.GameObjects.Arc;
   private ledgerDotTween!: Phaser.Tweens.Tween;
   private ledgerEnabled = true;
@@ -43,7 +62,12 @@ export class Hud {
     private scene: Phaser.Scene,
     bus: EventBus,
     private state: GameState,
-    callbacks: { onLedger: () => void; onGear: () => void }
+    callbacks: {
+      onLedger: () => void;
+      onGear: () => void;
+      onBag: () => void;
+      onStore: () => void;
+    }
   ) {
     // Portrait phones magnify the HUD (pillScale) and spread the gauge row wider
     // so the enlarged pills don't collide; desktop keeps its compact landscape row.
@@ -62,7 +86,7 @@ export class Hud {
     this.addPlus(this.coinPill, 'coins', bus);
     // Small countdown to the next +1 Warmth, just under the energy gauge.
     this.regenLabel = scene.add
-      .text(L.regen[0], L.regen[1], '', { fontFamily: FONT, fontSize: '27px', fontStyle: 'bold', color: PALETTE.cream })
+      .text(L.regen[0], L.regen[1], '', { fontFamily: FONT.ui, fontSize: '27px', fontStyle: 'bold', color: PALETTE.cream })
       .setOrigin(0.5)
       .setScale(this.pillScale)
       .setAlpha(0.9);
@@ -76,23 +100,56 @@ export class Hud {
       callbacks.onGear
     );
 
-    // Ledger button: bigger, with the scroll icon. Bottom-right corner.
+    // Ledger button: bigger, with the scroll icon. Bottom of the right column.
     this.ledgerButton = this.roundIconButton(
-      GAME_WIDTH - (IS_MOBILE ? 190 : 156),
-      LIVE_GAME_HEIGHT - (IS_MOBILE ? 260 : 168),
+      HUD_COLUMN_X,
+      hudColumnY(0),
       'ui_icon_scroll',
       1.5,
       () => {
+        // Dimmed during the tutorial. A dimmed button that does nothing at all
+        // reads as broken, so it re-points at the live step instead.
         if (this.ledgerEnabled) callbacks.onLedger();
+        else bus.emit('tutorial:nudge', {});
       }
     );
+    // Bag button — the satchel, one slot above the Ledger in the same column so
+    // the two board-side buttons read as one cluster. Its badge counts STACKS,
+    // matching the panel's capacity readout.
+    this.bagButton = this.roundIconButton(
+      HUD_COLUMN_X,
+      hudColumnY(1),
+      'ui_icon_bag',
+      1.5,
+      callbacks.onBag
+    );
+    // Store button — slot 3, top of the column. Cosmetics only, so it is the one
+    // button here that never gates play. It wears `ui_icon_shop` (the painted
+    // stall) because it is now the column's only shop door.
+    this.storeButton = this.roundIconButton(
+      HUD_COLUMN_X,
+      hudColumnY(3),
+      'ui_icon_shop',
+      1.5,
+      callbacks.onStore
+    );
+
+    this.bagBadge = scene.add.container(62, -62);
+    const badgeBg = scene.add.circle(0, 0, 26, num(PALETTE.gold)).setStrokeStyle(5, num(PALETTE.night));
+    this.bagBadgeText = scene.add
+      .text(0, 0, '0', { fontFamily: FONT.ui, fontSize: '30px', fontStyle: 'bold', color: PALETTE.night })
+      .setOrigin(0.5);
+    this.bagBadge.add([badgeBg, this.bagBadgeText]);
+    this.bagButton.add(this.bagBadge);
+    this.bagBadge.setVisible(false);
+
     this.ledgerDot = scene.add
       .circle(68, -68, 18, num(PALETTE.lava))
       .setStrokeStyle(5, num(PALETTE.cream));
     this.ledgerButton.add(this.ledgerDot);
     this.ledgerDot.setVisible(false);
-    // Pulse only while the dot is SHOWN — an invisible infinite tween still ticks
-    // every frame for nothing. `refreshLedgerDot` pauses and resumes it.
+    // Pulse only while the dot is shown — an invisible infinite tween still
+    // ticks every frame (battery). refreshLedgerDot pauses/resumes it.
     this.ledgerDotTween = scene.tweens.add({
       targets: this.ledgerDot,
       scale: 1.3,
@@ -115,7 +172,7 @@ export class Hud {
     this.xpFill = scene.add.graphics();
     this.xpLabel = scene.add
       .text(392, xpY, '', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '24px',
         fontStyle: 'bold',
         color: PALETTE.cream
@@ -123,7 +180,7 @@ export class Hud {
       .setOrigin(0.5);
     const lvlTag = scene.add
       .text(112, xpY + 32, 'LVL', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '20px',
         fontStyle: 'bold',
         color: PALETTE.goldShade
@@ -132,7 +189,7 @@ export class Hud {
     const disc = scene.add.image(112, xpY, 'ui_btn_round').setScale(0.82);
     this.levelText = scene.add
       .text(112, xpY - 10, '1', {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '52px',
         fontStyle: 'bold',
         color: PALETTE.textBrown
@@ -167,6 +224,12 @@ export class Hud {
     });
     uiRegistry.register(scene, 'hud.gear', 'Settings button', 'HUD', this.gearButton, {
       bg: this.gearButton.getAt(0), icon: this.gearButton.getAt(1)
+    });
+    uiRegistry.register(scene, 'hud.bag', 'Bag button', 'HUD', this.bagButton, {
+      bg: this.bagButton.getAt(0), icon: this.bagButton.getAt(1)
+    });
+    uiRegistry.register(scene, 'hud.store', 'Store button', 'HUD', this.storeButton, {
+      bg: this.storeButton.getAt(0), icon: this.storeButton.getAt(1)
     });
     uiRegistry.register(scene, 'hud.ledger', 'Ledger button', 'HUD', this.ledgerButton, {
       bg: this.ledgerButton.getAt(0), icon: this.ledgerButton.getAt(1)
@@ -211,7 +274,7 @@ export class Hud {
       this.ledgerDotTween.resume();
     } else if (!visible && !this.ledgerDotTween.isPaused()) {
       this.ledgerDotTween.pause();
-      this.ledgerDot.setScale(1); // parked at rest, not mid-pulse
+      this.ledgerDot.setScale(1);
     }
   }
 
@@ -240,6 +303,43 @@ export class Hud {
   }
 
   /** A little bump when Gold lands. */
+  /** Badge shows the number of STACKS held; hidden at zero so an empty bag is
+   *  quiet rather than a nagging "0". */
+  setBagCount(used: number): void {
+    this.bagBadgeText.setText(String(used));
+    this.bagBadge.setVisible(used > 0);
+  }
+
+  /** The satchel's arrival pulse: the button swells and a gold ring expands out
+   *  of it — the same beat the concept frame shows. Called once per stored item,
+   *  as the flight lands. */
+  bumpBag(): void {
+    const base = UI_SCALE;
+    this.scene.tweens.add({
+      targets: this.bagButton,
+      scale: { from: base * 1.22, to: base },
+      duration: 260,
+      ease: 'Back.easeOut'
+    });
+    const ring = this.scene.add
+      .circle(this.bagButton.x, this.bagButton.y, 62, undefined, 0)
+      .setStrokeStyle(6, num(PALETTE.goldAccent), 0.95)
+      .setDepth(this.bagButton.depth);
+    this.scene.tweens.add({
+      targets: ring,
+      scale: 2.1,
+      alpha: 0,
+      duration: 420,
+      ease: 'Sine.easeOut',
+      onComplete: () => ring.destroy()
+    });
+  }
+
+  /** WORLD position of the satchel — where a stored piece flies to. */
+  getBagPos(): { x: number; y: number } {
+    return { x: this.bagButton.x, y: this.bagButton.y };
+  }
+
   bumpCoin(): void {
     if (!this.coinPill) return;
     this.scene.tweens.add({
@@ -256,7 +356,7 @@ export class Hud {
     pill.plus = btn;
     const ring = this.scene.add.circle(0, 0, 31, 0x5fb43a).setStrokeStyle(6, num(PALETTE.cream));
     const plus = this.scene.add
-      .text(0, -4, '+', { fontFamily: FONT, fontSize: '52px', fontStyle: 'bold', color: '#ffffff' })
+      .text(0, -4, '+', { fontFamily: FONT.ui, fontSize: '52px', fontStyle: 'bold', color: '#ffffff' })
       .setOrigin(0.5);
     btn.add([ring, plus]);
     btn.setSize(70, 70);
@@ -276,7 +376,7 @@ export class Hud {
     const iconImg = this.scene.add.image(-116, 0, icon).setScale(iconScale);
     const text = this.scene.add
       .text(20, 0, value, {
-        fontFamily: FONT,
+        fontFamily: FONT.ui,
         fontSize: '42px',
         fontStyle: 'bold',
         color: PALETTE.cream
@@ -298,7 +398,14 @@ export class Hud {
     const base = UI_SCALE;
     const container = this.scene.add.container(x, y).setScale(base);
     const bg = this.scene.add.image(0, 0, 'ui_btn_round').setScale(scale);
-    const iconImg = this.scene.add.image(0, -8 * scale, icon).setScale(scale * 0.95);
+    // Icons arrive from two places at two resolutions: TextureFactory paints one
+    // at 44 logical units (88 px after RES), while a file-backed icon is whatever
+    // the PNG happens to be — icon_bag.png is 128 px, so the shared multiplier
+    // drew the satchel half again too large and it spilled off its own plate onto
+    // the button below. Fit every icon to the size a painted one lands at,
+    // whatever it was authored at.
+    const iconImg = this.scene.add.image(0, -8 * scale, icon);
+    iconImg.setScale((88 * scale * 0.95) / Math.max(iconImg.width, iconImg.height));
     container.add([bg, iconImg]);
     container.setSize(128 * scale, 128 * scale);
     container.setInteractive({ useHandCursor: true });
@@ -340,8 +447,12 @@ export class Hud {
     this.xpFill.fillRoundedRect(180, xpY - 11, width, 22, 11);
     this.xpFill.fillStyle(num(PALETTE.goldAccent), 0.65);
     this.xpFill.fillRoundedRect(180, xpY - 11, width, 9, 4.4);
-    // The chapter ends at the cap — the bar never fills toward nothing.
-    this.xpLabel.setText(atCap ? 'Chapter One complete ✦' : `${gained} / ${span} XP`);
+    // At the cap the bar has nothing left to fill toward, so it says what the
+    // cap MEANS instead of a number. Not "Chapter One complete" any more: the
+    // rank that tops the curve is the rank that opens Borealis, so the last
+    // thing the bar says has to point the Keeper onward rather than close a
+    // book on them.
+    this.xpLabel.setText(atCap ? 'The north is open ✦' : `${gained} / ${span} XP`);
   }
 
   private shakeEnergy(): void {

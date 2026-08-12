@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Emberkeep Mask Studio — point-by-point masks + perspective tile grids</title>
+<style>
+  :root {
+    --bg:#1d1622; --panel:#2a2030; --panel2:#352838; --line:#473548;
+    --cream:#FFF6E8; --gold:#F7A437; --gold2:#FFD84D; --lava:#E8503C;
+    --teal:#3FA8D9; --moss:#7ECB4F; --dim:#9b8d99; --blue:#2D78FF;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; overflow:hidden; }
+  body {
+    background:var(--bg); color:var(--cream);
+    font:13px/1.45 "Trebuchet MS", Verdana, sans-serif;
+    display:grid; grid-template-rows:46px 1fr 26px; grid-template-columns:236px 1fr 300px;
+    grid-template-areas:"toolbar toolbar toolbar" "shapes stage panel" "status status status";
+  }
+
+  /* ---------------- toolbar ---------------- */
+  #toolbar { grid-area:toolbar; display:flex; align-items:center; gap:8px;
+    background:var(--panel); border-bottom:1px solid var(--line); padding:0 12px; }
+  #toolbar .brand { color:var(--gold); font-weight:bold; white-space:nowrap; }
+  button { background:var(--panel2); color:var(--cream); border:1px solid var(--line);
+    border-radius:7px; padding:6px 10px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--gold); }
+  button:disabled { opacity:.4; cursor:default; border-color:var(--line); }
+  button.primary { background:var(--moss); color:#16280c; font-weight:bold; border-color:var(--moss); }
+  button.on { background:var(--gold2); color:#2a2030; font-weight:bold; border-color:var(--gold2); }
+  button.tiny { padding:2px 7px; font-size:11px; }
+  .sep { width:1px; height:24px; background:var(--line); }
+  .spacer { flex:1; }
+  .kbd { font-size:9px; opacity:.65; }
+
+  /* ---------------- side panels ---------------- */
+  #shapes { grid-area:shapes; background:var(--panel); border-right:1px solid var(--line);
+    overflow-y:auto; padding:8px; }
+  #panel { grid-area:panel; background:var(--panel); border-left:1px solid var(--line);
+    overflow-y:auto; padding:8px; }
+  h4 { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--gold);
+    margin:12px 2px 6px; display:flex; align-items:center; gap:6px; }
+  h4:first-child { margin-top:2px; }
+  h4 .spacer { flex:1; }
+  .hint { color:var(--dim); font-size:11px; margin:0 2px 8px; }
+  .row { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .row label { flex:none; width:74px; color:var(--dim); font-size:11px; }
+  .row input[type=range] { flex:1; accent-color:var(--blue); min-width:0; }
+  .row input[type=number], .row input[type=text], .row select {
+    background:var(--panel2); color:var(--cream); border:1px solid var(--line);
+    border-radius:6px; padding:4px 6px; font:inherit; font-size:11px; min-width:0; flex:1; }
+  .row input[type=color] { background:var(--panel2); border:1px solid var(--line);
+    border-radius:6px; width:34px; height:24px; padding:1px; cursor:pointer; }
+  .row .val { flex:none; width:40px; text-align:right; color:var(--gold2); font-size:10px; }
+  .row.check { color:var(--dim); font-size:11px; }
+  .row.check input { accent-color:var(--moss); }
+  .row.check label { width:auto; cursor:pointer; color:var(--cream); }
+  .grp { border:1px solid var(--line); border-radius:9px; padding:8px; margin-bottom:9px; background:#241c29; }
+  .btns { display:flex; gap:6px; flex-wrap:wrap; }
+  .btns button { flex:1; font-size:11px; padding:4px 6px; white-space:nowrap; }
+
+  /* item lists (shapes / grids) */
+  .item { display:flex; align-items:center; gap:6px; background:var(--panel2);
+    border:2px solid var(--line); border-radius:9px; padding:5px 7px; margin-bottom:5px; cursor:pointer; }
+  .item:hover { border-color:var(--gold); }
+  .item.sel { border-color:var(--gold2); background:#3d2c40; }
+  .item .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+  .item .sub { font-size:10px; color:var(--dim); }
+  .item .tag { font-size:9px; padding:1px 5px; border-radius:5px; border:1px solid var(--line); }
+  .item .tag.add { color:var(--moss); border-color:#3d5c2c; }
+  .item .tag.sub { color:var(--lava); border-color:#6b2f26; }
+  .item .ico { width:20px; text-align:center; font-size:12px; opacity:.85; }
+  .item .ico:hover { opacity:1; color:var(--gold2); }
+  .empty { color:var(--dim); font-size:11px; font-style:italic; padding:4px 2px 8px; }
+
+  /* ---------------- stage ---------------- */
+  #stageWrap { grid-area:stage; position:relative; overflow:hidden; background:#141018; }
+  #stage { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #drop { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(45,120,255,.16); border:3px dashed var(--blue); font-size:18px; font-weight:bold;
+    pointer-events:none; }
+  #drop.on { display:flex; }
+  #viewbar { position:absolute; top:10px; left:50%; transform:translateX(-50%); display:flex; gap:6px;
+    background:rgba(42,32,48,.86); border:1px solid var(--line); border-radius:20px; padding:4px 6px; }
+  #viewbar button { border:none; background:transparent; padding:4px 12px; border-radius:16px; font-size:12px; }
+  #viewbar button.on { background:var(--gold2); color:#2a2030; font-weight:bold; }
+  #stageHint { position:absolute; bottom:10px; left:0; right:0; text-align:center; color:var(--dim);
+    font-size:11px; pointer-events:none; text-shadow:0 1px 3px #000; }
+
+  #status { grid-area:status; background:var(--panel); border-top:1px solid var(--line);
+    padding:5px 14px; color:var(--dim); white-space:nowrap; overflow:hidden;
+    display:flex; gap:16px; align-items:center; }
+  #status b { color:var(--gold2); font-weight:normal; }
+  input[type=file] { display:none; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span class="brand">🎭 Mask Studio</span>
+  <button id="bUpload">Upload image</button>
+  <div class="sep"></div>
+  <button id="tPen"  class="tool on" data-tool="pen">✒️ Pen <span class="kbd">P</span></button>
+  <button id="tEdit" class="tool"    data-tool="edit">✥ Edit <span class="kbd">E</span></button>
+  <button id="tGrid" class="tool"    data-tool="grid">▦ Grid <span class="kbd">G</span></button>
+  <button id="tPan"  class="tool"    data-tool="pan">✋ Pan <span class="kbd">H</span></button>
+  <div class="sep"></div>
+  <button id="bInvert">◐ Invert mask <span class="kbd">I</span></button>
+  <div class="sep"></div>
+  <button id="bUndo" title="Ctrl+Z">↶</button>
+  <button id="bRedo" title="Ctrl+Shift+Z">↷</button>
+  <div class="spacer"></div>
+  <button id="bSave">Save .json</button>
+  <button id="bLoad">Load .json</button>
+  <button id="bExport" class="primary">⬇ Export PNG</button>
+</div>
+
+<div id="shapes">
+  <h4>Source<span class="spacer"></span><button class="tiny" id="bFit">Fit</button></h4>
+  <div class="hint" id="srcInfo">No image — drop one on the stage, paste from the clipboard, or draw on a blank canvas.</div>
+  <div class="grp" id="blankGrp">
+    <div class="row"><label>Blank W</label><input type="number" id="blankW" value="2048" min="16" max="16384" step="1"></div>
+    <div class="row"><label>Blank H</label><input type="number" id="blankH" value="1280" min="16" max="16384" step="1"></div>
+    <div class="btns"><button id="bBlank">Use blank canvas</button></div>
+  </div>
+
+  <h4>Mask shapes<span class="spacer"></span><button class="tiny" id="bAddShape">+ Shape</button></h4>
+  <div class="hint">Pen: click to drop points, click the first point (or Enter) to close. Alt-click a point in Edit removes it; click a segment to insert.</div>
+  <div id="shapeList"></div>
+  <div class="grp" id="shapeProps">
+    <div class="row"><label>Name</label><input type="text" id="shName"></div>
+    <div class="row"><label>Mode</label>
+      <select id="shMode"><option value="add">Add (white)</option><option value="sub">Subtract (black)</option></select>
+    </div>
+    <div class="row check"><input type="checkbox" id="shSmooth"><label for="shSmooth">Smooth (spline through points)</label></div>
+    <div class="btns">
+      <button id="shDup">Duplicate</button>
+      <button id="shDel">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="stageWrap">
+  <canvas id="stage"></canvas>
+  <div id="viewbar">
+    <button class="vm on" data-view="overlay">Overlay</button>
+    <button class="vm" data-view="mask">Mask</button>
+    <button class="vm" data-view="image">Image</button>
+  </div>
+  <div id="drop">Drop image to load</div>
+  <div id="stageHint"></div>
+</div>
+
+<div id="panel">
+  <h4>Tile grids<span class="spacer"></span><button class="tiny" id="bAddGrid">+ Grid</button></h4>
+  <div class="hint">Drag the corner squares for perspective, the centre diamond to move. In Grid mode click a tile to toggle it; click-hold and drag to paint a run of tiles (Alt = erase).</div>
+  <div id="gridList"></div>
+
+  <div class="grp" id="gridProps">
+    <div class="row"><label>Name</label><input type="text" id="gName"></div>
+    <div class="row"><label>Columns</label>
+      <button class="tiny" id="gColsM">−</button><input type="number" id="gCols" min="1" max="512" step="1"><button class="tiny" id="gColsP">+</button>
+    </div>
+    <div class="row"><label>Rows</label>
+      <button class="tiny" id="gRowsM">−</button><input type="number" id="gRows" min="1" max="512" step="1"><button class="tiny" id="gRowsP">+</button>
+    </div>
+    <div class="row"><label>Scale</label><input type="range" id="gScale" min="-100" max="100" value="0"><span class="val" id="gScaleV">drag</span></div>
+    <div class="row"><label>Rotate</label><input type="range" id="gRot" min="-100" max="100" value="0"><span class="val" id="gRotV">drag</span></div>
+    <div class="row"><label>Persp ↕</label><input type="range" id="gPerspV" min="-100" max="100" value="0"><span class="val" id="gPerspVV">drag</span></div>
+    <div class="row"><label>Persp ↔</label><input type="range" id="gPerspH" min="-100" max="100" value="0"><span class="val" id="gPerspHV">drag</span></div>
+    <div class="row"><label>Line px</label><input type="range" id="gLine" min="1" max="16" step="1" value="3"><span class="val" id="gLineV">3</span></div>
+    <div class="btns">
+      <button id="gRect">Rectangle</button>
+      <button id="gIso">Isometric</button>
+      <button id="gFitImg">Fit image</button>
+    </div>
+    <div class="btns" style="margin-top:6px">
+      <button id="gFillAll">All tiles</button>
+      <button id="gInvCells">Invert tiles</button>
+      <button id="gClear">Clear</button>
+    </div>
+    <div class="btns" style="margin-top:6px">
+      <button id="gDup">Duplicate</button>
+      <button id="gDel">Delete grid</button>
+    </div>
+  </div>
+
+  <h4>Output</h4>
+  <div class="grp">
+    <div class="row check"><input type="checkbox" id="oGrid" checked><label for="oGrid">Draw grids on the export</label></div>
+    <div class="row check"><input type="checkbox" id="oOnlyActive"><label for="oOnlyActive">Only active tiles (hide lattice)</label></div>
+    <div class="row"><label>Grid colour</label><input type="color" id="oColor" value="#2d78ff"><span class="val" id="oColorV">blue</span></div>
+    <div class="row"><label>Tile fill</label><input type="range" id="oFill" min="0" max="100" value="55"><span class="val" id="oFillV">55%</span></div>
+    <div class="row"><label>Size</label><span class="val" id="oSize" style="width:auto;color:var(--dim)">—</span></div>
+    <div class="btns">
+      <button id="bExport2" class="primary">⬇ Export mask PNG</button>
+    </div>
+    <div class="btns" style="margin-top:6px">
+      <button id="bExportCells">Export tiles .json</button>
+    </div>
+  </div>
+</div>
+
+<div id="status"></div>
+
+<input type="file" id="fileImg" accept="image/*">
+<input type="file" id="fileJson" accept="application/json,.json">
+
+<script>
+(() => {
+'use strict';
+
+// ---------------------------------------------------------------- constants
+const BLUE_DEFAULT = '#2d78ff';
+const HANDLE = 7;            // corner handle half-size, screen px
+const VERT   = 4.5;          // shape vertex radius, screen px
+const HIT    = 9;            // pick radius, screen px
+const UNDO_MAX = 80;
+
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// ---------------------------------------------------------------- state
+// All geometry lives in MASK space (source-image pixels), so the export is a
+// straight 1:1 render and the viewport is only ever a view transform.
+const S = {
+  img: null,
+  imgData: null,       // the source file's own bytes, re-embedded on save
+  imgName: 'blank',
+  W: 2048, H: 1280,
+  shapes: [],          // {id,name,pts:[{x,y}],mode:'add'|'sub',smooth,visible}
+  grids: [],           // {id,name,cols,rows,quad:[4×{x,y}],cells:Set<"i,j">,visible,line}
+  selShape: -1,
+  selGrid: -1,
+  draft: null,         // pen-in-progress shape
+  invert: false,
+  tool: 'pen',
+  viewMode: 'overlay',
+  view: { x: 0, y: 0, z: 1 },
+  out: { grid: true, onlyActive: false, color: BLUE_DEFAULT, fill: 0.55 }
+};
+let nextId = 1;
+
+const cv = $('stage');
+const ctx = cv.getContext('2d');
+const maskCv = document.createElement('canvas');   // B/W mask at full mask res
+const maskCtx = maskCv.getContext('2d');
+let maskDirty = true;
+
+// ---------------------------------------------------------------- homography
+// Unit square (0,0)-(1,1) → quad [TL,TR,BR,BL]. Projective, so a grid line is
+// still a straight segment after mapping — two mapped endpoints draw it.
+function homography(q) {
+  const [p0, p1, p2, p3] = q;
+  const dx1 = p1.x - p2.x, dx2 = p3.x - p2.x, dx3 = p0.x - p1.x + p2.x - p3.x;
+  const dy1 = p1.y - p2.y, dy2 = p3.y - p2.y, dy3 = p0.y - p1.y + p2.y - p3.y;
+  let a, b, c, d, e, f, g, h;
+  if (Math.abs(dx3) < 1e-9 && Math.abs(dy3) < 1e-9) {
+    g = 0; h = 0;
+    a = p1.x - p0.x; b = p2.x - p1.x; c = p0.x;
+    d = p1.y - p0.y; e = p2.y - p1.y; f = p0.y;
+  } else {
+    const den = dx1 * dy2 - dy1 * dx2;
+    if (Math.abs(den) < 1e-9) return null;
+    g = (dx3 * dy2 - dy3 * dx2) / den;
+    h = (dx1 * dy3 - dy1 * dx3) / den;
+    a = p1.x - p0.x + g * p1.x; b = p3.x - p0.x + h * p3.x; c = p0.x;
+    d = p1.y - p0.y + g * p1.y; e = p3.y - p0.y + h * p3.y; f = p0.y;
+  }
+  return { a, b, c, d, e, f, g, h };
+}
+function mapUV(M, u, v) {
+  const w = M.g * u + M.h * v + 1;
+  return { x: (M.a * u + M.b * v + M.c) / w, y: (M.d * u + M.e * v + M.f) / w };
+}
+// Inverse (adjugate of [[a,b,c],[d,e,f],[g,h,1]]) — point → unit square.
+function invUV(M, x, y) {
+  const { a, b, c, d, e, f, g, h } = M;
+  const A = e - f * h, B = c * h - b, C = b * f - c * e;
+  const D = f * g - d, E = a - c * g, F = c * d - a * f;
+  const G = d * h - e * g, H = b * g - a * h, I = a * e - b * d;
+  const w = G * x + H * y + I;
+  if (Math.abs(w) < 1e-9) return null;
+  return { u: (A * x + B * y + C) / w, v: (D * x + E * y + F) / w };
+}
+
+// ---------------------------------------------------------------- factories
+function newShape(name) {
+  return { id: nextId++, name: name || `shape ${S.shapes.length + 1}`, pts: [],
+           mode: 'add', smooth: false, visible: true };
+}
+function newGrid() {
+  // Default quad = middle half of the mask, axis aligned.
+  const w = S.W * 0.5, h = S.H * 0.5, x = S.W * 0.25, y = S.H * 0.25;
+  return {
+    id: nextId++, name: `grid ${S.grids.length + 1}`, cols: 8, rows: 8, line: 3,
+    quad: [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }],
+    cells: new Set(), visible: true
+  };
+}
+function selShape() { return S.shapes[S.selShape] || null; }
+function selGrid() { return S.grids[S.selGrid] || null; }
+
+// ---------------------------------------------------------------- undo
+const undoStack = [], redoStack = [];
+function snapshot() {
+  return JSON.stringify({
+    shapes: S.shapes, invert: S.invert, W: S.W, H: S.H,
+    grids: S.grids.map((g) => ({ ...g, cells: [...g.cells] })),
+    selShape: S.selShape, selGrid: S.selGrid
+  });
+}
+function restore(json) {
+  const d = JSON.parse(json);
+  S.shapes = d.shapes; S.invert = d.invert; S.W = d.W; S.H = d.H;
+  S.grids = d.grids.map((g) => ({ ...g, cells: new Set(g.cells) }));
+  S.selShape = Math.min(d.selShape, S.shapes.length - 1);
+  S.selGrid = Math.min(d.selGrid, S.grids.length - 1);
+  S.draft = null;
+  sizeMask(); maskDirty = true; syncUI(); render();
+}
+function pushUndo() {
+  undoStack.push(snapshot());
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack.length = 0;
+  refreshUndoBtns();
+}
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(snapshot());
+  restore(undoStack.pop());
+  refreshUndoBtns();
+}
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(snapshot());
+  restore(redoStack.pop());
+  refreshUndoBtns();
+}
+function refreshUndoBtns() {
+  $('bUndo').disabled = !undoStack.length;
+  $('bRedo').disabled = !redoStack.length;
+}
+
+// ---------------------------------------------------------------- view
+function toScreen(p) { return { x: (p.x - S.view.x) * S.view.z, y: (p.y - S.view.y) * S.view.z }; }
+function toMask(sx, sy) { return { x: sx / S.view.z + S.view.x, y: sy / S.view.z + S.view.y }; }
+function sw(px) { return px / S.view.z; }     // screen-constant width in mask units
+
+function fitView() {
+  const r = cv.getBoundingClientRect();
+  const z = Math.min(r.width / S.W, r.height / S.H) * 0.92;
+  S.view.z = z;
+  S.view.x = S.W / 2 - r.width / (2 * z);
+  S.view.y = S.H / 2 - r.height / (2 * z);
+  render();
+}
+
+function sizeMask() {
+  if (maskCv.width !== S.W || maskCv.height !== S.H) {
+    maskCv.width = S.W; maskCv.height = S.H;
+    maskDirty = true;
+  }
+  $('oSize').textContent = `${S.W} × ${S.H}`;
+}
+
+// ---------------------------------------------------------------- mask render
+function pathPts(c, pts, smooth, closed) {
+  const n = pts.length;
+  if (n < 2) return;
+  if (!smooth) {
+    c.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < n; i++) c.lineTo(pts[i].x, pts[i].y);
+    if (closed) c.closePath();
+    return;
+  }
+  const at = (i) => pts[closed ? (i % n + n) % n : clamp(i, 0, n - 1)];
+  c.moveTo(at(0).x, at(0).y);
+  const last = closed ? n : n - 1;
+  for (let i = 0; i < last; i++) {
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+    c.bezierCurveTo(
+      p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
+      p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
+      p2.x, p2.y
+    );
+  }
+  if (closed) c.closePath();
+}
+
+/** Paint the pure black/white mask (invert applied) into `c` at mask resolution. */
+function paintMask(c) {
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'source-over';
+  c.fillStyle = '#000';
+  c.fillRect(0, 0, S.W, S.H);
+  for (const s of S.shapes) {
+    if (!s.visible || s.pts.length < 3) continue;
+    c.fillStyle = s.mode === 'sub' ? '#000' : '#fff';
+    c.beginPath();
+    pathPts(c, s.pts, s.smooth, true);
+    c.fill('nonzero');
+  }
+  if (S.invert) {
+    c.globalCompositeOperation = 'difference';
+    c.fillStyle = '#fff';
+    c.fillRect(0, 0, S.W, S.H);
+    c.globalCompositeOperation = 'source-over';
+  }
+}
+function refreshMask() {
+  if (!maskDirty) return;
+  paintMask(maskCtx);
+  maskDirty = false;
+}
+
+/** Grid overlay in mask coordinates — the same call serves preview and export. */
+function paintGrids(c, opts) {
+  const fillA = opts.fill;
+  for (const g of S.grids) {
+    if (!g.visible) continue;
+    const M = homography(g.quad);
+    if (!M) continue;
+    // active tiles
+    if (fillA > 0 && g.cells.size) {
+      c.fillStyle = opts.color;
+      c.globalAlpha = fillA;
+      for (const key of g.cells) {
+        const [i, j] = key.split(',').map(Number);
+        if (i >= g.cols || j >= g.rows) continue;
+        const u0 = i / g.cols, u1 = (i + 1) / g.cols, v0 = j / g.rows, v1 = (j + 1) / g.rows;
+        const a = mapUV(M, u0, v0), b = mapUV(M, u1, v0), d = mapUV(M, u1, v1), e = mapUV(M, u0, v1);
+        c.beginPath();
+        c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.lineTo(d.x, d.y); c.lineTo(e.x, e.y);
+        c.closePath(); c.fill();
+      }
+      c.globalAlpha = 1;
+    }
+    // lattice
+    if (!opts.onlyActive) {
+      c.strokeStyle = opts.color;
+      c.lineWidth = opts.line != null ? opts.line : g.line;
+      c.lineJoin = 'round';
+      c.beginPath();
+      for (let i = 0; i <= g.cols; i++) {
+        const a = mapUV(M, i / g.cols, 0), b = mapUV(M, i / g.cols, 1);
+        c.moveTo(a.x, a.y); c.lineTo(b.x, b.y);
+      }
+      for (let j = 0; j <= g.rows; j++) {
+        const a = mapUV(M, 0, j / g.rows), b = mapUV(M, 1, j / g.rows);
+        c.moveTo(a.x, a.y); c.lineTo(b.x, b.y);
+      }
+      c.stroke();
+    } else if (g.cells.size) {
+      // outline the painted tiles so they read as tiles, not blobs
+      c.strokeStyle = opts.color;
+      c.lineWidth = opts.line != null ? opts.line : g.line;
+      c.beginPath();
+      for (const key of g.cells) {
+        const [i, j] = key.split(',').map(Number);
+        if (i >= g.cols || j >= g.rows) continue;
+        const u0 = i / g.cols, u1 = (i + 1) / g.cols, v0 = j / g.rows, v1 = (j + 1) / g.rows;
+        const a = mapUV(M, u0, v0), b = mapUV(M, u1, v0), d = mapUV(M, u1, v1), e = mapUV(M, u0, v1);
+        c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.lineTo(d.x, d.y); c.lineTo(e.x, e.y); c.closePath();
+      }
+      c.stroke();
+    }
+  }
+}
+
+// ---------------------------------------------------------------- viewport render
+let rafPending = false;
+function render() {
+  if (rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(draw);
+}
+function draw() {
+  rafPending = false;
+  const dpr = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect();
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) {
+    cv.width = Math.round(r.width * dpr);
+    cv.height = Math.round(r.height * dpr);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#141018';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  const z = S.view.z;
+  ctx.setTransform(dpr * z, 0, 0, dpr * z, -S.view.x * z * dpr, -S.view.y * z * dpr);
+
+  // mask-space page
+  ctx.fillStyle = '#0a080d';
+  ctx.fillRect(0, 0, S.W, S.H);
+
+  refreshMask();
+  if (S.viewMode === 'mask') {
+    ctx.drawImage(maskCv, 0, 0);
+  } else {
+    if (S.img) ctx.drawImage(S.img, 0, 0, S.W, S.H);
+    if (S.viewMode === 'overlay') {
+      // white mask lifts the image, black leaves it — same read as the export
+      ctx.globalAlpha = 0.45;
+      ctx.globalCompositeOperation = 'screen';
+      ctx.drawImage(maskCv, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // page border
+  ctx.strokeStyle = '#473548';
+  ctx.lineWidth = sw(1);
+  ctx.strokeRect(0, 0, S.W, S.H);
+
+  paintGrids(ctx, { color: S.out.color, fill: S.out.fill, line: null, onlyActive: false });
+  drawGridHandles();
+  drawShapeOverlay();
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  updateStatus();
+}
+
+function drawGridHandles() {
+  S.grids.forEach((g, gi) => {
+    if (!g.visible) return;
+    const active = gi === S.selGrid;
+    if (!active && S.tool !== 'grid') return;
+    ctx.strokeStyle = active ? '#FFD84D' : 'rgba(255,216,77,.35)';
+    ctx.lineWidth = sw(active ? 2 : 1);
+    ctx.beginPath();
+    g.quad.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.stroke();
+    if (!active) return;
+    const s = sw(HANDLE);
+    ctx.fillStyle = '#FFD84D';
+    for (const p of g.quad) ctx.fillRect(p.x - s, p.y - s, s * 2, s * 2);
+    const c = centroid(g.quad), d = sw(HANDLE + 1.5);
+    ctx.beginPath();
+    ctx.moveTo(c.x, c.y - d); ctx.lineTo(c.x + d, c.y); ctx.lineTo(c.x, c.y + d); ctx.lineTo(c.x - d, c.y);
+    ctx.closePath();
+    ctx.fillStyle = '#F7A437';
+    ctx.fill();
+  });
+}
+
+function drawShapeOverlay() {
+  const showVerts = S.tool === 'pen' || S.tool === 'edit';
+  S.shapes.forEach((s, si) => {
+    if (!s.visible || !s.pts.length) return;
+    const sel = si === S.selShape;
+    ctx.strokeStyle = s.mode === 'sub' ? '#E8503C' : '#7ECB4F';
+    ctx.lineWidth = sw(sel ? 2 : 1.25);
+    ctx.setLineDash(sel ? [] : [sw(6), sw(5)]);
+    ctx.beginPath();
+    pathPts(ctx, s.pts, s.smooth, true);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (!showVerts || !sel) return;
+    const rr = sw(VERT);
+    for (let i = 0; i < s.pts.length; i++) {
+      const p = s.pts[i];
+      ctx.fillStyle = i === 0 ? '#FFD84D' : '#FFF6E8';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#1d1622';
+      ctx.lineWidth = sw(1);
+      ctx.stroke();
+    }
+  });
+
+  const d = S.draft;
+  if (d && d.pts.length) {
+    ctx.strokeStyle = '#FFD84D';
+    ctx.lineWidth = sw(2);
+    ctx.beginPath();
+    ctx.moveTo(d.pts[0].x, d.pts[0].y);
+    for (let i = 1; i < d.pts.length; i++) ctx.lineTo(d.pts[i].x, d.pts[i].y);
+    if (hoverPt) ctx.lineTo(hoverPt.x, hoverPt.y);
+    ctx.stroke();
+    if (d.pts.length > 1 && hoverPt) {
+      ctx.setLineDash([sw(5), sw(5)]);
+      ctx.strokeStyle = 'rgba(255,216,77,.5)';
+      ctx.beginPath();
+      ctx.moveTo(hoverPt.x, hoverPt.y);
+      ctx.lineTo(d.pts[0].x, d.pts[0].y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    const rr = sw(VERT);
+    d.pts.forEach((p, i) => {
+      ctx.fillStyle = i === 0 ? '#F7A437' : '#FFF6E8';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, i === 0 ? rr * 1.4 : rr, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+}
+
+function centroid(q) {
+  return { x: (q[0].x + q[1].x + q[2].x + q[3].x) / 4, y: (q[0].y + q[1].y + q[2].y + q[3].y) / 4 };
+}
+
+// ---------------------------------------------------------------- picking
+function pickVertex(s, m) {
+  const r = sw(HIT);
+  for (let i = s.pts.length - 1; i >= 0; i--) {
+    const p = s.pts[i];
+    if (Math.hypot(p.x - m.x, p.y - m.y) <= r) return i;
+  }
+  return -1;
+}
+function pickSegment(s, m) {
+  const r = sw(HIT), n = s.pts.length;
+  for (let i = 0; i < n; i++) {
+    const a = s.pts[i], b = s.pts[(i + 1) % n];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1e-6) continue;
+    const t = clamp(((m.x - a.x) * dx + (m.y - a.y) * dy) / len2, 0, 1);
+    const px = a.x + dx * t, py = a.y + dy * t;
+    if (Math.hypot(px - m.x, py - m.y) <= r) return { i, t, p: { x: px, y: py } };
+  }
+  return null;
+}
+function pointInShape(s, m) {
+  const p = new Path2D();
+  pathPts(p, s.pts, s.smooth, true);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const hit = ctx.isPointInPath(p, m.x, m.y);
+  ctx.restore();
+  return hit;
+}
+function pickGridHandle(g, m) {
+  const r = sw(HANDLE + 3);
+  for (let i = 0; i < 4; i++) {
+    const p = g.quad[i];
+    if (Math.abs(p.x - m.x) <= r && Math.abs(p.y - m.y) <= r) return i;
+  }
+  const c = centroid(g.quad);
+  if (Math.abs(c.x - m.x) + Math.abs(c.y - m.y) <= r * 1.3) return 4;   // centre diamond
+  return -1;
+}
+function cellAt(g, m) {
+  const M = homography(g.quad);
+  if (!M) return null;
+  const uv = invUV(M, m.x, m.y);
+  if (!uv || uv.u < 0 || uv.u >= 1 || uv.v < 0 || uv.v >= 1) return null;
+  return { i: Math.floor(uv.u * g.cols), j: Math.floor(uv.v * g.rows) };
+}
+function gridUnder(m) {
+  for (let i = S.grids.length - 1; i >= 0; i--) {
+    if (S.grids[i].visible && cellAt(S.grids[i], m)) return i;
+  }
+  return -1;
+}
+
+// ---------------------------------------------------------------- interaction
+let drag = null;         // {kind, ...}
+let hoverPt = null;
+let spaceDown = false;
+
+cv.addEventListener('pointerdown', (ev) => {
+  cv.setPointerCapture(ev.pointerId);
+  const r = cv.getBoundingClientRect();
+  const m = toMask(ev.clientX - r.left, ev.clientY - r.top);
+  const panning = S.tool === 'pan' || spaceDown || ev.button === 1 ||
+                  (ev.button === 2 && S.tool !== 'grid');
+  if (panning) {
+    drag = { kind: 'pan', sx: ev.clientX, sy: ev.clientY, vx: S.view.x, vy: S.view.y };
+    return;
+  }
+  if (ev.button !== 0) return;
+
+  if (S.tool === 'pen') return penDown(m);
+  if (S.tool === 'edit') return editDown(m, ev);
+  if (S.tool === 'grid') return gridDown(m, ev);
+});
+
+cv.addEventListener('pointermove', (ev) => {
+  const r = cv.getBoundingClientRect();
+  const m = toMask(ev.clientX - r.left, ev.clientY - r.top);
+  hoverPt = m;
+
+  if (!drag) {
+    if (S.tool === 'pen' && S.draft) render();
+    updateStatus(m);
+    return;
+  }
+  if (drag.kind === 'pan') {
+    S.view.x = drag.vx - (ev.clientX - drag.sx) / S.view.z;
+    S.view.y = drag.vy - (ev.clientY - drag.sy) / S.view.z;
+    render();
+    return;
+  }
+  if (drag.kind === 'vertex') {
+    const s = S.shapes[drag.si];
+    s.pts[drag.vi] = { x: Math.round(m.x), y: Math.round(m.y) };
+    maskDirty = true; render();
+    return;
+  }
+  if (drag.kind === 'shape') {
+    const s = S.shapes[drag.si];
+    const dx = m.x - drag.mx, dy = m.y - drag.my;
+    s.pts = drag.pts.map((p) => ({ x: Math.round(p.x + dx), y: Math.round(p.y + dy) }));
+    maskDirty = true; render();
+    return;
+  }
+  if (drag.kind === 'corner') {
+    const g = S.grids[drag.gi];
+    g.quad[drag.ci] = { x: m.x, y: m.y };
+    render();
+    return;
+  }
+  if (drag.kind === 'gridmove') {
+    const g = S.grids[drag.gi];
+    const dx = m.x - drag.mx, dy = m.y - drag.my;
+    g.quad = drag.quad.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+    render();
+    return;
+  }
+  if (drag.kind === 'paint') {
+    // Interpolate along the stroke so a fast drag never skips a tile.
+    const g = S.grids[drag.gi];
+    const dist = Math.hypot(m.x - drag.last.x, m.y - drag.last.y);
+    const cellPx = Math.max(6, Math.min(S.W / g.cols, S.H / g.rows) / 3);
+    const steps = Math.max(1, Math.ceil(dist / cellPx));
+    for (let k = 1; k <= steps; k++) {
+      const p = { x: drag.last.x + (m.x - drag.last.x) * (k / steps),
+                  y: drag.last.y + (m.y - drag.last.y) * (k / steps) };
+      applyPaint(g, p, drag.value);
+    }
+    drag.last = m;
+    render();
+    return;
+  }
+});
+
+const endDrag = () => {
+  if (drag && drag.kind !== 'pan') { syncUI(); }
+  drag = null;
+};
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+
+cv.addEventListener('dblclick', () => {
+  if (S.tool === 'pen' && S.draft && S.draft.pts.length >= 3) commitDraft();
+});
+
+cv.addEventListener('wheel', (ev) => {
+  ev.preventDefault();
+  const r = cv.getBoundingClientRect();
+  const sx = ev.clientX - r.left, sy = ev.clientY - r.top;
+  const before = toMask(sx, sy);
+  const f = Math.pow(1.0015, -ev.deltaY);
+  S.view.z = clamp(S.view.z * f, 0.02, 40);
+  const after = toMask(sx, sy);
+  S.view.x += before.x - after.x;
+  S.view.y += before.y - after.y;
+  render();
+}, { passive: false });
+
+function penDown(m) {
+  if (!S.draft) {
+    pushUndo();
+    S.draft = newShape();
+  }
+  const p = { x: Math.round(m.x), y: Math.round(m.y) };
+  // clicking the first point closes the ring
+  if (S.draft.pts.length >= 3) {
+    const f = S.draft.pts[0];
+    if (Math.hypot(f.x - p.x, f.y - p.y) <= sw(HIT + 2)) return commitDraft();
+  }
+  S.draft.pts.push(p);
+  render();
+}
+function commitDraft() {
+  if (!S.draft || S.draft.pts.length < 3) { S.draft = null; render(); return; }
+  S.shapes.push(S.draft);
+  S.selShape = S.shapes.length - 1;
+  S.draft = null;
+  maskDirty = true;
+  syncUI(); render();
+}
+
+function editDown(m, ev) {
+  // selected shape first, so overlapping shapes stay editable
+  const order = [];
+  if (S.selShape >= 0) order.push(S.selShape);
+  for (let i = S.shapes.length - 1; i >= 0; i--) if (i !== S.selShape) order.push(i);
+
+  for (const si of order) {
+    const s = S.shapes[si];
+    if (!s.visible || !s.pts.length) continue;
+    const vi = pickVertex(s, m);
+    if (vi >= 0) {
+      pushUndo();
+      S.selShape = si;
+      if (ev.altKey) {
+        if (s.pts.length > 3) s.pts.splice(vi, 1);
+        maskDirty = true; syncUI(); render();
+        return;
+      }
+      drag = { kind: 'vertex', si, vi };
+      syncUI(); render();
+      return;
+    }
+  }
+  for (const si of order) {
+    const s = S.shapes[si];
+    if (!s.visible || s.pts.length < 2) continue;
+    const seg = pickSegment(s, m);
+    if (seg) {
+      pushUndo();
+      S.selShape = si;
+      s.pts.splice(seg.i + 1, 0, { x: Math.round(seg.p.x), y: Math.round(seg.p.y) });
+      drag = { kind: 'vertex', si, vi: seg.i + 1 };
+      maskDirty = true; syncUI(); render();
+      return;
+    }
+  }
+  for (const si of order) {
+    const s = S.shapes[si];
+    if (!s.visible || s.pts.length < 3) continue;
+    if (pointInShape(s, toScreenAbs(m))) {
+      pushUndo();
+      S.selShape = si;
+      drag = { kind: 'shape', si, mx: m.x, my: m.y, pts: s.pts.map((p) => ({ ...p })) };
+      syncUI(); render();
+      return;
+    }
+  }
+  S.selShape = -1;
+  syncUI(); render();
+}
+// isPointInPath works in device space, so hit-test shapes through the same transform
+function toScreenAbs(m) {
+  const dpr = window.devicePixelRatio || 1;
+  const s = toScreen(m);
+  return { x: s.x * dpr, y: s.y * dpr };
+}
+
+function gridDown(m, ev) {
+  const g = selGrid();
+  if (g && g.visible) {
+    const hi = pickGridHandle(g, m);
+    if (hi >= 0) {
+      pushUndo();
+      drag = hi === 4
+        ? { kind: 'gridmove', gi: S.selGrid, mx: m.x, my: m.y, quad: g.quad.map((p) => ({ ...p })) }
+        : { kind: 'corner', gi: S.selGrid, ci: hi };
+      return;
+    }
+  }
+  const cell = g && g.visible ? cellAt(g, m) : null;
+  if (!cell) {
+    const gi = gridUnder(m);
+    if (gi >= 0 && gi !== S.selGrid) { S.selGrid = gi; syncUI(); render(); return; }
+    if (gi < 0) return;
+  }
+  const gg = selGrid();
+  const c = cell || cellAt(gg, m);
+  if (!c) return;
+  pushUndo();
+  const key = `${c.i},${c.j}`;
+  // The first tile decides the stroke: toggling it sets the value the drag paints.
+  const value = ev.altKey ? false : !gg.cells.has(key);
+  applyPaint(gg, m, value);
+  drag = { kind: 'paint', gi: S.selGrid, value, last: m };
+  render();
+}
+function applyPaint(g, p, value) {
+  const c = cellAt(g, p);
+  if (!c) return;
+  const key = `${c.i},${c.j}`;
+  if (value) g.cells.add(key); else g.cells.delete(key);
+}
+
+// ---------------------------------------------------------------- grid transforms
+function transformQuad(g, fn) { g.quad = g.quad.map(fn); }
+function opScale(g, base, f) {
+  const c = centroid(base);
+  g.quad = base.map((p) => ({ x: c.x + (p.x - c.x) * f, y: c.y + (p.y - c.y) * f }));
+}
+function opRotate(g, base, deg) {
+  const c = centroid(base), a = deg * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  g.quad = base.map((p) => {
+    const dx = p.x - c.x, dy = p.y - c.y;
+    return { x: c.x + dx * ca - dy * sa, y: c.y + dx * sa + dy * ca };
+  });
+}
+// Perspective = converge one edge while the opposite edge diverges, which is
+// exactly what a projective quad needs to read as a receding plane.
+function opPerspV(g, base, k) {
+  const mt = { x: (base[0].x + base[1].x) / 2, y: (base[0].y + base[1].y) / 2 };
+  const mb = { x: (base[2].x + base[3].x) / 2, y: (base[2].y + base[3].y) / 2 };
+  const at = (p, m2, s) => ({ x: m2.x + (p.x - m2.x) * s, y: m2.y + (p.y - m2.y) * s });
+  g.quad = [at(base[0], mt, k), at(base[1], mt, k), at(base[2], mb, 1 / k), at(base[3], mb, 1 / k)];
+}
+function opPerspH(g, base, k) {
+  const ml = { x: (base[0].x + base[3].x) / 2, y: (base[0].y + base[3].y) / 2 };
+  const mr = { x: (base[1].x + base[2].x) / 2, y: (base[1].y + base[2].y) / 2 };
+  const at = (p, m2, s) => ({ x: m2.x + (p.x - m2.x) * s, y: m2.y + (p.y - m2.y) * s });
+  g.quad = [at(base[0], ml, k), at(base[1], mr, 1 / k), at(base[2], mr, 1 / k), at(base[3], ml, k)];
+}
+
+/**
+ * The quad itself is the truth (corners are dragged freely), so the sliders are
+ * relative nudges: snapshot on grab, apply the delta, spring back to centre.
+ */
+function relSlider(el, apply) {
+  let base = null, start = 0, prev = 0;
+  // `from` is the value the grab started at: the thumb position on a pointer
+  // grab, but 0 (the neutral rest position) when the arrow keys move it, so a
+  // keyboard nudge still resolves to a non-zero delta.
+  const grab = (from) => {
+    const g = selGrid();
+    if (!g) return;
+    base = g.quad.map((p) => ({ ...p }));
+    start = from;
+    pushUndo();
+  };
+  const release = () => { base = null; prev = 0; el.value = 0; };
+  el.addEventListener('pointerdown', () => grab(+el.value));
+  el.addEventListener('input', () => {
+    const g = selGrid();
+    if (!g) { el.value = 0; return; }
+    if (!base) grab(prev);
+    if (!base) return;
+    prev = +el.value;
+    apply(g, base, +el.value - start);
+    render();
+  });
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+  el.addEventListener('change', release);
+  el.addEventListener('blur', release);
+}
+
+// ---------------------------------------------------------------- UI lists
+function syncUI() {
+  // shapes
+  const sl = $('shapeList');
+  sl.innerHTML = '';
+  if (!S.shapes.length) sl.innerHTML = '<div class="empty">No shapes yet — pick the Pen and click out a contour.</div>';
+  S.shapes.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'item' + (i === S.selShape ? ' sel' : '');
+    el.innerHTML =
+      `<span class="ico" data-act="vis">${s.visible ? '👁' : '␀'}</span>` +
+      `<span class="nm">${escapeHtml(s.name)}<span class="sub"> · ${s.pts.length} pts</span></span>` +
+      `<span class="tag ${s.mode}">${s.mode === 'sub' ? 'SUB' : 'ADD'}</span>` +
+      `<span class="ico" data-act="up">↑</span><span class="ico" data-act="del">✕</span>`;
+    el.addEventListener('click', (ev) => {
+      const act = ev.target.dataset.act;
+      if (act === 'vis') { pushUndo(); s.visible = !s.visible; maskDirty = true; }
+      else if (act === 'del') { pushUndo(); S.shapes.splice(i, 1); S.selShape = Math.min(S.selShape, S.shapes.length - 1); maskDirty = true; }
+      else if (act === 'up') { if (i > 0) { pushUndo(); S.shapes.splice(i - 1, 0, S.shapes.splice(i, 1)[0]); S.selShape = i - 1; maskDirty = true; } }
+      else S.selShape = i;
+      syncUI(); render();
+    });
+    sl.appendChild(el);
+  });
+  const s = selShape();
+  $('shapeProps').style.display = s ? '' : 'none';
+  if (s) {
+    $('shName').value = s.name;
+    $('shMode').value = s.mode;
+    $('shSmooth').checked = s.smooth;
+  }
+
+  // grids
+  const gl = $('gridList');
+  gl.innerHTML = '';
+  if (!S.grids.length) gl.innerHTML = '<div class="empty">No grids — add one, then drag its corners.</div>';
+  S.grids.forEach((g, i) => {
+    const el = document.createElement('div');
+    el.className = 'item' + (i === S.selGrid ? ' sel' : '');
+    el.innerHTML =
+      `<span class="ico" data-act="vis">${g.visible ? '👁' : '␀'}</span>` +
+      `<span class="nm">${escapeHtml(g.name)}<span class="sub"> · ${g.cols}×${g.rows} · ${g.cells.size} on</span></span>` +
+      `<span class="ico" data-act="del">✕</span>`;
+    el.addEventListener('click', (ev) => {
+      const act = ev.target.dataset.act;
+      if (act === 'vis') { pushUndo(); g.visible = !g.visible; }
+      else if (act === 'del') { pushUndo(); S.grids.splice(i, 1); S.selGrid = Math.min(S.selGrid, S.grids.length - 1); }
+      else S.selGrid = i;
+      syncUI(); render();
+    });
+    gl.appendChild(el);
+  });
+  const g = selGrid();
+  $('gridProps').style.display = g ? '' : 'none';
+  if (g) {
+    $('gName').value = g.name;
+    $('gCols').value = g.cols;
+    $('gRows').value = g.rows;
+    $('gLine').value = g.line;
+    $('gLineV').textContent = g.line;
+  }
+
+  document.querySelectorAll('.tool').forEach((b) => b.classList.toggle('on', b.dataset.tool === S.tool));
+  document.querySelectorAll('.vm').forEach((b) => b.classList.toggle('on', b.dataset.view === S.viewMode));
+  $('bInvert').classList.toggle('on', S.invert);
+  $('srcInfo').textContent = S.img
+    ? `${S.imgName} — ${S.W}×${S.H}`
+    : `Blank ${S.W}×${S.H} — drop an image on the stage, or paste one.`;
+  sizeMask();
+  refreshUndoBtns();
+  $('stageHint').textContent = HINTS[S.tool];
+}
+const HINTS = {
+  pen: 'Click to drop mask points · click the first point or press Enter to close · Esc undoes the last point · Space/right-drag pans',
+  edit: 'Drag points · click a segment to insert a point · Alt-click a point to remove it · drag inside a shape to move it',
+  grid: 'Click a tile to toggle · click-hold and drag to paint a run · Alt-drag erases · drag corner squares for perspective, the diamond to move',
+  pan: 'Drag to pan · wheel to zoom'
+};
+function escapeHtml(t) { return String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function updateStatus(m) {
+  const parts = [
+    `<b>${S.W}×${S.H}</b> mask`,
+    `zoom <b>${(S.view.z * 100).toFixed(0)}%</b>`,
+    `<b>${S.shapes.length}</b> shape${S.shapes.length === 1 ? '' : 's'}`,
+    `<b>${S.grids.length}</b> grid${S.grids.length === 1 ? '' : 's'}`,
+    `<b>${S.grids.reduce((a, g) => a + g.cells.size, 0)}</b> tiles on`,
+    S.invert ? '<b>INVERTED</b>' : ''
+  ];
+  if (m) {
+    parts.push(`x <b>${Math.round(m.x)}</b> y <b>${Math.round(m.y)}</b>`);
+    const g = selGrid();
+    if (g) {
+      const c = cellAt(g, m);
+      parts.push(c ? `cell <b>${c.i},${c.j}</b>` : 'cell <b>—</b>');
+    }
+  }
+  $('status').innerHTML = parts.filter(Boolean).map((p) => `<span>${p}</span>`).join('');
+}
+
+// ---------------------------------------------------------------- image load
+function loadImageFile(file) {
+  // Read as a data URL rather than an object URL: the same bytes are what a
+  // saved project embeds, so a 500 KB jpg stays 500 KB instead of being
+  // re-encoded to a multi-megabyte PNG on every save.
+  const fr = new FileReader();
+  fr.onload = () => {
+    const img = new Image();
+    img.onload = () => { pushUndo(); setImage(img, file.name, String(fr.result)); };
+    img.onerror = () => alert('Could not decode that image.');
+    img.src = String(fr.result);
+  };
+  fr.readAsDataURL(file);
+}
+function setImage(img, name, data) {
+  S.img = img;
+  S.imgData = data || null;
+  S.imgName = name;
+  S.W = img.naturalWidth;
+  S.H = img.naturalHeight;
+  sizeMask();
+  maskDirty = true;
+  syncUI(); fitView();
+}
+
+$('bUpload').addEventListener('click', () => $('fileImg').click());
+$('fileImg').addEventListener('change', (e) => { if (e.target.files[0]) loadImageFile(e.target.files[0]); e.target.value = ''; });
+$('bBlank').addEventListener('click', () => {
+  pushUndo();
+  S.img = null; S.imgData = null; S.imgName = 'blank';
+  S.W = clamp(+$('blankW').value | 0, 16, 16384);
+  S.H = clamp(+$('blankH').value | 0, 16, 16384);
+  sizeMask(); maskDirty = true; syncUI(); fitView();
+});
+$('bFit').addEventListener('click', fitView);
+
+const dropEl = $('drop');
+const stageWrap = $('stageWrap');
+stageWrap.addEventListener('dragover', (e) => { e.preventDefault(); dropEl.classList.add('on'); });
+stageWrap.addEventListener('dragleave', () => dropEl.classList.remove('on'));
+stageWrap.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropEl.classList.remove('on');
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  if (f.type === 'application/json' || f.name.endsWith('.json')) loadProjectFile(f);
+  else loadImageFile(f);
+});
+window.addEventListener('paste', (e) => {
+  for (const item of e.clipboardData?.items || []) {
+    if (item.type.startsWith('image/')) { loadImageFile(item.getAsFile()); break; }
+  }
+});
+
+// ---------------------------------------------------------------- export
+function buildExport() {
+  const c = document.createElement('canvas');
+  c.width = S.W; c.height = S.H;
+  const x = c.getContext('2d');
+  paintMask(x);
+  if (S.out.grid && S.grids.length) {
+    paintGrids(x, { color: S.out.color, fill: S.out.fill, line: null, onlyActive: S.out.onlyActive });
+  }
+  return c;
+}
+function exportPng() {
+  const c = buildExport();
+  c.toBlob((blob) => {
+    const base = S.imgName.replace(/\.[^.]+$/, '') || 'mask';
+    downloadBlob(blob, `${base}-mask.png`);
+  }, 'image/png');
+}
+function downloadBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+$('bExport').addEventListener('click', exportPng);
+$('bExport2').addEventListener('click', exportPng);
+$('bExportCells').addEventListener('click', () => {
+  const doc = {
+    version: 1,
+    source: S.imgName,
+    size: { w: S.W, h: S.H },
+    invert: S.invert,
+    grids: S.grids.map((g) => ({
+      name: g.name, cols: g.cols, rows: g.rows,
+      quad: g.quad.map((p) => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2) })),
+      cells: [...g.cells].map((k) => k.split(',').map(Number))
+    }))
+  };
+  downloadBlob(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }),
+               `${(S.imgName.replace(/\.[^.]+$/, '') || 'mask')}-tiles.json`);
+});
+
+// project save / load — the image rides along so a project reopens whole
+$('bSave').addEventListener('click', () => {
+  let imgData = S.imgData;
+  if (S.img && !imgData) {
+    const t = document.createElement('canvas');
+    t.width = S.W; t.height = S.H;
+    t.getContext('2d').drawImage(S.img, 0, 0);
+    imgData = t.toDataURL('image/png');
+  }
+  const doc = {
+    version: 1, kind: 'maskstudio',
+    imgName: S.imgName, size: { w: S.W, h: S.H }, image: imgData,
+    invert: S.invert, out: S.out,
+    shapes: S.shapes,
+    grids: S.grids.map((g) => ({ ...g, cells: [...g.cells] }))
+  };
+  downloadBlob(new Blob([JSON.stringify(doc)], { type: 'application/json' }),
+               `${(S.imgName.replace(/\.[^.]+$/, '') || 'mask')}-maskstudio.json`);
+});
+$('bLoad').addEventListener('click', () => $('fileJson').click());
+$('fileJson').addEventListener('change', (e) => { if (e.target.files[0]) loadProjectFile(e.target.files[0]); e.target.value = ''; });
+function loadProjectFile(file) {
+  const fr = new FileReader();
+  fr.onload = () => {
+    let doc;
+    try { doc = JSON.parse(String(fr.result)); } catch { alert('Not valid JSON.'); return; }
+    if (doc.kind !== 'maskstudio') { alert('Not a Mask Studio project.'); return; }
+    pushUndo();
+    S.W = doc.size.w; S.H = doc.size.h;
+    S.imgName = doc.imgName || 'blank';
+    S.invert = !!doc.invert;
+    if (doc.out) Object.assign(S.out, doc.out);
+    S.shapes = doc.shapes || [];
+    S.grids = (doc.grids || []).map((g) => ({ ...g, cells: new Set(g.cells) }));
+    S.selShape = S.shapes.length ? 0 : -1;
+    S.selGrid = S.grids.length ? 0 : -1;
+    nextId = 1 + Math.max(0, ...S.shapes.map((s) => s.id || 0), ...S.grids.map((g) => g.id || 0));
+    const finish = () => { sizeMask(); maskDirty = true; syncOutUI(); syncUI(); fitView(); };
+    if (doc.image) {
+      const img = new Image();
+      img.onload = () => { S.img = img; S.imgData = doc.image; finish(); };
+      img.onerror = finish;
+      img.src = doc.image;
+    } else { S.img = null; S.imgData = null; finish(); }
+  };
+  fr.readAsText(file);
+}
+
+// ---------------------------------------------------------------- wiring
+document.querySelectorAll('.tool').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool)));
+document.querySelectorAll('.vm').forEach((b) => b.addEventListener('click', () => { S.viewMode = b.dataset.view; syncUI(); render(); }));
+function setTool(t) {
+  if (S.tool === 'pen' && t !== 'pen' && S.draft) commitDraft();
+  S.tool = t;
+  syncUI(); render();
+}
+
+$('bInvert').addEventListener('click', () => { pushUndo(); S.invert = !S.invert; maskDirty = true; syncUI(); render(); });
+$('bUndo').addEventListener('click', undo);
+$('bRedo').addEventListener('click', redo);
+
+$('bAddShape').addEventListener('click', () => { setTool('pen'); S.draft = null; render(); });
+$('shName').addEventListener('input', (e) => { const s = selShape(); if (s) { s.name = e.target.value; } });
+$('shName').addEventListener('change', syncUI);
+$('shMode').addEventListener('change', (e) => { const s = selShape(); if (!s) return; pushUndo(); s.mode = e.target.value; maskDirty = true; syncUI(); render(); });
+$('shSmooth').addEventListener('change', (e) => { const s = selShape(); if (!s) return; pushUndo(); s.smooth = e.target.checked; maskDirty = true; render(); });
+$('shDup').addEventListener('click', () => {
+  const s = selShape(); if (!s) return;
+  pushUndo();
+  S.shapes.push({ ...s, id: nextId++, name: s.name + ' copy', pts: s.pts.map((p) => ({ x: p.x + 12, y: p.y + 12 })) });
+  S.selShape = S.shapes.length - 1;
+  maskDirty = true; syncUI(); render();
+});
+$('shDel').addEventListener('click', () => {
+  if (S.selShape < 0) return;
+  pushUndo();
+  S.shapes.splice(S.selShape, 1);
+  S.selShape = Math.min(S.selShape, S.shapes.length - 1);
+  maskDirty = true; syncUI(); render();
+});
+
+$('bAddGrid').addEventListener('click', () => {
+  pushUndo();
+  S.grids.push(newGrid());
+  S.selGrid = S.grids.length - 1;
+  setTool('grid');
+});
+$('gName').addEventListener('input', (e) => { const g = selGrid(); if (g) g.name = e.target.value; });
+$('gName').addEventListener('change', syncUI);
+function setDim(key, v) {
+  const g = selGrid(); if (!g) return;
+  pushUndo();
+  g[key] = clamp(v | 0, 1, 512);
+  // drop tiles that fell outside the new lattice
+  for (const k of [...g.cells]) {
+    const [i, j] = k.split(',').map(Number);
+    if (i >= g.cols || j >= g.rows) g.cells.delete(k);
+  }
+  syncUI(); render();
+}
+$('gCols').addEventListener('change', (e) => setDim('cols', +e.target.value));
+$('gRows').addEventListener('change', (e) => setDim('rows', +e.target.value));
+$('gColsM').addEventListener('click', () => { const g = selGrid(); if (g) setDim('cols', g.cols - 1); });
+$('gColsP').addEventListener('click', () => { const g = selGrid(); if (g) setDim('cols', g.cols + 1); });
+$('gRowsM').addEventListener('click', () => { const g = selGrid(); if (g) setDim('rows', g.rows - 1); });
+$('gRowsP').addEventListener('click', () => { const g = selGrid(); if (g) setDim('rows', g.rows + 1); });
+$('gLine').addEventListener('input', (e) => { const g = selGrid(); if (!g) return; g.line = +e.target.value; $('gLineV').textContent = g.line; render(); });
+
+relSlider($('gScale'), (g, base, d) => opScale(g, base, Math.pow(2, d / 120)));
+relSlider($('gRot'), (g, base, d) => opRotate(g, base, d * 1.8));
+relSlider($('gPerspV'), (g, base, d) => opPerspV(g, base, 1 + d / 220));
+relSlider($('gPerspH'), (g, base, d) => opPerspH(g, base, 1 + d / 220));
+
+$('gRect').addEventListener('click', () => {
+  const g = selGrid(); if (!g) return;
+  pushUndo();
+  const xs = g.quad.map((p) => p.x), ys = g.quad.map((p) => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  g.quad = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+  render();
+});
+$('gIso').addEventListener('click', () => {
+  // 2:1 diamond — the lattice this project's boards are authored on
+  const g = selGrid(); if (!g) return;
+  pushUndo();
+  const c = centroid(g.quad);
+  const xs = g.quad.map((p) => p.x), ys = g.quad.map((p) => p.y);
+  const w = (Math.max(...xs) - Math.min(...xs)) / 2, h = w / 2;
+  g.quad = [{ x: c.x, y: c.y - h }, { x: c.x + w, y: c.y }, { x: c.x, y: c.y + h }, { x: c.x - w, y: c.y }];
+  render();
+});
+$('gFitImg').addEventListener('click', () => {
+  const g = selGrid(); if (!g) return;
+  pushUndo();
+  g.quad = [{ x: 0, y: 0 }, { x: S.W, y: 0 }, { x: S.W, y: S.H }, { x: 0, y: S.H }];
+  render();
+});
+$('gFillAll').addEventListener('click', () => {
+  const g = selGrid(); if (!g) return;
+  pushUndo();
+  g.cells.clear();
+  for (let j = 0; j < g.rows; j++) for (let i = 0; i < g.cols; i++) g.cells.add(`${i},${j}`);
+  syncUI(); render();
+});
+$('gInvCells').addEventListener('click', () => {
+  const g = selGrid(); if (!g) return;
+  pushUndo();
+  const had = g.cells;
+  g.cells = new Set();
+  for (let j = 0; j < g.rows; j++) for (let i = 0; i < g.cols; i++) {
+    const k = `${i},${j}`;
+    if (!had.has(k)) g.cells.add(k);
+  }
+  syncUI(); render();
+});
+$('gClear').addEventListener('click', () => { const g = selGrid(); if (!g) return; pushUndo(); g.cells.clear(); syncUI(); render(); });
+$('gDup').addEventListener('click', () => {
+  const g = selGrid(); if (!g) return;
+  pushUndo();
+  S.grids.push({ ...g, id: nextId++, name: g.name + ' copy',
+                 quad: g.quad.map((p) => ({ x: p.x + 24, y: p.y + 24 })), cells: new Set(g.cells) });
+  S.selGrid = S.grids.length - 1;
+  syncUI(); render();
+});
+$('gDel').addEventListener('click', () => {
+  if (S.selGrid < 0) return;
+  pushUndo();
+  S.grids.splice(S.selGrid, 1);
+  S.selGrid = Math.min(S.selGrid, S.grids.length - 1);
+  syncUI(); render();
+});
+
+function syncOutUI() {
+  $('oGrid').checked = S.out.grid;
+  $('oOnlyActive').checked = S.out.onlyActive;
+  $('oColor').value = S.out.color;
+  $('oFill').value = Math.round(S.out.fill * 100);
+  $('oFillV').textContent = `${Math.round(S.out.fill * 100)}%`;
+}
+$('oGrid').addEventListener('change', (e) => { S.out.grid = e.target.checked; });
+$('oOnlyActive').addEventListener('change', (e) => { S.out.onlyActive = e.target.checked; });
+$('oColor').addEventListener('input', (e) => {
+  S.out.color = e.target.value;
+  $('oColorV').textContent = e.target.value.toLowerCase() === BLUE_DEFAULT ? 'blue' : '';
+  render();
+});
+$('oFill').addEventListener('input', (e) => {
+  S.out.fill = +e.target.value / 100;
+  $('oFillV').textContent = `${e.target.value}%`;
+  render();
+});
+
+// ---------------------------------------------------------------- keyboard
+window.addEventListener('keydown', (e) => {
+  const typing = /input|textarea|select/i.test(document.activeElement?.tagName || '');
+  if (e.code === 'Space' && !typing) { spaceDown = true; e.preventDefault(); }
+  if (typing) return;
+  const meta = e.ctrlKey || e.metaKey;
+  if (meta && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (meta && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+  switch (e.key) {
+    case 'p': case 'P': setTool('pen'); break;
+    case 'e': case 'E': setTool('edit'); break;
+    case 'g': case 'G': setTool('grid'); break;
+    case 'h': case 'H': setTool('pan'); break;
+    case 'i': case 'I': $('bInvert').click(); break;
+    case 'f': case 'F': fitView(); break;
+    case 'Enter': if (S.draft) commitDraft(); break;
+    case 'Escape':
+      if (S.draft) {
+        S.draft.pts.pop();
+        if (!S.draft.pts.length) S.draft = null;
+        render();
+      }
+      break;
+    case 'Delete': case 'Backspace':
+      if (S.tool === 'grid' && selGrid()) $('gClear').click();
+      else if (S.selShape >= 0) $('shDel').click();
+      break;
+  }
+});
+window.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = false; });
+window.addEventListener('resize', render);
+
+// ---------------------------------------------------------------- boot
+sizeMask();
+syncOutUI();
+syncUI();
+fitView();
+})();
+</script>
+</body>
+</html>

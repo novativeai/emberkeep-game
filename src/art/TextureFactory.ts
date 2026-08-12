@@ -2,6 +2,18 @@ import Phaser from 'phaser';
 import { ITEM_SCALE, PALETTE, RES } from '../core/Constants';
 import type { AssetsManifest } from '../core/types';
 import { darken, lighten, seededRandom, withAlpha } from './colors';
+import {
+  chromeClasps,
+  chromeEdge,
+  chromeField,
+  chromePlate,
+  EDGE,
+  FONT,
+  INK,
+  RADIUS_TEX,
+  roundRectPath,
+  withShadow
+} from './design';
 
 const P = PALETTE;
 
@@ -34,8 +46,12 @@ export const UI_NINESLICE: Record<string, { l: number; r: number; t: number; b: 
   ui_btn_green: { l: 52, r: 52, t: 40, b: 60 },
   ui_btn_price: { l: 52, r: 52, t: 40, b: 60 },
   ui_btn_free: { l: 52, r: 52, t: 40, b: 60 },
-  ui_shop_panel: { l: 130, r: 130, t: 120, b: 120 },
-  ui_shop_card: { l: 90, r: 90, t: 90, b: 110 }
+  // No ui_shop_panel entry: the Emporium frame carries a title rule and an
+  // inner content box at fixed heights, so stretching its middle smears both.
+  // It is authored at its final size and used as a plain image.
+  ui_store_panel: { l: 130, r: 130, t: 120, b: 120 },
+  ui_quest_panel: { l: 100, r: 100, t: 90, b: 90 },
+  ui_shop_card: { l: 90, r: 90, t: 40, b: 40 }
 };
 
 export const UI_TEXTURE_PARAMS: Record<string, Record<string, string>> = {
@@ -43,7 +59,6 @@ export const UI_TEXTURE_PARAMS: Record<string, Record<string, string>> = {
   ui_btn_green: { highlight: lighten(PALETTE.moss, 0.25), base: PALETTE.moss, edge: darken(PALETTE.mossShade, 0.1) },
   ui_btn_round: { plate: PALETTE.goldShade, face: PALETTE.cream },
   ui_panel: { border: PALETTE.lava, borderShade: PALETTE.lavaShade, fill: PALETTE.cream },
-  ui_card: { fill: '#FFFDF6', border: '#E8B98F', stitch: PALETTE.goldShade },
   ui_pill: { fill: PALETTE.plumShade, border: PALETTE.gold },
   ui_slot: { fill: '#EFE0C8', border: '#D9C2A0' },
   // Ember Emporium (shop) chrome — trending merge-shop treatment.
@@ -51,8 +66,6 @@ export const UI_TEXTURE_PARAMS: Record<string, Record<string, string>> = {
   ui_shop_card: { rim: PALETTE.gold, rimShade: PALETTE.goldShade, fill: '#FFFDF6' },
   ui_shop_ribbon: { base: PALETTE.gold, edge: PALETTE.goldShade },
   ui_shop_badge: { base: PALETTE.lava, edge: PALETTE.lavaShade },
-  ui_btn_price: { highlight: lighten(PALETTE.moss, 0.25), base: PALETTE.moss, edge: darken(PALETTE.mossShade, 0.1) },
-  ui_btn_free: { highlight: lighten(PALETTE.goldAccent, 0.2), base: PALETTE.gold, edge: PALETTE.goldShade }
 };
 
 /**
@@ -124,14 +137,15 @@ export class TextureFactory {
       case 'item_flame_gem_2': return this.flameGem(key, false);
       case 'item_flame_gem_3': return this.flameGem(key, true);
       case 'decor_nest': return this.nest(key);
-      case 'item_dew_basin_1': return this.dewBasin(key);
+      case 'char_eleanor': return this.characterStandee(key, P.plum, P.plumHighlight);
+      case 'char_selyna': return this.characterStandee(key, P.tealDeep, P.teal);
       case 'fx_ember': return this.ember(key);
-      case 'fx_snow': return this.snowflake(key);
       case 'fx_spark': return this.spark(key);
+      case 'fx_confetti': return this.confetti(key);
       case 'fx_glow': return this.glow(key);
       case 'fx_shell': return this.shell(key);
       case 'portrait_pip': return this.portraitPip(key);
-      case 'portrait_cindra': return this.portraitCindra(key);
+      case 'portrait_eleanor': return this.portraitEleanor(key);
       case 'ui_tile_highlight': return this.tileHighlight(key);
       case 'ui_btn_play':
         return this.button(key, 264, 96, this.uiColor(key, 'highlight'), this.uiColor(key, 'base'), this.uiColor(key, 'edge'));
@@ -141,21 +155,32 @@ export class TextureFactory {
       case 'ui_panel': return this.panel(key);
       case 'ui_card': return this.card(key);
       case 'ui_pill': return this.pill(key);
+      case 'ui_heart': return this.heart(key, true);
+      case 'ui_heart_empty': return this.heart(key, false);
       case 'ui_slot': return this.slot(key);
+      case 'ui_store_panel': return this.storePanel(key);
+      case 'ui_quest_panel': return this.questPanel(key);
       case 'ui_shop_panel': return this.shopPanel(key);
-      case 'ui_shop_card': return this.shopCard(key);
+      case 'ui_shop_card': return this.shopCard(key, false);
+      case 'ui_shop_card_hot': return this.shopCard(key, true);
+      case 'ui_shop_price': return this.shopPricePill(key);
+      case 'ui_shop_tab': return this.shopTab(key, false);
+      case 'ui_shop_tab_on': return this.shopTab(key, true);
+      case 'ui_shop_plaque': return this.shopPlaque(key);
+      case 'ui_shop_wallet': return this.shopWallet(key);
+      case 'ui_shop_close': return this.shopClose(key);
       case 'ui_shop_ribbon': return this.shopRibbon(key);
       case 'ui_shop_badge': return this.shopBadge(key);
       case 'ui_shop_burst': return this.shopBurst(key);
-      case 'ui_btn_price':
-        return this.button(key, 230, 66, this.uiColor(key, 'highlight'), this.uiColor(key, 'base'), this.uiColor(key, 'edge'));
-      case 'ui_btn_free':
-        return this.button(key, 230, 66, this.uiColor(key, 'highlight'), this.uiColor(key, 'base'), this.uiColor(key, 'edge'));
+      // The Store's own two buttons — nothing else wears them, so they follow
+      // the shop material rather than the board's moss.
+      case 'ui_btn_price': return this.shopButton(key, false);
+      case 'ui_btn_free': return this.shopButton(key, true);
       case 'ui_icon_bolt': return this.iconBolt(key);
-      case 'ui_icon_coin': return this.iconCoin(key);
       case 'ui_icon_key': return this.iconKey(key);
       case 'ui_icon_gear': return this.iconGear(key);
       case 'ui_icon_scroll': return this.iconScroll(key);
+      case 'ui_icon_shop': return this.iconShop(key);
       default:
         // File-backed art with no bespoke generator (house, chest, coins, map
         // tiles…) still lands here when its PNG fails to load. Those get a
@@ -222,7 +247,7 @@ export class TextureFactory {
       this.roundRectPath(g, 26, 36, 44, 12, 6);
       g.fill();
       // "?" tag so it clearly reads as art-to-come.
-      g.font = 'bold 26px Trebuchet MS, Verdana, sans-serif';
+      g.font = `bold 26px ${FONT.ui}`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.lineWidth = 4;
@@ -258,6 +283,58 @@ export class TextureFactory {
     draw(g);
     g.restore();
     tex.refresh();
+  }
+
+  /**
+   * BLOCKOUT standee for a world character — a cloaked silhouette at the right
+   * footprint and height so placement, scale and depth can be judged before any
+   * real art exists. House rule: placeholder art is painted at runtime and real
+   * art swaps in via assets.json (`source: "file"`), so nothing downstream
+   * changes when the 3D version lands (docs/world-characters.md §3).
+   */
+  private characterStandee(key: string, body: string, trim: string): void {
+    const w = 150;
+    const h = 260;
+    this.paint(key, w, h, (g) => {
+      const cx = w / 2;
+      const footY = h - 12;
+      // Ground contact ellipse — sells that she stands ON the isometric floor.
+      g.fillStyle = 'rgba(36,27,34,0.28)';
+      g.beginPath();
+      g.ellipse(cx, footY, 46, 16, 0, 0, Math.PI * 2);
+      g.fill();
+      // Cloak: a tapering column, wide at the hem.
+      g.fillStyle = body;
+      g.beginPath();
+      g.moveTo(cx - 26, 92);
+      g.lineTo(cx + 26, 92);
+      g.lineTo(cx + 52, footY - 4);
+      g.lineTo(cx - 52, footY - 4);
+      g.closePath();
+      g.fill();
+      // Upper-left rim light, matching the board's light direction.
+      g.strokeStyle = trim;
+      g.lineWidth = 5;
+      g.beginPath();
+      g.moveTo(cx - 26, 92);
+      g.lineTo(cx - 52, footY - 4);
+      g.stroke();
+      // Hood + head.
+      g.fillStyle = body;
+      g.beginPath();
+      g.ellipse(cx, 78, 34, 40, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = trim;
+      g.beginPath();
+      g.ellipse(cx, 74, 20, 24, 0, 0, Math.PI * 2);
+      g.fill();
+      // Crescent — the Daughters' mark, and the one thing that reads at board zoom.
+      g.fillStyle = P.goldAccent;
+      g.beginPath();
+      g.arc(cx, 150, 17, -0.4, Math.PI + 0.4);
+      g.arc(cx + 5, 150, 15, Math.PI + 0.4, -0.4, true);
+      g.fill();
+    });
   }
 
   private diamondPath(g: Ctx2D, cx: number, cy: number, rx: number, ry: number): void {
@@ -310,14 +387,9 @@ export class TextureFactory {
     g.restore();
   }
 
+  /** Delegates to the design system's path so there is one rounded rect. */
   private roundRectPath(g: Ctx2D, x: number, y: number, w: number, h: number, r: number): void {
-    g.beginPath();
-    g.moveTo(x + r, y);
-    g.arcTo(x + w, y, x + w, y + h, r);
-    g.arcTo(x + w, y + h, x, y + h, r);
-    g.arcTo(x, y + h, x, y, r);
-    g.arcTo(x, y, x + w, y, r);
-    g.closePath();
+    roundRectPath(g, x, y, w, h, r);
   }
 
   /* ----------------------------- ground ----------------------------- */
@@ -1041,90 +1113,6 @@ export class TextureFactory {
     });
   }
 
-  /**
-   * The Dew Basin — a carved stone bowl holding a still pool that only fills at
-   * night (chains.json `phases:["night"]`). Painted cool (teal water, pale rim
-   * light) so it reads as the one NIGHT fixture on a warm ember board.
-   */
-  private dewBasin(key: string): void {
-    // Real basin art ships now, so this only paints when that file fails to load —
-    // and BoardScene multiplies it by ITEM_SCALE, which is tuned to the PHOTO's
-    // 372px. Counter-size the canvas (as genericItem does) so the stand-in still
-    // lands at the basin's size instead of shrinking to a pebble.
-    const s = 1 / Math.min(1, Math.max(0.125, ITEM_SCALE.dew_basin_1 ?? 1));
-    this.paint(key, Math.round(120 * s), Math.round(104 * s), (g) => {
-      g.scale(s, s);
-      const cx = 60;
-      const rimY = 46;
-      this.contactShadow(g, cx, 90, 40, 11);
-      // Pedestal: a tapered stone foot under the bowl.
-      const foot = g.createLinearGradient(0, 70, 0, 92);
-      foot.addColorStop(0, P.ash);
-      foot.addColorStop(1, darken(P.ashShade, 0.28));
-      g.fillStyle = foot;
-      g.beginPath();
-      g.moveTo(cx - 26, 66);
-      g.lineTo(cx + 26, 66);
-      g.lineTo(cx + 19, 88);
-      g.lineTo(cx - 19, 88);
-      g.closePath();
-      g.fill();
-      g.lineWidth = 1.6;
-      g.strokeStyle = withAlpha(darken(P.ashShade, 0.4), 0.85);
-      g.stroke();
-      // Bowl body.
-      const bowl = g.createLinearGradient(0, rimY, 0, 76);
-      bowl.addColorStop(0, lighten(P.ash, 0.16));
-      bowl.addColorStop(0.55, P.ash);
-      bowl.addColorStop(1, darken(P.ashShade, 0.22));
-      g.fillStyle = bowl;
-      g.beginPath();
-      g.moveTo(cx - 44, rimY);
-      g.quadraticCurveTo(cx, 88, cx + 44, rimY);
-      g.quadraticCurveTo(cx, rimY + 22, cx - 44, rimY);
-      g.closePath();
-      g.fill();
-      g.lineWidth = 2;
-      g.strokeStyle = withAlpha(darken(P.ashShade, 0.45), 0.9);
-      g.stroke();
-      // The dew pool — a still teal disc sunk into the rim.
-      const pool = g.createLinearGradient(0, rimY - 10, 0, rimY + 14);
-      pool.addColorStop(0, lighten(P.teal, 0.3));
-      pool.addColorStop(0.6, P.teal);
-      pool.addColorStop(1, P.tealDeep);
-      g.fillStyle = pool;
-      g.beginPath();
-      g.ellipse(cx, rimY + 1, 41, 12, 0, 0, Math.PI * 2);
-      g.fill();
-      // Moon glint + a ripple ring on the water.
-      g.fillStyle = withAlpha(P.cream, 0.55);
-      g.beginPath();
-      g.ellipse(cx - 13, rimY - 3, 12, 4, -0.18, 0, Math.PI * 2);
-      g.fill();
-      g.lineWidth = 1.4;
-      g.strokeStyle = withAlpha(P.cream, 0.35);
-      g.beginPath();
-      g.ellipse(cx + 10, rimY + 4, 14, 4.5, 0, 0, Math.PI * 2);
-      g.stroke();
-      // Rim catchlight — the pale night edge that sells the stone.
-      g.lineWidth = 3;
-      g.strokeStyle = withAlpha(lighten(P.ash, 0.5), 0.9);
-      g.beginPath();
-      g.ellipse(cx, rimY, 44, 13, 0, Math.PI * 1.02, Math.PI * 1.98);
-      g.stroke();
-      // Two dew drops gathering on the outside of the bowl.
-      g.fillStyle = withAlpha(lighten(P.teal, 0.35), 0.85);
-      for (const [dx, dy, r] of [
-        [-30, 64, 3.4],
-        [26, 70, 2.6]
-      ] as [number, number, number][]) {
-        g.beginPath();
-        g.ellipse(cx + dx, dy, r, r * 1.35, 0, 0, Math.PI * 2);
-        g.fill();
-      }
-    });
-  }
-
   /* ------------------------------ fx -------------------------------- */
 
   private ember(key: string): void {
@@ -1139,49 +1127,25 @@ export class TextureFactory {
     });
   }
 
-  /**
-   * Borealis' snow. ONE texture for the whole snowfall: the emitter varies its scale
-   * from a distant speck to a near flake, so it has to read at both ends — a soft
-   * halo (which is all a far flake ever is) around six branches that only resolve
-   * when a big one drifts past the camera. Drawn white and tinted by the emitter,
-   * never coloured here.
-   */
-  private snowflake(key: string): void {
-    this.paint(key, 20, 20, (g) => {
-      const c = 10;
-      // The halo: what a 0.25-scale flake actually looks like on screen.
-      const halo = g.createRadialGradient(c, c, 0.5, c, c, 9);
-      halo.addColorStop(0, 'rgba(255,255,255,0.95)');
-      halo.addColorStop(0.35, 'rgba(255,255,255,0.42)');
-      halo.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = halo;
-      g.fillRect(0, 0, 20, 20);
-      // Six branches with a fork near the tip — the classic dendrite, at the smallest
-      // size that survives the canvas. Round caps so nothing reads as a cross.
-      g.save();
-      g.translate(c, c);
-      g.strokeStyle = 'rgba(255,255,255,0.92)';
-      g.lineWidth = 1.15;
-      g.lineCap = 'round';
-      for (let i = 0; i < 6; i++) {
-        g.rotate(Math.PI / 3);
-        g.beginPath();
-        g.moveTo(0, 0);
-        g.lineTo(0, -8);
-        g.moveTo(0, -5.2);
-        g.lineTo(2.4, -7.4);
-        g.moveTo(0, -5.2);
-        g.lineTo(-2.4, -7.4);
-        g.stroke();
-      }
-      g.restore();
-    });
-  }
-
   private spark(key: string): void {
     this.paint(key, 22, 22, (g) => {
       this.star4(g, 11, 11, 10, P.goldAccent, 1);
       this.star4(g, 11, 11, 5, '#FFFFFF', 0.95);
+    });
+  }
+
+  /** A white paper slip — emitters tint it per burst, and the slight
+   *  parallelogram keeps a spinning piece reading as paper, not a square. */
+  private confetti(key: string): void {
+    this.paint(key, 20, 14, (g) => {
+      g.fillStyle = '#FFFFFF';
+      g.beginPath();
+      g.moveTo(2, 0);
+      g.lineTo(20, 2);
+      g.lineTo(18, 14);
+      g.lineTo(0, 12);
+      g.closePath();
+      g.fill();
     });
   }
 
@@ -1319,7 +1283,7 @@ export class TextureFactory {
     });
   }
 
-  private portraitCindra(key: string): void {
+  private portraitEleanor(key: string): void {
     this.paint(key, 96, 96, (g) => {
       this.portraitBase(g, (gg) => {
         const bg = gg.createRadialGradient(48, 52, 6, 48, 48, 44);
@@ -1483,31 +1447,16 @@ export class TextureFactory {
     });
   }
 
+  /**
+   * An order card inside the quest window. Sits ON the frame, so it is a shade
+   * lighter than the field behind it and wears a lighter edge than the frame —
+   * the hierarchy has to survive being seen two at a time.
+   */
   private card(key: string): void {
-    const fillC = this.uiColor(key, 'fill');
-    const borderC = this.uiColor(key, 'border');
-    const stitch = this.uiColor(key, 'stitch');
     this.paint(key, 320, 350, (g) => {
-      this.roundRectPath(g, 4, 4, 312, 342, 18);
-      g.fillStyle = fillC;
-      g.fill();
-      g.lineWidth = 3;
-      g.strokeStyle = borderC;
-      g.stroke();
-      // Stitched corners.
-      g.lineWidth = 2;
-      g.strokeStyle = withAlpha(stitch, 0.8);
-      g.setLineDash([6, 5]);
-      this.roundRectPath(g, 12, 12, 296, 326, 13);
-      g.stroke();
-      g.setLineDash([]);
-      // Bottom inner shade.
-      const shade = g.createLinearGradient(0, 290, 0, 346);
-      shade.addColorStop(0, 'rgba(181,96,47,0)');
-      shade.addColorStop(1, 'rgba(181,96,47,0.10)');
-      g.fillStyle = shade;
-      this.roundRectPath(g, 4, 250, 312, 96, 18);
-      g.fill();
+      chromeField(g, 6, 6, 308, 338, RADIUS_TEX.md, { x: 160, y: 40, radius: 260, strength: 0.26 });
+      chromeEdge(g, 6, 6, 308, 338, RADIUS_TEX.md, EDGE.thin);
+      chromeClasps(g, 6, 6, 308, 338, RADIUS_TEX.md, 11, 4.5);
     });
   }
 
@@ -1524,6 +1473,63 @@ export class TextureFactory {
       this.roundRectPath(g, 8, 5, 160, 18, 12);
       g.fillStyle = 'rgba(255,255,255,0.12)';
       g.fill();
+    });
+  }
+
+  /**
+   * A Regard heart — lit or spent.
+   *
+   * Painted in the board's own lava, not in a generic red: this is Emberkeep's
+   * relationship gauge and it should read as an ember someone is keeping alight.
+   * The empty state is the SAME silhouette hollowed out rather than a different
+   * shape, so five of them in a row read as one gauge at a glance instead of as
+   * two kinds of icon.
+   */
+  private heart(key: string, lit: boolean): void {
+    const S = 64;
+    this.paint(key, S, S, (g) => {
+      const path = (inset: number): void => {
+        const w = S - inset * 2;
+        const h = S - inset * 2;
+        const x = inset;
+        const y = inset;
+        const top = y + h * 0.3;
+        g.beginPath();
+        g.moveTo(x + w / 2, y + h * 0.97);
+        g.bezierCurveTo(x - w * 0.12, y + h * 0.55, x + w * 0.07, y - h * 0.06, x + w / 2, top);
+        g.bezierCurveTo(x + w * 0.93, y - h * 0.06, x + w * 1.12, y + h * 0.55, x + w / 2, y + h * 0.97);
+        g.closePath();
+      };
+
+      // A dark seat under both states, so a spent heart still has weight and the
+      // row keeps its rhythm when the gauge is nearly empty.
+      path(5);
+      g.fillStyle = withAlpha(P.night, lit ? 0.35 : 0.28);
+      g.fill();
+
+      if (lit) {
+        path(6);
+        const grad = g.createLinearGradient(0, 8, 0, S - 6);
+        grad.addColorStop(0, P.lavaHighlight);
+        grad.addColorStop(0.55, P.lava);
+        grad.addColorStop(1, P.lavaShade);
+        g.fillStyle = grad;
+        g.fill();
+        // The catchlight every other lit thing on this board carries.
+        g.beginPath();
+        g.ellipse(S * 0.35, S * 0.36, S * 0.1, S * 0.07, -0.5, 0, Math.PI * 2);
+        g.fillStyle = withAlpha(P.cream, 0.55);
+        g.fill();
+      } else {
+        path(6);
+        g.fillStyle = withAlpha(P.plumShade, 0.5);
+        g.fill();
+      }
+
+      path(6);
+      g.lineWidth = 3.2;
+      g.strokeStyle = withAlpha(lit ? P.goldAccent : P.plumHighlight, lit ? 0.95 : 0.8);
+      g.stroke();
     });
   }
 
@@ -1553,216 +1559,376 @@ export class TextureFactory {
 
   /* ------------------------- Ember Emporium ------------------------- */
 
-  /** The Emporium's big framed board: lava rim with a warm parchment face,
-   *  corner gems and a soft top-light — the anchor of the shop scene. */
-  private shopPanel(key: string): void {
-    const rim = this.uiColor(key, 'rim');
-    const rimShade = this.uiColor(key, 'rimShade');
-    const fill = this.uiColor(key, 'fill');
+  /**
+   * A Store button — a milled gold rim, a dark keyline, a lit cream face.
+   * `glow` adds the ember bloom that marks a screen's one featured action.
+   */
+  private shopButton(key: string, glow: boolean): void {
+    this.paint(key, 230, 66, (g) => {
+      const inset = glow ? 9 : 4;
+      chromePlate(g, inset, inset, 230 - inset * 2, 66 - inset * 2, (66 - inset * 2) / 2, {
+        weight: EDGE.bold,
+        glow
+      });
+    });
+  }
+
+  /**
+   * The Keeper's Store frame — the big showcase board the cosmetics sit on.
+   *
+   * Wears the Emporium's material (`design.ts`), not the board's cream-and-lava:
+   * these two are the game's two shops and a player crosses between them, so a
+   * different frame on each reads as two different products.
+   */
+  private storePanel(key: string): void {
     this.paint(key, 1060, 660, (g) => {
-      // Drop shadow.
-      g.shadowColor = 'rgba(20,12,18,0.55)';
-      g.shadowBlur = 30;
-      g.shadowOffsetY = 14;
-      this.roundRectPath(g, 22, 16, 1016, 620, 42);
-      const rimGrad = g.createLinearGradient(0, 16, 0, 636);
-      rimGrad.addColorStop(0, lighten(rim, 0.12));
-      rimGrad.addColorStop(0.5, rim);
-      rimGrad.addColorStop(1, darken(rimShade, 0.08));
-      g.fillStyle = rimGrad;
+      withShadow(g, 30, 14, () => {
+        this.roundRectPath(g, 22, 16, 1016, 620, 42);
+        g.fillStyle = INK.fieldDeep;
+        g.fill();
+      });
+      chromeField(g, 22, 16, 1016, 620, 42, { x: 530, y: 70, radius: 620, strength: 0.32 });
+      chromeEdge(g, 22, 16, 1016, 620, 42, EDGE.bold);
+      chromeClasps(g, 22, 16, 1016, 620, 42, 18, 6.5);
+    });
+  }
+
+  /**
+   * The quest window's frame — the Ledger, opened from the quest button.
+   *
+   * Its own key rather than `ui_panel`: the Cookbook shares that texture and is
+   * still a cream page, so re-pointing the shared key would have dragged the
+   * book along with the quests.
+   */
+  private questPanel(key: string): void {
+    this.paint(key, 660, 440, (g) => {
+      withShadow(g, 30, 14, () => {
+        this.roundRectPath(g, 14, 10, 632, 412, RADIUS_TEX.xl);
+        g.fillStyle = INK.fieldDeep;
+        g.fill();
+      });
+      chromeField(g, 14, 10, 632, 412, RADIUS_TEX.xl, { x: 330, y: 50, radius: 420, strength: 0.3 });
+      chromeEdge(g, 14, 10, 632, 412, RADIUS_TEX.xl, EDGE.bold);
+      chromeClasps(g, 14, 10, 632, 412, RADIUS_TEX.xl, 16, 6);
+    });
+  }
+
+  /* --------------------------- Ember Emporium --------------------------- */
+  /*
+   * The Emporium is the one surface in the game that does NOT wear the board's
+   * cream-and-lava chrome. It is a lit shop interior seen at night, drawn from
+   * the Seedream concept at
+   * `assets/raw/shop-concept/generations/bakeoff-seedream-pro.png`: a deep plum
+   * field, milled gold edges with corner clasps, and cream price plates. Forcing
+   * it into the shared PALETTE is exactly what made the old one read as a
+   * recoloured Ledger, so `SHOP_INK` is sampled from that reference instead.
+   */
+
+  /**
+   * The Emporium frame. Holds the whole shop: a title bar across the top (rule
+   * beneath it), then the tabbed content box the tabs bite into.
+   */
+  private shopPanel(key: string): void {
+    this.paint(key, 1180, 720, (g) => {
+      g.shadowColor = 'rgba(0,0,0,0.6)';
+      g.shadowBlur = 38;
+      g.shadowOffsetY = 16;
+      this.roundRectPath(g, 12, 10, 1156, 700, 30);
+      g.fillStyle = INK.fieldDeep;
       g.fill();
       g.shadowColor = 'transparent';
       g.shadowBlur = 0;
       g.shadowOffsetY = 0;
-      g.lineWidth = 4;
-      g.strokeStyle = withAlpha(darken(rimShade, 0.32), 0.95);
-      g.stroke();
-      // Gold pin-line riding the rim.
-      g.lineWidth = 3;
-      g.strokeStyle = withAlpha(P.goldAccent, 0.85);
-      this.roundRectPath(g, 30, 24, 1000, 604, 36);
-      g.stroke();
-      // Parchment face.
-      this.roundRectPath(g, 44, 38, 972, 576, 28);
-      const face = g.createLinearGradient(0, 38, 0, 614);
-      face.addColorStop(0, lighten(fill, 0.4));
-      face.addColorStop(0.1, fill);
-      face.addColorStop(0.85, darken(fill, 0.05));
-      face.addColorStop(1, darken(fill, 0.12));
-      g.fillStyle = face;
-      g.fill();
-      g.lineWidth = 2;
-      g.strokeStyle = withAlpha(P.goldShade, 0.55);
-      g.stroke();
-      // Soft interior top glow (stage light on the goods).
-      const glow = g.createRadialGradient(530, 120, 40, 530, 180, 460);
-      glow.addColorStop(0, withAlpha('#FFFFFF', 0.5));
-      glow.addColorStop(1, withAlpha('#FFFFFF', 0));
-      g.fillStyle = glow;
-      this.roundRectPath(g, 44, 38, 972, 300, 28);
-      g.fill();
-      // Corner gems.
-      for (const [cx, cy] of [[62, 56], [998, 56], [62, 596], [998, 596]]) {
-        const gem = g.createRadialGradient(cx! - 3, cy! - 3, 1, cx!, cy!, 12);
-        gem.addColorStop(0, P.goldAccent);
-        gem.addColorStop(0.65, P.gold);
-        gem.addColorStop(1, P.goldShade);
-        g.fillStyle = gem;
-        g.save();
-        g.translate(cx!, cy!);
-        g.rotate(Math.PI / 4);
-        g.fillRect(-8, -8, 16, 16);
-        g.lineWidth = 2;
-        g.strokeStyle = withAlpha(darken(P.goldShade, 0.3), 0.9);
-        g.strokeRect(-8, -8, 16, 16);
-        g.restore();
+
+      chromeField(g, 12, 10, 1156, 700, 30, { x: 590, y: 60, radius: 660, strength: 0.3 });
+      chromeEdge(g, 12, 10, 1156, 700, 30, 5);
+      chromeClasps(g, 12, 10, 1156, 700, 30, 16, 6);
+
+      // Rule under the title bar: a hairline that catches light at the middle
+      // and fades to nothing at both ends, so it never reads as a hard divider.
+      const rule = g.createLinearGradient(60, 0, 1120, 0);
+      rule.addColorStop(0, withAlpha(INK.gold, 0));
+      rule.addColorStop(0.5, withAlpha(INK.goldHi, 0.75));
+      rule.addColorStop(1, withAlpha(INK.gold, 0));
+      g.fillStyle = rule;
+      g.fillRect(60, 122, 1060, 2);
+      g.fillStyle = withAlpha('#000000', 0.5);
+      g.fillRect(60, 124, 1060, 2);
+
+      // Content box — the tabs bite into its top edge and the goods live inside.
+      chromeField(g, 34, 220, 1112, 464, 22, { x: 590, y: 244, radius: 560, strength: 0.16 });
+      chromeEdge(g, 34, 220, 1112, 464, 22, 4);
+      chromeClasps(g, 34, 220, 1112, 464, 22, 14, 5);
+    });
+  }
+
+  /**
+   * One product ROW.
+   *
+   * This used to be a tall showcase card, which is the wrong furniture for a
+   * currency shelf: three of them left the panel mostly empty, and the only
+   * places left to hang a tag were the corners — where the ribbon and the
+   * value chip both ended up riding ON the frame. A row has a middle, so every
+   * label sits in flow and nothing can collide with an edge.
+   *
+   * `hot` is the featured variant: the reference lights its chosen plate from
+   * inside and brightens the metal rather than adding furniture, so the two
+   * share every measurement.
+   */
+  private shopCard(key: string, hot: boolean): void {
+    this.paint(key, 880, 112, (g) => {
+      if (hot) {
+        // Amber bloom bleeding out past the metal — drawn first so the edge
+        // lands on top of it and the glow reads as light escaping the frame.
+        // CENTRED on the plate, not on the goods: an off-centre bloom is still
+        // above zero where the texture ends and shows as a rectangular halo.
+        const bloom = g.createRadialGradient(440, 56, 40, 440, 56, 452);
+        bloom.addColorStop(0, withAlpha(INK.ember, 0.3));
+        bloom.addColorStop(0.55, withAlpha(INK.ember, 0.1));
+        bloom.addColorStop(1, withAlpha(INK.ember, 0));
+        g.fillStyle = bloom;
+        g.fillRect(0, 0, 880, 112);
       }
+      chromeField(g, 8, 6, 864, 100, 20, {
+        x: 150,
+        y: 56,
+        radius: hot ? 260 : 210,
+        strength: hot ? 0.42 : 0.22,
+        warm: hot // only the featured row is lit by its own goods
+      });
+      chromeEdge(g, 8, 6, 864, 100, 20, 4.5, hot ? 0.32 : 0);
+      chromeClasps(g, 8, 6, 864, 100, 20, 13, hot ? 6 : 5);
+
+      // Stage shadow under the goods, so the product sits ON the row.
+      const seat = g.createRadialGradient(150, 88, 4, 150, 88, 96);
+      seat.addColorStop(0, 'rgba(0,0,0,0.4)');
+      seat.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = seat;
+      g.beginPath();
+      g.ellipse(150, 88, 96, 12, 0, 0, Math.PI * 2);
+      g.fill();
     });
   }
 
-  /** One product card: gold gradient rim, cream face with a gloss cap,
-   *  stitched inline and a warm base shade — reads as a physical token. */
-  private shopCard(key: string): void {
-    const rim = this.uiColor(key, 'rim');
-    const rimShade = this.uiColor(key, 'rimShade');
-    const fill = this.uiColor(key, 'fill');
-    this.paint(key, 210, 310, (g) => {
-      g.shadowColor = 'rgba(20,12,18,0.4)';
-      g.shadowBlur = 12;
-      g.shadowOffsetY = 7;
-      this.roundRectPath(g, 6, 4, 198, 298, 24);
-      const rimGrad = g.createLinearGradient(0, 4, 0, 302);
-      rimGrad.addColorStop(0, lighten(rim, 0.22));
-      rimGrad.addColorStop(0.55, rim);
-      rimGrad.addColorStop(1, darken(rimShade, 0.05));
-      g.fillStyle = rimGrad;
+  /** Cream price plate — the one bright element on the whole panel, which is
+   *  why the reference puts the number the player is deciding on inside it. */
+  private shopPricePill(key: string): void {
+    this.paint(key, 210, 56, (g) => {
+      g.shadowColor = 'rgba(0,0,0,0.5)';
+      g.shadowBlur = 10;
+      g.shadowOffsetY = 4;
+      this.roundRectPath(g, 6, 5, 198, 44, 22);
+      const face = g.createLinearGradient(0, 5, 0, 49);
+      face.addColorStop(0, '#FFF6DC');
+      face.addColorStop(0.5, INK.cream);
+      face.addColorStop(1, INK.creamWarm);
+      g.fillStyle = face;
       g.fill();
       g.shadowColor = 'transparent';
       g.shadowBlur = 0;
       g.shadowOffsetY = 0;
-      g.lineWidth = 2.4;
-      g.strokeStyle = withAlpha(darken(rimShade, 0.3), 0.95);
+      g.lineWidth = 3;
+      g.strokeStyle = INK.goldMid;
       g.stroke();
-      // Face.
-      this.roundRectPath(g, 14, 12, 182, 282, 18);
-      const face = g.createLinearGradient(0, 12, 0, 294);
-      face.addColorStop(0, lighten(fill, 0.35));
-      face.addColorStop(0.12, fill);
-      face.addColorStop(0.8, darken(fill, 0.03));
-      face.addColorStop(1, darken(fill, 0.1));
-      g.fillStyle = face;
-      g.fill();
-      // Gloss cap.
-      const gloss = g.createLinearGradient(0, 12, 0, 96);
-      gloss.addColorStop(0, 'rgba(255,255,255,0.55)');
-      gloss.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = gloss;
-      this.roundRectPath(g, 18, 15, 174, 78, 15);
-      g.fill();
-      // Stitched inline.
-      g.lineWidth = 1.6;
-      g.strokeStyle = withAlpha(P.goldShade, 0.7);
-      g.setLineDash([5, 4]);
-      this.roundRectPath(g, 20, 18, 170, 270, 13);
+      g.lineWidth = 1.4;
+      g.strokeStyle = withAlpha('#FFFFFF', 0.75);
+      this.roundRectPath(g, 9, 8, 192, 38, 19);
       g.stroke();
-      g.setLineDash([]);
-      // Bottom warm shade seats the price button.
-      const seat = g.createLinearGradient(0, 220, 0, 294);
-      seat.addColorStop(0, 'rgba(181,96,47,0)');
-      seat.addColorStop(1, 'rgba(181,96,47,0.14)');
-      g.fillStyle = seat;
-      this.roundRectPath(g, 14, 200, 182, 94, 18);
-      g.fill();
     });
   }
 
-  /** Amount banner: chevron-notched gold ribbon with a bevel + gloss. */
-  private shopRibbon(key: string): void {
-    const base = this.uiColor(key, 'base');
-    const edge = this.uiColor(key, 'edge');
-    this.paint(key, 210, 52, (g) => {
-      const notch = 14;
+  /** A shelf tab. The active one is lighter, brighter-edged and open along the
+   *  bottom so it merges into the content box it belongs to. */
+  private shopTab(key: string, active: boolean): void {
+    // The bottom 14 units are the LIP: fill with no edge, so the tab can be
+    // seated over the content box's top border and erase it where it sits.
+    // That overlap is the whole trick — without it the active tab floats above
+    // the shelf instead of belonging to it.
+    const H = 74;
+    const LIP = 14;
+    // An INACTIVE tab stops short of the lip and is closed all the way round, so
+    // it tucks behind the shelf. Only the active one runs long and open-bottomed.
+    const foot = active ? H : H - LIP;
+    this.paint(key, 300, H, (g) => {
       const path = (): void => {
         g.beginPath();
-        g.moveTo(2, 4);
-        g.lineTo(208, 4);
-        g.lineTo(208 - notch, 26);
-        g.lineTo(208, 48);
-        g.lineTo(2, 48);
-        g.lineTo(2 + notch, 26);
+        g.moveTo(6, foot);
+        g.lineTo(6, 24);
+        g.quadraticCurveTo(6, 6, 28, 6);
+        g.lineTo(272, 6);
+        g.quadraticCurveTo(294, 6, 294, 24);
+        g.lineTo(294, foot);
         g.closePath();
       };
       path();
-      const grad = g.createLinearGradient(0, 4, 0, 48);
-      grad.addColorStop(0, lighten(base, 0.28));
-      grad.addColorStop(0.5, base);
-      grad.addColorStop(1, darken(edge, 0.05));
-      g.fillStyle = grad;
+      const fill = g.createLinearGradient(0, 6, 0, foot);
+      // The ACTIVE tab's lip has to land on the same value the shelf's lit top
+      // edge is painted at, or the overlap shows as a darker block hanging below
+      // the gold line — the exact seam the lip exists to hide.
+      fill.addColorStop(0, active ? lighten(INK.fieldLift, 0.22) : INK.field);
+      fill.addColorStop(1, active ? lighten(INK.fieldLift, 0.05) : INK.fieldDeep);
+      g.fillStyle = fill;
       g.fill();
-      g.lineWidth = 2.4;
-      g.strokeStyle = withAlpha(darken(edge, 0.32), 0.95);
+      g.save();
+      if (active) {
+        // Clip the stroke off the lip so the active tab has no bottom edge to
+        // separate it from the shelf it is seated on.
+        g.beginPath();
+        g.rect(0, 0, 300, H - LIP);
+        g.clip();
+      }
+      path();
+      g.lineWidth = active ? 4.5 : 3;
+      g.strokeStyle = INK.goldDeep;
       g.stroke();
-      // Gloss band.
-      g.fillStyle = 'rgba(255,255,255,0.32)';
+      path();
+      g.lineWidth = active ? 2.6 : 1.5;
+      const crown = g.createLinearGradient(0, 6, 0, foot);
+      crown.addColorStop(0, active ? INK.goldHi : withAlpha(INK.goldMid, 0.8));
+      crown.addColorStop(1, active ? INK.gold : withAlpha(INK.goldMid, 0.35));
+      g.strokeStyle = crown;
+      g.stroke();
+      g.restore();
+    });
+  }
+
+  /** The EMPORIUM name plate: a gold frame with flared ends over a cream face,
+   *  the one piece of signage in the shop. */
+  private shopPlaque(key: string): void {
+    this.paint(key, 340, 82, (g) => {
+      // Flared gold surround.
       g.beginPath();
-      g.moveTo(8, 7);
-      g.lineTo(202, 7);
-      g.lineTo(198, 18);
-      g.lineTo(12, 18);
+      g.moveTo(4, 20);
+      g.lineTo(26, 8);
+      g.lineTo(314, 8);
+      g.lineTo(336, 20);
+      g.lineTo(336, 62);
+      g.lineTo(314, 74);
+      g.lineTo(26, 74);
+      g.lineTo(4, 62);
       g.closePath();
+      const frame = g.createLinearGradient(0, 8, 0, 74);
+      frame.addColorStop(0, INK.goldHi);
+      frame.addColorStop(0.45, INK.gold);
+      frame.addColorStop(1, INK.goldMid);
+      g.fillStyle = frame;
       g.fill();
+      g.lineWidth = 3;
+      g.strokeStyle = INK.goldDeep;
+      g.stroke();
+      // Cream face inset.
+      this.roundRectPath(g, 26, 18, 288, 46, 6);
+      const face = g.createLinearGradient(0, 18, 0, 64);
+      face.addColorStop(0, '#FFF3D6');
+      face.addColorStop(0.5, INK.cream);
+      face.addColorStop(1, '#EFC98D');
+      g.fillStyle = face;
+      g.fill();
+      g.lineWidth = 2;
+      g.strokeStyle = withAlpha(INK.goldDeep, 0.75);
+      g.stroke();
     });
   }
 
-  /** "BEST VALUE" sash pill: lava gradient with a cream trim. */
-  private shopBadge(key: string): void {
-    const base = this.uiColor(key, 'base');
-    const edge = this.uiColor(key, 'edge');
-    this.paint(key, 150, 40, (g) => {
-      this.roundRectPath(g, 3, 5, 144, 32, 16);
-      g.fillStyle = darken(edge, 0.1);
+  /** Wallet chip in the title bar — a dark lozenge with a gold rim, one per
+   *  currency the shop can take. */
+  private shopWallet(key: string): void {
+    this.paint(key, 180, 52, (g) => {
+      this.roundRectPath(g, 4, 4, 172, 44, 22);
+      const fill = g.createLinearGradient(0, 4, 0, 48);
+      fill.addColorStop(0, INK.fieldLift);
+      fill.addColorStop(1, INK.fieldDeep);
+      g.fillStyle = fill;
       g.fill();
-      this.roundRectPath(g, 3, 2, 144, 32, 16);
-      const grad = g.createLinearGradient(0, 2, 0, 34);
-      grad.addColorStop(0, lighten(base, 0.2));
-      grad.addColorStop(1, edge);
+      g.lineWidth = 3;
+      g.strokeStyle = INK.goldDeep;
+      g.stroke();
+      g.lineWidth = 1.6;
+      g.strokeStyle = withAlpha(INK.gold, 0.9);
+      this.roundRectPath(g, 5.5, 5.5, 169, 41, 20.5);
+      g.stroke();
+    });
+  }
+
+  /** Round gold close ring. */
+  private shopClose(key: string): void {
+    this.paint(key, 68, 68, (g) => {
+      g.beginPath();
+      g.arc(34, 34, 27, 0, Math.PI * 2);
+      const fill = g.createLinearGradient(0, 7, 0, 61);
+      fill.addColorStop(0, INK.fieldLift);
+      fill.addColorStop(1, INK.fieldDeep);
+      g.fillStyle = fill;
+      g.fill();
+      g.lineWidth = 6;
+      g.strokeStyle = INK.goldDeep;
+      g.stroke();
+      g.lineWidth = 3.4;
+      const ring = g.createLinearGradient(0, 7, 0, 61);
+      ring.addColorStop(0, INK.goldHi);
+      ring.addColorStop(1, INK.goldMid);
+      g.strokeStyle = ring;
+      g.stroke();
+    });
+  }
+
+  /** Rarity/offer ribbon — a small parchment banner pinned to a card's top-left
+   *  corner, with a folded tail, exactly as the reference hangs them. */
+  private shopRibbon(key: string): void {
+    this.paint(key, 118, 42, (g) => {
+      g.save();
+      g.translate(3, 9);
+      g.rotate(-0.11);
+      g.shadowColor = 'rgba(0,0,0,0.45)';
+      g.shadowBlur = 7;
+      g.shadowOffsetY = 3;
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(104, 0);
+      g.lineTo(97, 12);
+      g.lineTo(108, 24);
+      g.lineTo(0, 24);
+      g.closePath();
+      const face = g.createLinearGradient(0, 0, 0, 30);
+      face.addColorStop(0, '#FBEEC8');
+      face.addColorStop(1, '#DDBE8C');
+      g.fillStyle = face;
+      g.fill();
+      g.shadowColor = 'transparent';
+      g.shadowBlur = 0;
+      g.shadowOffsetY = 0;
+      g.lineWidth = 1.6;
+      g.strokeStyle = withAlpha('#8A6A45', 0.7);
+      g.stroke();
+      g.restore();
+    });
+  }
+
+  /** Kept for the UI Builder's element list — the shop no longer hangs a sash
+   *  badge, but the key must still resolve to a texture. */
+  private shopBadge(key: string): void {
+    this.paint(key, 150, 40, (g) => {
+      this.roundRectPath(g, 3, 3, 144, 34, 17);
+      const grad = g.createLinearGradient(0, 3, 0, 37);
+      grad.addColorStop(0, INK.fieldLift);
+      grad.addColorStop(1, INK.fieldDeep);
       g.fillStyle = grad;
       g.fill();
       g.lineWidth = 2.4;
-      g.strokeStyle = withAlpha(P.cream, 0.95);
+      g.strokeStyle = INK.goldMid;
       g.stroke();
-      g.fillStyle = 'rgba(255,255,255,0.3)';
-      this.roundRectPath(g, 9, 5, 132, 11, 6);
-      g.fill();
     });
   }
 
-  /** Radial sunburst seated behind a product icon — glow core + soft rays. */
+  /** Warm pool laid under a product. The old sunburst's spinning rays were the
+   *  loudest thing on the panel; the reference lights its goods with a soft
+   *  glow and nothing else. */
   private shopBurst(key: string): void {
     this.paint(key, 190, 190, (g) => {
-      const c = 95;
-      g.save();
-      g.translate(c, c);
-      for (let i = 0; i < 12; i++) {
-        g.save();
-        g.rotate((i / 12) * Math.PI * 2);
-        const ray = g.createLinearGradient(0, 0, 0, -88);
-        ray.addColorStop(0, withAlpha(P.goldAccent, 0.22));
-        ray.addColorStop(1, withAlpha(P.goldAccent, 0));
-        g.fillStyle = ray;
-        g.beginPath();
-        g.moveTo(0, -12);
-        g.lineTo(-10, -88);
-        g.lineTo(10, -88);
-        g.closePath();
-        g.fill();
-        g.restore();
-      }
-      g.restore();
-      const glow = g.createRadialGradient(c, c, 4, c, c, 78);
-      glow.addColorStop(0, withAlpha('#FFFFFF', 0.65));
-      glow.addColorStop(0.35, withAlpha(P.goldAccent, 0.4));
-      glow.addColorStop(1, withAlpha(P.goldAccent, 0));
+      const glow = g.createRadialGradient(95, 95, 3, 95, 95, 92);
+      glow.addColorStop(0, withAlpha(INK.emberLift, 0.55));
+      glow.addColorStop(0.4, withAlpha(INK.ember, 0.24));
+      glow.addColorStop(1, withAlpha(INK.ember, 0));
       g.fillStyle = glow;
       g.fillRect(0, 0, 190, 190);
     });
@@ -1796,38 +1962,6 @@ export class TextureFactory {
       g.moveTo(23, 8);
       g.lineTo(15, 20);
       g.stroke();
-    });
-  }
-
-  private iconCoin(key: string): void {
-    this.paint(key, 44, 44, (g) => {
-      const grad = g.createRadialGradient(17, 15, 2, 22, 22, 19);
-      grad.addColorStop(0, P.goldAccent);
-      grad.addColorStop(0.65, P.gold);
-      grad.addColorStop(1, P.goldShade);
-      g.beginPath();
-      g.arc(22, 22, 18, 0, Math.PI * 2);
-      g.fillStyle = grad;
-      g.fill();
-      g.lineWidth = 3;
-      g.strokeStyle = P.goldShade;
-      g.stroke();
-      g.lineWidth = 1.6;
-      g.strokeStyle = withAlpha(lighten(P.goldAccent, 0.4), 0.9);
-      g.beginPath();
-      g.arc(22, 22, 13, 0, Math.PI * 2);
-      g.stroke();
-      // Ember mark.
-      g.fillStyle = P.lava;
-      this.teardrop(g, 22, 29, 14, 5.5, 0);
-      g.fill();
-      g.fillStyle = P.goldAccent;
-      this.teardrop(g, 22, 28, 8, 3.2, 0);
-      g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.85)';
-      g.beginPath();
-      g.ellipse(15, 13, 4, 2.2, -0.6, 0, Math.PI * 2);
-      g.fill();
     });
   }
 
@@ -1866,6 +2000,74 @@ export class TextureFactory {
       g.stroke();
       g.restore();
       this.star4(g, 33, 12, 3.5, '#FFFFFF', 0.9);
+    });
+  }
+
+  /** Ember Emporium: a market stall — striped canopy with a scalloped hem over a
+   *  cream counter, one gold coin on it. Reads as "shop" at the column's plate
+   *  size while staying in the lava/cream/gold language of the rest of the HUD. */
+  private iconShop(key: string): void {
+    this.paint(key, 44, 44, (g) => {
+      // Canopy outline, reused twice: once as a clip for the stripes, once to stroke.
+      const canopy = (): void => {
+        const hemY = 20;
+        const left = 4;
+        const right = 40;
+        const bumps = 5;
+        const step = (right - left) / bumps;
+        g.beginPath();
+        g.moveTo(8, 8);
+        g.lineTo(36, 8);
+        g.lineTo(right, hemY);
+        for (let i = 0; i < bumps; i++) {
+          const sx = right - i * step;
+          g.quadraticCurveTo(sx - step / 2, hemY + 4.4, sx - step, hemY);
+        }
+        g.closePath();
+      };
+
+      // Counter first — the canopy paints over its top edge and reads as depth.
+      this.roundRectPath(g, 9, 21, 26, 16, 3);
+      const body = g.createLinearGradient(0, 21, 0, 37);
+      body.addColorStop(0, lighten(P.cream, 0.28));
+      body.addColorStop(1, darken(P.cream, 0.12));
+      g.fillStyle = body;
+      g.fill();
+      g.lineWidth = 2;
+      g.strokeStyle = P.textBrown;
+      g.stroke();
+
+      // Striped canopy.
+      g.save();
+      canopy();
+      g.clip();
+      g.fillStyle = lighten(P.cream, 0.22);
+      g.fillRect(0, 4, 44, 24);
+      g.fillStyle = P.lava;
+      for (let i = 0; i < 4; i++) g.fillRect(4.4 + i * 9.4, 4, 4.7, 24);
+      g.fillStyle = 'rgba(255,255,255,0.3)';
+      g.fillRect(0, 4, 44, 5.5);
+      g.restore();
+      canopy();
+      g.lineWidth = 2;
+      g.strokeStyle = darken(P.lavaShade, 0.25);
+      g.stroke();
+
+      // Gold coin on the counter — the universal "you can buy here" mark.
+      g.beginPath();
+      g.arc(22, 29.5, 5, 0, Math.PI * 2);
+      const coin = g.createLinearGradient(0, 24.5, 0, 34.5);
+      coin.addColorStop(0, P.goldAccent);
+      coin.addColorStop(1, P.goldShade);
+      g.fillStyle = coin;
+      g.fill();
+      g.lineWidth = 1.6;
+      g.strokeStyle = darken(P.goldShade, 0.3);
+      g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.55)';
+      g.beginPath();
+      g.arc(20.2, 27.7, 1.4, 0, Math.PI * 2);
+      g.fill();
     });
   }
 

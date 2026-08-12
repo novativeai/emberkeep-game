@@ -1,0 +1,31 @@
+{
+  "name": "path-of-embers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Path of Embers — the Emberkeep development tracker. A dependency-graph project manager in the shape of a constellation.",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "next dev --port 3210",
+    "build": "next build",
+    "start": "next start --port 3210",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
+    "next": "16.2.12",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3"
+  }
+}

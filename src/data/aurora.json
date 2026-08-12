@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "_note": "Borealis-world aurora presets. Schema + the physics behind each field: src/render/fx/AuroraFX.ts and auroraShader.ts. Tune live in tools/auroralab/index.html. The ramp is the curtain's colour BOTTOM to TOP (violet N2 fringe under, oxygen green through the body, red-violet off the top) \u2014 indexed by height inside the curtain, not by screen height, so a fold carries its fringe with it.",
+  "presets": {
+    "borealis": {
+      "label": "Borealis \u2014 the world sky",
+      "note": "Tuned to assets/sprites/background/borealis.webp: mint-green core, violet fringes, over the indigo night. Three curtains at different depths; the far one is dim and slow, the near one bright and quick.",
+      "ramp": [
+        "#8B5CD6",
+        "#4FE0C4",
+        "#6DF5A8",
+        "#3FC9C8",
+        "#5B4FBE"
+      ],
+      "intensity": 1,
+      "octaves": 4,
+      "dither": 2.0,
+      "surgeSpeed": 0.021,
+      "surgeWidth": 0.16,
+      "surgeGain": 0.55,
+      "fadeBottom": 0.22,
+      "layers": [
+        {
+          "seed": 0,
+          "rayFreq": 7.5,
+          "foldAmp": 0.1,
+          "brightness": 0.55,
+          "baseY": 0.3,
+          "thickness": 0.72,
+          "drift": 0.016,
+          "shimmer": 0.05
+        },
+        {
+          "seed": 13.7,
+          "rayFreq": 12.5,
+          "foldAmp": 0.14,
+          "brightness": 0.95,
+          "baseY": 0.16,
+          "thickness": 0.62,
+          "drift": 0.027,
+          "shimmer": 0.085
+        },
+        {
+          "seed": 41.3,
+          "rayFreq": 19,
+          "foldAmp": 0.09,
+          "brightness": 0.6,
+          "baseY": 0.06,
+          "thickness": 0.42,
+          "drift": 0.041,
+          "shimmer": 0.13
+        }
+      ]
+    },
+    "calm": {
+      "label": "Calm arc",
+      "note": "A single quiet band \u2014 for scenes that must not pull the eye. Two octaves, so it is also the cheapest preset by a wide margin.",
+      "ramp": [
+        "#6A4FB8",
+        "#3FCFB0",
+        "#5BE49A",
+        "#37A9B4",
+        "#2E2A6E"
+      ],
+      "intensity": 0.72,
+      "octaves": 3,
+      "dither": 2.0,
+      "surgeSpeed": 0.011,
+      "surgeWidth": 0.22,
+      "surgeGain": 0.3,
+      "fadeBottom": 0.3,
+      "layers": [
+        {
+          "seed": 5.2,
+          "rayFreq": 9,
+          "foldAmp": 0.07,
+          "brightness": 0.8,
+          "baseY": 0.24,
+          "thickness": 0.6,
+          "drift": 0.012,
+          "shimmer": 0.04
+        }
+      ]
+    },
+    "storm": {
+      "label": "Geomagnetic storm",
+      "note": "An active display: tighter rays, deeper folds, a fast surge. The magenta lower fringe is what a real substorm shows when nitrogen lights up below the green.",
+      "ramp": [
+        "#E85CC8",
+        "#5BF0D2",
+        "#8CFFB4",
+        "#43D4E0",
+        "#7B4FD8"
+      ],
+      "intensity": 1.1,
+      "octaves": 4,
+      "dither": 2.2,
+      "surgeSpeed": 0.055,
+      "surgeWidth": 0.11,
+      "surgeGain": 0.7,
+      "fadeBottom": 0.18,
+      "layers": [
+        {
+          "seed": 2.9,
+          "rayFreq": 10,
+          "foldAmp": 0.16,
+          "brightness": 0.7,
+          "baseY": 0.32,
+          "thickness": 0.7,
+          "drift": 0.03,
+          "shimmer": 0.11
+        },
+        {
+          "seed": 27.1,
+          "rayFreq": 17,
+          "foldAmp": 0.2,
+          "brightness": 1.05,
+          "baseY": 0.14,
+          "thickness": 0.58,
+          "drift": 0.05,
+          "shimmer": 0.19
+        },
+        {
+          "seed": 63.8,
+          "rayFreq": 26,
+          "foldAmp": 0.12,
+          "brightness": 0.72,
+          "baseY": 0.04,
+          "thickness": 0.38,
+          "drift": 0.075,
+          "shimmer": 0.28
+        }
+      ]
+    }
+  }
+}

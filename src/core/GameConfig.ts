@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE, POWER } from './Constants';
+import { GAME_WIDTH, IS_IOS, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
+import { graphics } from './graphicsState';
 import { renderScale } from './render-scale';
 import { BoardScene } from '../scenes/BoardScene';
 import { BootScene } from '../scenes/BootScene';
@@ -22,7 +23,11 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   // others at 3 — oversampling a 3× panel down to 2×-equivalent is invisible (the
   // fixed 2560 space already downsamples heavily) but reclaims a lot of framebuffer.
   const rawDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  const dpr = Math.min(rawDpr, IS_LOW_END ? 2 : 3);
+  // The graphics profile can only ever LOWER these: `high` carries the same
+  // dprCap 3 / ceiling 1.5 the engine always used, so a capable device — and
+  // anyone who picks High by hand — boots byte-identically to before.
+  const gfx = graphics.profile;
+  const dpr = Math.min(rawDpr, IS_LOW_END ? 2 : 3, gfx.dprCap);
   // On mobile the game is PORTRAIT: width = the phone's SHORT side, height = long,
   // regardless of how the device is currently held.
   const dispW = IS_MOBILE ? Math.min(window.innerWidth, window.innerHeight) : window.innerWidth;
@@ -33,28 +38,31 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     (dispH * dpr) / LIVE_GAME_HEIGHT
   );
   // Quantise to 1/8 steps (keeps 2560×1600 × R integral) and clamp. Desktop floors
-  // at 1 (crisp 1440p backing, up to ~4K on retina). Capable mobile floors at 0.75.
+  // at 1 (crisp 1440p backing, up to ~4K on retina). The portrait mobile canvas is
+  // ~2× taller, so a lower floor keeps the backing off a phone GPU's limit
+  // (~14M px at floor 1) while staying device-crisp. iOS's renderer-process memory
+  // budget is far tighter than Android's, so it floors lower still — at floor 0.75
+  // a hi-DPI iPhone SUPERSAMPLES well past its own screen (need≈0.46), needlessly
+  // inflating GPU memory into the WebKit crash zone; 0.5 tracks device pixels.
   // WEAK devices (IS_LOW_END: cheap Android, iOS, GPU-less/old PC) floor much lower
   // AND never supersample above device pixels (cap 1) — the framebuffer is the #1
   // GPU-memory hog, so tracking (or under-cutting) device pixels is what keeps the
-  // tab from the "A problem repeatedly occurred" / blank-screen crash.
-  const floor = IS_LOW_END ? 0.34 : IS_MOBILE ? 0.75 : 1;
-  const cap = IS_LOW_END ? 1 : 1.5;
-  // …and a HARD driver ceiling on top of both. An old GPU's MAX_TEXTURE_SIZE is
-  // 4096, and a backing axis past it is silently CLIPPED by the driver: the canvas
-  // renders partial or blank while the DOM logo still shows, which reads as "the
-  // Play button disappeared". Portrait is the tall axis (LIVE_GAME_HEIGHT up to
-  // 2.4×2560 = 6144 game-units; ×0.75 floor = 4608 > 4096 on 20:9 phones), so the
-  // floor itself has to yield to it. Quantised DOWN to 1/8 so the backing stays
-  // integral; desktop (1600 tall) never reaches it.
-  //
-  // This is a DIFFERENT protection from IS_LOW_END above, not a replacement: a weak
-  // device can sit under 4096 and still run out of VRAM. Both apply, strictest wins.
-  const gpuCap = Math.floor((4096 / Math.max(GAME_WIDTH, LIVE_GAME_HEIGHT)) * 8) / 8;
+  // tab out of the "A problem repeatedly occurred" / blank-screen crash.
+  const floor = IS_IOS ? 0.5 : IS_LOW_END ? 0.34 : IS_MOBILE ? 0.75 : 1;
+  const ceiling = Math.min(IS_LOW_END ? 1 : 1.5, gfx.backingCeiling);
+  // GPU ceiling: old-device MAX_TEXTURE_SIZE is 4096 — a backing axis past it
+  // gets silently clipped by the driver (the canvas renders partial/blank while
+  // the DOM logo still shows, so the title's Play button "disappears"). The
+  // portrait backing is the tall axis (LIVE_GAME_HEIGHT up to 2.4×2560 = 6144
+  // game-units; ×0.75 floor = 4608 > 4096 on 20:9 phones). Quantised DOWN to
+  // 1/8 so the backing stays integral; desktop (1600-tall) is untouched.
+  const gpuCap = Math.floor(((4096 / Math.max(GAME_WIDTH, LIVE_GAME_HEIGHT)) * 8)) / 8;
   renderScale.value = Phaser.Math.Clamp(
     Math.round(need * 8) / 8,
-    Math.min(floor, gpuCap),
-    Math.min(cap, gpuCap)
+    // A profile ceiling below the device floor must win — on Low the whole
+    // point is to under-cut device pixels.
+    Math.min(floor, gpuCap, ceiling),
+    Math.min(ceiling, gpuCap)
   );
 
   return {
@@ -68,15 +76,15 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     transparent: true,
     backgroundColor: num(PALETTE.tealDeep),
     banner: false,
+    scale: {
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     // Boot WITH a limit so TimeStep binds its limit-aware step: PowerGovernor
     // retunes the cap live (62 active / 30 idle / 15 doze) to spare batteries.
     // 62 (not 60) so a 60 Hz display renders every vsync — see POWER.
     fps: {
-      limit: POWER.activeFps
-    },
-    scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH
+      limit: gfx.activeFps
     },
     render: {
       // antialias = LINEAR texture filtering (smooth when the camera scales sprites

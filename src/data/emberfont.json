@@ -1,8 +1,0 @@
-{
-  "veins": [
-    { "chain": "flame_gem", "tier": 1, "weight": 4 },
-    { "chain": "ember_dragon", "tier": 1, "weight": 3 },
-    { "chain": "emerald", "tier": 1, "weight": 3 },
-    { "chain": "lumber", "tier": 1, "weight": 2 }
-  ]
-}

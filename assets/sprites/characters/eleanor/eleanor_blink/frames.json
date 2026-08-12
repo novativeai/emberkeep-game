@@ -1,0 +1,35 @@
+{
+  "character": "eleanor",
+  "sequence": "blink",
+  "fps": 7,
+  "width": 1100,
+  "height": 1536,
+  "frameCount": 4,
+  "source": "de-keyed + split from a 5x2 generated sheet; frames used as generated",
+  "frames": [
+    {
+      "index": 0,
+      "file": "eleanor_blink_00000.png",
+      "durationMs": 2600,
+      "blend": false
+    },
+    {
+      "index": 1,
+      "file": "eleanor_blink_00001.png",
+      "durationMs": 45,
+      "blend": false
+    },
+    {
+      "index": 2,
+      "file": "eleanor_blink_00002.png",
+      "durationMs": 70,
+      "blend": false
+    },
+    {
+      "index": 3,
+      "file": "eleanor_blink_00003.png",
+      "durationMs": 55,
+      "blend": false
+    }
+  ]
+}

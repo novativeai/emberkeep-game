@@ -7,6 +7,7 @@ import type {
   ChainConfig,
   ChainMergeOverride,
   ChainsData,
+  DragonCare,
   ItemSnapshot,
   TilePos
 } from '../core/types';
@@ -52,48 +53,41 @@ export class MergeSystem {
       return;
     }
 
-    if (to.col === from.col && to.row === from.row) {
+    const sameTile = to.col === from.col && to.row === from.row;
+    if (sameTile || !this.state.isTileActive(to.col, to.row)) {
       this.bus.emit('item:move_bounced', { itemId, at: from });
       return;
     }
 
-    // Drop onto an ACTIVE tile — the direct cases first.
-    if (this.state.isTileActive(to.col, to.row)) {
-      const targetItem = this.state.itemAt(to.col, to.row);
-      if (targetItem && targetItem.id !== itemId) {
-        // Dropped directly ON a matching item: merge if together they reach the
-        // threshold. If not, DON'T bounce yet — fall through to the forgiving magnet.
-        const matches =
-          targetItem.kind === 'item' &&
-          targetItem.chain === item.chain &&
-          targetItem.tier === item.tier;
-        if (matches && this.tryMergeOnto(item, targetItem, to)) return;
-      } else {
-        // Free active tile: move there, then merge the connected group / snap-merge.
-        this.state.moveItem(itemId, to);
-        if (this.tryMergeAt(item)) return;
-        if (this.trySnapMerge(item, to)) return;
-        this.bus.emit('item:moved', { itemId, from, to });
-        return;
-      }
+    const targetItem = this.state.itemAt(to.col, to.row);
+
+    // Fairyland-style: dropping the piece directly ON a matching item makes it
+    // join that cluster — merge if together they reach the threshold, else
+    // bounce home (you can't stack on an occupied tile otherwise).
+    if (targetItem && targetItem.id !== itemId) {
+      const matches =
+        targetItem.kind === 'item' &&
+        targetItem.chain === item.chain &&
+        targetItem.tier === item.tier;
+      if (matches && this.tryMergeOnto(item, targetItem, to)) return;
+      this.bus.emit('item:move_bounced', { itemId, at: from });
+      return;
     }
 
-    // FORGIVING MERGE — dropped on dead terrain, OR onto a cluster that didn't
-    // complete: SNAP onto a nearby free active cell that COMPLETES a merge (drag
-    // toward the piece in front → it fuses). No completing cell → bounce home
-    // (dropping on fog / a locked rim / a non-matching stack must still bounce).
+    // Dropping on a FREE tile: move there, then merge the connected group.
+    this.state.moveItem(itemId, to);
+    if (this.tryMergeAt(item)) return;
+    // Smart "near enough" merge: dropping NEXT TO a mergeable cluster (not dead
+    // on it) snaps the piece onto the completing tile and fuses.
     if (this.trySnapMerge(item, to)) return;
-    this.bus.emit('item:move_bounced', { itemId, at: from });
+    this.bus.emit('item:moved', { itemId, from, to });
   }
 
   /**
-   * Forgiving "magnet" merge: if the exact drop tile didn't fuse, scan the ring
-   * around it for the FREE active tile where placing this piece would complete an
-   * orthogonally-connected group of `minGroup`+ (the SAME connectivity the actual
-   * merge uses — so a candidate we snap to is guaranteed to fuse, never stranded).
-   * Prefer the biggest group, tie-broken by nearest to the drop. This makes
-   * dropping a piece NEAR a mergeable cluster glide it on and fuse, so you never
-   * have to land dead-centre on the stack.
+   * If the exact drop tile didn't form a group, scan the 8 tiles around it for a
+   * FREE active tile that sits beside enough matching pieces to merge; snap the
+   * dropped piece there and fuse. This makes dropping a piece NEAR a mergeable
+   * pair merge directly, the way a forgiving merge game should feel.
    */
   private trySnapMerge(item: BoardItemState, to: TilePos): boolean {
     const config = this.chainConfig(item.chain);
@@ -200,6 +194,16 @@ export class MergeSystem {
     const consumedIds = consumed.map((i) => i.id);
     const consumedAt = consumed.map((i) => ({ col: i.col, row: i.row }));
 
+    // Two Red Dragons becoming an Adult is ONE dragon growing up, so the care
+    // record survives the merge at the best of what went in. A player who has
+    // been feeding a dragon every day must never be punished for merging it —
+    // and its trust is a record of what they did, exactly like Regard's.
+    const inherited = this.bestCare(consumed);
+    // And her NAME. Without this the merge that grows a named dragon would read
+    // as the player losing her and being handed a stranger — the one way a board
+    // dragon could break the naming law (types.ts, BoardItemState.dragonName).
+    const inheritedName = consumed.find((i) => i.dragonName)?.dragonName;
+
     for (const member of consumed) {
       this.state.removeItem(member.id);
     }
@@ -223,7 +227,9 @@ export class MergeSystem {
         col: tile.col,
         row: tile.row,
         kind: 'item',
-        ...(generator ? { readyAt: this.clock.now() } : {})
+        ...(generator ? { readyAt: this.clock.now() } : {}),
+        ...(inherited ? { care: { ...inherited } } : {}),
+        ...(inheritedName ? { dragonName: inheritedName } : {})
       });
       outputs.push(this.state.snapshot(created, this.clock.now()));
     }
@@ -257,6 +263,28 @@ export class MergeSystem {
       }
     }
     return true;
+  }
+
+  /**
+   * The care record the merge's output inherits: the most-trusted of the dragons
+   * that went in, and the fullest belly among the records that share its trust.
+   * Undefined when nothing consumed was ever fed, so a plain merge writes no
+   * field at all and the save stays exactly as small as it was.
+   */
+  private bestCare(consumed: BoardItemState[]): DragonCare | undefined {
+    let best: DragonCare | undefined;
+    for (const member of consumed) {
+      const care = member.care;
+      if (!care) continue;
+      if (
+        !best ||
+        care.trust > best.trust ||
+        (care.trust === best.trust && care.day >= best.day && care.meals > best.meals)
+      ) {
+        best = care;
+      }
+    }
+    return best;
   }
 
   /** BFS from the seed so consumed members are nearest-first (seed included first). */

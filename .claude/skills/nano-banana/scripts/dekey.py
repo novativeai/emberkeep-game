@@ -31,6 +31,14 @@ def main() -> None:
     args = ap.parse_args()
 
     kr, kg, kb = (int(args.key[i:i + 2], 16) for i in (0, 2, 4))
+    # De-spill is measured against the key's dominant channel. Magenta (the
+    # default) spills into red+blue, so the term is min(r,b) − g; a green key
+    # spills into green, so it is g − max(r,b). Art whose own palette sits near
+    # the key colour needs the other key — this world's rose-and-lava islands
+    # are keyed on green because magenta would eat them.
+    green_key = kg > kr and kg > kb
+    spill_of = ((lambda r, g, b: max(0, g - max(r, b))) if green_key
+                else (lambda r, g, b: max(0, min(r, b) - g)))
     img = Image.open(args.src).convert('RGBA')
     px = img.load()
     w, h = img.size
@@ -45,13 +53,15 @@ def main() -> None:
                 px[x, y] = (0, 0, 0, 0)
             elif dist < hi:
                 alpha = int(255 * (dist - lo) / span)
-                spill = max(0, min(r, b) - g)
-                px[x, y] = (max(0, r - spill), g, max(0, b - spill), alpha)
+                spill = spill_of(r, g, b)
+                px[x, y] = ((r, max(0, g - spill), b) if green_key
+                            else (max(0, r - spill), g, max(0, b - spill))) + (alpha,)
             else:
                 # fully opaque — still strip strong spill on near-key hue
-                spill = max(0, min(r, b) - g)
-                if spill > 96:  # blatant magenta bleed inside the matte
-                    px[x, y] = (max(0, r - spill // 2), g, max(0, b - spill // 2), 255)
+                spill = spill_of(r, g, b)
+                if spill > 96:  # blatant key bleed inside the matte
+                    px[x, y] = ((r, max(0, g - spill // 2), b) if green_key
+                                else (max(0, r - spill // 2), g, max(0, b - spill // 2))) + (255,)
 
     if args.trim:
         alpha = img.getchannel('A')

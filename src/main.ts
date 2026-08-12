@@ -1,16 +1,14 @@
+// The Map Editor's chrome is drawn with FontAwesome glyphs (src/editor/EditorDom.ts).
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import Phaser from 'phaser';
 import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
 import { GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
 import { createGameConfig } from './core/GameConfig';
-import { MapEditor } from './editor/mapEditor';
 import { PowerGovernor } from './core/PowerGovernor';
+import { iapBridge } from './core/iapBridge';
+import { MapEditor } from './editor/mapEditor';
 import { gridToWorld } from './core/iso';
-import { msUntilPhase } from './core/dayCycle';
-import { printSaveAudit, type SaveAudit } from './core/saveAudit';
-import { editorStore } from './editor/editorStore';
-import type { DayPhase } from './core/types';
 
 interface BoardCellText {
   chain?: string;
@@ -25,8 +23,6 @@ interface RenderedGame {
   fps: number;
   tutorial: { step: string; index: number; total: number; done: boolean };
   energy: { current: number; max: number };
-  /** The four-phase day (morning · day · dusk · night, 8 min each). */
-  day: { phase: DayPhase; index: number; remainingMs: number };
   coins: number;
   keys: number;
   xp: number;
@@ -51,18 +47,19 @@ declare global {
     __emberkeep: {
       gridToPage: (col: number, row: number) => { x: number; y: number };
       itemToPage: (col: number, row: number) => { x: number; y: number };
+      characterToPage: (characterId: string) => { x: number; y: number } | null;
       centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
-      /** Jump the virtual clock to the next `phase` of the four-phase day. */
-      advanceToPhase: (phase: DayPhase) => { now: number; offset: number; phase: DayPhase };
-      /** Save-integrity report: every world's board measured against the ground it
-       *  actually offers. Prints a table and returns the raw findings. */
-      audit: () => SaveAudit;
-      /** Battery-governor diagnostics: current state + real rendered step rate. */
-      power: () => { state: string; fpsLimit: number; renderedFps: number };
       reset: () => void;
       saveKey: string;
       game: Phaser.Game;
+      power: () => { state: string; fpsLimit: number; renderedFps: number };
+      worlds: () => {
+        active: string;
+        all: { id: string; name: string; level: number; zones: number; cells: number }[];
+        available: string[];
+      };
+      switchWorld: (id: string) => string;
     };
     webkitAudioContext?: typeof AudioContext;
   }
@@ -95,13 +92,24 @@ const game = new Phaser.Game({
   }
 });
 
-// In-game Map Editor (dev level tool) — opened from Settings via `editor:open`.
-new MapEditor(game, ctx);
+// WebAudio unlock must come from a user gesture; resume on any pointer.
+if (audio) document.addEventListener('pointerdown', () => audio.unlock());
 
 // Battery governor: throttles the loop (and, via power:state, the ambient FX)
 // whenever the board sits untouched. Scenes read it from the registry.
 const power = new PowerGovernor(game, ctx.bus);
 game.registry.set('power', power);
+
+// Host-page bridge: real-money packs. Requests the hub's catalog when the
+// game is embedded; standalone builds stay on the Emporium's mock showcase.
+iapBridge.attach(ctx.bus);
+
+// Map Editor — the authoring tool for the zone registry the engine runs
+// (src/editor/, opened from Settings). Constructed at boot because it owns the
+// disk-backed design document, and it subscribes to `editor:open`; nothing in the
+// game calls into it. The UI Builder document has no board to edit, so it is the
+// one boot that skips it.
+if (!uiEditMode) new MapEditor(game, ctx);
 
 // Host-page bridge: the EmberGames hub reports when the game's iframe is
 // scrolled out of view — sleep the whole loop (tab-hidden is Phaser built-in).
@@ -117,36 +125,34 @@ window.addEventListener('message', (event: MessageEvent) => {
   }
 });
 
-// GPU safety net: a weak or overloaded device can drop the WebGL context. Without
-// preventDefault() the browser permanently kills the canvas — the visible "crash".
-// With it, we pause and reload from the autosave (the player loses nothing) — a
-// graceful recovery instead of a frozen/blank tab. A per-session counter stops a
-// fundamentally-too-weak device from reload-looping: after a few losses we show a
-// static message instead.
-let contextLostHandled = false;
-game.canvas.addEventListener(
-  'webglcontextlost',
-  (e: Event) => {
-    e.preventDefault();
-    if (contextLostHandled) return;
-    contextLostHandled = true;
-    const KEY = 'ek_ctxloss_reloads';
-    const n = Number(window.sessionStorage.getItem(KEY) ?? '0');
-    if (n >= 2) {
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        '<div class="boot-note">Graphics ran out of memory on this device — close other apps/tabs and reload.</div>'
-      );
-      return;
-    }
-    window.sessionStorage.setItem(KEY, String(n + 1));
-    window.setTimeout(() => window.location.reload(), 1200);
-  },
-  false
-);
-
-// WebAudio unlock must come from a user gesture; resume on any pointer.
-if (audio) document.addEventListener('pointerdown', () => audio.unlock());
+/**
+ * WRITE THE BOARD DOWN BEFORE THE PAGE GOES AWAY.
+ *
+ * Autosave is event-driven (SaveSystem.SAVE_ON), which covers every mutation but
+ * says nothing about the moment the player leaves — and leaving is not an event
+ * the game gets to see coming. A closed tab, a switched app, a phone locking:
+ * whatever happened since the last mutation would simply never be written.
+ *
+ * `pagehide` and `visibilitychange` are the pair that actually fire. `unload` and
+ * `beforeunload` are unreliable on mobile Safari and skipped entirely when a page
+ * goes into the back/forward cache, which is precisely the "come back later" case
+ * this exists for. The write is synchronous localStorage, so it completes inside
+ * the handler; both may fire for one departure and saving twice is harmless.
+ */
+const flushSave = (): void => {
+  // ONLY while a run is actually in progress. `running` is false before the
+  // first board exists and again the moment the game is reset — and a flush in
+  // either window writes an EMPTY state over the file. That is not a lost save,
+  // it is worse: the empty file LOADS, so `beginRun` sees a save, skips
+  // `newGame()`, and the player lands on a board with nothing on it at all. Reset
+  // wipes localStorage and reloads, so the flush fired between the two.
+  if (!ctx.running) return;
+  ctx.systems.save.save();
+};
+window.addEventListener('pagehide', flushSave);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushSave();
+});
 
 /* ------------------- agent instrumentation (spec §5) ------------------ */
 
@@ -210,11 +216,6 @@ window.render_game_to_text = (): RenderedGame => {
       done: state.tutorialDone
     },
     energy: { current: state.energyCurrent, max: state.energyMax },
-    day: {
-      phase: ctx.systems.day.phase,
-      index: ctx.systems.day.index,
-      remainingMs: ctx.systems.day.remainingMs
-    },
     coins: state.coins,
     keys: state.keys,
     xp: state.xp,
@@ -260,23 +261,6 @@ window.__emberkeep = {
   // Test/diagnostic: award XP so a level-up (and its camera fly) can be driven
   // deterministically without grinding merges.
   grantXp: (xp: number) => ctx.bus.emit('economy:add', { xp, reason: 'debug:grantXp' }),
-  // Test/diagnostic: fast-forward to a day phase (0 ms when already in it), so a
-  // night-only producer or a dusk-only feed can be driven without waiting 8 min.
-  advanceToPhase: (phase: DayPhase) => {
-    const { now, offset } = window.advanceTime(msUntilPhase(ctx.clock.now(), phase));
-    return { now, offset, phase: ctx.systems.day.phase };
-  },
-  // Save integrity, on demand: every world's board measured against the ground it
-  // actually offers, plus the cross-world facts that no single world can check —
-  // chiefly "the Golden dragon stands in exactly one place". See core/saveAudit.
-  audit: () => printSaveAudit(ctx.state, editorStore.baseHidden),
-  // Battery-governor diagnostics: which state the loop is in, the cap it applied,
-  // and the rate actually rendered (game.loop.actualFps tracks rAF, not steps).
-  power: () => ({
-    state: power.state,
-    fpsLimit: game.loop.fpsLimit,
-    renderedFps: Math.round(power.renderedFps())
-  }),
   // Dev/diagnostic: wipe the save and hard-reload, so a fresh newGame() runs and
   // any change to startingItems/startingDecor (e.g. the L1 dragon) shows again.
   // A loaded save otherwise masks new-game seeding.
@@ -296,6 +280,19 @@ window.__emberkeep = {
       | undefined;
     return worldToPage(board?.itemArtWorldPoint?.(col, row) ?? gridToWorld(col, row));
   },
+  /**
+   * Where to AIM at a world character — the middle of her BODY, not her cell.
+   * Her cell is no longer where she is drawn (characters.json carries a free
+   * dx/dy off it) and her hit rect is the lower half of her silhouette, which
+   * stands well above her feet either way. `null` if she is not on this map.
+   */
+  characterToPage: (characterId: string) => {
+    const board = game.scene.getScene(SCENES.board) as
+      | (Phaser.Scene & { characterAimWorldPoint?: (id: string) => { x: number; y: number } | null })
+      | undefined;
+    const at = board?.characterAimWorldPoint?.(characterId);
+    return at ? worldToPage(at) : null;
+  },
   /** Centre the board camera on a cell (test hook; the closer camera can leave
    *  off-zone targets like the fog gate out of view). */
   centerCell: (col: number, row: number) => {
@@ -303,5 +300,33 @@ window.__emberkeep = {
     if (!board) return;
     const { x, y } = gridToWorld(col, row);
     board.cameras.main.centerOn(x, y);
-  }
+  },
+  /**
+   * World travel. `worlds()` lists what this build can run and which of them the
+   * Keeper may currently reach; `switchWorld(id)` asks WorldSystem to go there —
+   * it refuses mid-tutorial and above the Keeper's rank exactly as any in-game
+   * door would, so driving it from here tests the real path rather than a
+   * shortcut around it. Returns the world actually being shown.
+   */
+  worlds: () => ({
+    active: ctx.state.worldId,
+    all: [...ctx.state.worlds.values()].map((w) => ({
+      id: w.id,
+      name: w.name,
+      level: w.level,
+      zones: w.zones.length,
+      cells: w.zones.reduce((n, z) => n + (z.dense ? z.matrix.cols * z.matrix.rows : z.cells.size), 0)
+    })),
+    available: ctx.systems.worlds.available().map((w) => w.id)
+  }),
+  switchWorld: (id: string) => {
+    ctx.bus.emit('world:switch', { to: id });
+    return ctx.state.worldId;
+  },
+  /** Battery-governor diagnostics: current state + real rendered step rate. */
+  power: () => ({
+    state: power.state,
+    fpsLimit: game.loop.fpsLimit,
+    renderedFps: Math.round(power.renderedFps())
+  })
 };

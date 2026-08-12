@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Crystal bake</title>
+<style>
+  body { margin: 0; background: #101418; color: #cfe; font: 13px/1.5 ui-monospace, monospace; }
+  #log { padding: 12px; white-space: pre; }
+</style>
+<div id="log">idle</div>
+<script type="module">
+  // The bake harness renders through the SHIPPED Crystal3D module, not a copy of
+  // it: the sequence is only a faithful replacement of the live gem if the
+  // pixels come from the very code being replaced. Vite transpiles the .ts and
+  // resolves `three`, so this page is the game's own renderer with a different
+  // clock driving it.
+  import { Crystal3D } from '/src/render/Crystal3D.ts';
+
+  const log = (m) => { document.getElementById('log').textContent = m; };
+
+  let crystal = null;
+
+  window.__init = (spec, w, h) => {
+    crystal = new Crystal3D(spec, w, h);
+    log(`ready ${crystal.canvas.width}x${crystal.canvas.height}`);
+    return [crystal.canvas.width, crystal.canvas.height];
+  };
+
+  /** Render at an absolute time and hand back the RGBA bytes as a data URL. */
+  window.__frame = (timeMs) => {
+    crystal.update(timeMs);
+    return crystal.canvas.toDataURL('image/png');
+  };
+
+  /** Raw pixels, for the periodicity proof (cheaper to compare than a PNG). */
+  window.__pixels = (timeMs) => {
+    crystal.update(timeMs);
+    const ctx = crystal.canvas.getContext('2d');
+    const d = ctx.getImageData(0, 0, crystal.canvas.width, crystal.canvas.height).data;
+    let hash = 2166136261;
+    for (let i = 0; i < d.length; i++) { hash ^= d[i]; hash = Math.imul(hash, 16777619); }
+    return hash >>> 0;
+  };
+
+  window.__bakeReady = true;
+  log('module loaded');
+</script>

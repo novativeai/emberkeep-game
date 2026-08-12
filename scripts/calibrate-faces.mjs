@@ -18,7 +18,8 @@
  * Run after adding/regenerating head-animation sets:
  *   node scripts/calibrate-faces.mjs
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
 import path from 'node:path';
@@ -176,6 +177,44 @@ const CHARACTERS = {
   }
 };
 
+/**
+ * The breeds whose banks come from `scripts/make-face-frames.py`.
+ *
+ * Expanded from the convention rather than written out, because that script
+ * NAMES the files from the same convention: six hand-copied blocks of the same
+ * thirty lines is six chances to drift from what is actually on disk, and the
+ * drift would surface as a missing-file throw long after the art was made. Add
+ * a breed to this list and its two stages calibrate themselves.
+ */
+for (const breed of ['frost', 'storm', 'moonwhisker']) {
+  const dir = `assets/sprites/characters/dragon/${breed}-dragon`;
+  const stages = [
+    ['', `${dir}/rig/dragon-${breed}.rig.json`, `${dir}/head-animation`, `${breed}-dragon`],
+    ['-adult', `${dir}/rig-adult/${breed}-dragon.rig.json`, `${dir}/head-animation-adult`,
+      `${breed}-dragon-adult`]
+  ];
+  for (const [suffix, rig, fsDir, prefix] of stages) {
+    CHARACTERS[`dragon-${breed}${suffix}`] = {
+      rig,
+      layer: 'head',
+      fsDir,
+      basePath: fsDir.replace(/^assets\//, ''),
+      sets: {
+        blink: {
+          dir: `${prefix}-blink-animation`,
+          files: ['open', 'halfOpen', 'closed', 'halfOpen2'].map((s) => `${prefix}-eyes-${s}.png`),
+          ref: 0
+        },
+        talk: {
+          dir: `${prefix}-roar_talk-animation`,
+          files: [0, 1, 2, 3].map((i) => `${prefix}-roar_talk_0000${i}.png`),
+          ref: 0
+        }
+      }
+    };
+  }
+}
+
 /* ------------------------- minimal PNG decoder ------------------------- */
 /** 8-bit RGBA / RGB, non-interlaced (what our pipeline emits). Returns rgba. */
 function decodePng(buf) {
@@ -298,6 +337,25 @@ function verifyMapping(base, baseBox, baseTop, ref, refBox, refTop, scale, label
   if (iou < 0.94) throw new Error(`${label}: silhouette IoU ${(iou * 100).toFixed(1)}% < 94% — alignment off`);
 }
 
+/**
+ * Decode a frame whatever it is stored as.
+ *
+ * The head-animation banks are LOSSLESS WebP now (scripts/optimize-art.py — same
+ * pixels, a third fewer bytes, and the .png master is gone), but this file has
+ * its own zlib PNG decoder and Node has no WebP one. `dwebp` ships in the same
+ * libwebp package as the `cwebp` that made the file, so the conversion is free
+ * here: WebP in, PNG bytes out, straight into the decoder that already exists.
+ * A `.png` config entry resolves to its sibling automatically, so the file
+ * lists above stay written the way the art was authored.
+ */
+function decodeFrame(file) {
+  const webp = file.replace(/\.png$/, '.webp');
+  if (existsSync(webp)) {
+    return decodePng(execFileSync('dwebp', [webp, '-quiet', '-o', '-'], { maxBuffer: 1 << 28 }));
+  }
+  return decodePng(readFileSync(file));
+}
+
 /* ------------------------------- main ---------------------------------- */
 const out = {};
 for (const [character, spec] of Object.entries(CHARACTERS)) {
@@ -324,7 +382,7 @@ for (const [character, spec] of Object.entries(CHARACTERS)) {
     if (framesMeta.frameCount !== setSpec.files.length) {
       throw new Error(`${character}/${setName}: frames.json says ${framesMeta.frameCount} frames, config lists ${setSpec.files.length}`);
     }
-    const ref = decodePng(readFileSync(path.join(dir, setSpec.files[setSpec.ref])));
+    const ref = decodeFrame(path.join(dir, setSpec.files[setSpec.ref]));
     const refBox = alphaBBox(ref);
     // Scale: content width must match (mouth/eye variants never widen the ref frame).
     const scale = baseBox.w / refBox.w;
@@ -344,8 +402,15 @@ for (const [character, spec] of Object.entries(CHARACTERS)) {
       textureScale: +scale.toFixed(5),
       originX: +(pivotRef.x / ref.width).toFixed(5),
       originY: +(pivotRef.y / ref.height).toFixed(5),
+      // Calibration reads the PNG masters, but what SHIPS is the lossless WebP
+      // sibling once `scripts/optimize-art.py` has made one (the build drops a
+      // .png whose .webp exists). So the runtime path is the sibling when it is
+      // there — otherwise a re-calibration would quietly point faces.json back at
+      // files the deploy no longer carries, and every dragon would stop blinking.
       frames: setSpec.files.map((file, i) => ({
-        file,
+        file: existsSync(path.join(dir, file.replace(/\.png$/, '.webp')))
+          ? file.replace(/\.png$/, '.webp')
+          : file,
         durationMs: framesMeta.frames[i].durationMs
       }))
     };

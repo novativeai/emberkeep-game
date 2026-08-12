@@ -4,7 +4,7 @@ import { createTestContext } from './helpers';
 describe('DragonJobSystem (dragon jobs)', () => {
   it('a working dragon pulls the House timer forward (+1× per worker), then tires → rests', () => {
     const ctx = createTestContext();
-    const house = ctx.state.addItem({ chain: 'lumber', tier: 2, col: 2, row: 2, kind: 'item' });
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
     const dragon = ctx.state.addItem({ chain: 'emerald', tier: 3, col: 4, row: 4, kind: 'item' });
 
     ctx.bus.emit('time:advanced', { ms: 0 }); // arm the House passive timer
@@ -29,7 +29,7 @@ describe('DragonJobSystem (dragon jobs)', () => {
 
   it('the speed-up is GLOBAL — it advances every timed object, not just the assigned one', () => {
     const ctx = createTestContext();
-    const house = ctx.state.addItem({ chain: 'lumber', tier: 2, col: 2, row: 2, kind: 'item' });
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
     const tree = ctx.state.addItem({ chain: 'bigtree', tier: 1, col: 6, row: 6, kind: 'item' });
     const dragon = ctx.state.addItem({ chain: 'emerald', tier: 3, col: 4, row: 4, kind: 'item' });
     ctx.bus.emit('time:advanced', { ms: 0 }); // arm both buildings
@@ -46,7 +46,7 @@ describe('DragonJobSystem (dragon jobs)', () => {
 
   it('a tired (resting) dragon cannot be put back to work until it has rested', () => {
     const ctx = createTestContext();
-    const house = ctx.state.addItem({ chain: 'lumber', tier: 2, col: 2, row: 2, kind: 'item' });
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
     const dragon = ctx.state.addItem({ chain: 'emerald', tier: 3, col: 4, row: 4, kind: 'item' });
     ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
     ctx.clock.advance(180_001);
@@ -64,7 +64,7 @@ describe('DragonJobSystem (dragon jobs)', () => {
 
   it('only actual DRAGON tiers work — the chain merge pieces (Ruby, Eggs) cannot be hired', () => {
     const ctx = createTestContext();
-    const house = ctx.state.addItem({ chain: 'lumber', tier: 2, col: 2, row: 2, kind: 'item' });
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
     const ruby = ctx.state.addItem({ chain: 'ember_dragon', tier: 1, col: 4, row: 4, kind: 'item' });
     const redEgg = ctx.state.addItem({ chain: 'ember_dragon', tier: 2, col: 5, row: 4, kind: 'item' });
     const greenEgg = ctx.state.addItem({ chain: 'emerald', tier: 2, col: 6, row: 4, kind: 'item' });

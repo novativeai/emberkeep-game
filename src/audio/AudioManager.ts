@@ -31,16 +31,18 @@ export class AudioManager {
     bus.on('audio:set_music_muted', ({ muted }) => this.applyMusicMuted(muted));
     bus.on('item:merged', ({ resultTier }) => this.popMerge(resultTier));
     bus.on('item:hatched', () => this.hatchChime());
+    // NO roar on `dragon:revealed`. The reveal card used to fire a synthesised
+    // roar on its overshoot; it read as bad rather than as grand, so the card
+    // now lands on the hatch chime and its own music alone. The reveal is a
+    // VISUAL beat — if a roar comes back it wants to be a real recording, not
+    // three stacked oscillators.
     bus.on('item:harvested', () => this.harvestTick());
     bus.on('item:produced', () => this.giftChime());
     bus.on('item:sold', () => this.coinBlip());
     bus.on('order:completed', () => this.fanfare());
+    bus.on('iap:completed', () => this.purchaseFanfare());
     bus.on('keeper:leveled', () => this.levelUp());
     bus.on('region:unlocked', () => this.fogWhoosh());
-    bus.on('emberfont:sparked', () => this.sparkPop());
-    bus.on('emberfont:surge', ({ active }) => { if (active) this.surgeRoar(); });
-    bus.on('duel:set_started', () => this.duelReady());
-    bus.on('duel:match', ({ outcome }) => this.duelResult(outcome));
     bus.on('item:move_bounced', () => this.deny(140, 0.05));
     bus.on('item:harvest_failed', () => this.deny(200, 0.07));
     bus.on('ui:ledger_toggled', () => this.click());
@@ -188,40 +190,6 @@ export class AudioManager {
     this.noiseSweep(0.18, 3200, 6400, 0.025, 0.02);
   }
 
-  /** A bright ember blip when the Spark Well draws a vein. */
-  private sparkPop(): void {
-    this.tone(520, 0.06, { type: 'triangle', gain: 0.14, slideTo: 940 });
-    this.tone(1180, 0.05, { type: 'sine', gain: 0.05, delay: 0.05 });
-    this.noiseSweep(0.12, 3000, 6200, 0.02);
-  }
-
-  /** A warm rising roar as the well ignites into a Surge. */
-  private surgeRoar(): void {
-    this.noiseSweep(0.5, 300, 2200, 0.08);
-    this.tone(150, 0.5, { type: 'sawtooth', gain: 0.08, slideTo: 440, release: 0.4 });
-    this.tone(300, 0.42, { type: 'triangle', gain: 0.05, delay: 0.06, slideTo: 660, release: 0.35 });
-  }
-
-  /** Three rising blips that land with the duel's 3-2-1 countdown (~700ms apart). */
-  private duelReady(): void {
-    this.tone(440, 0.09, { type: 'square', gain: 0.08 });
-    this.tone(520, 0.09, { type: 'square', gain: 0.08, delay: 0.7 });
-    this.tone(660, 0.12, { type: 'square', gain: 0.1, delay: 1.4, release: 0.15 });
-  }
-
-  /** Match outcome sting — bright chime on a win, soft thud on a loss. */
-  private duelResult(outcome: 'win' | 'lose' | 'tie'): void {
-    if (outcome === 'win') {
-      this.tone(660, 0.1, { type: 'triangle', gain: 0.12 });
-      this.tone(990, 0.14, { type: 'triangle', gain: 0.1, delay: 0.08, release: 0.2 });
-      this.noiseSweep(0.2, 3000, 6000, 0.03, 0.02);
-    } else if (outcome === 'lose') {
-      this.tone(300, 0.16, { type: 'sine', gain: 0.1, slideTo: 150, release: 0.2 });
-    } else {
-      this.tone(440, 0.1, { type: 'sine', gain: 0.07 });
-    }
-  }
-
   private coinBlip(): void {
     this.tone(760, 0.06, { type: 'triangle', gain: 0.1 });
     this.tone(1140, 0.09, { type: 'triangle', gain: 0.1, delay: 0.06 });
@@ -244,6 +212,21 @@ export class AudioManager {
       this.tone(freq / 2, 0.16, { type: 'sine', gain: 0.05, delay: i * 0.095 });
     });
     this.tone(1568, 0.3, { type: 'sine', gain: 0.07, delay: 0.4, release: 0.45 });
+  }
+
+  /** A real-money pack arrived: the fanfare's rise, resolved a full octave up
+   *  with a coin-bright double ping on top — grander than an order, and it
+   *  ends on the same sparkle the wallet blip uses, so it reads as "paid in". */
+  private purchaseFanfare(): void {
+    const notes = [523, 659, 784, 1046, 1318];
+    notes.forEach((freq, i) => {
+      this.tone(freq, 0.14, { type: 'triangle', gain: 0.14, delay: i * 0.08, release: 0.24 });
+      this.tone(freq / 2, 0.15, { type: 'sine', gain: 0.05, delay: i * 0.08 });
+    });
+    [1568, 2093].forEach((freq, i) => {
+      this.tone(freq, 0.22, { type: 'sine', gain: 0.07, delay: 0.5 + i * 0.09, release: 0.4 });
+    });
+    this.noiseSweep(0.5, 2800, 6400, 0.05, 0.15);
   }
 
   private fogWhoosh(): void {

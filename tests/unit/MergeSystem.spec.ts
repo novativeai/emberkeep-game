@@ -154,7 +154,7 @@ describe('MergeSystem', () => {
     expect(ctx.state.itemAt(3, 3)?.id).toBe(weed.id); // bounced home
   });
 
-  it('builds one House from three Bushes (standard 3→1 merge)', () => {
+  it('builds one Plank Set from three Cut Wood (standard 3→1 merge)', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 1, kind: 'item' });
     ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 2, kind: 'item' });
@@ -167,12 +167,12 @@ describe('MergeSystem', () => {
     expect(merges[0]!.consumedIds).toHaveLength(3);
     expect(merges[0]!.outputs).toHaveLength(1);
     expect(ctx.state.items.size).toBe(1);
-    const house = [...ctx.state.items.values()][0];
-    expect(house?.chain).toBe('lumber');
-    expect(house?.tier).toBe(2);
+    const planks = [...ctx.state.items.values()][0];
+    expect(planks?.chain).toBe('lumber');
+    expect(planks?.tier).toBe(2);
   });
 
-  it('five Bushes merge into two Houses (standard 5-bonus rule)', () => {
+  it('five Cut Wood merge into two Plank Sets (standard 5-bonus rule)', () => {
     const ctx = createTestContext();
     ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 1, kind: 'item' });
     ctx.state.addItem({ chain: 'lumber', tier: 1, col: 1, row: 2, kind: 'item' });
@@ -193,20 +193,20 @@ describe('MergeSystem', () => {
     }
   });
 
-  it('merges TWO Houses into one Manor (per-tier 2→1 override, Bushes still need 3)', () => {
+  it('merges TWO Houses into one Manor (per-tier 2→1 override, Planks still need 3)', () => {
     const ctx = createTestContext();
-    ctx.state.addItem({ chain: 'lumber', tier: 2, col: 1, row: 1, kind: 'item' });
-    ctx.state.addItem({ chain: 'lumber', tier: 2, col: 1, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'lumber', tier: 3, col: 1, row: 2, kind: 'item' });
     const merges = capture(ctx.bus, 'item:merged');
 
     drag(ctx, [1, 2], [1, 1]); // drop one House onto the other — only two needed
 
     expect(merges).toHaveLength(1);
-    expect(merges[0]!.consumedIds).toHaveLength(2); // the tier-2 override consumes TWO
-    expect(merges[0]!.resultTier).toBe(3);
+    expect(merges[0]!.consumedIds).toHaveLength(2); // the House override consumes TWO
+    expect(merges[0]!.resultTier).toBe(4);
     expect(ctx.state.items.size).toBe(1);
     const manor = [...ctx.state.items.values()][0];
-    expect(manor).toMatchObject({ chain: 'lumber', tier: 3 });
+    expect(manor).toMatchObject({ chain: 'lumber', tier: 4 });
     expect(manor?.readyAt).toBeDefined(); // the Manor is a passive gold generator
   });
 

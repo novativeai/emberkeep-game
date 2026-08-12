@@ -1,0 +1,19 @@
+{
+  "character": "selyna",
+  "frameWidth": 456,
+  "frameHeight": 543,
+  "frameCount": 8,
+  "anchorX": 0.6992,
+  "anchorY": 0.9982,
+  "body": {
+    "x": 120,
+    "y": 28,
+    "width": 335,
+    "height": 514
+  },
+  "scale": 0.4981,
+  "fps": {
+    "idle": 12,
+    "cast": 14
+  }
+}

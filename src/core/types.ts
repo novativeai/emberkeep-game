@@ -1,5 +1,9 @@
 /** Shared types: board model, data-file schemas, and the full EventBus contract. */
 
+import type { PersistedPlace } from './mapSpace';
+
+export type { PersistedPlace };
+
 export interface TilePos {
   col: number;
   row: number;
@@ -18,17 +22,72 @@ export interface BoardItemState {
   readyAt?: number;
   /** Absolute clock time at which this generator PASSIVELY gifts its next item. */
   passiveAt?: number;
+  /** Productions banked toward this generator's `bonus` drop (see
+   *  GeneratorConfig.bonus). Counts up and is spent, never reset, so a full
+   *  board DEFERS the rare drop instead of losing it. */
+  yields?: number;
+  /**
+   * What THIS generator makes, overriding its tier's `generator.produces`.
+   *
+   * The House's commission: a finished House is dedicated to one merge piece —
+   * chosen by the player from the Bag — and makes that, forever. Per ITEM and
+   * not per tier, because the whole point is that two Houses can be dedicated to
+   * two different things; a second item generator costs a second House.
+   *
+   * Write-once. `GeneratorSystem` refuses to change a set commission, so the
+   * choice is a commitment rather than a menu, which is what makes the second
+   * House worth building.
+   */
+  produces?: { chain: string; tier: number };
+  /**
+   * A BOARD dragon's care record — what it has eaten today, and what it thinks
+   * of the Keeper.
+   *
+   * Chapter One has dragons and no Cold Nest, so the only dragons in it stand on
+   * the merge board as items. They are still fed, and feeding still earns trust;
+   * what they do NOT get is a `Companion` record, because that is the named,
+   * un-mergeable thing the nest chapter produces (DragonSystem's naming law).
+   * So care lives here, per ITEM — the same shape the House's commission takes,
+   * and for the same reason: it is an instance's history, not its tier's.
+   *
+   * Consumed with the item on a merge, deliberately. Two Red Dragons becoming an
+   * Adult is one dragon growing up, not two records to reconcile — and the
+   * survivor keeps the higher trust (`MergeSystem` carries it over), so a
+   * player is never punished for raising the pair they merged.
+   */
+  care?: DragonCare;
+  /**
+   * What the Keeper named this dragon.
+   *
+   * The naming law says a NAMED thing never touches the merge board, and a
+   * companion out of a Cold Nest obeys it exactly. Chapter One's dragons cannot:
+   * they are the board, and the first one is the emotional beat the whole
+   * opening builds to. So they are named where they stand, and the one thing
+   * that would break the law — a named dragon being consumed and forgotten — is
+   * answered by carrying the name through the merge instead (`MergeSystem`), so
+   * a merge reads as her growing up rather than as her being spent.
+   *
+   * Absent = never named, and the readout falls back to the tier's own name.
+   */
+  dragonName?: string;
+}
+
+/** Per-board-dragon care. `day`/`trustDay` are `dayIndexAt` stamps, so both
+ *  daily allowances reset on the virtual clock like every other timer. */
+export interface DragonCare {
+  /** Day stamp the meal/green tallies below belong to. */
+  day: number;
+  /** Servings eaten today, taste-weighted (MEALS_PER_DAY fills the day). */
+  meals: number;
+  /** Cooling servings eaten today (DAILY_GREEN is the day's need). */
+  green: number;
+  /** 0..TRUST_MAX. Earned by feeding, at most once a day, and never decays. */
+  trust: number;
+  /** Day stamp of the last trust gain — the once-a-day latch. */
+  trustDay: number;
 }
 
 export type RegionStatus = 'active' | 'unlockable' | 'locked';
-
-/**
- * The four-phase day (8 min each, a 32-min round — DAY_CYCLE in Constants).
- * Deliberately NOT a simulated calendar: four coarse phases is all the design
- * needs (time-of-day food preferences, the night-only Dew Basin). The ring is
- * derived from `GameClock.now()`, so `window.advanceTime(ms)` steps it.
- */
-export type DayPhase = 'morning' | 'day' | 'dusk' | 'night';
 
 export type SpawnCause = 'init' | 'merge' | 'generator' | 'unlock' | 'load';
 
@@ -49,6 +108,11 @@ export interface ItemSnapshot {
 export interface GeneratorConfig {
   /** Spawns this item per cycle (item generators: dragons, the big tree). */
   produces?: { chain: string; tier: number };
+  /** A RARE second drop from the same generator: every `every` productions it
+   *  also drops this piece. The Ripe Emberberry Plant pays one Emberberry
+   *  Sprout per 12 berries, so the patch can be grown into a second patch
+   *  without the food itself ever being the gate. */
+  bonus?: { every: number; produces: { chain: string; tier: number } };
   /** Grants currency/energy per cycle instead of an item (the house). */
   reward?: { coins?: number; xp?: number; energy?: number };
   cooldownMs: number;
@@ -57,12 +121,11 @@ export interface GeneratorConfig {
    *  — free, no tap, no energy. The standing advantage of owning a dragon. */
   passiveMs?: number;
   /** Tap-to-harvest? Passive-only generators (house, big tree) set false: they
-   *  auto-produce on their passive timer; a tap does not harvest them. */
+   *  auto-produce on their passive timer; a tap only offers the energy skip. */
   tappable?: boolean;
-  /** Time-of-day gate: this generator only produces during these day phases (the
-   *  Dew Basin fills only at `["night"]`). Absent = produces around the clock.
-   *  An overdue timer simply HOLDS until the phase comes round again. */
-  phases?: DayPhase[];
+  /** Most GOLD the "buy now" skip can cost on THIS generator (the Crystal's
+   *  emeralds are dear). Falls back to GENERATOR_SKIP_MAX_ENERGY when unset. */
+  skipMaxGold?: number;
 }
 
 export interface ChainTierConfig {
@@ -79,6 +142,22 @@ export interface ChainTierConfig {
    *  `merge` when merging items of THIS tier (e.g. 2 Houses → 1 Manor while
    *  Bushes still merge 3 → 1 House). */
   merge?: ChainMergeOverride;
+  /** Display scale for this tier's board art. Consulted AFTER Constants'
+   *  ITEM_SCALE (which wins for hand-tuned keys) — this is the data-driven
+   *  path the worldbuilder Merge page writes for uploaded art. */
+  artScale?: number;
+  /**
+   * This tier is COMMISSIONED: the player picks what it will make, once, from
+   * the pieces in their Bag, and it makes that for the rest of its life
+   * (`BoardItemState.produces`).
+   *
+   * Data-driven rather than a hardcoded `chain === 'lumber'`, so the House is
+   * an instance of the rule rather than the rule itself. A commissioned tier
+   * still needs a `generator.produces` — that is what it makes UNTIL it is
+   * commissioned, so a player who closes the chooser is never left holding an
+   * ornament.
+   */
+  chooseProduce?: boolean;
 }
 
 /** Per-chain merge recipe override (e.g. 5 wood → 1 house). */
@@ -93,17 +172,32 @@ export interface ChainConfig {
   id: string;
   name: string;
   /**
-   * The world this chain BELONGS to (an editor map name — 'borealis'). Absent =
-   * the primary isle, which is every chain that shipped before worlds existed.
-   * It is a declaration, not a gate: the merge rules do not read it. Its job is
-   * to say whose art has to be resident when you stand in that world, so a cold
-   * world's icons stay off the boot preload (see WORLD_CHAIN_ART / lazyTextures).
+   * The world this chain belongs to. Absent = it belongs to whichever world is
+   * being played (the shared vocabulary: coin, chest, the dragon chains).
+   *
+   * This is NOT the same thing as `HIDDEN_CHAINS`, and conflating the two was
+   * the trap. A chain can be withheld for two unrelated reasons: it belongs to
+   * a later CHAPTER of this world (firepine, nest — `HIDDEN_CHAINS`), or it
+   * belongs to a DIFFERENT WORLD entirely (Selyna's frozen roster — this
+   * field). The first is a one-line switch a chapter flips; the second must
+   * flip itself the moment the player crosses, and must never flip for the
+   * world they came from. See `chainHiddenIn`.
    */
   world?: string;
   /** Tier whose creation counts as a hatch (dragon chains). */
   hatchAtTier?: number;
   /** Overrides the global mergeRule for this chain (e.g. lumber: 5 → 1). */
   merge?: ChainMergeOverride;
+  /**
+   * THE zone's legendary dragon — at most one chain per world may set this.
+   *
+   * It is the one chain no producer feeds: its eggs arrive only as quest
+   * rewards, three of them, and three merge into the dragon. That makes it the
+   * only piece in the game whose supply is the QUEST LADDER itself, which is
+   * why the audit enforces a directive about how they are spaced
+   * (docs/quest-ladder.md §7) rather than merely checking it is reachable.
+   */
+  legendary?: boolean;
   tiers: ChainTierConfig[];
 }
 
@@ -125,20 +219,18 @@ export interface OrderRequirement {
   count: number;
 }
 
-/** One selectable way to fulfil an order: consume board items and/or spend
- *  coins in exchange for this option's rewards. Delivering ANY option completes
- *  the order (the player picks their path). Used by orders that carry
- *  `options`; simple orders keep the legacy top-level `requires`/`rewards`. */
-export interface OrderOption {
-  label: string;
-  requires?: OrderRequirement[];
-  costCoins?: number;
-  rewards: { coins?: number; keys?: number; xp?: number; spawn?: { chain: string; tier: number; count: number } };
-}
-
 export interface OrderConfig {
   id: string;
   giver: string;
+  /**
+   * The world this order can be filled in. Absent = the authored world.
+   *
+   * A Ledger that followed the Keeper north would keep asking for Gem Shards in
+   * a place with no dragon to cough one up — the order would sit at 0/8 for
+   * ever, and its "encore" would too. An order belongs where its giver stands,
+   * for the same reason a chain does (`ChainConfig.world`).
+   */
+  world?: string;
   title: string;
   blurb: string;
   requires: OrderRequirement[];
@@ -151,10 +243,6 @@ export interface OrderConfig {
      *  for rewards staged OUTSIDE the board, like the Golden Altar egg. */
     tease?: string;
   };
-  /** When present, the ledger shows one row per option and delivering any one
-   *  completes the order. `requires`/`rewards` mirror option 0 for legacy
-   *  readers (progress text, tutorial). */
-  options?: OrderOption[];
 }
 
 export interface OrdersData {
@@ -168,33 +256,184 @@ export interface OrdersData {
 /* Dialogue + Keeper's Tasks data (src/data/dialogue.json, tasks.json)  */
 /* ------------------------------------------------------------------ */
 
+/** One chapter's spoken beats — a run of tap-advanced bubbles fired once, when
+ *  the chapter's gate is met. Authored in docs/script-chapters.md. */
+export interface StoryChapterConfig {
+  speaker: SpeakerId;
+  lines: string[];
+}
+
+/**
+ * What one person says about the relationship itself.
+ *
+ * `hearts` is keyed "1".."5" — the beat played the moment that heart fills, and
+ * the only place the gauge is ever explained. It is never shown as a number and
+ * never named as a mechanic: Regard is expressed as CONDUCT (docs/quests.md
+ * §1.3), so heart 3 is where she stops calling it "the ledger" and starts
+ * calling it "ours", not where a tooltip says "Regard 3/5".
+ */
+export interface RegardDialogue {
+  hearts: Record<string, StoryChapterConfig>;
+  /** Rotating one-liners when she takes a gift she asked for. */
+  giftAccepted: string[];
+  /** …and when she is handed something she did not. A refusal is never silent,
+   *  and it must never read as a failure — she is declining, not erroring. */
+  giftDeclined: string[];
+}
+
 export interface DialogueData {
-  /** Short Cindra quotes stamped on the order-complete banner (rotating). */
-  orderComplete: string[];
+  /** Short Eleanor quotes stamped on the order-complete banner (rotating),
+   *  banked BY STORY STAGE — key "1".."6". The same system says different things
+   *  as the story moves, which is where weeks of dialogue come from without new
+   *  design (docs/script-chapters.md, Part II). StorySystem picks the bank. */
+  orderComplete: Record<string, string[]>;
+  /** Post-tutorial chapter beats, keyed by chapter number. */
+  chapters: Record<string, StoryChapterConfig>;
+  /**
+   * What is said the FIRST time the Keeper stands in a world, keyed by world id.
+   *
+   * Deliberately not a chapter. Chapters advance one at a time on gates that
+   * read live state, and the crossing is rung 11 of a ladder whose rungs 3–10
+   * are gated on systems that do not exist yet (the Cold Nest, Trust, the Dragon
+   * Book). Wiring the north to `storyChapter` would either skip eight reveals or
+   * stall behind them; an arrival is its own occasion and needs neither.
+   */
+  arrivals?: Record<string, StoryChapterConfig>;
   /** Golden Egg tap flavor, keyed by XP progress toward the Level-3 finale. */
   goldenEgg: { early: string[]; mid: string[]; near: string[] };
-  /** Cindra's first (and only pre-encore) spoken line — the finale beat. */
-  finaleCindra: string;
+  /** The Golden Elder's first spoken line in the whole game — the finale beat.
+   *  She is silent until she wakes, which is what makes it land. */
+  finaleElder: string;
   /** Finale variant when the Golden Egg was never earned (Order 1 skipped) —
    *  reads as PROPHECY, pointing the player back to the un-filled promise. */
-  finaleCindraProphecy: string;
-  /** Cindra's banner quote the moment the egg materialises on the altar. */
+  finaleElderProphecy: string;
+  /** Eleanor's banner quote the moment the egg materialises on the altar. */
   goldenArrival: string;
-  /** Cindra's line when Order 1 completes AFTER Level 3 — the late awakening. */
+  /** Eleanor speaks the North Crossing open, right after the finale hands the
+   *  board back — the beat that ends with the portal blooming (`gate:opened`). */
+  gateOpens: { speaker: string; lines: string[] };
+  /** First-arrival walkthroughs of the two hubs. Each plays once ever
+   *  (stats `tour:<world>`); the Roothold one ends by unlocking the shop
+   *  button (`shop:unlocked`). */
+  tours: {
+    roothold: { intro: string[]; house: string; sections: string[]; close: string; outro: string };
+    hatchery: { intro: string[]; cauldron: string; explain: string; close: string };
+  };
+  /** The Elder's line when Order 1 completes AFTER Level 3 — the late awakening. */
   lateAwakening: string;
-  /** One-shot Laurah nudges post-tutorial. */
+  /** One-shot Eleanor nudges post-tutorial. */
   hints: {
     zeroWarmth: string;
     boardFull: string;
     eggTrembles: string;
     twoDragons: string;
     twoHouses: string;
+    /** First time the skip popup is offered post-tutorial: it shows a Gold price
+     *  and a Warmth price, and the tutorial only ever demonstrated Warmth. */
+    goldSkip: string;
+    /** First House the player finishes after the tutorial: what the chooser is
+     *  actually asking, and the part that is easy to miss — the choice is
+     *  PERMANENT, and a second output means a second House. */
+    houseCommission: string;
   };
-  /** Cindra's line when all Keeper's Tasks complete. */
+  /** Eleanor's line when all Keeper's Tasks complete. */
   tasksComplete: string;
+  /** The five-hearts banks, keyed by character id (`eleanor`, `selyna`). */
+  regard?: Record<string, RegardDialogue>;
 }
 
-export type TaskKind = 'hatches' | 'orders' | 'goldEarned' | 'merges' | 'elderTaps';
+/* ------------------------------------------------------------------ */
+/* World characters (src/data/characters.json)                          */
+/* ------------------------------------------------------------------ */
+
+/** What a character can be asked to do. Each comes from her craft, so the
+ *  fiction and the mechanic are the same sentence (docs/world-characters.md §4). */
+export type CharacterAction = 'give_back';
+
+export interface CharacterConfig {
+  id: string;
+  speaker: SpeakerId;
+  /** Which map she stands on. She exists nowhere else — Selyna is never in
+   *  Emberkeep, and that is canon, not staging. */
+  world: string;
+  /** Authored world cell. NOT a board tile: she is decor, never in `state.items`. */
+  anchor: [number, number];
+  /** Free nudge off that cell's centre, in WORLD-BUILDER pixels — the same units
+   *  and meaning `MapData.mapDecor` dx/dy carry, rebased by TILE_W /
+   *  map.tile.width at render. The lattice has no cell for a terrace rim, so the
+   *  cell alone could only ever put her on the nearest diamond centre. Absent =
+   *  centred. Authored in the World Builder (scripts/apply-characters.mjs). */
+  dx?: number;
+  dy?: number;
+  /** Who this standee IS — wardrobe (standee banks, fallback, scale trim) AND
+   *  identity (Regard, dialogue, action cooldown). Absent = the id. This is
+   *  what lets Eleanor stand in Roothold too: a second placement entry that is
+   *  still, in every social sense, Eleanor. */
+  art?: string;
+  action: CharacterAction;
+  cooldownMs: number;
+}
+
+/** A named dragon. NEVER a BoardItem: anything with a name never touches the
+ *  merge board (merge-chains.md §1.2). Acquired only from a Cold Nest. */
+export interface Companion {
+  id: string;
+  /** Which dragon art/rig it uses. */
+  chain: string;
+  name: string;
+  trust: number;
+  /** Chain it likes best. Hidden until discovered by experiment. */
+  favourite: string;
+  /** Chain it refuses outright. Also hidden — a diet is a ratio, a favourite AND
+   *  a refusal, and the refusal is what makes two dragons different to care for. */
+  dislike: string;
+  /** Book entries the player has actually revealed. */
+  discovered: string[];
+  /** Meals eaten so far on `mealDay` (fuel and green only — grit and drink are
+   *  their own axes and never stand in for a meal). */
+  meals: number;
+  mealDay: number;
+  /** Green (cooling) taken on `mealDay` — counts as a meal AND as its own axis. */
+  green: number;
+  /** Day it last dug (Trust 2) and last foraged (Trust 4) — once each per day. */
+  dugDay: number;
+  foragedDay: number;
+  /** Servings banked toward adulthood, weighted by taste: 1 per favourite feed,
+   *  ACCEPTED_RATE per accepted one. Adult at ADULT_SERVINGS[its rarity]. */
+  growth: number;
+  adult: boolean;
+  /** Day its last Trust gain landed — Trust rises at most once a day. */
+  trustDay: number;
+  /** Where it stands in the world — the cell its nest was on. Not a board tile
+   *  it occupies; it is scenery with a tap handler, like the world characters. */
+  col: number;
+  row: number;
+}
+
+/** Warming progress on one Cold Nest, keyed by its board cell. */
+export interface NestState {
+  points: number;
+  /** Points banked on `day` — capped so stockpiling cannot compress the wait. */
+  pointsToday: number;
+  day: number;
+}
+
+export interface CharactersData {
+  characters: CharacterConfig[];
+}
+
+/**
+ * A lifetime counter a Keeper's Task can be measured against. Each kind is a
+ * `GameState.stats` key TaskSystem owns, so a task never keeps a tally of its
+ * own and cannot drift from the thing it claims to measure.
+ *
+ * `recipes` counts Cookbook pages discovered — first-time merges, which is a
+ * number that only ever goes up and that every chain on the board contributes
+ * to. It replaced a `hatches` task: dragons are deliberately scarce and dear
+ * now, so a checklist row asking for four of them stopped being a chapter's
+ * work and became a wall.
+ */
+export type TaskKind = 'hatches' | 'orders' | 'goldEarned' | 'merges' | 'elderTaps' | 'recipes';
 
 export interface TaskConfig {
   id: string;
@@ -208,67 +447,224 @@ export interface TaskConfig {
   lockedHint?: string;
 }
 
+/**
+ * The cosmetics store (`src/data/store.json`) — Manor skins, decorations, and
+ * the sections that are announced but not yet buyable.
+ *
+ * `kind` is what a purchase DOES, and it is the whole contract:
+ *   'skin'  — swaps the art of the top-tier Manor. Owned + equipped.
+ *   'decor' — places a non-merging prop on the board. Owned; one placement each.
+ *   'soon'  — nothing is for sale; the section renders its blurb and a badge.
+ * A 'soon' section carries no items ON PURPOSE: a priced card that cannot be
+ * bought is worse than an honest empty shelf.
+ */
+export type StoreKind = 'skin' | 'dragon_skin' | 'decor' | 'soon';
+
+/**
+ * How rare a shelf item is meant to feel. It is PRESENTATION ONLY — a legendary
+ * costs more and wears a violet foil plate with a travelling sheen, but it buys
+ * exactly the same kind of thing an epic buys. Nothing here touches a payout.
+ */
+export type StoreRarity = 'epic' | 'legendary';
+
+export interface StoreItem {
+  id: string;
+  name: string;
+  blurb: string;
+  /** Texture key from assets.json — the card art AND, for a Manor skin, the art
+   *  the Manor swaps to. A `dragon_skin` card art is its own key-art
+   *  illustration; the board art it swaps to is `skin_<id>_<tier>`. */
+  art: string;
+  gold: number;
+  /** `dragon_skin` only: the merge chain this skin re-dresses ('ember_dragon',
+   *  'emerald'). It is the wardrobe slot — one worn skin per dragon. */
+  dragon?: string;
+  /** Absent = the plain cream card the Manor skins and decorations use. */
+  rarity?: StoreRarity;
+  /** The one showcase card in a section: full grid height, art full-bleed, and
+   *  it always sorts first. At most one per section — the panel takes the first
+   *  it finds and treats the rest as ordinary cards. */
+  hero?: boolean;
+}
+
+export interface StoreSection {
+  id: string;
+  title: string;
+  blurb: string;
+  kind: StoreKind;
+  items: StoreItem[];
+}
+
+export interface StoreData {
+  sections: StoreSection[];
+}
+
 export interface TasksData {
   tasks: TaskConfig[];
   reward: { coins: number; energy: number };
 }
 
-/** A "gift" goal shown by the quest journal: reach `count` of chain+tier on the
- *  board, then claim `coins` (Farmland-style milestone chain). */
-export interface MilestoneConfig {
+/* ------------------------------------------------------------------ */
+/* The Cauldron (src/data/cauldron.json)                                */
+/* ------------------------------------------------------------------ */
+
+/** One brew: consume `inputs` out of the Bag, bank `output` into it. The
+ *  cauldron trades in the Bag ONLY — it never touches a board, which is what
+ *  lets it live in the hatchery hub and still spend goods gathered anywhere. */
+export interface CauldronRecipeConfig {
   id: string;
+  output: { chain: string; tier: number; count: number };
+  inputs: Array<{ chain: string; tier: number; count: number }>;
+  /** Selyna's grimoire line — italic flavor under the recipe name. */
+  flavor: string;
+  /** What the output is FOR — the panel's answer to "why brew this". */
+  use: string;
+}
+
+export interface CauldronData {
+  recipes: CauldronRecipeConfig[];
+}
+
+/* ------------------------------------------------------------------ */
+/* The quest ladder (src/data/quests.json)                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What finishes a subquest. Every kind reads state that ALREADY exists — no
+ * goal keeps its own counter, so a goal can't drift from the thing it claims to
+ * measure (the same law StorySystem's chapter gates follow).
+ *
+ *   'have'         — this many of a chain+tier standing on the board RIGHT NOW.
+ *                    Non-monotonic (delivering consumes them), so QuestSystem
+ *                    latches it the first time it is seen met.
+ *   'order'        — a specific Ledger order delivered.
+ *   'active_order' — whatever order the Ledger is currently showing. The endless
+ *                    tail: it never completes, because the encore never runs out.
+ *   'stat'         — a lifetime counter TaskSystem already keeps.
+ *   'task'         — mirrors one Keeper's Task by id. Label, target, lock and
+ *                    progress all come from tasks.json, so the checklist has
+ *                    exactly ONE definition and the HUD cannot disagree with the
+ *                    Ledger's Tasks tab.
+ *   'level'        — Keeper level.
+ *   'region'       — a region's fog is lifted.
+ *   'recipe'       — a Cookbook page discovered (chain:from>to).
+ *   'world'        — the player has STOOD in that world. The journey goal: it is
+ *                    what a crossing completes, and (being latched on arrival)
+ *                    it stays true after they come home. A world may only ever
+ *                    be opened by a quest step, never by a merge — see the
+ *                    `teleport` placeholder in worlds.json for the trap.
+ *   'gift'         — this many of a piece GIVEN to a person (tap her, then tap
+ *                    the piece). The relationship subquest: the thing she needs,
+ *                    handed over rather than delivered to a Ledger. Consumed on
+ *                    the way, so the availability audit counts it as a need.
+ *   'regard'       — that person's hearts. The only goal that reads a
+ *                    relationship, and the one that lets a quest be gated on
+ *                    one (`lockedUntil.regard` gates a STEP; this finishes one).
+ */
+export type QuestGoal =
+  | { kind: 'have'; chain: string; tier: number; count: number }
+  | { kind: 'order'; orderId: string }
+  | { kind: 'active_order' }
+  | { kind: 'stat'; stat: TaskKind; count: number }
+  | { kind: 'task'; taskId: string }
+  | { kind: 'level'; level: number }
+  | { kind: 'region'; regionId: string }
+  | { kind: 'recipe'; chain: string; fromTier: number; toTier: number }
+  | { kind: 'world'; worldId: string }
+  | { kind: 'gift'; characterId: string; chain: string; tier: number; count: number }
+  | { kind: 'regard'; characterId: string; hearts: number };
+
+export interface QuestStepConfig {
+  id: string;
+  /** HUD label. Omitted for `task` goals — tasks.json owns their wording. */
+  label?: string;
+  goal: QuestGoal;
+  /**
+   * Merge pieces this step needs that its goal does NOT already name — the
+   * dragons behind a `hatches` stat, the Elder behind `elderTaps`. The
+   * availability audit (src/core/availability.ts) reads goal-implied needs AND
+   * these; anything a step consumes must be listed in one or the other or the
+   * audit is checking a lie.
+   */
+  needs?: OrderRequirement[];
+  /**
+   * Same shape as TaskConfig — a step whose subject doesn't exist yet is not
+   * shown as an active subquest until its gate opens.
+   *
+   * `regard` is the relationship gate: she will not ask for this until she
+   * thinks enough of you. It reads hearts, never points, so authored data says
+   * the thing the player can see on screen.
+   */
+  lockedUntil?: {
+    order?: string;
+    level?: number;
+    regard?: { characterId: string; hearts: number };
+  };
+  lockedHint?: string;
+}
+
+export interface QuestConfig {
+  id: string;
+  /** Story chapter this quest belongs to (docs/quest-ladder.md). */
+  chapter: number;
+  /**
+   * Which world this quest is tracked in. Absent = the authored world
+   * (`WORLD_ID`). The HUD shows one quest at a time and a `have` goal reads the
+   * board you are STANDING on, so a quest asking for Emberkeep goods would read
+   * `0 / 6` from the north — the ladder is filtered by world for that reason,
+   * not merely for tidiness. A quest with `world` set is invisible until the
+   * player is there.
+   */
+  world?: string;
+  giver: SpeakerId;
+  /** HUD title. Omitted only by the endless tail, which borrows the live
+   *  order's title. */
+  title?: string;
+  /** The Ledger order this quest is the story of, when it has one. */
+  orderId?: string;
+  steps: QuestStepConfig[];
+  /**
+   * Paid ONCE, when the quest's last step lands. Distinct from the order
+   * reward on `orderId`: that is what the Ledger pays for goods delivered, this
+   * is what the STORY pays for the quest being done — and only a quest reward
+   * may carry a legendary egg, because only the ladder's shape can guarantee
+   * three of them arrive spaced out and finish the zone.
+   *
+   * `spawn` banks its overflow in the Bag, so a full board can never eat one.
+   */
+  rewards?: {
+    coins?: number;
+    keys?: number;
+    xp?: number;
+    spawn?: { chain: string; tier: number; count: number };
+  };
+  /**
+   * Regard points paid to `giver` when this quest completes. Absent =
+   * `REGARD_QUEST_POINTS`, which is what paces the gauge to fill across the
+   * whole campaign; an explicit `0` says "this one is not about her" (the
+   * endless Ledger tail, a Keeper's-Tasks checklist).
+   */
+  regard?: number;
+  /**
+   * Design intent the offline audit checks (`pnpm quests`). `levelAtEnd` is the
+   * Keeper level this quest's last step is supposed to leave the player on — the
+   * Chapter One finale is choreographed off Level 3, so which quest lands it is
+   * a story fact, not an accident of tuning. The audit models the FLOOR (scripted
+   * XP only, no free-play merges), so a shortfall is reported with the gap
+   * rather than treated as broken.
+   */
+  expects?: { levelAtEnd?: number };
+}
+
+export interface QuestsData {
+  quests: QuestConfig[];
+}
+
+/** One pooled stack in the Bag. Identical chain+tier pieces share a slot. */
+export interface BagStack {
   chain: string;
   tier: number;
   count: number;
-  coins: number;
-}
-
-export interface MilestonesData {
-  milestones: MilestoneConfig[];
-}
-
-/** One drawable "vein" of the Emberfont Spark Well — a tier-1 merge piece the
- *  well can draw, and its relative frequency in the draw cycle. */
-export interface EmberfontVein {
-  chain: string;
-  tier: number;
-  weight: number;
-}
-
-export interface EmberfontData {
-  veins: EmberfontVein[];
-}
-
-/* -- Dragon Duel (rock-paper-scissors level-up mode) -- */
-export type DuelThrow = 'rock' | 'paper' | 'scissors';
-export type DuelOutcome = 'win' | 'lose' | 'tie';
-
-/** A dragon color in the duel roster (red = ember_dragon, green = emerald, …). */
-export interface DuelDragon {
-  chain: string;
-  /** Art/loop colour key: 'red' | 'green' | … (drives duel_<throw>_<color>). */
-  color: string;
-  name: string;
-  owned: boolean;
-  level: number;
-  gauge: number;
-}
-
-/** A quest definition (src/data/quests.json). `kind` drives the completed colour:
- *  main = gold, sub = platinum. `image` (optional) = a texture key shown on the card. */
-export interface QuestDef {
-  id: string;
-  kind: 'main' | 'sub';
-  title: string;
-  image?: string;
-}
-export interface QuestsData {
-  feedTargetLevel: number;
-  quests: QuestDef[];
-}
-/** A quest's live state broadcast to the HUD (`quest:changed`). */
-export interface QuestState extends QuestDef {
-  done: boolean;
 }
 
 export interface MapItemPlacement {
@@ -313,6 +709,18 @@ export interface MapRegionConfig {
   tiles: [number, number][];
   /** A region lifts on spending `keys` Gold Keys OR on reaching Keeper `level`. */
   unlock?: { keys?: number; level?: number };
+  /**
+   * Wear a cloud while locked? Default true — fog is how the board says "there
+   * is ground here, come and take it".
+   *
+   * False for ground the player cannot reach in this chapter AT ALL. A cloud is
+   * a promise the player can act on; one that cannot lift for the entire shipped
+   * game is not a tease but a lie, and it hides painted scenery behind a
+   * permanent grey lid. The cells stay real, addressable and saveable — they are
+   * simply not advertised yet, and the flag flips when the chapter that opens
+   * them ships.
+   */
+  fog?: boolean;
   contents?: MapItemPlacement[];
   decor?: MapDecorPlacement[];
 }
@@ -340,8 +748,11 @@ export interface MapData {
   startingItems: MapItemPlacement[];
   /** Featured decor placed on the active board at new-game (e.g. the L1 dragon). */
   startingDecor?: MapDecorPlacement[];
-  /** Authored tile footprint (world-builder units). */
-  tile?: { width: number; height: number };
+  /** Authored tile footprint (world-builder units). `skew`/`angle` describe the
+   *  full parametric projection the world was drawn at; `iso.projectionOf`
+   *  reads width/height/skew, and map space depends on all three, so they are
+   *  declared here rather than left as undeclared extras on the JSON. */
+  tile?: { width: number; height: number; skew?: number | null; angle?: number };
   /** All playable cells as [col, row] (for void/cliff silhouette detection). */
   playable?: [number, number][];
   /** Which tile-art variant sits on each playable cell, keyed "col,row". */
@@ -370,7 +781,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'chest:open' | 'dragon:working' | 'marketplace:purchased'; chain?: string }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number };
 
 export interface TutorialAllow {
@@ -387,6 +798,25 @@ export interface TutorialAllow {
   marketplace?: boolean;
   /** Allow tapping the Emberkeep Cookbook button during tutorial. */
   cookbook?: boolean;
+  /** Allow tap-to-pocket (BagSystem). Off by default mid-tutorial: pocketing a
+   *  scripted piece would strand the step that wants it merged. */
+  bag?: boolean;
+  /** Allow tapping a world character (Eleanor) to ask for her help. */
+  character?: boolean;
+  /** Allow the bag chooser's GIVE button. Drawn either way — a refused action
+   *  answers with a nudge, never with silence (tutorial-design law 3). */
+  give?: boolean;
+  /** Show the status readout under the quest tracker. Latched once set — see
+   *  UIScene. It debuts on the beat that teaches Eleanor's hearts. */
+  status?: boolean;
+  /** Allow dragging a good onto a dragon to feed it. Off by default mid-tutorial
+   *  for the same reason `bag` is: a scripted piece eaten by a dragon strands the
+   *  step that wanted it merged. */
+  feed?: boolean;
+  /** Allow the House's commission chooser to open. Off for the whole tutorial
+   *  except the one beat that teaches it — an unheralded modal landing on
+   *  `house_skip` would bury the lesson under it. */
+  commission?: boolean;
 }
 
 /**
@@ -399,13 +829,18 @@ export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: 
 
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string };
 
 export type TutorialArrowConfig =
   | { tile: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
-  | { fogRegion: string };
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { fogRegion: string }
+  /** A world character by id. NEVER point at one with a literal `tile` — where
+   *  she stands is authored in the World Builder (`characters.json` anchor +
+   *  dx/dy), so a hardcoded cell goes stale the moment she is moved and the
+   *  arrow ends up over empty ground. This resolves against her LIVE standee. */
+  | { character: string };
 
 /**
  * Scripted side-effects a tutorial step runs the moment it becomes active —
@@ -420,14 +855,47 @@ export type TutorialEffect =
   | { advanceClock: number }
   | { setEnergy: number }
   | { move: { chain: string; tier: number; to: [number, number] } }
-  | { setTimer: { chain: string; tier: number; remainingMs: number } };
+  | { setTimer: { chain: string; tier: number; remainingMs: number } }
+  /** Open the naming prompt on the first board dragon of this chain+tier. The
+   *  panel is not dismissible, so this is only ever authored on a step whose
+   *  gate is the naming itself. */
+  | { nameDragon: { chain: string; tier: number } }
+  /**
+   * Make a character want a piece for the duration of one lesson.
+   *
+   * Regard normally answers only to the quest ladder — a gift is accepted when,
+   * and only when, a live `gift` subquest names that exact piece. The tutorial
+   * runs before the Ledger is even open, so the give-gesture had nothing to be
+   * taught with; this is the scripted equivalent of that subquest, and it is
+   * consumed the moment the gift lands.
+   */
+  | {
+      wantGift: {
+        characterId: string;
+        chain: string;
+        tier: number;
+        count: number;
+        /** Regard paid for THIS gift, overriding `REGARD_GIFT_POINTS`. A scripted
+         *  gift is usually a keepsake rather than one of twelve deliveries, and a
+         *  lesson about the hearts has to actually light one. */
+        points?: number;
+      };
+    };
+
+/**
+ * Who can speak in the dialogue bubble. `eleanor` is the guide AND the quest
+ * giver — she teaches, she keeps the Ledger, and she is the only voice for most
+ * of the game. `golden_elder` is deliberately SILENT until she wakes, so her
+ * first line is an event; `selyna` arrives with the Borealis sanctuary.
+ * Only `eleanor` ships an animated disc atlas today (see PortraitAnimator);
+ * anyone else falls back to their static `portrait_<id>` texture.
+ */
+export type SpeakerId = 'eleanor' | 'selyna' | 'golden_elder';
 
 export interface TutorialStepConfig {
   id: string;
-  speaker: 'cindra' | 'laurah';
+  speaker: SpeakerId;
   text: string;
-  /** Short imperative title shown in the Tasks-list checklist (event steps only). */
-  task?: string;
   gate: TutorialGate;
   highlight?: TileRef[];
   hand?: TutorialHandConfig;
@@ -440,10 +908,6 @@ export interface TutorialStepConfig {
 export interface TutorialData {
   steps: TutorialStepConfig[];
 }
-
-/** worldId -> that world's script. A world absent from the map simply has no
- *  tutorial, which is every world but borealis today. */
-export type WorldTutorials = Record<string, TutorialData>;
 
 export interface AssetEntry {
   key: string;
@@ -467,76 +931,99 @@ export interface AnchorsData {
 /* Save schema                                                          */
 /* ------------------------------------------------------------------ */
 
+/** A board item as PERSISTED: its grid cell, plus where that cell sits on the
+ *  world's art. See `src/core/mapSpace.ts` — the grid cell is what the game
+ *  runs on, the place is what survives the world being re-gridded into zones. */
+export interface SavedBoardItem extends BoardItemState {
+  place?: PersistedPlace;
+}
+
 /**
- * A cell lattice, as stored in a save — structurally the `Lattice` of `iso.ts`
- * (declared here rather than imported so the save schema owns no module cycle).
+ * One world's board as persisted. The default world's is stored at the TOP
+ * LEVEL of the save (where it has always been, so a save written before travel
+ * existed loads with nothing to migrate); every other world's goes in `boards`.
  */
-export interface SavedLattice {
-  halfW: number;
-  halfH: number;
-  skewK: number;
-  originX: number;
-  originY: number;
+export interface SavedWorldBoard {
+  /** `mapSignature` for THAT world's grid. */
+  mapSignature?: string;
+  items: SavedBoardItem[];
+  nests?: Record<string, NestState>;
+  nestPlaces?: Record<string, PersistedPlace>;
 }
 
 export interface SaveDataV1 {
   version: number;
   savedAt: number;
-  items: BoardItemState[];
+  items: SavedBoardItem[];
   nextItemId: number;
+  /** Which world this save belongs to. Absent on saves written before worlds
+   *  were named; assumed to be the build's own `WORLD_ID`. */
+  world?: string;
+  /** Where the player currently stands. Absent = the authored world, which is
+   *  where every save written before world travel resumes. */
+  activeWorld?: string;
+  /** Boards for worlds OTHER than the authored one, keyed by world id. Only
+   *  worlds the player has actually put something on appear here. */
+  boards?: Record<string, SavedWorldBoard>;
+  /** Fingerprint of the grid this save's `(col,row)` were written against
+   *  (`mapSignature`). When it no longer matches the map being loaded, the grid
+   *  moved under the save and positions are recovered from `place` instead. */
+  mapSignature?: string;
+  /** Map-space positions for the Cold Nests, keyed by the same "col,row" as
+   *  `nests`, so a nest relocates with its cell rather than being orphaned. */
+  nestPlaces?: Record<string, PersistedPlace>;
   regions: Record<string, RegionStatus>;
   energy: { current: number; lastRegenAt: number };
   coins: number;
   keys: number;
   xp: number;
   orderProgress: { completedIds: string[] };
-  /** Claimed milestone-gift ids (optional — pre-milestone saves omit it). */
-  milestoneProgress?: { claimedIds: string[] };
-  /** Emberfont Spark Well progress (optional — pre-Emberfont saves omit it). */
-  emberfontProgress?: {
-    sparks: number;
-    sparkAt: number;
-    stoke: number;
-    stokeAt: number;
-    surgeUntil: number;
-    veinIndex: number;
-  };
-  /** Per-dragon-colour duel level/gauge (optional — pre-duel saves omit it).
-   *  `fedAt` = GameClock time of the last feed, drives the tap-menu hunger gauge. */
-  dragonLevels?: Record<string, { level: number; gauge: number; fedAt?: number }>;
-  /** Emberberry bushes banked in the dragon's larder (absent on pre-larder saves). */
-  berryStock?: number;
-  /** LEGACY (pre per-world boards): item id -> owning world name. Everything lived on
-   *  one board and this only said what to show. Still read on load, to split an old
-   *  save's pieces onto the right world's board; never written any more. */
-  itemWorlds?: Record<string, string>;
-  /**
-   * Every world's own board. The top-level `items`/`nextItemId` mirror the primary
-   * world so an older build still reads this save.
-   *
-   * `lattice` is the CELL LATTICE those (col,row) were written in — the unit of the
-   * coordinates, saved alongside them. A world's playable cells are re-derived at
-   * every boot from hand-drawn grids that live outside this file, so without it a
-   * redrawn grid (or a shipped update) silently changes what every saved coordinate
-   * MEANS. With it, the change is detected and the pieces are re-projected exactly.
-   * Absent on pre-lattice saves: the live lattice is then adopted as-is.
-   */
-  worlds?: Record<
-    string,
-    { items: BoardItemState[]; nextItemId: number; lattice?: SavedLattice }
-  >;
-  /** The world the player was in. A reload puts them back where they left off. */
-  activeWorld?: string;
   tutorial: { index: number; done: boolean };
-  /** Progress through the OTHER worlds' tutorials (borealis), keyed by world id.
-   *  The primary world keeps `tutorial` above, so an older save reads unchanged. */
-  worldTutorials?: Record<string, { index: number; done: boolean }>;
   /** Lifetime counters (Keeper's Tasks + chapter-card stats) and one-shot
    *  flags (`finaleSeen`, `tasksClaimed`) — all numeric for easy versioning. */
   stats: Record<string, number>;
   /** First-time merge discoveries for the Emberkeep Cookbook — keys like
    *  `"ember_dragon:1>2"`. Optional: older saves default to []. */
   discoveredRecipes?: string[];
+  /** Stored Bag stacks. Optional: older saves default to []. */
+  bag?: BagStack[];
+  /** How far the campaign has come, 1..12. Optional: older saves default to 1. */
+  storyChapter?: number;
+  /** Per-character action cooldowns, `characterId -> readyAt` (GameClock ms). */
+  characterCooldowns?: Record<string, number>;
+  /** Named dragons. Optional: older saves default to []. */
+  companions?: Companion[];
+  /** Cold Nest warming progress, keyed "col,row". */
+  nests?: Record<string, NestState>;
+  /** Store item ids the player has bought. Optional: older saves default to []. */
+  ownedCosmetics?: string[];
+  /** The equipped Manor skin id, or null for the authored Manor. */
+  manorSkin?: string | null;
+  /** Equipped DRAGON skins, keyed by the chain each one re-skins
+   *  (`{ ember_dragon: 'ashglass' }`). Keyed rather than a single slot because
+   *  the breeds are different animals — wearing Ashglass on the ember dragon
+   *  says nothing about what the emerald dragon is wearing. */
+  dragonSkins?: Record<string, string>;
+}
+
+/* ------------------------------------------------------------------ */
+/* Real-money packs (IAP)                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A real-money pack offered by the EmberGames hub. The catalog arrives over
+ * the host-page bridge (`iapBridge`) — the game never hard-codes prices, so
+ * the hub's `IAP_PACKS` stays the single source of truth for what money buys.
+ */
+export interface IapPackInfo {
+  id: string;
+  name: string;
+  blurb: string;
+  /** Price in EUR (display only — the hub's gateway does the charging). */
+  amountEur: number;
+  coins: number;
+  keys: number;
+  energy: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -547,38 +1034,104 @@ export interface EventMap {
   /* -- input intents (scenes/UI emit, systems handle) -- */
   'drag:dropped': { itemId: number; from: TilePos; to: TilePos };
   'item:tapped': { itemId: number };
+  /** Intent: stash the tapped board piece in the Bag (BagSystem handles it). */
+  'ui:store_requested': { itemId: number };
+  /** Intent: DROP one of this stack back out onto the board. */
+  'ui:bag_retrieve_requested': { chain: string; tier: number };
+
+  /* -- the House's commission (GeneratorSystem owns what a generator makes) -- */
+  /**
+   * Intent: dedicate this commissioned generator to one piece from the Bag.
+   *
+   * Refused, never silently ignored, when the generator is already committed,
+   * when its tier is not commissionable, or when the Bag does not hold the
+   * piece — only what the player actually has can be commissioned, which is why
+   * the chooser shows the Bag rather than the whole roster.
+   */
+  /**
+   * Intent: open the commission chooser for this generator.
+   *
+   * The board decides WHEN to ask (a House was just finished; an undecided one
+   * was tapped) and the UI owns the panel, so the two never reach into each
+   * other — the same split every other panel in the game already keeps.
+   */
+  'ui:commission_requested': { itemId: number };
+  'ui:produce_choice_requested': { itemId: number; chain: string; tier: number };
+  /** Fact: this generator is now dedicated. Fired once per generator, ever. */
+  'generator:produce_set': { itemId: number; chain: string; tier: number };
+  'generator:produce_refused': {
+    itemId: number;
+    reason: 'already_set' | 'not_commissionable' | 'not_in_bag';
+  };
+  /** Intent: SELL one of this stack for coins. Selling lives in the Bag and
+   *  nowhere else — a piece on the board can be dragged, merged or pocketed,
+   *  never sold, so the board keeps exactly one destructive verb and the player
+   *  has to have chosen to put something aside before they can lose it.
+   *  EconomySystem owns it (it owns coins) and commands `bag:consume`. */
+  'ui:bag_sell_requested': { chain: string; tier: number };
+  /** Command: take `count` of this stack out of the Bag. BagSystem owns the bag,
+   *  exactly as BoardSystem owns the grid behind `board:consume_items`. */
+  'bag:consume': { chain: string; tier: number; count: number };
+  /** COMMAND — put pieces straight into the Bag without them ever standing on
+   *  the board. The overflow path for a reward that had nowhere to land. */
+  'bag:bank': { chain: string; tier: number; count: number };
+  /** Intent: open/close the Bag panel. */
+  'ui:bag_toggled': Record<string, never>;
+  /** `gift` is a FREE skip paid by a character action, not by the player.
+   *  GeneratorSystem stays the only thing that touches a timer. */
+  'generator:skip': { itemId: number; currency: 'gold' | 'warmth' | 'gift' };
   /* -- dragon jobs -- */
   'dragon:work': { dragonId: number; houseId: number };
   'dragon:working': { dragonId: number; houseId: number };
   'dragon:rest': { dragonId: number };
   'dragon:rested': { dragonId: number };
   'ui:ledger_toggled': { open: boolean };
+  /** The Keeper's Store opened/closed. */
+  'ui:store_toggled': { open: boolean };
   /** The Emberkeep Cookbook panel opened/closed (tutorial gates + analytics). */
   'ui:cookbook_opened': { discovered: number };
   'ui:cookbook_closed': { discovered: number };
-  'ui:deliver_requested': { orderId: string; optionIndex?: number };
-  /** A gauge "+" button opened the shop for that currency. */
+  /** Intent: the cauldron decor in the hatchery hub was tapped. */
+  'ui:cauldron_tapped': Record<string, never>;
+  /** The Cauldron panel opened/closed. */
+  'ui:cauldron_toggled': { open: boolean };
+  /** Command: brew this recipe. CauldronSystem validates the Bag and owns the
+   *  outcome — the panel only asks. */
+  'cauldron:brew': { recipeId: string };
+  /** Fact: inputs left the Bag, the output was banked into it. */
+  'cauldron:brewed': { recipeId: string; output: { chain: string; tier: number; count: number } };
+  /** Fact: the brew was refused, and why — never silently. */
+  'cauldron:brew_failed': { recipeId: string; reason: 'ingredients' | 'bag_full' };
+  'ui:deliver_requested': { orderId: string };
+  /** A gauge "+" button opened the currency shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' };
-  'ui:sell_requested': { itemId: number };
-  /** The Emberfont Spark Well was tapped — spend a Spark, draw a vein. */
-  'emberfont:tap': Record<string, never>;
-  /* -- Dragon Duel intents (UI emits, DragonDuelSystem handles) -- */
-  'duel:choose': { chain: string };
-  'duel:start': Record<string, never>;
-  /** The player threw `move` for the current match — resolve it. */
-  'duel:play': { move: DuelThrow };
+  /** Intent: a real-money pack's price plate was tapped in the Emporium.
+   *  UIScene gates it (post-tutorial only) and opens the confirm dialog. */
+  'ui:iap_buy_requested': { packId: string };
+  /** Intent: buy a store cosmetic. StoreSystem validates gold and ownership. */
+  'ui:store_buy_requested': { itemId: string };
+  /** Intent: wear an owned Manor skin, or null to go back to the authored one. */
+  'ui:store_equip_requested': { itemId: string | null };
+  /** Fact: a cosmetic was bought (gold already spent). */
+  'store:purchased': { itemId: string; kind: StoreKind; gold: number };
+  /** Fact: the purchase was refused — the panel shakes the price. */
+  'store:purchase_failed': { itemId: string; reason: 'gold' | 'owned' | 'no_room' };
+  /** Fact: the Manor now wears this skin (null = the authored art). BoardScene
+   *  re-textures every lumber_4 on the board. */
+  'store:skin_changed': { itemId: string | null };
+  /** Fact: this DRAGON now wears this skin (null = its authored art).
+   *  BoardScene re-textures every item of that chain whose tier has skin art. */
+  'store:dragon_skin_changed': { dragon: string; itemId: string | null };
   /** Settings toggled the background music on/off (AudioManager applies it). */
   'audio:set_music_muted': { muted: boolean };
   'fog:tapped': { regionId: string };
   'tutorial:advance_requested': { stepId: string };
   'game:reset_requested': Record<string, never>;
-  /** Settings → open the in-game Map Editor (dev level tool). */
+  /** Settings asks for the Map Editor (`src/editor/`), the tool that authors the
+   *  zone registry the engine runs. An intent, like every other UI→system message —
+   *  the editor subscribes, nothing calls into it. */
   'editor:open': Record<string, never>;
   'time:advanced': { ms: number };
-  /** The day rolled into a new phase (morning → day → dusk → night → morning).
-   *  DayCycleSystem emits it; the board grades its sky off it. `startedAt`/`endsAt`
-   *  are absolute GameClock times, so a UI can count the phase down. */
-  'day:phase': { phase: DayPhase; index: number; startedAt: number; endsAt: number };
 
   /* -- cross-system commands (systems handle, synchronously) -- */
   'energy:spend': { amount: number; reason: string };
@@ -586,27 +1139,53 @@ export interface EventMap {
   'energy:set': { value: number; reason: string };
   'economy:add': { coins?: number; keys?: number; xp?: number; reason: string };
   'economy:spend_keys': { keys: number; reason: string };
+  /** Command: a hub-confirmed real-money purchase arrived over the bridge.
+   *  IapSystem applies it EXACTLY ONCE (`stats['iap:<purchaseId>']` is the
+   *  latch), granting via `economy:add` / `energy:add`, then announces
+   *  `iap:completed`. Replayed deliveries are silently absorbed. */
+  'iap:grant': { purchaseId: string; packId: string; name: string; coins: number; keys: number; energy: number };
   'board:consume_items': { itemIds: number[]; reason: string };
   /** Scripted spawn of `count` items, into free tiles near an item of `nearChain`. */
-  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number] };
+  /**
+   * `overflow` decides what happens to the pieces there was no room for.
+   * Default (absent) is the shipped behaviour: they are simply not spawned,
+   * which is correct for a renewable drop — the generator will pay again.
+   * `'bag'` banks the remainder instead, and is REQUIRED for anything finite:
+   * a legendary egg exists exactly three times in a zone, so a full board must
+   * never be able to destroy one.
+   */
+  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number]; overflow?: 'bag' };
   /** Transform one on-board item of `chain`+`fromTier` into `toTier` in place. */
   'board:retier': { chain: string; fromTier: number; toTier: number };
   /** Relocate one on-board item of `chain`+`tier` to a cell (tutorial staging). */
   'board:move': { chain: string; tier: number; to: [number, number] };
-  /** Re-seat pieces standing on cells the live world no longer offers (a world's
-   *  playable cells are re-derived on every entry — see BoardSystem.reconcile). */
-  'board:reconcile': Record<string, never>;
-  /** Bring a world's furniture back around a point — once per world. See
-   *  BoardSystem.gather: it repairs lairs that were seeded before the anchor rule. */
-  'board:gather': { around: [number, number]; chains: string[] };
+  /** Place a bought decoration on the board. Decor never merges and never
+   *  occupies a tile the player needs for a merge — BoardSystem picks the
+   *  FURTHEST free active tile from the busy middle for exactly that reason. */
+  'board:place_decor': { decor: string };
+  /** Fact: there was nowhere to put it. The store refunds nothing because it
+   *  never charged — StoreSystem asks the board first. */
+  'board:decor_placed': { decor: string; at: TilePos | null };
   /** Force a generator's tap-cooldown to `remainingMs` left (tutorial staging). */
   'generator:set_timer': { chain: string; tier: number; remainingMs: number };
 
   /** A treasure chest was tapped — ChestSystem grants a random reward + removes it. */
   'chest:open': { itemId: number };
-  'chest:claimed': { chestId: number; label: string };
+  /** `coins` lets the scene put the real coin art beside a Gold gift's label. */
+  'chest:claimed': { chestId: number; label: string; coins: boolean };
 
   /* -- state-change notifications (systems emit; UI + audio subscribe) -- */
+  /** Fact: the hub sent (or updated) the real-money pack catalog. An empty
+   *  list means purchases are unavailable (standalone build, no hub parent). */
+  'iap:catalog_changed': { packs: IapPackInfo[] };
+  /** Fact: the secure checkout window was opened for this pack. */
+  'iap:checkout_opened': { packId: string };
+  /** Fact: the purchase was applied — UIScene throws the confetti, the
+   *  AudioManager plays the purchase fanfare. Amounts are what was granted. */
+  'iap:completed': { purchaseId: string; packId: string; name: string; coins: number; keys: number; energy: number };
+  /** Fact: the checkout ended without a delivery, and why. `pending` means the
+   *  gateway hasn't confirmed yet — the hub delivers it on a later visit. */
+  'iap:failed': { packId: string; reason: 'cancelled' | 'declined' | 'pending' | 'unavailable' };
   'item:spawned': { item: ItemSnapshot; cause: SpawnCause };
   'item:moved': { itemId: number; from: TilePos; to: TilePos };
   'item:move_bounced': { itemId: number; at: TilePos };
@@ -621,128 +1200,222 @@ export interface EventMap {
     xp: number;
   };
   'item:hatched': { item: ItemSnapshot };
+  /** Fact: this dragon FORM is the player's for the first time (RevealSystem
+   *  latches it in `stats`, so it fires exactly once per save). UIScene plays
+   *  the full-screen card and AudioManager roars; neither knows the other. */
+  'dragon:revealed': { chain: string; tier: number; art: string; name: string; epithet: string };
+  /** The reveal card is up (or has let go). Same shape as the other panel
+   *  toggles, so anything that has to hold still while a card is open can. */
+  'ui:reveal_toggled': { open: boolean };
   /** A merge recipe was performed for the FIRST time — the Emberkeep Cookbook
    *  writes a new page (MergeSystem emits once per chain:fromTier>resultTier). */
   'cookbook:discovered': { chain: string; fromTier: number; resultTier: number };
   'item:harvested': { generatorId: number; output: ItemSnapshot };
-  'item:harvest_failed': {
-    generatorId: number;
-    reason: 'cooldown' | 'energy' | 'no_space' | 'phase';
-    /** Set with reason 'phase': the phase this generator waits for (the Dew Basin's night). */
-    requiresPhase?: DayPhase;
-  };
+  'item:harvest_failed': { generatorId: number; reason: 'cooldown' | 'energy' | 'no_space' };
   /** A generator passively gifted an item (no tap, no energy). */
   'item:produced': { generatorId: number; output: ItemSnapshot };
   /** A reward generator (the house) paid out currency/energy on its timer. */
   'generator:reward': { generatorId: number; coins: number; xp: number; energy: number };
+  /** A generator's wait was paid off (the skip button) — currency tells which. */
+  'generator:skipped': { itemId: number; chain: string; currency: 'gold' | 'warmth' | 'gift' };
   /** A Gold coin was tapped to bank it — UI flies coin(s) to the Gold gauge,
    *  one gauge pulse per arrival (the Pouch sends 3; default 1). */
   'gold:collected': { at: TilePos; coins?: number };
+  /** A piece went into the Bag — UIScene flies it to the satchel and pulses it. */
+  'bag:stored': { chain: string; tier: number; at: TilePos };
+  /** Nothing was stored. `full` = no free slot; `no_room` = nowhere to put it back. */
+  'bag:store_failed': { reason: 'full' | 'no_room' };
+  /** A piece came back out of the Bag onto `at`. */
+  'bag:retrieved': { chain: string; tier: number; at: TilePos };
+  /** The Bag's contents changed — the panel and the HUD badge re-read it. */
+  'bag:changed': { used: number; capacity: number };
+
+  /* -- world characters (WorldCharacterSystem owns cooldowns) -- */
+  /** The player tapped a character standing on the map. */
+  /* -- dragons as named companions (DragonSystem) -- */
+  /** Intent: give one good to a Cold Nest. Tier N is worth N points. */
+  'ui:nest_offer_requested': { col: number; row: number; chain: string; tier: number };
+  'nest:warmed': { col: number; row: number; points: number; required: number };
+  /** The nest refused: it has had its 3 points today, or the good is not food. */
+  'nest:offer_refused': { col: number; row: number; reason: 'daily_cap' | 'not_food' };
+  /** It hatched. The naming prompt opens on this, before anything else. */
+  'nest:hatched': { companionId: string; chain: string; col: number; row: number };
+  'ui:companion_named': { companionId: string; name: string };
+  'companion:named': { companionId: string; name: string };
+  /** Intent: feed a companion one good from the board or the bag. */
+  'ui:feed_companion_requested': { companionId: string; chain: string; tier: number };
+  'companion:fed': { companionId: string; chain: string; tier: number; favourite: boolean };
+  /** It turned its head away — the chain is its refusal. Nothing was consumed. */
+  'companion:refused': { companionId: string; chain: string };
+  /** Trust 2: it dug up its own grit. Trust 4: it fetched you a favourite. */
+  'companion:gave': { companionId: string; chain: string; tier: number; kind: 'dug' | 'foraged' };
+  'companion:trust_changed': { companionId: string; trust: number };
+
+  /* -- ambient life (DragonLifeSystem owns the mood; the board does the flying) -- */
+  /**
+   * A board dragon's mood changed. Fired on CHANGE only, never per tick.
+   *
+   * `asleep` is the day clock's night phase, `hungry` is its own care record
+   * saying it has not eaten today. Purely presentational downstream: nothing in
+   * the economy reads this, so a scene that ignored it would lose the character
+   * and keep the game.
+   */
+  'dragon:mood': { itemId: number; mood: 'awake' | 'hungry' | 'asleep'; from: string };
+  /** Fact: a dragon walked itself to another tile. The MOVE has already been
+   *  applied to state — the scene's job is to make it look like a flight rather
+   *  than a teleport (nothing on this board teleports). */
+  'dragon:wandered': { itemId: number; from: TilePos; to: TilePos };
+  /** It grew up — five well-fed days, no merging involved. */
+  'companion:grew': { companionId: string };
+  /** A Dragon Book entry revealed itself. */
+  'companion:discovered': { companionId: string; entry: string };
+
+  /* -- Board dragons: fed where they stand (BoardItemState.care) -- */
+  /**
+   * Intent: feed one good to the dragon standing on the board as `itemId`.
+   *
+   * The gesture is the piece DRAGGED onto the dragon, mirroring the dragon
+   * dragged onto a House — the board's two "put this on that" verbs are the
+   * same verb. Same contract as a nest offering and a gift: the board consumes
+   * the piece only once the care record has actually moved.
+   */
+  'ui:feed_dragon_requested': { itemId: number; chain: string; tier: number };
+  /** It ate. `meals`/`needs` are today's gauge, so a listener never recomputes. */
+  'dragon:fed': {
+    itemId: number;
+    chain: string;
+    tier: number;
+    favourite: boolean;
+    meals: number;
+    needs: number;
+  };
+  /** It turned its head away — the chain is this breed's refusal, or it is not
+   *  food at all. Nothing was consumed. */
+  'dragon:refused': { itemId: number; chain: string; reason: 'dislike' | 'not_food' };
+  /** Trust moved (at most once a day, +1, or +2 for a known favourite). */
+  'dragon:trust_changed': { itemId: number; trust: number };
+  /** Intent: open the naming prompt for the dragon standing on the board as
+   *  `itemId`. The tutorial's `nameDragon` effect is the only caller today. */
+  'ui:name_dragon_requested': { itemId: number };
+  /** The player chose. Emitted by the panel; DragonSystem writes the name. */
+  'ui:dragon_named': { itemId: number; name: string };
+  /** She has a name now. The one fact every readout and every line reads. */
+  'dragon:named': { itemId: number; name: string; chain: string };
+
+  /**
+   * The Keeper is looking at somebody — a world character or a board dragon.
+   * The status readout under the quest tracker follows this and nothing else,
+   * so "who am I looking at" has exactly one answer on screen at a time.
+   * `id` is a character id, or a board item id rendered as a string.
+   */
+  'ui:subject_selected': { kind: 'character' | 'dragon'; id: string };
+  /** Nobody is selected any more (the armed character was put away, the dragon
+   *  was merged or sold). The readout fades out. */
+  'ui:subject_cleared': Record<string, never>;
+
+  'ui:character_tapped': { characterId: string };
+  /** Intent: use an armed action, optionally on a board target. */
+  'ui:character_action_requested': { characterId: string; target?: number };
+
+  /* -- Regard: the five hearts (RegardSystem owns the points) -- */
+  /**
+   * Intent: hand this piece to a person. The board consumes it only if she
+   * takes it, so a declined gift costs the player nothing (the same contract
+   * feeding a nest or a dragon already holds).
+   */
+  /** A tutorial beat stages a gift: for now, she wants this piece. Cleared as
+   *  soon as it is handed over (see the `wantGift` effect). */
+  'tutorial:want_gift': {
+    characterId: string;
+    chain: string;
+    tier: number;
+    count: number;
+    points?: number;
+  };
+  /**
+   * The bag's THIRD verb. Chosen from the slot chooser beside Drop and Sell.
+   *
+   * Giving is a two-part act — pick the thing, then pick who it is for — so this
+   * only ARMS it: the panel closes and the next tap on a person or a dragon is
+   * the delivery. That split is the whole reason it lives in the bag rather than
+   * on the board: a piece you are holding is a piece you have already decided to
+   * do something deliberate with.
+   */
+  'ui:bag_give_requested': { chain: string; tier: number };
+  /** A give is armed and waiting for a recipient. The board listens. */
+  'bag:give_armed': { chain: string; tier: number };
+  /** Nothing is waiting any more — delivered, refused off, or tapped away. */
+  'bag:give_cancelled': Record<string, never>;
+  'ui:gift_requested': { characterId: string; chain: string; tier: number };
+  /** She took it — a live `gift` subquest wanted exactly this. */
+  'regard:gift_accepted': { characterId: string; chain: string; tier: number; points: number };
+  /** She did not: nothing on her list asks for it, or her hearts are already
+   *  full. Nothing was consumed either way. */
+  'regard:gift_declined': {
+    characterId: string;
+    chain: string;
+    tier: number;
+    reason: 'not_wanted' | 'complete';
+  };
+  /** The gauge moved. `hearts` is the derived readout the UI draws. */
+  'regard:changed': {
+    characterId: string;
+    points: number;
+    hearts: number;
+    reason: 'quest' | 'gift' | 'load';
+  };
+  /** A WHOLE heart filled — the milestone the dialogue bank speaks to. Fired
+   *  once per heart, never on load (the points are persisted; the beat is not
+   *  replayed the way a chapter's never is). */
+  'regard:heart': { characterId: string; hearts: number };
+  'character:action_used': { characterId: string; action: CharacterAction; readyAt: number };
+  /** A refusal is never silent. `not_mine` is the story one: she cannot wake. */
+  'character:action_failed': {
+    characterId: string;
+    reason: 'cooldown' | 'invalid_target' | 'not_mine';
+  };
+
+  /* -- story (StorySystem owns the chapter pointer) -- */
+  /** The campaign moved on. Fired once per chapter, never on load. UIScene
+   *  answers it by playing that chapter's beats through the dialogue bubble. */
+  'story:chapter': { chapter: number };
+  /** First time the Keeper has ever stood in this world — play its arrival
+   *  beats. Fires once ever; the latch lives in `stats`, so a reload is silent. */
+  'story:arrival': { worldId: string };
+  /** The player tapped through the last beat of a chapter's run. */
+  'story:beats_finished': { chapter: number };
   'item:removed': { itemId: number; at: TilePos; reason: 'sold' | 'delivered' };
-  'item:sold': { itemId: number; coins: number };
+  /** Fact: a piece was sold out of the Bag. No `itemId` — by the time anything
+   *  is sellable it has left the board, so there is no board item to name. */
+  'item:sold': { chain: string; tier: number; coins: number };
   'energy:changed': { current: number; max: number };
   'economy:changed': { coins: number; keys: number; xp: number; level: number };
   'keeper:leveled': { level: number; from: number };
-  /** The "ruby" was assembled for the first time — the WorldTeleportSystem asks for
-   *  the Demon dragon to teleport and the game to switch worlds. Handled by
-   *  BoardScene (the cinematic) which then emits `world:switch`. */
-  'world:teleport': { toWorld: string; dragonChain: string; at: TilePos };
-  /** The Golden Egg BURST (the finale awakening) — the WorldTeleportSystem uses this
-   *  to teleport the Golden dragon into the borealis world (if it exists). */
-  'golden:awakened': Record<string, never>;
-  /** Switch the live game to another editor world (backdrop + its playable cells +
-   *  decor). Emitted by BoardScene mid-cinematic; handled by MapEditor. */
-  'world:switch': { toWorld: string };
-  /** A world switch ACTUALLY happened (the target world exists). Emitted by MapEditor
-   *  after `switchToWorld` succeeds — lets the UI show a "return" button and the
-   *  tutorial stand down. Never fires when the target world is absent (e2e/prod). */
-  'world:switched': { toWorld: string };
-  /** Return the live game to the primary world ("Level 1"). Emitted by the return
-   *  button; handled by MapEditor. */
-  'world:return': Record<string, never>;
-  /** The player asked to FEED a dragon (the "Feed" button on its tap menu). */
-  'dragon:feed': { chain: string };
-  /** A dragon was fed: a berry consumed, its level raised. */
-  'dragon:fed': { chain: string; level: number };
-  /** A feed attempt failed (no berries, no gold, or the wrong hour — 'phase'). */
-  'dragon:feed_failed': { chain: string; reason: string; requiresPhase?: DayPhase };
-  /** The player asked to BUY one leaf for Gold (the sprout's "via des achats" path). */
-  'dragon:buy_food': { chain: string };
-  /** A leaf was bought (Gold spent, one berry added to the larder). */
-  'dragon:food_bought': { chain: string };
-  /** The player TAPPED an Emberberry bush to bank it in the dragon's larder. */
-  'dragon:store_food': { itemId: number };
-  /** The larder changed. `at` is the cell the berry came from, so the UI can fly it
-   *  to the gauge the way collected Gold flies to the purse; absent for a purchase. */
-  'dragon:stock_changed': { stock: number; gained: number; at?: TilePos };
-  /** Make Cindra/Laurah say a one-off line in the character bubble (used by the
-   *  Level-3 lair "how to merge berries" coach). */
-  'character:say': { speaker: 'cindra' | 'laurah'; text: string; holdMs?: number };
-  /** Quest progress broadcast to the HUD (main + side quests, each with a done flag). */
-  'quest:changed': { quests: QuestState[] };
-  /** Force-complete a quest by id (intent from any system). */
-  'quest:complete': { id: string };
   'energy:refill': { reason: string };
   'order:progress': { orderId: string; have: number[]; need: number[]; deliverable: boolean };
+
+  /* -- the quest ladder (QuestSystem owns the pointer) -- */
+  /** A subquest was satisfied. Fired ONCE per step, never on load. */
+  'quest:step_completed': { questId: string; stepId: string };
+  /** Every step of a quest is done — the main line strikes through and the next
+   *  quest takes the HUD. */
+  'quest:completed': { questId: string };
+  /** The tracked quest changed (advance, or a load landing mid-ladder). */
+  'quest:advanced': { questId: string; index: number; total: number };
   'order:completed': { orderId: string; rewards: { coins: number; keys: number; xp?: number } };
-  /** Milestone "gift" (Farmland-style): the player taps to claim when ready. */
-  'milestone:claim': Record<string, never>;
-  'milestone:changed': {
-    id: string | null;
-    chain: string;
-    tier: number;
-    have: number;
-    need: number;
-    coins: number;
-    ready: boolean;
-    done: boolean;
-  };
-  'milestone:claimed': { id: string; coins: number };
-  /** Emberfont Spark Well state (drives the StokeMeter HUD widget). */
-  'emberfont:changed': {
-    sparks: number;
-    maxSparks: number;
-    stoke: number;
-    maxStoke: number;
-    surging: boolean;
-    surgeRemainingMs: number;
-    nextVein: { chain: string; tier: number };
-    active: boolean;
-  };
-  /** A Spark was drawn: a vein piece dropped at `at` (scene plays the pop). */
-  'emberfont:sparked': { at: TilePos; chain: string; tier: number };
-  /** The well entered/left a Surge (scene/audio react). */
-  'emberfont:surge': { active: boolean; remainingMs: number };
-  /* -- Dragon Duel notifications (DragonDuelSystem emits; UI + audio subscribe) -- */
-  'duel:changed': {
-    unlocked: boolean;
-    roster: DuelDragon[];
-    selected: string | null;
-    matchesLeft: number;
-    canAfford: boolean;
-    energyCost: number;
-    gaugeMax: number;
-  };
-  /** A set of matches began — `energyCost` was paid, `matches` to play. */
-  'duel:set_started': { chain: string; matches: number };
-  /** Couldn't start a set. */
-  'duel:start_failed': { reason: 'energy' | 'locked' | 'no_dragon' };
-  /** One match resolved (UI animates the reveal from this). */
-  'duel:match': {
-    chain: string;
-    oppChain: string;
-    color: string;
-    oppColor: string;
-    playerThrow: DuelThrow;
-    oppThrow: DuelThrow;
-    outcome: DuelOutcome;
-    gauge: number;
-    gaugeMax: number;
-    level: number;
-    leveledUp: boolean;
-    matchesLeft: number;
-  };
   'order:all_done': Record<string, never>;
+  /**
+   * COMMAND — put a region's authored contents on the board, no gate consulted.
+   *
+   * The one caller is a first arrival in a world. A world that is not the
+   * authored one never runs `newGame`, so its opening board would otherwise be
+   * whatever the fog happened to lift: bare ground, no producer, and no way to
+   * ever make one, because a merge cannot cross to the island that has one.
+   * Routed through the bus rather than called, because UnlockSystem owns
+   * placing a region's contents and there must not be a second implementation
+   * of it (the same reason a character's help emits the skip command).
+   */
+  'region:reveal': { regionId: string };
   'region:unlocked': { regionId: string; tiles: TilePos[]; revealed: ItemSnapshot[] };
   'region:unlock_failed': { regionId: string; reason: 'keys' | 'not_unlockable' | 'level' };
   'marketplace:purchased': { energy: number; free: boolean };
@@ -751,36 +1424,65 @@ export interface EventMap {
   /** Every Keeper's Task reached its target (fired once; reward already paid). */
   'tasks:all_complete': Record<string, never>;
   'tutorial:step': TutorialStepEvent;
-  /** The whole tutorial checklist just FINISHED (natural completion only — NOT a
-   *  reload of an already-done save). Drives the end-of-tutorial world teleport. */
-  /** `world` = the world whose script finished (omitted = the primary isle, which
-   *  is what the lair teleport waits for). */
-  'tutorial:done': { world?: string };
+  /** The player touched something this step disallows. Never refuse in silence
+   *  (tutorial-design law 3) — the UI re-pulses the hand/arrow at what the step
+   *  actually wants, so a dead tap reads as guidance, not a broken button. */
+  'tutorial:nudge': Record<string, never>;
+  /** The skip popup opened — it offers BOTH a Gold and a Warmth price. Drives
+   *  the one-shot `goldSkip` lesson (the tutorial only demonstrates Warmth). */
+  'ui:skip_offered': { itemId: number };
   'state:saved': { at: number };
   'state:loaded': { offlineMs: number; energyRecovered: number };
-  /** Fired once after beginRun finishes (load OR new game) — the board is live and
-   *  state is settled (post-hydrate). The Map Editor re-applies its saved zones +
-   *  assets here so they persist across a reload on BOTH paths. */
-  'game:started': Record<string, never>;
   'game:reset': Record<string, never>;
+
+  /* -- world travel (WorldSystem owns the switch; see src/core/world.ts) -- */
+  /** Intent/command: show a different world. Refused mid-tutorial and below the
+   *  destination's Keeper level; the board it leaves keeps standing. */
+  'world:switch': { to: string };
+  /** Fact: the active world changed. BoardScene rebuilds on this — which means
+   *  fetching art over the network, so this is where the travel veil goes UP. */
+  'world:switched': { from: string; to: string };
+  /** Fact: the new world's board is built and on screen. The veil comes down
+   *  here, not on `world:switched` — between the two there is a texture fetch,
+   *  and that gap is the entire reason a loading state exists. */
+  'world:ready': { world: string };
+  'world:switch_failed': { to: string; reason: 'unknown' | 'level' | 'tutorial' | 'same' | 'story' };
+  /** Intent: a portal was tapped — UIScene answers with the travel prompt.
+   *  `label` is the door's authored name, `world` the destination's display name. */
+  'ui:travel_requested': { to: string; label: string; world: string };
+  /** Fact: the Ember Gate ceremony finished (Eleanor's lines after the finale).
+   *  BoardScene blooms the portal FX and re-enables its door on this. */
+  'gate:opened': Record<string, never>;
+  /** Intent: open the Emporium — the Roothold house is its physical storefront. */
+  'ui:emporium_requested': Record<string, never>;
+  /** Tour pointer over a BOARD landmark. BoardScene resolves the target's own
+   *  world position (only it knows them) and bounces an arrow there. */
+  'tour:point': { target: 'roothold_house' | 'hatchery_cauldron' };
+  'tour:unpoint': Record<string, never>;
+  /** Fact: a world tour finished and its latch is set — a save point. */
+  'tour:completed': { id: string };
 }
 
 export type ResolvedHand =
   | { from: TilePos; to: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string };
 
 export type ResolvedArrow =
   | { tile: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' }
-  | { fogRegion: string };
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { fogRegion: string }
+  /** Stays an id through the payload, exactly like `ui`: the UI re-reads her
+   *  position every frame, so she can move (World Builder, or a future walk)
+   *  without the arrow being re-resolved. */
+  | { character: string };
 
 export interface TutorialStepEvent {
   id: string;
   index: number;
   total: number;
   done: boolean;
-  speaker: 'cindra' | 'laurah';
+  speaker: SpeakerId;
   text: string;
   gateType: TutorialGate['type'];
   highlight: TilePos[];

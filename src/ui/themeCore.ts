@@ -23,7 +23,7 @@ export interface UiPartPatch {
   tint?: string | null;
   /** Swap the part's texture (ui_* chrome / icons). Images only. */
   texture?: string;
-  /** Play a PNG sequence (built-in Laurah bank or upload) ON this image part —
+  /** Play a PNG sequence (built-in character bank or upload) ON this image part —
    *  frames swap in place, contain-fit to the part's own footprint, so e.g. the
    *  bubble portrait becomes the talking animation. null clears it. */
   sequence?: string | null;

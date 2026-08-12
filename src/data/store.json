@@ -1,0 +1,200 @@
+{
+  "sections": [
+    {
+      "id": "skins",
+      "title": "Manor Skins",
+      "blurb": "Rebuild the Manor as something else entirely. Cosmetic only \u2014 it earns exactly what it earned before.",
+      "kind": "skin",
+      "items": [
+        {
+          "id": "manor_mushroom",
+          "name": "Mushroom Cottage",
+          "blurb": "Grown, not built. The cap sheds ash the way a roof sheds rain.",
+          "art": "skin_manor_mushroom",
+          "gold": 250
+        },
+        {
+          "id": "manor_windmill",
+          "name": "The Old Windmill",
+          "blurb": "It ground grain before the ash. The sails still catch the updraft.",
+          "art": "skin_manor_windmill",
+          "gold": 400
+        },
+        {
+          "id": "manor_treehouse",
+          "name": "Great Tree House",
+          "blurb": "The isle kept one tree through the burning. Someone moved in.",
+          "art": "skin_manor_treehouse",
+          "gold": 600
+        },
+        {
+          "id": "manor_igloo",
+          "name": "The Igloo",
+          "blurb": "Cut from Borealis ice, hauled south, and still not melting.",
+          "art": "skin_manor_igloo",
+          "gold": 750
+        }
+      ]
+    },
+    {
+      "id": "decor",
+      "title": "Decorations",
+      "blurb": "Placed on the first free tile when you buy it. Purely yours \u2014 nothing merges with it. The landmarks at the end are monuments: they are meant to be seen from across the isle.",
+      "kind": "decor",
+      "items": [
+        {
+          "id": "ash_urn",
+          "name": "Ash Urn",
+          "blurb": "The isle went to ash. Keeping some is how the line remembered.",
+          "art": "decor_ash_urn",
+          "gold": 120
+        },
+        {
+          "id": "watch_bell",
+          "name": "Watch Bell",
+          "blurb": "How a keeper called the dragons home. There were dragons then.",
+          "art": "decor_watch_bell",
+          "gold": 160
+        },
+        {
+          "id": "rekindled_step",
+          "name": "Rekindled Step",
+          "blurb": "Moss through a cracked stair, gold in the fracture.",
+          "art": "decor_rekindled_step",
+          "gold": 200
+        },
+        {
+          "id": "chain_anchor",
+          "name": "Chain Anchor",
+          "blurb": "One cleat, one chain, one island held up. There are thousands.",
+          "art": "decor_chain_anchor",
+          "gold": 240
+        },
+        {
+          "id": "ice_lantern",
+          "name": "Ice Lantern",
+          "blurb": "A flame kept inside ice. Someone north of here does this.",
+          "art": "decor_ice_lantern",
+          "gold": 300
+        },
+        {
+          "id": "frozen_spill",
+          "name": "Frozen Spill",
+          "blurb": "A waterfall that stopped mid-fall and has not moved since.",
+          "art": "decor_frozen_spill",
+          "gold": 340
+        },
+        {
+          "id": "rune_pad",
+          "name": "Rune Pad",
+          "blurb": "Moon-order line-work under snow. It still glows. Nobody lit it.",
+          "art": "decor_rune_pad",
+          "gold": 380
+        },
+        {
+          "id": "drift_cairn",
+          "name": "Drift Cairn",
+          "blurb": "Stones, a driftwood spar, a ribbon of spun light. A greeting.",
+          "art": "decor_drift_cairn",
+          "gold": 420
+        },
+        {
+          "id": "keeper_statue",
+          "name": "The First Keeper",
+          "blurb": "Carved while she was still alive, which she never forgave. The whelp at her feet is nobody anyone can name.",
+          "art": "decor_keeper_statue",
+          "gold": 900
+        },
+        {
+          "id": "broken_arch",
+          "name": "The Broken Gate",
+          "blurb": "Everything that ever came home came through here. It has not closed since the burning, because it cannot.",
+          "art": "decor_broken_arch",
+          "gold": 1100
+        },
+        {
+          "id": "ember_beacon",
+          "name": "The Ember Beacon",
+          "blurb": "Lit at dusk, every dusk, for four hundred years. Nobody alive remembers what answered it.",
+          "art": "decor_ember_beacon",
+          "gold": 1300
+        },
+        {
+          "id": "elder_bones",
+          "name": "The Elder's Rest",
+          "blurb": "She came down here on purpose and let the ash take her. The moss got to her first.",
+          "art": "decor_elder_bones",
+          "gold": 1500
+        },
+        {
+          "id": "tethered_isle",
+          "name": "The Tethered Isle",
+          "blurb": "A stray the keepers caught and moored before it drifted off. One tree came with it.",
+          "art": "decor_tethered_isle",
+          "gold": 1800
+        }
+      ]
+    },
+    {
+      "id": "dragons",
+      "title": "Dragons",
+      "blurb": "A dragon is still coaxed, never bought \u2014 but the ones already yours can be dressed in any breed the sanctuary has met. Cosmetic only: same eggs, same gifts, same wait.",
+      "kind": "dragon_skin",
+      "items": [
+        {
+          "id": "frost",
+          "name": "Frost",
+          "blurb": "Nested on the Borealis floes, scaled in clear ice, with the aurora burning through its wings.",
+          "art": "card_frost",
+          "gold": 2400,
+          "dragon": "ember_dragon",
+          "rarity": "legendary",
+          "hero": true
+        },
+        {
+          "id": "storm",
+          "name": "Storm",
+          "blurb": "It does not shelter from the thunderheads. It climbs the spire and answers them.",
+          "art": "card_storm",
+          "gold": 1600,
+          "dragon": "ember_dragon",
+          "rarity": "legendary"
+        },
+        {
+          "id": "moonwhisker",
+          "name": "Moonwhisker",
+          "blurb": "The Moonhold's own \u2014 all trailing ribbons and starlight, and far too shy to land near you.",
+          "art": "card_moonwhisker",
+          "gold": 900,
+          "dragon": "emerald",
+          "rarity": "epic"
+        },
+        {
+          "id": "ashglass",
+          "name": "Ashglass",
+          "blurb": "A night down in the caldera. Its scales cooled to black glass and the fire never went out.",
+          "art": "card_ashglass",
+          "gold": 900,
+          "dragon": "ember_dragon",
+          "rarity": "epic"
+        },
+        {
+          "id": "porcelain",
+          "name": "Porcelain",
+          "blurb": "Glazed like a temple vase, painted in cobalt, and mended with gold where it once broke.",
+          "art": "card_porcelain",
+          "gold": 900,
+          "dragon": "emerald",
+          "rarity": "epic"
+        }
+      ]
+    },
+    {
+      "id": "keepers",
+      "title": "Keepers",
+      "blurb": "Who stands on your isle, and what they wear while they do it.",
+      "kind": "soon",
+      "items": []
+    }
+  ]
+}

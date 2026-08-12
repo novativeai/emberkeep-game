@@ -20,7 +20,7 @@ gold       #F7A437  ←─ XP fill, rewards      moss      #7ECB4F  ←─ confi
 goldShade  #D9821F  ←─ shadow on gold text   mossShade #5FA63D  ←─ pressed green
 goldAccent #FFD84D  ←─ sparkle / stripe
 
-teal       #3FA8D9  ←─ info, Pip name tag    TEXT
+teal       #3FA8D9  ←─ info accents          TEXT
 tealDeep   #2E7FA6  ←─ darker teal           cream     #FFF6E8  ←─ body text / fill
                                               textBrown #B5602F  ←─ label text
 BACKGROUND                                   white     #FFFFFF  ←─ button label text
