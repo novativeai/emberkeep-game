@@ -487,7 +487,9 @@ export interface StoreItem {
   hero?: boolean;
   /**
    * The world this thing is MADE in — and therefore the only one it is sold in.
-   * Absent = stock every stall carries.
+   * Absent would mean "sold on every shelf"; the shipped catalogue names a world
+   * on EVERY card, and a unit test holds it that way, because a card that
+   * quietly followed the Keeper everywhere is what this exists to remove.
    *
    * Half the catalogue is northern: ice cut in Borealis, rune stone under snow,
    * a dragon nested on the floes. Set this and the card is on the shelf only

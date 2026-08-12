@@ -227,6 +227,28 @@ describe('goods that are only sold in the world that makes them', () => {
     expect(ctx.state.coins).toBe(before - 750);
   });
 
+  it('padlocks EMBERKEEP goods once the Keeper is in Borealis — both ways', () => {
+    const ctx = createTestContext();
+    fund(ctx, 2000);
+    ctx.state.switchWorld('borealis');
+    const failed = capture(ctx.bus, 'store:purchase_failed');
+
+    ctx.bus.emit('ui:store_buy_requested', { itemId: 'manor_mushroom' }); // world: emberkeep
+
+    expect(failed.at(-1)).toMatchObject({ itemId: 'manor_mushroom', reason: 'locked' });
+    expect(ctx.state.ownedCosmetics).not.toContain('manor_mushroom');
+  });
+
+  it('every card names the world it is sold in', () => {
+    // Untagged would mean "sold on every shelf", and a card that quietly
+    // followed the Keeper everywhere is exactly what this feature removes.
+    for (const section of STORE.sections) {
+      for (const item of section.items) {
+        expect(item.world, `${item.id} names no world`).toBeTruthy();
+      }
+    }
+  });
+
   it('only tags worlds this build actually has', () => {
     const ctx = createTestContext();
     const tagged = STORE.sections.flatMap((s) => s.items).filter((i) => i.world);
