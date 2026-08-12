@@ -270,7 +270,11 @@ def verify_dimensions():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="report without writing")
-    ap.add_argument("--budget", type=float, default=50.0, help="fail over this many MB")
+    # 50 → 56 MB when the Align-Studio character clips arrived: fourteen frame
+    # sheets (Eleanor, Selyna, the red whelp) are ~13 MB of source art and land
+    # around 7 MB shipped. The ceiling is a REGRESSION guard, not a target — it
+    # is raised deliberately, with the reason written down, or not at all.
+    ap.add_argument("--budget", type=float, default=56.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():

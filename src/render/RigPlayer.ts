@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { DRAGON_OUTLINE } from '../core/Constants';
 import {
   BlinkScheduler,
   BLINK_GAP_CALM,
@@ -15,6 +16,16 @@ import {
   resolveRig,
   type PresetContext
 } from './rigAnimations';
+import {
+  alphaBoundsOf,
+  ensureRigInkPipeline,
+  inkQuad,
+  inkRadiusTexels,
+  keylineUnits,
+  RIG_INK_PIPELINE,
+  uvFence,
+  type RigInkPipelineData
+} from './rigInkShader';
 import type { Facing, RigDoc, RigPose, ResolvedPart, RigVec } from './rigTypes';
 
 const D2R = Math.PI / 180;
@@ -23,6 +34,8 @@ interface LayerSprite {
   name: string;
   img: Phaser.GameObjects.Image;
   isEyelid: boolean;
+  /** The ink twin drawn behind every layer — see buildOutline(). */
+  ink?: Phaser.GameObjects.Image;
 }
 
 /** The face-frame wardrobe attached to one layer (usually the head). */
@@ -50,6 +63,9 @@ interface FaceWear {
 export class RigPlayer {
   readonly container: Phaser.GameObjects.Container; // scene sets position / display scale
   private inner: Phaser.GameObjects.Container; // animation root transform lives here
+  /** All of the keyline, behind all of the art — the union-dilation identity in
+   *  rigInkShader.ts only holds if nothing draws between these two. */
+  private inkRoot?: Phaser.GameObjects.Container;
   private root: RigVec;
   private layers: LayerSprite[] = [];
   private partToLayer = new Map<string, string>();
@@ -69,7 +85,7 @@ export class RigPlayer {
     scene: Phaser.Scene,
     private rig: RigDoc,
     textureKey: (layerName: string) => string,
-    opts: { scale?: number; speed?: number } = {}
+    opts: { scale?: number; speed?: number; outline?: boolean } = {}
   ) {
     this.resolved = resolveRig(rig);
     this.ctx = makePresetContext(rig);
@@ -81,6 +97,11 @@ export class RigPlayer {
     };
     this.container = scene.add.container(0, 0).setScale(this.displayScale);
     this.inner = scene.add.container(0, 0);
+    // The ink root goes in FIRST so every keyline draws behind every layer.
+    if (opts.outline !== false && DRAGON_OUTLINE.enabled && ensureRigInkPipeline(scene.game)) {
+      this.inkRoot = scene.add.container(0, 0);
+      this.container.add(this.inkRoot);
+    }
     this.container.add(this.inner);
 
     // Resolve which part drives each layer, and with what origin.
@@ -107,6 +128,80 @@ export class RigPlayer {
         isEyelid: layer.name === 'eyelid_left' || layer.name === 'eyelid_right'
       };
       this.layers.push(ls);
+    }
+
+    if (this.inkRoot) this.buildOutline(scene);
+  }
+
+  /**
+   * The keyline width this rig wears, in on-board units. Exposed so the
+   * Align-Studio clip that STANDS IN for the rig can wear the identical width —
+   * the handover is mid-animation and a line that changed weight across it would
+   * read as the dragon flinching.
+   */
+  get outlineUnits(): number {
+    const bounds = this.rig.bounds;
+    return keylineUnits(
+      Math.max(bounds.width, bounds.height) * this.displayScale,
+      DRAGON_OUTLINE
+    );
+  }
+
+  /**
+   * Give every layer an ink twin in `inkRoot`, so the composited rig wears one
+   * keyline of the board's own weight. See src/render/rigInkShader.ts for why the
+   * ink is per-layer yet still exactly the dilated UNION silhouette.
+   *
+   * The twin's quad is the layer's alpha box grown by the radius, not the whole
+   * 666x666 canvas, and its uv window is handed to the shader — so the tap loop
+   * never runs over the empty margin that canvas is mostly made of.
+   */
+  private buildOutline(scene: Phaser.Scene): void {
+    const bounds = this.rig.bounds;
+    const onboard = Math.max(bounds.width, bounds.height) * this.displayScale;
+    const radius = inkRadiusTexels(
+      onboard,
+      this.displayScale,
+      DRAGON_OUTLINE,
+      DRAGON_OUTLINE.maxRadiusTexels
+    );
+    if (!(radius > 0.25)) return;
+
+    const hex = DRAGON_OUTLINE.inkByCharacter[this.rig.character] ?? DRAGON_OUTLINE.ink;
+    const ink: [number, number, number] = [
+      ((hex >> 16) & 0xff) / 255,
+      ((hex >> 8) & 0xff) / 255,
+      (hex & 0xff) / 255
+    ];
+
+    for (const ls of this.layers) {
+      // Eyelids are interior overlays that animate on scaleY: their ink would be
+      // hidden behind the head anyway, so it is cost with nothing to show.
+      if (ls.isEyelid) continue;
+      const key = ls.img.texture.key;
+      const box = alphaBoundsOf(scene, key);
+      if (!box) continue; // transparent, or a canvas we may not read — skip silently
+
+      const q = inkQuad(box, radius, ls.img.x, ls.img.y, ls.img.originX, ls.img.originY);
+      // A rig layer is a standalone texture, so its fence is the whole image.
+      const fence = uvFence(box);
+      const twin = scene.add
+        .image(ls.img.x, ls.img.y, key)
+        .setDisplaySize(q.width, q.height)
+        .setOrigin(q.originX, q.originY)
+        .setPipeline(RIG_INK_PIPELINE);
+      twin.pipelineData = {
+        uvScale: q.uvScale,
+        uvOffset: q.uvOffset,
+        uvMin: fence.min,
+        uvMax: fence.max,
+        texel: [1 / box.texWidth, 1 / box.texHeight],
+        radius,
+        ink,
+        alpha: 1
+      } satisfies RigInkPipelineData;
+      this.inkRoot!.add(twin);
+      ls.ink = twin;
     }
   }
 
@@ -239,7 +334,13 @@ export class RigPlayer {
 
   /** Swap the face layer's texture — origin/scale come from the calibration so
    *  the head neither moves nor resizes; anchor rotation keeps applying because
-   *  the sprite (and its pivot position) are untouched. */
+   *  the sprite (and its pivot position) are untouched.
+   *
+   *  The keyline twin is deliberately NOT swapped with it. Face frames are the
+   *  same head re-rendered with different eyes and mouth (the mask-template
+   *  framing in docs/character-pipeline.md keeps the silhouette fixed), so the
+   *  base head's outline is already the right one — and re-deriving an alpha box
+   *  per blink frame would put a pixel readback on the animation path. */
   private applyFace(sel: FaceSelection | null): void {
     const face = this.face;
     if (!face) return;
@@ -264,6 +365,15 @@ export class RigPlayer {
     this.inner.rotation = pose.root.rotDeg * D2R;
     this.inner.scaleX = Math.abs(pose.root.sx);
     this.inner.scaleY = pose.root.sy;
+    // The ink root is a SIBLING of inner (it has to draw under every layer), so
+    // it does not inherit that transform — it has to be given the same one, or
+    // the keyline would sit still while the rig breathed.
+    if (this.inkRoot) {
+      this.inkRoot.y = this.inner.y;
+      this.inkRoot.rotation = this.inner.rotation;
+      this.inkRoot.scaleX = this.inner.scaleX;
+      this.inkRoot.scaleY = this.inner.scaleY;
+    }
 
     // accumulate part rotations onto their resolved layers (usually 1:1).
     this.scratchRot.clear();
@@ -275,6 +385,7 @@ export class RigPlayer {
     for (const ls of this.layers) {
       if (ls.isEyelid) { ls.img.scaleY = pose.eyelid ?? 1; continue; }
       ls.img.rotation = (this.scratchRot.get(ls.name) ?? 0) * D2R;
+      if (ls.ink) ls.ink.rotation = ls.img.rotation;
     }
   }
 

@@ -717,6 +717,27 @@ export const STANDEE_BREATH = {
 } as const;
 
 /**
+ * Cadence of the Align-Studio BLINK clip during a standee's atlas idle: the
+ * blinking clip is a full idle segment with a blink in it (~3 s), not a
+ * 100 ms eyelid frame, so it plays far less often than a rig blink would.
+ */
+export const STANDEE_CLIP_BLINK = {
+  minMs: 7000,
+  maxMs: 14000
+} as const;
+
+/**
+ * Portrait-ring atlas clips (the bust-framed talking/blinking sets): how long
+ * the TALKING loop holds per spoken line before settling back onto the
+ * blinking rest loop. Mirrors the disc animator's read-length feel.
+ */
+export const PORTRAIT_CLIP_TALK = {
+  msPerChar: 55,
+  minMs: 1400,
+  maxMs: 6500
+} as const;
+
+/**
  * The full-screen DRAGON REVEAL — the card a player is shown the first time a
  * dragon form is theirs.
  *
@@ -1547,6 +1568,51 @@ export const DRAGON_RIG_SCALE: Record<string, number> = {
   'emerald:4': 0.93
   // (The Golden Elder is NOT a board dragon — her altar scale lives in
   //  GOLDEN_ALTAR.elderScale.)
+};
+
+/**
+ * The dark keyline the dragon rigs wear, added at DRAW TIME (src/render/rigInkShader.ts).
+ *
+ * The board's item art carries its keyline in the file, put there by
+ * `scripts/unify-keyline.py`. A rig cannot: it is 6-8 separately posed layers, so
+ * ink baked into the art would draw a line along every internal seam the moment a
+ * limb moved. The rigs are therefore outlined by a shader instead — and the
+ * measured fact that forced it is that the dragon layer art has NO keyline at all
+ * (0.5px, i.e. nothing, on every whelp and adult layer), so the full width is
+ * added rather than topped up.
+ *
+ * THE WIDTH RULE IS THE ITEMS' RULE. Thickness is quoted in on-board units (the
+ * hi-res 2560x1600 space, so post-rig-scale), because that is the only thickness
+ * the player sees — rig art is ~666-1054px of source for a 221-unit whelp:
+ *
+ *     units = refUnits * (onboardSize / refSize) ** exponent
+ *
+ * `refUnits`/`refSize`/`exponent` MUST match the constants at the top of
+ * scripts/unify-keyline.py, or the dragons will not match the board they stand on.
+ * As shipped that puts the whelp (221 units) on a 2.70-unit line and the adult
+ * (358 units) on 3.04.
+ */
+export const DRAGON_OUTLINE = {
+  enabled: true,
+  /** Anchored on emberberry_1, the piece whose native line is the art direction. */
+  refUnits: 2.0,
+  refSize: 66.8,
+  exponent: 0.25,
+  /**
+   * THE canonical keyline ink for the whole game, and never flat black.
+   *
+   * Sampled from the keyline of `assets/sprites/items/chains/emberberry_plant_1.png`
+   * — the piece the board's outline pass is calibrated on. Its line is a dark warm
+   * brown-grey, (39,29,28) at V 0.153, holding that value consistently from one
+   * texel deep to eight. Anything that draws an outline reads this.
+   */
+  ink: 0x271d1c,
+  /** Per-character override, so a frost breed could take a colder line than a red
+   *  one. Empty on purpose: the canonical ink above is the art direction. */
+  inkByCharacter: {} as Record<string, number>,
+  /** Sanity ceiling on the dilation radius in texels — a mis-derived scale must
+   *  cost a fat line, not a shader that samples half a layer per pixel. */
+  maxRadiusTexels: 40
 };
 
 /**

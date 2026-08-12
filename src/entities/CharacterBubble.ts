@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { num, PALETTE, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
+import { CHARACTER_ANIMS, type CharacterClip, clipFor, clipKey, type PortraitView } from '../core/characterAnims';
+import { num, PALETTE, PORTRAIT_CLIP_TALK, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { SpeakerId, TutorialStepEvent } from '../core/types';
 import {
@@ -37,6 +38,11 @@ const RING_HOLE_RADIUS = RING_SIZE * (200 / 512);
 /** A static speaker's disc (the Golden Elder, Selyna) fits INSIDE the hole like
  *  a medallion photo — the fully-contained treatment. */
 const STATIC_DISC_SIZE = RING_SIZE * 0.98;
+/** Align-Studio PORTRAIT clips (character-anims.json, stage 'portrait') get
+ *  the SAME split treatment the guide's disc has — body copy masked BEHIND the
+ *  ring band, head copy (cropped at the neck) drawn ABOVE it — with per-
+ *  character framing from the entry's `portrait` view (frame display height,
+ *  top offset from ring centre, neck-line fraction). */
 /** The guide's bust cutout (scripts/bake-portrait-disc.py, 270x360 cells, top
  *  95% of her frame). She renders as TWO synced copies of the same sheet,
  *  split-layered around the ring:
@@ -115,6 +121,15 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   /** The line as authored, tokens unresolved — kept so a token arriving mid-line
    *  can re-render the same sentence rather than freezing the placeholder. */
   private rawLine = '';
+  /** Align-Studio PORTRAIT clips (stage 'portrait' in character-anims.json):
+   *  when a speaker has them, they are the DEFINITIVE ring animation — the
+   *  disc-atlas talk banks step aside entirely. '' = inactive. */
+  private atlasSpeaker = '';
+  private atlasClips: { talking: CharacterClip; blinking: CharacterClip } | null = null;
+  private atlasMode: 'talking' | 'blinking' = 'blinking';
+  private atlasFrame = 0;
+  private atlasTick: Phaser.Time.TimerEvent | null = null;
+  private atlasTalkHold: Phaser.Time.TimerEvent | null = null;
 
   constructor(scene: Phaser.Scene, private bus: EventBus) {
     super(scene, 0, 0);
@@ -336,6 +351,8 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
         this.scene.tweens.add({ targets: img, alpha: 1, duration: SPEAKER_CROSSFADE_MS, ease: 'Sine.easeOut' });
       }
     }
+    if (this.trySetAtlasPortrait(speaker, text)) return;
+    this.stopAtlasPortrait();
     if (isAnimatedSpeaker(speaker) && this.hasDiscSheet(speaker)) {
       const disc = discTextureFor(speaker);
       if (this.portrait.texture.key !== disc) this.portrait.setTexture(disc, 0);
@@ -361,6 +378,86 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.portrait.clearMask();
     this.portraitTop.setVisible(false);
     this.portraitBack.setVisible(false);
+  }
+
+  /**
+   * The Align-Studio BUST clips, when the speaker has them: TALKING while the
+   * line reads (length-scaled hold), then the BLINKING rest loop. These are the
+   * definitive ring animation — the disc-atlas talk banks never run under them
+   * (same speech, one mouth). Frames are stepped on the Image directly, the
+   * same manual-driver approach the disc animator uses.
+   */
+  private atlasView(speaker: string): PortraitView | null {
+    return CHARACTER_ANIMS.characters[speaker]?.portrait ?? null;
+  }
+
+  private trySetAtlasPortrait(speaker: string, text: string): boolean {
+    const talking = clipFor(speaker, 'talking');
+    const blinking = clipFor(speaker, 'blinking');
+    if (talking?.stage !== 'portrait' || blinking?.stage !== 'portrait') return false;
+    if (!this.scene.textures.exists(clipKey(speaker, 'talking')) || !this.scene.textures.exists(clipKey(speaker, 'blinking'))) {
+      return false;
+    }
+    const view = this.atlasView(speaker);
+    if (!view) return false;
+    this.portraitAnim.rest(); // the disc animator steps aside entirely
+    this.atlasSpeaker = speaker;
+    this.atlasClips = { talking, blinking };
+    // THE SPLIT, same as the guide's disc: the FULL frame drawn behind the
+    // ring band, clipped to the frame's circle by the mask; a second synced
+    // copy cropped at the NECK drawn above the band, so only her head ever
+    // overlaps the exterior frame. Both top-anchored so the per-character
+    // view's dy places the crown, whatever each clip's frame height is.
+    this.portrait.setOrigin(0.5, 0);
+    this.portrait.setCrop();
+    this.portrait.setMask(this.portraitMask);
+    this.portraitTop.setOrigin(0.5, 0);
+    this.portraitTop.setVisible(true);
+    this.portraitBack.setVisible(true);
+    this.startAtlasMode('talking');
+    this.atlasTalkHold?.remove();
+    const holdMs = Phaser.Math.Clamp(
+      text.length * PORTRAIT_CLIP_TALK.msPerChar,
+      PORTRAIT_CLIP_TALK.minMs,
+      PORTRAIT_CLIP_TALK.maxMs
+    );
+    this.atlasTalkHold = this.scene.time.delayedCall(holdMs, () => this.startAtlasMode('blinking'));
+    return true;
+  }
+
+  private startAtlasMode(mode: 'talking' | 'blinking'): void {
+    if (!this.atlasClips || !this.atlasSpeaker) return;
+    this.atlasMode = mode;
+    this.atlasFrame = 0;
+    const clip = this.atlasClips[mode];
+    const key = clipKey(this.atlasSpeaker, mode);
+    const view = this.atlasView(this.atlasSpeaker);
+    this.portrait.setTexture(key, 0);
+    this.portraitTop.setTexture(key, 0);
+    // Neck-line crop, in this clip's texture rows (talking and blinking may
+    // differ in frame size, so the crop follows the mounted clip).
+    if (view) this.portraitTop.setCrop(0, 0, clip.frameWidth, Math.round(clip.frameHeight * view.headCrop));
+    this.atlasTick?.remove();
+    this.atlasTick = this.scene.time.addEvent({
+      delay: 1000 / clip.fps,
+      loop: true,
+      callback: () => {
+        if (!this.atlasClips) return;
+        const c = this.atlasClips[this.atlasMode];
+        this.atlasFrame = (this.atlasFrame + 1) % c.frames;
+        this.portrait.setFrame(this.atlasFrame);
+        this.portraitTop.setFrame(this.atlasFrame);
+      }
+    });
+  }
+
+  private stopAtlasPortrait(): void {
+    this.atlasTick?.remove();
+    this.atlasTick = null;
+    this.atlasTalkHold?.remove();
+    this.atlasTalkHold = null;
+    this.atlasSpeaker = '';
+    this.atlasClips = null;
   }
 
   /** UI Builder registration — call AFTER the scene has positioned the bubble
@@ -682,6 +779,19 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       this.portrait.setPosition(px, py);
       this.portraitTop.setPosition(px, py);
       this.portraitAnim.applyBaseScale(s, s);
+    } else if (this.portrait.texture.key.startsWith('canim_') && this.atlasSpeaker) {
+      // Align-Studio portrait clip, split-layered like the guide's disc: both
+      // synced copies top-anchored at the view's crown offset, scaled so the
+      // whole frame reads at the view's display height. Body behind the band
+      // (masked), head copy above it (cropped at the neck by setSpeakerArt).
+      const view = this.atlasView(this.atlasSpeaker);
+      const frameH = Math.max(1, this.portrait.height);
+      const s = ((view?.height ?? 400) / frameH) * oPortrait.scale;
+      const px = ringX + oPortrait.dx;
+      const py = ringY + (view?.dy ?? -160) + oPortrait.dy;
+      this.portrait.setPosition(px, py);
+      this.portraitTop.setPosition(px, py);
+      this.portraitAnim.applyBaseScale(s, s);
     } else {
       // Static speaker disc: centred, fully CONTAINED inside the hole
       // like a medallion photo — the original look.
@@ -722,6 +832,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   hide(): void {
     if (!this.visible) return;
     this.portraitAnim.rest();
+    this.stopAtlasPortrait();
     const targetY = this.y;
     this.scene.tweens.add({
       targets: this,
