@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ENERGY_MAX, GENERATOR_SKIP_MAX_ENERGY, skipEnergyCost } from '../../src/core/Constants';
-import { capture, createTestContext } from './helpers';
+import { capture, createTestContext, MemoryStorage } from './helpers';
 
 describe('dragon passive generation (the standing advantage)', () => {
   it('a dragon gifts a Gem Shard once its passiveMs elapses — free, no tap', () => {
@@ -282,5 +282,49 @@ describe('a sleeping dragon gives nothing', () => {
     ctx.bus.emit('item:tapped', { itemId: dragon.id });
 
     expect(harvested).toHaveLength(1);
+  });
+});
+
+/**
+ * THE ×3 GIFT — one producer paying three times on a single return.
+ *
+ * `OFFLINE_BANK_CYCLES` is 3, and the offline catch-up paid up to that many
+ * overdue cycles at once, so a House left overnight dropped three Gold Coins
+ * the moment the player came back. It read as a duplication bug (it is not —
+ * it is authored, MECHANICS §4.3) and it is exactly what the owner reported.
+ *
+ * It cannot happen any more, and not because the loop was capped: `load`
+ * rebases the clock onto the save's own timestamp, so `offlineMs` is zero and
+ * `bankOffline` returns on its own guard. These two cases pin BOTH halves —
+ * that the catch-up is still correct if it is ever asked, and that nothing
+ * asks it after an absence.
+ */
+describe('the gift never arrives in threes', () => {
+  it('banks nothing for time spent away, however long the absence', () => {
+    const storage = new MemoryStorage();
+    const ctx1 = createTestContext(storage);
+    ctx1.systems.board.spawn('lumber', 3, 2, 2, 'init'); // a House: passive Gold
+    const house = [...ctx1.state.items.values()].at(-1)!;
+    house.passiveAt = ctx1.clock.now() + 1000;
+    ctx1.systems.save.save();
+
+    const ctx2 = createTestContext(storage);
+    ctx2.clock.advance(60 * 60 * 1000); // an hour of "offline"
+    const produced = capture(ctx2.bus, 'item:produced');
+    ctx2.systems.save.load();
+
+    expect(produced).toHaveLength(0);
+    expect(ctx2.systems.generator.lastOfflineGifts).toBe(0);
+  });
+
+  it('still pays at most one gift per live tick', () => {
+    const ctx = createTestContext();
+    ctx.systems.board.spawn('lumber', 3, 2, 2, 'init');
+    const produced = capture(ctx.bus, 'item:produced');
+    // Three passive intervals in ONE advance: the live path must not treat a
+    // long tick as three cycles owed.
+    ctx.clock.advance(210_000 * 3);
+    ctx.bus.emit('time:advanced', { ms: 210_000 * 3 });
+    expect(produced.length).toBeLessThanOrEqual(1);
   });
 });
