@@ -46,6 +46,24 @@ interface InkState {
 const STATE = new WeakMap<Phaser.GameObjects.Sprite, InkState>();
 
 /**
+ * The frame the twin MUST wear — and must be asked for BY NAME.
+ *
+ * `uvScale`/`uvOffset` are derived against an `outTexCoord` that spans 0..1
+ * across the twin's quad, which is true only of `__BASE` (the frame covering
+ * the whole source image). Every other frame hands the shader its OWN uv range,
+ * so the remap is applied on top of a window that is already a cell — and the
+ * taps land in a sliver of the wrong cell, which the fence then zeroes: no
+ * outline at all.
+ *
+ * The trap is that `add.image(x, y, key)` does NOT give you `__BASE`. A
+ * texture's default frame is its `firstFrame`, and for a `load.spritesheet`
+ * texture that is cell `'0'` — only a single-image texture (every rig layer)
+ * defaults to `__BASE`. Which is exactly why the rigs wore their keyline while
+ * the clip sheets and the standee banks silently wore none.
+ */
+const BASE_FRAME = '__BASE';
+
+/**
  * Give `sprite` an ink twin, or hand back the one it has. The twin is created
  * invisible and inert; `syncSpriteInk` is what dresses and shows it.
  *
@@ -64,7 +82,7 @@ export function attachSpriteInk(
     return existing.twin;
   }
   const twin = scene.add
-    .image(sprite.x, sprite.y, sprite.texture.key)
+    .image(sprite.x, sprite.y, sprite.texture.key, BASE_FRAME)
     .setVisible(false)
     .setPipeline(RIG_INK_PIPELINE);
   STATE.set(sprite, { twin, units: opts.units, key: '' });
@@ -115,11 +133,13 @@ export function syncSpriteInk(sprite: Phaser.GameObjects.Sprite): void {
   const dressKey = `${frame.texture.key}|${frame.name}|${radius.toFixed(2)}`;
   if (state.key !== dressKey) {
     state.key = dressKey;
-    // The twin deliberately wears the sheet's `__BASE` frame, not the animation's
-    // cell: that makes `outTexCoord` span 0..1 across the twin's quad, which is
-    // what `uvScale`/`uvOffset` are derived against. Binding the cell instead would
-    // hand the shader the cell's own uv range and remap it a second time.
-    if (twin.texture.key !== frame.texture.key) twin.setTexture(frame.texture.key);
+    // The twin wears the sheet's `__BASE` frame, never the animation's cell —
+    // see BASE_FRAME. Checked on the FRAME too, not just the texture key: a
+    // sprite that stays on one sheet still advances its cell every frame, and
+    // the twin must not follow it there.
+    if (twin.texture.key !== frame.texture.key || twin.frame.name !== BASE_FRAME) {
+      twin.setTexture(frame.texture.key, BASE_FRAME);
+    }
     const hex = DRAGON_OUTLINE.ink;
     twin.pipelineData = {
       uvScale: q.uvScale,
