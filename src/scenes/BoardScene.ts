@@ -378,6 +378,13 @@ export class BoardScene extends Phaser.Scene {
   /** Soft radial ground shadow under the Golden Egg (parity with board items). */
   private altarEggShadow?: Phaser.GameObjects.Image;
   private altarElder?: RigPlayer;
+  /** The Elder's Align-Studio clip sprite. When her wan-generated clip set is
+   *  resident she is CLIP-COMPLETE, exactly like the Emporium breeds: the
+   *  sprite IS the whole animal and no RigPlayer is mounted at all. The rig
+   *  path below survives as the fallback for a session whose sheets failed. */
+  private altarElderClip?: Phaser.GameObjects.Sprite;
+  /** Where the clip Elder is in her hover arc ('ground' when idle/roaring). */
+  private altarElderPhase: 'ground' | 'takeoff' | 'loop' | 'landing' = 'ground';
   private altarElderFallback?: Phaser.GameObjects.Image;
   private altarZone?: Phaser.GameObjects.Zone;
   /** The doors out of this world, each with its lit FX — see `buildPortals`. */
@@ -438,6 +445,8 @@ export class BoardScene extends Phaser.Scene {
     this.altarEggShadow = undefined;
     this.eggAura = undefined;
     this.altarElder = undefined;
+    this.altarElderClip = undefined;
+    this.altarElderPhase = 'ground';
     this.altarElderFallback = undefined;
     this.altarElderRoll = { mode: 'idle', remainMs: 0 };
     this.altarZone = undefined;
@@ -522,6 +531,8 @@ export class BoardScene extends Phaser.Scene {
       this.liveDragons.clear();
       this.altarElder?.destroy();
       this.altarElder = undefined;
+      this.altarElderClip?.destroy();
+      this.altarElderClip = undefined;
       this.crystal3d?.dispose();
       this.crystal3d = undefined;
       this.crystalTex = undefined;
@@ -704,17 +715,19 @@ export class BoardScene extends Phaser.Scene {
     this.snow?.update();
     this.updateDrag(delta);
     this.updateLiveDragons(delta);
-    if (this.altarElder) {
-      this.altarElder.update(delta);
+    if (this.altarElder || this.altarElderClip) {
+      this.altarElder?.update(delta); // the clip sprite animates itself
       this.altarElderRoll.remainMs -= delta;
       if (this.altarElderRoll.remainMs <= 0) {
         // The Elder is a calm ADULT: rare, unhurried low-flights between long idles.
         if (this.altarElderRoll.mode === 'idle' && Math.random() < DRAGON_ANIM.adultCelebrateChance) {
           this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.adultCelebrateMs };
-          this.altarElder.play('hover');
+          this.altarElder?.play('hover');
+          this.playElder('hover');
         } else {
           this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs(true) };
-          this.altarElder.play('idle');
+          this.altarElder?.play('idle');
+          this.playElder('idle');
         }
       }
     }
@@ -1911,7 +1924,7 @@ export class BoardScene extends Phaser.Scene {
    *  (Order 1 just delivered) the camera glides west and the egg FLARES — the
    *  old altar answering the rekindled brazier. */
   private showAltarEgg(ceremony: boolean): void {
-    if (!this.altarEgg && !this.altarElder && !this.altarElderFallback) {
+    if (!this.altarEgg && !this.altarElder && !this.altarElderClip && !this.altarElderFallback) {
       const p0 = this.altarPoint();
       const cal = GOLDEN_ALTAR.calibration;
       this.altarEgg = this.add
@@ -1942,10 +1955,11 @@ export class BoardScene extends Phaser.Scene {
     this.time.delayedCall(2600, () => this.glideToWorld(home.x, home.y, 900));
   }
 
-  /** The Elder stands on the altar — live rig when available, gold-tinted
-   *  stand-in otherwise (upgraded automatically when the rig arrives). */
+  /** The Elder stands on the altar — her Align-Studio clip set when resident
+   *  (the wan-generated idle/roar/fly), else the live rig, else a gold-tinted
+   *  stand-in (upgraded automatically when clips or rig arrive). */
   private showAltarElder(): void {
-    if (this.altarElder) return;
+    if (this.altarElder || this.altarElderClip) return;
     const p = this.altarPoint();
     const eggBottom = p.y + 1451 * p.scale; // egg art is 1176×1451, anchored top
     this.altarEgg?.destroy();
@@ -1955,6 +1969,30 @@ export class BoardScene extends Phaser.Scene {
     this.eggAura?.destroy();
     this.eggAura = undefined;
     this.stopGoldenTremble();
+    // Clip set first (golden_egg:2 → golden_adult): the Elder is then
+    // clip-complete and mounts as a plain sprite — aligned in character-anims
+    // against HER altar scale (GOLDEN_ALTAR.elderScale, not the board formula),
+    // so clip.scale lands her exactly where the rig stood.
+    const idle = this.elderClip('idle');
+    if (idle) {
+      this.altarElderFallback?.destroy();
+      this.altarElderFallback = undefined;
+      const sprite = this.add
+        .sprite(p.x, eggBottom - DRAGON_ANIM.groundLift, idle.key)
+        .setDepth(DEPTHS.itemBase + p.y + 1);
+      attachSpriteInk(this, sprite, {
+        units: keylineUnits(
+          Math.max(idle.clip.frameWidth, idle.clip.frameHeight) * idle.clip.scale,
+          DRAGON_OUTLINE
+        )
+      });
+      this.altarElderClip = sprite;
+      this.playElder('idle');
+      this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs(true) };
+      this.addGroundShadow(p.x, eggBottom, 170, DEPTHS.itemBase + p.y);
+      this.ensureAltarZone();
+      return;
+    }
     const rig = this.dragonRigs.get(GOLDEN_CHAIN);
     if (rig) {
       this.altarElderFallback?.destroy();
@@ -1982,6 +2020,108 @@ export class BoardScene extends Phaser.Scene {
     this.ensureAltarZone();
   }
 
+  /**
+   * The Elder's clip set (character-anims `golden_egg:2` → golden_adult), with
+   * the named clip's Phaser anim — and, for a phased clip, its segment anims —
+   * registered. Null when the clips are not pushed or the sheet is not
+   * resident, which is what sends showAltarElder down the rig path.
+   */
+  private elderClip(clipId: string): { clip: CharacterClip; key: string } | null {
+    const art = dragonClipCharacter(GOLDEN_CHAIN, GOLDEN_ELDER_TIER, null);
+    if (!art) return null;
+    const clip = clipFor(art, clipId);
+    const key = clipKey(art, clipId);
+    if (!clip || !this.textures.exists(key)) return null;
+    if (!this.anims.exists(key)) {
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+        frameRate: clip.fps,
+        repeat: clip.loop ? -1 : 0
+      });
+    }
+    for (const [seg, [start, end]] of Object.entries(clip.segments ?? {})) {
+      const sk = this.segKey(key, seg);
+      if (this.anims.exists(sk)) continue;
+      this.anims.create({
+        key: sk,
+        frames: this.anims.generateFrameNumbers(key, { start, end: end - 1 }),
+        frameRate: clip.fps,
+        repeat: seg === 'loop' ? -1 : 0
+      });
+    }
+    return { clip, key };
+  }
+
+  /** Bind a clip to the Elder's sprite and dress it NOW — same discipline as
+   *  dressOverlay: a clip switch never renders one frame in the previous
+   *  clip's transform. She faces right (the flip), watching over the isle. */
+  private dressElder(c: { clip: CharacterClip; key: string }): void {
+    const origin = originFor(c.clip, true);
+    this.altarElderClip!
+      .setData('clip', c.clip)
+      .setFlipX(true)
+      .setOrigin(origin.x, origin.y)
+      .setScale(c.clip.scale);
+  }
+
+  /**
+   * Drive the Elder's clips — her whole vocabulary at the altar. 'idle' folds
+   * an airborne Elder through her landing segment first (never a touchdown
+   * still mid-cruise); 'hover' ramps takeoff → cruise loop; 'announce' is the
+   * awakening — the roar clip once, jaws wide and wings flared, then straight
+   * into the hover the finale's roll keeps her in for introCelebrateMs.
+   */
+  private playElder(action: 'idle' | 'hover' | 'announce'): void {
+    const sprite = this.altarElderClip;
+    if (!sprite) return;
+    sprite.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    const fly = this.elderClip('fly');
+    if (action === 'announce') {
+      const roar = this.elderClip('roar');
+      if (roar) {
+        this.altarElderPhase = 'ground';
+        this.dressElder(roar);
+        sprite.play(roar.key);
+        sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => this.playElder('hover'));
+        return;
+      }
+      action = 'hover';
+    }
+    if (action === 'hover') {
+      if (this.altarElderPhase === 'takeoff' || this.altarElderPhase === 'loop') return;
+      if (fly?.clip.segments) {
+        this.altarElderPhase = 'takeoff';
+        this.dressElder(fly);
+        sprite.play(this.segKey(fly.key, 'takeoff'));
+        sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+          if (this.altarElderPhase !== 'takeoff') return;
+          this.altarElderPhase = 'loop';
+          sprite.play(this.segKey(fly.key, 'loop'));
+        });
+        return;
+      }
+      // No phased fly pushed: the idle IS the celebrate, like the clip babies.
+      action = 'idle';
+    }
+    // idle — via the wing-fold when she is airborne.
+    if (fly?.clip.segments && (this.altarElderPhase === 'takeoff' || this.altarElderPhase === 'loop')) {
+      this.altarElderPhase = 'landing';
+      this.dressElder(fly);
+      sprite.play(this.segKey(fly.key, 'landing'));
+      sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+        if (this.altarElderPhase === 'landing') this.playElder('idle');
+      });
+      return;
+    }
+    this.altarElderPhase = 'ground';
+    const idle = this.elderClip('idle');
+    if (idle) {
+      this.dressElder(idle);
+      sprite.play(idle.key, true);
+    }
+  }
+
   /** The finale's awakening beat AT the altar: the egg shakes, cracks in a
    *  flood of gold, and the legendary Elder rises where it stood. */
   private awakenAltarElder(): void {
@@ -2004,9 +2144,10 @@ export class BoardScene extends Phaser.Scene {
         this.sparks.explode(40, p.x, p.y + 44);
         this.burst.explode(20, p.x, p.y + 48);
         this.showAltarElder();
-        if (this.altarElder) {
-          this.altarElder.play('hover');
-          this.altarElder.playFace(2); // the Elder announces herself — a ROAR
+        if (this.altarElder || this.altarElderClip) {
+          this.altarElder?.play('hover');
+          this.altarElder?.playFace(2); // the Elder announces herself — a ROAR
+          this.playElder('announce'); // clip path: the roar clip IS the announcement
           this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.introCelebrateMs };
         }
       }
@@ -2039,7 +2180,7 @@ export class BoardScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     this.altarZone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (!this.isTap(pointer)) return;
-      if (this.altarElder || this.altarElderFallback) this.communeWithElder();
+      if (this.altarElder || this.altarElderClip || this.altarElderFallback) this.communeWithElder();
       else if (this.altarEgg) this.wobbleGoldenEgg();
     });
   }
@@ -2841,27 +2982,7 @@ export class BoardScene extends Phaser.Scene {
       const item = this.ctx.state.items.get(id);
       if (item && this.ctx.systems.dragons.isBoardDragon(item)) targets.push(sprite);
     }
-    // While a piece is held out, a standee's hit area becomes her WHOLE body.
-    //
-    // It is normally her lower body only, so her two-tile-tall frame cannot
-    // swallow taps meant for the cells behind her. But a held piece has no
-    // board interaction left to protect — every tap is aimed at a recipient —
-    // and the narrow rect made tapping her head miss, fall through to empty
-    // ground, and CANCEL the give. That is the "had to try twice" on the
-    // Crystal Ball: the tutorial arrow points at her top-centre, which was
-    // exactly the part of her that was not listening.
-    //
-    // The rect is mutated IN PLACE. `setInteractive` cannot do this: Phaser's
-    // `InputPlugin.enable` only calls `setHitArea` when the object has no
-    // `input` yet, so handing an already-interactive sprite a new shape is
-    // silently ignored and the old area stays live.
-    for (const sprite of this.characterSprites.values()) {
-      const box = sprite.getData('bodyBox') as HitBox | undefined;
-      const area = sprite.input?.hitArea as Phaser.Geom.Rectangle | undefined;
-      if (!box || !area) continue;
-      const r = characterHitRect(box, on);
-      area.setTo(r.x, r.y, r.width, r.height);
-    }
+    this.applyCharacterHitAreas();
     for (const target of targets) {
       const obj = target as Phaser.GameObjects.Sprite;
       if (!on) {
@@ -2885,13 +3006,38 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /**
+   * A standee's tap area, seated for the current interaction state.
+   *
+   * Her WHOLE body while a tap on her is the thing the game is asking for — a
+   * held give (every tap is aimed at a recipient, nothing on the board left to
+   * protect), or a tutorial step whose allow is the character verb
+   * (`eleanor_helps` points its arrow at her top-centre, and the narrow rect
+   * made exactly that spot dead: "tap me, then tap the House" refused the tap
+   * on her it had just asked for). Her lower body otherwise, so her
+   * two-tile-tall frame cannot swallow taps meant for the cells behind her.
+   *
+   * The rect is mutated IN PLACE. `setInteractive` cannot do this: Phaser's
+   * `InputPlugin.enable` only calls `setHitArea` when the object has no
+   * `input` yet, so handing an already-interactive sprite a new shape is
+   * silently ignored and the old area stays live.
+   */
+  private applyCharacterHitAreas(): void {
+    const whole = !!this.pendingGive || (!this.tutorialDone && this.allow.character);
+    for (const sprite of this.characterSprites.values()) {
+      const box = sprite.getData('bodyBox') as HitBox | undefined;
+      const area = sprite.input?.hitArea as Phaser.Geom.Rectangle | undefined;
+      if (!box || !area) continue;
+      const r = characterHitRect(box, whole);
+      area.setTo(r.x, r.y, r.width, r.height);
+    }
+  }
+
+  /**
    * Deliver the held piece to whoever was tapped.
    *
    * The same check-the-record-moved contract every other handing-over in this
    * game holds: ask through the bus, read the recipient's own counter, and take
-   * the piece out of the bag ONLY if it actually moved. A refusal leaves the
-   * piece pocketed and the gesture armed, so the player can simply tap somebody
-   * else rather than starting again from the satchel.
+   * the piece out of the bag ONLY if it actually moved.
    */
   private deliverGiveTo(target: { kind: 'character'; id: string } | { kind: 'dragon'; id: number }): void {
     const held = this.pendingGive;
@@ -2911,7 +3057,17 @@ export class BoardScene extends Phaser.Scene {
       if (taken) this.selectSubject('dragon', String(target.id), false);
     }
 
-    if (!taken) return; // the refusal already spoke for itself (UIScene)
+    if (!taken) {
+      // A refusal ENDS the gesture — visibly, back to the satchel. It used to
+      // leave the give armed ("tap somebody else"), but a held give claims
+      // every tap on a character (the give-first routing in onCharacterTapped),
+      // so a quiet refusal left an invisible state in which Eleanor could never
+      // be tapped to arm her CAST again. Give state exists only between the
+      // bag's Give press and one delivery attempt; outside it, her tap always
+      // does what her tap does.
+      this.cancelGive();
+      return;
+    }
     this.ctx.bus.emit('bag:consume', { chain, tier, count: 1 });
     this.pendingGive = null;
     this.pulseGiveTargets(false);
@@ -4429,9 +4585,10 @@ export class BoardScene extends Phaser.Scene {
     this.sparks.explode(14, p.x, p.y + 20);
     this.glowFlash(p.x, p.y + 30, PALETTE.goldAccent, 0.55, 1.3);
     this.floatText(p.x, p.y - 40, '✦', PALETTE.goldAccent);
-    if (this.altarElder) {
-      this.altarElder.play('hover');
-      this.altarElder.playFace(1);
+    if (this.altarElder || this.altarElderClip) {
+      this.altarElder?.play('hover');
+      this.altarElder?.playFace(1);
+      this.playElder('hover');
       this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.adultCelebrateMs };
     } else if (this.altarElderFallback) {
       const f = this.altarElderFallback;
@@ -5075,6 +5232,9 @@ export class BoardScene extends Phaser.Scene {
         this.tutorialDone = step.done;
         this.tutorialStepId = step.id;
         this.refreshAllDraggable();
+        // A step that asks for HER tap widens her tap area to her whole body —
+        // its arrow points at her head, which the lower-body rect never covered.
+        this.applyCharacterHitAreas();
         // Travel is barred for the whole tutorial, so the doors come alive on
         // the step that ends it — not on a later reload. Order 1 was delivered
         // MID-tutorial, so the Ember Gate blooms right here, as the game hands

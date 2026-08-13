@@ -597,7 +597,23 @@ const WORLDS = [
      *  two lattices over one slab is how a save loses its board. */
     skipOnAuthoredIsle: true,
     levelOf: emberkeepLevel,
-    regionPrefix: 'beyond'
+    regionPrefix: 'beyond',
+    /**
+     * The `beyond` slabs NEVER wear cloud, at any level.
+     *
+     * Not the same judgement as the level rule below, and it must not be tied
+     * to it: those 36 cells are not an island, they are the scattered little
+     * outcrops the nb2 backdrop already paints around the isle — two cells
+     * here, three there, across the whole frame. The authored cloud bank was
+     * drawn for a contiguous region and reads as a flood over confetti like
+     * that, and it hides the very scenery the backdrop is there to show. The
+     * isle's own regions still fog exactly as they always have; this is only
+     * about the ground grafted beside it.
+     *
+     * This used to fall out of `lvl > LEVEL_CAP` while the cap was 3. It is
+     * stated outright now, so raising the cap cannot silently re-flood the map.
+     */
+    fog: false
   },
   {
     id: 'borealis',
@@ -733,11 +749,12 @@ for (const spec of WORLDS) {
         // ranks up. Only ground gated past the cap stays 'locked'.
         status: lvl <= 1 ? 'active' : lvl <= LEVEL_CAP ? 'unlockable' : 'locked',
         unlock: lvl <= 1 ? undefined : { level: lvl },
-        // Ground gated above the shipped level cap wears no cloud: it cannot be
+        // No cloud when the WORLD opts out (see `fog` on the spec), or when the
+        // ground is gated above the shipped level cap: past the cap it cannot be
         // opened this chapter, so a cloud there would be a promise the game
         // cannot keep, over scenery the player should be looking at. See
         // MapRegionConfig.fog.
-        ...(lvl > LEVEL_CAP ? { fog: false } : {}),
+        ...(spec.fog === false || lvl > LEVEL_CAP ? { fog: false } : {}),
         tiles
       };
     });

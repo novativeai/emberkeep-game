@@ -180,6 +180,33 @@ const ROSTER = {
       roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false }
     }
   },
+  golden_adult: {
+    label: 'Golden Elder',
+    rawDir: `${RAW_BASE}/golden_adult_atlasses`,
+    rig: 'sprites/characters/dragon/golden-dragon/rig-adult/golden-dragon.rig.json',
+    // The Elder is an ALTAR FIXTURE, not a board item: BoardScene.showAltarElder
+    // mounts her rig at GOLDEN_ALTAR.elderScale directly — no whelpScale term,
+    // unlike every board dragon above. Aligning to any other scale would land
+    // the clips at board size and shrink her the moment a clip played.
+    rigScaleOf: (C) => C.GOLDEN_ALTAR.elderScale,
+    modes: { fly: 'center' },
+    // The chain:tier she occupies in the fiction (the altar egg draws
+    // `item_golden_egg_2`); dragonClipCharacter resolves her clips by this key.
+    board: 'golden_egg:2',
+    // Same wan 2.7 route as redadult: anim-plate → anim-generate →
+    // anim-ingest --skip 6, every clip pinned to the baked rest pose at both
+    // ends. Her baked composite was itself produced for this work (rig layers
+    // composited by z — see anim-plate.py's roster note).
+    clipInfo: {
+      idle: { trigger: 'altar rest — replaces the rig idle preset' },
+      roar: { trigger: 'the awakening bellow + ambient elder cadence', loop: false },
+      fly: {
+        trigger: 'hover blessing: unfold → wingbeat → fold (altar celebrate roll)',
+        // Measured (segments.json): 62f wingbeat @ RMSE 15.6, fold from 193.
+        segments: { takeoff: [0, 77], loop: [77, 139], landing: [193, 234] }
+      }
+    }
+  },
   storm_adult: {
     label: 'Storm Dragon (adult)',
     rawDir: `${RAW_BASE}/storm_adult_atlasses`,
@@ -233,7 +260,8 @@ function readConstants(root) {
     STANDEE_BANKS: readConstLiteral(src, 'STANDEE_BANKS'),
     STANDEE_SCALE_TRIM: readConstLiteral(src, 'STANDEE_SCALE_TRIM'),
     DRAGON_ANIM: readConstLiteral(src, 'DRAGON_ANIM'),
-    DRAGON_RIG_SCALE: readConstLiteral(src, 'DRAGON_RIG_SCALE')
+    DRAGON_RIG_SCALE: readConstLiteral(src, 'DRAGON_RIG_SCALE'),
+    GOLDEN_ALTAR: readConstLiteral(src, 'GOLDEN_ALTAR') // the Elder's altar display scale
   };
 }
 

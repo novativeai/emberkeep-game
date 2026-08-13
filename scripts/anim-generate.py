@@ -46,7 +46,12 @@ NEGATIVE = (
     'cropped, cut off, out of frame, wings clipped, camera movement, pan, '
     'zoom, walking, flying away, drifting, changing position, background '
     'change, scene cut, morphing anatomy, extra limbs, extra wings, changing '
-    'proportions, text, watermark, blurry, low quality'
+    'proportions, text, watermark, blurry, low quality, '
+    # The golden elder's first lowflight came back wreathed in purple magic
+    # clouds — pretty, and unkeyable: the green keyer can only remove GREEN.
+    # Nothing may ever be painted over the plate but the animal itself.
+    'smoke, mist, clouds, magic particles, sparkles, glowing dust, aura, '
+    'energy effects, fire, embers, motion trails'
 )
 
 BABY_FOOTER = (
@@ -102,8 +107,10 @@ CLIPS = {
                 'fixed in one position, not rising, sinking or drifting. The '
                 'legs hang below, the tail trails, the head moves slightly. '
                 'The whole dragon stays fully inside the frame, wingtips never '
-                'crossing the edge. Static locked-off camera, no camera '
-                'movement. The background stays still.'
+                'crossing the edge. No smoke, no clouds, no sparkles, no magic '
+                'effects — the plain flat background stays completely empty '
+                'and untouched. Static locked-off camera, no camera movement. '
+                'The background stays still.'
             )
         }
     }
@@ -116,7 +123,8 @@ PLATE_STAGES = {
     'frost_adult': 'adult',
     'storm_baby': 'baby',
     'storm_adult': 'adult',
-    'ember_adult': 'adult'
+    'ember_adult': 'adult',
+    'golden_adult': 'adult'  # the Golden Elder — same three adult clips
 }
 
 

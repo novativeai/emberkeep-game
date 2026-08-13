@@ -463,6 +463,64 @@
       },
       "board": "ember_dragon:4",
       "skin": "storm"
+    },
+    "golden_adult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/golden_adult/idle.webp",
+          "frames": 114,
+          "frameWidth": 372,
+          "frameHeight": 239,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.28952,
+          "dx": 57.16,
+          "dy": 47.71,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 239
+        },
+        "roar": {
+          "file": "sprites/anims/golden_adult/roar.webp",
+          "frames": 66,
+          "frameWidth": 455,
+          "frameHeight": 293,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.27299,
+          "dx": 37.33,
+          "dy": 51.48,
+          "srcFrameWidth": 455,
+          "srcFrameHeight": 293
+        },
+        "fly": {
+          "file": "sprites/anims/golden_adult/fly.webp",
+          "frames": 180,
+          "frameWidth": 256,
+          "frameHeight": 199,
+          "fps": 24,
+          "loop": true,
+          "segments": {
+            "takeoff": [
+              0,
+              77
+            ],
+            "loop": [
+              77,
+              139
+            ],
+            "landing": [
+              139,
+              180
+            ]
+          },
+          "scale": 2.86422,
+          "dx": -0.22,
+          "dy": 86.8,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 199
+        }
+      },
+      "board": "golden_egg:2"
     }
   }
 }

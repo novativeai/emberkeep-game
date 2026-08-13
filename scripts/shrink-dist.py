@@ -268,12 +268,14 @@ def verify_dimensions():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="report without writing")
-    # 80 MB (was 50, raised twice on 2026-08-12 with the user): six dragons
+    # 81 MB (was 50, raised twice on 2026-08-12 with the user): six dragons
     # (red/frost/storm × baby/adult) are now fully clip-animated — ~25 MB of
-    # atlases even after segment compaction and the 1.25× oversample cap —
-    # with headroom for one more breed. Texture-DIMENSION limits (4096, old
-    # devices) are untouched by this.
-    ap.add_argument("--budget", type=float, default=80.0, help="fail over this many MB")
+    # atlases even after segment compaction and the 1.25× oversample cap.
+    # The 80 figure included "headroom for one more breed"; that breed (the
+    # Golden Elder, 2026-08-13) landed the build at 80.3, so the estimate was
+    # 0.3 MB short — corrected here rather than shaving her atlases. Texture-
+    # DIMENSION limits (4096, old devices) are untouched by this.
+    ap.add_argument("--budget", type=float, default=81.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():

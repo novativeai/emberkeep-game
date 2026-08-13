@@ -48,7 +48,11 @@ ROSTER = {
     'frost_adult': (f'{DRAGONS}/frost-dragon/sprite-adult/frost-dragon-adult-baked.png', 'adult'),
     'storm_baby': (f'{DRAGONS}/storm-dragon/sprite/storm-dragon-baked.png', 'baby'),
     'storm_adult': (f'{DRAGONS}/storm-dragon/sprite-adult/storm-dragon-adult-baked.png', 'adult'),
-    'ember_adult': (f'{DRAGONS}/red-dragon/sprite-adult/red-dragon-adult-baked.png', 'adult')
+    'ember_adult': (f'{DRAGONS}/red-dragon/sprite-adult/red-dragon-adult-baked.png', 'adult'),
+    # The Golden Elder. Its baked composite is produced the dragonbreed way —
+    # rig layers composited by z at their own offsets — because golden predates
+    # the breeds pipeline and never had one on disk before the clip work.
+    'golden_adult': (f'{DRAGONS}/golden-dragon/sprite-adult/golden-dragon-adult-baked.png', 'adult')
 }
 
 
