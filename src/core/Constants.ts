@@ -1319,15 +1319,33 @@ export const ENERGY_REGEN_AMOUNT = 1;
  * demo's finale and is tuned so it lands on Order 3's delivery (DEMO-PLAN §Act
  * IV XP ledger: 60 tutorial + O1 30 + merges ~24 + O2 35 + optional hatch ~24
  * + merges ~34 + O3 50 ≈ 257 — orders pay XP in big chunks, so the level-up
- * fires on a delivery, the right beat). The array ENDS at 3 on purpose: the
- * chapter is complete — the XP bar never fills toward nothing.
+ * fires on a delivery, the right beat).
  *
- * Level 3 no longer FIRES anything. It opens `level_5`'s land and it is the
- * cap, but the Golden Elder's awakening moved off it onto
- * `GOLDEN_ALTAR.awakenQuestId` — a level the player crosses mid-merge is the
- * wrong trigger for the chapter's one irreversible story beat.
+ * PAST 3 THE LADDER KEEPS GOING. It used to stop there, on the argument that
+ * the chapter was complete and a bar should never fill toward nothing. What
+ * that actually produced is a Keeper who goes on earning XP and stays Level 3
+ * for the rest of the save — every merge, every delivery, every hatch counting
+ * toward a number that cannot move. A finished chapter is a reason to stop
+ * telling STORY at the player, not a reason to stop counting what they do.
+ *
+ *   L4   420 — a few deliveries past the finale
+ *   L5  1000 — the long middle of a post-chapter board
+ *   L6  1400 — the cap, and far enough out that reaching it is an achievement
+ *
+ * No threshold sits inside the `keepers_hoard` window (~550–810): a level-up
+ * camera glide must never fight the finale choreography, which fires on that
+ * quest's completion.
+ *
+ * These levels FIRE nothing on this map — the land they open in the other
+ * lineage (`beyond_l4`, `beyond_l5`) is authored in ITS ground, and ours is its
+ * own. Here they are warmth (ENERGY_PER_LEVEL) and a bar that still moves.
+ *
+ * Level 3 FIRES nothing either. It opens `level_5`'s land, but the Golden
+ * Elder's awakening lives on `GOLDEN_ALTAR.awakenQuestId` — a level the player
+ * crosses mid-merge is the wrong trigger for the chapter's one irreversible
+ * story beat.
  */
-export const LEVEL_XP = [0, 60, 220] as const;
+export const LEVEL_XP = [0, 60, 220, 420, 1000, 1400] as const;
 
 /** Max Warmth grows by this much per Keeper level (level 1 = ENERGY_MAX). */
 export const ENERGY_PER_LEVEL = 3;
