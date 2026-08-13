@@ -110,7 +110,16 @@ import { isDragonFood } from '../systems/DragonSystem';
 
 /** A featured live-rigged dragon overlaying its (invisible) interactive host. */
 interface LiveDragon {
-  player: RigPlayer;
+  /**
+   * The rig puppet — NULL for a clip-complete breed, which is the whole point
+   * of the Emporium roster: a bought Frost dragon that animated on the red
+   * dragon's rig was a red dragon wearing frost paint. A breed whose clip set
+   * carries the animal builds no rig at all.
+   */
+  player: RigPlayer | null;
+  /** 1 = the source art's own leftward facing, −1 = mirrored. Held HERE rather
+   *  than read off the rig container, which a clip-only breed does not have. */
+  facing: 1 | -1;
   host: BoardItem;
   shadow: Phaser.GameObjects.Image; // ground shadow scaled to the rig
   mode: 'hover' | 'idle';
@@ -522,7 +531,7 @@ export class BoardScene extends Phaser.Scene {
       this.offBus = [];
       for (const ld of this.liveDragons.values()) {
         ld.clipOverlay?.destroy();
-        ld.player.destroy();
+        ld.player?.destroy();
       }
       this.liveDragons.clear();
       this.altarElder?.destroy();
@@ -797,7 +806,10 @@ export class BoardScene extends Phaser.Scene {
    *  (the ember/emerald generator tiers). The Golden Elder is not a board
    *  item — she lives on the Golden Altar fixture (see syncGoldenAltar). */
   private wearsRigTier(chain: string, tier: number): boolean {
-    if (DRAGON_RIGS[rigKeyFor(chain, tier)] === undefined) return false;
+    // …or wears no rig at all because its clip set carries the whole animal.
+    // Either way it is a LIVE dragon rather than a still board piece, which is
+    // the question this answers.
+    if (DRAGON_RIGS[rigKeyFor(chain, tier)] === undefined && !this.clipComplete(chain, tier)) return false;
     return this.generatorConfigFor(chain, tier) !== undefined;
   }
 
@@ -871,11 +883,13 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /** Mirror the source art (faces LEFT) to face RIGHT and mount it over `host`,
-   *  which goes invisible but stays interactive/draggable. Returns false if the
-   *  rig isn't ready yet (caller falls back to the sprite). */
+   *  which goes invisible but stays interactive/draggable. CLIP-COMPLETE breeds
+   *  mount overlay-only (no RigPlayer); the others need their rig loaded —
+   *  returns false if it isn't ready yet (caller falls back to the sprite). */
   private attachDragon(host: BoardItem, intro: boolean): boolean {
+    const clipOnly = this.clipComplete(host.chain, host.tier);
     const rig = this.dragonRigs.get(rigKeyFor(host.chain, host.tier));
-    if (!rig) return false;
+    if (!clipOnly && !rig) return false;
     // Tear down FIRST, then fetch: `removeDragonRig` reconciles residency, and
     // a fetch queued before it would be offered to that eviction as sheets
     // nothing is wearing yet — dropped and immediately re-fetched.
@@ -886,20 +900,26 @@ export class BoardScene extends Phaser.Scene {
     const scale =
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
       (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1);
-    const calm = CALM_DRAGONS.has(rig.character);
-    const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, {
-      scale,
-      speed: calm ? DRAGON_ANIM.adultSpeed : DRAGON_ANIM.whelpSpeed
-    });
-    const face = FACES[rig.character];
-    if (face) player.attachFace(this, face, faceTextureKey(rig.character));
-    player.setFacing('left'); // rig's original (un-mirrored) orientation
-    if (!intro) player.play('idle');
+    // A clip-only breed has no rig character to look the cadence up by, so the
+    // tier decides: the adults are the calm ones, as they are for the rigs.
+    const calm = clipOnly ? host.tier >= 4 : CALM_DRAGONS.has(rig!.character);
+    let player: RigPlayer | null = null;
+    if (!clipOnly) {
+      player = new RigPlayer(this, rig!, (layer) => `rig:${rig!.character}:${layer}`, {
+        scale,
+        speed: calm ? DRAGON_ANIM.adultSpeed : DRAGON_ANIM.whelpSpeed
+      });
+      const face = FACES[rig!.character];
+      if (face) player.attachFace(this, face, faceTextureKey(rig!.character));
+      player.setFacing('left'); // rig's original (un-mirrored) orientation
+      if (!intro) player.play('idle');
+    }
     host.setArtVisible(false); // host is now just the invisible hit-target + bob anchor
     // Ground shadow proportional to the rig (666px pieces × scale).
     const shadow = this.addGroundShadow(host.x, host.y, 666 * scale, host.depth - 0.5);
     const ld: LiveDragon = {
       player,
+      facing: 1,
       host,
       shadow,
       mode: intro ? 'hover' : 'idle',
@@ -920,23 +940,30 @@ export class BoardScene extends Phaser.Scene {
       // The newborn roars its arrival: the ingested roar clip when pushed
       // (same bellow as the hungry cadence), the rig hover + ~2.1s of mouth
       // flap without it. Whichever plays is what fades in.
-      let target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container;
+      let target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container | null;
       if (this.playRoarClip(ld) && ld.clipOverlay) {
         target = ld.clipOverlay;
-      } else {
+      } else if (player) {
         player.play('hover');
         player.playFace(2);
         ld.mode = 'hover';
         ld.remainMs = DRAGON_ANIM.introCelebrateMs;
         target = player.container;
+      } else {
+        // Clip-only, and its roar sheet has not landed yet (it is a mood clip,
+        // fetched on the beat): arrive at rest rather than not at all.
+        this.dragonIdle(ld);
+        target = ld.clipOverlay ?? null;
       }
-      target.setAlpha(0);
-      this.tweens.add({
-        targets: target,
-        alpha: 1,
-        duration: DRAGON_ANIM.fadeInMs,
-        ease: 'Sine.easeOut'
-      });
+      target?.setAlpha(0);
+      if (target) {
+        this.tweens.add({
+          targets: target,
+          alpha: 1,
+          duration: DRAGON_ANIM.fadeInMs,
+          ease: 'Sine.easeOut'
+        });
+      }
     }
     return true;
   }
@@ -953,8 +980,8 @@ export class BoardScene extends Phaser.Scene {
 
   /** Keep the rig glued to its (possibly bobbing/dragged) host + advance anim. */
   private syncDragon(ld: LiveDragon): void {
-    ld.player.container.setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift);
-    ld.player.container.setDepth(ld.host.depth + 0.5);
+    ld.player?.container.setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift);
+    ld.player?.container.setDepth(ld.host.depth + 0.5);
     // Visibility, not just position: the rig's shadow is the ONLY one a dragon
     // shows (the host's own pair is hidden the moment the rig stands in for its
     // art), so it is the one that has to answer `setOverGround`'s question. It
@@ -965,10 +992,12 @@ export class BoardScene extends Phaser.Scene {
     ld.zzz?.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth + 4);
     if (ld.clipOverlay?.visible) {
       // The Align-Studio clip rides the host at the rig's own anchor and depth,
-      // mirroring with the rig's facing (source art faces left; dx mirrors too,
-      // so the registration lands where the flipped rig's would).
+      // mirroring with the ANIMAL's facing (source art faces left; dx mirrors
+      // too, so the registration lands where a flipped rig's would). Read off
+      // `ld.facing` rather than the rig container, which a clip-only breed
+      // does not have.
       const clip = ld.clipOverlay.getData('clip') as CharacterClip | undefined;
-      const flip = ld.player.container.scaleX < 0;
+      const flip = ld.facing < 0;
       ld.clipOverlay
         .setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift)
         .setDepth(ld.host.depth + 0.5)
@@ -1000,7 +1029,7 @@ export class BoardScene extends Phaser.Scene {
   private updateLiveDragons(delta: number): void {
     for (const ld of this.liveDragons.values()) {
       this.syncDragon(ld);
-      ld.player.update(delta);
+      ld.player?.update(delta);
       if (ld.busy || ld.host.getData('dragged')) continue; // flying/working/held: hold its animation
       // A sleeping dragon does not fidget: the rig is hidden behind the curled
       // sleep art, so rolling idle/hover under it would animate nothing and
@@ -1109,7 +1138,7 @@ export class BoardScene extends Phaser.Scene {
     if (!ld) return;
     ld.zzz?.destroy();
     ld.clipOverlay?.destroy();
-    ld.player.destroy();
+    ld.player?.destroy();
     ld.shadow.destroy();
     this.liveDragons.delete(itemId);
     // The last whelp merged into an adult is the commonest way a breed becomes
@@ -1132,7 +1161,7 @@ export class BoardScene extends Phaser.Scene {
     ld.sleepState = 'none'; // a bellowing dragon is not curled on a tile
     overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
     overlay.setVisible(true);
-    ld.player.container.setVisible(false);
+    ld.player?.container.setVisible(false);
     overlay.play(roar.key);
     ld.mode = 'idle';
     ld.remainMs = (roar.clip.frames / roar.clip.fps) * 1000;
@@ -1148,7 +1177,11 @@ export class BoardScene extends Phaser.Scene {
    *  rears back with the wide-mouth face, exactly as before. Purely a mood —
    *  nothing in the economy hears it. */
   private roarOnce(ld: LiveDragon): void {
-    if (!this.playRoarClip(ld)) {
+    if (!this.playRoarClip(ld) && ld.player) {
+      // Clearing the overlay is only safe when there is a rig BEHIND it to take
+      // the tile. On a clip-only breed whose roar sheet has not landed yet it
+      // would leave nothing on screen at all, so that one keeps its idle and
+      // bellows silently — the sparks and the "Hungry!" still say so.
       this.clearDragonOverlay(ld); // the bellow is the rig's — never under a fly loop
       ld.player.container.setVisible(true);
       ld.player.play('roar');
@@ -1197,14 +1230,15 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /**
-   * Fetch a breed's Align-Studio clips the first time one of its dragons stands
-   * on the board — never at boot.
+   * Fetch a breed's EAGER clips the first time one of its dragons stands on the
+   * board — never at boot, and never the whole wardrobe.
    *
    * These are the heaviest textures the game has, and it is frame COUNT that
-   * does it: the red whelp's `fly` is 240 frames of 256×214, uploaded as one
-   * 4096×3210 sheet — 50 MB of video memory. With `idle`, `tosleep` and `roar`
-   * the breed costs 126 MB, and it used to be resident from the title screen of
-   * a session that might never hatch anything. Every breed added multiplied it.
+   * does it: the red whelp's `fly` is 184 frames of 292×244, uploaded as one
+   * sheet worth 50 MB of video memory, and its full wardrobe is 106 MB. Six
+   * breeds of that resident at once is 608 MB. So a breed arrives in two waves
+   * (`clipLoadTiers`): the idle it rests on and the fly the next grab needs
+   * come now, the mood clips come with the mood — see `ensureMoodClip`.
    *
    * Nothing waits on the result: `dragonClip` returns null while a sheet is
    * missing and the dragon animates with its rig, which is how it moved before
@@ -1299,6 +1333,41 @@ export class BoardScene extends Phaser.Scene {
     return dragonClipCharacter(chain, tier, this.ctx.state.dragonSkins[chain] ?? null);
   }
 
+  /**
+   * True when this breed+skin's clip set carries the WHOLE animal, so no rig is
+   * built for it at all.
+   *
+   * The idle is the floor — everything else degrades onto it — and the sheet
+   * must actually be RESIDENT, not merely staged: a breed mounted clip-only on
+   * a sheet that failed to load is an invisible dragon, where the rig path is
+   * merely a plainer one. This is also what makes a bought Frost dragon a
+   * Frost dragon rather than the red rig wearing frost paint.
+   */
+  private clipComplete(chain: string, tier: number): boolean {
+    const id = this.clipCharacterFor(chain, tier);
+    if (!id || clipFor(id, 'idle') === null) return false;
+    return this.textures.exists(clipKey(id, 'idle'));
+  }
+
+  /** Face the animal left/right. The overlay follows `ld.facing` through
+   *  syncDragon/dressOverlay; the rig container follows too when the breed
+   *  still has one. */
+  private setDragonFacing(ld: LiveDragon, dir: 'left' | 'right'): void {
+    ld.facing = dir === 'left' ? 1 : -1;
+    ld.player?.setFacing(dir);
+  }
+
+  /** Keyline weight for a clip-only animal, from its idle clip's displayed size
+   *  through the same formula the rigs use — the line must not change weight
+   *  between a rigged breed and a clip-only one standing side by side. */
+  private clipOutlineUnits(ld: LiveDragon): number {
+    const idle = this.dragonClip(ld, 'idle');
+    const size = idle
+      ? Math.max(idle.clip.frameWidth, idle.clip.frameHeight) * idle.clip.scale
+      : 666 * DRAGON_ANIM.whelpScale;
+    return keylineUnits(size, DRAGON_OUTLINE);
+  }
+
   /** Mark a sheet most-recently-needed so the LRU takes the coldest first. */
   private touchClip(breed: string, clip: string): void {
     const id = `${breed}/${clip}`;
@@ -1363,7 +1432,7 @@ export class BoardScene extends Phaser.Scene {
       // carry its own — at the rig's exact width, since the handover happens
       // mid-animation and a line that changed weight across it would read as a
       // flinch. See src/render/SpriteInk.ts.
-      attachSpriteInk(this, ld.clipOverlay, { units: ld.player.outlineUnits });
+      attachSpriteInk(this, ld.clipOverlay, { units: ld.player?.outlineUnits ?? this.clipOutlineUnits(ld) });
     }
     return ld.clipOverlay;
   }
@@ -1387,7 +1456,7 @@ export class BoardScene extends Phaser.Scene {
     // the one door every clip goes through; the phases that want a rate set it
     // again immediately after.
     overlay.anims.timeScale = 1;
-    const flip = ld.player.container.scaleX < 0;
+    const flip = ld.facing < 0;
     const origin = originFor(c.clip, flip);
     overlay
       .setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift)
@@ -1457,6 +1526,13 @@ export class BoardScene extends Phaser.Scene {
       // (clearing any idle overlay a partial push may have left standing in).
       const whole = this.dragonClip(ld, 'fly');
       if (!whole) {
+        if (!ld.player) {
+          // A CLIP-ONLY breed with no fly sheet at all (the Emporium babies)
+          // keeps its idle look for the glide — the journey tween carries the
+          // motion, and an animal that slides is better than one that vanishes.
+          this.dragonIdle(ld);
+          return;
+        }
         this.clearDragonOverlay(ld);
         ld.player.container.setVisible(true);
         ld.player.play('hover');
@@ -1466,13 +1542,13 @@ export class BoardScene extends Phaser.Scene {
       overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
       overlay.setVisible(true);
       overlay.play(whole.key, true);
-      ld.player.container.setVisible(false);
+      ld.player?.container.setVisible(false);
       return;
     }
     const overlay = this.dressOverlay(ld, f);
     overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
     overlay.setVisible(true);
-    ld.player.container.setVisible(false);
+    ld.player?.container.setVisible(false);
     const airborne = ld.flightPhase === 'takeoff' || ld.flightPhase === 'loop';
     if (!airborne) {
       // Measured against the SCREEN length of the ramp, not the authored one:
@@ -1547,7 +1623,7 @@ export class BoardScene extends Phaser.Scene {
       const overlay = this.dressOverlay(ld, idle);
       overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
       overlay.setVisible(true);
-      ld.player.container.setVisible(false);
+      ld.player?.container.setVisible(false);
       // An idle roll landing on idle again must not restart the breath cycle.
       if (overlay.anims.currentAnim?.key !== idle.key || !overlay.anims.isPlaying) {
         overlay.play(idle.key);
@@ -1556,6 +1632,7 @@ export class BoardScene extends Phaser.Scene {
       return;
     }
     this.clearDragonOverlay(ld);
+    if (!ld.player) return; // clip-only breeds always have an idle sheet
     ld.player.container.setVisible(true);
     ld.player.play('idle');
   }
@@ -1599,7 +1676,7 @@ export class BoardScene extends Phaser.Scene {
     overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
     overlay.stop();
     overlay.setVisible(true);
-    ld.player.container.setVisible(false);
+    ld.player?.container.setVisible(false);
     ld.host.setArtVisible(false);
     overlay.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       overlay.setVisible(false);
@@ -1621,7 +1698,20 @@ export class BoardScene extends Phaser.Scene {
       ld.sleepState = 'seated';
       const sleepKey = `sleep_${ld.host.chain}_${ld.host.tier}`;
       if (!this.textures.exists(sleepKey)) {
-        ld.player.container.setVisible(true).setAlpha(0.65);
+        // No curled painting for this breed: dim whatever IS drawing it. The
+        // rig when it has one, its own idle when it does not — a clip-only
+        // breed dimmed to nothing is a dragon that vanishes at dusk. The idle
+        // is re-dressed rather than merely faded because the caller just
+        // cleared the overlay to make room for a painting that isn't there.
+        if (ld.player) {
+          ld.player.container.setVisible(true).setAlpha(0.65);
+          return;
+        }
+        const idle = this.dragonClip(ld, 'idle');
+        if (!idle) return;
+        const overlay = this.dressOverlay(ld, idle);
+        overlay.setVisible(true).setAlpha(0.65);
+        if (overlay.anims.currentAnim?.key !== idle.key || !overlay.anims.isPlaying) overlay.play(idle.key);
         return;
       }
       // The rig steps aside and the painting takes the tile — but the rig's
@@ -1630,7 +1720,7 @@ export class BoardScene extends Phaser.Scene {
       // the tile origin, which is the same line `syncDragon` puts that shadow
       // on: the dragon lies down ON its shadow rather than hovering over a
       // second one the item would otherwise light beneath itself.
-      ld.player.container.setVisible(false);
+      ld.player?.container.setVisible(false);
       ld.host.setArtTexture(sleepKey, this.ctx.data.anchors);
       ld.host.setArtScale(ITEM_SCALE[sleepKey] ?? DRAGON_SLEEP_SCALE);
       ld.host.setArtVisible(true);
@@ -1725,6 +1815,10 @@ export class BoardScene extends Phaser.Scene {
     ld.sleepState = 'none';
     if (!seated && !midTransition) return; // never seated — it is still flying or standing
     this.clearDragonOverlay(ld); // a mood flip mid-transition never strands the clip
+    // A clip-only breed with no curled painting slept as its own dimmed idle;
+    // waking has to give that alpha back, or it stays a ghost for the rest of
+    // the session. Harmless on every other path — the overlay is opaque there.
+    ld.clipOverlay?.setAlpha(1);
     ld.host.setSleepBreath(false);
     // Restore the STANDING art under the rig. The host is invisible while the
     // rig stands in, but a pooled item that is released still carrying the
@@ -1745,13 +1839,19 @@ export class BoardScene extends Phaser.Scene {
       ld.mode = 'idle';
       ld.remainMs = DRAGON_WAKE_MS;
       this.playDragonTransition(ld, t, true, () => {
-        ld.player.container.setAlpha(1);
+        ld.player?.container.setAlpha(1);
         this.dragonIdle(ld); // the atlas idle when pushed, the rig otherwise
       });
       return;
     }
-    ld.player.container.setVisible(true).setAlpha(1);
-    ld.player.play('stretch');
+    if (ld.player) {
+      ld.player.container.setVisible(true).setAlpha(1);
+      ld.player.play('stretch');
+    } else {
+      // No rig to stand up: a clip-only breed wakes straight into its idle,
+      // which is the pose the reversed tosleep would have handed it anyway.
+      this.dragonIdle(ld);
+    }
     ld.mode = 'idle';
     ld.remainMs = DRAGON_WAKE_MS;
   }
@@ -1773,7 +1873,7 @@ export class BoardScene extends Phaser.Scene {
     const ld = this.liveDragons.get(itemId);
     if (ld) {
       ld.busy = true;
-      ld.player.setFacing(dest.x <= sprite.x ? 'left' : 'right');
+      this.setDragonFacing(ld, dest.x <= sprite.x ? 'left' : 'right');
       this.dragonHover(ld, DRAGON_WANDER_FLIGHT_MS);
     }
     // Two tweens rather than a curve: x eases the whole way while y hops up and
@@ -4098,7 +4198,7 @@ export class BoardScene extends Phaser.Scene {
       this.stirSleeper(ld); // fed in her sleep — the painting answers, not the rig
     } else if (ld && !ld.busy) {
       this.dragonHover(ld);
-      ld.player.playFace(1); // a chirp for the meal
+      ld.player?.playFace(1); // a chirp for the meal
       ld.mode = 'hover';
       const span = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
       ld.remainMs = favourite ? span * 2 : span;
@@ -4841,7 +4941,7 @@ export class BoardScene extends Phaser.Scene {
     const landX = plant.x + 70; // land to the plant's right so the un-mirrored rig still faces it (left)
     if (ld) {
       ld.busy = true;
-      ld.player.setFacing(landX <= plant.x ? 'right' : 'left');
+      this.setDragonFacing(ld, landX <= plant.x ? 'right' : 'left');
       this.dragonHover(ld, DRAGON_ANIM.flyToMs);
     }
     const land = (): void => {
@@ -5021,7 +5121,7 @@ export class BoardScene extends Phaser.Scene {
     const landX = house.x + 70; // land beside the building so the un-mirrored rig faces it
     if (ld) {
       ld.busy = true;
-      ld.player.setFacing('left');
+      this.setDragonFacing(ld, 'left');
       this.dragonHover(ld, DRAGON_ANIM.flyToMs);
     }
     // Same beat as the harvest flourish: fly over, breathe a brief burst of
@@ -5223,7 +5323,7 @@ export class BoardScene extends Phaser.Scene {
     const ld = this.liveDragons.get(dragonId);
     if (ld) {
       this.dragonHover(ld);
-      ld.player.playFace(1); // a refreshed chirp
+      ld.player?.playFace(1); // a refreshed chirp
       ld.mode = 'hover';
       ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
     }
@@ -5763,7 +5863,7 @@ export class BoardScene extends Phaser.Scene {
     ld.mode = 'hover';
     ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
     this.dragonHover(ld);
-    ld.player.playFace(1); // one happy mouth-flap as the gift pops out
+    ld.player?.playFace(1); // one happy mouth-flap as the gift pops out
   }
 
   private onRegionUnlocked(tiles: TilePos[], revealed: ItemSnapshot[], regionId?: string): void {
@@ -5926,7 +6026,7 @@ export class BoardScene extends Phaser.Scene {
   private fullResync(): void {
     for (const ld of this.liveDragons.values()) {
       ld.clipOverlay?.destroy();
-      ld.player.destroy();
+      ld.player?.destroy();
     }
     this.liveDragons.clear();
     for (const id of [...this.itemAuras.keys()]) this.detachItemAura(id);
