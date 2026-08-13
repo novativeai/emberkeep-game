@@ -72,8 +72,8 @@ import {
   originFor
 } from '../core/characterAnims';
 import { type ClipRef, clipLoadTiers, planClipEviction } from '../core/dragonClips';
+import { LoadQueue } from '../core/LoadQueue';
 import { gridToWorld } from '../core/iso';
-import { ensureTextures } from '../core/lazyTextures';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
 import { artScaleAt, cellAtWorldPoint, setActiveWorld, worldPointOf } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
@@ -866,14 +866,21 @@ export class BoardScene extends Phaser.Scene {
       if (!rig.character || rig.character === 'character') {
         rig.character = DRAGON_RIG_NAMES[rigKey] ?? rigKey;
       }
-      await RigPlayer.loadTextures(this, rig, (layer) => `rig:${rig.character}:${layer}`);
+      // Through the queue: RigPlayer runs its own add/once/start, so it needs
+      // the loader to ITSELF or its promise resolves on somebody else's
+      // COMPLETE and the rig mounts on textures that have not arrived.
+      await this.loads.runExclusive(() =>
+        RigPlayer.loadTextures(this, rig, (layer) => `rig:${rig.character}:${layer}`)
+      );
       if (!this.scene.isActive()) return;
       // Face frame sets are optional per character; a failed frame simply
       // leaves that set unworn (attachFace validates per-set).
       const face = FACES[rig.character];
       if (face) {
         try {
-          await RigPlayer.loadFaceTextures(this, face, faceTextureKey(rig.character), base);
+          await this.loads.runExclusive(() =>
+            RigPlayer.loadFaceTextures(this, face, faceTextureKey(rig.character), base)
+          );
         } catch {
           /* face art optional */
         }
@@ -1286,31 +1293,20 @@ export class BoardScene extends Phaser.Scene {
     // the moment it uploads, so an eviction that runs once the newcomer has
     // landed has already been paid for by the peak it was meant to avoid.
     this.reconcileDragonClips(wanted.map((clip) => ({ breed: id, clip })));
-    let queued = 0;
-    for (const clipId of wanted) {
-      const clip = clipFor(id, clipId)!;
-      if (this.textures.exists(clipKey(id, clipId))) continue;
-      this.load.spritesheet(clipKey(id, clipId), clip.file, {
-        frameWidth: clip.frameWidth,
-        frameHeight: clip.frameHeight
-      });
-      this.residentClips.set(`${id}/${clipId}`, { breed: id, clip: clipId });
-      queued++;
-    }
-    if (!queued) return;
-    // AND TELL THE DRAGON WHEN THEY ARRIVE.
-    //
-    // The sheets land a second or two after the dragon does, and nothing was
-    // listening for them: the whelp kept the rig preset it was given at spawn
-    // until the next ambient roll happened to call `dragonIdle` again — 9 to
-    // 15 s of cozy cadence away. On a board rebuilt by every reload that is
-    // most of what the player sees, and the `fly` clip is missing for all of
-    // it, so a dragon picked up in those first seconds hovered on the rig
-    // instead of taking wing.
-    this.load.once(Phaser.Loader.Events.COMPLETE, () => this.dressBreedClips(id));
-    // `load.start()` on an already-running loader is a no-op that would drop the
-    // queue on the floor; Phaser folds new files into the run instead.
-    if (!this.load.isLoading()) this.load.start();
+    this.loads.run(
+      () => {
+        for (const clipId of wanted) {
+          const clip = clipFor(id, clipId)!;
+          if (this.textures.exists(clipKey(id, clipId))) continue;
+          this.load.spritesheet(clipKey(id, clipId), clip.file, {
+            frameWidth: clip.frameWidth,
+            frameHeight: clip.frameHeight
+          });
+          this.residentClips.set(`${id}/${clipId}`, { breed: id, clip: clipId });
+        }
+      },
+      () => this.dressBreedClips(id)
+    );
   }
 
   /**
@@ -1336,6 +1332,24 @@ export class BoardScene extends Phaser.Scene {
   /** Resident sheets in LEAST-recently-needed order — a Map iterates in
    *  insertion order, and `touchClip` re-inserts, so this IS the LRU queue. */
   private residentClips = new Map<string, ClipRef>();
+
+  /**
+   * THE ONE DOOR onto this scene's loader (src/core/LoadQueue.ts).
+   *
+   * Four unrelated things fetch art here — the world's backdrop at a portal, a
+   * breed's clip sheets, the Elder's, and the dragon rigs — on four unrelated
+   * schedules: a portal tap, a merge, a dragon getting hungry, a scene boot.
+   * They share ONE LoaderPlugin, on which `start()` is a silent no-op while a
+   * run is in flight and COMPLETE is broadcast to every listener at once, so
+   * overlapping them hands each caller the other's callback. That is how travel
+   * came to hang under the veil: `fetchWorldArt` was told its files were
+   * resident by somebody else's run, or never told at all.
+   */
+  private loads = new LoadQueue({
+    isReady: () => this.load.isReady(),
+    once: (event, fn) => void this.load.once(event, fn),
+    start: () => this.load.start()
+  });
 
   /**
    * The clip character dressing this board dragon, respecting the worn
@@ -2307,9 +2321,14 @@ export class BoardScene extends Phaser.Scene {
     const before = this.dragonClipsAsked.size;
     this.fetchClips(art, clipLoadTiers(art, { lean: DRAGON_CLIPS.lean }).eager);
     if (this.dragonClipsAsked.size === before) return; // nothing new was asked for
-    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-      if (this.scene.isActive()) this.showAltarElder();
-    });
+    // Behind the fetch above rather than beside it: an empty batch completes at
+    // once, so this always runs after her sheets have had their turn.
+    this.loads.run(
+      () => {},
+      () => {
+        if (this.scene.isActive()) this.showAltarElder();
+      }
+    );
   }
 
   /**
@@ -5530,52 +5549,50 @@ export class BoardScene extends Phaser.Scene {
     // (standee sheets have no assets entry; ensureTextures skips them and the
     // spritesheet queue below carries them instead).
     const fetchable = wanted.filter((k) => !k.startsWith('rig:'));
-    // Spritesheets carry frame dimensions, so they cannot go through
-    // `ensureTextures` (which only knows about plain images) — queue them here
-    // and let that call start the single loader run for both.
-    let queued = 0;
-    for (const cfg of this.ctx.systems.characters.charactersIn(this.ctx.state.worldId)) {
-      // The wardrobe key (`art ?? id`) names both the bank and its files —
-      // Eleanor-at-home fetches Eleanor's own sheets.
-      const art = cfg.art ?? cfg.id;
-      // Her Align-Studio atlas clips travel with her banks — same door, same
-      // loader run, and worldArtKeys lists them for the matching eviction.
-      for (const [clipId, clip] of Object.entries(clipsFor(art))) {
-        if (this.textures.exists(clipKey(art, clipId))) continue;
-        this.load.spritesheet(clipKey(art, clipId), clip.file, {
-          frameWidth: clip.frameWidth,
-          frameHeight: clip.frameHeight
-        });
-        queued++;
-      }
-      const bank = STANDEE_BANKS[art];
-      if (!bank) continue;
-      for (const [name, key] of Object.entries(bank.keys)) {
-        if (this.textures.exists(key)) continue;
-        this.load.spritesheet(key, `sprites/${art}/world-${name}.webp`, {
-          frameWidth: bank.frameWidth,
-          frameHeight: bank.frameHeight
-        });
-        queued++;
-      }
-    }
-    if (queued === 0) {
-      // Nothing but (possibly) the backdrop: `ensureTextures` handles both the
-      // already-resident case and the fetch, and calls back either way.
-      ensureTextures(this, this.ctx, fetchable, onReady);
-      return;
-    }
-    // Sheets are already queued, so the callback has to hang off THIS loader run
-    // — handing the backdrop to `ensureTextures` would let it fire `onReady`
-    // synchronously when the backdrop happens to be resident, restarting the
-    // scene while the sheets were still in flight.
-    for (const key of fetchable) {
-      const entry = this.ctx.data.assets.images.find((e) => e.key === key);
-      if (this.textures.exists(key) || entry?.source !== 'file' || !entry.file) continue;
-      this.load.image(key, entry.file);
-    }
-    this.load.once(Phaser.Loader.Events.COMPLETE, onReady);
-    this.load.start();
+    // ONE batch through the one door, backdrop and sheets together — and the
+    // residency checks live INSIDE it, because the queue may hold this back
+    // behind a run in flight and what was missing then may be resident now.
+    //
+    // This used to be two paths, and the split was the bug: a world whose
+    // sheets were all resident took an `ensureTextures` shortcut that could
+    // fire `onReady` synchronously — restarting the scene on top of whatever
+    // else was mid-flight — while a world that needed sheets hung its callback
+    // on a run some other caller could finish first. `onReady` restarts the
+    // board, so being wrong about when the art is ready is a rebuilt board over
+    // open sky, or a veil that never lifts.
+    this.loads.run(
+      () => {
+        for (const cfg of this.ctx.systems.characters.charactersIn(this.ctx.state.worldId)) {
+          // The wardrobe key (`art ?? id`) names both the bank and its files —
+          // Eleanor-at-home fetches Eleanor's own sheets.
+          const art = cfg.art ?? cfg.id;
+          // Her Align-Studio atlas clips travel with her banks — same door,
+          // same run, and worldArtKeys lists them for the matching eviction.
+          for (const [clipId, clip] of Object.entries(clipsFor(art))) {
+            if (this.textures.exists(clipKey(art, clipId))) continue;
+            this.load.spritesheet(clipKey(art, clipId), clip.file, {
+              frameWidth: clip.frameWidth,
+              frameHeight: clip.frameHeight
+            });
+          }
+          const bank = STANDEE_BANKS[art];
+          if (!bank) continue;
+          for (const [name, key] of Object.entries(bank.keys)) {
+            if (this.textures.exists(key)) continue;
+            this.load.spritesheet(key, `sprites/${art}/world-${name}.webp`, {
+              frameWidth: bank.frameWidth,
+              frameHeight: bank.frameHeight
+            });
+          }
+        }
+        for (const key of fetchable) {
+          const entry = this.ctx.data.assets.images.find((e) => e.key === key);
+          if (this.textures.exists(key) || entry?.source !== 'file' || !entry.file) continue;
+          this.load.image(key, entry.file);
+        }
+      },
+      onReady
+    );
   }
 
   private subscribe(): void {

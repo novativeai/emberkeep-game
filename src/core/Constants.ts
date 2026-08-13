@@ -1417,6 +1417,18 @@ export const FINALE = {
  *  finale still running?" against this; it used to be the chapter card's cue. */
 export const FINALE_ENDS_MS = FINALE.elderAtMs + FINALE.elderHoldMs;
 
+/**
+ * How long the travelling curtain may stay up without the board saying it is
+ * ready before UIScene lifts it anyway and complains in the console.
+ *
+ * Generous on purpose: this is a floor under a failure, not a load budget. The
+ * destination's backdrop is one 2610×1632 image and the veil normally lifts in
+ * well under a second, so anything past twenty is a broken build rather than a
+ * slow one — and a board the player can see and poke at beats a black scrim
+ * they cannot dismiss.
+ */
+export const TRAVEL_VEIL_TIMEOUT_MS = 20_000;
+
 /** Portal FX height in world px — sized to Eleanor's standee, so a door reads
  *  as tall as the people who use it. The tap area is the FX's own bounds
  *  (PortalFX.hitSize), never a smaller rectangle inside the glow. */

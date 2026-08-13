@@ -17,6 +17,7 @@ import {
   SCENES,
   TILE_W,
   TIMINGS,
+  TRAVEL_VEIL_TIMEOUT_MS,
   UI_SCALE,
   WELCOME_BACK_MIN_MS
 } from '../core/Constants';
@@ -102,6 +103,8 @@ export class UIScene extends Phaser.Scene {
   private iapDialog: Phaser.GameObjects.Container | null = null;
   /** The travelling curtain, while a destination world's art loads. */
   private travelVeil?: Phaser.GameObjects.Container;
+  /** Lifts the veil if `world:ready` never arrives — see `showTravelVeil`. */
+  private travelWatchdog?: Phaser.Time.TimerEvent;
   private lastStep: TutorialStepEvent | null = null;
   /** Heart milestones banked while the tutorial owns the bubble (see playRegardBeats). */
   private pendingHearts: Array<{ characterId: string; hearts: number }> = [];
@@ -632,9 +635,26 @@ export class UIScene extends Phaser.Scene {
     c.setAlpha(0);
     this.tweens.add({ targets: c, alpha: 1, duration: 180, ease: 'Sine.easeOut' });
     this.travelVeil = c;
+    // A DEAD MAN'S SWITCH. The veil is interactive by design, so while it is up
+    // the player cannot touch anything — which makes it the one overlay that
+    // must never be able to outlive its cause. If `world:ready` has not come by
+    // now the board is either broken or unreachably slow, and a visible board
+    // the player can poke at beats a black screen they cannot leave. It says so
+    // in the console rather than failing silently, because a veil that lifts on
+    // its own would otherwise hide exactly the bug it is papering over.
+    this.travelWatchdog?.remove();
+    this.travelWatchdog = this.time.delayedCall(TRAVEL_VEIL_TIMEOUT_MS, () => {
+      if (!this.travelVeil) return;
+      console.warn(
+        `[travel] no world:ready for "${worldId}" after ${TRAVEL_VEIL_TIMEOUT_MS}ms — lifting the veil anyway`
+      );
+      this.hideTravelVeil();
+    });
   }
 
   private hideTravelVeil(): void {
+    this.travelWatchdog?.remove();
+    this.travelWatchdog = undefined;
     const veil = this.travelVeil;
     if (!veil) return;
     this.travelVeil = undefined;
