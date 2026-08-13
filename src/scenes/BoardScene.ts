@@ -2841,11 +2841,13 @@ export class BoardScene extends Phaser.Scene {
         anchor: { x: 0.5, y: 0 }
       };
       const baseY = y + (cal.offsetY + (d.dy ?? 0)) * ratio; // + free-move offset (Move tool)
+      const dispScale = cal.scale * ratio * (DECOR_SCALE[d.name] ?? 1);
       const sprite = this.add
-        .image(x + (cal.offsetX + (d.dx ?? 0)) * ratio, baseY, key)
+        .sprite(x + (cal.offsetX + (d.dx ?? 0)) * ratio, baseY, key)
         .setOrigin(cal.anchor.x, cal.anchor.y)
-        .setScale(cal.scale * ratio * (DECOR_SCALE[d.name] ?? 1))
+        .setScale(dispScale)
         .setDepth(DEPTHS.itemBase + y);
+      this.playDecorClip(sprite, d.name, cal, dispScale);
       // Ground shadow under the PROP, not under its cell.
       //
       // A prop is drawn at the cell PLUS its calibration offset PLUS the Move
@@ -2877,6 +2879,46 @@ export class BoardScene extends Phaser.Scene {
         );
       }
     });
+  }
+
+  /**
+   * A decor piece's staged loop — the cauldron's boil. The still texture is the
+   * clip's own base frame (the plate ships as both start and end image), so the
+   * swap is invisible: the animated sprite occupies exactly the rectangle the
+   * still did, and the still remains the fallback whenever the sheet is not
+   * resident (same degrade rule as the dragon clips — the art moved before the
+   * clips existed, so a missing sheet costs motion, never the pot).
+   *
+   * Registration is the 'decor' stage convention (characterAnims.ts): clip
+   * scale is STILL px per atlas px, dx/dy the frame's top-left in still px.
+   * The anchor must land on the same world point either way, so the origin is
+   * the anchor's still-px position mapped into the frame.
+   */
+  private playDecorClip(
+    sprite: Phaser.GameObjects.Sprite,
+    name: string,
+    cal: { anchor: { x: number; y: number } },
+    dispScale: number
+  ): void {
+    const clip = clipFor(name, 'boil');
+    const key = clipKey(name, 'boil');
+    if (!clip || !this.textures.exists(key)) return;
+    const still = this.textures.get(`decor_${name}`).getSourceImage() as HTMLImageElement;
+    if (!this.anims.exists(key)) {
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+        frameRate: clip.fps,
+        repeat: -1
+      });
+    }
+    sprite.setTexture(key, 0);
+    sprite.setScale(dispScale * clip.scale);
+    sprite.setOrigin(
+      (cal.anchor.x * still.width - clip.dx) / clip.scale / clip.frameWidth,
+      (cal.anchor.y * still.height - clip.dy) / clip.scale / clip.frameHeight
+    );
+    sprite.play(key);
   }
 
   /**

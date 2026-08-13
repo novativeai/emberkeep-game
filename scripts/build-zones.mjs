@@ -698,9 +698,15 @@ const DECOR = {
       fromEditorAsset: 'pink_cauldron',
       // Measured on the art itself and NOT the editor's business: the
       // horizontal centre of the foot ring, and the height of the two side feet
-      // (in a 2:1 iso view the side feet sit at the contact ellipse's vertical
-      // centre, the front foot at its bottom).
-      anchor: { x: 0.5, y: 0.845 }
+      // (the side feet sit at the contact ellipse's vertical centre, the front
+      // foot at its bottom). The current art is the Runevault witch's pot at the
+      // plaza's own ~40-degree camera (assets/raw/decor-sets/cauldron/), whose
+      // swing handle hangs wide to the LEFT of the belly — which is why the
+      // foot-ring centre sits at 0.543 of the alpha box, not 0.5 — measure the
+      // TOE TIPS off the bottom profile, not the belly span, which the lid's
+      // overhang drags right. Re-measure
+      // with the same alpha-box pass whenever this art changes.
+      anchor: { x: 0.543, y: 0.889 }
     }
   ]
 };
