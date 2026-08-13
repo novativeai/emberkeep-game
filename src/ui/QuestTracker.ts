@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { GAME_WIDTH, IS_MOBILE, num, PALETTE, UI_SCALE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
-import type { QuestConfig, QuestStepConfig } from '../core/types';
+import type { QuestConfig, QuestStepConfig, SpeakerId } from '../core/types';
 import type { QuestSystem } from '../systems/QuestSystem';
 import { uiRegistry } from './theme';
 
@@ -56,6 +56,14 @@ const VIEW_W = 900;
 
 /** Gap between a row's label and its `n/target` counter. */
 const COUNT_GAP = 14;
+
+/** The track arrow — the small round button left of the main line that cycles
+ *  the readout between quest-GIVERS (Eleanor ⇄ the woken Golden Elder). Radius
+ *  of the painted plate and of its (larger) hit circle, in local units. */
+const SWITCH_R = 26;
+const SWITCH_HIT_R = 42;
+/** Gap between the main line's left edge and the arrow's centre. */
+const SWITCH_GAP = 48;
 
 /** Strike-through baseline, measured from a row's top. */
 const STRIKE_Y = 18;
@@ -131,6 +139,13 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   private tasksVisible = false;
   private readonly offBus: Array<() => void> = [];
 
+  /** Which of `QuestSystem.giversHere` the readout is showing. An INDEX, not an
+   *  id: when a track retires (the Elder's twelfth quest done) the modulo in
+   *  `viewGiver` folds the view back onto a live one without special-casing. */
+  private giverIdx = 0;
+  private switchBtn!: Phaser.GameObjects.Container;
+  private switchGlyph!: Phaser.GameObjects.Text;
+
   constructor(
     scene: Phaser.Scene,
     bus: EventBus,
@@ -171,7 +186,32 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.listMask = scene.make.graphics();
     this.rowsGroup.setMask(this.listMask.createGeometryMask());
 
-    this.add([this.mainGroup, this.listViewport]);
+    // ---- Track arrow: cycles the readout between givers, hidden while there
+    // is only one. Small and quiet by design (a HUD accessory, not a panel
+    // control), but its hit circle is half again the painted plate.
+    this.switchBtn = scene.add.container(0, 0);
+    const plate = scene.add.graphics();
+    plate.fillStyle(num(PALETTE.night), 0.38);
+    plate.fillCircle(0, 0, SWITCH_R);
+    plate.lineStyle(3, num(PALETTE.goldAccent), 0.9);
+    plate.strokeCircle(0, 0, SWITCH_R);
+    this.switchGlyph = scene.add
+      .text(1, 0, '❯', {
+        fontFamily: FONT.ui,
+        fontSize: '28px',
+        fontStyle: 'bold',
+        color: PALETTE.cream
+      })
+      .setOrigin(0.5);
+    this.switchBtn.add([plate, this.switchGlyph]);
+    this.switchBtn.setInteractive(
+      new Phaser.Geom.Circle(0, 0, SWITCH_HIT_R),
+      Phaser.Geom.Circle.Contains
+    );
+    this.switchBtn.on('pointerup', () => this.cycleGiver());
+    this.switchBtn.setVisible(false);
+
+    this.add([this.mainGroup, this.listViewport, this.switchBtn]);
     scene.add.existing(this);
 
     // Scroll input is scene-level and BOUNDS-TESTED rather than an interactive
@@ -187,7 +227,8 @@ export class QuestTracker extends Phaser.GameObjects.Container {
 
     uiRegistry.register(scene, 'hud.quests', 'Quest tracker', 'HUD', this, {
       mainTitle: this.mainTitle,
-      mainProgress: this.mainProgress
+      mainProgress: this.mainProgress,
+      trackArrow: this.switchGlyph
     });
 
     this.refreshMain();
@@ -277,21 +318,68 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.mainGroup.setVisible(this.storyVisible);
     this.listViewport.setVisible(this.tasksVisible);
     this.setVisible(this.storyVisible || this.tasksVisible);
+    this.updateSwitch();
     this.seatMask();
+  }
+
+  // -------------------------------------------------------------- giver view
+
+  /** The giver whose track the readout is on. Folds onto a live track whenever
+   *  the roster shrank underneath the index (a track finished, or the player
+   *  crossed to a world with different givers). */
+  private viewGiver(): SpeakerId | null {
+    const givers = this.quests.giversHere;
+    if (!givers.length) return null;
+    this.giverIdx %= givers.length;
+    return givers[this.giverIdx] ?? null;
+  }
+
+  private viewQuest(): QuestConfig | null {
+    const giver = this.viewGiver();
+    return giver ? this.quests.activeQuestFor(giver) : null;
+  }
+
+  /** Flip to the next giver's track. A view switch is instant — the rows leave
+   *  without a completion beat, because nothing completed. */
+  private cycleGiver(): void {
+    const givers = this.quests.giversHere;
+    if (givers.length < 2 || this.mainRetiring) return;
+    this.giverIdx = (this.giverIdx + 1) % givers.length;
+    for (const row of this.rows) row.root.destroy();
+    this.rows = [];
+    this.scrollY = 0;
+    this.rowsGroup.setY(0);
+    this.mainStrike.clear();
+    this.refreshMain();
+    this.syncRows();
+    this.scene.tweens.add({
+      targets: this.switchBtn,
+      scale: { from: 0.82, to: 1 },
+      duration: 180,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  /** The arrow exists only while there is a page to turn. */
+  private updateSwitch(): void {
+    this.switchBtn.setVisible(this.storyVisible && this.quests.giversHere.length > 1);
   }
 
   // ---------------------------------------------------------------- main line
 
   private refreshMain(): void {
+    this.updateSwitch();
     if (this.mainRetiring) return;
-    const quest = this.quests.activeQuest;
+    const quest = this.viewQuest();
     this.shownQuest = quest;
     if (!quest) {
       this.mainTitle.setText('');
       this.mainProgress.setText('');
       return;
     }
-    this.mainTitle.setText(this.quests.titleFor(quest));
+    // The Elder's asks wear his mark, so a glance says whose page is open.
+    const prefix = quest.giver === 'golden_elder' ? '✦ ' : '';
+    this.mainTitle.setText(prefix + this.quests.titleFor(quest));
     // A multi-step quest counts its steps; a one-step quest (the endless Ledger
     // tail) would only ever read "0 / 1", so it shows that step's own item
     // progress instead — the same number the Ledger's order card shows.
@@ -313,6 +401,11 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.mainProgress.setX(0);
     this.mainTitle.setX(-(this.mainProgress.width + COUNT_GAP));
     this.mainGroup.setScale(this.fitScale(this.mainWidth()));
+    // The arrow rides the main line's left edge, wherever the text ends.
+    this.switchBtn.setPosition(
+      -(this.mainWidth() * this.mainGroup.scaleX) - SWITCH_GAP,
+      MAIN_TITLE_Y + 24
+    );
   }
 
   /** Combined width of the main line, in its own unscaled units. */
@@ -366,7 +459,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
    *  add what just unlocked, and repaint the counters on the rest. */
   private syncRows(): void {
     if (!this.tasksVisible) return;
-    const quest = this.quests.activeQuest;
+    const quest = this.viewQuest();
 
     // The ladder moved on: the old quest's steps are all done by definition, so
     // they play their completion beat rather than vanishing.

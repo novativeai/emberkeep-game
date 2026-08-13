@@ -1044,10 +1044,28 @@ export function auditLegendaryArc(data: AuditData): Finding[] {
   }
 
   // Rules 3–5 — how many, how spaced, and where the arc ends.
-  const ladder = questsIn(data);
-  const completable = ladder.filter((q) => q.steps.some((step) => step.goal.kind !== 'active_order'));
+  //
+  // Measured over the ARC-GIVER's own ladder, not the whole world's: a world
+  // can host a second quest-giver whose track runs past the finale (the woken
+  // Golden Elder's twelve), and rule 5's "the zone ends on the hatch" is about
+  // the ladder that TELLS the dragon's story — appending another giver's
+  // post-game track must not read as the arc trailing off. One giver per arc is
+  // asserted first, because eggs split across two tracks would let the spacing
+  // rules pass on each half while the player experiences the interleaving.
+  const worldLadder = questsIn(data);
   const paysEgg = (q: QuestConfig): number =>
     q.rewards?.spawn?.chain === legendary.id ? q.rewards.spawn.count : 0;
+  const eggGivers = [...new Set(worldLadder.filter((q) => paysEgg(q) > 0).map((q) => q.giver))];
+  if (eggGivers.length > 1) {
+    findings.push({
+      severity: 'error',
+      at,
+      message: `${legendary.name} eggs are paid by ${eggGivers.length} different givers (${eggGivers.join(', ')}) — one ladder tells a dragon's story`
+    });
+    return findings;
+  }
+  const ladder = eggGivers.length ? worldLadder.filter((q) => q.giver === eggGivers[0]) : worldLadder;
+  const completable = ladder.filter((q) => q.steps.some((step) => step.goal.kind !== 'active_order'));
   const eggAt = completable
     .map((q, i) => ({ q, i, n: paysEgg(q) }))
     .filter((e) => e.n > 0);

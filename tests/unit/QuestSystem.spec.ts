@@ -158,6 +158,44 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
   });
 });
 
+describe("two givers on one board — the Golden Elder's track", () => {
+  it('is dormant until keepers_hoard wakes him: not tracked, and never pre-latched', () => {
+    const ctx = createTestContext();
+    expect(ctx.systems.quests.giversHere).toEqual(['eleanor']);
+    expect(ctx.systems.quests.activeQuestFor('golden_elder')).toBeNull();
+
+    // A board that satisfies his first ask, long before he wakes…
+    place(ctx, 'quartz', 2, 2);
+    expect(ctx.state.stat('q:elder_stones')).toBe(0);
+    // …and the wake must not inherit that stale board either.
+    for (const item of ctx.state.itemsMatching('quartz', 2)) ctx.state.removeItem(item.id);
+
+    ctx.state.addStat('q:done:keepers_hoard', 1);
+    ctx.bus.emit('economy:changed', { coins: 0, keys: 0, xp: 0, level: 1 });
+
+    expect(ctx.systems.quests.giversHere).toEqual(['eleanor', 'golden_elder']);
+    expect(ctx.systems.quests.activeQuestFor('golden_elder')!.id).toBe('elder_seeing_stones');
+    expect(ctx.state.stat('q:elder_stones')).toBe(0);
+    // Eleanor's own pointer is untouched by his arrival.
+    expect(ctx.systems.quests.activeQuest!.id).toBe('rekindle_brazier');
+  });
+
+  it('announces each track separately, naming the giver, and advances his ladder independently', () => {
+    const ctx = createTestContext();
+    const advanced = capture(ctx.bus, 'quest:advanced');
+    ctx.state.addStat('q:done:keepers_hoard', 1);
+    ctx.bus.emit('economy:changed', { coins: 0, keys: 0, xp: 0, level: 1 });
+
+    const elder = advanced.find((a) => a.giver === 'golden_elder')!;
+    expect(elder).toMatchObject({ questId: 'elder_seeing_stones', index: 1, total: 12 });
+
+    place(ctx, 'quartz', 2, 2); // his first ask — Eleanor's ladder wants none of it
+    const after = advanced.filter((a) => a.giver === 'golden_elder').at(-1)!;
+    expect(after.questId).toBe('elder_green_over_ash');
+    expect(ctx.systems.quests.activeQuest!.id).toBe('rekindle_brazier');
+  });
+});
+
 describe('quest rewards — the legendary egg arrives, once, and cannot be lost', () => {
   /** Drive the first Emberkeep egg quest (`raise_the_roofs`) to completion:
    *  its single step is holding 2 Houses. */

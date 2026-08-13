@@ -1419,12 +1419,42 @@ export const FINALE = {
   awakenAtMs: 2000, // …where the Golden Egg cracks: the Elder AWAKENS
   elderAtMs: 3200, // she speaks — her first words in the whole game
   returnAtMs: 6000, // camera returns to the player's zone while she finishes
-  elderHoldMs: 5200 // her line holds, then play simply continues
+  /** Her whole speech — now TWO lines, the budget split between them by
+   *  reading length (UIScene.runFinaleUi) — then play simply continues. */
+  elderHoldMs: 9000
 } as const;
+
+/**
+ * Hard cap for any single line in `dialogue.json` — a bubble is one breath,
+ * not a paragraph, and past this length the card grows tall enough to crowd
+ * the board. A longer speech is authored as an ARRAY of lines (a tap-advanced
+ * sequence, or the finale's chained says). Enforced by
+ * `tests/unit/Dialogue.spec.ts`, so an over-long line fails the build rather
+ * than shipping as a wall of text.
+ */
+export const DIALOGUE_MAX_CHARS = 190;
 
 /** When the finale is over — her line's last frame. Both scenes measure "is the
  *  finale still running?" against this; it used to be the chapter card's cue. */
 export const FINALE_ENDS_MS = FINALE.elderAtMs + FINALE.elderHoldMs;
+
+/**
+ * The Golden Elder's quest voice (dialogue.json `elder`), timed around the
+ * beats that surround it: his greeting waits out the Gate ceremony's portal
+ * bloom; a next ask waits for the previous quest's done line to finish; the
+ * once-per-session reminder waits out the welcome-back banner.
+ */
+export const ELDER_VOICE = {
+  /** After `gate:opened` — the portal bloom (~2s) lands first. */
+  greetingDelayMs: 3200,
+  /** After a quest's done line (held `doneHoldMs`) — the next ask follows it. */
+  nextAskDelayMs: 5400,
+  /** After `state:loaded`, once per session, he restates his current ask. */
+  reminderDelayMs: 9000,
+  askHoldMs: 5600,
+  doneHoldMs: 4600,
+  allDoneHoldMs: 7200
+} as const;
 
 /** Portal FX height in world px — sized to Eleanor's standee, so a door reads
  *  as tall as the people who use it. The tap area is the FX's own bounds

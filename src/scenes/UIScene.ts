@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
   ATMOSPHERE,
+  ELDER_VOICE,
   ENERGY_REGEN_MS,
   FINALE,
   FINALE_ENDS_MS,
@@ -18,7 +19,8 @@ import {
   TILE_W,
   TIMINGS,
   UI_SCALE,
-  WELCOME_BACK_MIN_MS
+  WELCOME_BACK_MIN_MS,
+  WORLD_ID
 } from '../core/Constants';
 import { FONT } from '../art/design';
 import { iapBridge } from '../core/iapBridge';
@@ -502,6 +504,20 @@ export class UIScene extends Phaser.Scene {
         // The Golden Elder's awakening — UIScene runs her voice, BoardScene the
         // camera and the egg, both off this one beat.
         if (questId === GOLDEN_ALTAR.awakenQuestId) this.time.delayedCall(0, () => this.runFinaleUi());
+        this.onElderQuestCompleted(questId);
+      }),
+      // The Elder's track moving to its next ask. His FIRST quest is announced
+      // by the Gate ceremony instead (runFinaleUi → playElderGreeting), because
+      // this event fires synchronously inside the very evaluate() that
+      // completes `keepers_hoard` — before the finale has even claimed the
+      // stage.
+      bus.on('quest:advanced', ({ questId, giver, index }) => {
+        if (giver !== 'golden_elder' || index === 1) return;
+        const line = this.elderLine(questId, 'start');
+        if (!line) return;
+        this.time.delayedCall(ELDER_VOICE.nextAskDelayMs, () =>
+          this.bubble.say('golden_elder', line, ELDER_VOICE.askHoldMs)
+        );
       }),
       bus.on('tasks:all_complete', () => this.celebrateTasksComplete()),
       bus.on('energy:changed', ({ current }) => {
@@ -526,6 +542,10 @@ export class UIScene extends Phaser.Scene {
         this.maybeWelcomeBack(offlineMs, energyRecovered);
         // A returning save may already hold a ready 2→1 pair.
         this.time.delayedCall(2500, () => this.checkRecipeHints());
+        // Once per session the Elder restates his current ask: a reload can
+        // land anywhere in his ladder, and quest:advanced never re-fires on
+        // load (the re-derive is silent by design).
+        this.time.delayedCall(ELDER_VOICE.reminderDelayMs, () => this.remindElderAsk());
       }),
       bus.on('tutorial:step', (step) => {
         // Appears for its tutorial introduction, then permanently post-tutorial.
@@ -846,15 +866,24 @@ export class UIScene extends Phaser.Scene {
     this.shop.requestClose();
     this.cookbook.requestClose();
     this.time.delayedCall(FINALE.elderAtMs, () => {
-      // No egg earned (Order 1 skipped)? Her line reads as PROPHECY — selling
+      // No egg earned (Order 1 skipped)? Her speech reads as PROPHECY — selling
       // the promise the player hasn't collected yet, never claiming an
       // awakening that didn't happen.
       const eggEarned = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
-      this.bubble.say(
-        'golden_elder',
-        eggEarned ? this.ctx.data.dialogue.finaleElder : this.ctx.data.dialogue.finaleElderProphecy,
-        FINALE.elderHoldMs
-      );
+      const lines = eggEarned
+        ? this.ctx.data.dialogue.finaleElder
+        : this.ctx.data.dialogue.finaleElderProphecy;
+      // The speech is LINES under DIALOGUE_MAX_CHARS, chained: elderHoldMs is
+      // split between them by reading length, so the finale still ends exactly
+      // on FINALE_ENDS_MS whatever the wording — the ceremony that rides its
+      // tail never moves.
+      const total = lines.reduce((a, l) => a + l.length, 0) || 1;
+      let at = 0;
+      for (const line of lines) {
+        const hold = Math.round(FINALE.elderHoldMs * (line.length / total));
+        this.time.delayedCall(at, () => this.bubble.say('golden_elder', line, hold));
+        at += hold;
+      }
     });
     // The stage is released when her line does, not when a panel is dismissed.
     this.time.delayedCall(FINALE_ENDS_MS, () => {
@@ -867,14 +896,64 @@ export class UIScene extends Phaser.Scene {
       const beats = this.ctx.data.dialogue.gateOpens;
       if (beats?.lines.length) {
         this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
-          this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () =>
-            this.ctx.bus.emit('gate:opened', {})
-          );
+          this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () => {
+            this.ctx.bus.emit('gate:opened', {});
+            // The Elder's quest-giving begins on the ceremony's tail: the
+            // portal blooms, and then HE speaks — greeting, then his first ask.
+            this.time.delayedCall(ELDER_VOICE.greetingDelayMs, () => this.playElderGreeting());
+          });
         });
       } else {
         this.ctx.bus.emit('gate:opened', {});
+        this.time.delayedCall(ELDER_VOICE.greetingDelayMs, () => this.playElderGreeting());
       }
     });
+  }
+
+  // --------------------------------------------------- the Elder's quest voice
+
+  private elderLine(questId: string, which: 'start' | 'done'): string | undefined {
+    return this.ctx.data.dialogue.elder?.quests[questId]?.[which];
+  }
+
+  /** The one-time introduction of his track — three tap-advanced lines (the
+   *  last teaches the tracker's track arrow), then his first ask. */
+  private playElderGreeting(): void {
+    const elder = this.ctx.data.dialogue.elder;
+    const first = this.ctx.systems.quests.activeQuestFor('golden_elder');
+    if (!elder?.greeting.length || !first) return;
+    this.bubble.sequence('golden_elder', elder.greeting, () => {
+      const line = this.elderLine(first.id, 'start');
+      if (line) {
+        this.time.delayedCall(900, () => this.bubble.say('golden_elder', line, ELDER_VOICE.askHoldMs));
+      }
+    });
+  }
+
+  /** His completion beat: the quest's done line — or, when the twelfth closes
+   *  his whole watch, the arc's own farewell instead. */
+  private onElderQuestCompleted(questId: string): void {
+    const quest = this.ctx.systems.quests.all.find((q) => q.id === questId);
+    if (quest?.giver !== 'golden_elder') return;
+    // He does not shout across worlds: a level quest can latch while the player
+    // stands in Borealis, and the catch-up `quest:advanced` on returning home
+    // re-states his next ask anyway.
+    if (this.ctx.state.worldId !== WORLD_ID) return;
+    const next = this.ctx.systems.quests.activeQuestFor('golden_elder');
+    const line = next ? this.elderLine(questId, 'done') : this.ctx.data.dialogue.elder?.allDone;
+    if (!line) return;
+    this.time.delayedCall(600, () =>
+      this.bubble.say('golden_elder', line, next ? ELDER_VOICE.doneHoldMs : ELDER_VOICE.allDoneHoldMs)
+    );
+  }
+
+  /** The once-per-session restatement of his current ask (state:loaded). */
+  private remindElderAsk(): void {
+    if (!this.ctx.state.tutorialDone || this.finaleActive) return;
+    if (this.ctx.state.worldId !== WORLD_ID) return;
+    const quest = this.ctx.systems.quests.activeQuestFor('golden_elder');
+    const line = quest ? this.elderLine(quest.id, 'start') : undefined;
+    if (line) this.bubble.say('golden_elder', line, ELDER_VOICE.askHoldMs);
   }
 
   /** Order completion — the demo's primary reward beat — now celebrates at

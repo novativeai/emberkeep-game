@@ -9,7 +9,8 @@ import type {
   QuestConfig,
   QuestGoal,
   QuestStepConfig,
-  QuestsData
+  QuestsData,
+  SpeakerId
 } from '../core/types';
 import type { OrderSystem } from './OrderSystem';
 import type { TaskSystem } from './TaskSystem';
@@ -105,7 +106,9 @@ export class QuestSystem {
     'regard:changed'
   ] as const;
 
-  private lastAnnounced: string | null = null;
+  /** Per GIVER — two people can hand out quests on one board (Eleanor and the
+   *  woken Elder), and each track announces its own advances. */
+  private lastAnnounced = new Map<SpeakerId, string>();
 
   constructor(
     private state: GameState,
@@ -122,7 +125,7 @@ export class QuestSystem {
     // three must not replay two quests' worth of completion beats.
     bus.on('state:loaded', () => this.evaluate(false));
     bus.on('game:reset', () => {
-      this.lastAnnounced = null;
+      this.lastAnnounced.clear();
     });
   }
 
@@ -144,17 +147,56 @@ export class QuestSystem {
     return this.quests.quests.filter((q) => (q.world ?? WORLD_ID) === this.state.worldId);
   }
 
-  /** The quest the HUD tracks: the first one in THIS world not finished. The
-   *  authored world's ladder ends in the endless Ledger tail, so it is never
-   *  null there; a world with no ladder yet returns null and the HUD stays
-   *  empty rather than showing another world's business. */
+  /** The quest the HUD tracks by default: the first LIVE one in THIS world not
+   *  finished. The authored world's ladder ends in the endless Ledger tail, so
+   *  it is never null there; a world with no ladder yet returns null and the
+   *  HUD stays empty rather than showing another world's business. */
   get activeQuest(): QuestConfig | null {
-    return this.tracked.find((q) => !this.isComplete(q)) ?? null;
+    return this.tracked.find((q) => !this.questLocked(q) && !this.isComplete(q)) ?? null;
   }
 
-  /** Its 1-based position within its own world's ladder. */
+  /**
+   * A quest whose `lockedUntil.quest` gate has not flipped is DORMANT: not
+   * latched, not completed, not announced, invisible to the HUD. The gate reads
+   * the same `q:done:<id>` latch the ladder itself writes, so it is derived
+   * state and survives reloads for free.
+   */
+  questLocked(quest: QuestConfig): boolean {
+    const gate = quest.lockedUntil?.quest;
+    return !!gate && this.state.stat(latchKey(`done:${gate}`)) === 0;
+  }
+
+  /**
+   * The givers with a LIVE track on this board, in ladder (file) order — the
+   * roster the tracker's track arrow cycles through. A giver is live once any
+   * of their quests is unlocked and unfinished: Eleanor is always here (her
+   * ladder ends in the endless tail), the Elder joins when `keepers_hoard`
+   * wakes him and leaves when his twelfth quest is done.
+   */
+  get giversHere(): SpeakerId[] {
+    const seen: SpeakerId[] = [];
+    for (const quest of this.tracked) {
+      if (seen.includes(quest.giver)) continue;
+      if (!this.questLocked(quest) && !this.isComplete(quest)) seen.push(quest.giver);
+    }
+    return seen;
+  }
+
+  /** One giver's ladder in this world, dormant quests included (positions are
+   *  authored; a locked quest is still rung N of the ladder it belongs to). */
+  trackedFor(giver: SpeakerId): QuestConfig[] {
+    return this.tracked.filter((q) => q.giver === giver);
+  }
+
+  /** The quest a giver's own track is on — what the HUD shows when the player
+   *  has switched the tracker to that giver. */
+  activeQuestFor(giver: SpeakerId): QuestConfig | null {
+    return this.trackedFor(giver).find((q) => !this.questLocked(q) && !this.isComplete(q)) ?? null;
+  }
+
+  /** Its 1-based position within its own GIVER's ladder in this world. */
   indexOf(quest: QuestConfig): number {
-    return this.tracked.findIndex((q) => q.id === quest.id) + 1;
+    return this.trackedFor(quest.giver).findIndex((q) => q.id === quest.id) + 1;
   }
 
   /** The quest's title — the endless tail borrows the live order's. */
@@ -237,6 +279,9 @@ export class QuestSystem {
 
   private evaluate(announce: boolean): void {
     for (const quest of this.quests.quests) {
+      // A dormant quest is deaf: its steps must not latch off board state that
+      // happens to satisfy them while its giver is still asleep.
+      if (this.questLocked(quest)) continue;
       for (const step of quest.steps) {
         if (this.state.stat(latchKey(step.id)) > 0) continue;
         if (!this.meets(step.goal)) continue;
@@ -259,15 +304,21 @@ export class QuestSystem {
         if (announce) this.bus.emit('quest:completed', { questId: quest.id });
       }
     }
-    const active = this.activeQuest;
-    if (active && active.id !== this.lastAnnounced) {
-      this.lastAnnounced = active.id;
-      if (announce) {
-        this.bus.emit('quest:advanced', {
-          questId: active.id,
-          index: this.indexOf(active),
-          total: this.tracked.length
-        });
+    // Each giver's track announces its own pointer moves — the Elder starting
+    // his first quest must not wait for (or interfere with) wherever Eleanor's
+    // ladder happens to be.
+    for (const giver of this.giversHere) {
+      const active = this.activeQuestFor(giver);
+      if (active && active.id !== this.lastAnnounced.get(giver)) {
+        this.lastAnnounced.set(giver, active.id);
+        if (announce) {
+          this.bus.emit('quest:advanced', {
+            questId: active.id,
+            giver,
+            index: this.indexOf(active),
+            total: this.trackedFor(giver).length
+          });
+        }
       }
     }
   }

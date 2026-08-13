@@ -310,12 +310,14 @@ export interface DialogueData {
   arrivals?: Record<string, StoryChapterConfig>;
   /** Golden Egg tap flavor, keyed by XP progress toward the Level-3 finale. */
   goldenEgg: { early: string[]; mid: string[]; near: string[] };
-  /** The Golden Elder's first spoken line in the whole game — the finale beat.
-   *  She is silent until she wakes, which is what makes it land. */
-  finaleElder: string;
+  /** The Golden Elder's first spoken words in the whole game — the finale
+   *  beat. She is silent until she wakes, which is what makes it land. LINES,
+   *  not a line: the speech is chained across FINALE.elderHoldMs, each bubble
+   *  under DIALOGUE_MAX_CHARS. */
+  finaleElder: string[];
   /** Finale variant when the Golden Egg was never earned (Order 1 skipped) —
    *  reads as PROPHECY, pointing the player back to the un-filled promise. */
-  finaleElderProphecy: string;
+  finaleElderProphecy: string[];
   /** Eleanor's banner quote the moment the egg materialises on the altar. */
   goldenArrival: string;
   /** Eleanor speaks the North Crossing open, right after the finale hands the
@@ -347,6 +349,19 @@ export interface DialogueData {
   };
   /** Eleanor's line when all Keeper's Tasks complete. */
   tasksComplete: string;
+  /**
+   * The Golden Elder as a QUEST-GIVER — everything he says once awake. The
+   * greeting plays once, right after the Gate ceremony hands the board back
+   * (its last line teaches the tracker's track arrow); each quest has a start
+   * line (the ask, in his voice) and a done line (the payoff); `allDone` closes
+   * the whole twelve-quest watch. Keyed by quest id so a ladder edit and its
+   * lines move together.
+   */
+  elder: {
+    greeting: string[];
+    quests: Record<string, { start: string; done: string }>;
+    allDone: string;
+  };
   /** The five-hearts banks, keyed by character id (`eleanor`, `selyna`). */
   regard?: Record<string, RegardDialogue>;
 }
@@ -626,6 +641,17 @@ export interface QuestConfig {
    */
   world?: string;
   giver: SpeakerId;
+  /**
+   * The whole QUEST is dormant until another quest's done-latch flips
+   * (`q:done:<id>` in stats). Distinct from a step's `lockedUntil`: a locked
+   * step still belongs to a live quest, whereas a locked quest is not tracked,
+   * not latched and not announced — its giver does not exist yet as far as the
+   * HUD is concerned. This is what keeps the Golden Elder's ladder from
+   * pre-completing during Eleanor's: steps latch wherever they are met, so
+   * without the gate his "hold two Gold Pouches" would silently latch weeks
+   * before he wakes.
+   */
+  lockedUntil?: { quest?: string };
   /** HUD title. Omitted only by the endless tail, which borrows the live
    *  order's title. */
   title?: string;
@@ -1406,7 +1432,7 @@ export interface EventMap {
    *  quest takes the HUD. */
   'quest:completed': { questId: string };
   /** The tracked quest changed (advance, or a load landing mid-ladder). */
-  'quest:advanced': { questId: string; index: number; total: number };
+  'quest:advanced': { questId: string; giver: SpeakerId; index: number; total: number };
   'order:completed': { orderId: string; rewards: { coins: number; keys: number; xp?: number } };
   'order:all_done': Record<string, never>;
   /**

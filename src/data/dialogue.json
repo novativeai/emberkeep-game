@@ -47,8 +47,14 @@
       "The gold burns bright — she is almost awake!"
     ]
   },
-  "finaleElder": "…Keeper. I have slept an age, and I woke to YOUR hands. So hear it from the only one still living who SAW: the Great Flame did not die. It was TAKEN. And it was carried NORTH. There is a woman on that ice who kept a light burning while the rest of us slept — she will not be glad to see you. Go anyway.",
-  "finaleElderProphecy": "…Keeper. I stir, but I do not rise — the altar is still cold, and Eleanor's first request goes unanswered. Finish it, and I will tell you what no one else living can: the Great Flame did not die. It was TAKEN.",
+  "finaleElder": [
+    "…Keeper. I have slept an age, and I woke to YOUR hands. So hear it from the only one still living who SAW: the Great Flame did not die. It was TAKEN. And it was carried NORTH.",
+    "There is a woman on that ice who kept a light burning while the rest of us slept — she will not be glad to see you. Go anyway."
+  ],
+  "finaleElderProphecy": [
+    "…Keeper. I stir, but I do not rise — the altar is still cold, and Eleanor's first request goes unanswered.",
+    "Finish it, and I will tell you what no one else living can: the Great Flame did not die. It was TAKEN."
+  ],
   "goldenArrival": "“The old altar ANSWERS you, Keeper. So the stories about that egg were true.” — Eleanor",
   "gateOpens": {
     "speaker": "eleanor",
@@ -94,6 +100,64 @@
     "houseCommission": "A House is a workshop, Keeper — pick ONE thing from your bag and it will make that, and only that, forever. Want a second? Build a second House."
   },
   "tasksComplete": "“Every task, done. The Keep hasn't been this warm in an age… you've earned your rest, Keeper.” — Eleanor",
+  "elder": {
+    "greeting": [
+      "You stayed. Good. An age of sleep teaches patience — sixty years of ash teach who is worth waking for.",
+      "Eleanor keeps her ledger. I keep something older: the MEASURE of a Keeper. From today, my asks stand beside hers.",
+      "Look to your quests, top right — the small arrow beside them turns the page between her work and mine. Begin."
+    ],
+    "quests": {
+      "elder_seeing_stones": {
+        "start": "First, eyes. Cut me two crystals from the old quartz — I have slept an age, and I would SEE this isle again.",
+        "done": "Clear. Sharp. The isle looks smaller than I remember, and better kept."
+      },
+      "elder_green_over_ash": {
+        "start": "The ash took the green first. Bale the moss that dares grow back — two bales, Keeper. Proof the ground forgives.",
+        "done": "Green over ash. The oldest trade there is."
+      },
+      "elder_old_forest": {
+        "start": "Before the court, before even the flame — the firs. Grow two tall again, and the wind will have something to speak through.",
+        "done": "They creak the way the old ones did. Close enough that I stopped to listen."
+      },
+      "elder_kindle_brood": {
+        "start": "One dragon is a survivor. TWO are a brood. Raise a second Red Dragon, and the sky starts owing us again.",
+        "done": "Two fires in the air at once. I had forgotten how that sounds."
+      },
+      "elder_gold_in_hand": {
+        "start": "Gold is patience made metal. Do not spend what the houses mint — HOLD it. Two full pouches, untouched.",
+        "done": "You can hold gold without spending it. Rarer than any dragon, that."
+      },
+      "elder_grow_keeper": {
+        "start": "Enough errands. Grow, Keeper — reach the fourth rank, and the land past the old fence will answer you.",
+        "done": "The fourth rank. The ground felt it — more of the isle stands open to you now."
+      },
+      "elder_berry_mother": {
+        "start": "The berry line fed the court through the last winter of the age. Grow two mother plants — we will want winters' worth.",
+        "done": "The line endures. Sweetness is also a supply, Keeper. The court knew it."
+      },
+      "elder_cold_light": {
+        "start": "Eleanor catches the moon's water; I ask for the step before the miracle. Three vials of dew, cold and honest.",
+        "done": "Cold and honest. She will make wonders of these — that is HER craft, and it deserves feeding."
+      },
+      "elder_far_sight": {
+        "start": "Now the far-sight. A full Crystal Ball, Keeper — I would look NORTH, where the Flame was carried.",
+        "done": "…Ice. A shore. A woman who does not sleep. It is as I told you — the north keeps what we lost."
+      },
+      "elder_rise_higher": {
+        "start": "Higher, Keeper. The fifth rank. The last of the fenced land waits on it — and so, in my way, do I.",
+        "done": "The fifth rank, and the isle whole beneath you. Nearly there now."
+      },
+      "elder_two_flames": {
+        "start": "Two grown flames, made one crown. Merge your Red Dragons into an Adult — this isle needs an heir to my watch.",
+        "done": "An Adult of the old blood. My watch has an heir; Emberkeep will not go dark again."
+      },
+      "elder_true_keeper": {
+        "start": "One thing remains, and it is nothing I can hand you. The sixth rank. Become what the stories call a TRUE Keeper.",
+        "done": "It is done."
+      }
+    },
+    "allDone": "It is done. A true Keeper stands on Emberkeep, and I saw it with waking eyes. Whatever the north asks of you now — you are ready. My watch is yours."
+  },
   "regard": {
     "eleanor": {
       "giftAccepted": [

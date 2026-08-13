@@ -96,6 +96,51 @@ the signal fire; the coast's Wrack Lines, Hoarfrost Fonts and six Broken Strakes
 fund the pitch and frames orders that pay for the keep) — `pnpm quests --all`
 proves it, and Selyna's door is deliberately the arc's last and dearest fog.
 
+*The Golden Elder (`giver: "golden_elder"`, Emberkeep, post-finale).*
+
+A world can host TWO givers: a quest belongs to a `(world, giver)` TRACK, and
+`QuestSystem` runs each track's pointer separately (`giversHere`,
+`activeQuestFor`, `trackedFor`; `quest:advanced` names its giver). The tracker
+shows one track at a time and grows a small round arrow left of the main line —
+visible only while two tracks are live — that cycles between them; the Elder's
+titles wear a `✦` so a glance says whose page is open. His whole ladder carries
+`lockedUntil: { quest: "keepers_hoard" }`, a QUEST-level gate reading the
+`q:done:` latch: while he sleeps his quests are dormant — not tracked, not
+announced, and **never latched**, so a board that happens to satisfy an ask
+weeks early credits nothing.
+
+| # | Quest | Chain | Ask |
+| --- | --- | --- | --- |
+| 1 | **The Seeing Stones** | quartz T2 | Make 2 Cut Crystals |
+| 2 | **Green Over the Ash** | ashmoss T3 | Make 2 Green Bales |
+| 3 | **The Old Forest** | firgrain T3 | Grow 2 Fir Trees |
+| 4 | **Kindle the Brood** | dragons T3 | Raise 2 Red Dragons |
+| 5 | **Gold in Hand** | coin T2 | Make 2 Gold Pouches |
+| 6 | **Grow, Keeper** | — | Reach Keeper Level 4 (opens `beyond_l4`) |
+| 7 | **The Berry Mothers** | strawberry T3 | Grow 2 Ripe Emberberry Plants |
+| 8 | **The Cold Light** | moonwater T2 | Make 3 Dew Vials |
+| 9 | **The Far-Sight** | quartz T3 | Make 1 Crystal Ball |
+| 10 | **Rise Higher Still** | — | Reach Keeper Level 5 (opens `beyond_l5`) |
+| 11 | **Two Flames, One Crown** | dragons T4 | Merge 2 Red Dragons into an Adult |
+| 12 | **A True Keeper** | — | Reach Keeper Level 6 — the cap |
+
+His ladder is the ENDGAME ladder: it works only chains Eleanor never asks for
+(quartz, ashmoss, firgrain, strawberry, coin, moonwater T2, dragons T3/T4 —
+no ask collides with hers, no two consecutive quests share a chain, and a chain
+rests before it returns), its XP rewards pace the climb to the Level-4/5 land
+slabs, and it ends on the level cap rather than an endless tail — when quest 12
+closes, the track retires and the arrow disappears. All twelve carry
+`regard: 0` (he keeps no gauge) and pay no legendary egg — the Ashdrake arc is
+Eleanor's, which is why `auditLegendaryArc` measures rules 3–5 over the
+ARC-GIVER's own ladder rather than the whole world's (and errors if two givers
+ever split one dragon's eggs).
+
+His voice is `dialogue.json` → `elder`: a one-time greeting on the Gate
+ceremony's tail (its last line teaches the arrow), a start/done pair per quest
+keyed by quest id, `allDone` for the twelfth, and a once-per-session
+restatement of the current ask on load — all timed by `ELDER_VOICE` in
+Constants. He never speaks from another world.
+
 **A quest title and its Ledger order carry the SAME name.** `quests.json` and
 `orders.json` are edited together — the player opens the Ledger to act on the
 HUD line, and two names for one job is a bug, not a synonym.

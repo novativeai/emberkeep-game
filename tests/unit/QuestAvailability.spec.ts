@@ -291,8 +291,12 @@ describe('the legendary egg directive (Constants §LEGENDARY_EGG_COUNT)', () => 
       expect(payers.length, `${worldId} egg quests`).toBe(3);
       for (const q of payers) expect(q.rewards?.spawn?.count).toBe(1);
 
+      // The arc lives in its GIVER's own ladder — a second giver's track on the
+      // same board (the woken Elder's twelve) is another story, not this one's
+      // trailing quests. Mirrors auditLegendaryArc.
+      const arcGiver = payers[0]!.giver;
       const ladder = (quests.quests as unknown as QuestConfig[]).filter(
-        (q) => (q.world ?? WORLD_ID) === worldId
+        (q) => (q.world ?? WORLD_ID) === worldId && q.giver === arcGiver
       );
       const completable = ladder.filter((q) =>
         q.steps.some((s) => s.goal.kind !== 'active_order')

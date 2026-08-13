@@ -89,6 +89,7 @@ Eleanor herself are all rows: they are live from the first frame.
 | Two Houses make a Manor | post-tutorial | `twoHouses` | contextual recipe hint + hand |
 | **Selyna's Cauldron** — brew from the Bag | the pot decor in the hatchery hub, post-tutorial | self-teaching on first tap | unreachable during the tutorial (the hub opens off borealis, worlds after Chapter One), so it carries no beat. The panel is its own lesson: recipe ledger left, the selected formula's ingredient cards right, have-counts in red when the Bag falls short, and the BREW button asleep until they don't |
 | The egg stirs near Level 3 | post-tutorial | `eggTrembles` | requires `eleanor_brazier` delivered — which the tutorial now does |
+| **The Elder's quests** — a second giver, and the tracker's track arrow | post-finale: the arrow appears the moment his ladder goes live | self-teaching via `dialogue.elder.greeting` | his three-line greeting rides the Gate ceremony's tail (`ELDER_VOICE.greetingDelayMs` after `gate:opened`); its LAST line points at the tracker and names the arrow ("the small arrow beside them turns the page"). The arrow only exists while two tracks are live, so it cannot be met before it is taught |
 
 ## Deliberately not in Chapter One
 
