@@ -558,7 +558,9 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // must still route the tap to the House. (Regression: tile-yield hit areas
     // sent this tap to the item behind — the player paid the WRONG generator's
     // Warmth skip and the house_skip gate never advanced.)
-    const houseCells = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 3);
+    // Tier 4, not 3: `house_merge` now teaches the two-House merge before the
+    // commission, so by this beat the building on the board is the MANOR.
+    const houseCells = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 4);
     expect(houseCells.length).toBeGreaterThanOrEqual(1);
     const housePage = await gridToPage(page, houseCells[0]![0], houseCells[0]![1]);
     await page.mouse.click(housePage.x, housePage.y - 45); // roof pixels (CSS = game ÷2)
@@ -574,7 +576,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       const item = ctx.state.items.get(scene.skipForId);
       return item ? `${item.chain}:${item.tier}` : 'none';
     });
-    expect(skipTarget).toBe('lumber:3'); // the roof tap raised the HOUSE's popup
+    expect(skipTarget).toBe('lumber:4'); // the roof tap raised the MANOR's popup
     // Pay with Warmth via the popup's real ⚡ button (game offset +150,+100 → CSS ÷2).
     await page.mouse.click(housePage.x + 75, housePage.y + 50);
     await page.waitForTimeout(500);

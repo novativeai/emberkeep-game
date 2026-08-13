@@ -206,6 +206,7 @@
           "name": "Manor",
           "sell": 0,
           "xp": 20,
+          "chooseProduce": true,
           "generator": {
             "produces": {
               "chain": "coin",
