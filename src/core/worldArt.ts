@@ -39,7 +39,14 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
   // player fetches the destination's at the door — and hands it back when
   // they leave, exactly like the backdrop.
   const map = world?.map;
-  for (const d of map?.mapDecor ?? []) keys.push(`decor_${d.name}`);
+  for (const d of map?.mapDecor ?? []) {
+    keys.push(`decor_${d.name}`);
+    // A decor piece can carry Align-Studio clips exactly like a character —
+    // the cauldron's boil loop lives under the character id of the SAME name.
+    // Listed here for the same reason the characters' clips are: a frame
+    // sheet is stored decoded, so travel must hand the departing world's back.
+    for (const clipId of Object.keys(clipsFor(d.name))) keys.push(clipKey(d.name, clipId));
+  }
   for (const d of map?.decor3d ?? []) keys.push(`decor_${d.name}`);
   for (const d of map?.startingDecor ?? []) keys.push(`decor_${d.decor}`);
   for (const r of map?.regions ?? []) for (const d of r.decor ?? []) keys.push(`decor_${d.decor}`);

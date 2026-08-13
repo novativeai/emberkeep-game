@@ -1,228 +1,246 @@
 {
-  "version": 1,
-  "characters": {
-    "eleanor": {
-      "clips": {
-        "idle": {
-          "file": "sprites/anims/eleanor/idle.webp",
-          "frames": 60,
-          "frameWidth": 200,
-          "frameHeight": 320,
-          "fps": 12,
-          "loop": true,
-          "scale": 0.5671,
-          "dx": -13.25,
-          "dy": 0.57,
-          "srcFrameWidth": 200,
-          "srcFrameHeight": 320
-        },
-        "cast": {
-          "file": "sprites/anims/eleanor/cast.webp",
-          "frames": 36,
-          "frameWidth": 263,
-          "frameHeight": 320,
-          "fps": 12,
-          "loop": false,
-          "scale": 0.61371,
-          "dx": -10.53,
-          "dy": 0.62,
-          "srcFrameWidth": 263,
-          "srcFrameHeight": 320
-        },
-        "laugh": {
-          "file": "sprites/anims/eleanor/laugh.webp",
-          "frames": 36,
-          "frameWidth": 200,
-          "frameHeight": 320,
-          "fps": 12,
-          "loop": false,
-          "scale": 0.56353,
-          "dx": -12.12,
-          "dy": 0.57,
-          "srcFrameWidth": 200,
-          "srcFrameHeight": 320
-        },
-        "happy": {
-          "file": "sprites/anims/eleanor/happy.webp",
-          "frames": 36,
-          "frameWidth": 199,
-          "frameHeight": 320,
-          "fps": 12,
-          "loop": false,
-          "scale": 0.5671,
-          "dx": -12.68,
-          "dy": 0.57,
-          "srcFrameWidth": 199,
-          "srcFrameHeight": 320
-        },
-        "talking": {
-          "file": "sprites/anims/eleanor/talking.webp",
-          "frames": 72,
-          "frameWidth": 235,
-          "frameHeight": 320,
-          "fps": 24,
-          "loop": true,
-          "stage": "portrait",
-          "scale": 0.56353,
-          "dx": -12.96,
-          "dy": 0.57,
-          "srcFrameWidth": 235,
-          "srcFrameHeight": 320
-        },
-        "blinking": {
-          "file": "sprites/anims/eleanor/blinking.webp",
-          "frames": 36,
-          "frameWidth": 234,
-          "frameHeight": 320,
-          "fps": 12,
-          "loop": true,
-          "stage": "portrait",
-          "scale": 0.56353,
-          "dx": -12.68,
-          "dy": 0.57,
-          "srcFrameWidth": 234,
-          "srcFrameHeight": 320
-        }
-      },
-      "portrait": {
-        "height": 360,
-        "dy": -170,
-        "headCrop": 0.47
-      }
+ "version": 1,
+ "characters": {
+  "eleanor": {
+   "clips": {
+    "idle": {
+     "file": "sprites/anims/eleanor/idle.webp",
+     "frames": 60,
+     "frameWidth": 200,
+     "frameHeight": 320,
+     "fps": 12,
+     "loop": true,
+     "scale": 0.5671,
+     "dx": -13.25,
+     "dy": 0.57,
+     "srcFrameWidth": 200,
+     "srcFrameHeight": 320
     },
-    "selyna": {
-      "clips": {
-        "idle": {
-          "file": "sprites/anims/selyna/idle.webp",
-          "frames": 60,
-          "frameWidth": 360,
-          "frameHeight": 480,
-          "fps": 12,
-          "loop": true,
-          "scale": 0.53023,
-          "dx": -23.92,
-          "dy": -0.01,
-          "srcFrameWidth": 360,
-          "srcFrameHeight": 480
-        },
-        "cast": {
-          "file": "sprites/anims/selyna/cast.webp",
-          "frames": 36,
-          "frameWidth": 360,
-          "frameHeight": 480,
-          "fps": 12,
-          "loop": false,
-          "scale": 0.37572,
-          "dx": -10.93,
-          "dy": -0.01,
-          "srcFrameWidth": 360,
-          "srcFrameHeight": 480
-        },
-        "talking": {
-          "file": "sprites/anims/selyna/talking.webp",
-          "frames": 72,
-          "frameWidth": 242,
-          "frameHeight": 336,
-          "fps": 24,
-          "loop": true,
-          "stage": "portrait",
-          "scale": 0.68141,
-          "dx": -10.93,
-          "dy": 49.73,
-          "srcFrameWidth": 242,
-          "srcFrameHeight": 336
-        },
-        "blinking": {
-          "file": "sprites/anims/selyna/blinking.webp",
-          "frames": 36,
-          "frameWidth": 242,
-          "frameHeight": 336,
-          "fps": 12,
-          "loop": true,
-          "stage": "portrait",
-          "scale": 0.68141,
-          "dx": -10.93,
-          "dy": 49.73,
-          "srcFrameWidth": 242,
-          "srcFrameHeight": 336
-        }
-      },
-      "portrait": {
-        "height": 380,
-        "dy": -172,
-        "headCrop": 0.55
-      }
+    "cast": {
+     "file": "sprites/anims/eleanor/cast.webp",
+     "frames": 36,
+     "frameWidth": 263,
+     "frameHeight": 320,
+     "fps": 12,
+     "loop": false,
+     "scale": 0.61371,
+     "dx": -10.53,
+     "dy": 0.62,
+     "srcFrameWidth": 263,
+     "srcFrameHeight": 320
     },
-    "redwhelp": {
-      "clips": {
-        "fly": {
-          "file": "sprites/anims/redwhelp/fly.webp",
-          "frames": 240,
-          "frameWidth": 256,
-          "frameHeight": 214,
-          "fps": 24,
-          "loop": true,
-          "segments": {
-            "takeoff": [
-              0,
-              61
-            ],
-            "loop": [
-              61,
-              136
-            ],
-            "landing": [
-              192,
-              240
-            ]
-          },
-          "scale": 1.2307089843749999,
-          "dx": 13.81,
-          "dy": 19.94,
-          "srcFrameWidth": 325,
-          "srcFrameHeight": 272
-        },
-        "tosleep": {
-          "file": "sprites/anims/redwhelp/tosleep.webp",
-          "frames": 48,
-          "frameWidth": 435,
-          "frameHeight": 360,
-          "fps": 24,
-          "loop": false,
-          "scale": 0.47214,
-          "dx": 36.24,
-          "dy": 2.34,
-          "srcFrameWidth": 435,
-          "srcFrameHeight": 360
-        },
-        "idle": {
-          "file": "sprites/anims/redwhelp/idle.webp",
-          "frames": 194,
-          "frameWidth": 227,
-          "frameHeight": 190,
-          "fps": 24,
-          "loop": true,
-          "scale": 0.86684,
-          "dx": 15.11,
-          "dy": -3.33,
-          "srcFrameWidth": 227,
-          "srcFrameHeight": 190
-        },
-        "roar": {
-          "file": "sprites/anims/redwhelp/roar.webp",
-          "frames": 72,
-          "frameWidth": 253,
-          "frameHeight": 200,
-          "fps": 24,
-          "loop": false,
-          "scale": 0.81916,
-          "dx": 19.95,
-          "dy": -3.33,
-          "srcFrameWidth": 253,
-          "srcFrameHeight": 200
-        }
-      },
-      "board": "ember_dragon:3"
+    "laugh": {
+     "file": "sprites/anims/eleanor/laugh.webp",
+     "frames": 36,
+     "frameWidth": 200,
+     "frameHeight": 320,
+     "fps": 12,
+     "loop": false,
+     "scale": 0.56353,
+     "dx": -12.12,
+     "dy": 0.57,
+     "srcFrameWidth": 200,
+     "srcFrameHeight": 320
+    },
+    "happy": {
+     "file": "sprites/anims/eleanor/happy.webp",
+     "frames": 36,
+     "frameWidth": 199,
+     "frameHeight": 320,
+     "fps": 12,
+     "loop": false,
+     "scale": 0.5671,
+     "dx": -12.68,
+     "dy": 0.57,
+     "srcFrameWidth": 199,
+     "srcFrameHeight": 320
+    },
+    "talking": {
+     "file": "sprites/anims/eleanor/talking.webp",
+     "frames": 72,
+     "frameWidth": 235,
+     "frameHeight": 320,
+     "fps": 24,
+     "loop": true,
+     "stage": "portrait",
+     "scale": 0.56353,
+     "dx": -12.96,
+     "dy": 0.57,
+     "srcFrameWidth": 235,
+     "srcFrameHeight": 320
+    },
+    "blinking": {
+     "file": "sprites/anims/eleanor/blinking.webp",
+     "frames": 36,
+     "frameWidth": 234,
+     "frameHeight": 320,
+     "fps": 12,
+     "loop": true,
+     "stage": "portrait",
+     "scale": 0.56353,
+     "dx": -12.68,
+     "dy": 0.57,
+     "srcFrameWidth": 234,
+     "srcFrameHeight": 320
     }
+   },
+   "portrait": {
+    "height": 360,
+    "dy": -170,
+    "headCrop": 0.47
+   }
+  },
+  "selyna": {
+   "clips": {
+    "idle": {
+     "file": "sprites/anims/selyna/idle.webp",
+     "frames": 60,
+     "frameWidth": 360,
+     "frameHeight": 480,
+     "fps": 12,
+     "loop": true,
+     "scale": 0.53023,
+     "dx": -23.92,
+     "dy": -0.01,
+     "srcFrameWidth": 360,
+     "srcFrameHeight": 480
+    },
+    "cast": {
+     "file": "sprites/anims/selyna/cast.webp",
+     "frames": 36,
+     "frameWidth": 360,
+     "frameHeight": 480,
+     "fps": 12,
+     "loop": false,
+     "scale": 0.37572,
+     "dx": -10.93,
+     "dy": -0.01,
+     "srcFrameWidth": 360,
+     "srcFrameHeight": 480
+    },
+    "talking": {
+     "file": "sprites/anims/selyna/talking.webp",
+     "frames": 72,
+     "frameWidth": 242,
+     "frameHeight": 336,
+     "fps": 24,
+     "loop": true,
+     "stage": "portrait",
+     "scale": 0.68141,
+     "dx": -10.93,
+     "dy": 49.73,
+     "srcFrameWidth": 242,
+     "srcFrameHeight": 336
+    },
+    "blinking": {
+     "file": "sprites/anims/selyna/blinking.webp",
+     "frames": 36,
+     "frameWidth": 242,
+     "frameHeight": 336,
+     "fps": 12,
+     "loop": true,
+     "stage": "portrait",
+     "scale": 0.68141,
+     "dx": -10.93,
+     "dy": 49.73,
+     "srcFrameWidth": 242,
+     "srcFrameHeight": 336
+    }
+   },
+   "portrait": {
+    "height": 380,
+    "dy": -172,
+    "headCrop": 0.55
+   }
+  },
+  "redwhelp": {
+   "clips": {
+    "fly": {
+     "file": "sprites/anims/redwhelp/fly.webp",
+     "frames": 240,
+     "frameWidth": 256,
+     "frameHeight": 214,
+     "fps": 24,
+     "loop": true,
+     "segments": {
+      "takeoff": [
+       0,
+       61
+      ],
+      "loop": [
+       61,
+       136
+      ],
+      "landing": [
+       192,
+       240
+      ]
+     },
+     "scale": 1.2307089843749999,
+     "dx": 13.81,
+     "dy": 19.94,
+     "srcFrameWidth": 325,
+     "srcFrameHeight": 272
+    },
+    "tosleep": {
+     "file": "sprites/anims/redwhelp/tosleep.webp",
+     "frames": 48,
+     "frameWidth": 435,
+     "frameHeight": 360,
+     "fps": 24,
+     "loop": false,
+     "scale": 0.47214,
+     "dx": 36.24,
+     "dy": 2.34,
+     "srcFrameWidth": 435,
+     "srcFrameHeight": 360
+    },
+    "idle": {
+     "file": "sprites/anims/redwhelp/idle.webp",
+     "frames": 194,
+     "frameWidth": 227,
+     "frameHeight": 190,
+     "fps": 24,
+     "loop": true,
+     "scale": 0.86684,
+     "dx": 15.11,
+     "dy": -3.33,
+     "srcFrameWidth": 227,
+     "srcFrameHeight": 190
+    },
+    "roar": {
+     "file": "sprites/anims/redwhelp/roar.webp",
+     "frames": 72,
+     "frameWidth": 253,
+     "frameHeight": 200,
+     "fps": 24,
+     "loop": false,
+     "scale": 0.81916,
+     "dx": 19.95,
+     "dy": -3.33,
+     "srcFrameWidth": 253,
+     "srcFrameHeight": 200
+    }
+   },
+   "board": "ember_dragon:3"
+  },
+  "cauldron": {
+   "clips": {
+    "boil": {
+     "file": "sprites/anims/cauldron/boil.webp",
+     "frames": 59,
+     "frameWidth": 375,
+     "frameHeight": 511,
+     "fps": 12,
+     "loop": true,
+     "scale": 2.15903,
+     "dx": 6.68,
+     "dy": -107.75,
+     "srcFrameWidth": 375,
+     "srcFrameHeight": 511,
+     "stage": "decor"
+    }
+   }
   }
+ }
 }

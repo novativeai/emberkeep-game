@@ -35,8 +35,12 @@ export interface CharacterClip {
    * Where the clip plays. 'board' (default) = on the standee/board anchor.
    * 'portrait' = the dialogue bubble's ring ONLY — talking/blinking sets live
    * there (they replace the disc-atlas animation) and never on the board.
+   * 'decor' = a map-decor piece (the cauldron). Registration differs: scale is
+   * STILL px per atlas px and dx/dy put the frame's top-left in the still
+   * art's own pixel space, so the clip occupies exactly the rectangle the
+   * static decor texture did (scripts/cauldron-boil.py `register`).
    */
-  stage?: 'board' | 'portrait';
+  stage?: 'board' | 'portrait' | 'decor';
   /**
    * Named frame sub-ranges [start, endExclusive] — the fly clip's
    * takeoff/loop/landing phases. Absent = the clip plays whole. (Typed as
