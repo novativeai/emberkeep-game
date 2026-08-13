@@ -1630,6 +1630,32 @@ export const DRAGON_ANIM = {
   idleRoarMaxLoops: 5
 } as const;
 
+/**
+ * THE CEILING ON DRAGON FRAME SHEETS — the one number that keeps six breeds
+ * from costing what six breeds cost.
+ *
+ * A staged clip is stored decoded, so the Emporium's whole roster resident at
+ * once is 718 MB against a device budget the audit put at ~174 MB. The policy
+ * that avoids that lives in `src/core/dragonClips.ts`; these are its dials.
+ *
+ * `budgetMb` is sized off the realistic worst case rather than a round number:
+ * a whelp and an adult both standing on the board, both having been hungry and
+ * having slept, is 203 MB of wardrobe. So the ceiling sits just above it and
+ * the first thing that ever forces an eviction is a THIRD breed — the Golden
+ * Elder at the finale, or a skin the player just switched to. That is exactly
+ * where a ceiling should bite: on the breed nothing is wearing any more.
+ *
+ * `leanBudgetMb` is the weak tier, where the eager wave is the idle alone
+ * (`clipLoadTiers`) — two live idles plus one mood clip, and the rig covers
+ * flight as it always did.
+ */
+export const DRAGON_CLIPS = {
+  budgetMb: 224,
+  leanBudgetMb: 96,
+  /** Weak devices load the idle only and fly on the rig. */
+  lean: IS_LOW_END
+} as const;
+
 /** Per-dragon-chain rig scale factor so different art reads at the SAME on-board
  *  size. The emerald rig renders larger, so it's taken down 40% to match red. */
 export const DRAGON_RIG_SCALE: Record<string, number> = {

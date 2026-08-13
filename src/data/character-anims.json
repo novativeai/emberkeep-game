@@ -223,6 +223,304 @@
         }
       },
       "board": "ember_dragon:3"
+    },
+    "redadult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/redadult/idle.webp",
+          "frames": 98,
+          "frameWidth": 409,
+          "frameHeight": 285,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.03807,
+          "dx": 36.64,
+          "dy": 44.7,
+          "srcFrameWidth": 409,
+          "srcFrameHeight": 285
+        },
+        "roar": {
+          "file": "sprites/anims/redadult/roar.webp",
+          "frames": 66,
+          "frameWidth": 455,
+          "frameHeight": 317,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.44811,
+          "dx": 16.44,
+          "dy": 51.31,
+          "srcFrameWidth": 455,
+          "srcFrameHeight": 317
+        },
+        "fly": {
+          "file": "sprites/anims/redadult/fly.webp",
+          "frames": 85,
+          "frameWidth": 256,
+          "frameHeight": 204,
+          "fps": 24,
+          "loop": true,
+          "segments": {
+            "takeoff": [
+              0,
+              34
+            ],
+            "loop": [
+              34,
+              65
+            ],
+            "landing": [
+              65,
+              85
+            ]
+          },
+          "scale": 2.45442,
+          "dx": -10.03,
+          "dy": 64.71,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 204
+        }
+      },
+      "board": "ember_dragon:4"
+    },
+    "frost_baby": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/frost_baby/idle.webp",
+          "frames": 149,
+          "frameWidth": 315,
+          "frameHeight": 246,
+          "fps": 24,
+          "loop": true,
+          "scale": 0.88893,
+          "dx": 19.21,
+          "dy": -9.6,
+          "srcFrameWidth": 315,
+          "srcFrameHeight": 246
+        },
+        "roar": {
+          "file": "sprites/anims/frost_baby/roar.webp",
+          "frames": 66,
+          "frameWidth": 211,
+          "frameHeight": 211,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8035071090047393,
+          "dx": 12.84,
+          "dy": -9.22,
+          "srcFrameWidth": 400,
+          "srcFrameHeight": 400
+        }
+      },
+      "board": "ember_dragon:3",
+      "skin": "frost"
+    },
+    "frost_adult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/frost_adult/idle.webp",
+          "frames": 112,
+          "frameWidth": 372,
+          "frameHeight": 239,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.29254,
+          "dx": 67.23,
+          "dy": 33.01,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 239
+        },
+        "roar": {
+          "file": "sprites/anims/frost_adult/roar.webp",
+          "frames": 66,
+          "frameWidth": 455,
+          "frameHeight": 236,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.68969,
+          "dx": 0.81,
+          "dy": 32.11,
+          "srcFrameWidth": 455,
+          "srcFrameHeight": 236
+        },
+        "fly": {
+          "file": "sprites/anims/frost_adult/fly.webp",
+          "frames": 126,
+          "frameWidth": 256,
+          "frameHeight": 188,
+          "fps": 24,
+          "loop": true,
+          "segments": {
+            "takeoff": [
+              0,
+              84
+            ],
+            "loop": [
+              84,
+              105
+            ],
+            "landing": [
+              105,
+              126
+            ]
+          },
+          "scale": 3.02454,
+          "dx": -4.08,
+          "dy": 33.45,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 188
+        }
+      },
+      "board": "ember_dragon:4",
+      "skin": "frost"
+    },
+    "storm_baby": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/storm_baby/idle.webp",
+          "frames": 162,
+          "frameWidth": 254,
+          "frameHeight": 210,
+          "fps": 24,
+          "loop": true,
+          "scale": 0.8029399606299212,
+          "dx": 31.77,
+          "dy": -5.48,
+          "srcFrameWidth": 315,
+          "srcFrameHeight": 260
+        },
+        "roar": {
+          "file": "sprites/anims/storm_baby/roar.webp",
+          "frames": 66,
+          "frameWidth": 232,
+          "frameHeight": 214,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8013859482758621,
+          "dx": 22.33,
+          "dy": -5.49,
+          "srcFrameWidth": 433,
+          "srcFrameHeight": 400
+        }
+      },
+      "board": "ember_dragon:3",
+      "skin": "storm"
+    },
+    "storm_adult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/storm_adult/idle.webp",
+          "frames": 108,
+          "frameWidth": 372,
+          "frameHeight": 261,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.21785,
+          "dx": 47.78,
+          "dy": 39.71,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 261
+        },
+        "roar": {
+          "file": "sprites/anims/storm_adult/roar.webp",
+          "frames": 66,
+          "frameWidth": 455,
+          "frameHeight": 279,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.73579,
+          "dx": -8.15,
+          "dy": 39.01,
+          "srcFrameWidth": 455,
+          "srcFrameHeight": 279
+        },
+        "fly": {
+          "file": "sprites/anims/storm_adult/fly.webp",
+          "frames": 203,
+          "frameWidth": 256,
+          "frameHeight": 189,
+          "fps": 24,
+          "loop": true,
+          "segments": {
+            "takeoff": [
+              0,
+              142
+            ],
+            "loop": [
+              142,
+              189
+            ],
+            "landing": [
+              189,
+              203
+            ]
+          },
+          "scale": 3.02027,
+          "dx": -7.92,
+          "dy": 40.29,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 189
+        }
+      },
+      "board": "ember_dragon:4",
+      "skin": "storm"
+    },
+    "golden_adult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/golden_adult/idle.webp",
+          "frames": 114,
+          "frameWidth": 372,
+          "frameHeight": 239,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.28952,
+          "dx": 57.16,
+          "dy": 47.71,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 239
+        },
+        "roar": {
+          "file": "sprites/anims/golden_adult/roar.webp",
+          "frames": 66,
+          "frameWidth": 455,
+          "frameHeight": 293,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.27299,
+          "dx": 37.33,
+          "dy": 51.48,
+          "srcFrameWidth": 455,
+          "srcFrameHeight": 293
+        },
+        "fly": {
+          "file": "sprites/anims/golden_adult/fly.webp",
+          "frames": 180,
+          "frameWidth": 256,
+          "frameHeight": 199,
+          "fps": 24,
+          "loop": true,
+          "segments": {
+            "takeoff": [
+              0,
+              77
+            ],
+            "loop": [
+              77,
+              139
+            ],
+            "landing": [
+              139,
+              180
+            ]
+          },
+          "scale": 2.86422,
+          "dx": -0.22,
+          "dy": 86.8,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 199
+        }
+      },
+      "board": "golden_egg:2"
     }
   }
 }

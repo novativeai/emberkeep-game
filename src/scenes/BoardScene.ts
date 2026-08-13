@@ -10,6 +10,7 @@ import {
   DEPTHS,
   DRAG,
   DRAGON_ANIM,
+  DRAGON_CLIPS,
   DRAGON_RIG_SCALE,
   CRYSTAL_3D,
   EMBER_MOTES,
@@ -70,6 +71,7 @@ import {
   dragonClipCharacter,
   originFor
 } from '../core/characterAnims';
+import { type ClipRef, clipLoadTiers, planClipEviction } from '../core/dragonClips';
 import { gridToWorld } from '../core/iso';
 import { ensureTextures } from '../core/lazyTextures';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
@@ -874,10 +876,13 @@ export class BoardScene extends Phaser.Scene {
   private attachDragon(host: BoardItem, intro: boolean): boolean {
     const rig = this.dragonRigs.get(rigKeyFor(host.chain, host.tier));
     if (!rig) return false;
+    // Tear down FIRST, then fetch: `removeDragonRig` reconciles residency, and
+    // a fetch queued before it would be offered to that eviction as sheets
+    // nothing is wearing yet — dropped and immediately re-fetched.
+    this.removeDragonRig(host.itemId);
     // A dragon of this breed is about to be on screen: this is the moment its
     // clip sheets are worth their video memory, and the first moment they are.
     this.ensureDragonClips(host.chain, host.tier);
-    this.removeDragonRig(host.itemId);
     const scale =
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
       (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1);
@@ -1107,6 +1112,10 @@ export class BoardScene extends Phaser.Scene {
     ld.player.destroy();
     ld.shadow.destroy();
     this.liveDragons.delete(itemId);
+    // The last whelp merged into an adult is the commonest way a breed becomes
+    // worn by nobody, and 106 MB of sheets it left behind is the commonest way
+    // a long session ends up over its budget.
+    this.reconcileDragonClips();
   }
 
   /* ------------------------- ambient life ---------------------------- */
@@ -1170,11 +1179,12 @@ export class BoardScene extends Phaser.Scene {
    * Null when this breed/tier has no pushed clips or the sheet is not resident.
    */
   private dragonClip(ld: LiveDragon, clipId: string): { clip: CharacterClip; key: string } | null {
-    const id = dragonClipCharacter(ld.host.chain, ld.host.tier);
+    const id = this.clipCharacterFor(ld.host.chain, ld.host.tier);
     if (!id) return null;
     const clip = clipFor(id, clipId);
     const key = clipKey(id, clipId);
     if (!clip || !this.textures.exists(key)) return null;
+    this.touchClip(id, clipId); // most-recently-needed, for the LRU
     if (!this.anims.exists(key)) {
       this.anims.create({
         key,
@@ -1201,16 +1211,42 @@ export class BoardScene extends Phaser.Scene {
    * these clips existed. They take over on the frame they arrive.
    */
   private ensureDragonClips(chain: string, tier: number): void {
-    const id = dragonClipCharacter(chain, tier);
-    if (!id || this.dragonClipsAsked.has(id)) return;
-    this.dragonClipsAsked.add(id);
+    const id = this.clipCharacterFor(chain, tier);
+    if (!id) return;
+    this.fetchClips(id, clipLoadTiers(id, { lean: DRAGON_CLIPS.lean }).eager);
+  }
+
+  /**
+   * Fetch a mood clip the moment its beat is decided — the hungry roar, the
+   * curl into sleep. They are left out of the eager wave (`clipLoadTiers`)
+   * because they are 27-36 MB on the adults and draw for a second and a half,
+   * a minute apart, only while the mood holds. Every one of them announces
+   * itself well before it is drawn, so fetching here costs nothing visible and
+   * a session that never starved a dragon never pays for the bellow at all.
+   */
+  private ensureMoodClip(ld: LiveDragon, clipId: string): void {
+    const id = this.clipCharacterFor(ld.host.chain, ld.host.tier);
+    if (id) this.fetchClips(id, [clipId]);
+  }
+
+  /** Queue a breed's named sheets, making room for them first. */
+  private fetchClips(id: string, clipIds: readonly string[]): void {
+    const wanted = clipIds.filter((c) => clipFor(id, c) !== null && !this.dragonClipsAsked.has(`${id}/${c}`));
+    if (!wanted.length) return;
+    for (const c of wanted) this.dragonClipsAsked.add(`${id}/${c}`);
+    // MAKE ROOM BEFORE ASKING, never after: a sheet costs its video memory from
+    // the moment it uploads, so an eviction that runs once the newcomer has
+    // landed has already been paid for by the peak it was meant to avoid.
+    this.reconcileDragonClips(wanted.map((clip) => ({ breed: id, clip })));
     let queued = 0;
-    for (const [clipId, clip] of Object.entries(clipsFor(id))) {
+    for (const clipId of wanted) {
+      const clip = clipFor(id, clipId)!;
       if (this.textures.exists(clipKey(id, clipId))) continue;
       this.load.spritesheet(clipKey(id, clipId), clip.file, {
         frameWidth: clip.frameWidth,
         frameHeight: clip.frameHeight
       });
+      this.residentClips.set(`${id}/${clipId}`, { breed: id, clip: clipId });
       queued++;
     }
     if (!queued) return;
@@ -1239,15 +1275,85 @@ export class BoardScene extends Phaser.Scene {
    */
   private dressBreedClips(id: string): void {
     for (const ld of this.liveDragons.values()) {
-      if (dragonClipCharacter(ld.host.chain, ld.host.tier) !== id) continue;
+      if (this.clipCharacterFor(ld.host.chain, ld.host.tier) !== id) continue;
       if (ld.busy || ld.mood === 'asleep' || ld.mode === 'hover') continue;
       if (ld.flightPhase !== null || ld.host.getData('dragged')) continue;
       this.dragonIdle(ld);
     }
   }
 
-  /** Breeds whose clips have been asked for, so the fetch runs once each. */
+  /** `breed/clip` sheets already asked for, so each fetch runs once. */
   private dragonClipsAsked = new Set<string>();
+
+  /** Resident sheets in LEAST-recently-needed order — a Map iterates in
+   *  insertion order, and `touchClip` re-inserts, so this IS the LRU queue. */
+  private residentClips = new Map<string, ClipRef>();
+
+  /**
+   * The clip character dressing this board dragon, respecting the worn
+   * Emporium skin: a purchased Frost or Storm IS that breed on the board, and
+   * that is also what bounds the memory — one wardrobe is askable, not the
+   * whole catalogue.
+   */
+  private clipCharacterFor(chain: string, tier: number): string | null {
+    return dragonClipCharacter(chain, tier, this.ctx.state.dragonSkins[chain] ?? null);
+  }
+
+  /** Mark a sheet most-recently-needed so the LRU takes the coldest first. */
+  private touchClip(breed: string, clip: string): void {
+    const id = `${breed}/${clip}`;
+    const ref = this.residentClips.get(id);
+    if (!ref) return;
+    this.residentClips.delete(id);
+    this.residentClips.set(id, ref);
+  }
+
+  /**
+   * Hand back the dragon sheets this board is no longer made of.
+   *
+   * The counterpart of `releaseAwayWorldArt`, and deliberately the same shape:
+   * ONE policy (`planClipEviction`) decides both what may stay and what goes,
+   * so the two can never drift into a leak. Called whenever the answer might
+   * have changed — a fetch, a merge, a skin swap, a rebuilt board — rather
+   * than on one event, so it self-corrects whatever route got us here.
+   *
+   * What is never offered: a sheet an overlay is drawing (evicting under a
+   * live sprite null-crashes the renderer and hangs the game — the travel
+   * freeze all over again), and the eager sheets of a breed still on the board.
+   */
+  private reconcileDragonClips(incoming: ClipRef[] = []): void {
+    const live = new Set<string>();
+    const playing: ClipRef[] = [];
+    for (const ld of this.liveDragons.values()) {
+      const breed = this.clipCharacterFor(ld.host.chain, ld.host.tier);
+      if (!breed) continue;
+      live.add(breed);
+      const key = ld.clipOverlay?.visible ? ld.clipOverlay.anims.currentAnim?.key : undefined;
+      // Anim keys are the clip keys (`canim_<breed>_<clip>`), segment keys
+      // suffix them — either way the sheet behind it is load-bearing.
+      for (const clip of Object.keys(clipsFor(breed))) {
+        if (key?.startsWith(clipKey(breed, clip))) playing.push({ breed, clip });
+      }
+    }
+    const plan = planClipEviction({
+      live,
+      playing,
+      resident: [...this.residentClips.values()],
+      incoming,
+      lean: DRAGON_CLIPS.lean,
+      budgetBytes: (DRAGON_CLIPS.lean ? DRAGON_CLIPS.leanBudgetMb : DRAGON_CLIPS.budgetMb) * 1024 * 1024
+    });
+    for (const ref of plan.drop) {
+      const key = clipKey(ref.breed, ref.clip);
+      // The Phaser animation goes with its frames: left behind it would point
+      // at a texture that no longer exists, and the next `play` of it would
+      // draw nothing at all rather than fall back to the rig.
+      if (this.anims.exists(key)) this.anims.remove(key);
+      if (this.textures.exists(key)) this.textures.remove(key);
+      this.residentClips.delete(`${ref.breed}/${ref.clip}`);
+      this.dragonClipsAsked.delete(`${ref.breed}/${ref.clip}`);
+    }
+  }
 
   /** The overlay sprite that stands in for the rig while a clip plays. */
   private dragonOverlay(ld: LiveDragon, key: string): Phaser.GameObjects.Sprite {
@@ -1464,6 +1570,10 @@ export class BoardScene extends Phaser.Scene {
    */
   private armIdleRoar(ld: LiveDragon, overlay: Phaser.GameObjects.Sprite, idleKey: string): void {
     let loops = Phaser.Math.Between(DRAGON_ANIM.idleRoarMinLoops, DRAGON_ANIM.idleRoarMaxLoops);
+    // Three to five idle loops of warning — ~24-40 s — is the most notice any
+    // deferred sheet gets, and it is plenty. Without this the ambient bellow
+    // would be the one beat that arrives before its frames do.
+    this.ensureMoodClip(ld, 'roar');
     overlay.off(Phaser.Animations.Events.ANIMATION_REPEAT);
     overlay.on(Phaser.Animations.Events.ANIMATION_REPEAT, (anim: Phaser.Animations.Animation) => {
       if (anim.key !== idleKey || this.liveDragons.get(ld.host.itemId) !== ld) return;
@@ -1587,6 +1697,12 @@ export class BoardScene extends Phaser.Scene {
     ld.mood = mood;
     if (mood === 'hungry') ld.roarInMs = 0; // say so at once, then on the cadence
     if (was === mood) return;
+    // The mood is the cue to go and get the sheet it will be drawn with. Both
+    // of these announce themselves before anything is rendered — a roar waits
+    // out `roarInMs`, a sleep plays a transition — so the fetch has time, and
+    // a session that never made a dragon hungry never pays for the bellow.
+    if (mood === 'hungry') this.ensureMoodClip(ld, 'roar');
+    if (mood === 'asleep') this.ensureMoodClip(ld, 'tosleep');
 
     if (mood === 'asleep') {
       // AIRBORNE dragons do not fall asleep in the air. The mood is recorded
@@ -4239,6 +4355,16 @@ export class BoardScene extends Phaser.Scene {
    *  art — a whelp-only skin leaves the adult alone by itself. */
   private applyDragonSkin(dragon: string): void {
     this.reskinChain(dragon, () => true);
+    // A skin swap changes which BREED every dragon of this chain is, so the
+    // one just taken off is now worn by nobody and its sheets are the coldest
+    // thing on the board — and the new one's have to be fetched. Both sides of
+    // that are one reconcile.
+    for (const ld of this.liveDragons.values()) {
+      if (ld.host.chain !== dragon) continue;
+      this.ensureDragonClips(ld.host.chain, ld.host.tier);
+      this.dragonIdle(ld); // wear the new breed's rest at once, not on the next roll
+    }
+    this.reconcileDragonClips();
   }
 
   private reskinChain(chain: string, wants: (item: BoardItemState) => boolean): void {
