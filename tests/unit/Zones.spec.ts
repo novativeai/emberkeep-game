@@ -625,21 +625,30 @@ describe('world art — visiting a world never leaves the others worse off', () 
     const ctx = new GameContext(new MemoryStorage());
     expect(worldArtKeys(ctx, 'emberkeep')).toContain('background_emberkeep');
     // Borealis is Selyna's: its art is the backdrop AND everything she is drawn
-    // with — her standee banks and her Align-Studio clips. That is the whole
-    // point of the one list: she is fetched on arrival and freed on departure
-    // with the ground she stands on, never separately. The clips are the
-    // expensive half (a frame sheet is held DECODED — hers are ~104 MB of video
-    // memory from 4.8 MB of WebP), so leaving them off the list meant travel
-    // only ever added.
+    // with ON THE BOARD — her standee banks and her board-stage clips. That is
+    // the whole point of the one list: she is fetched on arrival and freed on
+    // departure with the ground she stands on, never separately. The clips are
+    // the expensive half (a frame sheet is held DECODED), so leaving them off
+    // the list meant travel only ever added.
+    //
+    // Her PORTRAIT clips (talking, blinking) are absent on purpose. They belong
+    // to the dialogue bubble in UIScene, which never restarts and so still holds
+    // the last portrait it showed after the board is gone. Evicting a texture
+    // under a live sprite null-crashes the renderer and hangs the whole game —
+    // Borealis → Runevault froze on the travel veil for exactly that reason.
     expect(worldArtKeys(ctx, 'borealis').sort()).toEqual([
       'background_borealis',
-      'canim_selyna_blinking',
       'canim_selyna_cast',
       'canim_selyna_idle',
-      'canim_selyna_talking',
       'selyna_world_cast',
       'selyna_world_idle'
     ]);
+    // Said as its own rule, so a future clip cannot rejoin the list quietly.
+    for (const id of ctx.state.worlds.keys()) {
+      expect(worldArtKeys(ctx, id)).not.toContain('canim_selyna_talking');
+      expect(worldArtKeys(ctx, id)).not.toContain('canim_eleanor_talking');
+      expect(worldArtKeys(ctx, id)).not.toContain('canim_eleanor_blinking');
+    }
     // Shared art (tiles, items, UI, VFX) must never appear — it is not any one
     // world's to release, and releasing it would break the world we are ON.
     for (const id of ctx.state.worlds.keys()) {

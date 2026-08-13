@@ -27,12 +27,28 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
     const art = cfg.art ?? cfg.id;
     const bank = STANDEE_BANKS[art];
     if (bank) keys.push(...Object.values(bank.keys));
-    // …and her Align-Studio clips, which are by far the heaviest thing a
-    // character brings: a frame sheet is stored DECODED, so Selyna's four
-    // clips are ~104 MB of video memory from 4.8 MB of WebP. PreloadScene
-    // fetches the arriving world's; without them listed here nothing ever
-    // handed the departing world's back, and travel only ever added.
-    for (const clipId of Object.keys(clipsFor(art))) keys.push(clipKey(art, clipId));
+    // …and her Align-Studio BOARD clips, which are by far the heaviest thing a
+    // character brings: a frame sheet is stored DECODED, so Selyna's clips are
+    // tens of MB of video memory from a few MB of WebP. PreloadScene fetches
+    // the arriving world's; without them listed here nothing ever handed the
+    // departing world's back, and travel only ever added.
+    //
+    // PORTRAIT clips are deliberately NOT listed, and the reason is a freeze
+    // rather than a preference. They belong to the dialogue bubble, which lives
+    // in UIScene — a scene that never restarts and therefore outlives every
+    // board. So the bubble goes on holding the last portrait it showed long
+    // after that world is behind you, and evicting a texture out from under a
+    // live sprite does not merely blank it: it null-crashes the renderer, which
+    // kills Phaser's RAF chain and hangs the entire game — travel veil up,
+    // nothing responding. Leaving Borealis (where Selyna has just spoken) for
+    // the Runevault hub did exactly that.
+    //
+    // The board clips above are safe by construction: their sprites are torn
+    // down with the board that owns them.
+    for (const [clipId, clip] of Object.entries(clipsFor(art))) {
+      if (clip.stage === 'portrait') continue;
+      keys.push(clipKey(art, clipId));
+    }
   }
   // The map's own decor (the Hatchery cauldron, and whatever a world stands
   // up next). Boot only preloads the ACTIVE map's decor, so a travelling
