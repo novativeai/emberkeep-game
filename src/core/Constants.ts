@@ -421,7 +421,29 @@ export const ITEM_SCALE: Record<string, number> = {
   keel_1: 0.177, // Broken Strake, 418px → 74 units (the Cut Wood class)
   keel_2: 0.21, // Lashed Frame, 476px → 100 units (the Plank Set class)
   keel_3: 0.409, // Upturned Hull, 635px → 260 units (the House class)
-  keel_4: 0.49 // Longhall, 714px → 350 units (the Manor class)
+  keel_4: 0.49, // Longhall, 714px → 350 units (the Manor class)
+  // Selyna's second roster — five chains cut in one pass, and ONE number for
+  // all fifteen pieces rather than fifteen measured ones. That is not laziness:
+  // the cut step resamples every cell to exactly six times its on-board size
+  // (main's gen-borealis-chains.py, `TARGET * 6`), so the scale is 1/6 BY
+  // CONSTRUCTION and a re-cut cannot silently resize a piece on the board. The
+  // chains above still carry per-piece values because their art was cut before
+  // that rule existed — leave them measured, they are not wrong.
+  runestone_1: 0.1667, // Rune Shard
+  runestone_2: 0.1667, // Carved Stone
+  runestone_3: 0.1667, // Runestone
+  emberdram_1: 0.1667, // Dram Vial
+  emberdram_2: 0.1667, // Cordial Flask
+  emberdram_3: 0.1667, // Cordial Cask
+  hearthlamp_1: 0.1667, // Oil Lamp
+  hearthlamp_2: 0.1667, // Storm Lantern
+  hearthlamp_3: 0.1667, // Hearthlamp
+  manastone_1: 0.1667, // Mana Pebble
+  manastone_2: 0.1667, // Mana Nodule
+  manastone_3: 0.1667, // Manastone Cairn
+  wayfinder_1: 0.1667, // Lodestone
+  wayfinder_2: 0.1667, // Boxed Needle
+  wayfinder_3: 0.1667 // The Wayfinder
 };
 
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
