@@ -49,6 +49,17 @@ class FakeLoader implements QueueableLoader {
     this.fire();
   }
 
+  /** What Phaser does to a scene's loader on every boot and restart
+   *  (SceneManager.bootScene calls `loader.reset()` unconditionally): the
+   *  queues are emptied, the state goes back to idle, and — because the scene
+   *  shutdown ran `removeAllListeners` first — every pending callback is gone. */
+  sceneRestart(): void {
+    this.files = [];
+    this.flight = [];
+    this.loading = false;
+    this.listeners = [];
+  }
+
   private fire(): void {
     const ls = this.listeners;
     this.listeners = [];
@@ -141,6 +152,49 @@ describe('LoadQueue', () => {
     expect(order).toEqual(['first']);
     loader.finish();
     expect(order).toEqual(['first', 'second']);
+  });
+
+  it('survives the scene it belongs to being torn down mid-batch', () => {
+    // THE TWO-HOP HANG. Travelling restarts the board, which resets the loader
+    // and throws away every pending COMPLETE — but the queue is a field on the
+    // scene, and Phaser reuses the instance. Without `reset` it would still be
+    // waiting on that dead completion, and the SECOND journey would queue
+    // behind a corpse: no callback, no rebuilt board, a veil up forever.
+    const loader = new FakeLoader();
+    const q = new LoadQueue(loader);
+    let first = false;
+    q.run(() => loader.add('borealis.webp'), () => (first = true));
+    expect(loader.isReady()).toBe(false);
+
+    // …the board is torn down and rebuilt. Phaser resets the loader with it,
+    // and the shutdown dropped every listener on the way.
+    loader.sceneRestart();
+    q.reset();
+    expect(q.depth).toBe(0);
+    expect(first).toBe(false); // its callback died with the scene, as it must
+
+    // The queue is usable again on the very next journey.
+    let second = false;
+    q.run(() => {}, () => (second = true));
+    expect(second).toBe(true);
+  });
+
+  it('does not let a torn-down exclusive hold release the new board’s lock', async () => {
+    const loader = new FakeLoader();
+    const q = new LoadQueue(loader);
+    let resolveRig = (): void => {};
+    const rig = q.runExclusive(() => new Promise<void>((r) => (resolveRig = r)));
+    await Promise.resolve();
+    loader.sceneRestart(); // the scene went away while the rig was loading
+    q.reset();
+    let ran = false;
+    q.run(() => {}, () => (ran = true));
+    expect(ran).toBe(true); // the new era is free
+    resolveRig(); // the old fetch finally answers — and must change nothing
+    await rig;
+    let after = false;
+    q.run(() => {}, () => (after = true));
+    expect(after).toBe(true);
   });
 
   it('gives an add/once/start routine of its own the loader exclusively', async () => {

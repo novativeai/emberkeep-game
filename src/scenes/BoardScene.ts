@@ -535,6 +535,11 @@ export class BoardScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(POWER_STATE_EVENT, this.onPowerState, this);
       this.game.events.off(GRAPHICS_EVENT, this.onGraphicsChanged, this);
+      // The loader is reset with the scene and takes every pending COMPLETE
+      // with it, but THIS QUEUE IS A FIELD and Phaser reuses the instance — so
+      // without this it would wait forever on a completion that died here, and
+      // the next world's art would queue behind it and never load.
+      this.loads.reset();
       this.ambientEmitters = [];
       this.twinkleTimer = undefined;
       this.offBus.forEach((off) => off());
@@ -544,6 +549,16 @@ export class BoardScene extends Phaser.Scene {
         ld.player?.destroy();
       }
       this.liveDragons.clear();
+      // Sheets that were still in the air when the board went away never became
+      // textures, but the bookkeeping still says they were asked for — and
+      // "asked for" is what stops `fetchClips` asking again. Both maps outlive
+      // the scene (the texture manager is the GAME's), so the honest state is
+      // whatever actually made it into the manager.
+      for (const [id, ref] of [...this.residentClips]) {
+        if (this.textures.exists(clipKey(ref.breed, ref.clip))) continue;
+        this.residentClips.delete(id);
+        this.dragonClipsAsked.delete(id);
+      }
       this.altarElder?.destroy();
       this.altarElder = undefined;
       this.altarElderClip?.destroy();

@@ -50,6 +50,9 @@ export class LoadQueue {
   /** Set while waiting on a COMPLETE we did not start, so the wait is armed
    *  once rather than once per queued job. */
   private waiting = false;
+  /** Bumped by `reset`, so work outstanding from the previous board can tell
+   *  that the queue it is about to touch is no longer the one it started on. */
+  private era = 0;
 
   constructor(private readonly loader: QueueableLoader) {}
 
@@ -77,18 +80,48 @@ export class LoadQueue {
     await new Promise<void>((resolve) => this.run(() => {}, resolve));
     // The empty batch above completed, so the loader is idle and ours until
     // `fn` resolves — which it does on its own COMPLETE.
+    const era = this.era;
     this.busy = true;
     try {
       await fn();
     } finally {
-      this.busy = false;
-      this.pump();
+      // …unless the scene went away while we waited, in which case the queue
+      // has already been handed to a new board and this hold is not ours to
+      // release. `fn`'s own COMPLETE died with the old loader, so without this
+      // a torn-down rig fetch would clear a lock it no longer owns.
+      if (era === this.era) {
+        this.busy = false;
+        this.pump();
+      }
     }
   }
 
   /** How many batches are waiting. For assertions and diagnostics. */
   get depth(): number {
     return this.jobs.length;
+  }
+
+  /**
+   * Forget everything — THE SCENE IS GONE.
+   *
+   * Phaser reuses a scene INSTANCE across `scene.restart()`, so this queue
+   * outlives the board that owns it, while the LoaderPlugin under it is reset
+   * and every pending `once(COMPLETE)` is thrown away with it. A queue that was
+   * mid-batch when that happened would sit `busy` on a completion that can
+   * never arrive, and everything asked of it afterwards would join a line that
+   * never moves — which is a board that never rebuilds and a travelling veil
+   * that never lifts. Travelling twice was enough to do it: the first journey
+   * restarted the scene, the second queued behind the corpse.
+   *
+   * Dropping the pending batches is right rather than merely expedient. They
+   * were asked for by the board being torn down; the one being built asks
+   * again for whatever it actually needs.
+   */
+  reset(): void {
+    this.jobs.length = 0;
+    this.busy = false;
+    this.waiting = false;
+    this.era++;
   }
 
   private pump(): void {
