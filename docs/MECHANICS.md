@@ -215,10 +215,17 @@ Warmth.** Shipped free producers (all `energyCost: 0`):
   closes on itself). The isle authors no tree; this one is grown. **Theme
   Crystal** — an Emerald every 300 s.
 - **Treasure Chest** — a random gift every `CHEST_INTERVAL_MS` (300 s), forever.
-- They keep producing **offline**, banking up to `OFFLINE_BANK_CYCLES` (**3**)
-  overdue cycles per producer, which the "While you were away" card reports on
-  load (gated by `WELCOME_BACK_MIN_MS`, 5 min). Energy-gated dragons + free
-  auto-producers = the dual-gate the whole genre uses.
+- They **stop when the player leaves**, and that is a deliberate reversal of the
+  genre default. `GameClock` freezes while the tab is hidden and `load` rebases
+  it onto the save's own timestamp, so absence is not elapsed time: nothing
+  produces, no dragon grows hungry, the day does not roll. The isle runs while
+  someone is watching it and not otherwise. **[L1]**
+- The offline catch-up is therefore **dormant, not deleted**: banking up to
+  `OFFLINE_BANK_CYCLES` (**3**) overdue cycles per producer and the "While you
+  were away" card (`WELCOME_BACK_MIN_MS`, 5 min) are all still wired and still
+  correct — they are simply always asked about a gap of length zero. One line in
+  `SaveSystem.load` (the rebase) is the whole difference, and removing it brings
+  the authored behaviour back intact. **[full]**
 
 ### 4.4 Bubbles — the overflow valve **[full]**
 When the board is full and a harvest/merge has nowhere to land, the new item
@@ -308,7 +315,7 @@ regen*. For a **cozy single-player** game the research says go gentler still.
 | Start | **28** (so the tutorial's free Spark visibly tops it up) | — | teach the shop without a wall |
 | Regen | **+1 / 60 s** | +1 / 30 s (faster for cozy) | regen = session *frequency* |
 | Level-up | **full refill + scaling Gold** (`LEVELUP_REWARD`) | + cap bump | rescue the player at the wall → reward, not friction |
-| Offline | yes, catch-up on load, **3 banked cycles/producer** | **uncapped overflow banks** | rewards never wasted |
+| Offline | **no — the clock stops with the player** (§4.3) | catch-up on load, uncapped overflow banks | the isle runs while someone is watching it |
 | Floor at 0 | **shipped** — free auto-producers keep working (§4.3) | same | never open to a dead board |
 
 All timers read `GameClock.now()` so `advanceTime(ms)` stays deterministic. **[L1]**

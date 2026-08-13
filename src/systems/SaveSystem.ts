@@ -123,6 +123,22 @@ export class SaveSystem {
   load(): boolean {
     const data = this.peek();
     if (!data) return false;
+    /**
+     * THE GAP DID NOT HAPPEN. One line, and it is the whole rule.
+     *
+     * The clock is put back to the instant this save was written, so `now()`
+     * IS `savedAt` and the time the player spent away from the site is not
+     * time the isle had. Nothing below needs to know: `offlineMs` computes to
+     * zero on its own, `computeRegen` finds nothing owed, GeneratorSystem's
+     * offline catch-up returns on its own guard, and the welcome-back card
+     * never reaches its threshold. The machinery is all still here and still
+     * correct — it is simply asked about a gap of length zero.
+     *
+     * That is deliberate: making the clock tell the truth is reversible in a
+     * way that deleting four features is not. Drop this line and offline
+     * production comes back exactly as it was authored.
+     */
+    this.clock.rebaseTo(data.savedAt);
     const now = this.clock.now();
     const offlineMs = Math.max(0, now - data.savedAt);
     const max = energyMaxForLevel(levelForXp(data.xp ?? 0));

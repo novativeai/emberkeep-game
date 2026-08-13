@@ -150,8 +150,32 @@ const flushSave = (): void => {
   ctx.systems.save.save();
 };
 window.addEventListener('pagehide', flushSave);
+
+/**
+ * AND THE ISLE STOPS WHEN NOBODY IS LOOKING AT IT.
+ *
+ * The page being hidden is the only signal the browser gives for "the player
+ * left" that actually fires — and until now all it did was write the save. The
+ * game itself kept its appointment with the wall clock: producers came due,
+ * dragons grew hungry, the day rolled on. A dev server left running in another
+ * window was enough to make hours of unattended play happen.
+ *
+ * So the clock stops here and starts again on the way back, and the span in
+ * between is deducted rather than remembered (`GameClock.pause`/`resume`).
+ * Stopping FIRST is deliberate: the save that follows then stamps the frozen
+ * reading, which is the same instant `load` will rebase to if the tab is closed
+ * instead of merely hidden. Hidden and closed become the same story.
+ *
+ * `visibilitychange` covers switching tab, minimising, locking the phone and
+ * closing; `pagehide` above still flushes for the departures that skip it.
+ */
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushSave();
+  if (document.visibilityState === 'hidden') {
+    ctx.clock.pause();
+    flushSave();
+  } else {
+    ctx.clock.resume();
+  }
 });
 
 /**

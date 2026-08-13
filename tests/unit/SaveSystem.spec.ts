@@ -30,20 +30,46 @@ describe('SaveSystem', () => {
     expect(ctx2.state.nextItemId).toBe(ctx1.state.nextItemId);
   });
 
-  it('applies offline energy regen on load', () => {
+  /**
+   * TIME AWAY IS NOT TIME PLAYED.
+   *
+   * This test used to assert the opposite — three intervals away bought three
+   * energy — and it is inverted on purpose rather than deleted, because it is
+   * the one place the rule can be stated: the isle does not run for a player
+   * who is not there. `load` rebases the clock onto the save's own timestamp,
+   * so the gap is zero for EVERY consumer at once (energy here, the passive
+   * harvest in GeneratorSystem, the welcome-back card in UIScene) without any
+   * of them being touched.
+   *
+   * The advance is deliberately huge: any amount of absence must credit the
+   * same nothing, or the rule is a tuning value pretending to be a rule.
+   */
+  it('credits nothing for time spent away — a reload resumes at the instant it was saved', () => {
     const storage = new MemoryStorage();
     const ctx1 = createTestContext(storage);
     ctx1.beginRun();
     ctx1.bus.emit('energy:spend', { amount: 5, reason: 'test' });
     ctx1.systems.save.save();
+    // Read from the FILE, not from ctx1's clock: the wall moves between the
+    // write and this line, and the instant that matters is the one on disk —
+    // it is the only one `load` can see.
+    const savedAt = (JSON.parse(storage.getItem(SAVE_KEY)!) as { savedAt: number }).savedAt;
 
     const ctx2 = createTestContext(storage);
-    ctx2.clock.advance(ENERGY_REGEN_MS * 3 + 500); // "offline" for ~3 intervals
+    ctx2.clock.advance(ENERGY_REGEN_MS * 3 + 500); // three intervals of absence…
     const loadedEvents = capture(ctx2.bus, 'state:loaded');
     ctx2.systems.save.load();
 
-    expect(loadedEvents[0]?.energyRecovered).toBe(3);
-    expect(ctx2.state.energyCurrent).toBe(ENERGY_START - 5 + 3);
+    expect(loadedEvents[0]?.offlineMs).toBe(0);
+    expect(loadedEvents[0]?.energyRecovered).toBe(0);
+    expect(ctx2.state.energyCurrent).toBe(ENERGY_START - 5); // …bought nothing
+    // The clock did not merely decline to pay: it READS the saved instant and
+    // carries on from there, so every cooldown hydrated from that save is
+    // exactly as overdue as it was when the player left. The only distance
+    // between the two readings is this test's own runtime — never the three
+    // intervals of absence, which is the whole point.
+    expect(ctx2.clock.now()).toBeGreaterThanOrEqual(savedAt);
+    expect(ctx2.clock.now()).toBeLessThan(savedAt + ENERGY_REGEN_MS);
   });
 
   it('autosaves on mutations (merge updates storage without an explicit save)', () => {
