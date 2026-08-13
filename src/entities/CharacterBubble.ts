@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { CHARACTER_ANIMS, type CharacterClip, clipFor, clipKey, type PortraitView } from '../core/characterAnims';
-import { num, PALETTE, PORTRAIT_CLIP_TALK, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
+import { num, PALETTE, PORTRAIT_CLIP_TALK, SPEAKER_NAMES, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { SpeakerId, TutorialStepEvent } from '../core/types';
 import {
@@ -14,13 +14,14 @@ import {
 } from './PortraitAnimator';
 import { uiRegistry } from '../ui/theme';
 
-/** Display name + name-tag colour per speaker. Adding a speaker is an entry
- *  here plus a `portrait_<id>` texture (and, if she should animate, a disc
- *  atlas from `scripts/bake-portrait-disc.py`). */
+/** Name-tag colour per speaker; the display names come from SPEAKER_NAMES in
+ *  Constants (one table for every surface that prints them). Adding a speaker
+ *  is an entry here plus a `portrait_<id>` texture (and, if she should
+ *  animate, a disc atlas from `scripts/bake-portrait-disc.py`). */
 const SPEAKERS: Record<SpeakerId, { name: string; tag: string }> = {
-  eleanor: { name: 'Eleanor', tag: PALETTE.goldShade },
-  selyna: { name: 'Selyna', tag: PALETTE.tealDeep },
-  golden_elder: { name: 'The Golden Elder', tag: PALETTE.lavaShade }
+  eleanor: { name: SPEAKER_NAMES.eleanor, tag: PALETTE.goldShade },
+  selyna: { name: SPEAKER_NAMES.selyna, tag: PALETTE.tealDeep },
+  golden_elder: { name: SPEAKER_NAMES.golden_elder, tag: PALETTE.lavaShade }
 };
 /** Exported so every surface that prints a person's name prints the SAME name.
  *  A second table would drift the first time somebody is renamed. */

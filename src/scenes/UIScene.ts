@@ -506,18 +506,13 @@ export class UIScene extends Phaser.Scene {
         if (questId === GOLDEN_ALTAR.awakenQuestId) this.time.delayedCall(0, () => this.runFinaleUi());
         this.onElderQuestCompleted(questId);
       }),
-      // The Elder's track moving to its next ask. His FIRST quest is announced
-      // by the Gate ceremony instead (runFinaleUi → playElderGreeting), because
-      // this event fires synchronously inside the very evaluate() that
-      // completes `keepers_hoard` — before the finale has even claimed the
-      // stage.
-      bus.on('quest:advanced', ({ questId, giver, index }) => {
-        if (giver !== 'golden_elder' || index === 1) return;
-        const line = this.elderLine(questId, 'start');
-        if (!line) return;
-        this.time.delayedCall(ELDER_VOICE.nextAskDelayMs, () =>
-          this.bubble.say('golden_elder', line, ELDER_VOICE.askHoldMs)
-        );
+      // The Elder's track moving to its next ask. His very first advance fires
+      // inside the evaluate() that completes `keepers_hoard`, so by the time
+      // the delayed line would land the finale owns the stage — sayElderAsk's
+      // fire-time guard suppresses it, and the Gate ceremony's greeting
+      // introduces that first ask instead.
+      bus.on('quest:advanced', ({ giver }) => {
+        if (giver === 'golden_elder') this.sayElderAsk(ELDER_VOICE.nextAskDelayMs);
       }),
       bus.on('tasks:all_complete', () => this.celebrateTasksComplete()),
       bus.on('energy:changed', ({ current }) => {
@@ -545,7 +540,7 @@ export class UIScene extends Phaser.Scene {
         // Once per session the Elder restates his current ask: a reload can
         // land anywhere in his ladder, and quest:advanced never re-fires on
         // load (the re-derive is silent by design).
-        this.time.delayedCall(ELDER_VOICE.reminderDelayMs, () => this.remindElderAsk());
+        this.sayElderAsk(ELDER_VOICE.reminderDelayMs);
       }),
       bus.on('tutorial:step', (step) => {
         // Appears for its tutorial introduction, then permanently post-tutorial.
@@ -913,47 +908,53 @@ export class UIScene extends Phaser.Scene {
   // --------------------------------------------------- the Elder's quest voice
 
   private elderLine(questId: string, which: 'start' | 'done'): string | undefined {
-    return this.ctx.data.dialogue.elder?.quests[questId]?.[which];
+    return this.ctx.data.dialogue.elder.quests[questId]?.[which];
+  }
+
+  /**
+   * Speak the Elder's CURRENT ask after `delayMs` — the one line all three of
+   * his prompts share (next-quest advance, the greeting's tail, the
+   * per-session reminder). Everything is resolved at FIRE time, not schedule
+   * time: he never talks over the finale ceremony (the greeting introduces his
+   * first ask on its tail instead), never shouts across worlds, and always
+   * states the ask his track is actually on.
+   */
+  private sayElderAsk(delayMs: number): void {
+    this.time.delayedCall(delayMs, () => {
+      if (!this.ctx.state.tutorialDone || this.finaleActive) return;
+      if (this.ctx.state.worldId !== WORLD_ID) return;
+      const quest = this.ctx.systems.quests.activeQuestFor('golden_elder');
+      const line = quest ? this.elderLine(quest.id, 'start') : undefined;
+      if (line) this.bubble.say('golden_elder', line, ELDER_VOICE.askHoldMs);
+    });
   }
 
   /** The one-time introduction of his track — three tap-advanced lines (the
    *  last teaches the tracker's track arrow), then his first ask. */
   private playElderGreeting(): void {
     const elder = this.ctx.data.dialogue.elder;
-    const first = this.ctx.systems.quests.activeQuestFor('golden_elder');
-    if (!elder?.greeting.length || !first) return;
-    this.bubble.sequence('golden_elder', elder.greeting, () => {
-      const line = this.elderLine(first.id, 'start');
-      if (line) {
-        this.time.delayedCall(900, () => this.bubble.say('golden_elder', line, ELDER_VOICE.askHoldMs));
-      }
-    });
+    if (!elder.greeting.length || !this.ctx.systems.quests.activeQuestFor('golden_elder')) return;
+    this.bubble.sequence('golden_elder', elder.greeting, () =>
+      this.sayElderAsk(ELDER_VOICE.firstAskDelayMs)
+    );
   }
 
   /** His completion beat: the quest's done line — or, when the twelfth closes
    *  his whole watch, the arc's own farewell instead. */
   private onElderQuestCompleted(questId: string): void {
-    const quest = this.ctx.systems.quests.all.find((q) => q.id === questId);
-    if (quest?.giver !== 'golden_elder') return;
+    // His line table is keyed by quest id, so having a done line IS the
+    // "one of his" test — no ladder scan needed.
+    const done = this.elderLine(questId, 'done');
+    if (!done) return;
     // He does not shout across worlds: a level quest can latch while the player
     // stands in Borealis, and the catch-up `quest:advanced` on returning home
     // re-states his next ask anyway.
     if (this.ctx.state.worldId !== WORLD_ID) return;
     const next = this.ctx.systems.quests.activeQuestFor('golden_elder');
-    const line = next ? this.elderLine(questId, 'done') : this.ctx.data.dialogue.elder?.allDone;
-    if (!line) return;
-    this.time.delayedCall(600, () =>
+    const line = next ? done : this.ctx.data.dialogue.elder.allDone;
+    this.time.delayedCall(ELDER_VOICE.doneDelayMs, () =>
       this.bubble.say('golden_elder', line, next ? ELDER_VOICE.doneHoldMs : ELDER_VOICE.allDoneHoldMs)
     );
-  }
-
-  /** The once-per-session restatement of his current ask (state:loaded). */
-  private remindElderAsk(): void {
-    if (!this.ctx.state.tutorialDone || this.finaleActive) return;
-    if (this.ctx.state.worldId !== WORLD_ID) return;
-    const quest = this.ctx.systems.quests.activeQuestFor('golden_elder');
-    const line = quest ? this.elderLine(quest.id, 'start') : undefined;
-    if (line) this.bubble.say('golden_elder', line, ELDER_VOICE.askHoldMs);
   }
 
   /** Order completion — the demo's primary reward beat — now celebrates at

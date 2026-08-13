@@ -2,6 +2,7 @@
  * Every tunable in Emberkeep lives here or in src/data/*.json.
  * Systems and scenes must not contain magic numbers.
  */
+import type { SpeakerId } from './types';
 
 /** Emberkeep palette (string form for Canvas2D, use num() for Phaser). */
 export const PALETTE = {
@@ -1447,14 +1448,39 @@ export const FINALE_ENDS_MS = FINALE.elderAtMs + FINALE.elderHoldMs;
 export const ELDER_VOICE = {
   /** After `gate:opened` — the portal bloom (~2s) lands first. */
   greetingDelayMs: 3200,
+  /** After the greeting's last line — his first ask follows the introduction. */
+  firstAskDelayMs: 900,
   /** After a quest's done line (held `doneHoldMs`) — the next ask follows it. */
   nextAskDelayMs: 5400,
+  /** After `quest:completed` — a breath before the done line. */
+  doneDelayMs: 600,
   /** After `state:loaded`, once per session, he restates his current ask. */
   reminderDelayMs: 9000,
   askHoldMs: 5600,
   doneHoldMs: 4600,
   allDoneHoldMs: 7200
 } as const;
+
+/**
+ * Display names, one table for every surface that prints a person's name —
+ * the bubble's name tag, a subquest's "Deliver … to Eleanor", a HUD line.
+ * A second copy of this table drifts the first time somebody is renamed.
+ */
+export const SPEAKER_NAMES: Record<SpeakerId, string> = {
+  eleanor: 'Eleanor',
+  selyna: 'Selyna',
+  golden_elder: 'The Golden Elder'
+};
+
+/**
+ * The mark a giver's quest titles wear on the tracker, so a glance says whose
+ * page is open when two tracks share a board. Absent = unmarked (the world's
+ * host giver — Eleanor in the south, Selyna in the north — owns the plain
+ * title).
+ */
+export const GIVER_MARK: Partial<Record<SpeakerId, string>> = {
+  golden_elder: '✦ '
+};
 
 /** Portal FX height in world px — sized to Eleanor's standee, so a door reads
  *  as tall as the people who use it. The tap area is the FX's own bounds

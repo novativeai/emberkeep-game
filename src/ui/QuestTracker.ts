@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { GAME_WIDTH, IS_MOBILE, num, PALETTE, UI_SCALE } from '../core/Constants';
+import { GAME_WIDTH, GIVER_MARK, IS_MOBILE, num, PALETTE, UI_SCALE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { QuestConfig, QuestStepConfig, SpeakerId } from '../core/types';
 import type { QuestSystem } from '../systems/QuestSystem';
 import { uiRegistry } from './theme';
+import { scalePulse } from './tweens';
 
 
 /** Right margin of the cluster — main line and sub rows share this edge, so
@@ -324,14 +325,14 @@ export class QuestTracker extends Phaser.GameObjects.Container {
 
   // -------------------------------------------------------------- giver view
 
-  /** The giver whose track the readout is on. Folds onto a live track whenever
-   *  the roster shrank underneath the index (a track finished, or the player
-   *  crossed to a world with different givers). */
+  /** The giver whose track the readout is on. A pure read — the modulo folds
+   *  the index onto a live track whenever the roster shrank underneath it (a
+   *  track finished, or the player crossed to a world with different givers),
+   *  without writing view state from a render path. */
   private viewGiver(): SpeakerId | null {
     const givers = this.quests.giversHere;
     if (!givers.length) return null;
-    this.giverIdx %= givers.length;
-    return givers[this.giverIdx] ?? null;
+    return givers[this.giverIdx % givers.length] ?? null;
   }
 
   private viewQuest(): QuestConfig | null {
@@ -344,7 +345,8 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   private cycleGiver(): void {
     const givers = this.quests.giversHere;
     if (givers.length < 2 || this.mainRetiring) return;
-    this.giverIdx = (this.giverIdx + 1) % givers.length;
+    // Fold before stepping — the stored index may exceed a roster that shrank.
+    this.giverIdx = (this.giverIdx % givers.length + 1) % givers.length;
     for (const row of this.rows) row.root.destroy();
     this.rows = [];
     this.scrollY = 0;
@@ -352,12 +354,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.mainStrike.clear();
     this.refreshMain();
     this.syncRows();
-    this.scene.tweens.add({
-      targets: this.switchBtn,
-      scale: { from: 0.82, to: 1 },
-      duration: 180,
-      ease: 'Back.easeOut'
-    });
+    scalePulse(this.scene, this.switchBtn);
   }
 
   /** The arrow exists only while there is a page to turn. */
@@ -377,9 +374,9 @@ export class QuestTracker extends Phaser.GameObjects.Container {
       this.mainProgress.setText('');
       return;
     }
-    // The Elder's asks wear his mark, so a glance says whose page is open.
-    const prefix = quest.giver === 'golden_elder' ? '✦ ' : '';
-    this.mainTitle.setText(prefix + this.quests.titleFor(quest));
+    // A marked giver's asks wear his mark (GIVER_MARK), so a glance says whose
+    // page is open.
+    this.mainTitle.setText((GIVER_MARK[quest.giver] ?? '') + this.quests.titleFor(quest));
     // A multi-step quest counts its steps; a one-step quest (the endless Ledger
     // tail) would only ever read "0 / 1", so it shows that step's own item
     // progress instead — the same number the Ledger's order card shows.

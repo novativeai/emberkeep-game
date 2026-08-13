@@ -27,11 +27,15 @@ describe('dialogue.json line budget (Constants.DIALOGUE_MAX_CHARS)', () => {
     expect(over).toEqual([]);
   });
 
-  it('speaker keys are non-empty wherever a sequence declares one', () => {
+  it('speaker keys are present and non-empty wherever a sequence declares one', () => {
     // The bubble resolves speaker art and name tags off these ids; an empty one
-    // renders an unnamed portrait ring.
+    // renders an unnamed portrait ring. Collected first so a renamed key makes
+    // the test FAIL loudly rather than silently checking nothing.
+    const speakers: string[] = [];
     walk(dialogue, '', (path, line) => {
-      if (path.endsWith('.speaker')) expect(line, path).not.toBe('');
+      if (path.endsWith('.speaker')) speakers.push(line);
     });
+    expect(speakers.length).toBeGreaterThan(0);
+    expect(speakers.filter((s) => !s)).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 import { questStepNeeds } from '../core/availability';
-import { giftKey, heartsForPoints, regardKey, WORLD_ID } from '../core/Constants';
+import { giftKey, heartsForPoints, regardKey, SPEAKER_NAMES, WORLD_ID } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type {
@@ -19,6 +19,11 @@ import type { TaskSystem } from './TaskSystem';
  *  already persisted — the ladder adds no field to the save schema and so needs
  *  no SAVE_VERSION bump (ripple-map: TOUCH GameState fields → CHECK SaveSystem). */
 const latchKey = (stepId: string): string => `q:${stepId}`;
+
+/** The once-ever completion latch for a whole quest (`q:done:<id>`) — the key
+ *  `evaluate` writes, `questLocked` gates on, and WorldSystem's story doors
+ *  read. One derivation, because it is a PERSISTED save key. */
+const doneLatchKey = (questId: string): string => latchKey(`done:${questId}`);
 
 /** Plain-English verb per lifetime counter, so an unlabelled `stat` step reads
  *  "Hatch 4" rather than leaking the counter's field name onto the HUD. */
@@ -40,7 +45,7 @@ const STAT_VERB: Record<string, string> = {
  * never set foot in Borealis and never will (story-bible §5).
  */
 const giverName = (giver: string | undefined): string =>
-  giver ? giver.charAt(0).toUpperCase() + giver.slice(1) : 'the Ledger';
+  giver ? (SPEAKER_NAMES[giver as keyof typeof SPEAKER_NAMES] ?? giver) : 'the Ledger';
 
 export interface StepProgress {
   have: number;
@@ -152,7 +157,7 @@ export class QuestSystem {
    *  it is never null there; a world with no ladder yet returns null and the
    *  HUD stays empty rather than showing another world's business. */
   get activeQuest(): QuestConfig | null {
-    return this.tracked.find((q) => !this.questLocked(q) && !this.isComplete(q)) ?? null;
+    return this.tracked.find((q) => this.isLive(q)) ?? null;
   }
 
   /**
@@ -163,23 +168,34 @@ export class QuestSystem {
    */
   questLocked(quest: QuestConfig): boolean {
     const gate = quest.lockedUntil?.quest;
-    return !!gate && this.state.stat(latchKey(`done:${gate}`)) === 0;
+    return !!gate && this.state.stat(doneLatchKey(gate)) === 0;
+  }
+
+  /** The one predicate behind every track pointer: askable right now — awake
+   *  and unfinished. */
+  private isLive(quest: QuestConfig): boolean {
+    return !this.questLocked(quest) && !this.isComplete(quest);
   }
 
   /**
-   * The givers with a LIVE track on this board, in ladder (file) order — the
-   * roster the tracker's track arrow cycles through. A giver is live once any
-   * of their quests is unlocked and unfinished: Eleanor is always here (her
-   * ladder ends in the endless tail), the Elder joins when `keepers_hoard`
-   * wakes him and leaves when his twelfth quest is done.
+   * Each giver's live track head in this world, one ladder pass, in ladder
+   * (file) order. A giver is on the roster once any of their quests is unlocked
+   * and unfinished: Eleanor is always here (her ladder ends in the endless
+   * tail), the Elder joins when `keepers_hoard` wakes him and leaves when his
+   * twelfth quest is done. Derived per call — the `q:done:` fast path in
+   * `isComplete` makes the pass a handful of map reads.
    */
-  get giversHere(): SpeakerId[] {
-    const seen: SpeakerId[] = [];
+  private liveTracks(): Map<SpeakerId, QuestConfig> {
+    const tracks = new Map<SpeakerId, QuestConfig>();
     for (const quest of this.tracked) {
-      if (seen.includes(quest.giver)) continue;
-      if (!this.questLocked(quest) && !this.isComplete(quest)) seen.push(quest.giver);
+      if (!tracks.has(quest.giver) && this.isLive(quest)) tracks.set(quest.giver, quest);
     }
-    return seen;
+    return tracks;
+  }
+
+  /** The roster the tracker's track arrow cycles through. */
+  get giversHere(): SpeakerId[] {
+    return [...this.liveTracks().keys()];
   }
 
   /** One giver's ladder in this world, dormant quests included (positions are
@@ -191,7 +207,7 @@ export class QuestSystem {
   /** The quest a giver's own track is on — what the HUD shows when the player
    *  has switched the tracker to that giver. */
   activeQuestFor(giver: SpeakerId): QuestConfig | null {
-    return this.trackedFor(giver).find((q) => !this.questLocked(q) && !this.isComplete(q)) ?? null;
+    return this.liveTracks().get(giver) ?? null;
   }
 
   /** Its 1-based position within its own GIVER's ladder in this world. */
@@ -207,6 +223,10 @@ export class QuestSystem {
   }
 
   isComplete(quest: QuestConfig): boolean {
+    // The done latch answers first: completion is monotone (steps latch), so a
+    // set latch is the whole truth, and the track pointers that prefix-scan the
+    // ladder pay one map read per finished rung instead of re-walking its steps.
+    if (this.state.stat(doneLatchKey(quest.id)) > 0) return true;
     return quest.steps.every((step) => this.stepDone(step));
   }
 
@@ -289,7 +309,7 @@ export class QuestSystem {
         this.state.addStat(latchKey(step.id), 1);
         if (announce) this.bus.emit('quest:step_completed', { questId: quest.id, stepId: step.id });
       }
-      const doneKey = latchKey(`done:${quest.id}`);
+      const doneKey = doneLatchKey(quest.id);
       if (this.isComplete(quest) && this.state.stat(doneKey) === 0) {
         this.state.addStat(doneKey, 1);
         // The per-world completion counter WorldSystem's Rune Way gate reads
@@ -307,18 +327,17 @@ export class QuestSystem {
     // Each giver's track announces its own pointer moves — the Elder starting
     // his first quest must not wait for (or interfere with) wherever Eleanor's
     // ladder happens to be.
-    for (const giver of this.giversHere) {
-      const active = this.activeQuestFor(giver);
-      if (active && active.id !== this.lastAnnounced.get(giver)) {
-        this.lastAnnounced.set(giver, active.id);
-        if (announce) {
-          this.bus.emit('quest:advanced', {
-            questId: active.id,
-            giver,
-            index: this.indexOf(active),
-            total: this.trackedFor(giver).length
-          });
-        }
+    for (const [giver, active] of this.liveTracks()) {
+      if (active.id === this.lastAnnounced.get(giver)) continue;
+      this.lastAnnounced.set(giver, active.id);
+      if (announce) {
+        const ladder = this.trackedFor(giver);
+        this.bus.emit('quest:advanced', {
+          questId: active.id,
+          giver,
+          index: ladder.findIndex((q) => q.id === active.id) + 1,
+          total: ladder.length
+        });
       }
     }
   }

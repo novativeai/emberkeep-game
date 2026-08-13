@@ -1064,6 +1064,8 @@ export function auditLegendaryArc(data: AuditData): Finding[] {
     });
     return findings;
   }
+  // No egg-paying giver at all falls back to the whole world ladder — the
+  // `total !== LEGENDARY_EGG_COUNT` error below fires first in that case.
   const ladder = eggGivers.length ? worldLadder.filter((q) => q.giver === eggGivers[0]) : worldLadder;
   const completable = ladder.filter((q) => q.steps.some((step) => step.goal.kind !== 'active_order'));
   const eggAt = completable

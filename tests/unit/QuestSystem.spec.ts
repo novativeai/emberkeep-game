@@ -194,6 +194,24 @@ describe("two givers on one board — the Golden Elder's track", () => {
     expect(after.questId).toBe('elder_green_over_ash');
     expect(ctx.systems.quests.activeQuest!.id).toBe('rekindle_brazier');
   });
+
+  it('a gated track is gated WHOLE — every quest of the giver carries the same gate', () => {
+    // The dormancy that stops pre-latching is per QUEST, but the property it
+    // protects is per TRACK: one ungated quest in a sleeping giver's ladder
+    // silently pre-completes off Eleanor-era board states, with no on-screen
+    // symptom until he wakes into a half-finished ladder. Authored data has to
+    // hold the invariant, so this test states it.
+    const ctx = createTestContext();
+    const byTrack = new Map<string, Array<string | undefined>>();
+    for (const quest of ctx.systems.quests.all) {
+      const track = `${quest.world ?? 'emberkeep'}:${quest.giver}`;
+      if (!byTrack.has(track)) byTrack.set(track, []);
+      byTrack.get(track)!.push(quest.lockedUntil?.quest);
+    }
+    for (const [track, gates] of byTrack) {
+      expect(new Set(gates).size, `track ${track} mixes gates: ${[...new Set(gates)].join(', ')}`).toBe(1);
+    }
+  });
 });
 
 describe('quest rewards — the legendary egg arrives, once, and cannot be lost', () => {
