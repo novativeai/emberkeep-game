@@ -351,6 +351,9 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
         this.scene.tweens.add({ targets: img, alpha: 1, duration: SPEAKER_CROSSFADE_MS, ease: 'Sine.easeOut' });
       }
     }
+    // Shown by default; only the static branch below can withhold it, and only
+    // when the speaker has no face of their own to wear.
+    this.portrait.setVisible(true);
     if (this.trySetAtlasPortrait(speaker, text)) return;
     this.stopAtlasPortrait();
     if (isAnimatedSpeaker(speaker) && this.hasDiscSheet(speaker)) {
@@ -371,12 +374,38 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       return;
     }
     this.portraitAnim.rest();
+    /**
+     * NOBODY WEARS SOMEBODY ELSE'S FACE.
+     *
+     * This used to set the texture only `if (exists)` and otherwise leave the
+     * portrait on whatever it was last showing — which for a speaker with no
+     * registered `portrait_<id>` meant the previous person's. The Golden Elder
+     * had exactly that gap, so her line at the golden delivery opened under her
+     * name wearing ELEANOR's disc frame; and because the layout pass keys off
+     * the TEXTURE (`endsWith('_disc')`) while this one had already centre-
+     * origined and unmasked it, the two disagreed about how to frame it and her
+     * head hung outside the ring. Her art existed the whole time
+     * (`sprites/golden-elder/portrait.webp`) — nothing loaded it.
+     *
+     * So: her own face when it is registered, and NO face rather than the wrong
+     * one when it is not. A missing portrait is now a visibly absent portrait,
+     * which is debuggable; a borrowed one reads as a rendering bug in the ring.
+     */
     const staticKey = `portrait_${speaker}`;
-    if (this.scene.textures.exists(staticKey)) this.portrait.setTexture(staticKey);
+    const has = this.scene.textures.exists(staticKey);
+    if (has) this.portrait.setTexture(staticKey);
+    this.portrait.setVisible(has);
     this.portrait.setOrigin(0.5, 0.5);
     this.portrait.setCrop();
-    this.portrait.clearMask();
+    // Masked like every other treatment. `STATIC_DISC_SIZE` is wider than the
+    // ring's hole, so "fully contained like a medallion photo" was true only of
+    // art that happened to be circular with margin — the frame never enforced
+    // it. Now it does, and the arcs of the ring are the edge of the portrait
+    // whatever art is handed to it.
+    this.portrait.setMask(this.portraitMask);
     this.portraitTop.setVisible(false);
+    // A medallion fills the hole itself, so it keeps the split treatment's
+    // backing disc off — that exists to fill the gaps around a cut-out bust.
     this.portraitBack.setVisible(false);
   }
 

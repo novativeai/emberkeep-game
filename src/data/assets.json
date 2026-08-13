@@ -294,6 +294,12 @@
       "file": "sprites/items/arrow.webp"
     },
     {
+      "key": "portrait_golden_elder",
+      "source": "file",
+      "generator": "portrait",
+      "file": "sprites/golden-elder/portrait.webp"
+    },
+    {
       "key": "portrait_ring",
       "source": "file",
       "generator": "portrait",
