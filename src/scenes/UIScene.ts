@@ -105,6 +105,9 @@ export class UIScene extends Phaser.Scene {
   private lastStep: TutorialStepEvent | null = null;
   /** Heart milestones banked while the tutorial owns the bubble (see playRegardBeats). */
   private pendingHearts: Array<{ characterId: string; hearts: number }> = [];
+  /** Beats held because their speaker does not stand in the world the player is
+   *  in (see `speakHere`). Flushed on `world:switched`. */
+  private pendingAway: Array<{ speaker: SpeakerId; lines: string[] }> = [];
   /** The opening's held silence is a one-shot: only the very first step of a
    *  run waits, and a resumed save never re-holds. */
   private openingHeld = false;
@@ -568,7 +571,11 @@ export class UIScene extends Phaser.Scene {
       // The Roothold house is the Emporium's storefront — its tap opens the
       // same panel the (later-unlocked) HUD button does.
       bus.on('ui:emporium_requested', () => this.store.open()),
-      bus.on('world:switched', ({ to }) => this.maybeStartTour(to))
+      bus.on('world:switched', ({ to }) => this.maybeStartTour(to)),
+      // …and anything a speaker could not say from the world we just left. On
+      // `world:ready`, not `world:switched`: the board has to exist under the
+      // bubble, or she talks over the travelling curtain.
+      bus.on('world:ready', () => this.flushAwayBeats())
     );
   }
 
@@ -1186,6 +1193,41 @@ export class UIScene extends Phaser.Scene {
     this.applyMarkers(step);
   }
 
+  /**
+   * NOBODY SPEAKS FROM A WORLD THEY ARE NOT STANDING IN.
+   *
+   * A beat that can fire anywhere — a chapter turning, a heart earned — used to
+   * open the bubble wherever the player happened to be. Cross into Borealis,
+   * finish the thing that turns the chapter, and Eleanor talked over Selyna's
+   * snow from an isle two doors away.
+   *
+   * Held, never dropped: these beats play once ever, so the queue empties the
+   * next time the player is somewhere their speaker actually stands. The rule
+   * itself lives in WorldCharacterSystem (`speakerBelongs`) because it is a
+   * fact about the roster, not about the bubble — and a voice no body claims,
+   * like the Golden Elder's, is welcome everywhere by design.
+   */
+  private speakHere(speaker: SpeakerId, lines: string[], done?: () => void): void {
+    if (!this.ctx.systems.characters.speakerBelongs(speaker, this.ctx.state.worldId)) {
+      this.pendingAway.push({ speaker, lines });
+      done?.(); // the beat is deferred; whatever it unlocks is not
+      return;
+    }
+    this.bubble.sequence(speaker, lines, done);
+  }
+
+  /** Back somewhere they can be heard: play what was held, one beat at a time. */
+  private flushAwayBeats(): void {
+    const next = this.pendingAway.find((b) =>
+      this.ctx.systems.characters.speakerBelongs(b.speaker, this.ctx.state.worldId)
+    );
+    if (!next) return;
+    this.pendingAway.splice(this.pendingAway.indexOf(next), 1);
+    this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      this.bubble.sequence(next.speaker, next.lines, () => this.flushAwayBeats());
+    });
+  }
+
   /** A chapter turned: play its beats, tap by tap. Fires once per chapter — the
    *  pointer is persisted, so a reload never replays them. */
   private playChapterBeats(chapter: number): void {
@@ -1193,7 +1235,7 @@ export class UIScene extends Phaser.Scene {
     if (!beats) return;
     // Let the order-complete celebration land first; her reaction is TO it.
     this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
-      this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () => {
+      this.speakHere(beats.speaker as SpeakerId, beats.lines, () => {
         this.ctx.bus.emit('story:beats_finished', { chapter });
       });
     });
@@ -1358,7 +1400,7 @@ export class UIScene extends Phaser.Scene {
     const beats = this.ctx.systems.story.regardBeats(characterId, hearts);
     if (!beats) return;
     this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
-      this.bubble.sequence(beats.speaker as SpeakerId, beats.lines);
+      this.speakHere(beats.speaker as SpeakerId, beats.lines);
     });
   }
 

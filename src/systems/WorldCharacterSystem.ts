@@ -49,6 +49,32 @@ export class WorldCharacterSystem {
     return this.byId.get(characterId);
   }
 
+  /**
+   * MAY THIS VOICE BE HEARD HERE? — asked of the SPEAKER, not the character.
+   *
+   * A bubble names a speaker (`eleanor`), while the map holds bodies
+   * (`eleanor`, `eleanor_home`), so the question is whether ANY body wearing
+   * that voice stands in this world. Eleanor is welcome in Emberkeep and in
+   * Roothold, where she keeps a second post; Selyna only in Borealis.
+   *
+   * A voice NO body claims is welcome everywhere, and that is the deliberate
+   * half. The Golden Elder speaks from her altar and is not in the roster at
+   * all; the fallback is what stops a rule about roaming characters from
+   * silencing the one voice the chapter ends on.
+   *
+   * Only a beat that could fire ANYWHERE needs to ask — a chapter turning, a
+   * heart earned. Arrival beats already choose their speaker by world.
+   */
+  speakerBelongs(speaker: string, world: string): boolean {
+    let claimed = false;
+    for (const c of this.byId.values()) {
+      if (c.speaker !== speaker) continue;
+      claimed = true;
+      if (c.world === world) return true;
+    }
+    return !claimed;
+  }
+
   /** Clock time when this character's action is usable again (0 = now). */
   readyAt(characterId: string): number {
     return this.state.characterCooldowns[characterId] ?? 0;

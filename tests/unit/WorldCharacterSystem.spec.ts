@@ -102,4 +102,32 @@ describe('WorldCharacterSystem (Eleanor standing in the world)', () => {
     ctx.state.hydrate(save);
     expect(ctx.systems.characters.isReady('eleanor')).toBe(true);
   });
+
+  /**
+   * A bubble names a SPEAKER, while the map holds BODIES — and Eleanor has two
+   * of them (`eleanor` in Emberkeep, `eleanor_home` in Roothold) wearing one
+   * voice. So "may she be heard here" cannot be answered by looking one id up.
+   */
+  describe('who may be heard where', () => {
+    it('lets a voice speak from any world one of her bodies stands in', () => {
+      const ctx = createTestContext();
+      expect(ctx.systems.characters.speakerBelongs('eleanor', 'emberkeep')).toBe(true);
+      expect(ctx.systems.characters.speakerBelongs('eleanor', 'roothold')).toBe(true);
+    });
+
+    it('keeps Eleanor out of Borealis and Selyna out of Emberkeep', () => {
+      const ctx = createTestContext();
+      expect(ctx.systems.characters.speakerBelongs('eleanor', 'borealis')).toBe(false);
+      expect(ctx.systems.characters.speakerBelongs('selyna', 'emberkeep')).toBe(false);
+      expect(ctx.systems.characters.speakerBelongs('selyna', 'borealis')).toBe(true);
+    });
+
+    it('lets a voice NO body claims be heard anywhere — the Golden Elder', () => {
+      const ctx = createTestContext();
+      // She speaks from her altar and is in no roster; a rule about roaming
+      // characters must not silence the voice the chapter ends on.
+      expect(ctx.systems.characters.speakerBelongs('golden_elder', 'emberkeep')).toBe(true);
+      expect(ctx.systems.characters.speakerBelongs('golden_elder', 'borealis')).toBe(true);
+    });
+  });
 });
