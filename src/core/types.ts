@@ -158,6 +158,15 @@ export interface ChainTierConfig {
    * ornament.
    */
   chooseProduce?: boolean;
+  /**
+   * The highest tier this generator may be COMMISSIONED to make (default 1).
+   * The rank of the building is the rank of the work: a House works simple
+   * pieces — tier 1 — and a Manor takes tier 2 as well. Enforced in
+   * `GeneratorSystem.commission` (reason `tier_too_high`), mirrored by the
+   * chooser (ineligible bag slots render locked), and cited by the
+   * `house_commission` tutorial beat.
+   */
+  produceMaxTier?: number;
 }
 
 /** Per-chain merge recipe override (e.g. 5 wood → 1 house). */
@@ -1061,7 +1070,7 @@ export interface EventMap {
   'generator:produce_set': { itemId: number; chain: string; tier: number };
   'generator:produce_refused': {
     itemId: number;
-    reason: 'already_set' | 'not_commissionable' | 'not_in_bag';
+    reason: 'already_set' | 'not_commissionable' | 'not_in_bag' | 'tier_too_high';
   };
   /** Intent: SELL one of this stack for coins. Selling lives in the Bag and
    *  nowhere else — a piece on the board can be dragged, merged or pocketed,

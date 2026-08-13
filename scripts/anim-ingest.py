@@ -132,13 +132,21 @@ def key_green(f: np.ndarray) -> tuple[np.ndarray, dict]:
 
     # Isolated speck / edge-band cleanup: the subject is one large component;
     # the floor is RELATIVE to it (an absolute floor once missed a 1178px band).
+    # A component TOUCHING the frame border is plate noise by construction —
+    # the generation plates pad the subject well clear of every edge — unless
+    # it is the largest component (art that genuinely reaches the edge must
+    # never be culled by its own safety net).
     opaque = a > 0.3
     lab, n = ndimage.label(opaque)
     dropped = 0
     if n:
         areas = ndimage.sum(opaque, lab, range(1, n + 1))
+        border_ids = set(np.unique(np.concatenate(
+            [lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
+        biggest = int(np.argmax(areas)) + 1
         thr = max(500, 0.05 * areas.max())
-        keep_ids = [i + 1 for i in range(n) if areas[i] >= thr]
+        keep_ids = [i + 1 for i in range(n)
+                    if areas[i] >= thr and (i + 1 == biggest or i + 1 not in border_ids)]
         dropped = n - len(keep_ids)
         main = np.isin(lab, keep_ids)
         gate = ndimage.binary_dilation(main, iterations=6)
@@ -175,6 +183,9 @@ def main() -> None:
     ap.add_argument('--trim-loop', action='store_true',
                     help='cut the clip at the frame (searched over the back third) '
                          'that best matches frame 0 — a cleaner close AND a smaller sheet')
+    ap.add_argument('--skip', type=int, default=0,
+                    help='drop the first N extracted frames (wan puts plate '
+                         'compression noise on frame 0)')
     ap.add_argument('--character', default=None)
     args = ap.parse_args()
 
@@ -184,6 +195,10 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as td:
         paths = extract_frames(args.video, args.fps, Path(td))
+        if args.skip:
+            if args.skip >= len(paths):
+                fail(f'--skip {args.skip} would drop every frame')
+            paths = paths[args.skip:]
         first = np.asarray(Image.open(paths[0]).convert('RGB'))
         keyer, thr = detect_plate(first)
 

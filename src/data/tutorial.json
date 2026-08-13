@@ -1409,7 +1409,7 @@
     {
       "id": "house_commission",
       "speaker": "eleanor",
-      "text": "Your House mints coin because nobody told it otherwise. Tap it, pick from your satchel, and it makes that forever. Take the Resin Bead. A second thing needs a second House.",
+      "text": "Tap your House, pick from your satchel — it makes that forever. Take the Resin Bead. A House works simple pieces; a Manor takes finer too. A second thing needs a second House.",
       "gate": {
         "type": "event",
         "event": "generator:produce_set"

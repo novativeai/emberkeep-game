@@ -111,11 +111,13 @@ in `chains.json` as the unit tests' generic merge chain but is listed in
 - **Dragon Jobs**: send a dragon to a House and it works `DRAGON_WORK_MS` (3 min)
   advancing every timer at 2× per worker, then rests `DRAGON_REST_MS` (5 min).
 - **Treasure Chest**: a permanent fixture that readies a gift every
-  `CHEST_INTERVAL_MS` (5 min) — 15 Gold, 3 Rubies, or **one piece of anything
+  `CHEST_INTERVAL_MS` (5 min) — 15 Gold, or **three tier-1 pieces of ONE chain
   this world makes** (the `anyItem` wildcard, rolled at open time from
-  `chestWildcardChains`; it replaced the Emeralds when the green chain was
-  dropped). Never a legendary egg — the Directive forbids it and the audit
-  checks the roster, not just the written lines.
+  `chestWildcardChains`; three is a merge, so the gift is a move). Never an
+  egg-bearing chain: no legendary, and no `hatchAtTier` chain either — the old
+  fixed "3 Rubies" gift came off when the rule tightened (Dragon Rubies come
+  from a worked Red Dragon's every-10th-harvest bonus now, the wood-chain
+  grammar).
 - **Warmth**: max **30** (+3 per Keeper level), start 28, **+1 / 60 s**,
   offline catch-up on load, banking up to `OFFLINE_BANK_CYCLES` (3) passive
   cycles for the "While you were away" card.
@@ -133,12 +135,11 @@ gate story, not power.
 1. *Light the Brazier* — 6× Gem Shard → 25 G, 30 XP, **and the Golden Egg
    appears on the Golden Altar** (the demo's MacGuffin).
 2. *Warm the Long Hearth* — 3× Flame Gem → 75 G, 35 XP.
-3. *Craft the Radiant Centerpiece* — 1× Radiant Gem → 110 G, **80 XP**. That XP
-   is load-bearing, not a reward curve: it is what carries the scripted floor
-   past `LEVEL_XP[2] = 220` so the Level-3 finale fires on THIS delivery for
-   every player, rather than only for those who merged enough on the way (it was
-   50, and the finale slipped to Order 4 for a player who merged nothing
-   optional — see quest-ladder.md §4).
+3. *Craft the Radiant Centerpiece* — 1× Radiant Gem → 110 G, **80 XP**. (The
+   old note about this XP carrying the scripted floor past Level 3 is history:
+   the finale moved onto `keepers_hoard`'s completion, and after the ladder
+   re-rhythm the floor now crosses Level 3 on `eleanor_hearth`'s delivery —
+   see quest-ladder.md §4.)
 4. *Fill the Keeper's Hoard* — 3× Radiant Gem → 240 G, 85 XP.
 
 Plus **4 repeatable orders** so the Ledger never dead-ends. A second Ledger tab
@@ -161,12 +162,18 @@ shipped seed of the collection meta MECHANICS §14 calls for — a reason to mer
 something you don't currently need.
 
 ## Progression & the finale
-`LEVEL_XP = [0, 60, 220]`. The tutorial earns **exactly 60 XP** so Level 2 lands
-on its scripted `levelup` beat; Level 3 (220) is the cap and opens `level_5`'s
-land. **The array ends at 3 on purpose** — the chapter is complete, and the XP
-bar reads "Chapter One complete" at the cap rather than filling toward nothing.
-Every level-up pays a full Warmth refill + scaling Gold (`LEVELUP_REWARD`), Level
-3 included — it is an ordinary level-up now.
+`LEVEL_XP = [0, 60, 220, 420, 1000, 1400]`. The tutorial earns **exactly 60 XP**
+so Level 2 lands on its scripted `levelup` beat; Level 3 (220) crosses on
+`eleanor_hearth`'s delivery and opens `level_5`'s land (and is the Borealis
+door's rank floor). The curve **no longer ends at 3**: Level 4 (~the Radiant
+Centerpiece) opens the `beyond_l4` slab right before the Hoard's board crunch,
+Level 5 (~Selyna's pitch order) opens the `beyond_l5` terrace back home, and
+Level 6 caps the curve near the north's last delivery — at the cap the XP bar
+reads "A true Keeper ✦". Every level-up pays a full Warmth refill + scaling
+Gold, and from Level 3 on a **Bronze Chest** drops onto the board carrying the
+active world's gift table (`LEVELUP_REWARD.chestFromLevel`). No threshold sits
+inside the `keepers_hoard` window, so a level-up glide can never fight the
+finale choreography.
 
 **The finale fires on a QUEST**, `GOLDEN_ALTAR.awakenQuestId` (the Keeper's
 Hoard), not on a level — she wakes one quest before `keepers_tasks` asks the

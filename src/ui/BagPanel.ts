@@ -367,15 +367,21 @@ export class BagPanel extends Phaser.GameObjects.Container {
 
     const bx = BTN_W + BTN_GAP;
     const by = POP_H / 2 - BTN_H / 2 - 26;
+    // A piece the game refuses to sell (`sellable:false` — the legendary eggs)
+    // gets NO Sell plate at all: a button that only nudges is a dead button,
+    // and EconomySystem would refuse the sale anyway. Two fates centre up.
+    const sellHere = tier?.sellable !== false;
+    const dropX = sellHere ? -bx : -bx / 2;
+    const giveX = sellHere ? 0 : bx / 2;
     // Three fates, ordered by how far they take the piece from the player:
     // Drop puts it back where it came from, Give hands it to somebody, Sell ends
     // it. Drop is reversible so it is the quiet one; Sell is final and wears the
     // coin it pays, which is also the only place the value is ever shown.
-    const drop = this.chooserButton('Drop', -bx, by, PALETTE.plumHighlight, PALETTE.plumShade, () => {
+    const drop = this.chooserButton('Drop', dropX, by, PALETTE.plumHighlight, PALETTE.plumShade, () => {
       this.bus.emit('ui:bag_retrieve_requested', { chain: stack.chain, tier: stack.tier });
       this.closeChooser();
     });
-    const give = this.chooserButton('Give', 0, by, PALETTE.lava, PALETTE.lavaShade, () => {
+    const give = this.chooserButton('Give', giveX, by, PALETTE.lava, PALETTE.lavaShade, () => {
       if (!this.giveAllowed) {
         this.bus.emit('tutorial:nudge', {});
         return;
@@ -386,23 +392,26 @@ export class BagPanel extends Phaser.GameObjects.Container {
       this.closeChooser();
     });
     give.setAlpha(this.giveAllowed ? 1 : 0.5);
-    const sell = this.chooserButton(`+${value}`, bx, by, PALETTE.gold, PALETTE.night, () => {
-      if (!this.sellAllowed) {
-        this.bus.emit('tutorial:nudge', {});
-        return;
-      }
-      this.bus.emit('ui:bag_sell_requested', { chain: stack.chain, tier: stack.tier });
-      this.closeChooser();
-    }, true);
-    sell.setAlpha(this.sellAllowed ? 1 : 0.5);
-    chooser.add([drop, give, sell]);
+    let sell: Phaser.GameObjects.Container | undefined;
+    if (sellHere) {
+      sell = this.chooserButton(`+${value}`, bx, by, PALETTE.gold, PALETTE.night, () => {
+        if (!this.sellAllowed) {
+          this.bus.emit('tutorial:nudge', {});
+          return;
+        }
+        this.bus.emit('ui:bag_sell_requested', { chain: stack.chain, tier: stack.tier });
+        this.closeChooser();
+      }, true);
+      sell.setAlpha(this.sellAllowed ? 1 : 0.5);
+    }
+    chooser.add(sell ? [drop, give, sell] : [drop, give]);
 
     slot.add(chooser);
     // Above every other slot: the plate is wider than its own slot and would
     // otherwise be painted under the ones drawn after it.
     slot.parentContainer.bringToTop(slot);
     this.chooser = chooser;
-    this.sellButton = sell;
+    this.sellButton = sell ?? null;
     this.giveButton = give;
     this.dimOthers(slot);
 

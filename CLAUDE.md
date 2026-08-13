@@ -135,10 +135,14 @@ silently drops `checklist` writes, so everything goes in `notes`.
   (and what is referenced but missing) — run it after any art or loader change.
   A `.png` with a `.webp` sibling never ships, so a reference and its
   re-encode move TOGETHER: `pnpm optimize:art` does both (lossless, pixel-verified).
-- XP (`LEVEL_XP = [0, 60, 220]`) is tuned so the tutorial's EXACT 60 XP lands
-  Level 2 on the scripted `levelup` beat (wakes zone 2). Level 3 (220) is the
-  cap and opens `level_5`'s land; it FIRES nothing. The array deliberately ends
-  at level 3; the XP bar reads "Chapter One complete" at the cap.
+- XP (`LEVEL_XP = [0, 60, 220, 420, 1000, 1400]`) is tuned so the tutorial's
+  EXACT 60 XP lands Level 2 on the scripted `levelup` beat (wakes zone 2).
+  Level 3 (220) opens `level_5`'s land and is the Borealis door's rank floor;
+  it FIRES no story. Levels 4/5 open the grafted `beyond_l4`/`beyond_l5` slabs
+  (build-zones `LEVEL_CAP` is hand-synced to this array — regenerate zones.json
+  when it moves); level 6 is the cap ("A true Keeper ✦" on the XP bar). From
+  level 3 on, RewardSystem also drops a Bronze Chest. Keep every threshold out
+  of `keepers_hoard`'s XP window — the finale fires on that quest.
 - The FINALE — camera to the Golden Altar, the egg cracks, the Golden Elder
   wakes and speaks, camera home — is choreographed off the shared `FINALE`
   timeline in Constants and triggered by `quest:completed` for

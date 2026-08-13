@@ -20,7 +20,7 @@ describe('ChestSystem (standing gift box)', () => {
     expect(chest.readyAt).toBeLessThanOrEqual(ctx.clock.now() + CHEST_INTERVAL_MS);
   });
 
-  it('pops ONE piece of this world (random → the wildcard), and never an Emerald', () => {
+  it('pops THREE tier-1 pieces of ONE chain of this world (random → the wildcard)', () => {
     const ctx = createTestContext();
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // index 1 → the wildcard
     const chest = ctx.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
@@ -28,9 +28,14 @@ describe('ChestSystem (standing gift box)', () => {
 
     ctx.bus.emit('chest:open', { itemId: chest.id });
 
-    expect(spawned).toHaveLength(1); // ONE piece, not a handful
-    expect(spawned[0]!.item.tier).toBe(1); // always the bottom of a ladder
-    expect(spawned[0]!.item.chain).not.toBe('emerald');
+    expect(spawned).toHaveLength(3); // three is a merge — the gift is a move
+    const chains = new Set(spawned.map((s) => s.item.chain));
+    expect(chains.size).toBe(1); // ONE rolled chain, three of it
+    for (const s of spawned) {
+      expect(s.item.tier).toBe(1); // always the bottom of a ladder
+      expect(s.item.chain).not.toBe('emerald');
+      expect(s.item.chain).not.toBe('ember_dragon'); // eggs come from the story, never a box
+    }
     expect(ctx.state.items.get(chest.id)).toBeDefined();
   });
 
@@ -42,41 +47,20 @@ describe('ChestSystem (standing gift box)', () => {
       // Withheld rosters stay withheld — a chest is not a way around the
       // chapter gate or the world gate.
       expect(chainHiddenIn(chain, ctx.state.worldId)).toBe(false);
-      // The Legendary Egg Directive: no producer ever pays an egg, chest least
-      // of all. This is the assertion that keeps a random table from becoming
-      // the hole in that rule.
+      // No producer ever pays an egg, chest least of all — neither a legendary
+      // egg nor an ordinary hatching chain (Dragon Rubies hatch dragons). This
+      // is the assertion that keeps a random table from becoming the hole in
+      // that rule.
       expect(chain.legendary ?? false).toBe(false);
+      expect(chain.hatchAtTier).toBeUndefined();
       // A fixture (one tier) is not a merge element; a wildcard that dropped one
       // would hand the player a piece with nothing to do.
       expect(chain.tiers.length).toBeGreaterThan(1);
       expect(chain.tiers.some((t) => t.tier === 1)).toBe(true);
     }
-    for (const id of ['emerald', 'coin', 'golden_egg']) {
+    for (const id of ['emerald', 'coin', 'golden_egg', 'ember_dragon', 'ashdrake', 'rimewyrm']) {
       expect(pool.some((c) => c.id === id)).toBe(false);
     }
-  });
-
-  it('pops 3 Rubies (random → ember_dragon)', () => {
-    const ctx = createTestContext();
-    vi.spyOn(Math, 'random').mockReturnValue(0.99); // index 2 → ember_dragon (ruby)
-    const chest = ctx.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
-    const spawned = capture(ctx.bus, 'item:spawned');
-
-    ctx.bus.emit('chest:open', { itemId: chest.id });
-
-    const rubies = spawned.filter((s) => s.item.chain === 'ember_dragon' && s.item.tier === 1);
-    expect(rubies).toHaveLength(3);
-  });
-
-  it('never spawns wood — lumber appears only from cleared cloud zones', () => {
-    const ctx = createTestContext();
-    vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    const chest = ctx.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
-    const spawned = capture(ctx.bus, 'item:spawned');
-
-    ctx.bus.emit('chest:open', { itemId: chest.id });
-
-    expect(spawned.some((s) => s.item.chain === 'lumber')).toBe(false);
   });
 
   it('ignores a tap while the gift is still cooking (cooldown not elapsed)', () => {

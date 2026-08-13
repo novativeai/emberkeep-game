@@ -40,6 +40,32 @@
       }
     },
     {
+      "id": "raise_the_roofs",
+      "chapter": 2,
+      "giver": "eleanor",
+      "title": "Raise the Roofs",
+      "rewards": {
+        "coins": 80,
+        "spawn": {
+          "chain": "ashdrake",
+          "tier": 1,
+          "count": 1
+        }
+      },
+      "steps": [
+        {
+          "id": "roofs_houses",
+          "label": "Build 2 Houses",
+          "goal": {
+            "kind": "have",
+            "chain": "lumber",
+            "tier": 3,
+            "count": 2
+          }
+        }
+      ]
+    },
+    {
       "id": "warm_the_hearth",
       "chapter": 2,
       "giver": "eleanor",
@@ -66,85 +92,7 @@
         }
       ],
       "rewards": {
-        "coins": 40,
-        "spawn": {
-          "chain": "ashdrake",
-          "tier": 1,
-          "count": 1
-        }
-      }
-    },
-    {
-      "id": "radiant_centerpiece",
-      "chapter": 2,
-      "giver": "eleanor",
-      "title": "Craft the Radiant Centerpiece",
-      "orderId": "eleanor_centerpiece",
-      "expects": {
-        "levelAtEnd": 3
-      },
-      "steps": [
-        {
-          "id": "centerpiece_radiant",
-          "label": "Make 1 Radiant Gem",
-          "goal": {
-            "kind": "have",
-            "chain": "flame_gem",
-            "tier": 3,
-            "count": 1
-          }
-        },
-        {
-          "id": "centerpiece_deliver",
-          "label": "Deliver 1 Radiant Gem to Eleanor",
-          "goal": {
-            "kind": "order",
-            "orderId": "eleanor_centerpiece"
-          }
-        }
-      ],
-      "rewards": {
-        "coins": 60
-      }
-    },
-    {
-      "id": "keepers_hoard",
-      "chapter": 2,
-      "giver": "eleanor",
-      "title": "Fill the Keeper's Hoard",
-      "orderId": "eleanor_hoard",
-      "steps": [
-        {
-          "id": "hoard_manor",
-          "label": "Merge 2 Houses into a Manor",
-          "goal": {
-            "kind": "have",
-            "chain": "lumber",
-            "tier": 4,
-            "count": 1
-          }
-        },
-        {
-          "id": "hoard_radiant",
-          "label": "Make 3 Radiant Gems",
-          "goal": {
-            "kind": "have",
-            "chain": "flame_gem",
-            "tier": 3,
-            "count": 3
-          }
-        },
-        {
-          "id": "hoard_deliver",
-          "label": "Deliver 3 Radiant Gems to Eleanor",
-          "goal": {
-            "kind": "order",
-            "orderId": "eleanor_hoard"
-          }
-        }
-      ],
-      "rewards": {
-        "coins": 90
+        "coins": 40
       }
     },
     {
@@ -218,51 +166,42 @@
       }
     },
     {
-      "id": "raise_the_roofs",
+      "id": "radiant_centerpiece",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Raise the Roofs",
+      "title": "Craft the Radiant Centerpiece",
+      "orderId": "eleanor_centerpiece",
+      "expects": {
+        "levelAtEnd": 3
+      },
+      "steps": [
+        {
+          "id": "centerpiece_radiant",
+          "label": "Make 1 Radiant Gem",
+          "goal": {
+            "kind": "have",
+            "chain": "flame_gem",
+            "tier": 3,
+            "count": 1
+          }
+        },
+        {
+          "id": "centerpiece_deliver",
+          "label": "Deliver 1 Radiant Gem to Eleanor",
+          "goal": {
+            "kind": "order",
+            "orderId": "eleanor_centerpiece"
+          }
+        }
+      ],
       "rewards": {
-        "coins": 80,
+        "coins": 60,
         "spawn": {
           "chain": "ashdrake",
           "tier": 1,
           "count": 1
         }
-      },
-      "steps": [
-        {
-          "id": "roofs_houses",
-          "label": "Build 2 Houses",
-          "goal": {
-            "kind": "have",
-            "chain": "lumber",
-            "tier": 3,
-            "count": 2
-          }
-        }
-      ]
-    },
-    {
-      "id": "the_long_gallery",
-      "chapter": 2,
-      "giver": "eleanor",
-      "title": "Light the Long Gallery",
-      "rewards": {
-        "coins": 100
-      },
-      "steps": [
-        {
-          "id": "gallery_gems",
-          "label": "Make 4 Flame Gems",
-          "goal": {
-            "kind": "have",
-            "chain": "flame_gem",
-            "tier": 2,
-            "count": 4
-          }
-        }
-      ]
+      }
     },
     {
       "id": "fill_the_larder",
@@ -284,6 +223,46 @@
           }
         }
       ]
+    },
+    {
+      "id": "keepers_hoard",
+      "chapter": 2,
+      "giver": "eleanor",
+      "title": "Fill the Keeper's Hoard",
+      "orderId": "eleanor_hoard",
+      "steps": [
+        {
+          "id": "hoard_manor",
+          "label": "Merge 2 Houses into a Manor",
+          "goal": {
+            "kind": "have",
+            "chain": "lumber",
+            "tier": 4,
+            "count": 1
+          }
+        },
+        {
+          "id": "hoard_radiant",
+          "label": "Make 3 Radiant Gems",
+          "goal": {
+            "kind": "have",
+            "chain": "flame_gem",
+            "tier": 3,
+            "count": 3
+          }
+        },
+        {
+          "id": "hoard_deliver",
+          "label": "Deliver 3 Radiant Gems to Eleanor",
+          "goal": {
+            "kind": "order",
+            "orderId": "eleanor_hoard"
+          }
+        }
+      ],
+      "rewards": {
+        "coins": 90
+      }
     },
     {
       "id": "keepers_tasks",
@@ -337,6 +316,27 @@
       "rewards": {
         "coins": 120
       }
+    },
+    {
+      "id": "the_long_gallery",
+      "chapter": 2,
+      "giver": "eleanor",
+      "title": "Light the Long Gallery",
+      "rewards": {
+        "coins": 100
+      },
+      "steps": [
+        {
+          "id": "gallery_gems",
+          "label": "Make 4 Flame Gems",
+          "goal": {
+            "kind": "have",
+            "chain": "flame_gem",
+            "tier": 2,
+            "count": 4
+          }
+        }
+      ]
     },
     {
       "id": "the_emerald_brood",
@@ -594,6 +594,50 @@
       }
     },
     {
+      "id": "north_hulls",
+      "chapter": 11,
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Turn Two Hulls",
+      "rewards": {
+        "coins": 160
+      },
+      "steps": [
+        {
+          "id": "hulls_pair",
+          "label": "Make 2 Upturned Hulls",
+          "goal": {
+            "kind": "have",
+            "chain": "keel",
+            "tier": 3,
+            "count": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "north_pitchworks",
+      "chapter": 11,
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Stock the Pitchworks",
+      "rewards": {
+        "coins": 130
+      },
+      "steps": [
+        {
+          "id": "pitchworks_ember",
+          "label": "Make 1 Black Ember",
+          "goal": {
+            "kind": "have",
+            "chain": "tarknot",
+            "tier": 3,
+            "count": 1
+          }
+        }
+      ]
+    },
+    {
       "id": "north_longhall",
       "chapter": 11,
       "giver": "selyna",
@@ -624,50 +668,6 @@
       "rewards": {
         "coins": 140
       }
-    },
-    {
-      "id": "north_pitchworks",
-      "chapter": 11,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "Stock the Pitchworks",
-      "rewards": {
-        "coins": 130
-      },
-      "steps": [
-        {
-          "id": "pitchworks_ember",
-          "label": "Make 1 Black Ember",
-          "goal": {
-            "kind": "have",
-            "chain": "tarknot",
-            "tier": 3,
-            "count": 1
-          }
-        }
-      ]
-    },
-    {
-      "id": "north_hulls",
-      "chapter": 11,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "Turn Two Hulls",
-      "rewards": {
-        "coins": 160
-      },
-      "steps": [
-        {
-          "id": "hulls_pair",
-          "label": "Make 2 Upturned Hulls",
-          "goal": {
-            "kind": "have",
-            "chain": "keel",
-            "tier": 3,
-            "count": 2
-          }
-        }
-      ]
     },
     {
       "id": "north_terms",

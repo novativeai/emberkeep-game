@@ -121,17 +121,24 @@ describe('zones — new ground beside the isle', () => {
   });
 
   /**
-   * The load-bearing safety property. Chapter One caps at Keeper level
-   * LEVEL_XP.length; if any new ground opened at or below that, tiles would pop
-   * onto the shipped board mid-campaign and the tutorial would be teaching a
-   * different game than the one it was written for.
+   * The load-bearing safety property, re-drawn for the uncapped curve.
+   * Chapter One's STORY runs to Keeper Level 3 (the level that opens the
+   * altar's land and the Borealis door); if any grafted ground opened at or
+   * below that, tiles would pop onto the shipped board mid-campaign and the
+   * tutorial would be teaching a different game than the one it was written
+   * for. Above 3 the ground is welcome — that is what the extended LEVEL_XP
+   * exists to hand out — but it must be 'unlockable' (so UnlockSystem lifts it
+   * on the rank-up, clouds and all) and within the curve, never 'locked'
+   * scenery a reachable rank silently walks past.
    */
-  it('cannot open any new emberkeep ground during Chapter One', () => {
+  it('new emberkeep ground opens only past the Chapter One story, via the curve', () => {
     const added = EMBERKEEP.map.regions.filter((r) => !MAP.regions.some((a) => a.id === r.id));
     expect(added.length).toBeGreaterThan(0);
     for (const region of added) {
-      expect(region.status).toBe('locked');
-      expect(region.unlock?.level ?? 0).toBeGreaterThan(LEVEL_XP.length);
+      const level = region.unlock?.level ?? 0;
+      expect(level).toBeGreaterThan(3);
+      if (level <= LEVEL_XP.length) expect(region.status).toBe('unlockable');
+      else expect(region.status).toBe('locked');
     }
   });
 

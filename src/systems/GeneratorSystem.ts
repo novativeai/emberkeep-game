@@ -71,6 +71,13 @@ export class GeneratorSystem {
     return this.tierConfig(item.chain, item.tier)?.chooseProduce === true;
   }
 
+  /** The highest tier this generator may be commissioned to make (default 1).
+   *  Public because the chooser reads it to lock over-rank bag slots — one
+   *  number, read by the gate and the view, so the two can never disagree. */
+  produceMaxTierOf(item: Pick<BoardItemState, 'chain' | 'tier'>): number {
+    return this.tierConfig(item.chain, item.tier)?.produceMaxTier ?? 1;
+  }
+
   /** What a generator actually makes: its own commission if it has one, else
    *  whatever its tier makes by default. ONE resolver, so the passive tick, the
    *  offline catch-up and a tap can never disagree about a House's output. */
@@ -99,6 +106,14 @@ export class GeneratorSystem {
     }
     if (item.produces) {
       this.bus.emit('generator:produce_refused', { itemId, reason: 'already_set' });
+      return;
+    }
+    // The rank of the building is the rank of the work: a House takes tier-1
+    // commissions only, a Manor tiers 1–2 (`produceMaxTier`). The chooser
+    // renders over-rank stacks locked, so this refusal is the belt to that
+    // brace — the rule must hold even for a caller that never opened the panel.
+    if (tier > this.produceMaxTierOf(item)) {
+      this.bus.emit('generator:produce_refused', { itemId, reason: 'tier_too_high' });
       return;
     }
     if (!this.state.bag.some((s) => s.chain === chain && s.tier === tier && s.count > 0)) {

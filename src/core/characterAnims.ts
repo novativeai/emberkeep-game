@@ -69,6 +69,12 @@ export interface CharacterAnimEntry {
    * looked up by wardrobe key instead.
    */
   board?: string;
+  /**
+   * For BOARD DRAGONS bought in the Emporium: the worn skin id this character
+   * answers to (e.g. 'frost' → the Frost dragon's own clip set dresses an
+   * `ember_dragon:3` wearing the frost skin). Absent = the chain's bare look.
+   */
+  skin?: string;
   /** Ring framing for this character's portrait-stage clips. */
   portrait?: PortraitView;
 }
@@ -95,11 +101,26 @@ export function clipKey(characterId: string, clipId: string): string {
   return `canim_${characterId}_${clipId}`;
 }
 
-/** The clip character dressing a board dragon of this chain+tier, or null. */
-export function dragonClipCharacter(chain: string, tier: number, data: CharacterAnimsData = CHARACTER_ANIMS): string | null {
+/**
+ * The clip character dressing a board dragon of this chain+tier, or null.
+ * SKIN-AWARE: a purchased dragon (Emporium Frost/Storm) wears its own breed's
+ * clip set; the bare chain falls back to the skinless character — and a skin
+ * with no clip set of its own falls back the same way rather than to nothing.
+ */
+export function dragonClipCharacter(
+  chain: string,
+  tier: number,
+  skin?: string | null,
+  data: CharacterAnimsData = CHARACTER_ANIMS
+): string | null {
   const key = `${chain}:${tier}`;
-  for (const [id, c] of Object.entries(data.characters)) if (c.board === key) return id;
-  return null;
+  let bare: string | null = null;
+  for (const [id, c] of Object.entries(data.characters)) {
+    if (c.board !== key) continue;
+    if (skin && c.skin === skin) return id;
+    if (!c.skin) bare = id;
+  }
+  return bare;
 }
 
 /** Characters whose clips dress board dragons — loaded at boot, not per world. */

@@ -21,6 +21,12 @@ export class UnlockSystem {
   ) {
     bus.on('fog:tapped', ({ regionId }) => this.tryKeyUnlock(regionId));
     bus.on('keeper:leveled', ({ level }) => this.unlockForLevel(level));
+    // A save can wake up UNDER a longer curve than the one it was written
+    // against: a Keeper who banked 500 XP at the old cap loads straight in at
+    // Level 4, and no keeper:leveled will ever fire for the rank they already
+    // hold. Settle the active world's level ground on load; the other worlds
+    // settle when a door is walked (WorldSystem.settleUnlocks).
+    bus.on('state:loaded', () => this.unlockForLevel(this.state.level));
     bus.on('region:reveal', ({ regionId }) => {
       const region = this.map.regions.find((r) => r.id === regionId);
       if (region) this.reveal(region);

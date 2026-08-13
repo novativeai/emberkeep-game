@@ -127,9 +127,31 @@ describe('the Borealis roster', () => {
     expect(t3).toEqual(['Runestone', 'Cordial Cask', 'Hearthlamp', 'Manastone Cairn', 'The Wayfinder']);
   });
 
-  it('the new farms stay out of the Cookbook until their seeds are placed', () => {
-    // They have working generators but no authored tier-1 source yet, and an
-    // unreachable row is a completion counter the player can never finish.
-    for (const id of NEW_FARMS) expect(HIDDEN_CHAINS.has(id), `${id} is reachable?`).toBe(true);
+  it('the new farms are seeded, live, and every Cookbook row is finishable', () => {
+    // The seeds are placed (build-zones BOREALIS_PLAN), so the five are OFF the
+    // hidden list — the gate this test used to hold shut.
+    for (const id of NEW_FARMS) expect(HIDDEN_CHAINS.has(id), `${id} still hidden?`).toBe(false);
+
+    const zones = JSON.parse(
+      readFileSync(path.join(ROOT, 'src/data/zones.json'), 'utf8')
+    ) as { worlds: Array<{ id: string; map?: { regions: Array<{ contents?: Array<{ chain: string; tier: number }> }> } }> };
+    const north = zones.worlds.find((w) => w.id === 'borealis')!;
+    const seeded = new Map<string, number>();
+    for (const r of north.map!.regions) {
+      for (const c of r.contents ?? []) {
+        seeded.set(`${c.chain}:${c.tier}`, (seeded.get(`${c.chain}:${c.tier}`) ?? 0) + 1);
+      }
+    }
+    // Self-reseeding farms stand ready-built: their t3 streams its own tier-1,
+    // so both merge rows discover off the farm itself.
+    for (const id of ['runestone', 'emberdram', 'manastone']) {
+      expect(seeded.get(`${id}:3`) ?? 0, `${id}:3 stands somewhere?`).toBeGreaterThanOrEqual(1);
+    }
+    // The lamp and the compass never reseed a tier-1, so they arrive as parts:
+    // 3 × t1 + 2 × t2 is exactly one build with both rows discovered en route.
+    for (const id of ['hearthlamp', 'wayfinder']) {
+      expect(seeded.get(`${id}:1`) ?? 0, `${id} t1 parts?`).toBeGreaterThanOrEqual(3);
+      expect(seeded.get(`${id}:2`) ?? 0, `${id} t2 parts?`).toBeGreaterThanOrEqual(2);
+    }
   });
 });

@@ -77,18 +77,20 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
     });
 
     expect(completed.map((q) => q.questId)).toContain('rekindle_brazier');
-    expect(ctx.systems.quests.activeQuest!.id).toBe('warm_the_hearth');
+    expect(ctx.systems.quests.activeQuest!.id).toBe('raise_the_roofs');
   });
 
   it('skips a quest the player satisfied out of order (the Ledger shows two at once)', () => {
     const ctx = createTestContext();
-    // Order 3 is deliverable before Order 2 — both cost nine shards.
-    ctx.state.completedOrderIds.push('eleanor_brazier', 'eleanor_centerpiece');
+    // Quest 4 (Catch the Moonwater) is finished before quest 3 (Warm the Long
+    // Hearth): its order was deliverable alongside the hearth's, both visible.
+    ctx.state.completedOrderIds.push('eleanor_brazier', 'eleanor_moonwater');
     place(ctx, 'flame_gem', 1, 6);
-    place(ctx, 'flame_gem', 3, 1);
+    place(ctx, 'moonwater', 3, 1);
+    place(ctx, 'lumber', 3, 2); // quest 2 (Raise the Roofs) satisfied too
     merges(ctx, 10);
 
-    // Quest 3 is complete, so the ladder stops on quest 2 and will jump past it.
+    // Quest 4 is complete, so the ladder stops on quest 3 and will jump past it.
     expect(ctx.systems.quests.activeQuest!.id).toBe('warm_the_hearth');
     place(ctx, 'flame_gem', 2, 3);
     ctx.state.completedOrderIds.push('eleanor_hearth');
@@ -96,7 +98,7 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
       orderId: 'eleanor_hearth',
       rewards: { coins: 75, keys: 0, xp: 35 }
     });
-    expect(ctx.systems.quests.activeQuest!.id).toBe('keepers_hoard');
+    expect(ctx.systems.quests.activeQuest!.id).toBe('what_she_keeps');
   });
 
   it("mirrors the Keeper's Tasks from tasks.json — one definition, two readouts", () => {
@@ -157,23 +159,21 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
 });
 
 describe('quest rewards — the legendary egg arrives, once, and cannot be lost', () => {
-  /** Drive the first Emberkeep egg quest (`warm_the_hearth`) to completion. */
-  const finishHearth = (ctx: ReturnType<typeof createTestContext>): void => {
-    // Its two steps: hold 3 Flame Gems, then deliver the order.
-    for (let i = 0; i < 3; i++) {
-      ctx.state.addItem({ chain: 'flame_gem', tier: 2, col: i, row: 0, kind: 'item' });
+  /** Drive the first Emberkeep egg quest (`raise_the_roofs`) to completion:
+   *  its single step is holding 2 Houses. */
+  const finishRoofs = (ctx: ReturnType<typeof createTestContext>): void => {
+    for (let i = 0; i < 2; i++) {
+      ctx.state.addItem({ chain: 'lumber', tier: 3, col: i, row: 0, kind: 'item' });
     }
     ctx.bus.emit('item:spawned', {
-      item: { id: 0, chain: 'flame_gem', tier: 2, col: 0, row: 0, kind: 'item' },
+      item: { id: 0, chain: 'lumber', tier: 3, col: 0, row: 0, kind: 'item' },
       cause: 'init'
     });
-    ctx.state.completedOrderIds.push('eleanor_brazier', 'eleanor_hearth');
-    ctx.bus.emit('order:completed', { orderId: 'eleanor_hearth', rewards: { coins: 0, keys: 0 } });
   };
 
   it('pays the egg on completion, exactly once, no matter how often state moves', () => {
     const ctx = createTestContext();
-    finishHearth(ctx);
+    finishRoofs(ctx);
     const eggs = (): number => ctx.state.countItems('ashdrake', 1) + bagCount(ctx, 'ashdrake', 1);
     expect(eggs()).toBe(1);
 
@@ -192,7 +192,7 @@ describe('quest rewards — the legendary egg arrives, once, and cannot be lost'
         ctx.state.addItem({ chain: 'lumber', tier: 1, col, row, kind: 'item' });
       }
     }
-    finishHearth(ctx);
+    finishRoofs(ctx);
     // Nowhere on the board — so it is in the satchel, not gone. A legendary egg
     // exists three times in a zone; losing one costs the dragon for good.
     expect(ctx.state.countItems('ashdrake', 1)).toBe(0);

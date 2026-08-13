@@ -262,8 +262,9 @@ export function solveAvailability(world: WorldModel, data: AuditData): Availabil
   }
 
   // ---- the treasure chest: a PERMANENT fixture that readies a fresh gift on a
-  //      timer, so anything in this world's gift table is renewable once one
-  //      stands. The table is per world — a northern chest pays northern goods.
+  //      timer. The table is all-wildcard now (plus Gold), so in practice no
+  //      fixed `item` gifts remain to credit — the loop stays for any future
+  //      authored gift, and the wildcard is skipped below on purpose.
   if ((world.board.get(pieceKey('chest', 1)) ?? 0) > 0) {
     for (const gift of chestGiftsIn(data.worldId)) {
       // `anyItem` is skipped ON PURPOSE. It rolls one chain out of the whole

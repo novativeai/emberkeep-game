@@ -317,11 +317,10 @@
         "regions": [
           {
             "id": "beyond_l4",
-            "status": "locked",
+            "status": "unlockable",
             "unlock": {
               "level": 4
             },
-            "fog": false,
             "tiles": [
               [
                 14,
@@ -363,11 +362,10 @@
           },
           {
             "id": "beyond_l5",
-            "status": "locked",
+            "status": "unlockable",
             "unlock": {
               "level": 5
             },
-            "fog": false,
             "tiles": [
               [
                 23,
@@ -2879,16 +2877,32 @@
                 "chain": "frostfont",
                 "tier": 1,
                 "at": [
-                  61,
+                  70,
+                  2
+                ]
+              },
+              {
+                "chain": "runestone",
+                "tier": 3,
+                "at": [
+                  62,
                   3
+                ]
+              },
+              {
+                "chain": "emberdram",
+                "tier": 3,
+                "at": [
+                  11,
+                  0
                 ]
               },
               {
                 "chain": "chest",
                 "tier": 1,
                 "at": [
-                  11,
-                  0
+                  8,
+                  1
                 ]
               }
             ]
@@ -3035,7 +3049,7 @@
                 ]
               },
               {
-                "chain": "rimebloom",
+                "chain": "keel",
                 "tier": 1,
                 "at": [
                   86,
@@ -3043,7 +3057,7 @@
                 ]
               },
               {
-                "chain": "rimebloom",
+                "chain": "keel",
                 "tier": 1,
                 "at": [
                   80,
@@ -3051,7 +3065,7 @@
                 ]
               },
               {
-                "chain": "rimebloom",
+                "chain": "keel",
                 "tier": 1,
                 "at": [
                   89,
@@ -3059,15 +3073,15 @@
                 ]
               },
               {
-                "chain": "driftwood",
-                "tier": 1,
+                "chain": "manastone",
+                "tier": 3,
                 "at": [
                   88,
                   0
                 ]
               },
               {
-                "chain": "driftwood",
+                "chain": "wayfinder",
                 "tier": 1,
                 "at": [
                   83,
@@ -3075,7 +3089,7 @@
                 ]
               },
               {
-                "chain": "driftwood",
+                "chain": "wayfinder",
                 "tier": 1,
                 "at": [
                   86,
@@ -3083,7 +3097,7 @@
                 ]
               },
               {
-                "chain": "keel",
+                "chain": "wayfinder",
                 "tier": 1,
                 "at": [
                   80,
@@ -3091,18 +3105,58 @@
                 ]
               },
               {
-                "chain": "keel",
-                "tier": 1,
+                "chain": "wayfinder",
+                "tier": 2,
                 "at": [
                   91,
                   1
                 ]
               },
               {
-                "chain": "keel",
+                "chain": "wayfinder",
+                "tier": 2,
+                "at": [
+                  91,
+                  0
+                ]
+              },
+              {
+                "chain": "hearthlamp",
+                "tier": 1,
+                "at": [
+                  79,
+                  1
+                ]
+              },
+              {
+                "chain": "hearthlamp",
                 "tier": 1,
                 "at": [
                   91,
+                  2
+                ]
+              },
+              {
+                "chain": "hearthlamp",
+                "tier": 1,
+                "at": [
+                  79,
+                  0
+                ]
+              },
+              {
+                "chain": "hearthlamp",
+                "tier": 2,
+                "at": [
+                  83,
+                  1
+                ]
+              },
+              {
+                "chain": "hearthlamp",
+                "tier": 2,
+                "at": [
+                  86,
                   0
                 ]
               },
@@ -3110,8 +3164,8 @@
                 "chain": "chest",
                 "tier": 1,
                 "at": [
-                  79,
-                  1
+                  82,
+                  0
                 ]
               }
             ]
@@ -6579,7 +6633,7 @@
           },
           {
             "id": "roothold_l2",
-            "status": "locked",
+            "status": "unlockable",
             "unlock": {
               "level": 2
             },

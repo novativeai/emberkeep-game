@@ -448,11 +448,11 @@ export class Hud {
     this.xpFill.fillStyle(num(PALETTE.goldAccent), 0.65);
     this.xpFill.fillRoundedRect(180, xpY - 11, width, 9, 4.4);
     // At the cap the bar has nothing left to fill toward, so it says what the
-    // cap MEANS instead of a number. Not "Chapter One complete" any more: the
-    // rank that tops the curve is the rank that opens Borealis, so the last
-    // thing the bar says has to point the Keeper onward rather than close a
-    // book on them.
-    this.xpLabel.setText(atCap ? 'The north is open ✦' : `${gained} / ${span} XP`);
+    // cap MEANS instead of a number. The curve now runs to Level 6 — past the
+    // north's last delivery — so the cap is no longer "the rank that opens
+    // Borealis" (that is Level 3, crossed mid-campaign); it is the top of the
+    // shipped curve, and the bar names the rank rather than close a book.
+    this.xpLabel.setText(atCap ? 'A true Keeper ✦' : `${gained} / ${span} XP`);
   }
 
   private shakeEnergy(): void {

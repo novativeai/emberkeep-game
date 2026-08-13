@@ -280,12 +280,15 @@ plates · thick ring on a block.** No collisions with the eleven already standin
 cracking open, which in a game about dragon eggs is a collision that matters
 more than any silhouette rule.
 
-**What is NOT done:** their seeds. Each tier-3 is a working generator and three
-of them reseed themselves, but a farm has to start somewhere and the first tier-1
-of each is authored region contents. `zones.json` is GENERATED, so that is a
-world-editor pass plus `build-zones` — until it lands the five sit in
-`HIDDEN_CHAINS` so the north's Cookbook does not carry fifteen rows nobody can
-finish.
+**Their seeds are PLACED** (build-zones `BOREALIS_PLAN`), and the five are off
+`HIDDEN_CHAINS`. The three self-reseeding farms stand READY-BUILT — the
+Runestone and Cordial Cask on the coast's generator rim, Selyna's Cairn in the
+keep — because a seeded t3 that streams its own tier-1 strands no Cookbook row.
+The two that never reseed (`hearthlamp`, `wayfinder`) arrive in the keep as
+parts, 3 × t1 + 2 × t2 each: exactly one build, both rows discovered on the way
+(the dew_basin precedent). The keep's loose rimebloom/driftwood stock came off
+to make room — both renewable from the Font and Wrack Line standing beside
+them.
 
 #### 2.4.2 What the north got when it was actually built
 

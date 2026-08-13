@@ -30,6 +30,11 @@ import { fileURLToPath } from 'node:url';
 
 const PY = process.env.PYTHON ?? 'python3';
 const MAX_TEXTURE = 4096; // old-device budget — see CLAUDE.md / memory
+// Never ship more texture than ~1.25× what the clip DISPLAYS. The raw
+// workspaces keep full-quality masters; staging is where the deploy diet
+// happens (a baby roar authored at 400px but drawn at 165 was shipping 2.4×
+// the pixels the screen can use).
+const MAX_OVERSAMPLE = 1.25;
 const RAW_BASE = 'assets/raw/new-animations';
 const DATA_FILE = 'src/data/character-anims.json';
 
@@ -105,6 +110,92 @@ const ROSTER = {
       // DRAGON_ROAR_EVERY_MS cadence — replaces the rig roar preset.
       roar: { trigger: 'hungry roar cadence — replaces the rig roar preset', loop: false },
       tosleep: { trigger: 'dragon:mood asleep, once SEATED on a tile → curl into the sleep art; reversed on wake', loop: false }
+    }
+  },
+  redadult: {
+    label: 'Adult Red Dragon',
+    rawDir: `${RAW_BASE}/redadult_atlasses`,
+    rig: 'sprites/characters/dragon/red-dragon/rig-adult/red-dragon.rig.json',
+    // BoardScene.attachDragon: tier ≥ 3 → whelpScale × the tier-specific rig scale
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE['ember_dragon:4'],
+    modes: { fly: 'center' },
+    board: 'ember_dragon:4',
+    // The wan 2.7 generation route end to end (anim-plate → anim-generate →
+    // anim-ingest --skip 6): every clip starts AND ends on the baked rest pose.
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded — replaces the rig idle preset' },
+      roar: { trigger: 'every bellow: hungry cadence + ambient idle cadence', loop: false },
+      fly: {
+        trigger: 'flight: unfold → wingbeat cruise → fold (drag hold loops; release lands)',
+        // Measured by scripts/anim-segments.py (segments.json in the raw
+        // workspace): 31f wingbeat closing at RMSE 8.6, fold from 214.
+        segments: { takeoff: [0, 34], loop: [34, 65], landing: [214, 234] }
+      }
+    }
+  },
+  // ---- Emporium dragons: REAL purchasable breeds. Buying one dresses the
+  // ember chain in the breed's own clip set (character-anims `skin` key), and
+  // the clips ARE the whole animal — no rig. Alignment registers each breed's
+  // idle onto ITS OWN rig-file rest pose at the RED's board display scale
+  // (same board slot, same footprint).
+  frost_baby: {
+    label: 'Frost Dragon (baby)',
+    rawDir: `${RAW_BASE}/frost_baby_atlasses`,
+    rig: 'sprites/characters/dragon/frost-dragon/rig/dragon-frost.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE.ember_dragon,
+    board: 'ember_dragon:3',
+    skin: 'frost',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded (also stands in for flight — no baby fly clip)' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false }
+    }
+  },
+  frost_adult: {
+    label: 'Frost Dragon (adult)',
+    rawDir: `${RAW_BASE}/frost_adult_atlasses`,
+    rig: 'sprites/characters/dragon/frost-dragon/rig-adult/frost-dragon.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE['ember_dragon:4'],
+    modes: { fly: 'center' },
+    board: 'ember_dragon:4',
+    skin: 'frost',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false },
+      fly: {
+        trigger: 'flight: unfold → wingbeat cruise → fold',
+        // Measured (segments.json): 21f wingbeat @ RMSE 15.1.
+        segments: { takeoff: [0, 84], loop: [84, 105], landing: [213, 234] }
+      }
+    }
+  },
+  storm_baby: {
+    label: 'Storm Dragon (baby)',
+    rawDir: `${RAW_BASE}/storm_baby_atlasses`,
+    rig: 'sprites/characters/dragon/storm-dragon/rig/dragon-storm.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE.ember_dragon,
+    board: 'ember_dragon:3',
+    skin: 'storm',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded (also stands in for flight — no baby fly clip)' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false }
+    }
+  },
+  storm_adult: {
+    label: 'Storm Dragon (adult)',
+    rawDir: `${RAW_BASE}/storm_adult_atlasses`,
+    rig: 'sprites/characters/dragon/storm-dragon/rig-adult/storm-dragon.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE['ember_dragon:4'],
+    modes: { fly: 'center' },
+    board: 'ember_dragon:4',
+    skin: 'storm',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false },
+      fly: {
+        trigger: 'flight: unfold → wingbeat cruise → fold',
+        // Measured (segments.json): 47f wingbeat @ RMSE 12.1.
+        segments: { takeoff: [0, 142], loop: [142, 189], landing: [220, 234] }
+      }
     }
   }
 };
@@ -284,6 +375,7 @@ export function ingestClip(root, opts) {
   if (opts.height) argv.push('--height', String(opts.height));
   if (opts.loop === false) argv.push('--no-loop');
   if (opts.trimLoop) argv.push('--trim-loop');
+  if (opts.skip) argv.push('--skip', String(opts.skip));
   if (entry.label) argv.push('--character', entry.label);
   const r = spawnSync(PY, argv, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   if (r.status !== 0 || !r.stdout.trim()) {
@@ -340,6 +432,44 @@ export function applyAnimAlign(doc, root) {
       const meta = atlas.animations[aid];
       if (!meta) throw new Error(`${id}/${aid}: not in ${entry.rawDir}/atlas.json`);
       const dstRel = `sprites/anims/${id}/${meta.file}`;
+      // A PHASED clip ships only the frames its segments actually play — the
+      // cruise footage between the loop and the fold is dead sheet area (64%
+      // of a wan lowflight). Kept ranges are merged spans; the written
+      // segments are remapped onto the compacted frame order.
+      const info0 = entry.clipInfo?.[aid] ?? {};
+      let keepSpec = '';
+      let remapped = info0.segments;
+      if (info0.segments) {
+        const spans = Object.values(info0.segments)
+          .map(([a, b]) => [a, b])
+          .sort((a, b) => a[0] - b[0]);
+        const merged = [];
+        for (const [a, b] of spans) {
+          const last = merged[merged.length - 1];
+          if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+          else merged.push([a, b]);
+        }
+        const offsetOf = (frame) => {
+          let off = 0;
+          for (const [a, b] of merged) {
+            if (frame < b) return off + (frame - a);
+            off += b - a;
+          }
+          throw new Error(`${id}/${aid}: segment frame ${frame} outside kept ranges`);
+        };
+        remapped = Object.fromEntries(
+          Object.entries(info0.segments).map(([seg, [a, b]]) => [seg, [offsetOf(a), offsetOf(a) + (b - a)]])
+        );
+        keepSpec = merged.map(([a, b]) => `${a}-${b}`).join(',');
+      }
+      // Oversample cap: the DISPLAYED scale is the board transform — except
+      // portrait-stage clips, whose ring framing (`portraitView.height` over
+      // the frame height) can draw larger than their board registration says.
+      const ringScale = info0.stage === 'portrait' && entry.portraitView
+        ? entry.portraitView.height / meta.frameHeight
+        : 0;
+      const dispScale = Math.max(t.scale, ringScale);
+      const shrink = dispScale * MAX_OVERSAMPLE < 1 ? dispScale * MAX_OVERSAMPLE : 1;
       const r = spawnSync(
         PY,
         [
@@ -351,7 +481,9 @@ export function applyAnimAlign(doc, root) {
           String(meta.frameHeight),
           String(meta.cols),
           String(meta.frames),
-          String(MAX_TEXTURE)
+          String(MAX_TEXTURE),
+          keepSpec,
+          shrink < 1 ? shrink.toFixed(5) : ''
         ],
         { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }
       );
@@ -363,10 +495,10 @@ export function applyAnimAlign(doc, root) {
       }
       const staged = JSON.parse(r.stdout);
       if (!staged.ok) throw new Error(`${id}/${aid}: ${staged.error}`);
-      const info = entry.clipInfo?.[aid] ?? {};
+      const info = info0;
       clips[aid] = {
         file: dstRel,
-        frames: meta.frames,
+        frames: staged.frames ?? meta.frames,
         frameWidth: staged.frameWidth,
         frameHeight: staged.frameHeight,
         fps: meta.fps,
@@ -374,7 +506,7 @@ export function applyAnimAlign(doc, root) {
         // laugh, tosleep…) is one-shot in the game whatever the sheet loops.
         loop: info.loop ?? !!meta.loop,
         ...(info.stage ? { stage: info.stage } : {}),
-        ...(info.segments ? { segments: info.segments } : {}),
+        ...(remapped ? { segments: remapped } : {}),
         // the transform was authored against RAW frames; a downscale shrinks
         // the texture, so the runtime scale grows by the same factor
         scale: t.scale * (meta.frameWidth / staged.frameWidth),
@@ -390,6 +522,7 @@ export function applyAnimAlign(doc, root) {
     runtime.characters[id] = {
       clips: { ...(runtime.characters[id]?.clips ?? {}), ...clips },
       ...(entry.board ? { board: entry.board } : {}),
+      ...(entry.skin ? { skin: entry.skin } : {}),
       ...(entry.portraitView ? { portrait: entry.portraitView } : {})
     };
   }

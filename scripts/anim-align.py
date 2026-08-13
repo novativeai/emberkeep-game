@@ -32,6 +32,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -224,27 +225,46 @@ def cmd_auto() -> None:
 def cmd_stage(argv: list[str]) -> None:
     src, dst = Path(argv[0]), Path(argv[1])
     fw, fh, cols, frames, maxdim = (int(v) for v in argv[2:7])
+    # Optional 8th arg: "a-b,c-d" half-open frame ranges — stage ONLY these
+    # (a phased clip's runtime never draws the frames between its segments,
+    # so shipping them is pure dead weight). The kept frames repack into
+    # their own near-square grid.
+    keep: list[int] | None = None
+    if len(argv) > 7 and argv[7]:
+        keep = []
+        for span in argv[7].split(','):
+            a, b = (int(v) for v in span.split('-'))
+            keep.extend(range(a, b))
+    # Optional 9th arg: OVERSAMPLE CAP shrink factor (≤ 1) — the caller knows
+    # the clip's displayed size and refuses to ship texture past ~1.25× it.
+    shrink = float(argv[8]) if len(argv) > 8 and argv[8] else 1.0
     sheet = Image.open(src).convert('RGBA')
-    rows = (frames + cols - 1) // cols
-    if sheet.width <= maxdim and sheet.height <= maxdim:
+    if keep is None and shrink >= 1.0 and sheet.width <= maxdim and sheet.height <= maxdim:
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(src.read_bytes())
-        print(json.dumps({'ok': True, 'frameWidth': fw, 'frameHeight': fh,
+        print(json.dumps({'ok': True, 'frames': frames, 'frameWidth': fw, 'frameHeight': fh,
                           'sheetWidth': sheet.width, 'sheetHeight': sheet.height, 'resized': False}))
         return
-    # Downscale frame-exactly: integer frame dims, re-packed per frame, so the
-    # runtime cutter and the sheet can never disagree by accumulated rounding.
-    f = min(maxdim / (fw * cols), maxdim / (fh * rows), 1.0)
+    # Repack (subset and/or downscaled) frame-exactly: integer frame dims, so
+    # the runtime cutter and the sheet can never disagree by rounding.
+    idx = keep if keep is not None else list(range(frames))
+    n = len(idx)
+    ncols = math.ceil(math.sqrt(n))
+    nrows = math.ceil(n / ncols)
+    f = min(maxdim / (fw * ncols), maxdim / (fh * nrows), shrink, 1.0)
     nfw, nfh = max(1, int(fw * f)), max(1, int(fh * f))
-    out = Image.new('RGBA', (nfw * cols, nfh * rows), (0, 0, 0, 0))
-    for i in range(frames):
+    out = Image.new('RGBA', (nfw * ncols, nfh * nrows), (0, 0, 0, 0))
+    for j, i in enumerate(idx):
         col, row = i % cols, i // cols
         frame = sheet.crop((col * fw, row * fh, (col + 1) * fw, (row + 1) * fh))
-        out.paste(frame.resize((nfw, nfh), Image.LANCZOS), (col * nfw, row * nfh))
+        if (nfw, nfh) != (fw, fh):
+            frame = frame.resize((nfw, nfh), Image.LANCZOS)
+        out.paste(frame, ((j % ncols) * nfw, (j // ncols) * nfh))
     dst.parent.mkdir(parents=True, exist_ok=True)
     out.save(dst, 'WEBP', quality=90, method=6)
-    print(json.dumps({'ok': True, 'frameWidth': nfw, 'frameHeight': nfh,
-                      'sheetWidth': out.width, 'sheetHeight': out.height, 'resized': True}))
+    print(json.dumps({'ok': True, 'frames': n, 'frameWidth': nfw, 'frameHeight': nfh,
+                      'sheetWidth': out.width, 'sheetHeight': out.height,
+                      'resized': f < 1.0, 'compacted': keep is not None}))
 
 
 def main() -> None:

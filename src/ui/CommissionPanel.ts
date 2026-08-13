@@ -233,17 +233,36 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     this.offBus.length = 0;
   }
 
+  /** The highest tier THIS generator may be commissioned to make — the same
+   *  `produceMaxTier` GeneratorSystem enforces, read off the same data. */
+  private maxTier(): number {
+    const item = this.gameState.items.get(this.forItemId);
+    if (!item) return 1;
+    const cfg = this.chains.chains
+      .find((c) => c.id === item.chain)
+      ?.tiers.find((t) => t.tier === item.tier);
+    return cfg?.produceMaxTier ?? 1;
+  }
+
   private render(): void {
     this.closeChooser();
     const stacks = this.gameState.bag;
+    const cap = this.maxTier();
     this.emptyText.setVisible(stacks.length === 0);
     this.helper.setVisible(stacks.length > 0);
+    // The rank of the building is the rank of the work — say so where the
+    // choice is made, not only in the refusal.
+    this.helper.setText(
+      cap <= 1
+        ? 'Choose one — this house will make it, and only it, from now on.\nA House works simple pieces: tier one. A Manor takes tier two.'
+        : 'Choose one — this manor will make it, and only it, from now on.\nA Manor works pieces of tier one and two.'
+    );
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i]!;
       slot.removeAll(true);
       slot.setVisible(stacks.length > 0);
       const stack = stacks[i];
-      if (stack) this.paintFilled(slot, stack);
+      if (stack) this.paintFilled(slot, stack, stack.tier <= cap);
       else this.paintEmpty(slot);
     }
   }
@@ -267,11 +286,11 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     slot.add(g);
   }
 
-  private paintFilled(slot: Phaser.GameObjects.Container, stack: BagStack): void {
+  private paintFilled(slot: Phaser.GameObjects.Container, stack: BagStack, eligible: boolean): void {
     const g = this.scene.add.graphics();
     g.fillStyle(num(INK.fieldDeep), 1);
     g.fillRoundedRect(-SLOT / 2, -SLOT / 2, SLOT, SLOT, 26);
-    g.lineStyle(6, num(INK.gold), 1);
+    g.lineStyle(6, num(eligible ? INK.gold : INK.goldMid), eligible ? 1 : 0.5);
     g.strokeRoundedRect(-SLOT / 2, -SLOT / 2, SLOT, SLOT, 26);
     slot.add(g);
 
@@ -279,7 +298,19 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     if (this.scene.textures.exists(key)) {
       const art = this.scene.add.image(0, -6, key);
       art.setScale((SLOT - 62) / Math.max(art.width, art.height));
+      if (!eligible) art.setAlpha(0.35).setTint(0x8a8494);
       slot.add(art);
+    }
+    // Over-rank for THIS building: shown (the player should see what a Manor
+    // would unlock), locked (this one cannot take it). The 🔒 is the badge and
+    // the tap answers with a shake — a locked slot must never read as broken.
+    if (!eligible) {
+      slot.add(
+        this.scene.add
+          .text(0, -6, '🔒', { fontSize: '44px' })
+          .setOrigin(0.5)
+          .setAlpha(0.9)
+      );
     }
 
     // NO stack count. The Bag shows how many you have because that is what it is
@@ -291,8 +322,9 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     slot.add(glow);
 
     slot.setSize(SLOT, SLOT);
-    slot.setInteractive({ useHandCursor: true });
+    slot.setInteractive({ useHandCursor: eligible });
     slot.on('pointerover', () => {
+      if (!eligible) return;
       glow.setAlpha(1);
       slot.setScale(1.05);
     });
@@ -304,6 +336,15 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
       'pointerup',
       (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
         ev.stopPropagation();
+        if (!eligible) {
+          this.scene.tweens.add({
+            targets: slot,
+            x: { from: slot.x - 7, to: slot.x },
+            duration: 190,
+            ease: 'Bounce.easeOut'
+          });
+          return;
+        }
         this.openChooser(slot, stack);
       }
     );

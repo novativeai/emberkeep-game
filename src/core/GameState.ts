@@ -254,8 +254,13 @@ export class GameState {
       this.hydrateBoard(id, board);
     }
     this.nextItemId = save.nextItemId;
+    // Only 'active' is the PLAYER'S state — the one runtime transition is
+    // unlockable→active, so any other saved value is just an echo of the
+    // authored status at save time. Letting it through would pin a region to a
+    // build's old lock typing: a save written while `beyond_l4` was 'locked'
+    // demo scenery must not keep it locked now that the curve reaches it.
     for (const [regionId, status] of Object.entries(save.regions)) {
-      this.regionStatus.set(regionId, status);
+      if (status === 'active') this.regionStatus.set(regionId, status);
     }
     this.energyCurrent = save.energy.current;
     this.energyLastRegenAt = save.energy.lastRegenAt;

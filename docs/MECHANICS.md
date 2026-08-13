@@ -210,7 +210,7 @@ Warmth.** Shipped free producers (all `energyCost: 0`):
 - **Ripe Emberberry Plant** — an Emberberry every 20 s, tappable, free, plus a
   **bonus** Emberberry Sprout every 12 yields (`generator.bonus`): nine sprouts
   is a second patch, so the food chain seeds its own expansion.
-- **House / Manor** — a Gold Coin / Gold Pouch every 210 s (`tappable: false`).
+- **House / Manor** — a Gold Coin / Gold Pouch every 210 s (`tappable: false`), until COMMISSIONED: tap one, pick a piece from the Bag, and it makes that forever (write-once). Rank-capped — a House takes tier-1 commissions only, a Manor tiers 1–2 (`produceMaxTier`).
 - **Fir Tree** — a Cut Wood every 300 s, plus a Fir Grain every 10th (the loop
   closes on itself). The isle authors no tree; this one is grown. **Theme
   Crystal** — an Emerald every 300 s.
@@ -261,8 +261,9 @@ The map is ash-cold; rekindling it is the visible spine of progress.
   clouds clear when the Keeper reaches that level OR spends the matching Key.
   This is the gate that paces world expansion. **[L1 — shipped]** Today
   `level_2` opens at Level 2; `level_2_gate` accepts a key *or* Level 2 and is
-  opened by the tutorial's granted key (§12); `level_5` opens at Level 3, the
-  cap — its `level: 99` was demo scaffolding and came off in production.
+  opened by the tutorial's granted key (§12); `level_5` opens at Level 3; the
+  grafted `beyond_l4` / `beyond_l5` slabs open at Levels 4 and 5 now that the
+  curve runs past the old chapter cap.
 
 ---
 
@@ -341,28 +342,30 @@ rather than grinding sideways.
 Per-tier `xp` already lives in `chains.json`, so "points per merge" is data, not
 code. Recommended: low/zero on tier-2, rising sharply on tier-4+ and Shrines.
 
-### 9.2 Level cap & curve **[L1 chapter array → full curve]**
-- **Shipped:** `LEVEL_XP = [0, 60, 220]` — three levels, and the array **ends at
-  3 on purpose**. The tutorial earns exactly 60 XP so Level 2 lands on its
-  scripted `levelup` beat, and Level 3 lands on Order 3's delivery. Level 3 no
-  longer fires the finale — that moved onto a quest (§ the Golden Altar) — it
-  opens `level_5`'s land.
-  At the cap the XP bar reads *"Chapter One complete"* rather than filling
-  toward nothing. The cap is a **story pause, not a content wall**.
+### 9.2 Level cap & curve **[L1 six-level array → full curve]**
+- **Shipped:** `LEVEL_XP = [0, 60, 220, 420, 1000, 1400]` — six levels. The
+  tutorial earns exactly 60 XP so Level 2 lands on its scripted `levelup` beat;
+  Level 3 crosses on `eleanor_hearth`'s delivery and opens `level_5`'s land;
+  Level 4 opens `beyond_l4`, Level 5 opens `beyond_l5`, Level 6 is the cap and
+  lands near the north's last delivery. No threshold sits inside the
+  `keepers_hoard` window (the finale fires on that quest, and a level-up glide
+  must never fight its choreography). At the cap the XP bar reads *"A true
+  Keeper ✦"*.
 - **[full]** A visible **Keeper Level** with a **soft cap (~40)** the content
   roadmap raises (genre-standard; Merge Mansion caps at 50 "to be increased").
   **Steep-then-flat curve:** reach ~level 8–10 in the first 1–2 sessions to
-  front-load unlocks, then rising XP-per-level. Extending the array past 3 also
-  means re-choreographing the finale off `keeper:leveled(3)` — see §17.
+  front-load unlocks, then rising XP-per-level.
 
-### 9.3 Level-up rewards (a multi-reward burst) **[L1 refill + Gold; rest full]**
+### 9.3 Level-up rewards (a multi-reward burst) **[L1 refill + Gold + chest; rest full]**
 Shipped: `RewardSystem` grants a **full Warmth refill + scaling Gold**
-(`LEVELUP_REWARD`: 25 base + 15/level) on every `keeper:leveled`, with a
-celebration banner, spark burst and rising arpeggio. The full design adds more:
-every level-up fires at once: **full Warmth refill** (the key beat) + **Gold** +
-an **alternating chest** (odd levels Ember Chest, even levels Sky Chest, so each
-level feels distinct) + occasional **cap bump / new unlock**. The refill rescues
-the player exactly when they'd hit the Warmth wall — friction becomes reward.
+(`LEVELUP_REWARD`: 25 base + 15/level) on every `keeper:leveled`, plus a
+**Bronze Chest on the board from Level 3 on** (`chestFromLevel` — never on the
+tutorial's scripted Level-2 beat; the chest carries the active world's gift
+table, and a full board banks it in the Bag), with a celebration banner, spark
+burst and rising arpeggio. The full design adds more: an **alternating chest**
+(odd levels Ember Chest, even levels Sky Chest, so each level feels distinct) +
+occasional **cap bump / new unlock**. The refill rescues the player exactly
+when they'd hit the Warmth wall — friction becomes reward.
 
 ### 9.4 What leveling gates **[full]**
 Tie *capability* to level, not just cosmetics:

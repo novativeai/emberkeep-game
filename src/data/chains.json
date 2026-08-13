@@ -112,7 +112,14 @@
             },
             "cooldownMs": 45000,
             "energyCost": 1,
-            "passiveMs": 120000
+            "passiveMs": 120000,
+            "bonus": {
+              "every": 10,
+              "produces": {
+                "chain": "ember_dragon",
+                "tier": 1
+              }
+            }
           }
         },
         {
@@ -128,7 +135,14 @@
             },
             "cooldownMs": 30000,
             "energyCost": 1,
-            "passiveMs": 90000
+            "passiveMs": 90000,
+            "bonus": {
+              "every": 8,
+              "produces": {
+                "chain": "ember_dragon",
+                "tier": 1
+              }
+            }
           }
         }
       ]
@@ -198,7 +212,8 @@
             "energyCost": 0,
             "passiveMs": 210000,
             "tappable": false
-          }
+          },
+          "produceMaxTier": 1
         },
         {
           "tier": 4,
@@ -215,7 +230,9 @@
             "energyCost": 0,
             "passiveMs": 210000,
             "tappable": false
-          }
+          },
+          "chooseProduce": true,
+          "produceMaxTier": 2
         }
       ]
     },

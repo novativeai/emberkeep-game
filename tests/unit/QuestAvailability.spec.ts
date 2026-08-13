@@ -318,7 +318,7 @@ describe('the legendary egg directive (Constants §LEGENDARY_EGG_COUNT)', () => 
 
   it('catches two eggs from one quest', () => {
     const found = bent(WORLD_ID, (qs) => {
-      const q = qs.find((x) => x.id === 'warm_the_hearth')!;
+      const q = qs.find((x) => x.id === 'raise_the_roofs')!;
       q.rewards!.spawn!.count = 2;
     });
     expect(found.some((f) => f.message.includes('one quest, one egg'))).toBe(true);
@@ -326,10 +326,10 @@ describe('the legendary egg directive (Constants §LEGENDARY_EGG_COUNT)', () => 
 
   it('catches eggs that arrive back to back', () => {
     const found = bent(WORLD_ID, (qs) => {
-      // Move the middle egg next to the first.
-      qs.find((x) => x.id === 'raise_the_roofs')!.rewards!.spawn = undefined;
-      qs.find((x) => x.id === 'radiant_centerpiece')!.rewards = {
-        coins: 60,
+      // Move the middle egg next to the first (roofs is quest 2, hearth quest 3).
+      qs.find((x) => x.id === 'radiant_centerpiece')!.rewards!.spawn = undefined;
+      qs.find((x) => x.id === 'warm_the_hearth')!.rewards = {
+        coins: 40,
         spawn: { chain: 'ashdrake', tier: 1, count: 1 }
       };
     });

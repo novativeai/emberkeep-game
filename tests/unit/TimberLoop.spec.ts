@@ -146,6 +146,43 @@ describe("the House's commission — one house, one output, for good", () => {
     expect(refused.at(-1)).toMatchObject({ reason: 'not_commissionable' });
   });
 
+  it('a HOUSE refuses a tier-2 commission — the rank of the building is the rank of the work', () => {
+    const ctx = createTestContext();
+    const house = houseAt(ctx, 2, 2);
+    const refused = capture(ctx.bus, 'generator:produce_refused');
+    ctx.state.bag.push({ chain: 'flame_gem', tier: 2, count: 1 });
+    ctx.bus.emit('ui:produce_choice_requested', { itemId: house.id, chain: 'flame_gem', tier: 2 });
+    expect(refused.at(-1)).toMatchObject({ reason: 'tier_too_high' });
+    expect(house.produces).toBeUndefined();
+    // …and the SAME house still takes the tier-1 sibling: the refusal is about
+    // the piece's rank, never a latch on the building.
+    ctx.state.bag.push({ chain: 'flame_gem', tier: 1, count: 1 });
+    ctx.bus.emit('ui:produce_choice_requested', { itemId: house.id, chain: 'flame_gem', tier: 1 });
+    expect(house.produces).toEqual({ chain: 'flame_gem', tier: 1 });
+  });
+
+  it('a MANOR takes tier 1 AND tier 2, and stops at 3', () => {
+    const ctx = createTestContext();
+    const manorAt = (col: number, row: number) =>
+      ctx.state.addItem({ chain: 'lumber', tier: 4, col, row, kind: 'item' });
+    const a = manorAt(1, 1);
+    const b = manorAt(4, 4);
+    const refused = capture(ctx.bus, 'generator:produce_refused');
+    ctx.state.bag.push(
+      { chain: 'flame_gem', tier: 2, count: 1 },
+      { chain: 'lumber', tier: 1, count: 1 },
+      { chain: 'flame_gem', tier: 3, count: 1 }
+    );
+    // A fresh Manor asks the same question a fresh House does.
+    expect(ctx.systems.generator.awaitingChoice(a)).toBe(true);
+    ctx.bus.emit('ui:produce_choice_requested', { itemId: a.id, chain: 'flame_gem', tier: 2 });
+    expect(a.produces).toEqual({ chain: 'flame_gem', tier: 2 });
+    ctx.bus.emit('ui:produce_choice_requested', { itemId: b.id, chain: 'flame_gem', tier: 3 });
+    expect(refused.at(-1)).toMatchObject({ reason: 'tier_too_high' });
+    ctx.bus.emit('ui:produce_choice_requested', { itemId: b.id, chain: 'lumber', tier: 1 });
+    expect(b.produces).toEqual({ chain: 'lumber', tier: 1 });
+  });
+
   it('two houses can be commissioned to two different things', () => {
     const ctx = createTestContext();
     const a = houseAt(ctx, 1, 1);

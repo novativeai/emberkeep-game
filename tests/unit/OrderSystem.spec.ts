@@ -75,7 +75,7 @@ describe('OrderSystem', () => {
     // The first order remains active; the third slides into view.
     expect(ctx.systems.order.activeOrders.map((o) => o.id)).toEqual([
       'eleanor_brazier',
-      'eleanor_centerpiece'
+      'eleanor_moonwater'
     ]);
   });
 
@@ -105,7 +105,7 @@ describe('OrderSystem', () => {
   it('NEVER dead-ends: encore orders generate after the scripted list', () => {
     const ctx = createTestContext();
     // Complete all five scripted orders directly (state-level shortcut).
-    for (const o of ['eleanor_brazier', 'eleanor_hearth', 'eleanor_centerpiece', 'eleanor_hoard', 'eleanor_moonwater']) {
+    for (const o of ['eleanor_brazier', 'eleanor_hearth', 'eleanor_moonwater', 'eleanor_centerpiece', 'eleanor_hoard']) {
       ctx.state.completedOrderIds.push(o);
     }
     const encore = ctx.systems.order.activeOrders;
@@ -121,7 +121,7 @@ describe('OrderSystem', () => {
 
   it('encore ids skip completed ones even out of order', () => {
     const ctx = createTestContext();
-    for (const o of ['eleanor_brazier', 'eleanor_hearth', 'eleanor_centerpiece', 'eleanor_hoard', 'eleanor_moonwater']) {
+    for (const o of ['eleanor_brazier', 'eleanor_hearth', 'eleanor_moonwater', 'eleanor_centerpiece', 'eleanor_hoard']) {
       ctx.state.completedOrderIds.push(o);
     }
     // Deliver the SECOND visible encore first (encore_2 = 2× flame_gem t2).

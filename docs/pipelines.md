@@ -781,8 +781,25 @@ folder's `atlas.json`) onto the characters' IN-GAME rest poses:
   4096×3210 with its scale compensated) and writes
   `src/data/character-anims.json`, which the game bundles.
 
-- **Video ingest** (`scripts/anim-ingest.py`) is the stage UPSTREAM of all of
-  that: raw mp4 footage (e.g. `assets/raw/new-animations/raw-mp4/`) → keyed
+- **Generation plates** (`scripts/anim-plate.py`) — the FIRST stage of the
+  video route: a dragon's baked rest-pose PNG → padded canvas on a pure-green
+  plate in `assets/raw/new-animations/plates/`. ADULTS get a canvas 2× the
+  original image (wings deploy, the low-flight hovers clear of the ground),
+  BABIES 1.5×; content sits bottom-centre so the headroom is where the action
+  goes. The green is what the ingest keyer later removes.
+- **Video generation** (`scripts/anim-generate.py`) — the SECOND stage:
+  fal-ai/wan v2.7 image-to-video over the queue API (`FAL_KEY` env/.env; each
+  job is real money). The plate ships as BOTH `image_url` and `end_image_url`
+  — start and end pinned to the same rest pose is what closes the loop
+  (verified: the roar settles back onto the bake's exact pose). The clip
+  briefs (baby idle 7s/roar 3s; adult idle 5s/roar 3s/lowflight 10s), the
+  shared negative prompt and the plate roster (frost/storm baby+adult, ember
+  adult only — the redwhelp is already mounted) live in the script; outputs
+  land in `raw-mp4/<plate>-<clip>.mp4` with every request recorded in
+  `raw-mp4/generation-manifest.json`. `--list` shows jobs, `--dry` prints
+  without spending, job ids re-run individual clips.
+- **Video ingest** (`scripts/anim-ingest.py`) is the NEXT stage: raw mp4
+  footage (`assets/raw/new-animations/raw-mp4/`) → keyed
   frames → a packed WebP atlas in the character's raw workspace. It implements
   the technique documented in `raw-mp4/ATLAS_TUTO.md` — read that for the WHY:
   ffmpeg decimation at 24fps (12 is invisible on breathing but NOT on wing
@@ -841,6 +858,30 @@ fallback for breeds with no pushed clips. The seated sleep deliberately does
 NOT cut to the separately-authored sleep painting: the transition ends exactly
 where the sleep pose begins, so freezing its final frame is seamless where the
 art swap popped.)
+
+SIX dragons are now fully CLIP-ANIMATED — red, frost and storm, baby
+(`ember_dragon:3`) and adult (`ember_dragon:4`, renewable: 2 Red Dragons
+merge) — and for them THE CLIPS ARE THE WHOLE ANIMAL: `attachDragon` builds
+NO RigPlayer (`LiveDragon.player` is null; facing lives on `ld.facing`), and
+the rig paths survive only as fallbacks for breeds without clip sets
+(emerald, golden) or a failed sheet load. Frost/Storm are the Emporium's
+purchasable dragons: the worn skin picks the clip CHARACTER
+(`dragonClipCharacter(chain, tier, skin)` — character-anims entries carry
+`board` + `skin`), so a bought Frost idles, bellows and flies in its own
+breed's footage at every tier with clips; buying/wearing one REBUILDS the
+live animal (`applyDragonSkin`), keeping its mood. Babies have no fly clip —
+they glide on their idle look, carried by the journey tween. A skinned or
+clip-only sleeper without its own sleep painting sleeps as its DIMMED idle
+frame (never the red chain painting), still breathing via `syncDragon`.
+
+Adult flys are PHASED — unfold → wingbeat cruise → fold, measured by
+`scripts/anim-segments.py` (reports saved as `segments.json` beside each fly
+atlas; e.g. redadult: 31f wingbeat @ RMSE 8.6). Staging keeps the deploy on a
+diet: PHASED clips are COMPACTED to only the frames their segments play
+(remapped indices — the footage between loop and fold was 64% of a raw wan
+sheet), and EVERY staged sheet obeys the 1.25× OVERSAMPLE CAP — never more
+texture than the clip displays (board transform, or ring framing for
+portrait-stage clips). Raw workspaces keep the full-quality masters.
 
 The RING treatment is the guide's split, kept: the frame's BODY copy masked
 BEHIND the gold band, a second synced copy cropped at the NECK drawn ABOVE it —

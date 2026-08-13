@@ -4,7 +4,7 @@
       "id": "eleanor_brazier",
       "giver": "eleanor",
       "title": "Light the Brazier",
-      "blurb": "Six Gem Shards, Keeper. That brazier has been cold since the last keeper fled — light it, and I will part with something I have kept far too long.",
+      "blurb": "Six Gem Shards, Keeper. That brazier has been cold since the last keeper fled \u2014 light it, and I will part with something I have kept far too long.",
       "requires": [
         {
           "chain": "flame_gem",
@@ -16,14 +16,14 @@
         "coins": 25,
         "keys": 0,
         "xp": 30,
-        "tease": "🥚 ???"
+        "tease": "\ud83e\udd5a ???"
       }
     },
     {
       "id": "eleanor_hearth",
       "giver": "eleanor",
       "title": "Warm the Long Hearth",
-      "blurb": "Your little dragon keeps coughing up shards — good. Forge me THREE Flame Gems and the hall will be warm by supper.",
+      "blurb": "Your little dragon keeps coughing up shards \u2014 good. Forge me THREE Flame Gems and the hall will be warm by supper.",
       "requires": [
         {
           "chain": "flame_gem",
@@ -33,6 +33,24 @@
       ],
       "rewards": {
         "coins": 75,
+        "keys": 0,
+        "xp": 60
+      }
+    },
+    {
+      "id": "eleanor_moonwater",
+      "giver": "eleanor",
+      "title": "Catch the Moonwater",
+      "blurb": "The basin on the high ground fills whether anyone watches it or not. Three drops make a vial, three vials make Moonwater \u2014 bring me one, and I will show you what the moon does with borrowed light.",
+      "requires": [
+        {
+          "chain": "moonwater",
+          "tier": 3,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 130,
         "keys": 0,
         "xp": 60
       }
@@ -59,7 +77,7 @@
       "id": "eleanor_hoard",
       "giver": "eleanor",
       "title": "Fill the Keeper's Hoard",
-      "blurb": "An encore, Keeper — three Radiant Gems. A proper hoard for a proper Keep, and proof enough for anyone still watching.",
+      "blurb": "An encore, Keeper \u2014 three Radiant Gems. A proper hoard for a proper Keep, and proof enough for anyone still watching.",
       "requires": [
         {
           "chain": "flame_gem",
@@ -74,29 +92,11 @@
       }
     },
     {
-      "id": "eleanor_moonwater",
-      "giver": "eleanor",
-      "title": "Catch the Moonwater",
-      "blurb": "The basin on the high ground fills whether anyone watches it or not. Three drops make a vial, three vials make Moonwater — bring me one, and I will show you what the moon does with borrowed light.",
-      "requires": [
-        {
-          "chain": "moonwater",
-          "tier": 3,
-          "count": 1
-        }
-      ],
-      "rewards": {
-        "coins": 130,
-        "keys": 0,
-        "xp": 60
-      }
-    },
-    {
       "id": "selyna_signal",
       "giver": "selyna",
       "world": "borealis",
       "title": "Bank a Signal Fire",
-      "blurb": "You came a long way to stand on nine feet of ice. Bind me two faggots of that driftwood and I will light something you can steer by — then the coast is yours to walk. The door comes later, if I like what you do with it.",
+      "blurb": "You came a long way to stand on nine feet of ice. Bind me two faggots of that driftwood and I will light something you can steer by \u2014 then the coast is yours to walk. The door comes later, if I like what you do with it.",
       "requires": [
         {
           "chain": "driftwood",
@@ -115,7 +115,7 @@
       "giver": "selyna",
       "world": "borealis",
       "title": "Feed the Northern Dragons",
-      "blurb": "Mine eat pitch, not berries. Nothing grows here, so the fire has to be built before it can be fed — a woodpile first, then three cakes of it. That is the whole north in one errand.",
+      "blurb": "Mine eat pitch, not berries. Nothing grows here, so the fire has to be built before it can be fed \u2014 a woodpile first, then three cakes of it. That is the whole north in one errand.",
       "requires": [
         {
           "chain": "tarknot",
@@ -206,7 +206,7 @@
     {
       "giver": "eleanor",
       "title": "More Dragon Rubies",
-      "blurb": "Five Dragon Rubies. Ask the red one — she hoards them anyway.",
+      "blurb": "Five Dragon Rubies. Ask the red one \u2014 she hoards them anyway.",
       "requires": [
         {
           "chain": "ember_dragon",

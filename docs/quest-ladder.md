@@ -38,21 +38,31 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 
 *Emberkeep. 🥚 marks a quest whose reward is a legendary egg (§6).*
 
-| # | Quest | Order | Subquests |
-| --- | --- | --- | --- |
-| 1 | **Light the Brazier** | `eleanor_brazier` | Merge 10 times · Collect 6 Gem Shards · Deliver 6 Gem Shards to Eleanor |
-| 2 🥚 | **Warm the Long Hearth** | `eleanor_hearth` | Make 2 Flame Gems · Deliver 2 Flame Gems to Eleanor |
-| 3 | **Craft the Radiant Centerpiece** | `eleanor_centerpiece` | Make 1 Radiant Gem · Deliver 1 Radiant Gem to Eleanor |
-| 4 | **Fill the Keeper's Hoard** | `eleanor_hoard` | Merge 2 Houses into a Manor · Make 3 Radiant Gems · Deliver 3 Radiant Gems to Eleanor |
-| 5 | **Catch the Moonwater** | `eleanor_moonwater` | Make 1 Moonwater · Deliver 1 Moonwater to Eleanor |
-| 6 | **What She Keeps** | — | Give Eleanor 2 Emberberry Baskets · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart)* |
-| 7 🥚 | **Raise the Roofs** | — | Build 2 Houses |
-| 8 | **Light the Long Gallery** | — | Make 4 Flame Gems |
-| 9 | **Fill the Larder** | — | Make 2 Emberberry Preserves |
-| 10 | **The Keeper's Tasks** | — | the five `tasks.json` entries, by reference — recipes 20 · merges 30 · orders 5 · gold 500 · Elder 10 |
-| 11 🥚 | **Raise the Ember Brood** | — | Make 4 Red Eggs |
-| 12 | **Wake the Ashdrake** | — | Merge 3 Ashdrake Eggs into the Ashdrake |
-| 13 | *(the live order's title)* | the encore | Deliver 8 × Gem Shard to Eleanor |
+| # | Quest | Order | Chain | Subquests |
+| --- | --- | --- | --- | --- |
+| 1 | **Light the Brazier** | `eleanor_brazier` | gems T1 | Merge 10 times · Collect 6 Gem Shards · Deliver 6 Gem Shards to Eleanor |
+| 2 🥚 | **Raise the Roofs** | — | timber T3 | Build 2 Houses |
+| 3 | **Warm the Long Hearth** | `eleanor_hearth` | gems T2 | Make 2 Flame Gems · Deliver 2 Flame Gems to Eleanor |
+| 4 | **Catch the Moonwater** | `eleanor_moonwater` | moonwater | Make 1 Moonwater · Deliver 1 Moonwater to Eleanor |
+| 5 | **What She Keeps** | — | berries | Give Eleanor 2 Emberberry Baskets · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart — exactly what quests 1–4 have paid)* |
+| 6 🥚 | **Craft the Radiant Centerpiece** | `eleanor_centerpiece` | gems T3 | Make 1 Radiant Gem · Deliver 1 Radiant Gem to Eleanor |
+| 7 | **Fill the Larder** | — | berries T3 | Make 2 Emberberry Preserves |
+| 8 | **Fill the Keeper's Hoard** | `eleanor_hoard` | timber T4 | Merge 2 Houses into a Manor · Make 3 Radiant Gems · Deliver 3 Radiant Gems to Eleanor — **the FINALE quest** (`GOLDEN_ALTAR.awakenQuestId`) |
+| 9 | **The Keeper's Tasks** | — | mixed | the five `tasks.json` entries, by reference |
+| 10 | **Light the Long Gallery** | — | gems T2 | Make 4 Flame Gems |
+| 11 🥚 | **Raise the Ember Brood** | — | dragons T2 | Make 4 Red Eggs |
+| 12 | **Wake the Ashdrake** | — | — | Merge 3 Ashdrake Eggs into the Ashdrake |
+| 13 | *(the live order's title)* | the encore | — | Deliver 8 × Gem Shard to Eleanor |
+
+**The ladder ping-pongs between chains on purpose** (retuned on playtest — it
+used to open with FOUR gem quests in a row): no two consecutive quests work the
+same merge chain, the low tiers of each chain come before its high ones, and a
+chain rests for at least one quest before the ladder returns to it. The
+legendary eggs moved with the shuffle (they sit at completable indices 1 / 5 /
+10 — gaps of 3 and 4, last egg second-to-last, all still audit-enforced), and
+`orders.json`'s scripted sequence was reordered WITH the quests, because the
+Ledger serves scripted orders in file order and a quest must never wait on an
+order the Ledger has not surfaced yet.
 
 Quest 5 is the tutorial's `moonwater_merge` promise kept: Eleanor tells the
 player "three vials make true Moonwater, and that is what I will ask you for",
@@ -70,9 +80,9 @@ Basin that feeds it would be dead stock.
 | 4 | **Salvage the Wrecks** | `selyna_frames` | Make 2 Lashed Frames · Deliver 2 Lashed Frames to Selyna |
 | 5 | **Open Selyna's Keep** | — | Spend 2 Gold Keys on the fog around the keep |
 | 6 🥚 | **What She Will Take** | — | Give Selyna 2 Bound Faggots · Give Selyna 3 Frost Flowers |
-| 7 | **Raise a Longhall** | — | Merge 2 Lashed Frames into an Upturned Hull · Merge 2 Upturned Hulls into a Longhall |
+| 7 | **Turn Two Hulls** | — | Make 2 Upturned Hulls |
 | 8 | **Stock the Pitchworks** | — | Make 1 Black Ember |
-| 9 | **Turn Two Hulls** | — | Make 2 Upturned Hulls |
+| 9 | **Raise a Longhall** | — | Merge 2 Lashed Frames into an Upturned Hull · Merge 2 Upturned Hulls into a Longhall — the two hulls from quest 7 are exactly what it merges |
 | 10 🥚 | **Spin the Light-Fast Spindles** | `selyna_spindle` | Earn a place at Selyna's fire · Grow a Rime Bloom · Make 2 Light-Fast Spindles · Deliver 2 to Selyna |
 | 11 | **Wake the Rimewyrm** | — | Merge 3 Rimewyrm Eggs into the Rimewyrm |
 | 12 | *(the live order's title)* | the encore | whatever her Ledger asks |
@@ -241,15 +251,17 @@ whether or not anyone remembers this command.
 > *the scripted floor is Level 2 at 193 XP — the beat depends on 27 XP of
 > free-play merging landing before the last delivery.*
 
-`Constants.ts` pins the Chapter One finale to Order 3's delivery, but the
+`Constants.ts` used to pin the Chapter One finale to Order 3's delivery, but the
 scripted XP alone did not reach `LEVEL_XP[2] = 220`. A player who merged nothing
 beyond the four deliveries reached Level 3 on **Order 4**, and the whole finale —
 camera to the altar, the egg cracking, the Elder's only line — landed a quest
 late, on a delivery that has nothing to do with her.
 
-**Fixed by paying `eleanor_centerpiece` 80 XP instead of 50.** The scripted floor
-now clears 220 on its own delivery, so the climax fires where it was authored to
-fire for every player, not just the ones who merged enough on the way. The
+**Fixed by paying `eleanor_centerpiece` 80 XP instead of 50.** (Both halves are
+history now: the finale fires on `keepers_hoard`'s completion rather than on any
+level, and after the ladder re-rhythm the floor crosses 220 on
+`eleanor_hearth`'s delivery — still an order beat, which is the property that
+matters. The curve also runs past 3 to Level 6; see Constants' LEVEL_XP.) The
 `expects` assertion stays, and the audit reports zero warnings — which is the
 point of declaring design intent in data rather than in a comment.
 

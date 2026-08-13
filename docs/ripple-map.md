@@ -70,7 +70,7 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | dragon:rest / dragon:rested | DragonJobSystem | BoardScene |
 | energy:changed | EnergySystem, BoardSystem | Hud, Save |
 | economy:changed | EconomySystem, BoardSystem | Hud, AudioManager, Save |
-| keeper:leveled | EconomySystem | UnlockSystem (level regions lift), RewardSystem, BoardScene (camera fly; **level≥3 runs the FINALE sequence instead**), UIScene (banner; **level≥3 → Cindra line + chapter card on the FINALE timeline**), AudioManager |
+| keeper:leveled | EconomySystem | UnlockSystem (level regions lift), RewardSystem (Gold + refill + **chest from level 3**), BoardScene (camera fly to the opened region — skipped for perk-only levels and for the altar's level pre-awakening), UIScene (banner), AudioManager |
 | order:progress | OrderSystem (one per VISIBLE order — payload orderId matters) | Hud (dot = ANY deliverable), LedgerPanel |
 | order:completed | OrderSystem | Hud, LedgerPanel, UIScene (celebration banner), AudioManager, TutorialDirector, TaskSystem, Save |
 | tasks:all_complete | TaskSystem (reward already paid) | UIScene (banner + Cindra line), LedgerPanel (Tasks-tab refresh) |
@@ -257,7 +257,12 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   until the player commits, and a tier without one leaves a closed chooser holding an
   ornament. (2) The commission is WRITE-ONCE (`GeneratorSystem.commission`); a
   re-pointable House is a menu, and the whole design is that a second output costs a
-  second House. (3) Resolve output ONLY through `producesOf` — the passive tick, the
+  second House. (2b) The commission is RANK-CAPPED (`produceMaxTier`, default 1): a
+  House takes tier-1 pieces only, a Manor (now `chooseProduce` too) tiers 1–2.
+  `GeneratorSystem.commission` refuses `tier_too_high`, the chooser renders over-rank
+  bag slots locked (🔒, shake on tap — visible so the player learns what a Manor
+  buys), and the `house_commission` beat cites the rule. `TimberLoop.spec` pins both
+  sides. (3) Resolve output ONLY through `producesOf` — the passive tick, the
   offline catch-up and a tap must never disagree about what a House makes. (4) The
   chooser is suppressed for the whole tutorial: the script builds its own House and
   teaches the Warmth skip on it (`house_skip`), and a modal panel would fight that beat
@@ -337,7 +342,13 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   watched stillness accrues; one-shot, `remainMs` held to the clip's real
   length). The seated SLEEP is the tosleep clip's frozen LAST
   frame breathing in `syncDragon` — the sleep painting is only the no-clip
-  fallback, never a cut after the transition. TWO INVARIANTS guard the machine:
+  fallback, never a cut after the transition. CLIP-COMPLETE breeds
+  (red/frost/storm × baby/adult) carry NO RIG — `LiveDragon.player` is null,
+  facing lives on `ld.facing`, and every `ld.player` touch must stay guarded.
+  The worn Emporium skin picks the clip character
+  (`dragonClipCharacter(chain, tier, skin)`); `applyDragonSkin` REBUILDS live
+  animals (mood carried), and a sleeper without its own painting sleeps as
+  its dimmed idle frame — a Frost dragon must never sleep in the red art. TWO INVARIANTS guard the machine:
   (1) every clip SWITCH goes through `dressOverlay` (transform applied
   synchronously) — mood events land in update()'s `time:advanced` tail AFTER
   updateLiveDragons ran, so waiting for syncDragon renders one frame of the
@@ -411,10 +422,21 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   table in `characters.json` or the two will disagree about what she will take.
 - **TOUCH LEVEL_XP or any tier `xp` → CHECK** tutorial pacing: the whole tutorial earns
   EXACTLY 60 XP (26 + 24 hatches + the `levelup` step's 10) and LEVEL_XP[1]=60, so Level 2
-  lands ON the scripted `levelup` beat. LEVEL_XP[2]=220 is the FINALE curve (lands on
-  Order 3's delivery — DEMO-PLAN §Act IV); the array deliberately ENDS at level 3.
-  keeper:leveled(≥3) triggers the finale in BOTH BoardScene and UIScene (shared FINALE
-  timeline in Constants). Camera glide is suppressed while the tutorial runs.
+  lands ON the scripted `levelup` beat (`pnpm quests` errors if not). The curve runs to
+  SIX levels: L3=220 (crosses on `eleanor_hearth`'s delivery; opens `level_5`; the
+  Borealis door's rank floor), L4=420 (`beyond_l4`), L5=1000 (`beyond_l5`), L6=1400 cap.
+  Keep every threshold OUT of the `keepers_hoard` XP window (~550–810): the finale fires
+  on that quest's completion, and a level-up glide must not fight its camera. Changing
+  LEVEL_XP also moves the build-zones `LEVEL_CAP` (hand-synced) — regenerate zones.json
+  or 'beyond' ground goes stale. Camera glide is suppressed while the tutorial runs, for
+  perk-only levels (no level region in the active map), and for the altar's level while
+  the awakening quest is unfinished.
+- **TOUCH keeper:leveled handlers → RULE** RewardSystem also drops a Bronze Chest
+  (`board:spawn`, overflow to Bag) from `LEVELUP_REWARD.chestFromLevel` (3) on — never
+  below it, or the tutorial's scripted `levelup` beat grows an unscripted interactive
+  object. WorldSystem.settleUnlocks mirrors UnlockSystem's gates ('unlockable' only,
+  never key-priced) and settles through `region:reveal` so contents spawn; it runs AFTER
+  seed() or a first-arrival region would reveal twice.
 - **TOUCH world export → RULE** re-run BOTH `scripts/ingest-world.mjs` then
   `scripts/build-gamemap.mjs`. map.json is generated (hand edits clobbered). build-gamemap
   re-anchors tutorial start items by **+1,+4** and carves `level_2_gate` from the dozen

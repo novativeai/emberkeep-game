@@ -25,7 +25,6 @@ import {
   GOLDEN_TREMBLE_PROGRESS,
   IS_IOS,
   ITEM_SCALE,
-  LEVEL_XP,
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
@@ -105,9 +104,16 @@ import type { RigDoc } from '../render/rigTypes';
 import { hopTo, hoverBob, popIn, scalePulse } from '../ui/tweens';
 import { isDragonFood } from '../systems/DragonSystem';
 
-/** A featured live-rigged dragon overlaying its (invisible) interactive host. */
+/** A featured live dragon overlaying its (invisible) interactive host.
+ *  CLIP-COMPLETE breeds (red baby/adult, the Emporium Frost/Storm) are driven
+ *  entirely by their Align-Studio clip sets and carry NO rig — `player` is
+ *  null for them and every rig call is a guarded fallback for the breeds that
+ *  still puppet (emerald, golden). */
 interface LiveDragon {
-  player: RigPlayer;
+  player: RigPlayer | null;
+  /** Which way the animal faces; −1 mirrors (source art faces left). The rig
+   *  container follows this when there is one, the overlay always does. */
+  facing: 1 | -1;
   host: BoardItem;
   shadow: Phaser.GameObjects.Image; // ground shadow scaled to the rig
   mode: 'hover' | 'idle';
@@ -511,7 +517,7 @@ export class BoardScene extends Phaser.Scene {
       this.offBus = [];
       for (const ld of this.liveDragons.values()) {
         ld.clipOverlay?.destroy();
-        ld.player.destroy();
+        ld.player?.destroy();
       }
       this.liveDragons.clear();
       this.altarElder?.destroy();
@@ -774,7 +780,11 @@ export class BoardScene extends Phaser.Scene {
    *  (the ember/emerald generator tiers). The Golden Elder is not a board
    *  item — she lives on the Golden Altar fixture (see syncGoldenAltar). */
   private wearsRigTier(chain: string, tier: number): boolean {
-    if (DRAGON_RIGS[rigKeyFor(chain, tier)] === undefined) return false;
+    // A tier is a LIVE dragon when a rig is registered for it OR its clip set
+    // carries the whole animal (clip-only breeds — no rig at all).
+    if (DRAGON_RIGS[rigKeyFor(chain, tier)] === undefined && !this.clipComplete(chain, tier)) {
+      return false;
+    }
     return this.generatorConfigFor(chain, tier) !== undefined;
   }
 
@@ -847,30 +857,52 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
+  /** The clip character dressing this board dragon, respecting the worn
+   *  Emporium skin (a purchased Frost/Storm IS that breed on the board). */
+  private clipCharacterFor(chain: string, tier: number): string | null {
+    return dragonClipCharacter(chain, tier, this.ctx.state.dragonSkins[chain] ?? null);
+  }
+
+  /** True when this breed+skin's clip set carries the whole animal (an idle
+   *  clip is the floor — everything else degrades onto it), so no rig is
+   *  built at all. The idle TEXTURE must actually be resident: a failed sheet
+   *  load falls back to the rig path instead of mounting an invisible animal. */
+  private clipComplete(chain: string, tier: number): boolean {
+    const id = this.clipCharacterFor(chain, tier);
+    if (!id || clipFor(id, 'idle') === null) return false;
+    return this.textures.exists(clipKey(id, 'idle'));
+  }
+
   /** Mirror the source art (faces LEFT) to face RIGHT and mount it over `host`,
-   *  which goes invisible but stays interactive/draggable. Returns false if the
-   *  rig isn't ready yet (caller falls back to the sprite). */
+   *  which goes invisible but stays interactive/draggable. CLIP-COMPLETE
+   *  breeds mount overlay-only (no RigPlayer); others need their rig loaded —
+   *  returns false if it isn't ready yet (caller falls back to the sprite). */
   private attachDragon(host: BoardItem, intro: boolean): boolean {
+    const clipOnly = this.clipComplete(host.chain, host.tier);
     const rig = this.dragonRigs.get(rigKeyFor(host.chain, host.tier));
-    if (!rig) return false;
+    if (!clipOnly && !rig) return false;
     this.removeDragonRig(host.itemId);
     const scale =
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
       (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1);
-    const calm = CALM_DRAGONS.has(rig.character);
-    const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, {
-      scale,
-      speed: calm ? DRAGON_ANIM.adultSpeed : DRAGON_ANIM.whelpSpeed
-    });
-    const face = FACES[rig.character];
-    if (face) player.attachFace(this, face, faceTextureKey(rig.character));
-    player.setFacing('left'); // rig's original (un-mirrored) orientation
-    if (!intro) player.play('idle');
+    const calm = clipOnly ? host.tier >= 4 : CALM_DRAGONS.has(rig!.character);
+    let player: RigPlayer | null = null;
+    if (!clipOnly) {
+      player = new RigPlayer(this, rig!, (layer) => `rig:${rig!.character}:${layer}`, {
+        scale,
+        speed: calm ? DRAGON_ANIM.adultSpeed : DRAGON_ANIM.whelpSpeed
+      });
+      const face = FACES[rig!.character];
+      if (face) player.attachFace(this, face, faceTextureKey(rig!.character));
+      player.setFacing('left'); // rig's original (un-mirrored) orientation
+      if (!intro) player.play('idle');
+    }
     host.setArtVisible(false); // host is now just the invisible hit-target + bob anchor
-    // Ground shadow proportional to the rig (666px pieces × scale).
+    // Ground shadow proportional to the animal (666px rig pieces × scale).
     const shadow = this.addGroundShadow(host.x, host.y, 666 * scale, host.depth - 0.5);
     const ld: LiveDragon = {
       player,
+      facing: 1,
       host,
       shadow,
       mode: intro ? 'hover' : 'idle',
@@ -891,25 +923,48 @@ export class BoardScene extends Phaser.Scene {
       // The newborn roars its arrival: the ingested roar clip when pushed
       // (same bellow as the hungry cadence), the rig hover + ~2.1s of mouth
       // flap without it. Whichever plays is what fades in.
-      let target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container;
+      let target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container | null;
       if (this.playRoarClip(ld) && ld.clipOverlay) {
         target = ld.clipOverlay;
-      } else {
+      } else if (player) {
         player.play('hover');
         player.playFace(2);
         ld.mode = 'hover';
         ld.remainMs = DRAGON_ANIM.introCelebrateMs;
         target = player.container;
+      } else {
+        this.dragonIdle(ld); // clip-only with no roar staged: arrive at rest
+        target = ld.clipOverlay ?? null;
       }
-      target.setAlpha(0);
-      this.tweens.add({
-        targets: target,
-        alpha: 1,
-        duration: DRAGON_ANIM.fadeInMs,
-        ease: 'Sine.easeOut'
-      });
+      if (target) {
+        target.setAlpha(0);
+        this.tweens.add({
+          targets: target,
+          alpha: 1,
+          duration: DRAGON_ANIM.fadeInMs,
+          ease: 'Sine.easeOut'
+        });
+      }
     }
     return true;
+  }
+
+  /** Face the animal left/right: the overlay always follows `ld.facing`
+   *  (via syncDragon/dressOverlay); the rig container follows too when the
+   *  breed still has one. */
+  private setDragonFacing(ld: LiveDragon, dir: 'left' | 'right'): void {
+    ld.facing = dir === 'left' ? 1 : -1;
+    ld.player?.setFacing(dir);
+  }
+
+  /** Keyline weight for a clip-only animal, from its idle clip's displayed
+   *  size through the same formula the rigs use (rigInkGeometry). */
+  private clipOutlineUnits(ld: LiveDragon): number {
+    const idle = this.dragonClip(ld, 'idle');
+    const size = idle
+      ? Math.max(idle.clip.frameWidth, idle.clip.frameHeight) * idle.clip.scale
+      : 666 * DRAGON_ANIM.whelpScale;
+    return keylineUnits(size, DRAGON_OUTLINE);
   }
 
   private idleSpanMs(calm = false): number {
@@ -922,18 +977,19 @@ export class BoardScene extends Phaser.Scene {
     return DRAGON_ANIM.idleMinMs + Math.random() * (DRAGON_ANIM.idleMaxMs - DRAGON_ANIM.idleMinMs);
   }
 
-  /** Keep the rig glued to its (possibly bobbing/dragged) host + advance anim. */
+  /** Keep the animal glued to its (possibly bobbing/dragged) host + advance
+   *  the rig anim when this breed still has one. */
   private syncDragon(ld: LiveDragon): void {
-    ld.player.container.setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift);
-    ld.player.container.setDepth(ld.host.depth + 0.5);
+    ld.player?.container.setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift);
+    ld.player?.container.setDepth(ld.host.depth + 0.5);
     ld.shadow.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth - 0.5);
     ld.zzz?.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth + 4);
     if (ld.clipOverlay?.visible) {
       // The Align-Studio clip rides the host at the rig's own anchor and depth,
-      // mirroring with the rig's facing (source art faces left; dx mirrors too,
-      // so the registration lands where the flipped rig's would).
+      // mirroring with the animal's facing (source art faces left; dx mirrors
+      // too, so the registration lands where a flipped rig's would).
       const clip = ld.clipOverlay.getData('clip') as CharacterClip | undefined;
-      const flip = ld.player.container.scaleX < 0;
+      const flip = ld.facing < 0;
       ld.clipOverlay
         .setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift)
         .setDepth(ld.host.depth + 0.5)
@@ -965,7 +1021,7 @@ export class BoardScene extends Phaser.Scene {
   private updateLiveDragons(delta: number): void {
     for (const ld of this.liveDragons.values()) {
       this.syncDragon(ld);
-      ld.player.update(delta);
+      ld.player?.update(delta);
       if (ld.busy || ld.host.getData('dragged')) continue; // flying/working/held: hold its animation
       // A sleeping dragon does not fidget: the rig is hidden behind the curled
       // sleep art, so rolling idle/hover under it would animate nothing and
@@ -1074,7 +1130,7 @@ export class BoardScene extends Phaser.Scene {
     if (!ld) return;
     ld.zzz?.destroy();
     ld.clipOverlay?.destroy();
-    ld.player.destroy();
+    ld.player?.destroy();
     ld.shadow.destroy();
     this.liveDragons.delete(itemId);
   }
@@ -1093,7 +1149,7 @@ export class BoardScene extends Phaser.Scene {
     ld.sleepState = 'none'; // a bellowing dragon is not curled on a tile
     overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
     overlay.setVisible(true);
-    ld.player.container.setVisible(false);
+    ld.player?.container.setVisible(false);
     overlay.play(roar.key);
     ld.mode = 'idle';
     ld.remainMs = (roar.clip.frames / roar.clip.fps) * 1000;
@@ -1109,7 +1165,7 @@ export class BoardScene extends Phaser.Scene {
    *  rears back with the wide-mouth face, exactly as before. Purely a mood —
    *  nothing in the economy hears it. */
   private roarOnce(ld: LiveDragon): void {
-    if (!this.playRoarClip(ld)) {
+    if (!this.playRoarClip(ld) && ld.player) {
       this.clearDragonOverlay(ld); // the bellow is the rig's — never under a fly loop
       ld.player.container.setVisible(true);
       ld.player.play('roar');
@@ -1140,7 +1196,7 @@ export class BoardScene extends Phaser.Scene {
    * Null when this breed/tier has no pushed clips or the sheet is not resident.
    */
   private dragonClip(ld: LiveDragon, clipId: string): { clip: CharacterClip; key: string } | null {
-    const id = dragonClipCharacter(ld.host.chain, ld.host.tier);
+    const id = this.clipCharacterFor(ld.host.chain, ld.host.tier);
     if (!id) return null;
     const clip = clipFor(id, clipId);
     const key = clipKey(id, clipId);
@@ -1163,8 +1219,12 @@ export class BoardScene extends Phaser.Scene {
       // A clip HIDES the rig, and with it the rig's keyline, so the stand-in has to
       // carry its own — at the rig's exact width, since the handover happens
       // mid-animation and a line that changed weight across it would read as a
-      // flinch. See src/render/SpriteInk.ts.
-      attachSpriteInk(this, ld.clipOverlay, { units: ld.player.outlineUnits });
+      // flinch. A CLIP-ONLY breed has no rig to match: its weight derives from
+      // the idle clip's own displayed size through the same board formula.
+      // See src/render/SpriteInk.ts.
+      attachSpriteInk(this, ld.clipOverlay, {
+        units: ld.player?.outlineUnits ?? this.clipOutlineUnits(ld)
+      });
     }
     return ld.clipOverlay;
   }
@@ -1182,7 +1242,8 @@ export class BoardScene extends Phaser.Scene {
   private dressOverlay(ld: LiveDragon, c: { clip: CharacterClip; key: string }): Phaser.GameObjects.Sprite {
     const overlay = this.dragonOverlay(ld, c.key);
     overlay.setData('clip', c.clip);
-    const flip = ld.player.container.scaleX < 0;
+    overlay.setAlpha(1); // a dimmed-sleep or faded-intro overlay must not leak forward
+    const flip = ld.facing < 0;
     const origin = originFor(c.clip, flip);
     overlay
       .setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift)
@@ -1250,24 +1311,30 @@ export class BoardScene extends Phaser.Scene {
     if (!f) {
       // No phased clip: the whole-loop overlay, else the rig's hover preset
       // (clearing any idle overlay a partial push may have left standing in).
+      // A CLIP-ONLY breed with no fly clip at all (the Emporium babies) keeps
+      // its idle look for the glide — the journey tween carries the motion.
       const whole = this.dragonClip(ld, 'fly');
       if (!whole) {
-        this.clearDragonOverlay(ld);
-        ld.player.container.setVisible(true);
-        ld.player.play('hover');
+        if (ld.player) {
+          this.clearDragonOverlay(ld);
+          ld.player.container.setVisible(true);
+          ld.player.play('hover');
+        } else {
+          this.dragonIdle(ld);
+        }
         return;
       }
       const overlay = this.dressOverlay(ld, whole);
       overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
       overlay.setVisible(true);
       overlay.play(whole.key, true);
-      ld.player.container.setVisible(false);
+      ld.player?.container.setVisible(false);
       return;
     }
     const overlay = this.dressOverlay(ld, f);
     overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
     overlay.setVisible(true);
-    ld.player.container.setVisible(false);
+    ld.player?.container.setVisible(false);
     const airborne = ld.flightPhase === 'takeoff' || ld.flightPhase === 'loop';
     if (!airborne) {
       const rampFits = durationMs === undefined || durationMs > this.segMs(f.clip, 'takeoff') + DRAGON_ANIM.landingLeadMs;
@@ -1331,7 +1398,7 @@ export class BoardScene extends Phaser.Scene {
       const overlay = this.dressOverlay(ld, idle);
       overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
       overlay.setVisible(true);
-      ld.player.container.setVisible(false);
+      ld.player?.container.setVisible(false);
       // An idle roll landing on idle again must not restart the breath cycle.
       if (overlay.anims.currentAnim?.key !== idle.key || !overlay.anims.isPlaying) {
         overlay.play(idle.key);
@@ -1340,6 +1407,7 @@ export class BoardScene extends Phaser.Scene {
       return;
     }
     this.clearDragonOverlay(ld);
+    if (!ld.player) return; // clip-only breeds always have an idle clip
     ld.player.container.setVisible(true);
     ld.player.play('idle');
   }
@@ -1379,7 +1447,7 @@ export class BoardScene extends Phaser.Scene {
     overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
     overlay.stop();
     overlay.setVisible(true);
-    ld.player.container.setVisible(false);
+    ld.player?.container.setVisible(false);
     ld.host.setArtVisible(false);
     overlay.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       overlay.setVisible(false);
@@ -1399,9 +1467,24 @@ export class BoardScene extends Phaser.Scene {
     if (ld.sleepState !== 'none') return;
     const seatSleep = (): void => {
       ld.sleepState = 'seated';
-      const sleepKey = `sleep_${ld.host.chain}_${ld.host.tier}`;
-      if (!this.textures.exists(sleepKey)) {
-        ld.player.container.setVisible(true).setAlpha(0.65);
+      // The sleep painting is the CHAIN's bare art. A worn Emporium skin
+      // (Frost/Storm) must never sleep in the red painting — with no skin
+      // painting authored, the breed sleeps as its own DIMMED idle frame
+      // (breathing via syncDragon), which is also the clip-only fallback.
+      const skin = this.ctx.state.dragonSkins[ld.host.chain];
+      const sleepKey = skin ? '' : `sleep_${ld.host.chain}_${ld.host.tier}`;
+      if (!sleepKey || !this.textures.exists(sleepKey)) {
+        const idle = this.dragonClip(ld, 'idle');
+        if (idle) {
+          const overlay = this.dressOverlay(ld, idle);
+          overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+          overlay.stop();
+          overlay.setFrame(0);
+          overlay.setVisible(true).setAlpha(0.65);
+          ld.player?.container.setVisible(false);
+        } else {
+          ld.player?.container.setVisible(true).setAlpha(0.65);
+        }
         return;
       }
       // The rig steps aside and the painting takes the tile — but the rig's
@@ -1410,7 +1493,8 @@ export class BoardScene extends Phaser.Scene {
       // the tile origin, which is the same line `syncDragon` puts that shadow
       // on: the dragon lies down ON its shadow rather than hovering over a
       // second one the item would otherwise light beneath itself.
-      ld.player.container.setVisible(false);
+      this.clearDragonOverlay(ld); // an idle overlay must not cover the painting
+      ld.player?.container.setVisible(false);
       ld.host.setArtTexture(sleepKey, this.ctx.data.anchors);
       ld.host.setArtScale(ITEM_SCALE[sleepKey] ?? DRAGON_SLEEP_SCALE);
       ld.host.setArtVisible(true);
@@ -1519,13 +1603,17 @@ export class BoardScene extends Phaser.Scene {
       ld.mode = 'idle';
       ld.remainMs = DRAGON_WAKE_MS;
       this.playDragonTransition(ld, t, true, () => {
-        ld.player.container.setAlpha(1);
+        ld.player?.container.setAlpha(1);
         this.dragonIdle(ld); // the atlas idle when pushed, the rig otherwise
       });
       return;
     }
-    ld.player.container.setVisible(true).setAlpha(1);
-    ld.player.play('stretch');
+    if (ld.player) {
+      ld.player.container.setVisible(true).setAlpha(1);
+      ld.player.play('stretch');
+    } else {
+      this.dragonIdle(ld); // clip-only: back onto the idle loop (alpha reset by dress)
+    }
     ld.mode = 'idle';
     ld.remainMs = DRAGON_WAKE_MS;
   }
@@ -1547,7 +1635,7 @@ export class BoardScene extends Phaser.Scene {
     const ld = this.liveDragons.get(itemId);
     if (ld) {
       ld.busy = true;
-      ld.player.setFacing(dest.x <= sprite.x ? 'left' : 'right');
+      this.setDragonFacing(ld, dest.x <= sprite.x ? 'left' : 'right');
       this.dragonHover(ld, DRAGON_WANDER_FLIGHT_MS);
     }
     // Two tweens rather than a curve: x eases the whole way while y hops up and
@@ -2042,12 +2130,22 @@ export class BoardScene extends Phaser.Scene {
     // Never yank the camera away mid-onboarding — the tutorial's scripted taps
     // all live in the L1 zone. Zones still unlock; the view just stays put.
     if (!this.tutorialDone) return;
-    // The LAST level opens the land the Golden Altar stands beside, so its glide
-    // reads as the game presenting the egg — a promise it cannot keep while the
+    // A glide is the game PRESENTING new ground, so it only happens when this
+    // rank actually opened some in the world the player is looking at. A
+    // perk-only level (or any rank crossed in a world of key-gated isles) pays
+    // its coins and chest without stealing the camera.
+    const opened = this.ctx.state.map.regions.some(
+      (r) => r.unlock?.level === level && r.unlock.keys === undefined
+    );
+    if (!opened) return;
+    // Level 3 opens the land the Golden Altar stands beside, so its glide reads
+    // as the game presenting the egg — a promise it cannot keep while the
     // awakening quest is unfinished, and the player is left staring at an egg
     // that does nothing. The land still opens; the camera stays where they are
     // working, and the altar gets its move when the quest actually wakes her.
-    if (level >= LEVEL_XP.length && !this.goldenQuestDone()) return;
+    const altarLevel = this.ctx.state.map.regions.find((r) => r.id === FINALE_REGION)?.unlock
+      ?.level;
+    if (level === altarLevel && !this.goldenQuestDone()) return;
     const target = this.frameForLevel(level);
     // actual (×renderScale) zoom space — cam.zoom below is already scaled.
     const targetZoom = Math.max(target.zoom, this.minZoom) * renderScale.value; // stay inside the image
@@ -3684,7 +3782,7 @@ export class BoardScene extends Phaser.Scene {
       this.stirSleeper(ld); // fed in her sleep — the painting answers, not the rig
     } else if (ld && !ld.busy) {
       this.dragonHover(ld);
-      ld.player.playFace(1); // a chirp for the meal
+      ld.player?.playFace(1); // a chirp for the meal
       ld.mode = 'hover';
       const span = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
       ld.remainMs = favourite ? span * 2 : span;
@@ -3884,9 +3982,18 @@ export class BoardScene extends Phaser.Scene {
 
   /** Re-texture every dragon of one chain when its worn skin changes. Every
    *  tier is offered to `textureFor`, which swaps only the ones that have skin
-   *  art — a whelp-only skin leaves the adult alone by itself. */
+   *  art — a whelp-only skin leaves the adult alone by itself. LIVE dragons
+   *  also REBUILD: the worn breed decides which clip set IS the animal
+   *  (Frost/Storm are their own creatures, not a re-paint), and the rebuilt
+   *  animal keeps the mood it was in — a re-dressed sleeper stays asleep. */
   private applyDragonSkin(dragon: string): void {
     this.reskinChain(dragon, () => true);
+    for (const [id, ld] of [...this.liveDragons]) {
+      if (ld.host.chain !== dragon) continue;
+      const mood = ld.mood;
+      this.attachDragon(ld.host, false);
+      if (mood !== 'awake') this.applyDragonMood(id, mood);
+    }
   }
 
   private reskinChain(chain: string, wants: (item: BoardItemState) => boolean): void {
@@ -4149,10 +4256,12 @@ export class BoardScene extends Phaser.Scene {
     if (COLLECTIBLE_REWARD[`${item.chain}_${item.tier}`] ?? COLLECTIBLE_REWARD[item.chain]) return false;
     if (item.chain === 'chest') return false;
     if (this.generatorConfigFor(item.chain, item.tier)) return false;
-    const tier = this.ctx.data.chains.chains
-      .find((c) => c.id === item.chain)
-      ?.tiers.find((t) => t.tier === item.tier);
-    if (tier?.sellable === false) return false;
+    // NOT gated on `sellable` any more: unsellable is a rule about the SELL
+    // verb, not about the satchel — a legendary egg (ashdrake/rimewyrm, both
+    // `sellable:false`) is exactly the precious thing a player pockets while
+    // clearing room, and refusing the tap made a quest reward read as broken.
+    // The Bag chooser omits its Sell plate for these (BagPanel), and
+    // EconomySystem refuses the sale anyway, so nothing downstream can go wrong.
     // Mid-tutorial the board is a script; pocketing a scripted piece would
     // strand the step that wants it merged. `allow.bag` opens it for the one
     // beat that teaches the satchel, on a piece nothing else needs.
@@ -4363,7 +4472,7 @@ export class BoardScene extends Phaser.Scene {
     const landX = plant.x + 70; // land to the plant's right so the un-mirrored rig still faces it (left)
     if (ld) {
       ld.busy = true;
-      ld.player.setFacing(landX <= plant.x ? 'right' : 'left');
+      this.setDragonFacing(ld, landX <= plant.x ? 'right' : 'left');
       this.dragonHover(ld, DRAGON_ANIM.flyToMs);
     }
     const land = (): void => {
@@ -4543,7 +4652,7 @@ export class BoardScene extends Phaser.Scene {
     const landX = house.x + 70; // land beside the building so the un-mirrored rig faces it
     if (ld) {
       ld.busy = true;
-      ld.player.setFacing('left');
+      this.setDragonFacing(ld, 'left');
       this.dragonHover(ld, DRAGON_ANIM.flyToMs);
     }
     // Same beat as the harvest flourish: fly over, breathe a brief burst of
@@ -4745,7 +4854,7 @@ export class BoardScene extends Phaser.Scene {
     const ld = this.liveDragons.get(dragonId);
     if (ld) {
       this.dragonHover(ld);
-      ld.player.playFace(1); // a refreshed chirp
+      ld.player?.playFace(1); // a refreshed chirp
       ld.mode = 'hover';
       ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
     }
@@ -5266,8 +5375,11 @@ export class BoardScene extends Phaser.Scene {
    * and giving something in your sleep is not a reason to get up.
    */
   private stirSleeper(ld: LiveDragon): void {
+    // Rock whatever is actually asleep on screen: the painting rides the host
+    // art; a clip-only breed sleeps as its dimmed overlay frame.
+    const target = ld.clipOverlay?.visible ? ld.clipOverlay : ld.host;
     this.tweens.add({
-      targets: ld.host,
+      targets: target,
       angle: { from: 0, to: -3.5 },
       duration: 200,
       yoyo: true,
@@ -5294,7 +5406,7 @@ export class BoardScene extends Phaser.Scene {
     ld.mode = 'hover';
     ld.remainMs = ld.calm ? DRAGON_ANIM.adultCelebrateMs : DRAGON_ANIM.celebrateMs;
     this.dragonHover(ld);
-    ld.player.playFace(1); // one happy mouth-flap as the gift pops out
+    ld.player?.playFace(1); // one happy mouth-flap as the gift pops out
   }
 
   private onRegionUnlocked(tiles: TilePos[], revealed: ItemSnapshot[], regionId?: string): void {
@@ -5457,7 +5569,7 @@ export class BoardScene extends Phaser.Scene {
   private fullResync(): void {
     for (const ld of this.liveDragons.values()) {
       ld.clipOverlay?.destroy();
-      ld.player.destroy();
+      ld.player?.destroy();
     }
     this.liveDragons.clear();
     for (const id of [...this.itemAuras.keys()]) this.detachItemAura(id);

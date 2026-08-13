@@ -186,7 +186,11 @@ export class RigPlayer {
       // A rig layer is a standalone texture, so its fence is the whole image.
       const fence = uvFence(box);
       const twin = scene.add
-        .image(ls.img.x, ls.img.y, key)
+        // `__BASE` by name: a rig layer is a standalone texture, so it is also the
+        // default frame — but the shader's uv remap REQUIRES it, and asking for it
+        // by name is what stops a layer that ever arrives packed in an atlas from
+        // silently losing its outline. See BASE_FRAME in ./SpriteInk.
+        .image(ls.img.x, ls.img.y, key, '__BASE')
         .setDisplaySize(q.width, q.height)
         .setOrigin(q.originX, q.originY)
         .setPipeline(RIG_INK_PIPELINE);

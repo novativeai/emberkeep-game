@@ -53,15 +53,17 @@ const BOARD_ORIGIN_Y = 316;
  *  emberkeep placement, so one art→world transform serves all of them. */
 const ART_W = 2610;
 const ART_H = 1632;
-/** First Keeper level a new emberkeep zone may open on — one past the Chapter
- *  One cap, so none of this ground can appear during the shipped campaign. */
+/** First Keeper level a new emberkeep zone may open on — one past Chapter
+ *  One's STORY cap of 3, so none of this ground can appear while the shipped
+ *  tutorial and early ladder still own the isle. */
 const BEYOND_BASE_LEVEL = 4;
 /** Blank columns between two zones' index blocks. One is enough to make a
  *  ±1 step fall in the gap, so adjacency can never leak between zones even
  *  before the same-zone rule in world.ts. */
 const BLOCK_GUTTER = 1;
-/** Highest Keeper level the shipped campaign reaches (Constants' LEVEL_XP). */
-const LEVEL_CAP = 3;
+/** Highest Keeper level the shipped curve reaches (Constants' LEVEL_XP —
+ *  keep in sync by hand; this script must not import from src/). */
+const LEVEL_CAP = 6;
 
 const source = read(SOURCE);
 const authored = read('src/data/map.json');
@@ -372,12 +374,23 @@ const BOREALIS_PLAN = {
     // coast has been worked. Two keys, which is exactly what the pitch and
     // frames orders have paid by then; at one banked key only the coast is
     // affordable, so the march cannot be spent out of order.
+    // The loose rimebloom/driftwood stock came OFF this island: both are
+    // renewable from the Font and the Wrack Line standing right here, and the
+    // freed tiles carry the last three of the five farms (merge-chains
+    // §2.4.1b) instead. Selyna's two — the Cairn ready-built (it reseeds
+    // itself), the Wayfinder as parts — and the Hearthlamp as parts salvaged
+    // among the wreck timbers, because neither the lamp nor the compass ever
+    // reseeds its own tier-1: 3 × t1 + 2 × t2 is exactly one build, with both
+    // Cookbook rows discovered on the way (the dew_basin precedent).
     seeds: [
       ['frostfont', 1, 1],
       ['wrackline', 1, 1],
-      ['rimebloom', 1, 3],
-      ['driftwood', 1, 3],
       ['keel', 1, 3],
+      ['manastone', 3, 1],
+      ['wayfinder', 1, 3],
+      ['wayfinder', 2, 2],
+      ['hearthlamp', 1, 3],
+      ['hearthlamp', 2, 2],
       ['chest', 1, 1]
     ]
   },
@@ -395,9 +408,16 @@ const BOREALIS_PLAN = {
     // (which pays Strakes too), so the frames order funds itself without a
     // scatter of freebies undercutting the farms.
     layout: 'perimeter',
+    // The Runestone and the Cordial Cask join the rim WORKING (tier 3): both
+    // reseed their own tier-1 (the rune bonus / the cask's own produce), so a
+    // seeded t3 here strands no Cookbook row — the parts stream starts the
+    // moment the farm does. That is what lets them keep the coast's
+    // generators-only law instead of arriving as a scatter of parts.
     seeds: [
       ['wrackline', 1, 2],
       ['frostfont', 1, 2],
+      ['runestone', 3, 1],
+      ['emberdram', 3, 1],
       ['chest', 1, 1]
     ]
   }
@@ -708,7 +728,10 @@ for (const spec of WORLDS) {
       }
       return {
         id: `${spec.regionPrefix}_l${lvl}`,
-        status: lvl <= 1 ? 'active' : 'locked',
+        // Within the shipped curve a level region is UNLOCKABLE — it wears the
+        // standard cloud bank and UnlockSystem lifts it the moment the Keeper
+        // ranks up. Only ground gated past the cap stays 'locked'.
+        status: lvl <= 1 ? 'active' : lvl <= LEVEL_CAP ? 'unlockable' : 'locked',
         unlock: lvl <= 1 ? undefined : { level: lvl },
         // Ground gated above the shipped level cap wears no cloud: it cannot be
         // opened this chapter, so a cloud there would be a promise the game

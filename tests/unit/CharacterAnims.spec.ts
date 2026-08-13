@@ -41,8 +41,8 @@ describe('character-anims.json', () => {
     const wardrobe = new Set(
       (charactersDoc as { characters: { id: string; art?: string }[] }).characters.map((c) => c.art ?? c.id)
     );
-    for (const id of Object.keys(CHARACTER_ANIMS.characters)) {
-      if (id === 'redwhelp') continue; // board dragon, not a world character
+    for (const [id, c] of Object.entries(CHARACTER_ANIMS.characters)) {
+      if (c.board) continue; // board dragons (redwhelp, redadult…), not world characters
       expect(wardrobe.has(id), `${id} is not worn by anyone in characters.json`).toBe(true);
     }
   });

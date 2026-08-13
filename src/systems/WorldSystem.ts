@@ -85,8 +85,11 @@ export class WorldSystem {
     const from = this.state.worldId;
     const arriving = !this.state.visited(to);
     this.state.switchWorld(to);
-    this.settleUnlocks(world);
+    // Seed BEFORE settling: seed hands over the contents of regions that were
+    // already active, settleUnlocks reveals the newly-earned ones (contents
+    // included). The other order would reveal a just-settled region twice.
     if (arriving) this.seed(world);
+    this.settleUnlocks(world);
     this.bus.emit('world:switched', { from, to });
   }
 
@@ -111,17 +114,23 @@ export class WorldSystem {
    * Open the level-gated regions this world would already have opened had the
    * Keeper been standing on it when they ranked up.
    *
-   * Written straight to `regionStatus` rather than replayed through
-   * `keeper:leveled`: that event also drives the Chapter One finale, the camera
-   * flights and the XP bar, none of which should fire again because someone
-   * walked through a door.
+   * Settled through `region:reveal` rather than by replaying `keeper:leveled`:
+   * that event also drives the camera flights, the level-up banner and the
+   * reward bundle, none of which should fire again because someone walked
+   * through a door — but the region's hidden CONTENTS must still appear, and
+   * only UnlockSystem's reveal knows how to seed them.
+   *
+   * Mirrors UnlockSystem's own gates: only 'unlockable' regions (never
+   * 'locked' future ground), and never a key-priced one — `level_2_gate` costs
+   * a Gold Key, and walking home through a door must not waive the price.
    */
   private settleUnlocks(world: WorldRuntime): void {
     for (const region of world.map.regions) {
       const level = region.unlock?.level;
       if (level === undefined || level > this.state.level) continue;
-      if (this.state.regionStatus.get(region.id) === 'active') continue;
-      this.state.regionStatus.set(region.id, 'active');
+      if (region.unlock?.keys !== undefined) continue;
+      if (this.state.regionStatus.get(region.id) !== 'unlockable') continue;
+      this.bus.emit('region:reveal', { regionId: region.id });
     }
   }
 }

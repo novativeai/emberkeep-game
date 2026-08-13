@@ -498,20 +498,14 @@ export const HIDDEN_CHAINS = new Set<string>([
   // would sit in the Cookbook as permanent "· · ·" rows. They turn on with the
   // nest chapter, alongside the farms that will supply them.
   'stormcap',
-  'nightbloom',
-  // The five new Borealis farms, here for a DIFFERENT reason from everything
-  // above them, and the difference matters: those wait on a CHAPTER, these wait
-  // on their SEEDS. Their tier-3s are working generators and two of them reseed
-  // themselves, but a farm still has to start somewhere, and the first tier-1 of
-  // each is authored region contents — `zones.json` is GENERATED, so placing
-  // them is a world-editor pass plus `build-zones`, not an edit here. Until that
-  // lands they would be fifteen permanent "· · ·" rows in the north's Cookbook.
-  // Delete these five lines the moment the seeds are placed.
-  'runestone',
-  'emberdram',
-  'hearthlamp',
-  'manastone',
-  'wayfinder'
+  'nightbloom'
+  // The five new Borealis farms sat here waiting on their SEEDS; those are
+  // authored region contents now (build-zones BOREALIS_PLAN: the Runestone and
+  // the Cordial Cask stand working on the coast's rim, Selyna's Cairn plus the
+  // Wayfinder's and the Hearthlamp's parts in the keep), so the five lines came
+  // off exactly as the note here said they would. Their `world: "borealis"`
+  // carries the withholding that matters — see the block below.
+  //
   // Selyna's Borealis roster USED to sit here. It does not belong here: this set
   // is "not this CHAPTER", and those four are "not this WORLD". They now carry
   // `world: "borealis"` in chains.json, which withholds them from Emberkeep and
@@ -1188,46 +1182,61 @@ export const REWARD_SPAWN_RADIUS = 3;
 export type ChestGift =
   | { kind: 'coins'; amount: number; label: string }
   | { kind: 'item'; chain: string; tier: number; count: number; label: string }
-  /** One tier-1 piece, of a chain rolled from THIS world at open time. */
-  | { kind: 'anyItem'; label: string };
+  /** `count` tier-1 pieces of ONE chain rolled from THIS world at open time. */
+  | { kind: 'anyItem'; count: number; label: string };
 
+/**
+ * The one gift table, every world. The chest's item face is ALWAYS the
+ * wildcard now — the roster it rolls from is the standing world's
+ * (`chestWildcardChains`), so the per-world tables this replaced are carried
+ * by the roll, not by authoring. Three of one chain, because three is a merge:
+ * the gift is something to DO, not a lone fixture. The wildcard entry appears
+ * twice to keep the old odds (Gold one time in three). The fixed `3 Rubies`
+ * gift is gone for good: Dragon Rubies hatch dragons, and eggs come from the
+ * story, never from a random box (the same law the Egg Directive states for
+ * legendaries — see `chestWildcardChains`).
+ */
 export const CHEST_GIFTS: ReadonlyArray<ChestGift> = [
   { kind: 'coins', amount: 15, label: '+15' }, // the scene draws the coin art beside it
-  // Was `3 × emerald` — the green dragon is dropped, and the chest was the last
-  // thing on the board still handing its chain out. Replaced by the wildcard
-  // rather than by another fixed chain: a named third gift would just be a
-  // second Ruby drop with a different sprite, and the chest's job is to be the
-  // one place the isle surprises you.
-  { kind: 'anyItem', label: 'A find!' },
-  { kind: 'item', chain: 'ember_dragon', tier: 1, count: 3, label: '3 Rubies!' }
+  { kind: 'anyItem', count: 3, label: 'A find!' },
+  { kind: 'anyItem', count: 3, label: 'A find!' }
 ];
 
-/** Never rolled by the `anyItem` wildcard, whatever world it opens in. */
+/** Never rolled by the `anyItem` wildcard, whatever world it opens in.
+ *  (Egg-bearing chains need no entry here — anything with a `hatchAtTier`,
+ *  emerald and golden_egg included, is barred by the filter itself.) */
 export const CHEST_WILDCARD_NEVER = new Set<string>([
-  'coin', // currency, and the chest already has a Gold face
-  'golden_egg', // the finale's — placed by the altar, brewed at Selyna's Cauldron, and by nothing else
-  'emerald' // the dropped green-dragon chain — the whole point of the change
+  'coin' // currency, and the chest already has a Gold face
 ]);
 
 /**
  * What the wildcard may roll in `worldId`: a real MERGE chain of this world.
  *
- * Four filters, each load-bearing. Not withheld from this world
+ * Five filters, each load-bearing. Not withheld from this world
  * (`chainHiddenIn` — a chest must never leak the next chapter's roster or the
- * north's onto the isle). Not `legendary`: the Egg Directive above says *no
- * producer ever makes an egg, not a chest*, and a random table is exactly the
- * hole that rule exists to close. More than one tier, so the drop is something
- * the player can DO something with rather than a lone fixture. And a tier 1,
- * because the wildcard always pays the bottom of a ladder — a chest that
- * occasionally handed out a tier-3 would outrank every generator on the board.
+ * north's onto the isle). Not `legendary` and not ANY chain that hatches
+ * (`hatchAtTier`): eggs come from the story — a random table is exactly the
+ * hole that rule exists to close, and a "Dragon Ruby from a box" breaks it
+ * just as surely as a legendary egg would. More than one tier, so the drop is
+ * something the player can DO something with rather than a lone fixture. And
+ * a tier 1, because the wildcard always pays the bottom of a ladder — a chest
+ * that occasionally handed out a tier-3 would outrank every generator on the
+ * board.
  */
 export function chestWildcardChains<
-  T extends { id: string; world?: string; legendary?: boolean; tiers: ReadonlyArray<{ tier: number }> }
+  T extends {
+    id: string;
+    world?: string;
+    legendary?: boolean;
+    hatchAtTier?: number;
+    tiers: ReadonlyArray<{ tier: number }>;
+  }
 >(chains: readonly T[], worldId: string): T[] {
   return chains.filter(
     (c) =>
       !chainHiddenIn(c, worldId) &&
       !c.legendary &&
+      c.hatchAtTier === undefined &&
       !CHEST_WILDCARD_NEVER.has(c.id) &&
       c.tiers.length > 1 &&
       c.tiers.some((t) => t.tier === 1)
@@ -1235,17 +1244,8 @@ export function chestWildcardChains<
 }
 
 /**
- * A chest pays in the currency of the world it stands in.
- *
- * The table above is Emberkeep's, and it is made of Emberkeep chains — neither
- * `emerald` nor `ember_dragon` carries a `world`, so `chainHiddenIn` does NOT
- * withhold them in the north. A chest opened in Borealis would cheerfully drop
- * Dragon Rubies onto an island with no dragon to want them, no order that asks
- * for them and no producer to continue the chain: dead weight, on a board where
- * a tile is the scarcest thing there is, and a silent contradiction of the rule
- * that each world has its own roster.
- *
- * Borealis pays what Borealis makes. Gold is shared vocabulary and stays.
+ * A chest pays in the currency of the world it stands in — via the wildcard's
+ * per-world roster, not per-world tables. Gold is shared vocabulary and stays.
  */
 /* ------------------------------------------------------------------ */
 /* THE LEGENDARY EGG DIRECTIVE                                          */
@@ -1293,18 +1293,10 @@ export function legendaryChainIn<T extends { id: string; world?: string; legenda
   return chains.find((c) => c.legendary && !chainHiddenIn(c, worldId));
 }
 
-export const CHEST_GIFTS_BY_WORLD: Readonly<Record<string, ReadonlyArray<ChestGift>>> = {
-  borealis: [
-    { kind: 'coins', amount: 15, label: '+15' },
-    { kind: 'item', chain: 'driftwood', tier: 1, count: 3, label: '3 Drift Spars!' },
-    { kind: 'item', chain: 'rimebloom', tier: 1, count: 3, label: '3 Frost Flowers!' },
-    { kind: 'item', chain: 'keel', tier: 1, count: 2, label: '2 Broken Strakes!' }
-  ]
-};
-
-/** The gift table for the world the Keeper is standing in. */
-export const chestGiftsIn = (worldId: string): ReadonlyArray<ChestGift> =>
-  CHEST_GIFTS_BY_WORLD[worldId] ?? CHEST_GIFTS;
+/** The gift table for the world the Keeper is standing in. One table now —
+ *  the wildcard entries resolve against the standing world's roster at open
+ *  time, which is what the per-world tables used to hand-maintain. */
+export const chestGiftsIn = (_worldId: string): ReadonlyArray<ChestGift> => CHEST_GIFTS;
 
 /** Energy. */
 export const ENERGY_MAX = 30;
@@ -1317,19 +1309,29 @@ export const ENERGY_REGEN_AMOUNT = 1;
 /**
  * Cumulative XP to reach each Keeper level (index 0 = level 1 = 0 xp).
  * The scripted tutorial earns exactly 60 XP (26 + 24 hatches + 10 scripted), so
- * the Level-2 beat lands ON the tutorial's `levelup` step. Level 3 (220) is the
- * demo's finale and is tuned so it lands on Order 3's delivery (DEMO-PLAN §Act
- * IV XP ledger: 60 tutorial + O1 30 + merges ~24 + O2 35 + optional hatch ~24
- * + merges ~34 + O3 50 ≈ 257 — orders pay XP in big chunks, so the level-up
- * fires on a delivery, the right beat). The array ENDS at 3 on purpose: the
- * chapter is complete — the XP bar never fills toward nothing.
+ * the Level-2 beat lands ON the tutorial's `levelup` step — `pnpm quests`
+ * enforces this as an error. Level 3 (220) crosses on `eleanor_hearth`'s
+ * delivery in the scripted floor (tutorial 162 + hearth 60 = 222): a big-chunk
+ * order beat, and comfortably before the Borealis door asks for rank 3.
  *
- * Level 3 no longer FIRES anything. It opens `level_5`'s land and it is the
- * cap, but the Golden Elder's awakening moved off it onto
- * `GOLDEN_ALTAR.awakenQuestId` — a level the player crosses mid-merge is the
- * wrong trigger for the chapter's one irreversible story beat.
+ * The curve used to END at 3 — the demo's cap. It now runs on to 6, tuned
+ * against the realistic ladder ledger (scripted floor + the merge XP the quest
+ * requirements force; scratch: xp-ledger):
+ *   L4  420 — lands building the Radiant Centerpiece (~quest 6); opens the
+ *             `beyond_l4` slab right before the Keeper's Hoard board crunch.
+ *   L5 1000 — lands in the north around Selyna's pitch order; opens the
+ *             `beyond_l5` terrace back home.
+ *   L6 1400 — the cap, landing near the north's last big delivery
+ *             (`selyna_spindle`).
+ * No threshold sits inside the `keepers_hoard` window (~550–810): a level-up
+ * camera glide must never fight the finale choreography, which fires on that
+ * quest's completion.
+ *
+ * Level 3 FIRES no story. It opens `level_5`'s land, but the Golden Elder's
+ * awakening lives on `GOLDEN_ALTAR.awakenQuestId` — a level the player crosses
+ * mid-merge is the wrong trigger for the chapter's one irreversible story beat.
  */
-export const LEVEL_XP = [0, 60, 220] as const;
+export const LEVEL_XP = [0, 60, 220, 420, 1000, 1400] as const;
 
 /** Max Warmth grows by this much per Keeper level (level 1 = ENERGY_MAX). */
 export const ENERGY_PER_LEVEL = 3;
@@ -1342,10 +1344,15 @@ export function energyMaxForLevel(level: number): number {
   return ENERGY_MAX + Math.max(0, level - 1) * ENERGY_PER_LEVEL;
 }
 
-/** Level-up reward: full Warmth refill (handled by EnergySystem) + this Gold. */
+/** Level-up reward: full Warmth refill (handled by EnergySystem) + this Gold —
+ *  and from `chestFromLevel` on, a Bronze Chest lands on the board (its gift
+ *  table is the ACTIVE world's, `chestGiftsIn`). Not below that: Level 2 fires
+ *  mid-tutorial on the scripted `levelup` beat, and an unscripted chest there
+ *  would put an interactive object on a stage the allow-contract owns. */
 export const LEVELUP_REWARD = {
   coinsBase: 25,
-  coinsPerLevel: 15
+  coinsPerLevel: 15,
+  chestFromLevel: 3
 } as const;
 
 /* ------------------------- the Chapter One finale ------------------------- */

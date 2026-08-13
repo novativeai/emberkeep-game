@@ -13,11 +13,11 @@ import type { ChainsData } from '../core/types';
 /**
  * The standing treasure chest. It is a PERMANENT fixture — never consumed. Every
  * CHEST_INTERVAL_MS a gift readies; tapping the ready chest (BoardScene emits
- * `chest:open`) grants ONE random gift from CHEST_GIFTS — Gold, a handful of
- * Rubies, or one piece of whatever else this world makes — popped onto the tiles
- * beside it, then the chest recharges its timer and emits `chest:claimed` so the
- * scene can play the reveal. Tapping it while a gift is still cooking does
- * nothing. Phaser-free, so it runs in the node tests.
+ * `chest:open`) grants ONE random gift from CHEST_GIFTS — Gold, or three tier-1
+ * pieces of one chain this world actually makes (never an egg-bearing chain) —
+ * popped onto the tiles beside it, then the chest recharges its timer and emits
+ * `chest:claimed` so the scene can play the reveal. Tapping it while a gift is
+ * still cooking does nothing. Phaser-free, so it runs in the node tests.
  */
 export class ChestSystem {
   constructor(
@@ -55,7 +55,15 @@ export class ChestSystem {
     const chain = pool[Math.floor(Math.random() * pool.length)];
     const tier = chain?.tiers.find((t) => t.tier === 1);
     if (!chain || !tier) return this.gifts.find((g) => g.kind === 'coins') ?? gift;
-    return { kind: 'item', chain: chain.id, tier: 1, count: 1, label: `${tier.name}!` };
+    // Three of ONE rolled chain — three is a merge, so the gift is a move the
+    // player can make, not three unrelated souvenirs.
+    return {
+      kind: 'item',
+      chain: chain.id,
+      tier: 1,
+      count: gift.count,
+      label: `${gift.count} × ${tier.name}!`
+    };
   }
 
   private open(itemId: number): void {
