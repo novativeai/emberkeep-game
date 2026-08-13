@@ -104,18 +104,13 @@ describe('TutorialDirector (the new gates advance)', () => {
     expect(ctx.state.tutorialIndex).toBe(index + 1);
   });
 
-  it("advances Eleanor's beat when her help is actually used", () => {
-    const ctx = createTestContext();
-    const index = stepAt('eleanor_helps');
-    ctx.state.tutorialIndex = index;
-
-    ctx.bus.emit('character:action_used', {
-      characterId: 'eleanor',
-      action: 'give_back',
-      readyAt: 1
-    });
-    expect(ctx.state.tutorialIndex).toBe(index + 1);
-  });
+  // (The `character:action_used` gate had its own case here, pinned on
+  // `eleanor_helps`. That step was cut from the ladder — it turned the energy
+  // lesson into a two-target errand — and a test that looks up a step by an id
+  // no longer in the script asserts against index −1, which passes for the
+  // wrong reason as easily as it fails. The DIRECTOR still handles the gate,
+  // and `allows the verb every event gate demands` above still holds any
+  // future step that uses it to allowing `character`.)
 
   it('emits an allow-list carrying the new verbs', () => {
     const ctx = createTestContext();

@@ -1466,37 +1466,6 @@
       }
     },
     {
-      "id": "eleanor_helps",
-      "speaker": "eleanor",
-      "text": "I can't wake anything on this isle — that is your hands, not mine. But I can stand over a slow thing and hurry it. Tap me, then tap the House.",
-      "gate": {
-        "type": "event",
-        "event": "character:action_used"
-      },
-      "effects": [
-        {
-          "setTimer": {
-            "chain": "lumber",
-            "tier": 3,
-            "remainingMs": 150000
-          }
-        }
-      ],
-      "arrow": {
-        "character": "eleanor"
-      },
-      "highlight": [
-        {
-          "chain": "lumber",
-          "nth": 0,
-          "tier": 3
-        }
-      ],
-      "allow": {
-        "character": true
-      }
-    },
-    {
       "id": "buy_energy",
       "speaker": "eleanor",
       "text": "Low on Warmth? It creeps back on its own, a little each minute — but your first Ember Spark is free. Tap the ⚡ + to open the Emporium and claim it.",

@@ -578,7 +578,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // Pay with Warmth via the popup's real ⚡ button (game offset +150,+100 → CSS ÷2).
     await page.mouse.click(housePage.x + 75, housePage.y + 50);
     await page.waitForTimeout(500);
-    if ((await gameText(page)).tutorial.step !== 'eleanor_helps') {
+    if ((await gameText(page)).tutorial.step !== 'buy_energy') {
       // Flake fallback (software rendering): perform the skip via a direct emit.
       await page.evaluate(() => {
         const ctx = window.__emberkeep.game.registry.get('ctx') as {
@@ -589,49 +589,13 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
         if (house) ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'warmth' });
       });
     }
-    await waitStep(page, 'eleanor_helps');
-    expect((await gameText(page)).energy.current).toBeLessThan(energyBeforeSkip); // Warmth dropped
-
-    // ---------- Eleanor's help: tap her to arm, then tap what she should hurry ----------
-    // She has stood on the map since the first frame; this is the beat that
-    // finally explains her. The step's setTimer put a live wait on the House.
-    // Where she stands is authored in the World Builder (characters.json: a cell
-    // PLUS a free dx/dy), so ask the game where she actually is rather than pin a
-    // cell here — a hardcoded cell silently stops tapping her the moment she is
-    // moved, and the fallback emit below hides that.
-    const eleCell = await page.evaluate(() => {
-      const ctx = window.__emberkeep.game.registry.get('ctx') as {
-        systems: { characters: { charactersIn: (w: string) => { id: string; anchor: [number, number] }[] } };
-      };
-      const her = ctx.systems.characters.charactersIn('emberkeep').find((c) => c.id === 'eleanor');
-      return her ? her.anchor : null;
-    });
-    expect(eleCell).not.toBeNull();
-    await page.evaluate((c) => window.__emberkeep.centerCell(c[0], c[1]), eleCell!);
-    await page.waitForTimeout(450);
-    // Her BODY, not her cell: she is ~2 tiles tall, her hit rect is the lower half
-    // of her silhouette, and her free offset means the cell is not under her feet.
-    const elePage = await page.evaluate(() => window.__emberkeep.characterToPage('eleanor'));
-    expect(elePage).not.toBeNull();
-    await page.mouse.click(elePage!.x, elePage!.y);
-    await page.waitForTimeout(350);
-    const helpHouse = await findCells(page, (c) => c.chain === 'lumber' && c.tier === 3);
-    if (helpHouse.length) {
-      const hp = await gridToPage(page, helpHouse[0]![0], helpHouse[0]![1]);
-      await page.mouse.click(hp.x, hp.y - 45); // roof pixels, as in house_skip
-      await page.waitForTimeout(500);
-    }
-    if ((await gameText(page)).tutorial.step !== 'buy_energy') {
-      await page.evaluate(() => {
-        const ctx = window.__emberkeep.game.registry.get('ctx') as {
-          state: { items: Map<number, { id: number; chain: string; tier: number }> };
-          bus: { emit: (event: string, payload: unknown) => void };
-        };
-        const house = [...ctx.state.items.values()].find((i) => i.chain === 'lumber' && i.tier === 3);
-        ctx.bus.emit('ui:character_action_requested', { characterId: 'eleanor', target: house?.id });
-      });
-    }
+    // The skip IS the whole energy lesson now: the House's own popup, paid in
+    // Warmth, hands straight to `buy_energy`. `eleanor_helps` used to sit here
+    // and made the beat a two-target errand — tap her, then tap the House — on
+    // a step whose subject is spending Warmth ON the House. It was cut from the
+    // ladder, so this leg no longer walks over to her and back.
     await waitStep(page, 'buy_energy');
+    expect((await gameText(page)).energy.current).toBeLessThan(energyBeforeSkip); // Warmth dropped
     await page.screenshot({ path: shot('15-buy-energy') });
 
     // ---------- Buy energy: the REAL UI path — ⚡+ opens the Emporium, claim FREE ----------

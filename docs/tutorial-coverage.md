@@ -70,7 +70,7 @@ Eleanor herself are all rows: they are live from the first frame.
 
 | Concept | First on screen | Taught at | Note |
 |---|---|---|---|
-| Eleanor stands on the map | frame 1, at her `characters.json` anchor | `eleanor_helps` | tappable from the first frame; the beat's arrow is `{"character":"eleanor"}` — never a literal cell, which goes stale the moment the World Builder moves her |
+| Eleanor stands on the map | frame 1, at her `characters.json` anchor | `eleanor_gift` | tappable from the first frame; the beat's arrow is `{"character":"eleanor"}` — never a literal cell, which goes stale the moment the World Builder moves her. Taught by the GIFT beat since `eleanor_helps` was cut: handing her the Crystal Ball is already a tap on her body, and it runs through `pendingGive` ahead of the character gate, so it needs no `allow.character` of its own |
 | Moonwater — the isle's own material | level_2 + the gate, at `key_unlock` | `isle_materials` | 3 seeded on the west ledge; hers end to end (`MAGE_ONLY`) |
 | Moonwater merges like anything else | `isle_materials` names it | `moonwater_merge` | she names the chain, then has the player actually fuse it — 3 Dew Drops → a Dew Vial |
 | Ash Moss — the isle's green, given back | the Stump's first drop, at `moss_stump` | `moss_stump` → `ash_green` | 1 harvested + 2 spawned at the stump → a Moss Bundle. Pays off `arrival_ask`'s "the warmth, the green, and whatever's still asleep"; the Bale (tier 3) needs 9 and is not offered |
@@ -82,7 +82,7 @@ Eleanor herself are all rows: they are live from the first frame.
 | A refused meal costs nothing | a dragon's dislike | `feed_dragon` | not scripted — the board floats "It turns its head away" and leaves the piece exactly where it was, the same contract a declined gift holds |
 | **The status readout** — who am I looking at | under the quest tracker, from `eleanor_hearts` | `eleanor_hearts` (people) → `dragon_status` (dragons) | switched on by `allow.status`, which LATCHES: it debuts on Eleanor's hearts and the dragon beats reuse the same surface. Five hearts = trust for a dragon, Regard for a person; the second line is what today still owes the animal |
 | Selecting somebody to read them | any tap on a character or dragon | `dragon_status` | the line names both verbs — "tap her to read it again, tap me for mine". A value that MOVES flashes its own subject for `STATUS_FLASH_MS` without being asked |
-| She can hasten a countdown | `eleanor_helps` | `eleanor_helps` | costs the player nothing; she has a cooldown |
+| She can hasten a countdown | post-tutorial | **deliberately untaught** | `eleanor_helps` used to teach it, wedged between `house_skip` and `buy_energy` — and it made the ENERGY lesson a two-target errand: tap her, then tap the House, on a beat whose whole subject is spending Warmth on the House. Cut on the owner's call. The ability is untouched and still works the moment the tutorial ends (`tutorialDone` opens the character gate); what it no longer has is a scripted first use, which is the honest state to record rather than a teach-point that does not exist |
 | She cannot wake anything | canon, throughout | `arrival_ask` | the refusal line `not_mine` repeats it in play |
 | The golden egg on the altar | authored decor, frame 1 (west) | `golden_tease` | aura starts once the tease has played |
 | Two grown dragons make an Elder | post-tutorial | `twoDragons` | contextual recipe hint + hand |
