@@ -135,6 +135,9 @@ export class IapBridge {
         const pending = this.pending;
         if (!pending || data.requestId !== pending.requestId) return;
         const packId = pending.packId;
+        // The placeholder window never got a payment URL to go to — close it,
+        // or the player is left staring at "Opening secure checkout…".
+        pending.popup?.close();
         this.settle();
         this.bus.emit('iap:failed', { packId, reason: 'unavailable' });
         return;
