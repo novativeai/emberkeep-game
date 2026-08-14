@@ -34,13 +34,20 @@ const NEW_FARMS = ['runestone', 'emberdram', 'hearthlamp', 'manastone', 'wayfind
  */
 const ICE = { satMax: 0.55, darkMax: 0.52, brightMin: 0.8 };
 /**
- * The pieces that predate the rule. Named rather than skipped, because the list
- * IS the problem the rule exists to stop growing — every one of them is a pale
- * blue-white object on pale blue-white ground.
+ * The seven that predated the rule and have since been REDRAWN to clear it
+ * (`gen-borealis-legacy.py`). The objects did not change — a drift spar is
+ * still a drift spar — but each took a colour lane nothing else up here owns:
+ * driftwood chestnut, keel red-ochre, rimebloom violet, frostsilk cobalt,
+ * wrackline olive, frostfont basalt, and tarknot kept the black-and-orange it
+ * always read correctly in.
  */
-const GRANDFATHERED = new Set([
-  'driftwood', 'keel', 'rimebloom', 'wrackline', 'frostfont', 'frostsilk', 'rimewyrm'
-]);
+const REDRAWN = ['driftwood', 'keel', 'rimebloom', 'frostsilk', 'wrackline', 'frostfont', 'tarknot'];
+/**
+ * What is left of the pale roster. Named rather than skipped, because the list
+ * IS the problem the rule exists to stop growing — and it is now one dragon,
+ * whose art comes off the breed pipeline rather than a chain sheet.
+ */
+const GRANDFATHERED = new Set(['rimewyrm']);
 
 /** Mean saturation/value of a webp's opaque pixels, straight off the file. */
 function meanHsv(file: string): { sat: number; val: number } {
@@ -81,9 +88,12 @@ describe('the Borealis roster', () => {
     }
   });
 
-  it('no new northern piece disappears into the ice it stands on', () => {
-    for (const id of NEW_FARMS) {
-      for (const tier of [1, 2, 3]) {
+  it('no northern piece disappears into the ice it stands on', () => {
+    // Every chain up here but the one grandfathered dragon, at every tier it
+    // actually has — `keel` runs to four and two of them are single-tier props.
+    for (const id of [...NEW_FARMS, ...REDRAWN]) {
+      const chain = chains.find((c) => c.id === id)!;
+      for (const { tier } of chain.tiers) {
         const { sat, val } = meanHsv(`${id}_${tier}`);
         const escapes = sat >= ICE.satMax || val <= ICE.darkMax || val >= ICE.brightMin;
         expect(
@@ -100,7 +110,13 @@ describe('the Borealis roster', () => {
     // rule above then applies to it. This keeps the list from quietly growing.
     const northern = new Set(chains.filter((c) => c.world === 'borealis').map((c) => c.id));
     for (const id of GRANDFATHERED) expect(northern, `${id} is not northern`).toContain(id);
-    for (const id of NEW_FARMS) expect(GRANDFATHERED.has(id), `${id} is not old art`).toBe(false);
+    for (const id of [...NEW_FARMS, ...REDRAWN]) {
+      expect(GRANDFATHERED.has(id), `${id} is measured, not grandfathered`).toBe(false);
+    }
+    // Nothing northern may sit outside both lists — a new chain is measured or
+    // it is named here, never quietly neither.
+    const measured = new Set([...NEW_FARMS, ...REDRAWN, ...GRANDFATHERED]);
+    for (const id of northern) expect(measured, `${id} is in neither list`).toContain(id);
   });
 
   it("Selyna's materials are recipient-locked, and never dragon food", () => {

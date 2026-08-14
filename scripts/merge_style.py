@@ -35,7 +35,7 @@ STYLE_SOURCES = [
     ROOT / 'assets/sprites/items/chains/moonwater_3.png',
 ]
 
-HEAD = (
+HEAD_CORE = (
     'Image 1 is the ART-STYLE REFERENCE: match its RENDERING TECHNIQUE ONLY. Copy its heavy, '
     'even, near-black outline running all the way around every silhouette; its few large flat '
     'colour masses with soft gradients inside them; its almost complete absence of small '
@@ -57,14 +57,55 @@ HEAD = (
     'CAMERA — isometric three-quarter view from above at roughly 30 degrees, 2:1 isometric '
     'projection, no perspective convergence. Key light from the upper left; the lower-right '
     'faces are the shaded ones.\n\n'
-    'LAYOUT — exactly THREE separate objects in one horizontal row, evenly spaced, each fully '
-    'inside the frame with a generous empty margin around it. Nothing touches or overlaps '
-    'anything else. Nothing is cropped by any edge. Left object smallest, middle medium, right '
-    'largest and most finished — three steps of the same thing being made. Give the three '
-    'DISTINCT silhouettes so they can never be confused at icon size. The LEFT object must be a '
-    'SOLID COMPACT shape — it is drawn at 66 pixels in game, so no thin stems, no lonely '
-    'filaments and no scattered pieces.\n\n'
 )
+
+#: The clause every LAYOUT ends with. The left cell is the one the cut resamples
+#: smallest, so it is the one a thin stem destroys.
+_COMPACT_LEFT = (
+    'The LEFT object must be a SOLID COMPACT shape — it is drawn at 66 pixels in game, so no '
+    'thin stems, no lonely filaments and no scattered pieces.'
+)
+_ROW = (
+    'evenly spaced, each fully inside the frame with a generous empty margin around it. Nothing '
+    'touches or overlaps anything else. Nothing is cropped by any edge. '
+)
+
+#: LAYOUT block per cell count. A sheet is cut on the GAPS between objects
+#: (`column_runs`), so the count in the prompt and the count in the cut are the
+#: same number — asking for three and getting four silently remaps every tier.
+LAYOUTS = {
+    1: (
+        'LAYOUT — exactly ONE object, alone and centred, fully inside the frame with a generous '
+        'empty margin all around it. Nothing is cropped by any edge. There is ONE object only: '
+        'no row, no grid, no variants, no smaller copies of it anywhere in the frame.\n\n'
+    ),
+    2: (
+        'LAYOUT — exactly TWO separate objects in one horizontal row, ' + _ROW +
+        'The two are DIFFERENT THINGS, not two sizes of one thing — give them DISTINCT '
+        'silhouettes so they can never be confused at icon size.\n\n'
+    ),
+    3: (
+        'LAYOUT — exactly THREE separate objects in one horizontal row, ' + _ROW +
+        'Left object smallest, middle medium, right largest and most finished — three steps of '
+        'the same thing being made. Give the three DISTINCT silhouettes so they can never be '
+        'confused at icon size. ' + _COMPACT_LEFT + '\n\n'
+    ),
+    4: (
+        'LAYOUT — exactly FOUR separate objects in one horizontal row, ' + _ROW +
+        'Smallest on the left, then each one larger and more finished than the one before it, '
+        'largest on the right — four steps of the same thing being built. Give the four DISTINCT '
+        'silhouettes so they can never be confused at icon size. ' + _COMPACT_LEFT + '\n\n'
+    ),
+}
+
+
+def head(cells: int = 3) -> str:
+    """The house style, laid out for a sheet of `cells` objects."""
+    return HEAD_CORE + LAYOUTS[cells]
+
+
+#: The 3-across head, which is what almost every chain sheet is.
+HEAD = head(3)
 
 #: Appended when the sheet is keyed on magenta (the default).
 TAIL_MAGENTA = (

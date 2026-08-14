@@ -224,8 +224,34 @@ That is measurable, so it is a rule with a number behind it
 > **The ice band** is saturation 0.30–0.51 AND value 0.54–0.78. A northern piece
 > must escape it — saturated (≥0.55), dark (≤0.52) or bright (≥0.80).
 
-The shipped pale roster is grandfathered by name rather than skipped, so the list
-of offenders stays visible and cannot quietly grow.
+The shipped pale roster was grandfathered by name rather than skipped, so the
+list of offenders stayed visible and could not quietly grow. **It has since been
+worked off** — `scripts/gen-borealis-legacy.py` redrew all seven old chains, and
+the test now measures every northern tier but `rimewyrm`, whose art comes off the
+breed pipeline rather than a chain sheet.
+
+The redraw changed no OBJECT — a drift spar is still a drift spar, the Longhall
+is still the Longhall, and `chains.json`, the tier names, the generators and the
+supply graph are untouched. What it changed was the palette and the finish, and
+it did that by **allocating colour rather than picking it**: twelve northern
+chains share one board, so each takes a lane nothing else owns.
+
+| lane | chains |
+|---|---|
+| the five farms | `runestone` orange · `emberdram` rose · `hearthlamp` gold · `manastone` turquoise · `wayfinder` ivory+rose |
+| the redraw | `driftwood` chestnut · `keel` red-ochre · `rimebloom` violet · `frostsilk` cobalt · `wrackline` olive · `frostfont` basalt · `tarknot` black |
+
+Two of those are worth the note. **Driftwood is waterlogged, not sun-dried** —
+the sea really does bleach wood silver, which is precisely why the old art
+vanished, so this wood is what the sea soaked rather than what the sun cured.
+And **`keel` is painted**: tarred black with a red-ochre strake, because worked
+ship timber having been worked by somebody is the one thing that separates it
+from `driftwood`, which is the same material nobody touched.
+
+Sizes did not move. Every northern `ITEM_SCALE` is hand-tuned against a specific
+pixel size (`keel_3` is the House class, not another log), so the cut resamples
+each new cell to the SAME maximum dimension as the piece it replaces —
+`TARGET_PX` in that script. Constants.ts was not touched.
 
 **Shape.** Colour was only half of it. A heap of wood, a heap of crystals and a
 heap of salt are all THE SAME KIND OF THING: raw material in a pile. Nothing in
