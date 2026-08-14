@@ -526,19 +526,172 @@
       "clips": {
         "boil": {
           "file": "sprites/anims/cauldron/boil.webp",
-          "frames": 59,
-          "frameWidth": 375,
-          "frameHeight": 511,
+          "frames": 56,
+          "frameWidth": 303,
+          "frameHeight": 360,
           "fps": 12,
           "loop": true,
-          "scale": 2.15903,
-          "dx": 6.68,
-          "dy": -107.75,
-          "srcFrameWidth": 375,
-          "srcFrameHeight": 511,
+          "scale": 2.74115,
+          "dx": -2.74,
+          "dy": 7.26,
+          "srcFrameWidth": 303,
+          "srcFrameHeight": 360,
           "stage": "decor"
         }
       }
+    },
+    "ashdrake_young": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/ashdrake_young/idle.webp",
+          "frames": 155,
+          "frameWidth": 315,
+          "frameHeight": 231,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.00781,
+          "dx": -6.45,
+          "dy": 12.32,
+          "srcFrameWidth": 315,
+          "srcFrameHeight": 231
+        },
+        "roar": {
+          "file": "sprites/anims/ashdrake_young/roar.webp",
+          "frames": 66,
+          "frameWidth": 279,
+          "frameHeight": 279,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8022556272401434,
+          "dx": 0.41,
+          "dy": 12.56,
+          "srcFrameWidth": 359,
+          "srcFrameHeight": 359
+        }
+      },
+      "board": "ashdrake:2"
+    },
+    "rimewyrm_young": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/rimewyrm_young/idle.webp",
+          "frames": 142,
+          "frameWidth": 334,
+          "frameHeight": 341,
+          "fps": 24,
+          "loop": true,
+          "scale": 0.84885,
+          "dx": 22.81,
+          "dy": 33.8,
+          "srcFrameWidth": 334,
+          "srcFrameHeight": 341
+        },
+        "roar": {
+          "file": "sprites/anims/rimewyrm_young/roar.webp",
+          "frames": 66,
+          "frameWidth": 269,
+          "frameHeight": 285,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8023620817843866,
+          "dx": -3.28,
+          "dy": 16.81,
+          "srcFrameWidth": 340,
+          "srcFrameHeight": 360
+        }
+      },
+      "board": "rimewyrm:2"
+    },
+    "moonwhisker_baby": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/moonwhisker_baby/idle.webp",
+          "frames": 162,
+          "frameWidth": 315,
+          "frameHeight": 231,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.0626,
+          "dx": 19.49,
+          "dy": -12.1,
+          "srcFrameWidth": 315,
+          "srcFrameHeight": 231
+        },
+        "roar": {
+          "file": "sprites/anims/moonwhisker_baby/roar.webp",
+          "frames": 66,
+          "frameWidth": 263,
+          "frameHeight": 254,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8009315589353613,
+          "dx": 3.87,
+          "dy": -12.03,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 360
+        }
+      },
+      "board": "emerald:3",
+      "skin": "moonwhisker"
+    },
+    "moonwhisker_adult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/moonwhisker_adult/idle.webp",
+          "frames": 114,
+          "frameWidth": 372,
+          "frameHeight": 232,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.34614,
+          "dx": 60.3,
+          "dy": 33.55,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 232
+        },
+        "roar": {
+          "file": "sprites/anims/moonwhisker_adult/roar.webp",
+          "frames": 66,
+          "frameWidth": 442,
+          "frameHeight": 360,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.56933,
+          "dx": 59.14,
+          "dy": 32.43,
+          "srcFrameWidth": 442,
+          "srcFrameHeight": 360
+        },
+        "fly": {
+          "file": "sprites/anims/moonwhisker_adult/fly.webp",
+          "frames": 215,
+          "frameWidth": 256,
+          "frameHeight": 195,
+          "fps": 24,
+          "loop": true,
+          "segments": {
+            "takeoff": [
+              0,
+              124
+            ],
+            "loop": [
+              124,
+              187
+            ],
+            "landing": [
+              187,
+              215
+            ]
+          },
+          "scale": 2.99883,
+          "dx": 7.07,
+          "dy": 51.85,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 195
+        }
+      },
+      "board": "emerald:4",
+      "skin": "moonwhisker"
     }
   }
 }

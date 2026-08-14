@@ -109,8 +109,8 @@ export const LIVE_GAME_HEIGHT: number = (() => {
 })();
 
 /**
- * The bottom-right button column — Ledger, Bag, Cookbook, Store, bottom-up
- * (slots 0..3).
+ * The bottom-right button column — Ledger, Bag, Cookbook, Store, Dragon Codex,
+ * bottom-up (slots 0..4).
  *
  * It lives here because it is built in two files (Hud owns the Ledger, the Bag
  * and the Store, UIScene the Cookbook) and so drifts apart when each picks its
@@ -126,10 +126,80 @@ export const LIVE_GAME_HEIGHT: number = (() => {
  * anything closer than that overlaps its neighbour. UI_SCALE magnifies each
  * button about its own centre, so the pitch scales with it.
  */
+/**
+ * THE TOP-RIGHT CLUSTER — the quest tracker, and the status readout that hangs
+ * under it.
+ *
+ * Seated here rather than inside their own files because the HUD COLUMN has to
+ * clear them, and a clearance nothing can compute is a collision waiting to
+ * happen. It already happened once: a fifth column button landed inside the
+ * readout and printed a dragon's name across the Dragon Codex plate. Both
+ * cluster and column now derive from these, so `HudColumn.spec` can do the
+ * arithmetic in node instead of the player doing it on screen.
+ *
+ * The values are LOCAL units where noted — the cluster is right-anchored and
+ * scaled by UI_SCALE about that anchor, so its screen height is these × scale.
+ */
+export const QUEST_TRACKER_TOP_Y: number = IS_MOBILE ? 300 : 196;
+export const QUEST_TRACKER_RIGHT: number = IS_MOBILE ? 64 : 56;
+/** The main line's counter rides BESIDE its title, so the sub-row list starts
+ *  here rather than a full title-height down. */
+export const QUEST_LIST_TOP_Y = 62;
+/** Sub-row pitch, and how many are on screen before the list scrolls. */
+export const QUEST_ROW_H = 56;
+export const QUEST_VISIBLE_ROWS = 3;
+/** A sliver of the FOURTH row stays inside the viewport, half-faded — the only
+ *  scroll affordance a background-free cluster gets. */
+export const QUEST_PEEK_H = 26;
+export const QUEST_VIEW_H = QUEST_ROW_H * QUEST_VISIBLE_ROWS + QUEST_PEEK_H;
+/** The tracker's own height in LOCAL units — where the list's viewport ends,
+ *  and therefore the first free y under the whole tracker. */
+export const QUEST_TRACKER_BOTTOM = QUEST_LIST_TOP_Y + QUEST_VIEW_H;
+/** Air between the tracker's last row and the name line under it. */
+export const STATUS_READOUT_GAP = 44;
+/** The readout's own height in LOCAL units: the name at 0, the hearts at 58,
+ *  the line at 96, and that line's own type under it. */
+export const STATUS_READOUT_H = 126;
+/** Where the readout ENDS on screen — the ceiling the HUD column may not cross. */
+export const STATUS_READOUT_BOTTOM_Y: number =
+  QUEST_TRACKER_TOP_Y + (QUEST_TRACKER_BOTTOM + STATUS_READOUT_GAP + STATUS_READOUT_H) * UI_SCALE;
+
 export const HUD_COLUMN_X: number = GAME_WIDTH - (IS_MOBILE ? 190 : 156);
-export const HUD_COLUMN_PITCH: number = 200 * UI_SCALE;
+
+/**
+ * FIVE DOORS, AND A CEILING THEY MAY NOT CROSS.
+ *
+ * The column grew a fifth seat when the Dragon Codex arrived, and a fifth seat
+ * at the old 200-unit pitch landed the top button INSIDE the status readout —
+ * the who-am-I-looking-at line that hangs under the quest tracker and reaches
+ * to about y 622 on desktop (StatusPanel: seated at QUEST_TRACKER_TOP_Y +
+ * QUEST_TRACKER_BOTTOM + 44, and 126 units tall). A dragon's name printed
+ * across the Codex button is what that looks like.
+ *
+ * So the column was re-fitted rather than extended. Two dials moved together:
+ *
+ *   • the base seat drops (168 → 120), which is free — the bottom-right corner
+ *     holds nothing else, and the disc's own 87-unit reach still clears the
+ *     canvas edge at 1567 of 1600.
+ *   • the pitch tightens (200 → 186), which is the most that can come off: the
+ *     visible disc is ~174 units, so anything under that has the plates
+ *     touching.
+ *
+ * Which puts the top seat at 1480 − 4×186 = 736, its disc starting at 649 —
+ * clear of the readout with 27 units of air. `HudColumn.spec` does that
+ * arithmetic so a sixth door, or a taller readout, fails in node.
+ *
+ * `ui_btn_round` is painted 68 logical units wide around a disc of radius 29,
+ * so at the column's 1.5× plate scale the VISIBLE disc is ~174 units across.
+ * UI_SCALE magnifies each button about its own centre, so both dials scale
+ * with it.
+ */
+export const HUD_COLUMN_SLOTS = 5;
+export const HUD_COLUMN_DISC = 174 * UI_SCALE;
+export const HUD_COLUMN_PITCH: number = 186 * UI_SCALE;
+export const HUD_COLUMN_BASE_Y: number = LIVE_GAME_HEIGHT - (IS_MOBILE ? 200 : 120);
 export const hudColumnY = (slot: number): number =>
-  LIVE_GAME_HEIGHT - (IS_MOBILE ? 260 : 168) - slot * HUD_COLUMN_PITCH;
+  HUD_COLUMN_BASE_Y - slot * HUD_COLUMN_PITCH;
 
 /** Isometric 2:1 projection. */
 export const TILE_W = 256;
@@ -989,6 +1059,33 @@ export const NEST_POINTS_PER_DAY = 3;
  * adults by merging and start becoming adults by being raised. */
 export const TRUST_MAX = 5;
 export const MEALS_PER_DAY = 3;
+
+/* ---------------- Feed cycles (the Dragon Codex's clock) ----------------
+ *
+ * A CYCLE is the window a board dragon must be fed inside: when it rolls over,
+ * the hunger gauge returns to zero and the window starts again. It is the
+ * period the care record's meal/green tallies live on (DragonSystem.careOf) —
+ * ONE clock, shared by the gauge, the roar and the Codex, because a second
+ * hunger clock would drift from the gauge the player is looking at. Trust
+ * stays on the slower `dayIndexAt` day: a relationship is not an appetite.
+ *
+ * A cycle in which the dragon reached a FULL gauge (MEALS_PER_DAY) is a
+ * WELL-FED cycle, counted once per cycle into its lifetime record — the number
+ * the Codex shows, and the coin the evolution condition is priced in.
+ */
+export const DRAGON_CYCLE_MS = 10 * 60_000;
+export const cycleIndexAt = (ms: number): number => Math.floor(ms / DRAGON_CYCLE_MS);
+/** Well-fed cycles a breed needs before it can evolve (the Codex's condition
+ *  page). Absent = the Codex shows no evolution for that breed. */
+export const WELL_FED_EVOLUTION: Record<string, number> = {
+  ember_dragon: 6,
+  // One bar for every breed: the Codex teaches "fully fed for 6 cycles" once
+  // (the Red Dragon's page) and every other page keeps that promise identical.
+  emerald: 6,
+  frost: 6,
+  storm: 6,
+  moonwhisker: 6
+};
 /** Meal value by tier: a snack, a meal, a feast (merge-chains §1.4). */
 export const MEAL_VALUE: Record<number, number> = { 1: 1 / 3, 2: 1, 3: 1 };
 
@@ -1717,19 +1814,33 @@ export const DRAGON_ANIM = {
  * once is 718 MB against a device budget the audit put at ~174 MB. The policy
  * that avoids that lives in `src/core/dragonClips.ts`; these are its dials.
  *
- * `budgetMb` is sized off the realistic worst case rather than a round number:
- * a whelp and an adult both standing on the board, both having been hungry and
- * having slept, is 203 MB of wardrobe. So the ceiling sits just above it and
- * the first thing that ever forces an eviction is a THIRD breed — the Golden
- * Elder at the finale, or a skin the player just switched to. That is exactly
- * where a ceiling should bite: on the breed nothing is wearing any more.
+ * `budgetMb` is sized off the realistic BOARD, not the roster's total weight —
+ * the catalogue was never meant to be resident, which is the whole reason the
+ * eviction pass exists. What has to fit without eviction is the set of breeds
+ * that can be STANDING at once, and that is measured two ways:
  *
- * `leanBudgetMb` is the weak tier, where the eager wave is the idle alone
- * (`clipLoadTiers`) — two live idles plus one mood clip, and the rig covers
- * flight as it always did.
+ *   • PER WORLD. `GameState` holds a board per world and BoardScene reconciles
+ *     residency against the ACTIVE board, so the two legendaries never meet:
+ *     the Ashdrake is Emberkeep's, the Rimewyrm the north's.
+ *   • PER SKIN. A Keeper wears one skin per chain, so what is askable is a
+ *     wardrobe rather than the shop's whole rail.
+ *
+ * The heaviest THREE breeds that can share a board, over every (world × skin),
+ * is 234 MB — the whelp, the Moonwhisker adult and the Golden Elder. So 288
+ * sits about one breed above it, which keeps the ceiling doing the job it was
+ * drawn for: three animals standing together never evict anything, and the
+ * FOURTH gives back the sheets of whatever nobody is wearing any more. It was
+ * 224 when the roster was four breeds; the legendaries and the Moonwhisker are
+ * what moved it. `DragonClips.spec` pins both halves — the three-breed fit and
+ * the give-back — so a new breed fails in node rather than on the device.
+ *
+ * `leanBudgetMb` is DELIBERATELY UNCHANGED. The weak tier's eager wave is the
+ * idle alone (`clipLoadTiers`) and the rig covers flight as it always did, so
+ * nothing about the legendaries makes a weak device hold more at once — raising
+ * its ceiling alongside the desktop's would hand back the protection for free.
  */
 export const DRAGON_CLIPS = {
-  budgetMb: 224,
+  budgetMb: 288,
   leanBudgetMb: 96,
   /** Weak devices load the idle only and fly on the rig. */
   lean: IS_LOW_END
