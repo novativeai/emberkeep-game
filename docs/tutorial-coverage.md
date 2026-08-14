@@ -91,7 +91,11 @@ Eleanor herself are all rows: they are live from the first frame.
 | The egg stirs near Level 3 | post-tutorial | `eggTrembles` | requires `eleanor_brazier` delivered — which the tutorial now does |
 | **The Elder's quests** — a second giver, and the tracker's track arrow | post-finale: the arrow appears the moment his ladder goes live | self-teaching via `dialogue.elder.greeting` | his three-line greeting rides the Gate ceremony's tail (`ELDER_VOICE.greetingDelayMs` after `gate:opened`); its LAST line points at the tracker and names the arrow ("the small arrow beside them turns the page"). The arrow only exists while two tracks are live, so it cannot be met before it is taught |
 | **Board hygiene** — generators work anywhere; carry them off the crowded hearth | mid-tutorial, right after the key lesson opens the eastern field | `board_room` | the first `move`-gated beat: hand demonstrates the drag (Emberbark Stump → a `level_2` tile), gate is the drop landing INSIDE the region, so a wiggle on the spot teaches nothing and credits nothing |
-| **The Dragon Codex** — the dragon-head button above the Cookbook | appears with a pop the moment the first dragon is NAMED (`dragon:named`) | `codex_meal` | the book TEACHES ITSELF mid-tutorial: right after the scripted Hearth-Cake feed, `codex_meal` opens the panel on the dragon's own page (the `openCodex` effect), the just-discovered FAVOURITE MEAL row fades in with a gold bloom, and the arrow points at the ✕ only after the reveal has played (`getClosePos` answers null until then). Taste rows are written by EXPERIMENT — favourite on a loved meal, dislike on an actual refusal; '???' until tested |
+| **The Dragon Codex** — the dragon-head button above the Cookbook | appears with a pop the moment the first dragon is NAMED (`dragon:named`) | `codex_meal` | the book TEACHES ITSELF mid-tutorial: right after the scripted Hearth-Cake feed the `openCodex` effect opens it on the ROSTER — every breed as a card, the named one in colour and the rest locked silhouettes — and `codex_meal` asks for the one gesture that matters, opening her page. The lesson HOLDS the book open (`allow.codexHold`), because Phaser hands the bubble's tap to the panel's scrim as well and an unheld book shuts under the beat waiting on it |
+| **A dragon's page** — the record: art, story, ability, tastes | the moment the roster card is opened, mid-tutorial | `codex_taste` | the FAVOURITE MEAL row fades in there with a gold bloom (the reveal is armed on the roster and plays on the page the player turns to), so the discovery lands on the spread that recorded it. Taste rows are written by EXPERIMENT — favourite on a loved meal, dislike on an actual refusal; '???' until tested |
+| **Evolution** — the adult a hatchling grows into | the EVOLUTION button, live on the page as soon as it is opened | `codex_evolution` | the page is a locked silhouette over its own glow: `codex_evolution` names what the shadow is and why it is dark. Chapter One promises the FORM — the picture in colour and her grown name — and nothing about the board, which is exactly what the beat claims |
+| **Well-fed cycles** — the currency evolution is priced in | the segmented gauge under the dragon's art, and again under the silhouette | `codex_cycles`, `codex_reward` | one bubble for the rule (fill the hunger gauge inside a single `DRAGON_CYCLE_MS` window and that cycle banks, permanently), one for the payoff at six. The player has just banked meals toward their first, so the gauge they are reading is their own |
+| **Closing a panel** | every panel the tutorial opens | `codex_shut` | the last beat of the lesson drops `codexHold`, which is what puts the ✕ back on the page for the arrow to point at — the book is never dismissed out from under a beat, and it is never left open across the hand-off either |
 
 ## Deliberately not in Chapter One
 
@@ -149,12 +153,42 @@ the player must act on needs a teach-point, or it is a defect.
 | Concept | First on screen | Taught at | Note |
 | --- | --- | --- | --- |
 | A merge cannot cross water | arrival — 9 cells with sea on all sides | Selyna's arrival beat (*"Nine feet of shingle… that is the whole of your holding"*) | the board itself is the lesson; the beat only names it |
-| The tide, not the soil, is the supply | the Wrack Line, from the first frame | arrival beat (*"every stick of wood you see arrived on the water"*) | it is the world's premise AND its root producer |
+| Nothing here was grown — it was MADE | the Glass Kiln, from the first frame | arrival beat (*"Nothing grows here — so nothing here was grown. It was made, or it was salvaged off somebody's wreck"*) | the world's premise, and the reason every northern root producer is a machine rather than a plant |
 | Fog costs Gold Keys here, not levels | `borealis_keep` cloud | `north_door` — *"Spend 1 Gold Key on the fog around the keep"* | the south taught the key tap once, at `level_2_gate`; this is the same verb |
 | Keys come from her Ledger | first delivery | `selyna_signal` blurb (*"then the door is yours"*) | the reward card shows the key |
-| **The diet inverts: fuel is the wall** | first Tar Knot | `selyna_pitch` blurb (*"Mine eat pitch, not berries. Nothing grows here, so the fire has to be built before it can be fed"*) | the one genuinely new RULE in the north, and the reason `tarknot` costs a woodpile where a berry cost a minute |
-| Wrecks are the north's timber ladder | first Broken Strake (Wrack Line bonus) | `north_salvage` + `selyna_frames` blurb | the loop is `lumber`'s, so it is recognised rather than taught |
+| **The diet inverts: fuel is the wall** | first Pitch Bead | `selyna_pitch` blurb (*"Mine eat pitch, not berries. Nothing grows here, so the fire has to be dug up before it can be fed"*) | the one genuinely new RULE in the north, and the reason `emberheart` costs a kiln where a berry cost a minute |
+| Salvage is the north's iron ladder | first Iron Cap (Wreck Forge) | `north_salvage` + `selyna_frames` blurb | the loop is `lumber`'s, so it is recognised rather than taught |
 
 Nothing else is new: merging, tiers, the Cookbook, generators, chests, the
 Ledger and delivery are all carried over intact, which is the entire reason the
 north can open with a conversation instead of a lesson.
+
+**The farm structure is carried over too, and deliberately so.** A northern farm
+is a fixture chain (part → assembly → **machine**) whose machine makes a product
+chain and drops its own tier 1 every twelfth production. Both halves already have
+teach-points in the south, which is why the north needs no new *rule*:
+
+- *parts merge into a building* is `wood_merge` → `plank_merge` (Cut Wood → Plank
+  Set → House), taught in two beats precisely so a House cannot read as "three of
+  anything";
+- *a generator pays a second, rarer yield that becomes another generator* is
+  `emberberry_merge` — the patch pays a Sprout every 12 berries and nine Sprouts
+  are a second patch. That is the northern every-12 drop exactly.
+
+### OPEN — the five farms have no first-contact beat
+
+What is missing is not a rule but an **introduction**. Measured against
+player-facing text (`quests.json`, `orders.json`, `dialogue.json`), three of the
+ten new chains are never named anywhere the player can read them:
+
+| chain | named in player-facing text? |
+| --- | --- |
+| `seaglass`, `warhelm`, `emberheart`, `auroraweave` | yes — Selyna's order blurbs |
+| `glasskiln`, `wreckforge`, `tarkiln`, `auroraloom` | **no** — the machines themselves are never named |
+| `starbench`, `orrery` | **no** — and `north_terms` requires an Orrery, while `what_she_will_take` gifts three Ground Lenses |
+
+A quest that asks for an Orrery the player has never heard named is the same
+defect class this ledger exists to catch. Authoring is owned by the
+`tutorial-design` pass; the rows above stay as they are until it lands, because
+a row whose teach-point does not exist would fail `ftuecheck.py` rather than
+record the gap.
