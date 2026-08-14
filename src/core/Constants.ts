@@ -824,6 +824,28 @@ export const DRAGON_REVEAL: Record<string, { art: string; name: string; epithet:
     name: 'Emerald Dragon',
     epithet: 'the moss and the ash both answer to her now'
   },
+  // The store breeds — real chains since their promotion (egg → baby → adult,
+  // the Emporium sells the clutch). Same two-card arc as ember/emerald.
+  'frost:2': {
+    art: 'reveal_frost',
+    name: 'Frost Whelp',
+    epithet: 'a shard of some older winter, warm to exactly one person'
+  },
+  'frost:3': {
+    art: 'reveal_frost_adult',
+    name: 'Frost Dragon',
+    epithet: 'the aurora burning through its wings'
+  },
+  'storm:2': {
+    art: 'reveal_storm',
+    name: 'Storm Whelp',
+    epithet: 'small, loud, and certain the thunder answers it'
+  },
+  'storm:3': {
+    art: 'reveal_storm_adult',
+    name: 'Storm Dragon',
+    epithet: 'it climbs the spire and answers them'
+  },
   // The legendary breeds hatch AT tier 2 — egg to animal in one merge — so
   // their one card is the young form. Brewed at Selyna's Cauldron or paid out
   // by the ladder's egg arc; either road ends on this same screen.
@@ -1025,7 +1047,13 @@ export const cycleIndexAt = (ms: number): number => Math.floor(ms / DRAGON_CYCLE
 /** Well-fed cycles a breed needs before it can evolve (the Codex's condition
  *  page). Absent = the Codex shows no evolution for that breed. */
 export const WELL_FED_EVOLUTION: Record<string, number> = {
-  ember_dragon: 6
+  ember_dragon: 6,
+  // One bar for every breed: the Codex teaches "fully fed for 6 cycles" once
+  // (the Red Dragon's page) and every other page keeps that promise identical.
+  emerald: 6,
+  frost: 6,
+  storm: 6,
+  moonwhisker: 6
 };
 /** Meal value by tier: a snack, a meal, a feast (merge-chains §1.4). */
 export const MEAL_VALUE: Record<number, number> = { 1: 1 / 3, 2: 1, 3: 1 };
@@ -1948,7 +1976,10 @@ export const SAVE_KEY = 'emberkeep_save';
 // those lines already carries the stump as a board item, and the new spawn
 // effect firing over it would seed a SECOND free generator — wipe, same rule
 // as v12 itself.
-export const SAVE_VERSION = 14;
+// 15: frost/storm promoted from Emporium skins to their own chains — a v14
+// save's `dragonSkins` could point board items at skin ids that no longer
+// resolve, and its owned cards no longer mean what they meant.
+export const SAVE_VERSION = 15;
 
 /** The opening's held silence: the board is visible and quiet before Eleanor's
  *  first line, so the player sees the ash before anyone frames it

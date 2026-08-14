@@ -12,6 +12,54 @@
         "condition": "Fully fed for 6 cycles"
       }
     },
+    "emerald": {
+      "title": "Green Dragon",
+      "story": "Hatched from an emerald the deep roots grew warm — where the Red Dragon is the isle's returning fire, she is its patient garden.",
+      "personality": "Gentle and unhurried. She tends things: a wilting sprout, a cold nest, a Keeper who forgot to rest — all get the same careful attention.",
+      "ability": "Her breath quickens growth — berries ripen early under it, and green things lean toward her the way they lean toward morning sun.",
+      "evolution": {
+        "wellFedCycles": 6,
+        "into": "Adult Emerald Dragon",
+        "reveal": "reveal_emerald_adult",
+        "condition": "Fully fed for 6 cycles"
+      }
+    },
+    "frost": {
+      "title": "Frost Dragon",
+      "story": "Winter-born, from an egg that arrived on the Emporium's coldest shelf and never quite melted. Even in Emberkeep's warmth she carries her own quiet of snow.",
+      "personality": "Calm and precise. She watches a long time before she moves, and her landings never make a sound.",
+      "ability": "Breathes a fine hoarfrost that cools whatever runs too hot — a forge, a fever, a temper — without ever putting the fire out.",
+      "evolution": {
+        "wellFedCycles": 6,
+        "into": "Adult Frost Dragon",
+        "reveal": "reveal_frost_adult",
+        "condition": "Fully fed for 6 cycles"
+      }
+    },
+    "storm": {
+      "title": "Storm Dragon",
+      "story": "Cracked his shell in a thunderhead and rode the same storm down to the isle. The weather has followed him around like a loyal dog ever since.",
+      "personality": "Restless and crackling — he naps in high places, wakes with the wind, and cannot resist a chase.",
+      "ability": "His wingbeats charge the air; he can call a small, polite thunder that rattles shutters and delights him every single time.",
+      "evolution": {
+        "wellFedCycles": 6,
+        "into": "Adult Storm Dragon",
+        "reveal": "reveal_storm_adult",
+        "condition": "Fully fed for 6 cycles"
+      }
+    },
+    "moonwhisker": {
+      "title": "Moonwhisker",
+      "story": "Nobody saw her arrive — one night the moon came up and she was simply there, as if she had stepped out of it and pulled the light shut behind her.",
+      "personality": "Secretive and moon-led. She keeps her own hours, appears exactly where she is thinking of, and pretends none of it is remarkable.",
+      "ability": "Her whiskers read moonlight the way fingers read braille — in full dark she sees the isle as clearly as noon, and finds what was lost in it.",
+      "evolution": {
+        "wellFedCycles": 6,
+        "into": "Adult Moonwhisker",
+        "reveal": "reveal_moonwhisker_adult",
+        "condition": "Fully fed for 6 cycles"
+      }
+    },
     "ashdrake": {
       "title": "Ashdrake",
       "story": "The old nests never truly cooled. Three eggs kept warm under a hundred years of ash — and the Keeper who gathered them woke the first drake Emberkeep has seen in living memory.",

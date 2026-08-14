@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DRAGON_CYCLE_MS, MEALS_PER_DAY, WELL_FED_EVOLUTION } from '../../src/core/Constants';
+import { DRAGON_CYCLE_MS, DRAGON_DIET, MEALS_PER_DAY, WELL_FED_EVOLUTION } from '../../src/core/Constants';
 import type { DragondexData } from '../../src/core/types';
+import assets from '../../src/data/assets.json';
 import dragondex from '../../src/data/dragondex.json';
 import { capture, createTestContext } from './helpers';
 
@@ -79,6 +80,26 @@ describe('feed cycles — the 10-minute window behind the Dragon Codex', () => {
     // The head turns away — nothing eaten, but the book writes it down.
     ctx.bus.emit('ui:feed_dragon_requested', { itemId, chain: 'tarknot', tier: 1 });
     expect(ctx.systems.dragons.tasteKnowledge(itemId).dislike.known).toBe(true);
+  });
+
+  it('every breed is CODEX READY — a diet implies a page, and a promised adult has its art', () => {
+    // The Codex opens on any dragon the player names, and naming reaches every
+    // breed with a DRAGON_DIET entry (isBoardDragon). A breed that can be
+    // named but has no page would open the book onto a blank card.
+    const dex = (dragondex as unknown as DragondexData).dragons;
+    const registered = new Set(assets.images.map((img) => img.key));
+    for (const breed of Object.keys(DRAGON_DIET)) {
+      const entry = dex[breed];
+      expect(entry, `dragondex.${breed}`).toBeDefined();
+      for (const field of ['title', 'story', 'personality', 'ability'] as const) {
+        expect(entry[field], `${breed}.${field}`).toBeTruthy();
+      }
+      // The Evolution page paints `reveal` as the silhouette; a key that is
+      // not in assets.json renders an empty frame over the condition text.
+      if (entry.evolution) {
+        expect(registered.has(entry.evolution.reveal), `${breed} reveal '${entry.evolution.reveal}'`).toBe(true);
+      }
+    }
   });
 
   it('dragondex.json and WELL_FED_EVOLUTION state the same bar — words and law agree', () => {
