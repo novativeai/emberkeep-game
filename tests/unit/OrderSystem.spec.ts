@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import ordersDoc from '../../src/data/orders.json';
+import type { OrdersData } from '../../src/core/types';
 import { capture, createTestContext } from './helpers';
+
+/** Every scripted order, in file order — the list the encore begins after.
+ *  Derived, because the ladder gains orders as it grows and a hard-coded five
+ *  turns this invariant into a stale literal. */
+const SCRIPTED_ORDER_IDS = (ordersDoc as unknown as OrdersData).orders.map((o) => o.id);
 
 /** Spawn `count` flame_gem tier 1 items filling the active cells (cols 1-5, rows 1-5). */
 function spawnGemShards(ctx: ReturnType<typeof createTestContext>, count: number): void {
@@ -104,10 +111,10 @@ describe('OrderSystem', () => {
 
   it('NEVER dead-ends: encore orders generate after the scripted list', () => {
     const ctx = createTestContext();
-    // Complete all five scripted orders directly (state-level shortcut).
-    for (const o of ['eleanor_brazier', 'eleanor_hearth', 'eleanor_moonwater', 'eleanor_centerpiece', 'eleanor_hoard']) {
-      ctx.state.completedOrderIds.push(o);
-    }
+    // Complete every scripted order directly (state-level shortcut). Derived
+    // from orders.json rather than listed: the ladder gains orders as it grows,
+    // and a hard-coded five turns this invariant into a stale literal.
+    for (const o of SCRIPTED_ORDER_IDS) ctx.state.completedOrderIds.push(o);
     const encore = ctx.systems.order.activeOrders;
     expect(encore.map((o) => o.id)).toEqual(['encore_1', 'encore_2']);
     expect(encore[0]!.requires.length).toBeGreaterThan(0);
@@ -121,9 +128,7 @@ describe('OrderSystem', () => {
 
   it('encore ids skip completed ones even out of order', () => {
     const ctx = createTestContext();
-    for (const o of ['eleanor_brazier', 'eleanor_hearth', 'eleanor_moonwater', 'eleanor_centerpiece', 'eleanor_hoard']) {
-      ctx.state.completedOrderIds.push(o);
-    }
+    for (const o of SCRIPTED_ORDER_IDS) ctx.state.completedOrderIds.push(o);
     // Deliver the SECOND visible encore first (encore_2 = 2× flame_gem t2).
     for (let i = 0; i < 2; i++) ctx.systems.board.spawn('flame_gem', 2, i + 1, 1, 'init');
     ctx.bus.emit('ui:deliver_requested', { orderId: 'encore_2' });
@@ -187,28 +192,28 @@ describe('give and Deliver are one verb in two grammars', () => {
 
   it('the Deliver verb pays a GIFT step straight off the board', () => {
     const ctx = createTestContext();
-    // `what_she_keeps` opens asking Eleanor for 2 Emberberry Baskets.
-    expect(ctx.systems.regard.wants('eleanor', 'emberberry', 2)).toBe(true);
-    ctx.systems.board.spawn('emberberry', 2, 1, 1, 'init');
-    ctx.systems.board.spawn('emberberry', 2, 2, 1, 'init');
+    // `what_she_will_take` asks Selyna for 3 Ground Lenses — the keepsake ask
+    // that stays a GIFT (Eleanor's baskets are a delivery now).
+    expect(ctx.systems.regard.wants('selyna', 'orrery', 1)).toBe(true);
+    for (let i = 0; i < 3; i++) ctx.systems.board.spawn('orrery', 1, i + 1, 1, 'init');
     const accepted = capture(ctx.bus, 'regard:gift_accepted');
 
-    ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
+    ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'selyna', chain: 'orrery', tier: 1 });
 
-    // Both pieces handed over exactly as two bag gives would be: counter,
+    // Every piece handed over exactly as three bag gives would be: counter,
     // Regard points per piece, and the board is clear of them.
-    expect(accepted).toHaveLength(2);
-    expect(ctx.systems.regard.given('eleanor', 'emberberry', 2)).toBe(2);
-    expect(ctx.state.countItems('emberberry', 2)).toBe(0);
-    expect(ctx.systems.regard.wants('eleanor', 'emberberry', 2)).toBe(false);
+    expect(accepted).toHaveLength(3);
+    expect(ctx.systems.regard.given('selyna', 'orrery', 1)).toBe(3);
+    expect(ctx.state.countItems('orrery', 1)).toBe(0);
+    expect(ctx.systems.regard.wants('selyna', 'orrery', 1)).toBe(false);
   });
 
   it('a board deliver takes only what she still wants, and a dry board takes nothing', () => {
     const ctx = createTestContext();
-    for (const col of [1, 2, 3]) ctx.systems.board.spawn('emberberry', 2, col, 1, 'init');
-    ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
-    expect(ctx.state.countItems('emberberry', 2)).toBe(1); // the third stays — she asked for two
-    ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'eleanor', chain: 'quartz', tier: 1 });
-    expect(ctx.systems.regard.given('eleanor', 'quartz', 1)).toBe(0);
+    for (const col of [1, 2, 3, 4]) ctx.systems.board.spawn('orrery', 1, col, 1, 'init');
+    ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'selyna', chain: 'orrery', tier: 1 });
+    expect(ctx.state.countItems('orrery', 1)).toBe(1); // the fourth stays — she asked for three
+    ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'selyna', chain: 'quartz', tier: 1 });
+    expect(ctx.systems.regard.given('selyna', 'quartz', 1)).toBe(0);
   });
 });

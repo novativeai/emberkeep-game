@@ -288,11 +288,19 @@ energy meter + temporary event currency.** Emberkeep themes them:
 | **Warmth** (energy) | the lantern's hearthlight | regen (+1/60 s), level-up full refill, one free tutorial Ember Spark, Warmth Shop (bought with **Gold**) | harvesting dragons, premium timer skips (1.5×) | **[L1]** |
 | **Gold** (coins) | the sanctuary's ancient gold | orders, Gold Coins/Pouches from Houses, selling, chests, level-ups | **timer skips** and **Warmth refills** — the two live sinks | **[L1]** |
 
-Gold is **denominated**: a Gold Coin is 5 Gold and a Gold Pouch is the three
-Coins it was merged from, 15. Every scripted award is authored as a multiple of
-the Coin, so any balance the player holds can be handed over as money — 35 Gold
-is seven Coins — and a House pays in the same currency the player spends
-(`COLLECTIBLE_REWARD`, pinned by `tests/unit/GoldDenomination.spec.ts`).
+Gold is **denominated**: a Gold Coin is 5 Gold (`GOLD_UNIT`) and a Gold Pouch is
+the three Coins it was merged from, 15. Every scripted award is authored as a
+multiple of the Coin, so any balance the player holds can be handed over as
+money — 35 Gold is seven Coins.
+
+A Coin is a **piece**, not a pickup: a House drops one each cycle, a Manor drops
+a Pouch, and the player pockets it like anything else. Gold is realised in the
+BAG, by selling. Coins used to be collectibles — a tap banked the gold and
+destroyed the piece — which meant they could never reach the Bag, and the
+commission chooser reads the Bag: a House commissioned to anything else could
+never be told to make Gold Coins again, and a Manor could never be pointed at
+Pouches at all. The two outputs the buildings exist for were the only two the
+player could not choose. (Pinned by `tests/unit/GoldDenomination.spec.ts`.)
 | **Gold Keys** | keys of ancient gold ("Stone Key" in the tutorial) | **one, granted by the tutorial**; [full] orders, chests, merging Silver Keys | unlocking fog regions — one gate in the demo | **[L1 scripted once] — see §12** |
 | **Star Shards** (premium) | shards of fallen stars dragons hoard | sparse: daily, events, milestones (or purchase) | Warmth refills, skip a nap, +board space, pop a bubble early | **[full]** |
 | **Festival Embers** (event) | embers of a seasonal festival | event tasks only | event reward track | **[full]** |
@@ -570,7 +578,7 @@ regenerate it after structural refactors rather than duplicating it here.
 `item:move_bounced`, `item:merged`, `item:hatched`, `item:harvested`,
 `item:harvest_failed`, `item:produced`, `item:removed`, `item:sold`,
 `generator:skipped`, `dragon:working`, `dragon:rested`, `chest:claimed`,
-`gold:collected`, `marketplace:purchased`, `cookbook:discovered`,
+`marketplace:purchased`, `cookbook:discovered`,
 `energy:changed`, `economy:changed`, `keeper:leveled`, `order:progress`,
 `order:completed`, `order:all_done`, `tasks:all_complete`, `region:unlocked`,
 `region:unlock_failed`, `tutorial:step`, `state:saved`, `state:loaded`,

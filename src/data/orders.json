@@ -74,6 +74,24 @@
       }
     },
     {
+      "id": "eleanor_keeps",
+      "giver": "eleanor",
+      "title": "What She Keeps",
+      "blurb": "Two baskets, and I will put them by rather than eat them. A larder is not what you have — it is what you did not need today.",
+      "requires": [
+        {
+          "chain": "emberberry",
+          "tier": 2,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 60,
+        "keys": 0,
+        "xp": 40
+      }
+    },
+    {
       "id": "eleanor_hoard",
       "giver": "eleanor",
       "title": "Fill the Keeper's Hoard",
@@ -145,6 +163,24 @@
       "rewards": {
         "coins": 120,
         "keys": 1,
+        "xp": 40
+      }
+    },
+    {
+      "id": "selyna_buoys",
+      "giver": "selyna",
+      "title": "What She Will Take",
+      "blurb": "Two buoys, netted and hung. Bring them up the shingle yourself — I want to see whether you carry a load the same way you merge one.",
+      "requires": [
+        {
+          "chain": "seaglass",
+          "tier": 2,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 70,
+        "keys": 0,
         "xp": 40
       }
     },

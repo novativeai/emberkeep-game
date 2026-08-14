@@ -537,7 +537,12 @@ export class UIScene extends Phaser.Scene {
         // the pop settle, then offer the recipe demonstration.
         this.time.delayedCall(700, () => this.checkRecipeHints());
       }),
-      bus.on('gold:collected', ({ at, coins }) => this.flyCoinToGold(at, coins ?? 1)),
+      // A Coin is a PIECE now, so gold arrives when one is sold out of the Bag
+      // rather than when it is tapped on the board — the flight follows it.
+      bus.on('item:sold', ({ chain, tier }) => {
+        if (chain !== 'coin') return;
+        this.flyCoinToGold(undefined, tier === 2 ? 3 : 1);
+      }),
       bus.on('bag:stored', ({ chain, tier, at }) => this.flyItemToBag(chain, tier, at)),
       bus.on('bag:changed', ({ used }) => this.hud.setBagCount(used)),
       bus.on('bag:store_failed', ({ reason }) =>
@@ -949,8 +954,11 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  private flyCoinToGold(at: TilePos, count = 1): void {
-    const start = this.cellToScreen(at.col, at.row);
+  /** Coins arcing to the gauge. `at` is a board cell when something on the
+   *  board paid out; without one the flight starts at the satchel, which is
+   *  where a sold Coin leaves from. */
+  private flyCoinToGold(at: TilePos | undefined, count = 1): void {
+    const start = at ? this.cellToScreen(at.col, at.row) : this.hud.getBagPos();
     const end = this.hud.getCoinPos();
     for (let i = 0; i < count; i++) {
       const coin = this.add

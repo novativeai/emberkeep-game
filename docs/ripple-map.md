@@ -66,7 +66,6 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | item:sold | EconomySystem | BoardScene, AudioManager |
 | generator:reward | GeneratorSystem | BoardScene |
 | generator:skipped | GeneratorSystem | TutorialDirector (gate) |
-| gold:collected | BoardScene | UIScene |
 | chest:claimed | ChestSystem | BoardScene |
 | dragon:working | DragonJobSystem | TutorialDirector (gate) — BoardScene animates in startDragonWork, not via this event |
 | dragon:rest / dragon:rested | DragonJobSystem | BoardScene |

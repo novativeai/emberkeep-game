@@ -5,7 +5,6 @@ import {
   ATMOSPHERE,
   CAULDRON_DECOR,
   CHEST_INTERVAL_MS,
-  COLLECTIBLE_REWARD,
   DECOR_SCALE,
   DEPTHS,
   DRAG,
@@ -4963,7 +4962,6 @@ export class BoardScene extends Phaser.Scene {
   private isStorable(itemId: number): boolean {
     const item = this.ctx.state.items.get(itemId);
     if (!item || item.kind !== 'item') return false;
-    if (COLLECTIBLE_REWARD[`${item.chain}_${item.tier}`] ?? COLLECTIBLE_REWARD[item.chain]) return false;
     if (item.chain === 'chest') return false;
     if (this.generatorConfigFor(item.chain, item.tier)) return false;
     // NOT gated on `sellable` any more: unsellable is a rule about the SELL
@@ -5018,20 +5016,6 @@ export class BoardScene extends Phaser.Scene {
     // A Cold Nest: tap it to arm an offering, tap again to put it away.
     if (item.chain === 'nest') {
       this.onNestTapped(item.id, item.col, item.row);
-      return;
-    }
-    // Collectible (a Gold coin): tap banks it — +Gold, a coin flies to the gauge
-    // (UIScene), and the board coin is consumed.
-    const collect = COLLECTIBLE_REWARD[`${item.chain}_${item.tier}`] ?? COLLECTIBLE_REWARD[item.chain];
-    if (collect) {
-      // Always collectable (even mid-tutorial) — banking a coin never interferes.
-      this.ctx.bus.emit('economy:add', { coins: collect.coins, reason: 'collect' });
-      // The Pouch bursts into THREE coins riding to the gauge (one gauge pulse
-      // per arrival); a single coin sends one.
-      const flight = item.chain === 'coin' && item.tier === 2 ? 3 : 1;
-      this.ctx.bus.emit('gold:collected', { at: { col: item.col, row: item.row }, coins: flight });
-      this.sparks.explode(8, sprite.x, sprite.y - 40);
-      this.ctx.bus.emit('board:consume_items', { itemIds: [item.id], reason: 'sold' });
       return;
     }
     // A treasure chest: a standing gift box (never disappears). Tap it READY to

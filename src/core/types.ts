@@ -1398,7 +1398,6 @@ export interface EventMap {
   'generator:skipped': { itemId: number; chain: string; currency: 'gold' | 'warmth' | 'gift' };
   /** A Gold coin was tapped to bank it — UI flies coin(s) to the Gold gauge,
    *  one gauge pulse per arrival (the Pouch sends 3; default 1). */
-  'gold:collected': { at: TilePos; coins?: number };
   /** A piece went into the Bag — UIScene flies it to the satchel and pulses it. */
   'bag:stored': { chain: string; tier: number; at: TilePos };
   /** Nothing was stored. `full` = no free slot; `no_room` = nowhere to put it back. */

@@ -183,46 +183,6 @@
       }
     },
     {
-      "id": "what_she_keeps",
-      "chapter": 2,
-      "giver": "eleanor",
-      "title": "What She Keeps",
-      "steps": [
-        {
-          "id": "keeps_basket",
-          "label": "Give Eleanor 2 Emberberry Baskets",
-          "goal": {
-            "kind": "gift",
-            "characterId": "eleanor",
-            "chain": "emberberry",
-            "tier": 2,
-            "count": 2
-          }
-        },
-        {
-          "id": "keeps_preserve",
-          "label": "Give Eleanor 1 Emberberry Preserve",
-          "goal": {
-            "kind": "gift",
-            "characterId": "eleanor",
-            "chain": "emberberry",
-            "tier": 3,
-            "count": 1
-          },
-          "lockedUntil": {
-            "regard": {
-              "characterId": "eleanor",
-              "hearts": 1
-            }
-          },
-          "lockedHint": "She won't ask for this until she knows you'll come back."
-        }
-      ],
-      "rewards": {
-        "coins": 90
-      }
-    },
-    {
       "id": "radiant_centerpiece",
       "chapter": 2,
       "giver": "eleanor",
@@ -254,6 +214,54 @@
       "rewards": {
         "coins": 80
       }
+    },
+    {
+      "id": "what_she_keeps",
+      "chapter": 2,
+      "giver": "eleanor",
+      "title": "What She Keeps",
+      "steps": [
+        {
+          "id": "keeps_basket",
+          "label": "Make 2 Emberberry Baskets",
+          "goal": {
+            "kind": "have",
+            "chain": "emberberry",
+            "tier": 2,
+            "count": 2
+          }
+        },
+        {
+          "id": "keeps_deliver",
+          "label": "Deliver 2 Baskets to Eleanor",
+          "goal": {
+            "kind": "order",
+            "orderId": "eleanor_keeps"
+          }
+        },
+        {
+          "id": "keeps_preserve",
+          "label": "Give Eleanor 1 Emberberry Preserve",
+          "goal": {
+            "kind": "gift",
+            "characterId": "eleanor",
+            "chain": "emberberry",
+            "tier": 3,
+            "count": 1
+          },
+          "lockedUntil": {
+            "regard": {
+              "characterId": "eleanor",
+              "hearts": 1
+            }
+          },
+          "lockedHint": "She won't ask for this until she knows you'll come back."
+        }
+      ],
+      "rewards": {
+        "coins": 90
+      },
+      "orderId": "eleanor_keeps"
     },
     {
       "id": "keepers_hoard",
@@ -629,13 +637,20 @@
       "steps": [
         {
           "id": "take_faggot",
-          "label": "Give Selyna 2 Glass Buoys",
+          "label": "Make 2 Glass Buoys",
           "goal": {
-            "kind": "gift",
-            "characterId": "selyna",
+            "kind": "have",
             "chain": "seaglass",
             "tier": 2,
             "count": 2
+          }
+        },
+        {
+          "id": "take_deliver",
+          "label": "Deliver 2 Glass Buoys to Selyna",
+          "goal": {
+            "kind": "order",
+            "orderId": "selyna_buoys"
           }
         },
         {
@@ -647,19 +662,13 @@
             "chain": "orrery",
             "tier": 1,
             "count": 3
-          },
-          "lockedUntil": {
-            "regard": {
-              "characterId": "selyna",
-              "hearts": 1
-            }
-          },
-          "lockedHint": "She takes nothing from a stranger. Work first."
+          }
         }
       ],
       "rewards": {
         "coins": 80
-      }
+      },
+      "orderId": "selyna_buoys"
     },
     {
       "id": "north_lodestones",

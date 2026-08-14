@@ -46,8 +46,8 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 | 4 | **Raise the Roofs** | — | timber · moss | T3 | Build 2 Houses · Thatch them with 2 Moss Bundles |
 | 5 | **Light the Long Gallery** | — | quartz | **T2** | Make 2 Cut Crystals |
 | 6 🥚 | **Catch the Moonwater** | `eleanor_moonwater` | moonwater | T3 | Make 1 Moonwater · Deliver 1 Moonwater to Eleanor |
-| 7 | **What She Keeps** | — | berries | **T2** | Give Eleanor 2 Emberberry Baskets · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart — long paid by here)* |
-| 8 | **Craft the Radiant Centerpiece** | `eleanor_centerpiece` | gems | T3 | Make 1 Radiant Gem · Deliver 1 Radiant Gem to Eleanor |
+| 7 | **Craft the Radiant Centerpiece** | `eleanor_centerpiece` | gems | T3 | Make 1 Radiant Gem · Deliver 1 Radiant Gem to Eleanor |
+| 8 | **What She Keeps** | `eleanor_keeps` | berries | **T2** | Make 2 Emberberry Baskets · Deliver 2 Baskets to Eleanor · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart)* |
 | 9 | **Fill the Keeper's Hoard** | `eleanor_hoard` | timber | T4 | Merge 2 Houses into a Manor · Make 3 Radiant Gems · Deliver 3 Radiant Gems to Eleanor — **the FINALE quest** (`GOLDEN_ALTAR.awakenQuestId`) |
 | 10 🥚 | **The Keeper's Tasks** | — | mixed | — | the five `tasks.json` entries, by reference |
 | 11 | **Wake the Ashdrake** | — | — | — | Merge 3 Ashdrake Eggs into the Ashdrake |
@@ -97,6 +97,31 @@ and this is the order that asks. Moonwater and quartz are `MAGE_ONLY` — no
 dragon eats any tier of either — so without a sink each chain and the producer
 that feeds it would be dead stock.
 
+**The two Radiant Gem asks are no longer neighbours.** "Make 1 Radiant Gem" and
+"Make 3 Radiant Gems" sat at 8 and 9 — the same piece twice running, the second
+simply three times heavier, which reads as the ladder repeating itself at the
+exact moment it should feel like a climax. The berry quest moved between them.
+Nothing else could: the legendary eggs are pinned at completable indices 1/5/9,
+and swapping two NON-egg quests is the only reordering that leaves them alone.
+`orders.json` still lists its orders in the sequence the ladder consumes them
+(brazier → hearth → moonwater → centerpiece → keeps → hoard), which is what the
+Ledger serves from.
+
+**GIVE and DELIVER are one verb in two grammars, and the ladder now says so.**
+A `gift` step counts what has been HANDED OVER, so making two baskets moved the
+tracker not at all until the player found the Give plate in the satchel — the
+counter sat at 0/2 beside a board with both baskets on it. The bulk asks are
+`have` + `order` steps now: the tracker counts pieces as they appear on the
+board, and the Ledger's Deliver button lights the moment the count is met.
+
+What stayed a gift is the KEEPSAKE ask at the end of each of those quests —
+Eleanor's Preserve, Selyna's three Ground Lenses. That is not sentiment:
+`RegardSystem.wants()` is derived from live gift steps, so a character with no
+gift step can never be given anything, can never earn a heart, and
+`north_terms` ("Earn a place at Selyna's fire") would be an unwinnable step.
+The Ledger's Deliver button pays a gift step straight off the board anyway, so
+both grammars are playable with the same gesture.
+
 **Quest 4 carries the moss, because nothing else in the chapter did.** Ashmoss
 is the first thing the player ever farms — the Emberbark Stump is live from
 frame one, `moss_stump` → `ash_green` open the game on it, and Eleanor's arrival
@@ -142,7 +167,7 @@ pot through the Rune Way, not merged on an island.*
 | 7 🍲 | **Bricks for a Second Kiln** | — | Brew 3 Fire Bricks |
 | 8 🥚 | **Open Selyna's Keep** | — | Spend 2 Gold Keys on the fog around the keep |
 | 9 🍲 | **Light for the Long Dark** | — | Brew 3 Oil Lamps |
-| 10 | **What She Will Take** | — | Give Selyna 2 Glass Buoys · Give Selyna 3 Ground Lenses |
+| 10 | **What She Will Take** | `selyna_buoys` | Make 2 Glass Buoys · Deliver 2 Glass Buoys to Selyna · Give Selyna 3 Ground Lenses |
 | 11 🍲 | **Something That Points** | — | Brew 3 Lodestones |
 | 12 🥚 | **Forge Two Helms** | — | Forge 2 Horned Helms |
 | 13 🍲 | **Spin It Fine** | — | Brew 3 Woven Bolts |

@@ -512,22 +512,27 @@ export const ITEM_SCALE: Record<string, number> = {
 };
 
 /**
- * Chains collected by TAP into a currency, and the DENOMINATION of Gold.
+ * The DENOMINATION of Gold: a Gold Coin is five Gold.
  *
- * A Gold Coin is five Gold — the unit the whole currency is counted in, so any
- * balance the player holds can be handed over as coins (35 Gold is seven of
- * them) and a House can pay in the same money the player spends. Every scripted
- * Gold award is therefore authored as a multiple of five: a quest paying 26
- * could not be handed over.
+ * It is the unit the whole currency is counted in, so any balance the player
+ * holds can be handed over as coins (35 Gold is seven of them) and a House pays
+ * in the same money the player spends. Every scripted Gold award is authored as
+ * a multiple of it — a quest paying 26 could not be handed over. The per-piece
+ * worth lives in `chains.json` as each coin tier's `sell`, because a Coin is a
+ * PIECE now: the House drops one, the player pockets it like anything else, and
+ * the Bag is where it turns back into money.
  *
- * The Pouch is three Coins merged, so it is worth three Coins. It used to pay
+ * The Pouch is three Coins merged, so it sells for three Coins. It used to pay
  * ten, which quietly burned five Gold every time the player made one — the
  * merge the Manor exists to feed was the one merge in the game that lost money.
+ *
+ * Coins used to be COLLECTIBLES: a tap banked the gold and destroyed the piece,
+ * which meant they could never reach the Bag — and the commission chooser reads
+ * the Bag, so a House could never be told to make Gold Coins again once it had
+ * been commissioned to anything else. A currency you cannot hold is a currency
+ * the rest of the game cannot see.
  */
-export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
-  coin: { coins: 5 }, // Gold Coin — the House drops one each cycle
-  coin_2: { coins: 15 } // Gold Pouch — 3 Coins merged, and worth exactly that
-};
+export const GOLD_UNIT = 5;
 
 /**
  * Chains that exist in chains.json (the unit tests use `sparkweed` as their
