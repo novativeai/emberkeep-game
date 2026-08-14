@@ -11,6 +11,7 @@ import {
   DRAG,
   DRAGON_ANIM,
   DRAGON_CLIPS,
+  decorClipCharacter,
   DRAGON_RIG_SCALE,
   CRYSTAL_3D,
   EMBER_MOTES,
@@ -2900,8 +2901,10 @@ export class BoardScene extends Phaser.Scene {
     cal: { anchor: { x: number; y: number } },
     dispScale: number
   ): void {
-    const clip = clipFor(name, 'boil');
-    const key = clipKey(name, 'boil');
+    // The clips are filed under a CHARACTER id, not the decor's art name.
+    const art = decorClipCharacter(name);
+    const clip = clipFor(art, 'boil');
+    const key = clipKey(art, 'boil');
     if (!clip || !this.textures.exists(key)) return;
     const still = this.textures.get(`decor_${name}`).getSourceImage() as HTMLImageElement;
     if (!this.anims.exists(key)) {

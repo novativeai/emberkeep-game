@@ -6,7 +6,7 @@
  * rather than something only a browser can tell you.
  */
 import { clipKey, clipsFor } from './characterAnims';
-import { STANDEE_BANKS, WORLD_ID } from './Constants';
+import { decorClipCharacter, STANDEE_BANKS, WORLD_ID } from './Constants';
 import type { GameContext } from './Context';
 
 /**
@@ -58,10 +58,13 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
   for (const d of map?.mapDecor ?? []) {
     keys.push(`decor_${d.name}`);
     // A decor piece can carry Align-Studio clips exactly like a character —
-    // the cauldron's boil loop lives under the character id of the SAME name.
-    // Listed here for the same reason the characters' clips are: a frame
-    // sheet is stored decoded, so travel must hand the departing world's back.
-    for (const clipId of Object.keys(clipsFor(d.name))) keys.push(clipKey(d.name, clipId));
+    // the cauldron's boil loop. Its clips are filed under a CHARACTER id, which
+    // is not the decor's art name (`decorClipCharacter`); looking them up by
+    // the decor name found nothing, so the sheet was never listed and never
+    // handed back. Listed here for the same reason the characters' are: a frame
+    // sheet is stored decoded, so travel must release the departing world's.
+    const art = decorClipCharacter(d.name);
+    for (const clipId of Object.keys(clipsFor(art))) keys.push(clipKey(art, clipId));
   }
   for (const d of map?.decor3d ?? []) keys.push(`decor_${d.name}`);
   for (const d of map?.startingDecor ?? []) keys.push(`decor_${d.decor}`);

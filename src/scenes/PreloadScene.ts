@@ -2,7 +2,15 @@ import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
 import { clipKey, clipsFor } from '../core/characterAnims';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES, STANDEE_BANKS } from '../core/Constants';
+import {
+  decorClipCharacter,
+  GAME_WIDTH,
+  LIVE_GAME_HEIGHT,
+  num,
+  PALETTE,
+  SCENES,
+  STANDEE_BANKS
+} from '../core/Constants';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
 import { ANIMATED_SPEAKERS, discTextureFor } from '../entities/PortraitAnimator';
@@ -158,9 +166,10 @@ export class PreloadScene extends Phaser.Scene {
     // `cauldron`), and follow the characters' fetch discipline exactly: only
     // the ACTIVE map's decor is fetched, and travel exchanges them at the door.
     for (const d of ctx.state.map.mapDecor ?? []) {
-      for (const [clipId, clip] of Object.entries(clipsFor(d.name))) {
-        if (this.textures.exists(clipKey(d.name, clipId))) continue;
-        this.load.spritesheet(clipKey(d.name, clipId), clip.file, {
+      const art = decorClipCharacter(d.name);
+      for (const [clipId, clip] of Object.entries(clipsFor(art))) {
+        if (this.textures.exists(clipKey(art, clipId))) continue;
+        this.load.spritesheet(clipKey(art, clipId), clip.file, {
           frameWidth: clip.frameWidth,
           frameHeight: clip.frameHeight
         });

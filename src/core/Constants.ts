@@ -1587,6 +1587,29 @@ export const DRAG = {
  *  world-agnostic because the cauldron trades only in the Bag. */
 export const CAULDRON_DECOR = 'pink_cauldron';
 
+/**
+ * MAP DECOR THAT MOVES → the character id its Align-Studio clips live under.
+ *
+ * The two namespaces are genuinely different and were assumed to be the same:
+ * a decor piece is named by its ART FILE (`pink_cauldron`, the texture key the
+ * map places), while a staged clip is filed under a CHARACTER id chosen in the
+ * Studio (`cauldron`). Every step of the cauldron's animation path looked the
+ * clip up by the decor's own name — so `clipsFor('pink_cauldron')` came back
+ * empty, the boil sheet was never listed for loading, never preloaded, and
+ * `playDecorClip` returned on its first line. The pot has never boiled.
+ *
+ * An explicit map rather than a rename, because `character-anims.json` is
+ * GENERATED (scripts/apply-anim-align.mjs) and a rename there would be undone
+ * by the next push from the Studio.
+ */
+export const DECOR_CLIP_CHARACTER: Record<string, string> = {
+  pink_cauldron: 'cauldron'
+};
+
+/** The clip character dressing a decor piece — itself unless mapped above. */
+export const decorClipCharacter = (decorName: string): string =>
+  DECOR_CLIP_CHARACTER[decorName] ?? decorName;
+
 // (The bespoke dragon Job menu — Work ⛏️ / Harvest ✋ under a tapped dragon —
 // is GONE, and its DRAGON_MENU block with it: a dragon now offers the same two
 // skip buttons every generator does. Work is the drag onto a House the tutorial
