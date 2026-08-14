@@ -1,58 +1,77 @@
 import Phaser from 'phaser';
-import { FONT } from '../art/design';
+import { FONT, INK, RADIUS, TYPE } from '../art/design';
 import {
   GAME_WIDTH,
   LIVE_GAME_HEIGHT,
   num,
-  PALETTE,
   panelMobileScale,
   WELL_FED_EVOLUTION
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { ChainsData, DragondexData, DragondexEntry } from '../core/types';
 import type { DragonSystem } from '../systems/DragonSystem';
-import {
-  CHIP_DY,
-  CHIP_H,
-  CONTENT_TOP,
-  EVOLVE_DY,
-  EVOLVE_H,
-  LEFT_W,
-  LEFT_X,
-  leftColumnRoom,
-  PORTRAIT_H,
-  REVEAL_CONDITION_DY,
-  REVEAL_CYCLES_DY,
-  REVEAL_DY,
-  REVEAL_FIT,
-  REVEAL_INTO_DY,
-  RIGHT_W,
-  RIGHT_X
-} from './codexLayout';
+import { GaugeBar } from './GaugeBar';
 import { uiRegistry } from './theme';
 
 /** The three pages the Codex turns between. */
 type Page = 'roster' | 'detail' | 'evolution';
 
-/** Ink the silhouette is painted in — near-night, so the adult reads as a
- *  promise rather than a spoiler. */
-const SILHOUETTE_INK = 0x241b22;
+/* ----------------------------------------------------------------------
+ * Geometry, in the 2560-space, measured off the PAINTED frame.
+ *
+ * `ui_store_panel` draws its plate at 1016x620 LOGICAL, i.e. 2032x1240 game
+ * units, and the frame image is seated at y+40 — so the plate's inside runs
+ * x -1016..+1016 and y -588..+652. Every number below is derived from that
+ * rather than guessed, which is what the old cream layout got wrong: it laid
+ * a 520-wide text column down a 1230-wide page and then ran three lore
+ * paragraphs off the bottom of the book.
+ * -------------------------------------------------------------------- */
+const EDGE_X = 1000;
+const HEAD_Y = -586;
+const BODY_TOP = -466;
+const BODY_FLOOR = 636;
 
+/** Detail page — a SPECIMEN column (art + vitals) beside a DOSSIER column. */
+const SPEC_X = -636;
+const SPEC_W = 700;
+const SPEC_PLATE_TOP = BODY_TOP;
+const SPEC_PLATE_H = 700;
+const DOSSIER_X = -240;
+/** Wrap width for dossier prose. The whole reason the lore now fits: at 1180
+ *  a 190-character story is three lines, where the old 520 made it seven. */
+const DOSSIER_W = 1180;
+
+/** Roster cards. */
+const CARD_W = 300;
+const CARD_H = 380;
+const CARD_GAP_X = 336;
+const CARD_GAP_Y = 420;
+const ROSTER_COLS = 4;
+
+/** Taste cards, side by side under the dossier prose. */
+const TASTE_W = 566;
+const TASTE_H = 148;
+const TASTE_GAP = 48;
 
 /**
  * The Dragon Codex — the keepsake record of the dragons the Keeper has NAMED.
  *
- * Three pages inside the standard cream panel:
- *   • ROSTER — one face card per named dragon (Chapter One holds exactly one).
- *   • DETAIL — the lore card: story, personality, special ability and the
- *     well-fed cycle count on the left; the dragon's rest-pose sprite on the
- *     right; the Evolution button beneath.
- *   • EVOLUTION — the ADULT's reveal art as a silhouette (full colour once the
- *     condition is met) with the condition and live progress under it.
+ * Dressed in the design system's plum chrome (`src/art/design.ts`), like the
+ * Emporium, the Store and the Cauldron. It used to wear the board's cream
+ * `ui_panel`, which made the game's one *collection* screen read as another
+ * Ledger; a codex is a thing you look INTO, and the dark hall is what lets the
+ * dragon art be the light in the room.
  *
- * Reads only: DragonSystem owns the names and the care records, dragondex.json
- * owns the words. The panel re-renders its live numbers off `dragon:well_fed`
- * while open, so the count can never lag a feeding.
+ * Three pages:
+ *   • ROSTER — one specimen card per named dragon, art-forward.
+ *   • DETAIL — the record: specimen plate + well-fed vitals on the left, the
+ *     dossier (story, personality, ability, tastes) on the right.
+ *   • EVOLUTION — the adult as a lit silhouette over its own glow, with the
+ *     condition and a segmented progress gauge; full colour once earned.
+ *
+ * Reads only: DragonSystem owns the names and care records, dragondex.json
+ * owns the words. Re-renders its live numbers off `dragon:well_fed` while
+ * open, so the count can never lag a feeding.
  */
 export class DragonCodexPanel extends Phaser.GameObjects.Container {
   isOpen = false;
@@ -63,14 +82,18 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
   private pageDetail: Phaser.GameObjects.Container;
   private pageEvolution: Phaser.GameObjects.Container;
   private title: Phaser.GameObjects.Text;
+  private titleBg: Phaser.GameObjects.Graphics;
   private closeBtn!: Phaser.GameObjects.Container;
   /** The dragon the detail/evolution pages are showing. */
   private selected: { itemId: number; name: string; chain: string; tier: number } | null = null;
-  /** Mid-cinematic (the tutorial's favourite-meal reveal): the favourite row is
+  /** Mid-cinematic (the tutorial's favourite-meal reveal): the favourite card is
    *  waiting to fade in, and `getClosePos` answers null so the tutorial arrow
    *  cannot point at the ✕ until the reveal has been SEEN. */
   private revealPending = false;
   private favouriteRow: Phaser.GameObjects.Container | null = null;
+  /** Idle tweens owned by the live page — killed on every re-render, so a
+   *  breathing sprite cannot outlive the page that started it. */
+  private pageTweens: Phaser.Tweens.Tween[] = [];
 
   constructor(
     scene: Phaser.Scene,
@@ -82,30 +105,31 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
     const dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
+      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
     dim.on('pointerup', () => this.requestClose());
     this.add(dim);
 
-    const panel = scene.add.image(0, 16, 'ui_panel');
-    this.baseScale = panelMobileScale(panel.width);
-    this.add(panel);
+    const frame = scene.add.image(0, 40, 'ui_store_panel');
+    this.baseScale = panelMobileScale(frame.width);
+    this.add(frame);
 
-    const lozenge = scene.add.graphics();
-    lozenge.fillStyle(num(PALETTE.gold), 1);
-    lozenge.fillRoundedRect(-330, -436, 660, 104, 52);
-    lozenge.lineStyle(6, num(PALETTE.cream), 0.95);
-    lozenge.strokeRoundedRect(-330, -436, 660, 104, 52);
-    this.add(lozenge);
+    // Title plaque — the same gold-seated cream banner the Store and Cauldron
+    // wear, so the three dark screens read as one suite of furniture.
+    this.titleBg = scene.add.graphics();
+    this.add(this.titleBg);
+    // A dragon's name is a proper noun, so the plaque speaks in the DISPLAY
+    // serif. The plaque carries the page's title and nothing else — a kicker
+    // line above it sat OUTSIDE the frame, on the board.
     this.title = scene.add
-      .text(0, -384, 'Dragon Codex', {
-        fontFamily: FONT.ui,
-        fontSize: '48px',
+      .text(0, HEAD_Y, 'DRAGON CODEX', {
+        fontFamily: FONT.display,
+        fontSize: `${TYPE.title}px`,
         fontStyle: 'bold',
-        color: PALETTE.textBrown
+        color: INK.onField
       })
       .setOrigin(0.5)
-      .setShadow(0, 3, 'rgba(255,255,255,0.5)', 3);
+      .setShadow(0, 5, 'rgba(11,7,10,0.6)', 6);
     this.add(this.title);
 
     this.pageRoster = scene.add.container(0, 0);
@@ -114,18 +138,21 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     this.add([this.pageRoster, this.pageDetail, this.pageEvolution]);
 
     // The ✕ — the close affordance the tutorial's pointer aims at.
-    this.closeBtn = scene.add.container(586, -384);
-    const closePlate = scene.add.graphics();
-    closePlate.fillStyle(num(PALETTE.lava), 1);
-    closePlate.fillCircle(0, 0, 44);
-    closePlate.lineStyle(5, num(PALETTE.cream), 0.95);
-    closePlate.strokeCircle(0, 0, 44);
+    this.closeBtn = scene.add.container(EDGE_X - 44, HEAD_Y + 46);
+    const closeBg = scene.add.image(0, 6, 'ui_btn_round').setScale(0.92).setTint(num(INK.field));
     const closeGlyph = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '42px', fontStyle: 'bold', color: PALETTE.cream })
+      .text(0, -2, '✕', {
+        fontFamily: FONT.ui,
+        fontSize: `${TYPE.title}px`,
+        fontStyle: 'bold',
+        color: INK.onFieldGold
+      })
       .setOrigin(0.5);
-    this.closeBtn.add([closePlate, closeGlyph]);
-    this.closeBtn.setSize(110, 110);
+    this.closeBtn.add([closeBg, closeGlyph]);
+    this.closeBtn.setSize(120, 120);
     this.closeBtn.setInteractive({ useHandCursor: true });
+    this.closeBtn.on('pointerover', () => this.closeBtn.setScale(1.08));
+    this.closeBtn.on('pointerout', () => this.closeBtn.setScale(1));
     this.closeBtn.on('pointerup', () => this.requestClose());
     this.add(this.closeBtn);
 
@@ -143,6 +170,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     );
 
     uiRegistry.register(scene, 'panel.dragondex', 'Dragon Codex', 'Panels', this, {
+      frame,
       title: this.title
     });
   }
@@ -181,11 +209,18 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
   teardown(): void {
     this.offBus.forEach((off) => off());
     this.offBus.length = 0;
+    this.killPageTweens();
   }
 
   // ------------------------------------------------------------------- pages
 
+  private killPageTweens(): void {
+    for (const tween of this.pageTweens) tween.stop();
+    this.pageTweens = [];
+  }
+
   private showPage(page: Page): void {
+    this.killPageTweens();
     this.page = page;
     this.pageRoster.setVisible(page === 'roster');
     this.pageDetail.setVisible(page === 'detail');
@@ -199,78 +234,164 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     return this.dex.dragons[chain];
   }
 
-  /** MAIN page — the dragons we have, face only. One card each. */
+  /** Set the plaque's line and re-cut the banner to it. */
+  private setHeading(title: string): void {
+    this.title.setText(title);
+    const w = Math.max(620, this.title.width + 220);
+    const y = HEAD_Y - 52;
+    const g = this.titleBg;
+    g.clear();
+    g.fillStyle(num(INK.goldDeep), 1);
+    g.fillRoundedRect(-w / 2, y + 10, w, 104, RADIUS.md);
+    g.fillStyle(num(INK.field), 1);
+    g.fillRoundedRect(-w / 2, y, w, 104, RADIUS.md);
+    g.lineStyle(6, num(INK.gold), 1);
+    g.strokeRoundedRect(-w / 2, y, w, 104, RADIUS.md);
+    g.fillStyle(num(INK.fieldLift), 0.5);
+    g.fillRoundedRect(-w / 2 + 14, y + 8, w - 28, 34, RADIUS.sm);
+  }
+
+  /* ------------------------------- roster -------------------------------- */
+
+  /**
+   * MAIN page — the whole BREED roster, not just the dragons already met.
+   *
+   * A codex is a collection screen, and a collection screen with one card in a
+   * two-thousand-unit panel reads as broken rather than as early. Every breed
+   * `dragondex.json` knows about gets a slot: the ones you have named stand in
+   * colour, the rest are locked silhouettes. The page is then full from the
+   * first dragon on, and it says what is still out there — which is the whole
+   * reason to open a codex twice.
+   */
   private renderRoster(): void {
     this.pageRoster.removeAll(true);
-    this.title.setText('Dragon Codex');
-    const roster = this.dragons.namedDragons();
+    this.setHeading('Dragon Codex');
+    const named = new Map(this.dragons.namedDragons().map((d) => [d.chain, d]));
+    const breeds = Object.keys(this.dex.dragons);
 
-    if (!roster.length) {
-      // Unreachable through the button (it only appears once a dragon is
-      // named), but a page must never render blank.
+    const cols = Math.min(breeds.length, ROSTER_COLS);
+    const rows = Math.ceil(breeds.length / cols);
+    const gridH = (rows - 1) * CARD_GAP_Y + CARD_H;
+    // Rows start at the block's left edge so the columns line up top to bottom
+    // and a short last row leaves its gap on the right — the same rule the
+    // Store's shelf follows.
+    const startX = -((cols - 1) * CARD_GAP_X) / 2;
+    // The grid plus its completion line, centred as ONE block in the body band.
+    const blockTop = (BODY_TOP + BODY_FLOOR) / 2 - (gridH + 90) / 2;
+    const startY = blockTop + CARD_H / 2;
+
+    breeds.forEach((chain, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
       this.pageRoster.add(
-        this.scene.add
-          .text(0, -40, 'No dragon has told you its name yet.', {
-            fontFamily: FONT.ui,
-            fontSize: '32px',
-            fontStyle: 'italic',
-            color: '#8A6248'
-          })
-          .setOrigin(0.5)
+        this.rosterCard(
+          startX + col * CARD_GAP_X,
+          startY + row * CARD_GAP_Y,
+          chain,
+          named.get(chain) ?? null
+        )
       );
-      return;
-    }
-
-    // Face cards on a centred row (wraps to a second row from the fifth on).
-    const perRow = Math.min(roster.length, 4);
-    const gap = 320;
-    roster.forEach((dragon, i) => {
-      const col = i % perRow;
-      const row = Math.floor(i / perRow);
-      const x = (col - (perRow - 1) / 2) * gap;
-      const y = -60 + row * 380;
-      const card = this.scene.add.container(x, y);
-
-      const plate = this.scene.add.graphics();
-      plate.fillStyle(num(PALETTE.cream), 1);
-      plate.fillRoundedRect(-130, -150, 260, 300, 28);
-      plate.lineStyle(6, num(PALETTE.gold), 1);
-      plate.strokeRoundedRect(-130, -150, 260, 300, 28);
-      const face = this.scene.add.image(0, -34, 'ui_icon_dragondex');
-      face.setDisplaySize(200, 200);
-      const name = this.scene.add
-        .text(0, 108, dragon.name, {
-          fontFamily: FONT.ui,
-          fontSize: '34px',
-          fontStyle: 'bold',
-          color: PALETTE.textBrown
-        })
-        .setOrigin(0.5);
-      card.add([plate, face, name]);
-      card.setSize(260, 300);
-      card.setInteractive({ useHandCursor: true });
-      card.on('pointerover', () => card.setScale(1.04));
-      card.on('pointerout', () => card.setScale(1));
-      card.on('pointerup', () => {
-        this.selected = dragon;
-        this.showPage('detail');
-      });
-      this.pageRoster.add(card);
     });
+
+    // The completion line — the number that makes the locked slots a goal.
+    this.pageRoster.add(
+      this.scene.add
+        .text(0, blockTop + gridH + 62, `${named.size} OF ${breeds.length} NAMED`, {
+          fontFamily: FONT.ui,
+          fontSize: `${TYPE.label}px`,
+          fontStyle: 'bold',
+          color: INK.onFieldGold
+        })
+        .setOrigin(0.5)
+        .setLetterSpacing(8)
+    );
+  }
+
+  /** The breed's young art — the form a codex card should show. */
+  private youngArtKey(chain: string): string {
+    const tier = this.chains.chains.find((c) => c.id === chain)?.hatchAtTier ?? 3;
+    return `item_${chain}_${tier}`;
   }
 
   /**
-   * The lore card: the words down the left, and the right column stacking the
-   * rest-pose portrait, the cycle record and the Evolution button.
-   *
-   * Everything is measured against FIELD. The chip and the button used to sit
-   * at fixed page coordinates below a column whose height depends on how long
-   * the entry's prose runs — so a wordy breed pushed the taste rows under the
-   * button and the chip out through the panel's bottom edge. They now live in
-   * the RIGHT column, whose height is fixed, and the left column is a container
-   * that scales itself down if its words ever outgrow the field. Neither can
-   * spill, whatever an entry says.
+   * One roster slot. `dragon` null means the breed is not yours yet: the same
+   * card, drained of colour, its art a silhouette and its name withheld — a
+   * locked slot that looks like the thing it will become, never a different
+   * shape (the design system's rule for every disabled state).
    */
+  private rosterCard(
+    x: number,
+    y: number,
+    chain: string,
+    dragon: { itemId: number; name: string; chain: string; tier: number } | null
+  ): Phaser.GameObjects.Container {
+    const card = this.scene.add.container(x, y);
+    const half = { w: CARD_W / 2, h: CARD_H / 2 };
+    const owned = dragon !== null;
+
+    const plate = this.scene.add.graphics();
+    plate.fillStyle(num(owned ? INK.goldDeep : INK.idleDeep), 1);
+    plate.fillRoundedRect(-half.w, -half.h + 8, CARD_W, CARD_H, RADIUS.md);
+    plate.fillStyle(num(INK.fieldDeep), 1);
+    plate.fillRoundedRect(-half.w, -half.h, CARD_W, CARD_H, RADIUS.md);
+    card.add(plate);
+
+    // A pool of the hall's own light under the animal, so the card has depth
+    // instead of being a sticker on a dark rectangle. A locked slot gets the
+    // same pool, cooled — it is what lets a near-black silhouette read at all.
+    card.add(this.glowPool(0, -30, 210, owned ? INK.gold : INK.fieldGlow, owned ? 0.16 : 0.22));
+
+    const artKey = dragon ? `item_${dragon.chain}_${dragon.tier}` : this.youngArtKey(chain);
+    const key = this.scene.textures.exists(artKey) ? artKey : 'ui_icon_dragondex';
+    const art = this.scene.add.image(0, -30, key);
+    art.setScale(Math.min(226 / art.width, 226 / art.height));
+    if (!owned) art.setTintFill(num(INK.idleDeep)).setAlpha(0.95);
+    card.add(art);
+
+    // Name plate along the card's foot — a cream strip that carries dark type,
+    // the system's rule for anything that must be read at a glance.
+    const nameY = half.h - 74;
+    const strip = this.scene.add.graphics();
+    strip.fillStyle(num(owned ? INK.cream : INK.field), 1);
+    strip.fillRoundedRect(-half.w + 22, nameY, CARD_W - 44, 62, RADIUS.sm);
+    if (!owned) {
+      strip.lineStyle(3, num(INK.idleDeep), 1);
+      strip.strokeRoundedRect(-half.w + 22, nameY, CARD_W - 44, 62, RADIUS.sm);
+    }
+    card.add(strip);
+    const name = this.scene.add
+      .text(0, nameY + 31, dragon ? dragon.name : '? ? ?', {
+        fontFamily: FONT.display,
+        fontSize: `${TYPE.label}px`,
+        fontStyle: 'bold',
+        color: owned ? INK.onPlate : INK.idle
+      })
+      .setOrigin(0.5);
+    // A long name shrinks rather than spilling past its own strip.
+    const maxW = CARD_W - 76;
+    if (name.width > maxW) name.setScale(maxW / name.width);
+    card.add(name);
+
+    const rim = this.scene.add.graphics();
+    rim.lineStyle(5, num(owned ? INK.gold : INK.idleDeep), 1);
+    rim.strokeRoundedRect(-half.w, -half.h, CARD_W, CARD_H, RADIUS.md);
+    card.add(rim);
+
+    if (!dragon) return card; // a locked slot has nothing to open
+    card.setSize(CARD_W, CARD_H);
+    card.setInteractive({ useHandCursor: true });
+    card.on('pointerover', () => card.setScale(1.05));
+    card.on('pointerout', () => card.setScale(1));
+    card.on('pointerup', () => {
+      this.selected = dragon;
+      this.showPage('detail');
+    });
+    return card;
+  }
+
+  /* ------------------------------- detail -------------------------------- */
+
+  /** The record: specimen + vitals left, dossier right, Evolution beneath. */
   private renderDetail(): void {
     this.pageDetail.removeAll(true);
     const dragon = this.selected;
@@ -279,131 +400,282 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       return;
     }
     const entry = this.entryFor(dragon.chain);
-    this.title.setText(dragon.name);
+    this.setHeading(dragon.name);
     this.pageDetail.add(this.backButton(() => this.showPage('roster')));
 
-    // ---- left column: the words, in their own container --------------
-    // Local coordinates start at 0 so the whole column can be scaled about its
-    // top-left if it overruns — the one thing a fixed layout cannot do.
-    const left = this.scene.add.container(LEFT_X, CONTENT_TOP);
-    this.pageDetail.add(left);
-    let y = 0;
-    const block = (label: string, text: string, italic = false): void => {
-      if (label) {
-        left.add(
-          this.scene.add.text(0, y, label, {
-            fontFamily: FONT.ui,
-            fontSize: '25px',
-            fontStyle: 'bold',
-            color: PALETTE.goldShade
-          })
-        );
-        y += 34;
-      }
-      const body = this.scene.add.text(0, y, text, {
-        fontFamily: FONT.ui,
-        fontSize: '27px',
-        fontStyle: italic ? 'italic' : 'normal',
-        color: PALETTE.textBrown,
-        wordWrap: { width: LEFT_W },
-        lineSpacing: 4
-      });
-      left.add(body);
-      y += body.height + 22;
-    };
-    block('', entry?.story ?? '', true);
-    block('PERSONALITY', entry?.personality ?? '');
-    block('SPECIAL ABILITY', entry?.ability ?? '');
+    this.buildSpecimen(dragon, entry);
+    this.buildDossier(dragon, entry);
 
-    // ---- taste rows: written by EXPERIMENT, '???' until tested -------
-    const taste = this.dragons.tasteKnowledge(dragon.itemId);
-    y += 6;
-    this.favouriteRow = this.tasteRow(0, y, 'FAVOURITE MEAL', taste.favourite);
-    left.add(this.favouriteRow);
-    if (this.revealPending) this.favouriteRow.setAlpha(0); // the cinematic owns its entrance
-    y += 70;
-    left.add(this.tasteRow(0, y, "WON'T TOUCH", taste.dislike));
-    y += 62;
-
-    // The column may not leave the field. Scaling is the honest answer: the
-    // alternative is clipping words the card exists to be read for.
-    const room = leftColumnRoom();
-    if (y > room) left.setScale(room / y);
-
-    // ---- right column: portrait, record, and the way forward ---------
-    const cx = RIGHT_X + RIGHT_W / 2;
-    const artKey = `item_${dragon.chain}_${dragon.tier}`;
-    if (this.scene.textures.exists(artKey)) {
-      const backing = this.scene.add.graphics();
-      backing.fillStyle(num(PALETTE.gold), 0.1);
-      backing.fillRoundedRect(RIGHT_X, CONTENT_TOP, RIGHT_W, PORTRAIT_H, 32);
-      backing.lineStyle(4, num(PALETTE.gold), 0.5);
-      backing.strokeRoundedRect(RIGHT_X, CONTENT_TOP, RIGHT_W, PORTRAIT_H, 32);
-      this.pageDetail.add(backing);
-      const sprite = this.scene.add.image(cx, CONTENT_TOP + PORTRAIT_H / 2, artKey);
-      const fit = 330 / Math.max(sprite.width, sprite.height);
-      sprite.setScale(fit);
-      this.pageDetail.add(sprite);
-      // The rest pose breathes — a keepsake, not a museum pin.
-      this.scene.tweens.add({
-        targets: sprite,
-        scale: fit * 1.02,
-        duration: 1600,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut'
-      });
-    }
-
-    // The cycle record — the number the feeding loop banks.
-    const cycles = this.dragons.wellFedCyclesOf(dragon.itemId);
-    const chipY = CONTENT_TOP + CHIP_DY;
-    const chip = this.scene.add.graphics();
-    chip.fillStyle(num(PALETTE.gold), 0.18);
-    chip.fillRoundedRect(RIGHT_X, chipY, RIGHT_W, CHIP_H, CHIP_H / 2);
-    chip.lineStyle(3, num(PALETTE.gold), 0.6);
-    chip.strokeRoundedRect(RIGHT_X, chipY, RIGHT_W, CHIP_H, CHIP_H / 2);
-    this.pageDetail.add(chip);
-    this.pageDetail.add(
-      this.scene.add
-        .text(cx, chipY + CHIP_H / 2, `Well fed for ${cycles} cycle${cycles === 1 ? '' : 's'}`, {
-          fontFamily: FONT.ui,
-          fontSize: '28px',
-          fontStyle: 'bold',
-          color: PALETTE.goldShade
-        })
-        .setOrigin(0.5)
-    );
-
-    // ---- the Evolution button ---------------------------------------
+    // The CTA closes the LEFT column's own story — art, species, progress,
+    // then the thing that progress buys. Parked centre-bottom it both left the
+    // left column trailing off into dead space and sat exactly where Eleanor's
+    // dialogue bubble comes in.
     if (entry?.evolution) {
-      const btn = this.scene.add.container(cx, CONTENT_TOP + EVOLVE_DY);
-      const g = this.scene.add.graphics();
-      g.fillStyle(num(PALETTE.gold), 1);
-      g.fillRoundedRect(-RIGHT_W / 2, -EVOLVE_H / 2, RIGHT_W, EVOLVE_H, EVOLVE_H / 2);
-      g.lineStyle(5, num(PALETTE.cream), 0.95);
-      g.strokeRoundedRect(-RIGHT_W / 2, -EVOLVE_H / 2, RIGHT_W, EVOLVE_H, EVOLVE_H / 2);
-      const label = this.scene.add
-        .text(0, 0, 'Evolution', {
-          fontFamily: FONT.ui,
-          fontSize: '36px',
-          fontStyle: 'bold',
-          color: PALETTE.cream
-        })
-        .setOrigin(0.5)
-        .setStroke(PALETTE.goldShade, 4);
-      btn.add([g, label]);
-      btn.setSize(RIGHT_W, EVOLVE_H);
-      btn.setInteractive({ useHandCursor: true });
-      btn.on('pointerover', () => btn.setScale(1.05));
-      btn.on('pointerout', () => btn.setScale(1));
-      btn.on('pointerup', () => this.showPage('evolution'));
-      this.pageDetail.add(btn);
+      this.pageDetail.add(
+        this.emberButton(SPEC_X, BODY_FLOOR - 96, 'EVOLUTION  ›', () => this.showPage('evolution'))
+      );
     }
   }
 
-  /** The promise page: the adult's reveal art as a silhouette, the condition
-   *  under it — full colour the moment the condition is met. */
+  /** Left column: the animal on a lit plate, its species, and its vitals. */
+  private buildSpecimen(
+    dragon: { itemId: number; name: string; chain: string; tier: number },
+    entry: DragondexEntry | undefined
+  ): void {
+    const top = SPEC_PLATE_TOP;
+    const h = SPEC_PLATE_H;
+    const midY = top + h / 2;
+
+    const plate = this.scene.add.graphics();
+    plate.fillStyle(num(INK.fieldDeep), 1);
+    plate.fillRoundedRect(SPEC_X - SPEC_W / 2, top, SPEC_W, h, RADIUS.lg);
+    this.pageDetail.add(plate);
+    this.pageDetail.add(this.glowPool(SPEC_X, midY, 300, INK.gold, 0.17));
+
+    const artKey = `item_${dragon.chain}_${dragon.tier}`;
+    if (this.scene.textures.exists(artKey)) {
+      const sprite = this.scene.add.image(SPEC_X, midY, artKey);
+      const fit = Math.min((SPEC_W - 130) / sprite.width, (h - 130) / sprite.height);
+      sprite.setScale(fit);
+      this.pageDetail.add(sprite);
+      // The rest pose breathes — a keepsake, not a museum pin.
+      this.pageTweens.push(
+        this.scene.tweens.add({
+          targets: sprite,
+          scale: fit * 1.025,
+          duration: 1800,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        })
+      );
+    }
+
+    const rim = this.scene.add.graphics();
+    rim.lineStyle(5, num(INK.goldMid), 1);
+    rim.strokeRoundedRect(SPEC_X - SPEC_W / 2, top, SPEC_W, h, RADIUS.lg);
+    this.pageDetail.add(rim);
+
+    // Species chip, straddling the plate's foot like a museum label.
+    if (entry?.title) {
+      const label = this.scene.add
+        .text(SPEC_X, top + h, entry.title.toUpperCase(), {
+          fontFamily: FONT.ui,
+          fontSize: `${TYPE.micro}px`,
+          fontStyle: 'bold',
+          color: INK.onFieldGold
+        })
+        .setOrigin(0.5)
+        .setLetterSpacing(6);
+      const chipW = label.width + 76;
+      const chip = this.scene.add.graphics();
+      chip.fillStyle(num(INK.field), 1);
+      chip.fillRoundedRect(SPEC_X - chipW / 2, top + h - 26, chipW, 52, 26);
+      chip.lineStyle(4, num(INK.goldMid), 1);
+      chip.strokeRoundedRect(SPEC_X - chipW / 2, top + h - 26, chipW, 52, 26);
+      this.pageDetail.add([chip, label]);
+    }
+
+    // ---- vitals: the cycle record, as a gauge rather than a sentence ----
+    const needed = WELL_FED_EVOLUTION[dragon.chain] ?? entry?.evolution?.wellFedCycles ?? 6;
+    const cycles = this.dragons.wellFedCyclesOf(dragon.itemId);
+    const vitalsY = top + h + 104;
+    this.pageDetail.add(
+      this.scene.add
+        .text(SPEC_X - SPEC_W / 2 + 10, vitalsY, 'WELL FED', {
+          fontFamily: FONT.ui,
+          fontSize: `${TYPE.micro}px`,
+          fontStyle: 'bold',
+          color: INK.onFieldDim
+        })
+        .setLetterSpacing(6)
+    );
+    this.pageDetail.add(
+      this.scene.add
+        .text(SPEC_X + SPEC_W / 2 - 10, vitalsY, `${Math.min(cycles, needed)} / ${needed}`, {
+          fontFamily: FONT.ui,
+          fontSize: `${TYPE.label}px`,
+          fontStyle: 'bold',
+          color: cycles >= needed ? INK.gain : INK.onFieldGold
+        })
+        .setOrigin(1, 0)
+    );
+    // The same segmented gauge the dragon's hunger uses — one meter language
+    // for "how far along is this animal", wherever it is read.
+    const gauge = new GaugeBar(this.scene, SPEC_X - SPEC_W / 2, vitalsY + 70, SPEC_W, 34);
+    gauge.set(Math.min(cycles / needed, 1), needed, cycles >= needed);
+    this.pageDetail.add(gauge);
+  }
+
+  /** Right column: the words. Flowed top-down off MEASURED heights, then
+   *  scaled as one block if a future lore entry ever outgrows the page. */
+  private buildDossier(
+    dragon: { itemId: number; name: string; chain: string; tier: number },
+    entry: DragondexEntry | undefined
+  ): void {
+    // The taste cards are anchored to the FOOT of the column and the prose
+    // flows from the top, so the spare room lands between them instead of
+    // pooling under a top-heavy block.
+    const tasteY = BODY_FLOOR - TASTE_H - 26;
+    const group = this.scene.add.container(DOSSIER_X, BODY_TOP);
+    this.pageDetail.add(group);
+    let y = 0;
+
+    // The story is a QUOTE — indented behind a gold rule, the one piece of the
+    // record that is voice rather than data.
+    if (entry?.story) {
+      const body = this.scene.add.text(28, 0, entry.story, {
+        fontFamily: FONT.ui,
+        fontSize: `${TYPE.body}px`,
+        fontStyle: 'italic',
+        color: INK.onField,
+        wordWrap: { width: DOSSIER_W - 28 },
+        lineSpacing: 10
+      });
+      const rule = this.scene.add.graphics();
+      rule.fillStyle(num(INK.gold), 0.9);
+      rule.fillRoundedRect(0, 2, 6, body.height - 4, 3);
+      group.add([rule, body]);
+      y = body.height + 56;
+    }
+
+    const section = (label: string, text: string): void => {
+      if (!text) return;
+      const head = this.scene.add
+        .text(0, y, label, {
+          fontFamily: FONT.ui,
+          fontSize: `${TYPE.micro}px`,
+          fontStyle: 'bold',
+          color: INK.onFieldGold
+        })
+        .setLetterSpacing(6);
+      group.add(head);
+      y += 46;
+      const body = this.scene.add.text(0, y, text, {
+        fontFamily: FONT.ui,
+        fontSize: `${TYPE.body}px`,
+        color: INK.onField,
+        wordWrap: { width: DOSSIER_W },
+        lineSpacing: 10
+      });
+      group.add(body);
+      y += body.height + 52;
+    };
+    section('PERSONALITY', entry?.personality ?? '');
+    section('SPECIAL ABILITY', entry?.ability ?? '');
+
+    // The guard that makes the page overflow-proof for any future entry: the
+    // prose is measured against the gap above the taste cards, and if it ever
+    // outgrows it the block scales as ONE unit from its top-left, so the
+    // columns stay aligned rather than the paragraphs colliding.
+    const available = tasteY - 96 - BODY_TOP;
+    if (y > available) group.setScale(available / y);
+
+    // ---- taste cards: written by EXPERIMENT, '???' until tested ----------
+    this.pageDetail.add(
+      this.scene.add
+        .text(DOSSIER_X, tasteY - 48, 'AT THE TABLE', {
+          fontFamily: FONT.ui,
+          fontSize: `${TYPE.micro}px`,
+          fontStyle: 'bold',
+          color: INK.onFieldGold
+        })
+        .setLetterSpacing(6)
+    );
+    const taste = this.dragons.tasteKnowledge(dragon.itemId);
+    this.favouriteRow = this.tasteCard(DOSSIER_X, tasteY, 'FAVOURITE MEAL', taste.favourite, INK.gain);
+    this.pageDetail.add(this.favouriteRow);
+    if (this.revealPending) this.favouriteRow.setAlpha(0); // the cinematic owns its entrance
+    this.pageDetail.add(
+      this.tasteCard(DOSSIER_X + TASTE_W + TASTE_GAP, tasteY, 'WON’T TOUCH', taste.dislike, INK.spend)
+    );
+  }
+
+  /**
+   * One taste card: the food's icon in a rimmed well, its name beside it —
+   * or '???' until the player has actually TESTED it (fed the favourite /
+   * been refused). The chain's tier-1 piece names the food family.
+   */
+  private tasteCard(
+    x: number,
+    y: number,
+    label: string,
+    taste: { chain: string; known: boolean },
+    accent: string
+  ): Phaser.GameObjects.Container {
+    // Seated on its own CENTRE, with every child drawn around 0,0 — so the
+    // reveal cinematic's scale-pop grows from the middle of the card instead
+    // of shoving its bottom-right corner into the card beside it.
+    const card = this.scene.add.container(x + TASTE_W / 2, y + TASTE_H / 2);
+    const half = { w: TASTE_W / 2, h: TASTE_H / 2 };
+    card.setData('rowAt', { w: TASTE_W, h: TASTE_H });
+
+    const plate = this.scene.add.graphics();
+    plate.fillStyle(num(INK.fieldDeep), 1);
+    plate.fillRoundedRect(-half.w, -half.h, TASTE_W, TASTE_H, RADIUS.md);
+    plate.lineStyle(4, num(taste.known ? accent : INK.idleDeep), taste.known ? 0.9 : 1);
+    plate.strokeRoundedRect(-half.w, -half.h, TASTE_W, TASTE_H, RADIUS.md);
+    card.add(plate);
+
+    card.add(
+      this.scene.add
+        .text(-half.w + 122, -half.h + 30, label, {
+          fontFamily: FONT.ui,
+          fontSize: `${TYPE.micro}px`,
+          fontStyle: 'bold',
+          color: taste.known ? accent : INK.idle
+        })
+        .setLetterSpacing(5)
+    );
+
+    // The icon well — a rimmed disc on the left, holding the food or a '?'.
+    const wellX = -half.w + 66;
+    const wellY = 0;
+    const well = this.scene.add.graphics();
+    well.fillStyle(num(INK.field), 1);
+    well.fillCircle(wellX, wellY, 46);
+    well.lineStyle(4, num(taste.known ? accent : INK.idleDeep), 1);
+    well.strokeCircle(wellX, wellY, 46);
+    card.add(well);
+
+    const iconKey = `item_${taste.chain}_1`;
+    if (taste.known && this.scene.textures.exists(iconKey)) {
+      const icon = this.scene.add.image(wellX, wellY, iconKey);
+      icon.setScale(66 / Math.max(icon.width, icon.height));
+      card.add(icon);
+    } else {
+      card.add(
+        this.scene.add
+          .text(wellX, wellY - 2, '?', {
+            fontFamily: FONT.display,
+            fontSize: `${TYPE.heading}px`,
+            fontStyle: 'bold',
+            color: INK.idle
+          })
+          .setOrigin(0.5)
+      );
+    }
+
+    const foodName = taste.known
+      ? this.chains.chains.find((c) => c.id === taste.chain)?.tiers.find((t) => t.tier === 1)?.name ??
+        taste.chain
+      : 'Not yet known';
+    const nameText = this.scene.add.text(-half.w + 122, -half.h + 74, foodName, {
+      fontFamily: FONT.ui,
+      fontSize: `${TYPE.label}px`,
+      fontStyle: taste.known ? 'bold' : 'italic',
+      color: taste.known ? INK.onField : INK.idle
+    });
+    const maxW = TASTE_W - 146;
+    if (nameText.width > maxW) nameText.setScale(maxW / nameText.width);
+    card.add(nameText);
+    return card;
+  }
+
+  /* ----------------------------- evolution ------------------------------- */
+
+  /** The promise page: the adult as a silhouette over its own glow, the
+   *  condition under it — full colour the moment the condition is met. */
   private renderEvolution(): void {
     this.pageEvolution.removeAll(true);
     const dragon = this.selected;
@@ -412,120 +684,180 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       this.showPage('detail');
       return;
     }
-    this.title.setText('Evolution');
+    this.setHeading('Evolution');
     this.pageEvolution.add(this.backButton(() => this.showPage('detail')));
 
     const needed = WELL_FED_EVOLUTION[dragon.chain] ?? entry.evolution.wellFedCycles;
     const cycles = this.dragons.wellFedCyclesOf(dragon.itemId);
     const met = cycles >= needed;
 
-    // Sized to the FIELD, not to the art: at 560 the card reached up under the
-    // title lozenge and pushed the three lines below it onto the panel's
-    // bottom border. 420 clears both with room either side.
+    const stageY = BODY_TOP + 340;
+    const stage = this.scene.add.graphics();
+    stage.fillStyle(num(INK.fieldDeep), 1);
+    stage.fillRoundedRect(-660, BODY_TOP, 1320, 680, RADIUS.lg);
+    stage.lineStyle(5, num(met ? INK.gold : INK.goldDeep), 1);
+    stage.strokeRoundedRect(-660, BODY_TOP, 1320, 680, RADIUS.lg);
+    this.pageEvolution.add(stage);
+    // A locked silhouette is painted near-black — on the plum hall that would
+    // be a hole in the page, so the glow goes BEHIND it and the shape reads as
+    // a shadow cast on light. Earned, the same pool becomes the ember halo.
+    this.pageEvolution.add(
+      this.glowPool(0, stageY, 360, met ? INK.ember : INK.gold, met ? 0.3 : 0.2)
+    );
+
     if (this.scene.textures.exists(entry.evolution.reveal)) {
-      const art = this.scene.add.image(0, CONTENT_TOP + REVEAL_DY, entry.evolution.reveal);
-      const fit = REVEAL_FIT / Math.max(art.width, art.height);
-      art.setScale(fit);
+      const art = this.scene.add.image(0, stageY, entry.evolution.reveal);
+      art.setScale(Math.min(1160 / art.width, 580 / art.height));
       if (met) {
-        // Earned: the silhouette steps aside and the adult stands in colour.
         art.setAlpha(0);
-        this.scene.tweens.add({ targets: art, alpha: 1, duration: 600, ease: 'Sine.easeOut' });
+        this.pageTweens.push(
+          this.scene.tweens.add({ targets: art, alpha: 1, duration: 600, ease: 'Sine.easeOut' })
+        );
       } else {
-        art.setTintFill(SILHOUETTE_INK);
-        art.setAlpha(0.92);
+        art.setTintFill(num(INK.fieldDeep));
+        art.setAlpha(0.96);
       }
       this.pageEvolution.add(art);
     }
 
+    const nameY = BODY_TOP + 762;
     this.pageEvolution.add(
       this.scene.add
-        .text(0, CONTENT_TOP + REVEAL_INTO_DY, met ? entry.evolution.into : `???  ·  ${entry.evolution.into.replace(/\S/g, '?')}`, {
-          fontFamily: FONT.ui,
-          fontSize: '40px',
+        .text(0, nameY, met ? entry.evolution.into : '? ? ? ? ?', {
+          fontFamily: FONT.display,
+          fontSize: `${TYPE.heading}px`,
           fontStyle: 'bold',
-          color: met ? PALETTE.goldShade : '#8A6248'
+          color: met ? INK.onFieldGold : INK.idle
         })
         .setOrigin(0.5)
+        .setLetterSpacing(met ? 0 : 10)
     );
     this.pageEvolution.add(
       this.scene.add
-        .text(0, CONTENT_TOP + REVEAL_CONDITION_DY, entry.evolution.condition, {
+        .text(0, nameY + 58, entry.evolution.condition, {
           fontFamily: FONT.ui,
-          fontSize: '30px',
+          fontSize: `${TYPE.tiny}px`,
           fontStyle: 'italic',
-          color: '#8A6248'
+          color: INK.onFieldDim
         })
         .setOrigin(0.5)
     );
+
+    // The same gauge as the detail page's vitals — the player sees the very
+    // meter they are filling, on the page that explains what filling it buys.
+    const gaugeW = 760;
+    const gauge = new GaugeBar(this.scene, -gaugeW / 2, nameY + 138, gaugeW, 38);
+    gauge.set(Math.min(cycles / needed, 1), needed, met);
+    this.pageEvolution.add(gauge);
     this.pageEvolution.add(
       this.scene.add
-        .text(0, CONTENT_TOP + REVEAL_CYCLES_DY, `${Math.min(cycles, needed)} / ${needed} cycles`, {
+        .text(0, nameY + 198, met ? 'READY' : `${Math.min(cycles, needed)} / ${needed} cycles`, {
           fontFamily: FONT.ui,
-          fontSize: '34px',
+          fontSize: `${TYPE.label}px`,
           fontStyle: 'bold',
-          color: met ? PALETTE.goldShade : PALETTE.textBrown
+          color: met ? INK.gain : INK.onField
         })
         .setOrigin(0.5)
+        .setLetterSpacing(met ? 8 : 0)
     );
   }
 
+  /* ----------------------------- primitives ------------------------------ */
+
   /**
-   * One taste row: label, then the food's icon and name — or '???' until the
-   * player has actually TESTED it (fed the favourite / been refused). The
-   * chain's tier-1 piece names the food family.
+   * A soft pool of light. Phaser's Graphics has no radial gradient, so this is
+   * a stack of thinning circles — cheap, and it never needs a texture that the
+   * loader could fail to fetch.
    */
-  private tasteRow(
-    x: number,
-    y: number,
-    label: string,
-    taste: { chain: string; known: boolean }
-  ): Phaser.GameObjects.Container {
-    const row = this.scene.add.container(0, 0);
-    row.setData('rowAt', { x, y }); // children carry page coords — remembered for the reveal glow
-    row.add(
-      this.scene.add.text(x, y, label, {
-        fontFamily: FONT.ui,
-        fontSize: '26px',
-        fontStyle: 'bold',
-        color: PALETTE.goldShade
-      })
-    );
-    const foodName = taste.known
-      ? this.chains.chains.find((c) => c.id === taste.chain)?.tiers.find((t) => t.tier === 1)?.name ??
-        taste.chain
-      : '???';
-    let tx = x + 290;
-    const iconKey = `item_${taste.chain}_1`;
-    if (taste.known && this.scene.textures.exists(iconKey)) {
-      const chip = this.scene.add.graphics();
-      chip.fillStyle(num(PALETTE.gold), 0.16);
-      chip.fillCircle(tx + 26, y + 16, 32);
-      row.add(chip);
-      const icon = this.scene.add.image(tx + 26, y + 16, iconKey);
-      icon.setDisplaySize(52, 52);
-      row.add(icon);
-      tx += 70;
+  private glowPool(x: number, y: number, radius: number, color: string, peak: number): Phaser.GameObjects.Graphics {
+    const g = this.scene.add.graphics();
+    const rings = 7;
+    for (let i = rings; i >= 1; i--) {
+      g.fillStyle(num(color), peak / rings);
+      g.fillCircle(x, y, (radius * i) / rings);
     }
-    row.add(
-      this.scene.add.text(tx, y, foodName, {
-        fontFamily: FONT.ui,
-        fontSize: '28px',
-        fontStyle: taste.known ? 'bold' : 'italic',
-        color: taste.known ? PALETTE.textBrown : '#8A6248'
-      })
-    );
-    return row;
+    return g;
   }
+
+  /** The screen's single warm call to action — the design system allows one
+   *  ember element per surface, and on this page it is Evolution. */
+  private emberButton(x: number, y: number, text: string, onTap: () => void): Phaser.GameObjects.Container {
+    const btn = this.scene.add.container(x, y);
+    const label = this.scene.add
+      .text(0, 0, text, {
+        fontFamily: FONT.ui,
+        fontSize: `${TYPE.sub}px`,
+        fontStyle: 'bold',
+        color: INK.onPlate
+      })
+      .setOrigin(0.5)
+      .setLetterSpacing(4);
+    const w = Math.max(420, label.width + 120);
+    const h = 92;
+    const g = this.scene.add.graphics();
+    // Capsule radius spelled out, NOT RADIUS.pill: Phaser's Graphics does not
+    // clamp an oversized corner radius (the Canvas2D painters in design.ts do),
+    // and 999 on a 92-tall rect threw stray geometry across the whole screen.
+    const r = h / 2;
+    g.fillStyle(num(INK.emberDeep), 1);
+    g.fillRoundedRect(-w / 2, -h / 2 + 8, w, h, r);
+    g.fillStyle(num(INK.ember), 1);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
+    g.fillStyle(num(INK.emberLift), 0.55);
+    g.fillRoundedRect(-w / 2 + 16, -h / 2 + 8, w - 32, 26, RADIUS.sm);
+    g.lineStyle(5, num(INK.goldHi), 0.9);
+    g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+    btn.add([g, label]);
+    btn.setSize(w, h);
+    btn.setInteractive({ useHandCursor: true });
+    btn.on('pointerover', () => btn.setScale(1.05));
+    btn.on('pointerout', () => btn.setScale(1));
+    btn.on('pointerup', onTap);
+    return btn;
+  }
+
+  /** The ‹ Back pill every inner page carries, mirroring the ✕. */
+  private backButton(onTap: () => void): Phaser.GameObjects.Container {
+    const btn = this.scene.add.container(-EDGE_X + 110, HEAD_Y + 46);
+    const w = 200;
+    const h = 84;
+    const r = h / 2; // spelled out — see emberButton on why not RADIUS.pill
+    const g = this.scene.add.graphics();
+    g.fillStyle(num(INK.goldDeep), 1);
+    g.fillRoundedRect(-w / 2, -h / 2 + 6, w, h, r);
+    g.fillStyle(num(INK.field), 1);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
+    g.lineStyle(4, num(INK.goldMid), 1);
+    g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+    const label = this.scene.add
+      .text(0, 0, '‹  BACK', {
+        fontFamily: FONT.ui,
+        fontSize: `${TYPE.label}px`,
+        fontStyle: 'bold',
+        color: INK.onFieldGold
+      })
+      .setOrigin(0.5)
+      .setLetterSpacing(3);
+    btn.add([g, label]);
+    btn.setSize(w, h);
+    btn.setInteractive({ useHandCursor: true });
+    btn.on('pointerover', () => btn.setScale(1.06));
+    btn.on('pointerout', () => btn.setScale(1));
+    btn.on('pointerup', onTap);
+    return btn;
+  }
+
+  /* ------------------------------ cinematic ------------------------------ */
 
   /**
    * The tutorial's cinematic: open straight onto this dragon's page with the
-   * favourite row held back, then let it FADE IN — a gold bloom, the row
+   * favourite card held back, then let it FADE IN — a gold bloom, the card
    * settling, and only then does `getClosePos` start answering, so the
    * tutorial's arrow points at the ✕ after the reveal, never through it.
    */
   openReveal(itemId: number): void {
-    const dragon = this.dragons.namedDragons().find((d) => d.itemId === itemId) ??
-      this.dragons.namedDragons()[0];
+    const dragon =
+      this.dragons.namedDragons().find((d) => d.itemId === itemId) ?? this.dragons.namedDragons()[0];
     if (!dragon) return;
     this.selected = dragon;
     this.revealPending = true;
@@ -549,11 +881,11 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
         this.revealPending = false;
         return;
       }
-      // The bloom behind the line — the book writing, made visible.
-      const at = row.getData('rowAt') as { x: number; y: number };
+      // The bloom behind the card — the book writing, made visible.
+      const at = row.getData('rowAt') as { w: number; h: number };
       const glow = this.scene.add.graphics();
-      glow.fillStyle(num(PALETTE.goldAccent), 0.35);
-      glow.fillRoundedRect(at.x - 14, at.y - 10, 560, 62, 31);
+      glow.fillStyle(num(INK.goldHi), 0.4);
+      glow.fillRoundedRect(-at.w / 2 - 14, -at.h / 2 - 14, at.w + 28, at.h + 28, RADIUS.lg);
       glow.setAlpha(0);
       row.addAt(glow, 0);
       this.scene.tweens.add({
@@ -565,7 +897,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
         ease: 'Sine.easeInOut',
         onComplete: () => glow.destroy()
       });
-      row.setScale(1.12);
+      row.setScale(1.1);
       this.scene.tweens.add({
         targets: row,
         alpha: 1,
@@ -585,28 +917,5 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     if (!this.isOpen || this.revealPending || !this.visible) return null;
     const m = this.closeBtn.getWorldTransformMatrix();
     return { x: m.tx, y: m.ty };
-  }
-
-  /** The ‹ Back pill every inner page carries, top-left of the spread. */
-  private backButton(onTap: () => void): Phaser.GameObjects.Container {
-    const btn = this.scene.add.container(-560, -384);
-    const g = this.scene.add.graphics();
-    g.fillStyle(num(PALETTE.plum), 0.9);
-    g.fillRoundedRect(-84, -36, 168, 72, 36);
-    g.lineStyle(4, num(PALETTE.cream), 0.8);
-    g.strokeRoundedRect(-84, -36, 168, 72, 36);
-    const label = this.scene.add
-      .text(0, 0, '‹ Back', {
-        fontFamily: FONT.ui,
-        fontSize: '30px',
-        fontStyle: 'bold',
-        color: PALETTE.cream
-      })
-      .setOrigin(0.5);
-    btn.add([g, label]);
-    btn.setSize(168, 72);
-    btn.setInteractive({ useHandCursor: true });
-    btn.on('pointerup', onTap);
-    return btn;
   }
 }
