@@ -1,7 +1,10 @@
-import { BAG_SLOTS } from '../core/Constants';
+import { BAG_SLOTS, GOLD_UNIT, POUCH_UNIT } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { BagStack } from '../core/types';
+
+/** What a coin tier is worth in Gold. */
+const coinValue = (tier: number): number => (tier >= 2 ? POUCH_UNIT : GOLD_UNIT);
 
 /**
  * The Bag — the player's off-board pocket.
@@ -69,6 +72,12 @@ export class BagSystem {
    */
   private bank(chain: string, tier: number, count: number): void {
     if (count <= 0) return;
+    // Gold is the BALANCE, and the satchel's purse is a view of it — a coin
+    // banked as a stack would be a second pile of money to reconcile.
+    if (chain === 'coin') {
+      this.bus.emit('economy:add', { coins: coinValue(tier) * count, reason: 'purse' });
+      return;
+    }
     if (!this.canStore(chain, tier)) {
       this.bus.emit('bag:store_failed', { reason: 'full' });
       return;
@@ -87,6 +96,13 @@ export class BagSystem {
   private store(itemId: number): void {
     const item = this.state.items.get(itemId);
     if (!item || item.kind !== 'item') return;
+    // Same rule from the other direction: pocketing a Coin adds its worth to
+    // the purse and takes the piece off the board.
+    if (item.chain === 'coin') {
+      this.bus.emit('economy:add', { coins: coinValue(item.tier), reason: 'purse' });
+      this.bus.emit('board:consume_items', { itemIds: [itemId], reason: 'stored' });
+      return;
+    }
     if (!this.canStore(item.chain, item.tier)) {
       this.bus.emit('bag:store_failed', { reason: 'full' });
       return;

@@ -533,6 +533,30 @@ export const ITEM_SCALE: Record<string, number> = {
  * the rest of the game cannot see.
  */
 export const GOLD_UNIT = 5;
+/** A Gold Pouch — three Coins merged, and worth exactly that. */
+export const POUCH_UNIT = GOLD_UNIT * 3;
+
+/**
+ * The PURSE: the Gold balance, expressed as the coins it is made of.
+ *
+ * There is one pile of money in this game and two ways to look at it. The
+ * number in the HUD and the coins in the satchel are the SAME Gold — a purse
+ * that had to be filled by pocketing pieces would be a second, shadow balance
+ * the player has to reconcile by hand.
+ *
+ * The denomination depends on who is looking. The Bag shows the largest that
+ * fills: 500 Gold is 33 Pouches. A commission chooser shows the rank the
+ * BUILDING can work — a House caps at tier one, so the same money reads to it
+ * as 100 Gold Coins, and a House is never offered a Pouch it could not make.
+ */
+export function goldPurse(
+  coins: number,
+  maxTier = 2
+): { chain: 'coin'; tier: 1 | 2; count: number } | null {
+  const tier: 1 | 2 = maxTier >= 2 && coins >= POUCH_UNIT ? 2 : 1;
+  const count = Math.floor(coins / (tier === 2 ? POUCH_UNIT : GOLD_UNIT));
+  return count > 0 ? { chain: 'coin', tier, count } : null;
+}
 
 /**
  * Chains that exist in chains.json (the unit tests use `sparkweed` as their

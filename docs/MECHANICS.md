@@ -293,14 +293,20 @@ the three Coins it was merged from, 15. Every scripted award is authored as a
 multiple of the Coin, so any balance the player holds can be handed over as
 money — 35 Gold is seven Coins.
 
-A Coin is a **piece**, not a pickup: a House drops one each cycle, a Manor drops
-a Pouch, and the player pockets it like anything else. Gold is realised in the
-BAG, by selling. Coins used to be collectibles — a tap banked the gold and
-destroyed the piece — which meant they could never reach the Bag, and the
-commission chooser reads the Bag: a House commissioned to anything else could
-never be told to make Gold Coins again, and a Manor could never be pointed at
-Pouches at all. The two outputs the buildings exist for were the only two the
-player could not choose. (Pinned by `tests/unit/GoldDenomination.spec.ts`.)
+The HUD number and the satchel's purse are the SAME money. There is one balance
+(`state.coins`); `goldPurse()` expresses it as the coins it is made of, and the
+denomination depends on who is looking. The Bag shows the largest that fills —
+500 Gold is 33 Pouches. A commission chooser shows the rank the BUILDING can
+work, so the same 500 reads to a House as 100 Gold Coins and it is never offered
+a Pouch it could not make. Tapping a Coin or a Pouch on the board banks it into
+the balance; the purse costs no bag capacity, because money is not stock.
+
+That link is what makes the buildings' own output choosable. Coins were
+collectibles that vanished into a counter, so the Bag could never show them —
+and the commission chooser reads the Bag, so a House commissioned to anything
+else could never be told to make Gold Coins again, and a Manor could never be
+pointed at Pouches at all. The two outputs the buildings exist for were the only
+two the player could not choose. (Pinned by `tests/unit/GoldDenomination.spec.ts`.)
 | **Gold Keys** | keys of ancient gold ("Stone Key" in the tutorial) | **one, granted by the tutorial**; [full] orders, chests, merging Silver Keys | unlocking fog regions — one gate in the demo | **[L1 scripted once] — see §12** |
 | **Star Shards** (premium) | shards of fallen stars dragons hoard | sparse: daily, events, milestones (or purchase) | Warmth refills, skip a nap, +board space, pop a bubble early | **[full]** |
 | **Festival Embers** (event) | embers of a seasonal festival | event tasks only | event reward track | **[full]** |

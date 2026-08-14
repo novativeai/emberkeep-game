@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import {
   BAG_SLOTS,
+  goldPurse,
   LIVE_GAME_HEIGHT,
   LIVE_GAME_WIDTH,
   num,
@@ -77,6 +78,8 @@ export class BagPanel extends Phaser.GameObjects.Container {
   private dim: Phaser.GameObjects.Rectangle;
   private slots: Phaser.GameObjects.Container[] = [];
   private capacityText: Phaser.GameObjects.Text;
+  /** The Gold balance, drawn as Pouches (or Coins below a Pouch's worth). */
+  private purse!: Phaser.GameObjects.Container;
   private baseScale = 1;
   /** The Drop/Sell chooser, parented to the slot it belongs to (null = none
    *  open). Only one is ever live: opening another closes this one. */
@@ -169,7 +172,11 @@ export class BagPanel extends Phaser.GameObjects.Container {
       this.requestClose();
     });
 
-    body.add([frame, banner, title, capIcon, this.capacityText, close, closeX]);
+    // The PURSE: the Gold balance, in the coins it is made of. It is not a
+    // storage slot — money is the balance, so it costs no capacity and can
+    // never push a pocketed piece out of the grid.
+    this.purse = scene.add.container(-FRAME_W / 2 + 250, -FRAME_H / 2 + 92);
+    body.add([frame, banner, title, capIcon, this.capacityText, close, closeX, this.purse]);
 
     const gridW = COLS * SLOT + (COLS - 1) * GAP;
     const gridH = ROWS * SLOT + (ROWS - 1) * GAP;
@@ -202,6 +209,11 @@ export class BagPanel extends Phaser.GameObjects.Container {
     this.offBus.push(
       bus.on('bag:changed', () => {
         if (this.isOpen) this.render();
+      }),
+      // The purse is a view of the balance, so it follows the money rather than
+      // the satchel — a coin banked while the panel is open must show at once.
+      bus.on('economy:changed', () => {
+        if (this.isOpen) this.paintPurse();
       })
     );
     this.once(Phaser.GameObjects.Events.DESTROY, () => {
@@ -237,6 +249,7 @@ export class BagPanel extends Phaser.GameObjects.Container {
     this.closeChooser();
     const stacks = this.gameState.bag;
     this.capacityText.setText(`${stacks.length}/${BAG_SLOTS}`);
+    this.paintPurse();
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i]!;
       slot.removeAll(true);
@@ -244,6 +257,33 @@ export class BagPanel extends Phaser.GameObjects.Container {
       if (stack) this.paintFilled(slot, stack);
       else this.paintEmpty(slot);
     }
+  }
+
+  /**
+   * The purse tile: the same Gold the HUD counts, shown as the largest coin it
+   * fills — 500 Gold is 33 Pouches. Empty of art below one Coin's worth, so a
+   * player with 3 Gold is not shown a coin they cannot spend as one.
+   */
+  private paintPurse(): void {
+    this.purse.removeAll(true);
+    const held = goldPurse(this.gameState.coins);
+    if (!held) return;
+    const key = `item_coin_${held.tier}`;
+    if (this.scene.textures.exists(key)) {
+      const art = this.scene.add.image(-46, 0, key);
+      art.setScale(Math.min(84 / art.width, 84 / art.height));
+      this.purse.add(art);
+    }
+    this.purse.add(
+      this.scene.add
+        .text(4, 0, `x${held.count}`, {
+          fontFamily: FONT.display,
+          fontSize: '46px',
+          fontStyle: 'bold',
+          color: PALETTE.cream
+        })
+        .setOrigin(0, 0.5)
+    );
   }
 
   /** An unfilled slot: a recessed square with a faint gold DASHED outline and

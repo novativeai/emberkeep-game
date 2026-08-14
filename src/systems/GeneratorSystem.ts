@@ -3,7 +3,8 @@ import {
   OFFLINE_BANK_CYCLES,
   REWARD_SPAWN_RADIUS,
   skipEnergyCost,
-  skipWarmthCost
+  skipWarmthCost,
+  goldPurse
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
@@ -116,7 +117,15 @@ export class GeneratorSystem {
       this.bus.emit('generator:produce_refused', { itemId, reason: 'tier_too_high' });
       return;
     }
-    if (!this.state.bag.some((s) => s.chain === chain && s.tier === tier && s.count > 0)) {
+    // The Bag is the roster, and the purse is part of it: Gold is held as the
+    // balance rather than as a stack, so a coin is "in the bag" when the
+    // balance covers one of that rank. Without this a House could never be
+    // pointed back at Gold Coins — the one thing every House starts out making.
+    const held =
+      chain === 'coin'
+        ? (goldPurse(this.state.coins, tier)?.tier ?? 0) === tier
+        : this.state.bag.some((s) => s.chain === chain && s.tier === tier && s.count > 0);
+    if (!held) {
       this.bus.emit('generator:produce_refused', { itemId, reason: 'not_in_bag' });
       return;
     }

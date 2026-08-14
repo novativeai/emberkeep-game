@@ -4963,6 +4963,8 @@ export class BoardScene extends Phaser.Scene {
     const item = this.ctx.state.items.get(itemId);
     if (!item || item.kind !== 'item') return false;
     if (item.chain === 'chest') return false;
+    // A Coin has its own tap (it banks into the purse), handled before this.
+    if (item.chain === 'coin') return false;
     if (this.generatorConfigFor(item.chain, item.tier)) return false;
     // NOT gated on `sellable` any more: unsellable is a rule about the SELL
     // verb, not about the satchel — a legendary egg (ashdrake/rimewyrm, both
@@ -5016,6 +5018,13 @@ export class BoardScene extends Phaser.Scene {
     // A Cold Nest: tap it to arm an offering, tap again to put it away.
     if (item.chain === 'nest') {
       this.onNestTapped(item.id, item.col, item.row);
+      return;
+    }
+    // A Gold Coin (or a Pouch): tap banks it into the purse — the HUD number and
+    // the satchel's purse tile are the same money, so there is nothing to store.
+    if (item.chain === 'coin') {
+      this.ctx.bus.emit('ui:store_requested', { itemId: item.id });
+      this.sparks.explode(8, sprite.x, sprite.y - 40);
       return;
     }
     // A treasure chest: a standing gift box (never disappears). Tap it READY to

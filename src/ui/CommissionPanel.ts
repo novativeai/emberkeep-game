@@ -1,5 +1,13 @@
 import Phaser from 'phaser';
-import { BAG_SLOTS, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelMobileScale, TIMINGS } from '../core/Constants';
+import {
+  BAG_SLOTS,
+  goldPurse,
+  LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
+  num,
+  panelMobileScale,
+  TIMINGS
+} from '../core/Constants';
 import { FONT, INK, TYPE } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
@@ -252,8 +260,9 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     this.closeChooser();
     const stacks = this.gameState.bag;
     const cap = this.maxTier();
-    this.emptyText.setVisible(stacks.length === 0);
-    this.helper.setVisible(stacks.length > 0);
+    const hasGold = goldPurse(this.gameState.coins, cap) !== null;
+    this.emptyText.setVisible(stacks.length === 0 && !hasGold);
+    this.helper.setVisible(stacks.length > 0 || hasGold);
     // The rank of the building is the rank of the work — say so where the
     // choice is made, not only in the refusal.
     this.helper.setText(
@@ -261,11 +270,21 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
         ? 'Choose one — this house will make it, and only it, from now on.\nA House works simple pieces: tier one. A Manor takes tier two.'
         : 'Choose one — this manor will make it, and only it, from now on.\nA Manor works pieces of tier one and two.'
     );
+    // The PURSE is the first thing a building can be pointed at, at the rank it
+    // can work: a House sees Gold Coins, a Manor sees Gold Pouches. It is the
+    // one output every building starts with, so leaving it out of the roster
+    // made the default choice the only unchoosable one.
+    const purse = goldPurse(this.gameState.coins, cap);
+    // Eligible first, so if the satchel is full the entry that falls off the
+    // end is one this building could never have been commissioned to anyway.
+    const entries = [...(purse ? [purse as BagStack] : []), ...stacks].sort(
+      (a, b) => Number(b.tier <= cap) - Number(a.tier <= cap)
+    );
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i]!;
       slot.removeAll(true);
-      slot.setVisible(stacks.length > 0);
-      const stack = stacks[i];
+      slot.setVisible(entries.length > 0);
+      const stack = entries[i];
       if (stack) this.paintFilled(slot, stack, stack.tier <= cap);
       else this.paintEmpty(slot);
     }
