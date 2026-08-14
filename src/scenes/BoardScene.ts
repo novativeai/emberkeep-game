@@ -4130,10 +4130,13 @@ export class BoardScene extends Phaser.Scene {
         // wearsRigTier — an actual DRAGON tier (base/adult generator tiers of the
         // ember/emerald chains), never the chain's merge pieces: a Ruby or Egg
         // shares the dragon's chain but can't be hired.
+        // No restRemaining clause here: a shift-rester must be CAUGHT by this
+        // block, not fall past it — falling through to `drag:dropped` would
+        // let the drop MOVE the sleeper (the cell behind a tall House is often
+        // free). The sleep check inside cancels her home instead.
         if (
           this.wearsRigTier(obj.chain, obj.tier) &&
-          (this.tutorialDone || this.allow.dragonWork) &&
-          !this.ctx.systems.jobs.restRemaining(obj.itemId)
+          (this.tutorialDone || this.allow.dragonWork)
         ) {
           // Match by CELL, or by the drop point landing anywhere on the
           // generator's ART: the House is ~2.5 iso rows tall, so dropping onto
@@ -4155,6 +4158,27 @@ export class BoardScene extends Phaser.Scene {
             // and its lifted drag-shadow forever after the work trip — it reads
             // as a dragon floating over a shadow that isn't its own.
             obj.settleFromDrag();
+            // A SLEEPER cannot be put to work: the drop cancels outright — the
+            // curled painting glides back to its own tile (the move_bounced
+            // tween, minus the system round-trip) and says why. Falling through
+            // to `drag:dropped` instead could MOVE her (the cell behind a tall
+            // House is often free), and a dragon that wakes up somewhere else
+            // because you tried to employ her reads as a glitch, not a refusal.
+            // Rest is checked on its own (a HUNGRY rester's mood reads 'hungry',
+            // not 'asleep') so a worn-out dragon can never be re-hired either.
+            const resting = this.ctx.systems.jobs.restRemaining(obj.itemId) > 0;
+            if (resting || this.ctx.systems.dragonLife.moodOf(obj.itemId) === 'asleep') {
+              this.floatText(tgt.x, tgt.y - 190, resting ? 'Resting…' : 'Fast asleep…', PALETTE.cream);
+              this.tweens.add({
+                targets: obj,
+                x: home.x,
+                y: home.y,
+                duration: TIMINGS.dragReturn,
+                ease: 'Back.easeOut',
+                onComplete: () => obj.settleDepth()
+              });
+              return;
+            }
             this.startDragonWork(obj, home, tgt); // work the EXACT house it was dropped on
             return;
           }
@@ -4940,7 +4964,11 @@ export class BoardScene extends Phaser.Scene {
     if (ld) {
       ld.busy = true;
       this.setDragonFacing(ld, landX <= plant.x ? 'right' : 'left');
-      this.dragonHover(ld, DRAGON_ANIM.flyToMs);
+      // No duration: the wings must NOT fold at the plant. One takeoff, one
+      // cruise held across the visit, and the ONE landing is the return leg's
+      // (its dragonHover(ld, flyBackMs) schedules the fold near home) — a
+      // touch-and-go at the plant read as a stutter, not a landing.
+      this.dragonHover(ld);
     }
     const land = (): void => {
       this.glowFlash(plant.x, plant.y - 36, PALETTE.goldAccent, 0.6, 1.2);
@@ -5120,7 +5148,12 @@ export class BoardScene extends Phaser.Scene {
     if (ld) {
       ld.busy = true;
       this.setDragonFacing(ld, 'left');
-      this.dragonHover(ld, DRAGON_ANIM.flyToMs);
+      // No duration — the dragon stays ON THE WING for the whole errand,
+      // hovering over the House while the work-magic lands. The only landing
+      // is the return leg's (dragonHover(ld, flyBackMs) below schedules the
+      // fold as it reaches home); folding at the House and taking off again
+      // half a second later read as a hitch.
+      this.dragonHover(ld);
     }
     // Same beat as the harvest flourish: fly over, breathe a brief burst of
     // work-magic onto the building, and come STRAIGHT home. The job itself

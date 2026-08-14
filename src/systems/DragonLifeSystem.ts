@@ -97,6 +97,11 @@ export class DragonLifeSystem {
     const item = this.state.items.get(itemId);
     if (!item || !this.dragons.isBoardDragon(item)) return 'awake';
     if (this.isHungry(itemId)) return 'hungry';
+    // The TUTORIAL never sleeps. Its beats point the hand at the dragon and
+    // gate on her answering — a lesson whose subject curls up under the arrow
+    // (scripted advanceTime jumps land in night/nap windows at random) is a
+    // lesson that soft-locks. Hunger stays: the feeding beat depends on it.
+    if (!this.state.tutorialDone) return 'awake';
     // Fatigue outranks the sky: a dragon that just came off a shift sleeps at
     // noon, and this is the path the player sees most often.
     if (this.jobs.restRemaining(itemId) > 0) return 'asleep';

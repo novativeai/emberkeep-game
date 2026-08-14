@@ -77,6 +77,23 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(ctx.state.items.get(dragon.id)).toMatchObject({ col: 1, row: 1 });
   });
 
+  it('never sleeps during the tutorial — night, nap or fatigue, she stays awake', () => {
+    // A tutorial beat that points at the dragon cannot survive its subject
+    // curling up under the arrow; the scripted advanceTime jumps land in
+    // night/nap windows at random. Hunger is the one mood that may surface —
+    // the feeding lesson depends on it.
+    const ctx = createTestContext();
+    const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.state.tutorialDone = false;
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    atPhase(ctx, 3); // night — the strongest sleep pull there is
+    tick(ctx, 0);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+    // The moment the tutorial hands over, the same clock reads as bedtime.
+    ctx.state.tutorialDone = true;
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+  });
+
   it('is reproducible: the same clock lands the same dragon on the same tile', () => {
     const run = (): string => {
       const ctx = createTestContext();

@@ -62,6 +62,14 @@ export function frameBox(
  * The ink quad deliberately reaches PAST the frame — that is where the outline
  * lives — so without a fence its taps would wander into whatever frame is packed
  * next door and dilate a neighbouring pose into this one's outline.
+ *
+ * Inset HALF A TEXEL from the cell edge. The fence test is on the tap POINT,
+ * but the fetch under it is bilinear: a tap inside the cell's outermost half-
+ * texel still blends the texel across the boundary — the pose packed next door
+ * (or the sheet border) leaking phantom alpha the dilation then paints as thin
+ * ink trails down the frame's left and right edges (worst on the fly sheets,
+ * whose wide wings pack the cells tight). The half-texel costs the outline
+ * nothing visible; the trails were pure sampling artefact, touching no art.
  */
 export function uvFence(box: AlphaBounds): { min: [number, number]; max: [number, number] } {
   const sw = box.sheetWidth ?? box.texWidth;
@@ -69,8 +77,8 @@ export function uvFence(box: AlphaBounds): { min: [number, number]; max: [number
   const fx = box.frameX ?? 0;
   const fy = box.frameY ?? 0;
   return {
-    min: [fx / sw, fy / sh],
-    max: [(fx + box.texWidth) / sw, (fy + box.texHeight) / sh]
+    min: [(fx + 0.5) / sw, (fy + 0.5) / sh],
+    max: [(fx + box.texWidth - 0.5) / sw, (fy + box.texHeight - 0.5) / sh]
   };
 }
 

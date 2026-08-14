@@ -191,11 +191,16 @@ describe('inkQuad over a spritesheet frame', () => {
     expect(q.uvOffset[0] + q.uvScale[0]).toBeCloseTo((FRAME.x + FRAME.w + radius) / SHEET.w, 10);
   });
 
-  it('fences sampling to the frame cell, never the neighbouring pose', () => {
+  it('fences sampling to the frame cell, inset HALF A TEXEL from the neighbouring pose', () => {
     const box = frameBox(FRAME.x, FRAME.y, FRAME.w, FRAME.h, SHEET.w, SHEET.h);
     const f = uvFence(box);
-    expect(f.min).toEqual([FRAME.x / SHEET.w, FRAME.y / SHEET.h]);
-    expect(f.max).toEqual([(FRAME.x + FRAME.w) / SHEET.w, (FRAME.y + FRAME.h) / SHEET.h]);
+    // The half-texel inset: the fence test is on the tap point, but the fetch
+    // is bilinear — a tap inside the cell's outermost half-texel still blends
+    // the texel across the boundary, and that phantom alpha dilated into thin
+    // ink trails down the frame's left/right edges on the tightly-packed fly
+    // sheets. The fence must therefore stop half a texel short of the cell.
+    expect(f.min).toEqual([(FRAME.x + 0.5) / SHEET.w, (FRAME.y + 0.5) / SHEET.h]);
+    expect(f.max).toEqual([(FRAME.x + FRAME.w - 0.5) / SHEET.w, (FRAME.y + FRAME.h - 0.5) / SHEET.h]);
     // The quad's own window is strictly WIDER than the fence — which is the whole
     // reason the fence has to exist.
     const q = inkQuad(box, 6, 0, 0, 0.5, 0.97);
@@ -203,10 +208,12 @@ describe('inkQuad over a spritesheet frame', () => {
     expect(q.uvOffset[0] + q.uvScale[0]).toBeGreaterThan(f.max[0]);
   });
 
-  it('a standalone texture fences to the whole image', () => {
+  it('a standalone texture fences to the whole image, half a texel in from the border', () => {
+    // Same mechanism at the image border: sampling the outermost half-texel
+    // under CLAMP smears the border texel outward into a streak.
     const f = uvFence(BOX);
-    expect(f.min).toEqual([0, 0]);
-    expect(f.max).toEqual([1, 1]);
+    expect(f.min).toEqual([0.5 / BOX.texWidth, 0.5 / BOX.texHeight]);
+    expect(f.max).toEqual([(BOX.texWidth - 0.5) / BOX.texWidth, (BOX.texHeight - 0.5) / BOX.texHeight]);
   });
 
   it('keeps one width per character across clips authored at different scales', () => {
