@@ -3864,6 +3864,13 @@ export class BoardScene extends Phaser.Scene {
   ): void {
     const sprite = this.itemSprites.get(itemId);
     if (!sprite?.active) return;
+    // The cinematic owns this animal until it is through: `busy` stops the idle
+    // roll and the sleep seat from writing the same transform mid-arc.
+    const live = this.liveDragons.get(itemId);
+    if (live) {
+      live.busy = true;
+      this.dragonHover(live);
+    }
     const home = { x: sprite.x, y: sprite.y };
     const target = { x: door.zone.x, y: door.zone.y - 30 };
     // Arc control point well above the straight line — a flight, not a slide.
@@ -3890,31 +3897,27 @@ export class BoardScene extends Phaser.Scene {
         sprite.setAlpha(t > 0.66 ? Math.max(0, 1 - (t - 0.66) / 0.3) : 1);
       },
       onComplete: () => {
+        // THROUGH. He does not come back out — he has gone to Roothold, and
+        // that is where the player meets him again (buildHubDragon stands him
+        // by Eleanor's door). The old return leg flew him straight back out of
+        // the glare, which read as the portal spitting him out and made the
+        // whole ceremony pointless.
         sprite.setAlpha(0);
-        // The return: back out of the glare along the same arc, home exactly.
-        this.time.delayedCall(2600, () => {
-          if (!sprite.active) return;
-          const back = { t: 0 };
-          this.tweens.add({
-            targets: back,
-            t: 1,
-            duration: 1500,
-            ease: 'Sine.easeInOut',
-            onUpdate: () => {
-              const t = back.t;
-              const u = 1 - t;
-              sprite.x = u * u * target.x + 2 * u * t * peak.x + t * t * home.x;
-              sprite.y = u * u * target.y + 2 * u * t * peak.y + t * t * home.y;
-              sprite.setAlpha(Math.min(1, t / 0.3));
-            },
-            onComplete: () => {
-              sprite.setPosition(home.x, home.y);
-              sprite.setAlpha(1);
-              if ('setFacing' in sprite) {
-                (sprite as { setFacing(dir: 'left' | 'right'): unknown }).setFacing('left');
-              }
-            }
-          });
+        sprite.setPosition(home.x, home.y); // parked at home, just not visible
+        if ('setFacing' in sprite) {
+          (sprite as { setFacing(dir: 'left' | 'right'): unknown }).setFacing('left');
+        }
+        // Travelling rebuilds this scene from state, so in the ordinary flow he
+        // is simply standing on his tile again when the Keeper comes home. This
+        // is the net for the player who never goes: a hidden sprite is also an
+        // UNTAPPABLE one (Phaser skips hit-tests on a cleared render flag), so
+        // the board must never be left one generator short. No flight — he is
+        // just back, the way he would be if you had not been watching.
+        this.time.delayedCall(GATE_FLIGHT.awayMs, () => {
+          if (!sprite.active || sprite.alpha > 0) return;
+          const ld = this.liveDragons.get(itemId);
+          if (ld) ld.busy = false;
+          this.tweens.add({ targets: sprite, alpha: 1, duration: 500, ease: 'Sine.easeOut' });
         });
       }
     });

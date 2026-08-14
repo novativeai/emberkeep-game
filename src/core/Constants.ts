@@ -1547,7 +1547,18 @@ export const GATE_FLIGHT = {
    *  and back — so the nap it was taking cannot re-assert mid-air. */
   keepAwakeMs: 20_000,
   /** Wake first, fly after: long enough for the uncurl to read as its own beat. */
-  wakeLeadMs: 2000
+  wakeLeadMs: 2000,
+  /**
+   * How long he stays GONE after the portal takes him.
+   *
+   * He has left for Roothold, so the ordinary ending is the player following
+   * him through — travel rebuilds the board from state and he is on his tile
+   * again, having come home with them. This is only the net for a player who
+   * never goes: a hidden sprite is an untappable one, and the board may not be
+   * left a generator short for ever. Long enough that the ceremony, Eleanor's
+   * lines and the travel prompt all land first.
+   */
+  awayMs: 45_000
 } as const;
 
 /**
