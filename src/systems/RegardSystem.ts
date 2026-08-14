@@ -11,7 +11,20 @@ import {
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { CharactersData, QuestConfig, QuestStepConfig } from '../core/types';
+import type { OrderSystem } from './OrderSystem';
 import type { QuestSystem } from './QuestSystem';
+
+/** A live gift step of the active quest, shaped for the Ledger's card. */
+export interface GiftAsk {
+  stepId: string;
+  label: string;
+  characterId: string;
+  chain: string;
+  tier: number;
+  remaining: number;
+  onBoard: number;
+  deliverable: boolean;
+}
 
 /**
  * REGARD — the five hearts each of the two people keeps for the Keeper.
@@ -44,7 +57,11 @@ export class RegardSystem {
     private state: GameState,
     private bus: EventBus,
     characters: CharactersData,
-    private quests: QuestSystem
+    private quests: QuestSystem,
+    /** Read-only here (giveTarget): a give that no gift step wants may still be
+     *  a delivery in singles. The MUTATION goes through `order:give`, which
+     *  OrderSystem owns — the one-way rule between systems holds. */
+    private orders: OrderSystem
   ) {
     // Canonical PEOPLE, not standee entries: `art ?? id` folds Eleanor-at-home
     // (roothold) onto Eleanor — one Regard gauge and one heart-scene bank per
@@ -54,6 +71,25 @@ export class RegardSystem {
     bus.on('ui:gift_requested', ({ characterId, chain, tier }) =>
       this.offer(characterId, chain, tier)
     );
+    bus.on('ui:gift_deliver_requested', ({ characterId, chain, tier }) =>
+      this.deliverFromBoard(characterId, chain, tier)
+    );
+    // The gift-ask "order" announcements (Hud dot + Ledger card): a gift step's
+    // deliverability is a property of the BOARD, so it re-announces on the same
+    // facts the real Ledger does — plus quest movement, which is what retires an
+    // ask and must switch its dot off.
+    for (const event of [
+      'item:spawned',
+      'item:merged',
+      'item:removed',
+      'state:loaded',
+      'world:switched',
+      'quest:step_completed',
+      'quest:advanced',
+      'regard:gift_accepted'
+    ] as const) {
+      bus.on(event, () => this.announceGiftAsks());
+    }
     // A finished quest pays its giver. Latched per quest, so a re-derivation can
     // never pay twice — and a quest that completed while the ladder was being
     // re-derived silently (a load) is caught by `settleUnpaid` below.
@@ -170,6 +206,20 @@ export class RegardSystem {
   private offer(characterId: string, chain: string, tier: number): void {
     if (!this.ids.includes(characterId)) return;
     if (!this.wants(characterId, chain, tier)) {
+      // No gift step wants it — but her own live ORDER might. Give and Deliver
+      // are the same verb in different grammar: a piece handed over that the
+      // giver's visible order needs is a delivery in singles, banked toward the
+      // order (`order:give` → OrderSystem), which completes on its own the
+      // moment everything is given. The lifetime given-counter still moves (it
+      // IS a thing given to her — and it is what tells the board the piece was
+      // taken), but no Regard points: the Deliver button pays none either, and
+      // the two verbs must stay worth exactly the same.
+      if (this.orders.giveTarget(characterId, chain, tier)) {
+        this.state.addStat(giftKey(characterId, chain, tier), 1);
+        this.bus.emit('order:give', { characterId, chain, tier });
+        this.bus.emit('regard:gift_accepted', { characterId, chain, tier, points: 0 });
+        return;
+      }
       this.bus.emit('regard:gift_declined', {
         characterId,
         chain,
@@ -196,6 +246,83 @@ export class RegardSystem {
     // subscribes to `regard:gift_accepted` like any other trigger — which is why
     // the award is paid AFTER the counter is written and the fact announced.
     this.award(characterId, points, 'gift', true);
+  }
+
+  /**
+   * The Deliver verb, pointed at a GIFT step: hand over pieces straight off the
+   * board, no pocketing. Each piece runs the exact accept `offer` runs for a
+   * bag give — counter, points, celebration, the same events in the same order
+   * — and is consumed from the board only after her record moved (the
+   * check-the-record contract every handing-over holds). Stops the moment she
+   * wants no more or the board runs dry, so a partial board still pays what it
+   * can.
+   */
+  private deliverFromBoard(characterId: string, chain: string, tier: number): void {
+    for (let guard = 0; guard < 99; guard++) {
+      if (this.outstanding(characterId, chain, tier) <= 0) break;
+      const item = this.state.itemsMatching(chain, tier).sort((a, b) => a.id - b.id)[0];
+      if (!item) break;
+      const before = this.given(characterId, chain, tier);
+      this.offer(characterId, chain, tier);
+      if (this.given(characterId, chain, tier) <= before) break;
+      this.bus.emit('board:consume_items', { itemIds: [item.id], reason: 'delivered' });
+    }
+  }
+
+  // ------------------------------------------- the gift ask, worn as an order
+
+  /** Ids announced last time, so a retired ask can switch its dot OFF. */
+  private announcedAsks = new Set<string>();
+
+  /**
+   * The ACTIVE quest's live gift steps, shaped for the Ledger: who is asking,
+   * for what, how many are still owed, and whether the board covers it. The
+   * Ledger wears one as a card with a Deliver button; the Hud's dot hears the
+   * `order:progress` announcements below exactly as it hears a real order's.
+   */
+  giftAsks(): GiftAsk[] {
+    const quest = this.quests.activeQuest;
+    if (!quest) return [];
+    const out: GiftAsk[] = [];
+    for (const step of quest.steps) {
+      const goal = step.goal;
+      if (goal.kind !== 'gift') continue;
+      if (this.quests.stepDone(step) || this.quests.isLocked(step)) continue;
+      const remaining = Math.max(0, goal.count - this.given(goal.characterId, goal.chain, goal.tier));
+      if (remaining === 0) continue;
+      const onBoard = this.state.countItems(goal.chain, goal.tier);
+      out.push({
+        stepId: step.id,
+        label: this.quests.progressFor(step).label,
+        characterId: goal.characterId,
+        chain: goal.chain,
+        tier: goal.tier,
+        remaining,
+        onBoard: Math.min(onBoard, remaining),
+        deliverable: onBoard >= remaining
+      });
+    }
+    return out;
+  }
+
+  private announceGiftAsks(): void {
+    const seen = new Set<string>();
+    for (const ask of this.giftAsks()) {
+      const id = `gift:${ask.stepId}`;
+      seen.add(id);
+      this.bus.emit('order:progress', {
+        orderId: id,
+        have: [ask.onBoard],
+        need: [ask.remaining],
+        deliverable: ask.deliverable
+      });
+    }
+    for (const id of this.announcedAsks) {
+      if (!seen.has(id)) {
+        this.bus.emit('order:progress', { orderId: id, have: [], need: [], deliverable: false });
+      }
+    }
+    this.announcedAsks = seen;
   }
 
   // ------------------------------------------------------------------ quests

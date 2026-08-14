@@ -172,6 +172,13 @@ export class GameState {
     return this.board().items;
   }
 
+  /** Read-only view of a world's board items WITHOUT materialising it — for
+   *  surfaces that ask about a board the player is not standing on (the Dragon
+   *  Codex roster, the hub standee). An unvisited world reads as absent. */
+  itemsIn(worldId: string): ReadonlyMap<number, BoardItemState> | undefined {
+    return this.boards.get(worldId)?.items;
+  }
+
   /** grid[row][col] -> itemId or null, for the ACTIVE world. */
   get grid(): (number | null)[][] {
     return this.board().grid;

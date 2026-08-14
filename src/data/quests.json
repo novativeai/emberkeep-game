@@ -40,12 +40,12 @@
       }
     },
     {
-      "id": "raise_the_roofs",
+      "id": "fill_the_larder",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Raise the Roofs",
+      "title": "Fill the Larder",
       "rewards": {
-        "coins": 80,
+        "coins": 110,
         "spawn": {
           "chain": "ashdrake",
           "tier": 1,
@@ -54,11 +54,11 @@
       },
       "steps": [
         {
-          "id": "roofs_houses",
-          "label": "Build 2 Houses",
+          "id": "larder_preserve",
+          "label": "Make 2 Emberberry Preserves",
           "goal": {
             "kind": "have",
-            "chain": "lumber",
+            "chain": "emberberry",
             "tier": 3,
             "count": 2
           }
@@ -96,6 +96,48 @@
       }
     },
     {
+      "id": "raise_the_roofs",
+      "chapter": 2,
+      "giver": "eleanor",
+      "title": "Raise the Roofs",
+      "rewards": {
+        "coins": 80
+      },
+      "steps": [
+        {
+          "id": "roofs_houses",
+          "label": "Build 2 Houses",
+          "goal": {
+            "kind": "have",
+            "chain": "lumber",
+            "tier": 3,
+            "count": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "the_long_gallery",
+      "chapter": 2,
+      "giver": "eleanor",
+      "title": "Light the Long Gallery",
+      "rewards": {
+        "coins": 100
+      },
+      "steps": [
+        {
+          "id": "gallery_gems",
+          "label": "Make 4 Flame Gems",
+          "goal": {
+            "kind": "have",
+            "chain": "flame_gem",
+            "tier": 2,
+            "count": 4
+          }
+        }
+      ]
+    },
+    {
       "id": "catch_the_moonwater",
       "chapter": 2,
       "giver": "eleanor",
@@ -122,7 +164,12 @@
         }
       ],
       "rewards": {
-        "coins": 45
+        "coins": 45,
+        "spawn": {
+          "chain": "ashdrake",
+          "tier": 1,
+          "count": 1
+        }
       }
     },
     {
@@ -195,34 +242,8 @@
         }
       ],
       "rewards": {
-        "coins": 60,
-        "spawn": {
-          "chain": "ashdrake",
-          "tier": 1,
-          "count": 1
-        }
+        "coins": 60
       }
-    },
-    {
-      "id": "fill_the_larder",
-      "chapter": 2,
-      "giver": "eleanor",
-      "title": "Fill the Larder",
-      "rewards": {
-        "coins": 110
-      },
-      "steps": [
-        {
-          "id": "larder_preserve",
-          "label": "Make 2 Emberberry Preserves",
-          "goal": {
-            "kind": "have",
-            "chain": "emberberry",
-            "tier": 3,
-            "count": 2
-          }
-        }
-      ]
     },
     {
       "id": "keepers_hoard",
@@ -314,55 +335,13 @@
         }
       ],
       "rewards": {
-        "coins": 120
-      }
-    },
-    {
-      "id": "the_long_gallery",
-      "chapter": 2,
-      "giver": "eleanor",
-      "title": "Light the Long Gallery",
-      "rewards": {
-        "coins": 100
-      },
-      "steps": [
-        {
-          "id": "gallery_gems",
-          "label": "Make 4 Flame Gems",
-          "goal": {
-            "kind": "have",
-            "chain": "flame_gem",
-            "tier": 2,
-            "count": 4
-          }
-        }
-      ]
-    },
-    {
-      "id": "the_emerald_brood",
-      "chapter": 2,
-      "giver": "eleanor",
-      "title": "Raise the Ember Brood",
-      "rewards": {
-        "coins": 150,
+        "coins": 120,
         "spawn": {
           "chain": "ashdrake",
           "tier": 1,
           "count": 1
         }
-      },
-      "steps": [
-        {
-          "id": "brood_eggs",
-          "label": "Make 4 Red Eggs",
-          "goal": {
-            "kind": "have",
-            "chain": "ember_dragon",
-            "tier": 2,
-            "count": 4
-          }
-        }
-      ]
+      }
     },
     {
       "id": "the_ashdrake_wakes",
@@ -431,30 +410,46 @@
       }
     },
     {
-      "id": "north_coast",
-      "chapter": 11,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "Open the Wrack Coast",
-      "steps": [
-        {
-          "id": "coast_open",
-          "label": "Spend 1 Gold Key on the fog along the coast",
-          "goal": {
-            "kind": "region",
-            "regionId": "borealis_coast"
+        "id": "north_coast",
+        "chapter": 11,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Open the Wrack Coast",
+        "steps": [
+          {
+            "id": "coast_open",
+            "label": "Spend 1 Gold Key on the fog along the coast",
+            "goal": {
+              "kind": "region",
+              "regionId": "borealis_coast"
+            }
           }
+        ],
+        "rewards": {
+          "coins": 40
         }
-      ],
-      "rewards": {
-        "coins": 40,
-        "spawn": {
-          "chain": "rimewyrm",
-          "tier": 1,
-          "count": 1
+      },
+    {
+        "id": "north_strakes",
+        "chapter": 11,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Strakes from Spars",
+        "steps": [
+          {
+            "id": "strakes_brew",
+            "label": "Brew 4 Broken Strakes",
+            "goal": {
+              "kind": "brew",
+              "recipeId": "broken_strake",
+              "count": 4
+            }
+          }
+        ],
+        "rewards": {
+          "coins": 35
         }
-      }
-    },
+      },
     {
       "id": "north_fuel",
       "chapter": 11,
@@ -497,6 +492,27 @@
       }
     },
     {
+        "id": "north_threadwork",
+        "chapter": 11,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Thread from the Frost",
+        "steps": [
+          {
+            "id": "thread_brew",
+            "label": "Brew 4 Frost Threads",
+            "goal": {
+              "kind": "brew",
+              "recipeId": "frost_thread",
+              "count": 4
+            }
+          }
+        ],
+        "rewards": {
+          "coins": 55
+        }
+      },
+    {
       "id": "north_salvage",
       "chapter": 11,
       "giver": "selyna",
@@ -528,93 +544,182 @@
       }
     },
     {
-      "id": "north_door",
-      "chapter": 11,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "Open Selyna's Keep",
-      "steps": [
-        {
-          "id": "door_open",
-          "label": "Spend 2 Gold Keys on the fog around the keep",
-          "goal": {
-            "kind": "region",
-            "regionId": "borealis_keep"
+        "id": "north_pitchpot",
+        "chapter": 11,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Boil the Pitch",
+        "steps": [
+          {
+            "id": "pitchpot_brew",
+            "label": "Brew 3 Pitch Cakes",
+            "goal": {
+              "kind": "brew",
+              "recipeId": "pitch_cake",
+              "count": 3
+            }
+          }
+        ],
+        "rewards": {
+          "coins": 75
+        }
+      },
+    {
+        "id": "north_door",
+        "chapter": 11,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Open Selyna's Keep",
+        "steps": [
+          {
+            "id": "door_open",
+            "label": "Spend 2 Gold Keys on the fog around the keep",
+            "goal": {
+              "kind": "region",
+              "regionId": "borealis_keep"
+            }
+          }
+        ],
+        "rewards": {
+          "coins": 60,
+          "spawn": {
+            "chain": "rimewyrm",
+            "tier": 1,
+            "count": 1
           }
         }
-      ],
-      "rewards": {
-        "coins": 60
-      }
-    },
+      },
     {
-      "id": "what_she_will_take",
-      "chapter": 11,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "What She Will Take",
-      "steps": [
-        {
-          "id": "take_faggot",
-          "label": "Give Selyna 2 Bound Faggots",
-          "goal": {
-            "kind": "gift",
-            "characterId": "selyna",
-            "chain": "driftwood",
-            "tier": 2,
-            "count": 2
+        "id": "north_lamplight",
+        "chapter": 11,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Light for the Long Dark",
+        "steps": [
+          {
+            "id": "lamplight_brew",
+            "label": "Brew 3 Oil Lamps",
+            "goal": {
+              "kind": "brew",
+              "recipeId": "oil_lamp",
+              "count": 3
+            }
           }
-        },
-        {
-          "id": "take_flowers",
-          "label": "Give Selyna 3 Frost Flowers",
-          "goal": {
-            "kind": "gift",
-            "characterId": "selyna",
-            "chain": "rimebloom",
-            "tier": 1,
-            "count": 3
-          },
-          "lockedUntil": {
-            "regard": {
+        ],
+        "rewards": {
+          "coins": 95
+        }
+      },
+    {
+        "id": "what_she_will_take",
+        "chapter": 11,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "What She Will Take",
+        "steps": [
+          {
+            "id": "take_faggot",
+            "label": "Give Selyna 2 Bound Faggots",
+            "goal": {
+              "kind": "gift",
               "characterId": "selyna",
-              "hearts": 1
+              "chain": "driftwood",
+              "tier": 2,
+              "count": 2
             }
           },
-          "lockedHint": "She takes nothing from a stranger. Work first."
-        }
-      ],
-      "rewards": {
-        "coins": 80,
-        "spawn": {
-          "chain": "rimewyrm",
-          "tier": 1,
-          "count": 1
-        }
-      }
-    },
-    {
-      "id": "north_hulls",
-      "chapter": 11,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "Turn Two Hulls",
-      "rewards": {
-        "coins": 160
-      },
-      "steps": [
-        {
-          "id": "hulls_pair",
-          "label": "Make 2 Upturned Hulls",
-          "goal": {
-            "kind": "have",
-            "chain": "keel",
-            "tier": 3,
-            "count": 2
+          {
+            "id": "take_flowers",
+            "label": "Give Selyna 3 Frost Flowers",
+            "goal": {
+              "kind": "gift",
+              "characterId": "selyna",
+              "chain": "rimebloom",
+              "tier": 1,
+              "count": 3
+            },
+            "lockedUntil": {
+              "regard": {
+                "characterId": "selyna",
+                "hearts": 1
+              }
+            },
+            "lockedHint": "She takes nothing from a stranger. Work first."
           }
+        ],
+        "rewards": {
+          "coins": 80
         }
-      ]
-    },
+      },
+    {
+        "id": "north_lodestones",
+        "chapter": 11,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Something That Points",
+        "steps": [
+          {
+            "id": "lodestones_brew",
+            "label": "Brew 3 Lodestones",
+            "goal": {
+              "kind": "brew",
+              "recipeId": "lodestone",
+              "count": 3
+            }
+          }
+        ],
+        "rewards": {
+          "coins": 115
+        }
+      },
+    {
+        "id": "north_hulls",
+        "chapter": 11,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Turn Two Hulls",
+        "rewards": {
+          "coins": 160,
+          "spawn": {
+            "chain": "rimewyrm",
+            "tier": 1,
+            "count": 1
+          }
+        },
+        "steps": [
+          {
+            "id": "hulls_pair",
+            "label": "Make 2 Upturned Hulls",
+            "goal": {
+              "kind": "have",
+              "chain": "keel",
+              "tier": 3,
+              "count": 2
+            }
+          }
+        ]
+      },
+    {
+        "id": "north_skeins",
+        "chapter": 12,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Spin It Fine",
+        "steps": [
+          {
+            "id": "skeins_brew",
+            "label": "Brew 3 Spun Skeins",
+            "goal": {
+              "kind": "brew",
+              "recipeId": "spun_skein",
+              "count": 3
+            }
+          }
+        ],
+        "rewards": {
+          "coins": 135
+        }
+      },
     {
       "id": "north_pitchworks",
       "chapter": 11,
@@ -637,6 +742,27 @@
         }
       ]
     },
+    {
+        "id": "north_runeshards",
+        "chapter": 12,
+        "giver": "selyna",
+        "world": "borealis",
+        "title": "Split the Nodule",
+        "steps": [
+          {
+            "id": "runeshards_brew",
+            "label": "Fire a Black Ember into shards",
+            "goal": {
+              "kind": "brew",
+              "recipeId": "rune_shard",
+              "count": 1
+            }
+          }
+        ],
+        "rewards": {
+          "coins": 155
+        }
+      },
     {
       "id": "north_longhall",
       "chapter": 11,

@@ -33,6 +33,7 @@ import type {
   ChainsData,
   CharactersData,
   DialogueData,
+  DragondexData,
   MapData,
   OrdersData,
   QuestsData,
@@ -44,6 +45,7 @@ import anchorsJson from '../data/anchors.json';
 import assetsJson from '../data/assets.json';
 import cauldronJson from '../data/cauldron.json';
 import chainsJson from '../data/chains.json';
+import dragondexJson from '../data/dragondex.json';
 import charactersJson from '../data/characters.json';
 import dialogueJson from '../data/dialogue.json';
 import mapJson from '../data/map.json';
@@ -56,6 +58,7 @@ import tutorialJson from '../data/tutorial.json';
 export interface GameData {
   cauldron: CauldronData;
   chains: ChainsData;
+  dragondex: DragondexData;
   orders: OrdersData;
   map: MapData;
   tutorial: TutorialData;
@@ -113,6 +116,7 @@ export class GameContext {
     this.data = {
       cauldron: cauldronJson as unknown as CauldronData,
       chains: chainsJson as unknown as ChainsData,
+      dragondex: dragondexJson as unknown as DragondexData,
       orders: ordersJson as unknown as OrdersData,
       map: mapJson as unknown as MapData,
       tutorial: tutorialJson as unknown as TutorialData,
@@ -142,6 +146,7 @@ export class GameContext {
       this.bus,
       this.data.quests,
       this.data.chains,
+      this.data.cauldron,
       order,
       tasks
     );
@@ -167,7 +172,7 @@ export class GameContext {
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains),
       tasks,
       quests,
-      regard: new RegardSystem(this.state, this.bus, this.data.characters, quests),
+      regard: new RegardSystem(this.state, this.bus, this.data.characters, quests, order),
       bag: new BagSystem(this.state, this.bus),
       store: new StoreSystem(this.state, this.bus, this.data.store),
       story: new StorySystem(this.state, this.bus, this.data.dialogue),

@@ -1,0 +1,76 @@
+import { describe, expect, it } from 'vitest';
+import { DRAGON_CYCLE_MS, MEALS_PER_DAY, WELL_FED_EVOLUTION } from '../../src/core/Constants';
+import dragondex from '../../src/data/dragondex.json';
+import { capture, createTestContext } from './helpers';
+
+/** A Red Dragon on the board, returned by id — the codex/cycle test subject. */
+function placeDragon(ctx: ReturnType<typeof createTestContext>): number {
+  ctx.bus.emit('board:spawn', { chain: 'ember_dragon', tier: 3, count: 1 });
+  const dragon = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon' && i.tier === 3)!;
+  expect(dragon).toBeDefined();
+  return dragon.id;
+}
+
+/** One full serving of his favourite (resin T2 = one whole meal at rate 1). */
+function feed(ctx: ReturnType<typeof createTestContext>, itemId: number, times = 1): void {
+  for (let i = 0; i < times; i++) {
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId, chain: 'resin', tier: 2 });
+  }
+}
+
+describe('feed cycles — the 10-minute window behind the Dragon Codex', () => {
+  it('credits ONE well-fed cycle when the gauge fills, never twice in a window', () => {
+    const ctx = createTestContext();
+    const itemId = placeDragon(ctx);
+    const wellFed = capture(ctx.bus, 'dragon:well_fed');
+
+    feed(ctx, itemId, MEALS_PER_DAY - 1);
+    expect(ctx.systems.dragons.wellFedCyclesOf(itemId)).toBe(0); // not full yet
+
+    feed(ctx, itemId);
+    expect(ctx.systems.dragons.wellFedCyclesOf(itemId)).toBe(1);
+    expect(wellFed).toHaveLength(1);
+    expect(wellFed[0]).toMatchObject({ itemId, chain: 'ember_dragon', cycles: 1, needed: 6 });
+
+    // Stuffing him further inside the SAME window credits nothing more.
+    feed(ctx, itemId, 3);
+    expect(ctx.systems.dragons.wellFedCyclesOf(itemId)).toBe(1);
+    expect(wellFed).toHaveLength(1);
+  });
+
+  it('the cycle rollover returns hunger to zero, and the next full gauge counts again', () => {
+    const ctx = createTestContext();
+    const itemId = placeDragon(ctx);
+    feed(ctx, itemId, MEALS_PER_DAY);
+    expect(ctx.systems.dragons.careOf(itemId).meals).toBeGreaterThanOrEqual(MEALS_PER_DAY);
+
+    // The window turns: no reset job runs — the stale stamp simply stops
+    // matching, and the record reads hungry again.
+    ctx.clock.advance(DRAGON_CYCLE_MS);
+    expect(ctx.systems.dragons.careOf(itemId).meals).toBe(0);
+    expect(ctx.systems.dragons.wellFedCyclesOf(itemId)).toBe(1); // lifetime count kept
+
+    feed(ctx, itemId, MEALS_PER_DAY);
+    expect(ctx.systems.dragons.wellFedCyclesOf(itemId)).toBe(2);
+  });
+
+  it('a MISSED cycle credits nothing — the count is cycles fed, not time served', () => {
+    const ctx = createTestContext();
+    const itemId = placeDragon(ctx);
+    feed(ctx, itemId, MEALS_PER_DAY);
+    ctx.clock.advance(DRAGON_CYCLE_MS * 5); // four windows starved
+    feed(ctx, itemId, MEALS_PER_DAY);
+    expect(ctx.systems.dragons.wellFedCyclesOf(itemId)).toBe(2);
+  });
+
+  it('dragondex.json and WELL_FED_EVOLUTION state the same bar — words and law agree', () => {
+    // The data file says the words on the Evolution page; Constants holds the
+    // number the systems enforce. A retune that moves one without the other
+    // ships a page that lies.
+    for (const [chain, entry] of Object.entries(dragondex.dragons)) {
+      if (!entry.evolution) continue;
+      expect(WELL_FED_EVOLUTION[chain], `WELL_FED_EVOLUTION.${chain}`).toBe(entry.evolution.wellFedCycles);
+      expect(entry.evolution.condition).toContain(String(entry.evolution.wellFedCycles));
+    }
+  });
+});

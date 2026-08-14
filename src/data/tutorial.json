@@ -670,6 +670,36 @@
       }
     },
     {
+      "id": "board_room",
+      "speaker": "eleanor",
+      "text": "One habit before we go on: workers work ANYWHERE. When the hearthside gets crowded, drag the Emberbark Stump onto the new field — it drips moss just as well out there.",
+      "gate": {
+        "type": "move",
+        "chain": "emberbark",
+        "region": "level_2"
+      },
+      "highlight": [
+        {
+          "chain": "emberbark",
+          "nth": 0,
+          "tier": 1
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "emberbark",
+          "nth": 0,
+          "tier": 1
+        },
+        "to": [4, 4]
+      },
+      "allow": {
+        "drag": [
+          "emberbark"
+        ]
+      }
+    },
+    {
       "id": "emberberry_tap",
       "speaker": "eleanor",
       "text": "A wild Emberberry patch grew in the opened land! It feeds you for FREE — tapping it never costs Warmth. Tap the patch to pick a berry.",

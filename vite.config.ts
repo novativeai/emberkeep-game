@@ -869,10 +869,10 @@ const copyRuntimeArt = (): Plugin => ({
       // Superseded / never-referenced art, each verified against the reference
       // graph (`node scripts/audit-art.mjs`) rather than by eye:
       'sprites/background/emberkeep.jpg', //  background_emberkeep points at emberkeep-nb2.webp
-      // (hatchery.webp used to sit here as "worlds.json-only, not a zone". It is
-      //  a zone now — Borealis's hub, ground measured out of this very file by
-      //  scripts/fit-deck-grid.py — so it ships like any other backdrop.)
-      'sprites/background/runevault.webp', //  worlds.json-only; not a zone, so nothing can load it
+      // (runevault.webp used to sit here as "worlds.json-only, not a zone" while
+      //  hatchery.webp was the hub. Runevault IS the hub now — Borealis's, with
+      //  its ground measured out of this very file by fit-deck-grid.py — so it
+      //  ships like any other backdrop and no longer belongs on this list.)
       'sprites/environment/full-water-bg',
       'sprites/environment/level-blocker', //  superseded by sprites/environment/blockers/
       'sprites/environment/blockers/cloud/cloud-cropped', // cloud_tile is the shipped one

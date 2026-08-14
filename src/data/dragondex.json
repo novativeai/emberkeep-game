@@ -1,0 +1,16 @@
+{
+  "dragons": {
+    "ember_dragon": {
+      "title": "Red Dragon",
+      "story": "Hatched from a ruby the ash kept warm for sixty years — the first flame to come back to Emberkeep.",
+      "personality": "Highly energetic and endlessly curious. He loves roaming — no corner of the isle stays unexplored for long.",
+      "ability": "Reshapes his wings to catch the high thermals and fly higher than any other hatchling — and wraps his tail around himself to stay warm through the cold nights.",
+      "evolution": {
+        "wellFedCycles": 6,
+        "into": "Adult Red Dragon",
+        "reveal": "reveal_ember_adult",
+        "condition": "Fully fed for 6 cycles"
+      }
+    }
+  }
+}

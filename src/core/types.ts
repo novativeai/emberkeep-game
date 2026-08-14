@@ -75,16 +75,28 @@ export interface BoardItemState {
 /** Per-board-dragon care. `day`/`trustDay` are `dayIndexAt` stamps, so both
  *  daily allowances reset on the virtual clock like every other timer. */
 export interface DragonCare {
-  /** Day stamp the meal/green tallies below belong to. */
+  /**
+   * CYCLE stamp the meal/green tallies below belong to (`cycleIndexAt`, the
+   * 10-minute feed window). The field kept its old name when hunger moved from
+   * the 32-minute day onto the cycle: an old save's day stamp simply never
+   * matches a cycle index, so its stale tallies reset once on load — exactly
+   * what a rollover does anyway.
+   */
   day: number;
-  /** Servings eaten today, taste-weighted (MEALS_PER_DAY fills the day). */
+  /** Servings eaten this cycle, taste-weighted (MEALS_PER_DAY fills the gauge). */
   meals: number;
-  /** Cooling servings eaten today (DAILY_GREEN is the day's need). */
+  /** Cooling servings eaten this cycle (DAILY_GREEN is the cycle's need). */
   green: number;
-  /** 0..TRUST_MAX. Earned by feeding, at most once a day, and never decays. */
+  /** 0..TRUST_MAX. Earned by feeding, at most once a DAY (`dayIndexAt` — a
+   *  relationship is not an appetite), and never decays. */
   trust: number;
   /** Day stamp of the last trust gain — the once-a-day latch. */
   trustDay: number;
+  /** Lifetime count of WELL-FED cycles — cycles whose gauge reached full
+   *  (MEALS_PER_DAY). The Codex's number, and the evolution condition's coin. */
+  wellFedCycles?: number;
+  /** Cycle stamp of the last well-fed credit — the once-per-cycle latch. */
+  wellFedCycle?: number;
 }
 
 export type RegionStatus = 'active' | 'unlockable' | 'locked';
@@ -328,7 +340,7 @@ export interface DialogueData {
    *  button (`shop:unlocked`). */
   tours: {
     roothold: { intro: string[]; house: string; sections: string[]; close: string; outro: string };
-    hatchery: { intro: string[]; cauldron: string; explain: string; close: string };
+    runevault: { intro: string[]; cauldron: string; explain: string; close: string };
   };
   /** The Elder's line when Order 1 completes AFTER Level 3 — the late awakening. */
   lateAwakening: string;
@@ -534,7 +546,7 @@ export interface TasksData {
 
 /** One brew: consume `inputs` out of the Bag, bank `output` into it. The
  *  cauldron trades in the Bag ONLY — it never touches a board, which is what
- *  lets it live in the hatchery hub and still spend goods gathered anywhere. */
+ *  lets it live in the runevault hub and still spend goods gathered anywhere. */
 export interface CauldronRecipeConfig {
   id: string;
   output: { chain: string; tier: number; count: number };
@@ -594,6 +606,16 @@ export type QuestGoal =
   | { kind: 'level'; level: number }
   | { kind: 'region'; regionId: string }
   | { kind: 'recipe'; chain: string; fromTier: number; toTier: number }
+  /**
+   * Brewed at Selyna's Cauldron, `count` times (`cauldron.json` recipe ids).
+   *
+   * A LIFETIME counter (`brew:<recipeId>` in `stats`), like `gift` and unlike
+   * `have`: brewing is a thing that happened, so spending the output cannot
+   * un-do the step and it never needs latching. The cauldron trades Bag→Bag,
+   * so this goal is world-agnostic by construction — but the audit still
+   * charges the step its recipe's inputs, in the world that asks.
+   */
+  | { kind: 'brew'; recipeId: string; count: number }
   | { kind: 'world'; worldId: string }
   | { kind: 'gift'; characterId: string; chain: string; tier: number; count: number }
   | { kind: 'regard'; characterId: string; hearts: number };
@@ -817,7 +839,11 @@ export interface MapData {
 export type TutorialGate =
   | { type: 'tap' }
   | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
-  | { type: 'count'; chain: string; tier: number; count: number };
+  | { type: 'count'; chain: string; tier: number; count: number }
+  /** A piece of `chain` CARRIED into `region` — the board-hygiene lesson. The
+   *  gate is the drop landing inside the named region's tiles, so a wiggle on
+   *  the spot cannot satisfy it. Requires `allow.drag` to include the chain. */
+  | { type: 'move'; chain: string; region: string };
 
 export interface TutorialAllow {
   /** Chain ids the player may drag ('*' = all). */
@@ -960,6 +986,35 @@ export interface AssetsManifest {
 export interface AnchorsData {
   default: [number, number];
   byKey: Record<string, [number, number]>;
+}
+
+/* ------------------------------------------------------------------ */
+/* The Dragon Codex (src/data/dragondex.json)                           */
+/* ------------------------------------------------------------------ */
+
+/** One breed's Codex entry — the lore card behind its face. */
+export interface DragondexEntry {
+  /** Breed display title (the named dragon's own name headlines the card). */
+  title: string;
+  /** Kept SHORT by design — one or two sentences; the card is a keepsake,
+   *  not a wiki. */
+  story: string;
+  personality: string;
+  ability: string;
+  /** The Evolution page. `reveal` is the ADULT's reveal-art texture key,
+   *  shown as a silhouette until the condition is met; `wellFedCycles`
+   *  mirrors WELL_FED_EVOLUTION (the data states the words, Constants the
+   *  number the systems enforce — a mismatch is caught by the unit test). */
+  evolution?: {
+    wellFedCycles: number;
+    into: string;
+    reveal: string;
+    condition: string;
+  };
+}
+
+export interface DragondexData {
+  dragons: Record<string, DragondexEntry>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1126,10 +1181,15 @@ export interface EventMap {
   /** The Emberkeep Cookbook panel opened/closed (tutorial gates + analytics). */
   'ui:cookbook_opened': { discovered: number };
   'ui:cookbook_closed': { discovered: number };
-  /** Intent: the cauldron decor in the hatchery hub was tapped. */
+  /** Intent: the cauldron decor in the runevault hub was tapped. */
   'ui:cauldron_tapped': Record<string, never>;
   /** The Cauldron panel opened/closed. */
   'ui:cauldron_toggled': { open: boolean };
+  /** The House's produce chooser opened/closed — guided beats (the merge-hint
+   *  gauntlet) must wait their turn rather than point THROUGH the panel. */
+  'ui:commission_toggled': { open: boolean };
+  /** The Dragon Codex opened/closed. */
+  'ui:codex_toggled': { open: boolean };
   /** Command: brew this recipe. CauldronSystem validates the Bag and owns the
    *  outcome — the panel only asks. */
   'cauldron:brew': { recipeId: string };
@@ -1138,6 +1198,11 @@ export interface EventMap {
   /** Fact: the brew was refused, and why — never silently. */
   'cauldron:brew_failed': { recipeId: string; reason: 'ingredients' | 'bag_full' };
   'ui:deliver_requested': { orderId: string };
+  /** Intent: the Ledger's Deliver pressed on a GIFT-ask card — hand the active
+   *  quest's gift pieces over straight off the board, no pocketing required.
+   *  RegardSystem owns it: it accepts each piece exactly as a bag give would
+   *  (counter, points, celebration) and only then consumes it from the board. */
+  'ui:gift_deliver_requested': { characterId: string; chain: string; tier: number };
   /** A gauge "+" button opened the currency shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' };
   /** Intent: a real-money pack's price plate was tapped in the Emporium.
@@ -1323,6 +1388,10 @@ export interface EventMap {
   /** It turned its head away — the chain is this breed's refusal, or it is not
    *  food at all. Nothing was consumed. */
   'dragon:refused': { itemId: number; chain: string; reason: 'dislike' | 'not_food' };
+  /** This cycle's gauge reached FULL — a well-fed cycle, credited once per
+   *  cycle into the lifetime count the Codex shows. `needed` is the breed's
+   *  evolution bar (WELL_FED_EVOLUTION), 0 when the breed has none. */
+  'dragon:well_fed': { itemId: number; chain: string; cycles: number; needed: number };
   /** Trust moved (at most once a day, +1, or +2 for a known favourite). */
   'dragon:trust_changed': { itemId: number; trust: number };
   /** Intent: open the naming prompt for the dragon standing on the board as
@@ -1378,7 +1447,13 @@ export interface EventMap {
   /** Nothing is waiting any more — delivered, refused off, or tapped away. */
   'bag:give_cancelled': Record<string, never>;
   'ui:gift_requested': { characterId: string; chain: string; tier: number };
-  /** She took it — a live `gift` subquest wanted exactly this. */
+  /** Command (RegardSystem → OrderSystem): a hand-to-hand give turned out to be
+   *  a DELIVERY in singles — the giver's own live order needs this piece. The
+   *  owning system banks it against that order (`orderGiveKey`) and completes
+   *  the order the moment every requirement is fully given. */
+  'order:give': { characterId: string; chain: string; tier: number };
+  /** She took it — a live `gift` subquest wanted exactly this, or (points: 0)
+   *  her own live ORDER did, and the piece was banked toward the delivery. */
   'regard:gift_accepted': { characterId: string; chain: string; tier: number; points: number };
   /** She did not: nothing on her list asks for it, or her hearts are already
    *  full. Nothing was consumed either way. */
@@ -1488,7 +1563,7 @@ export interface EventMap {
   'ui:emporium_requested': Record<string, never>;
   /** Tour pointer over a BOARD landmark. BoardScene resolves the target's own
    *  world position (only it knows them) and bounces an arrow there. */
-  'tour:point': { target: 'roothold_house' | 'hatchery_cauldron' };
+  'tour:point': { target: 'roothold_house' | 'runevault_cauldron' };
   'tour:unpoint': Record<string, never>;
   /** Fact: a world tour finished and its latch is set — a save point. */
   'tour:completed': { id: string };

@@ -1,4 +1,4 @@
-import { GOLDEN_ALTAR, HATCHERY_QUESTS_NEEDED } from '../core/Constants';
+import { GOLDEN_ALTAR, RUNEVAULT_QUESTS_NEEDED } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { WorldRuntime } from '../core/world';
@@ -50,13 +50,13 @@ export class WorldSystem {
    *              her hub opens the moment the game hands over);
    *   borealis — the Golden Elder awake (`q:done:keepers_hoard`, the same
    *              latch the altar derives her presence from);
-   *   hatchery — HATCHERY_QUESTS_NEEDED of Selyna's quests done, read off the
+   *   runevault — RUNEVAULT_QUESTS_NEEDED of Selyna's quests done, read off the
    *              per-world counter QuestSystem keeps (`q:world:borealis:done`).
    */
   private storyOpen(worldId: string): boolean {
     if (worldId === 'roothold') return this.state.completedOrderIds.includes('eleanor_brazier');
     if (worldId === 'borealis') return this.state.stat(`q:done:${GOLDEN_ALTAR.awakenQuestId}`) > 0;
-    if (worldId === 'hatchery') return this.state.stat('q:world:borealis:done') >= HATCHERY_QUESTS_NEEDED;
+    if (worldId === 'runevault') return this.state.stat('q:world:borealis:done') >= RUNEVAULT_QUESTS_NEEDED;
     return true;
   }
 

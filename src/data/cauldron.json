@@ -11,6 +11,70 @@
       "use": "A full meal for any dragon, and Eleanor never refuses one."
     },
     {
+      "id": "broken_strake",
+      "output": { "chain": "keel", "tier": 1, "count": 1 },
+      "inputs": [{ "chain": "driftwood", "tier": 2, "count": 1 }],
+      "flavor": "Boil a bound faggot until the salt lets go, and it comes out the shape a hull wants.",
+      "use": "The wrecks give up strakes far too slowly to build on."
+    },
+    {
+      "id": "frost_thread",
+      "output": { "chain": "frostsilk", "tier": 1, "count": 1 },
+      "inputs": [{ "chain": "rimebloom", "tier": 2, "count": 1 }],
+      "flavor": "A cluster of frost flowers, simmered until only the fibre is left.",
+      "use": "Thread without waiting on a full Rime Bloom to grow one."
+    },
+    {
+      "id": "pitch_cake",
+      "output": { "chain": "tarknot", "tier": 2, "count": 1 },
+      "inputs": [
+        { "chain": "tarknot", "tier": 1, "count": 2 },
+        { "chain": "driftwood", "tier": 1, "count": 2 }
+      ],
+      "flavor": "Two knots of tar and two spars of wood: the wood is what makes it burn slow.",
+      "use": "The north's fuel. Dragons eat it; boats are sealed with it."
+    },
+    {
+      "id": "oil_lamp",
+      "output": { "chain": "hearthlamp", "tier": 1, "count": 1 },
+      "inputs": [
+        { "chain": "tarknot", "tier": 2, "count": 1 },
+        { "chain": "emberdram", "tier": 1, "count": 2 }
+      ],
+      "flavor": "Pitch for the burning, spirit for the light, and a wick of anything to hand.",
+      "use": "Three make a Storm Lantern. Only a handful were ever left on the ice."
+    },
+    {
+      "id": "lodestone",
+      "output": { "chain": "wayfinder", "tier": 1, "count": 1 },
+      "inputs": [
+        { "chain": "manastone", "tier": 1, "count": 2 },
+        { "chain": "keel", "tier": 1, "count": 1 }
+      ],
+      "flavor": "Two mana pebbles quarrelling over one strake of wreck timber, until one of them wins and points.",
+      "use": "The road to a Wayfinder, which pays in coin forever."
+    },
+    {
+      "id": "spun_skein",
+      "output": { "chain": "frostsilk", "tier": 2, "count": 1 },
+      "inputs": [
+        { "chain": "frostsilk", "tier": 1, "count": 2 },
+        { "chain": "rimebloom", "tier": 2, "count": 1 }
+      ],
+      "flavor": "Two threads and a cluster to hold them apart while they set.",
+      "use": "Three make a Light-Fast Spindle — what Selyna's last order asks for."
+    },
+    {
+      "id": "rune_shard",
+      "output": { "chain": "runestone", "tier": 1, "count": 3 },
+      "inputs": [
+        { "chain": "manastone", "tier": 2, "count": 1 },
+        { "chain": "tarknot", "tier": 3, "count": 1 }
+      ],
+      "flavor": "A Black Ember burns hot enough to split a nodule clean, and clean is the whole art.",
+      "use": "Three shards begin a second Runestone — and a Runestone makes tar forever."
+    },
+    {
       "id": "treasure_chest",
       "output": { "chain": "chest", "tier": 1, "count": 1 },
       "inputs": [

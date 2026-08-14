@@ -38,54 +38,128 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 
 *Emberkeep. 🥚 marks a quest whose reward is a legendary egg (§6).*
 
-| # | Quest | Order | Chain | Subquests |
-| --- | --- | --- | --- | --- |
-| 1 | **Light the Brazier** | `eleanor_brazier` | gems T1 | Merge 10 times · Collect 6 Gem Shards · Deliver 6 Gem Shards to Eleanor |
-| 2 🥚 | **Raise the Roofs** | — | timber T3 | Build 2 Houses |
-| 3 | **Warm the Long Hearth** | `eleanor_hearth` | gems T2 | Make 2 Flame Gems · Deliver 2 Flame Gems to Eleanor |
-| 4 | **Catch the Moonwater** | `eleanor_moonwater` | moonwater | Make 1 Moonwater · Deliver 1 Moonwater to Eleanor |
-| 5 | **What She Keeps** | — | berries | Give Eleanor 2 Emberberry Baskets · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart — exactly what quests 1–4 have paid)* |
-| 6 🥚 | **Craft the Radiant Centerpiece** | `eleanor_centerpiece` | gems T3 | Make 1 Radiant Gem · Deliver 1 Radiant Gem to Eleanor |
-| 7 | **Fill the Larder** | — | berries T3 | Make 2 Emberberry Preserves |
-| 8 | **Fill the Keeper's Hoard** | `eleanor_hoard` | timber T4 | Merge 2 Houses into a Manor · Make 3 Radiant Gems · Deliver 3 Radiant Gems to Eleanor — **the FINALE quest** (`GOLDEN_ALTAR.awakenQuestId`) |
-| 9 | **The Keeper's Tasks** | — | mixed | the five `tasks.json` entries, by reference |
-| 10 | **Light the Long Gallery** | — | gems T2 | Make 4 Flame Gems |
-| 11 🥚 | **Raise the Ember Brood** | — | dragons T2 | Make 4 Red Eggs |
-| 12 | **Wake the Ashdrake** | — | — | Merge 3 Ashdrake Eggs into the Ashdrake |
-| 13 | *(the live order's title)* | the encore | — | Deliver 8 × Gem Shard to Eleanor |
+| # | Quest | Order | Chain | Tier | Subquests |
+| --- | --- | --- | --- | --- | --- |
+| 1 | **Light the Brazier** | `eleanor_brazier` | gems | **T1** | Merge 10 times · Collect 6 Gem Shards · Deliver 6 Gem Shards to Eleanor |
+| 2 🥚 | **Fill the Larder** | — | berries | T3 | Make 2 Emberberry Preserves |
+| 3 | **Warm the Long Hearth** | `eleanor_hearth` | gems | **T2** | Make 2 Flame Gems · Deliver 2 Flame Gems to Eleanor |
+| 4 | **Raise the Roofs** | — | timber | T3 | Build 2 Houses |
+| 5 | **Light the Long Gallery** | — | gems | **T2** | Make 4 Flame Gems |
+| 6 🥚 | **Catch the Moonwater** | `eleanor_moonwater` | moonwater | T3 | Make 1 Moonwater · Deliver 1 Moonwater to Eleanor |
+| 7 | **What She Keeps** | — | berries | **T2** | Give Eleanor 2 Emberberry Baskets · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart — long paid by here)* |
+| 8 | **Craft the Radiant Centerpiece** | `eleanor_centerpiece` | gems | T3 | Make 1 Radiant Gem · Deliver 1 Radiant Gem to Eleanor |
+| 9 | **Fill the Keeper's Hoard** | `eleanor_hoard` | timber | T4 | Merge 2 Houses into a Manor · Make 3 Radiant Gems · Deliver 3 Radiant Gems to Eleanor — **the FINALE quest** (`GOLDEN_ALTAR.awakenQuestId`) |
+| 10 🥚 | **The Keeper's Tasks** | — | mixed | — | the five `tasks.json` entries, by reference |
+| 11 | **Wake the Ashdrake** | — | — | — | Merge 3 Ashdrake Eggs into the Ashdrake |
+| 12 | *(the live order's title)* | the encore | — | — | Deliver 8 × Gem Shard to Eleanor |
 
-**The ladder ping-pongs between chains on purpose** (retuned on playtest — it
-used to open with FOUR gem quests in a row): no two consecutive quests work the
-same merge chain, the low tiers of each chain come before its high ones, and a
-chain rests for at least one quest before the ladder returns to it. The
-legendary eggs moved with the shuffle (they sit at completable indices 1 / 5 /
-10 — gaps of 3 and 4, last egg second-to-last, all still audit-enforced), and
-`orders.json`'s scripted sequence was reordered WITH the quests, because the
-Ledger serves scripted orders in file order and a quest must never wait on an
-order the Ledger has not surfaced yet.
+**No quest asks for a dragon any more.** "Raise the Ember Brood" (Make 4 Red
+Eggs) was cut: the red dragon is meant to be UNIQUE and the Dragon Ruby is
+leaving the merge board, so a quest asking for four of its eggs was asking the
+player to mass-produce the one thing the design wants rare. It was also the
+ladder's only `dragons` beat, which is why the order below is not simply the old
+one with a hole in it.
 
-Quest 5 is the tutorial's `moonwater_merge` promise kept: Eleanor tells the
+**The ladder ping-pongs on TWO axes, and both are load-bearing.**
+
+*By tier* — an easy low-tier ask, then a dear one, all the way down: **T1**, T3,
+**T2**, T3, **T2**, T3, **T2**, T3, T4. A player is never asked for two deep
+merges in a row, and the bold column is what they can clear in one sitting
+between the long ones. The one exception is the last pair, 8 → 9, and it is
+forced: with the brood quest cut there are four low-tier asks for five high ones,
+so exactly one doubling has to happen and the finale is where it belongs. This is why **Raise the Roofs sits at 4, not at 2** — two
+Houses is nine Plank Sets, and landing that on the quest right after the tutorial
+made the second thing the game ever asked for the heaviest thing it had asked so
+far. The low side climbs T1 → T2 across the chapter; the high side holds at T3
+until the finale takes T4.
+
+*By chain* — no two consecutive quests work the same merge chain, the low tiers
+of a chain come before its high ones, and a chain rests at least one quest before
+the ladder returns to it. (It used to open with FOUR gem quests in a row.)
+
+Two things follow the shuffle rather than surviving it. The legendary eggs sit at
+completable indices 1 / 5 / 9 — gaps of 3 and 3, last egg second-to-last, all
+audit-enforced (§6). And `orders.json`'s scripted sequence is kept in the order
+its quests consume it (brazier → hearth → moonwater → centerpiece → hoard),
+because the Ledger serves scripted orders in file order, two at a time, and a
+quest must never wait on an order the Ledger has not surfaced yet.
+
+One slot is not free to move: **quest 2 has to be a T3 the board can already
+make.** At Level 2 with three regions open, that is berries or timber and nothing
+else — the Dew Basin is behind a Level-3 fog, so Moonwater at slot 2 audits
+UNREACHABLE ("needs 3 × Dew Vial, and only 1 can ever exist"). Timber is spoken
+for at 4, which leaves the Larder. Anything cheaper there would break the
+alternation on its first step.
+
+Quest 6 is the tutorial's `moonwater_merge` promise kept: Eleanor tells the
 player "three vials make true Moonwater, and that is what I will ask you for",
 and this is the order that asks. Moonwater and quartz are `MAGE_ONLY` — no
 dragon eats any tier of either — so without this sink the chain and the Dew
 Basin that feeds it would be dead stock.
 
-*Borealis (`world: "borealis"`).*
+*Borealis (`world: "borealis"`). 🍲 marks a CAULDRON quest — brewed at Selyna's
+pot through the Rune Way, not merged on an island.*
 
 | # | Quest | Order | Subquests |
 | --- | --- | --- | --- |
 | 1 | **Make Camp on the Ice** | `selyna_signal` | Merge 3 Drift Spars into a Bound Faggot · Deliver 2 Bound Faggots to Selyna |
-| 2 🥚 | **Open the Wrack Coast** | — | Spend 1 Gold Key on the fog along the coast |
-| 3 | **Feed the Northern Dragons** | `selyna_pitch` | Build a Drift Stack from 9 Drift Spars · Make 3 Pitch Cakes · Deliver 3 Pitch Cakes to Selyna |
-| 4 | **Salvage the Wrecks** | `selyna_frames` | Make 2 Lashed Frames · Deliver 2 Lashed Frames to Selyna |
-| 5 | **Open Selyna's Keep** | — | Spend 2 Gold Keys on the fog around the keep |
-| 6 🥚 | **What She Will Take** | — | Give Selyna 2 Bound Faggots · Give Selyna 3 Frost Flowers |
-| 7 | **Turn Two Hulls** | — | Make 2 Upturned Hulls |
-| 8 | **Stock the Pitchworks** | — | Make 1 Black Ember |
-| 9 | **Raise a Longhall** | — | Merge 2 Lashed Frames into an Upturned Hull · Merge 2 Upturned Hulls into a Longhall — the two hulls from quest 7 are exactly what it merges |
-| 10 🥚 | **Spin the Light-Fast Spindles** | `selyna_spindle` | Earn a place at Selyna's fire · Grow a Rime Bloom · Make 2 Light-Fast Spindles · Deliver 2 to Selyna |
-| 11 | **Wake the Rimewyrm** | — | Merge 3 Rimewyrm Eggs into the Rimewyrm |
-| 12 | *(the live order's title)* | the encore | whatever her Ledger asks |
+| 2 | **Open the Wrack Coast** | — | Spend 1 Gold Key on the fog along the coast |
+| 3 🍲 | **Strakes from Spars** | — | Brew 4 Broken Strakes |
+| 4 | **Feed the Northern Dragons** | `selyna_pitch` | Build a Drift Stack from 9 Drift Spars · Make 3 Pitch Cakes · Deliver 3 Pitch Cakes to Selyna |
+| 5 🍲 | **Thread from the Frost** | — | Brew 4 Frost Threads |
+| 6 | **Salvage the Wrecks** | `selyna_frames` | Make 2 Lashed Frames · Deliver 2 Lashed Frames to Selyna |
+| 7 🍲 | **Boil the Pitch** | — | Brew 3 Pitch Cakes |
+| 8 🥚 | **Open Selyna's Keep** | — | Spend 2 Gold Keys on the fog around the keep |
+| 9 🍲 | **Light for the Long Dark** | — | Brew 3 Oil Lamps |
+| 10 | **What She Will Take** | — | Give Selyna 2 Bound Faggots · Give Selyna 3 Frost Flowers |
+| 11 🍲 | **Something That Points** | — | Brew 3 Lodestones |
+| 12 🥚 | **Turn Two Hulls** | — | Make 2 Upturned Hulls |
+| 13 🍲 | **Spin It Fine** | — | Brew 3 Spun Skeins |
+| 14 | **Stock the Pitchworks** | — | Make 1 Black Ember |
+| 15 🍲 | **Split the Nodule** | — | Fire a Black Ember into shards |
+| 16 | **Raise a Longhall** | — | Merge 2 Lashed Frames into an Upturned Hull · Merge 2 Upturned Hulls into a Longhall — the two hulls from quest 12 are exactly what it merges |
+| 17 🥚 | **Spin the Light-Fast Spindles** | `selyna_spindle` | Earn a place at Selyna's fire · Grow a Rime Bloom · Make 2 Light-Fast Spindles · Deliver 2 to Selyna |
+| 18 | **Wake the Rimewyrm** | — | Merge 3 Rimewyrm Eggs into the Rimewyrm |
+| 19 | *(the live order's title)* | the encore | whatever her Ledger asks |
+
+**The north ping-pongs between its two KINDS of work, where Emberkeep ping-pongs
+between tiers.** Its islands are small and its chains are short, so a tier
+rhythm runs out of low-tier asks by quest 6 (§2's problem, restated). What the
+north has instead is a second verb: the pot. From quest 3 to quest 16 the ladder
+alternates **M C M C M C M C M C M C M M** — never two brews back to back (a
+second trip through the Rune Way with nothing merged between them is the thing
+this rhythm exists to prevent), and exactly one merge double at the end, because
+the legendary arc puts the last egg on the second-to-last quest.
+
+**The first brew lands at quest 3 of 18 — 17% of the way down.** That number is
+authored, not incidental: `RUNEVAULT_QUESTS_NEEDED = 2` opens the Rune Way on
+quest 2's completion, one quest before the ladder first asks for a brew, and
+`QuestAvailability.spec` fails the build if the two ever drift apart or if the
+first brew leaves the 15–20% window.
+
+**Every northern recipe converts an ABUNDANCE into a SCARCITY, which is the one
+thing a merge board cannot do** — merges only ever climb one chain. That is what
+each of the seven quests is for:
+
+| # | Brews | Out of | Because |
+| --- | --- | --- | --- |
+| 3 | Broken Strake | 1 Bound Faggot | Strakes trickle from the Wrack Line one per three yields; the whole keel chain waits on them |
+| 5 | Frost Thread | 1 Rime Cluster | Thread otherwise needs a full-grown Rime Bloom first |
+| 7 | Pitch Cake | 2 Tar Knots + 2 Drift Spars | The north's fuel, and the wood is what makes it burn slow |
+| 9 | Oil Lamp | 1 Pitch Cake + 2 Dram Vials | Only five lamps were ever seeded; the Hearthlamp is a tappable generator |
+| 11 | Lodestone | 2 Mana Pebbles + 1 Broken Strake | Same for the Wayfinder, which pays coin forever once built |
+| 13 | Spun Skein | 2 Frost Threads + 1 Rime Cluster | Feeds quest 17's two Light-Fast Spindles directly |
+| 15 | Rune Shard ×3 | 1 Mana Nodule + 1 Black Ember | A SECOND Runestone, i.e. a second tar generator — and it spends the Black Ember quest 14 just taught |
+
+Two rules hold this together, both enforced. **A brew is charged its
+ingredients**, `count` times over, in the world that asks (`questStepNeeds`), so
+`pnpm quests` proves a northern brew the same way it proves a merge. And
+**no northern recipe reaches south**: the cauldron trades Bag→Bag and the Bag
+crosses worlds, so a recipe *could* ask for Gem Shards — and then the quest would
+send the player back through a portal mid-step with no word of it on screen.
+`chainHiddenIn` is asserted over every quest-brewed input for that reason. (The
+seven southern recipes — Hearth Cake, the eggs, the Golden Egg — are untouched
+and remain free-play brewing, driven by no quest.)
 
 **The Borealis fog lifts south → north, on keys alone.** Shore (open, cy≈1509
 world px) → coast (1 key, cy≈884) → keep (2 keys, cy≈652): each cloud is the
@@ -168,14 +242,15 @@ claims to measure. `TaskKind` counters, `completedOrderIds`, `countItems`,
 | Kind | Finished when | Notes |
 | --- | --- | --- |
 | `have` | that many of a chain+tier are on the board | **Non-monotonic** — delivering consumes them, so a met `have` is LATCHED |
-| `order` | that order is DELIVERED | Its counters show the goods (`6 / 6 — go and deliver`), but holding them is not finishing |
+| `order` | that order is DELIVERED | Its counters show the goods (`6 / 6 — go and deliver`), but holding them is not finishing. Deliver and Give are interchangeable: a piece GIVEN hand to hand that the order needs is banked toward it (board + bank is one tally), and giving everything completes the order by itself |
 | `active_order` | never | The endless tail: a live readout of the Ledger |
 | `stat` | a lifetime counter reaches the target | The same counters TaskSystem owns |
 | `task` | mirrors one Keeper's Task by id | Label, target and lock come from `tasks.json` — **one definition, two readouts** |
 | `level` / `region` / `recipe` | Keeper level · fog lifted · Cookbook page | |
 | `world` | the player has STOOD there | Latched on arrival, so coming home never re-opens the crossing |
-| `gift` | that many of a piece GIVEN to a person | A **lifetime** counter (`gift:<who>:<chain>:<tier>`), so it never needs latching. **Consumed** — the audit counts it as a need |
+| `gift` | that many of a piece GIVEN to a person | A **lifetime** counter (`gift:<who>:<chain>:<tier>`), so it never needs latching. **Consumed** — the audit counts it as a need. Works in the Deliver grammar too: the active quest's live gift step appears in the Ledger as a card whose Deliver button hands the pieces over straight off the board, per-piece Regard included |
 | `regard` | that person's hearts reach N | The only goal that reads a relationship. See §3.1 |
+| `brew` | that recipe has been brewed N times | A **lifetime** counter (`brew:<recipeId>`), for the same reason `gift` is one: the output is meant to be SPENT, and a step that un-finished when the player used what they brewed would be a trap. **Consumed** — the audit charges the step its recipe's inputs, `count` times over |
 
 **The latch adds no save field.** It lives in `GameState.stats` as `q:<stepId>`,
 which is already persisted — so the whole ladder shipped without a
@@ -291,7 +366,7 @@ whether or not anyone remembers this command.
 
 ### The finale no longer depends on how much the player merges
 
-`expects.levelAtEnd: 3` on quest 3 used to warn:
+`expects.levelAtEnd: 3` on the Centerpiece (quest 6) used to warn:
 
 > *the scripted floor is Level 2 at 193 XP — the beat depends on 27 XP of
 > free-play merging landing before the last delivery.*
@@ -461,7 +536,7 @@ The rule lives in `Constants.ts` (`LEGENDARY_EGG_COUNT`) and is enforced by
    up, because a producer behind a fog the audit never lifts is invisible to
    the solver and perfectly real in play.
    **The one sanctioned exception is Selyna's Cauldron** (`src/data/cauldron.json`,
-   the pot in the hatchery hub): a deliberate late-game faucet that BREWS eggs
+   the pot in the Runevault hub): a deliberate late-game faucet that BREWS eggs
    out of the Bag, priced in renewable tier-3 goods so a legendary egg is a
    session-scale project rather than a drop. It trades Bag→Bag only — it can
    never place a piece on a board — which is why it lives outside the audit's
@@ -477,16 +552,23 @@ The rule lives in `Constants.ts` (`LEGENDARY_EGG_COUNT`) and is enforced by
    the eggs out over a zone instead of handing over a dragon.
 
 Consequence, stated out loud because it decides ladder length: a zone needs
-**11 completable quests** before it can hold an arc (`1 + 2×(gap+1) + 1`). A
+**10 completable quests** before it can hold an arc (`1 + 2×(gap+1) + 1`). A
 shorter ladder is not "mostly compliant" — it is a zone that cannot have a
 dragon, and the audit says so in those words.
 
 | | Emberkeep — **Ashdrake** | Borealis — **Rimewyrm** |
 | --- | --- | --- |
-| Egg 1 | 2. Warm the Long Hearth | 2. Open Selyna's Keep |
-| Egg 2 | 6. Raise the Roofs | 6. What She Will Take |
-| Egg 3 | 10. Raise the Ember Brood | 10. Spin the Light-Fast Spindles |
-| Hatch | 11. Wake the Ashdrake | 11. Wake the Rimewyrm |
+| Egg 1 | 2. Fill the Larder | 8. Open Selyna's Keep |
+| Egg 2 | 6. Catch the Moonwater | 12. Turn Two Hulls |
+| Egg 3 | 10. The Keeper's Tasks | 17. Spin the Light-Fast Spindles |
+| Hatch | 11. Wake the Ashdrake | 18. Wake the Rimewyrm |
+
+The Emberkeep column is chosen by INDEX, not by quest identity, so it has moved
+twice: once when the ladder was re-rhythmed by tier, and again when the brood
+quest was cut. With eleven completable quests and the last egg pinned to the
+second-to-last, the only legal triples are (1,5,9), (1,6,9) and (2,6,9) 0-based —
+and the opener is spoken for (its ORDER already teases the Golden Egg), which
+leaves exactly one: the Larder, the Moonwater and the Keeper's Tasks.
 
 Both dragons come out **FINITE 1** in the audit, which is the correct and
 intended verdict: exactly one can ever exist per zone. That is also why a quest

@@ -1,8 +1,9 @@
 import { questStepNeeds } from '../core/availability';
-import { giftKey, heartsForPoints, regardKey, SPEAKER_NAMES, WORLD_ID } from '../core/Constants';
+import { brewKey, giftKey, heartsForPoints, regardKey, SPEAKER_NAMES, WORLD_ID } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type {
+  CauldronData,
   ChainsData,
   OrderConfig,
   OrderRequirement,
@@ -120,6 +121,7 @@ export class QuestSystem {
     private bus: EventBus,
     private quests: QuestsData,
     private chains: ChainsData,
+    private cauldron: CauldronData,
     private orders: OrderSystem,
     private tasks: TaskSystem
   ) {
@@ -292,7 +294,13 @@ export class QuestSystem {
    * actually asks for.
    */
   needsFor(step: QuestStepConfig): OrderRequirement[] {
-    return questStepNeeds(step, this.orders.scripted, this.orders.encorePool, this.tasks.tasks);
+    return questStepNeeds(
+      step,
+      this.orders.scripted,
+      this.orders.encorePool,
+      this.tasks.tasks,
+      this.cauldron.recipes
+    );
   }
 
   // ------------------------------------------------------------- evaluation
@@ -313,7 +321,7 @@ export class QuestSystem {
       if (this.isComplete(quest) && this.state.stat(doneKey) === 0) {
         this.state.addStat(doneKey, 1);
         // The per-world completion counter WorldSystem's Rune Way gate reads
-        // (`q:world:borealis:done` >= HATCHERY_QUESTS_NEEDED). A counter, not
+        // (`q:world:borealis:done` >= RUNEVAULT_QUESTS_NEEDED). A counter, not
         // an id list, so renaming a quest can never silently re-lock a door.
         this.state.addStat(`q:world:${quest.world ?? 'emberkeep'}:done`, 1);
         // Paid on the LATCH flipping, not on `announce`. A save resumed past
@@ -414,6 +422,14 @@ export class QuestSystem {
         const key = `${goal.chain}:${goal.fromTier}>${goal.toTier}`;
         return { have: this.state.discoveredRecipes.includes(key) ? 1 : 0, need: 1 };
       }
+      case 'brew':
+        // Counts BREWS, not the pieces they made — the output is meant to be
+        // spent, and a step that un-finished when the player used what they
+        // brewed would be a trap.
+        return {
+          have: Math.min(this.state.stat(brewKey(goal.recipeId)), goal.count),
+          need: goal.count
+        };
       case 'world':
         // Standing there IS the goal. It latches on arrival, so coming home
         // never re-opens the crossing.
@@ -479,6 +495,13 @@ export class QuestSystem {
         return 'Clear the ash';
       case 'recipe':
         return `Discover ${this.pieceName(goal.chain, goal.toTier)}`;
+      case 'brew': {
+        // Named by what comes OUT, because that is the word on the pot's card —
+        // the recipe id is an authoring handle and never reaches the HUD.
+        const output = this.cauldron.recipes.find((r) => r.id === goal.recipeId)?.output;
+        const what = output ? this.pieceName(output.chain, output.tier) : goal.recipeId;
+        return `Brew ${goal.count} × ${what}`;
+      }
       case 'world':
         return 'Travel to the next world';
       case 'gift':

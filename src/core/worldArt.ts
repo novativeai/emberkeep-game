@@ -32,12 +32,20 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
     // DRAGON clip sets are absent by construction — they ride the boot preload.
     for (const clipId of Object.keys(clipsFor(art))) keys.push(clipKey(art, clipId));
   }
-  // The map's own decor (the Hatchery cauldron, and whatever a world stands
+  // The map's own decor (the Runevault cauldron, and whatever a world stands
   // up next). Boot only preloads the ACTIVE map's decor, so a travelling
   // player fetches the destination's at the door — and hands it back when
   // they leave, exactly like the backdrop.
   const map = world?.map;
-  for (const d of map?.mapDecor ?? []) keys.push(`decor_${d.name}`);
+  for (const d of map?.mapDecor ?? []) {
+    keys.push(`decor_${d.name}`);
+    // A decor piece can carry Align-Studio clips exactly like a character — the
+    // cauldron's boil loop lives under the character id of the SAME name.
+    // Listed here for the same reason the backdrop is: a frame sheet is stored
+    // DECODED (the boil is 3000×4088), so travel must hand the departing
+    // world's back or leaving a hub only ever adds.
+    for (const clipId of Object.keys(clipsFor(d.name))) keys.push(clipKey(d.name, clipId));
+  }
   for (const d of map?.decor3d ?? []) keys.push(`decor_${d.name}`);
   for (const d of map?.startingDecor ?? []) keys.push(`decor_${d.decor}`);
   for (const r of map?.regions ?? []) for (const d of r.decor ?? []) keys.push(`decor_${d.decor}`);

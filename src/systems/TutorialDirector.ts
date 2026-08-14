@@ -113,6 +113,17 @@ export class TutorialDirector {
     bus.on('ui:cookbook_closed', () => this.onGateEvent('ui:cookbook_closed'));
     bus.on('item:spawned', () => this.checkCountGate());
     bus.on('item:removed', () => this.checkCountGate());
+    // The board-hygiene lesson: a piece CARRIED into a region. Gated on the
+    // drop landing inside the named region's tiles, so a wiggle on the spot
+    // cannot satisfy it.
+    bus.on('item:moved', ({ itemId, to }) => {
+      const step = this.currentStep;
+      if (!step || step.gate.type !== 'move') return;
+      if (this.state.items.get(itemId)?.chain !== step.gate.chain) return;
+      const region = this.state.map.regions.find((r) => r.id === (step.gate as { region: string }).region);
+      if (!region?.tiles.some(([c, r]) => c === to.col && r === to.row)) return;
+      this.advance();
+    });
     bus.on('tutorial:advance_requested', ({ stepId }) => {
       const step = this.currentStep;
       if (step && step.id === stepId && step.gate.type === 'tap') {

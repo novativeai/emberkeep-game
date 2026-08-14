@@ -249,7 +249,7 @@ function zoneOf(grid, block) {
 /**
  * A world whose ground came from the PAINTING rather than the map editor.
  *
- * Hatchery has no editor grid — only its backdrop — so `scripts/fit-deck-grid.py`
+ * Runevault has no editor grid — only its backdrop — so `scripts/fit-deck-grid.py`
  * measures the flagstone lattice out of the art itself and writes
  * `assets/map/<name>-deck.json` in backdrop px. This turns one of its islands
  * into a runtime zone, through the very same `artToWorld` the editor worlds go
@@ -512,8 +512,8 @@ function seedRegion(cells, seeds, taken, layout) {
  *   Emberkeep ─ the North Crossing (ice)    → Borealis   opens: the Elder wakes
  *   Roothold  ─ the Vine Arch (flame)       → Emberkeep  always
  *   Borealis  ─ the Ash Road (flame)        → Emberkeep  always
- *   Borealis  ─ the Rune Way (ice)          → Hatchery   opens: 3 Selyna quests
- *   Hatchery  ─ the Rune Circle (ice)       → Borealis   always
+ *   Borealis  ─ the Rune Way (ice)          → Runevault  opens: 2 Selyna quests
+ *   Runevault ─ the Rune Circle (ice)       → Borealis   always
  *
  * The North Crossing stands beside the Golden Altar because the Elder IS its
  * key — Eleanor speaks it open right after the finale. The Ash Road hovers by
@@ -537,14 +537,15 @@ const PORTALS = {
     // the first nine tiles the player owns in the north.
     { id: 'borealis_shore_gate', to: 'emberkeep', label: 'The Ash Road', art: [1440, 1150, 150, 210] },
     // Over the circular inlay at the top-left of the mainland deck.
-    { id: 'borealis_rune_gate', to: 'hatchery', label: 'The Rune Way', art: [365, 235, 175, 205] }
+    { id: 'borealis_rune_gate', to: 'runevault', label: 'The Rune Way', art: [365, 235, 175, 205] }
   ],
-  hatchery: [
-    // The gold rune circle inlaid in the middle of the deck. It sits ON playable
-    // ground, which is exactly right and costs nothing: a portal is the lowest
-    // interactive band on the board, so a piece standing on the circle takes the
-    // tap and only bare stone travels.
-    { id: 'hatchery_circle', to: 'borealis', label: 'The Rune Circle', art: [1335, 605, 415, 275] }
+  runevault: [
+    // The astral rune inlaid flush in the deck — measured off the painting at
+    // centre (727, 613), outer ring 630 × 380. It sits ON playable ground,
+    // which is exactly right and costs nothing: a portal is the lowest
+    // interactive band on the board, so the cauldron standing on the same rune
+    // takes the tap inside its own art and only bare stone travels.
+    { id: 'runevault_circle', to: 'borealis', label: 'The Rune Circle', art: [412, 423, 630, 380] }
   ]
 };
 
@@ -562,12 +563,20 @@ const PORTALS = {
  * sit at the contact ellipse's vertical centre, the front foot at its bottom).
  */
 const DECOR = {
-  hatchery: [
+  runevault: [
     {
       name: 'pink_cauldron',
-      at: [1542.5, 742.5], // the gold rune circle's centre
-      anchor: { x: 0.5, y: 0.845 },
-      scale: 1
+      // The astral rune's dead centre, measured on runevault.webp: the
+      // innermost bullseye spans x 680–775, y 589–637. (The session that
+      // re-cut the art measured 700, 614 on its own copy — same point, two
+      // gold-mask thresholds.)
+      at: [727, 613],
+      // Toe tips, not belly span: the lid drags a belly measurement ~0.12 right.
+      anchor: { x: 0.543, y: 0.889 },
+      // A MONUMENT, not a pot. 822 art px × 1.148 / 2 = 472 backdrop px, which
+      // puts the widest span at 72% of the rune's 630px outer ring — the
+      // proportion the art was re-cut to at Runevault's own ~40° camera.
+      scale: 1.148
     }
   ]
 };
@@ -642,19 +651,19 @@ const WORLDS = [
     regionPrefix: 'roothold'
   },
   {
-    id: 'hatchery',
-    name: 'Hatchery',
+    id: 'runevault',
+    name: 'Runevault',
     // Borealis's hub, so it opens with Borealis: a hub the player cannot reach
     // from the sanctuary it serves is a shop with the lights off.
     level: 3,
     // No editor grid exists for this world — its ground is MEASURED out of the
     // backdrop by scripts/fit-deck-grid.py. See `deckZone`.
-    deck: 'hatchery',
-    backdrop: 'hatchery',
+    deck: 'runevault',
+    backdrop: 'runevault',
     extendsAuthoredMap: false,
     skipOnAuthoredIsle: false,
     levelOf: plainLevel,
-    regionPrefix: 'hatchery'
+    regionPrefix: 'runevault'
   }
 ];
 

@@ -2,6 +2,7 @@ import {
   ACCEPTED_RATE,
   ADULT_SERVINGS,
   BOOK_REVEAL_CHANCE,
+  cycleIndexAt,
   DAILY_GREEN,
   dayIndexAt,
   DRAGON_DIET,
@@ -13,7 +14,8 @@ import {
   NEST_POINTS_REQUIRED,
   TRUST_DIGS,
   TRUST_FORAGES,
-  TRUST_MAX
+  TRUST_MAX,
+  WELL_FED_EVOLUTION
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
@@ -405,16 +407,48 @@ export class DragonSystem {
     return undefined;
   }
 
-  /** This dragon's care record, rolled over to today. Read-only: it returns a
-   *  fresh record for an item that has never been fed rather than writing one,
-   *  so merely LOOKING at a dragon never dirties the save. */
+  /** This dragon's care record, rolled over to the current CYCLE (`care.day`
+   *  holds the cycle stamp — see DragonCare). Read-only: it returns a fresh
+   *  record for an item that has never been fed rather than writing one, so
+   *  merely LOOKING at a dragon never dirties the save. The rollover is what
+   *  "after a cycle the hunger comes back to 0" IS — no reset job, the stale
+   *  stamp simply stops matching. */
   careOf(itemId: number): DragonCare {
     const item = this.state.items.get(itemId);
     const care = item?.care;
-    const day = dayIndexAt(this.clock.now());
-    if (!care) return { day, meals: 0, green: 0, trust: 0, trustDay: -1 };
-    if (care.day === day) return care;
-    return { ...care, day, meals: 0, green: 0 };
+    const cycle = cycleIndexAt(this.clock.now());
+    if (!care) return { day: cycle, meals: 0, green: 0, trust: 0, trustDay: -1 };
+    if (care.day === cycle) return care;
+    return { ...care, day: cycle, meals: 0, green: 0 };
+  }
+
+  /** Lifetime count of this dragon's WELL-FED cycles — the Codex's number.
+   *  Searches every materialised board: the Codex is readable from the hubs,
+   *  where the dragon's own board is not the one underfoot. */
+  wellFedCyclesOf(itemId: number): number {
+    return this.findAnywhere(itemId)?.care?.wellFedCycles ?? 0;
+  }
+
+  /** Every NAMED dragon across all materialised boards, home world first — the
+   *  Codex roster. Chapter One holds exactly one, but the shape is a list. */
+  namedDragons(): Array<{ itemId: number; name: string; chain: string; tier: number }> {
+    const found: Array<{ itemId: number; name: string; chain: string; tier: number }> = [];
+    for (const worldId of this.state.worlds.keys()) {
+      for (const item of this.state.itemsIn(worldId)?.values() ?? []) {
+        if (item.dragonName) {
+          found.push({ itemId: item.id, name: item.dragonName, chain: item.chain, tier: item.tier });
+        }
+      }
+    }
+    return found;
+  }
+
+  private findAnywhere(itemId: number): BoardItemState | undefined {
+    for (const worldId of this.state.worlds.keys()) {
+      const item = this.state.itemsIn(worldId)?.get(itemId);
+      if (item) return item;
+    }
+    return undefined;
   }
 
   /** What today still owes this board dragon — the numbers the status readout
@@ -462,13 +496,27 @@ export class DragonSystem {
       return;
     }
 
-    // Roll the day over on the item itself — `careOf` only reports the rollover,
-    // it never writes, so this is the one place a new day is committed.
+    // Roll the cycle over on the item itself — `careOf` only reports the
+    // rollover, it never writes, so this is the one place a new cycle is
+    // committed.
     const care = { ...this.careOf(itemId) };
     const taste = tasteOf({ favourite: diet.favourite, dislike: diet.refuses }, chain);
     const rate = tasteRate(taste);
     if (axisOf(chain, tier) === 'green') care.green++;
     care.meals += (MEAL_VALUE[tier] ?? 0) * rate;
+
+    // A FULL gauge inside one cycle is a WELL-FED cycle, credited once — the
+    // Codex's lifetime count, and what the evolution condition is priced in.
+    // Latched on the cycle stamp, so topping the gauge up twice in one window
+    // cannot double-credit, and the credit lands the moment the bar fills
+    // rather than at some rollover bookkeeping later.
+    let wellFed = false;
+    const cycle = cycleIndexAt(this.clock.now());
+    if (care.meals >= MEALS_PER_DAY && care.wellFedCycle !== cycle) {
+      care.wellFedCycle = cycle;
+      care.wellFedCycles = (care.wellFedCycles ?? 0) + 1;
+      wellFed = true;
+    }
 
     const day = dayIndexAt(this.clock.now());
     let trustMoved = false;
@@ -487,6 +535,14 @@ export class DragonSystem {
       meals: care.meals,
       needs: MEALS_PER_DAY
     });
+    if (wellFed) {
+      this.bus.emit('dragon:well_fed', {
+        itemId,
+        chain: item.chain,
+        cycles: care.wellFedCycles ?? 0,
+        needed: WELL_FED_EVOLUTION[item.chain] ?? 0
+      });
+    }
     if (trustMoved) this.bus.emit('dragon:trust_changed', { itemId, trust: care.trust });
   }
 }

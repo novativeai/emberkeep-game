@@ -11,7 +11,7 @@ FIT DECK GRID — recover the playable lattice of a backdrop from the backdrop.
 WHY THIS EXISTS
 ---------------
 Emberkeep, Borealis and Roothold got their cells from the map editor, whose
-export (`assets/map/nionja-worlds.json`) carries a grid per island. Hatchery has
+export (`assets/map/nionja-worlds.json`) carries a grid per island. Runevault has
 no editor grid — only the painting. Hand-typing 223 cells against a render is
 both miserable and unverifiable, and would have to be redone the moment the art
 is regenerated at a different size.
@@ -35,7 +35,7 @@ The output is checkable by eye, which is the point of `--overlay`: it draws the
 fitted diamonds back onto the art, and a bad fit is obvious in one glance rather
 than as a subtly wrong board weeks later.
 
-    python3 scripts/fit-deck-grid.py hatchery --overlay /tmp/hatchery-fit.png
+    python3 scripts/fit-deck-grid.py runevault --overlay /tmp/runevault-fit.png
 """
 import argparse
 import json
@@ -48,7 +48,7 @@ from PIL import Image, ImageDraw, ImageFilter
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Deck stone against forest: pale enough, and never green-dominant. Both sides
-# of the pair matter — the shaded south-west corner of Hatchery's deck sits at
+# of the pair matter — the shaded south-west corner of Runevault's deck sits at
 # luminance ~80, and the sunlit canopy above it is brighter than that but wildly
 # green, so neither test alone separates them.
 #
@@ -65,7 +65,7 @@ MAX_GREEN = 4
 #: that background is bright and warm, so it passes both tests above and the
 #: fit spills off the north-east rim into open air. But it is also rendered out
 #: of focus, and the deck is not — every flagstone is ringed by a crisp groove.
-#: Measured on Hatchery: true deck cells run 22–55, the bokeh canopy 5–17.
+#: Measured on Runevault: true deck cells run 22–55, the bokeh canopy 5–17.
 #: Both 18 and 20 give the identical answer (238 deck + 8 outpost), and the
 #: plateau is what makes the number a measurement rather than a knob.
 MIN_SHARPNESS = 18
@@ -181,7 +181,7 @@ def islands(rgb, hp, base, u, v, reach):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("name", help="backdrop name, e.g. hatchery")
+    ap.add_argument("name", help="backdrop name, e.g. runevault")
     ap.add_argument(
         "--patch",
         default="520,1000,380,1420",

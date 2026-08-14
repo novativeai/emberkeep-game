@@ -40,9 +40,6 @@ SUBJECTS = {
     'borealis': ('assets/sprites/background/borealis.webp',
                  'An isometric fantasy game map: snow-covered floating islands with paved '
                  'diamond tile decks, under a night sky with aurora borealis.'),
-    'hatchery': ('assets/sprites/background/hatchery.webp',
-                 'An isometric fantasy game zone: a paved stone plateau with dragon egg '
-                 'nests and timber structures, in a sunlit forest clearing.'),
     'roothold': ('assets/sprites/background/roothold.webp',
                  'An isometric fantasy game zone: a paved stone plateau with a wooden '
                  'archive tower, inside the hollow trunk of a colossal tree.'),

@@ -1,4 +1,4 @@
-import { WORLD_ID } from '../core/Constants';
+import { orderGiveKey, WORLD_ID } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { OrderConfig, OrdersData } from '../core/types';
@@ -21,6 +21,7 @@ export class OrderSystem {
     private orders: OrdersData
   ) {
     bus.on('ui:deliver_requested', ({ orderId }) => this.deliver(orderId));
+    bus.on('order:give', ({ characterId, chain, tier }) => this.takeGive(characterId, chain, tier));
     bus.on('item:spawned', () => this.announceProgress());
     bus.on('item:merged', () => this.announceProgress());
     bus.on('item:produced', () => this.announceProgress());
@@ -114,15 +115,59 @@ export class OrderSystem {
     return out;
   }
 
+  /** Pieces already GIVEN (hand to hand) toward one requirement of `order`. */
+  private banked(order: OrderConfig, chain: string, tier: number): number {
+    return this.state.stat(orderGiveKey(order.id, chain, tier));
+  }
+
+  /** Progress counts the board AND what has been given hand-to-hand — the two
+   *  verbs pay into one tally, which is what makes them interchangeable. */
   progressFor(order: OrderConfig): { have: number[]; need: number[]; deliverable: boolean } {
     const have = order.requires.map((req) =>
-      Math.min(this.state.countItems(req.chain, req.tier), req.count)
+      Math.min(
+        this.state.countItems(req.chain, req.tier) + this.banked(order, req.chain, req.tier),
+        req.count
+      )
     );
     const need = order.requires.map((req) => req.count);
     const deliverable = order.requires.every(
       (req, i) => (have[i] ?? 0) >= req.count
     );
     return { have, need, deliverable };
+  }
+
+  /**
+   * The visible order of this giver that still needs `chain:tier` beyond what
+   * has already been given toward it — the read RegardSystem's give gesture
+   * asks before turning a gift into a delivery payment. Null = no such order,
+   * and the give falls through to a decline.
+   */
+  giveTarget(characterId: string, chain: string, tier: number): OrderConfig | null {
+    for (const order of this.activeOrders) {
+      if (order.giver !== characterId) continue;
+      const open = order.requires.some(
+        (req) =>
+          req.chain === chain && req.tier === tier && this.banked(order, chain, tier) < req.count
+      );
+      if (open) return order;
+    }
+    return null;
+  }
+
+  /**
+   * A give gesture paid one piece toward this giver's order (`order:give`).
+   * Bank it; the moment every requirement is FULLY given the order completes on
+   * the spot — handing over the last piece IS the delivery, no button needed.
+   */
+  private takeGive(characterId: string, chain: string, tier: number): void {
+    const order = this.giveTarget(characterId, chain, tier);
+    if (!order) return;
+    this.state.addStat(orderGiveKey(order.id, chain, tier), 1);
+    const fullyGiven = order.requires.every(
+      (req) => this.banked(order, req.chain, req.tier) >= req.count
+    );
+    if (fullyGiven) this.complete(order, []);
+    else this.announceProgress();
   }
 
   announceProgress(): void {
@@ -138,15 +183,30 @@ export class OrderSystem {
     const { deliverable } = this.progressFor(order);
     if (!deliverable) return;
 
+    // Only the REMAINDER comes off the board: whatever was already given hand
+    // to hand is banked and must not be collected twice.
     const consumeIds: number[] = [];
     for (const req of order.requires) {
+      const remaining = Math.max(0, req.count - this.banked(order, req.chain, req.tier));
       const matches = this.state
         .itemsMatching(req.chain, req.tier)
         .sort((a, b) => a.id - b.id)
-        .slice(0, req.count);
+        .slice(0, remaining);
       consumeIds.push(...matches.map((m) => m.id));
     }
-    this.bus.emit('board:consume_items', { itemIds: consumeIds, reason: 'delivered' });
+    this.complete(order, consumeIds);
+  }
+
+  /** Pay the order out — shared by the Deliver button and a fully-given order.
+   *  Clears the give bank so a repeatable's encore starts from zero. */
+  private complete(order: OrderConfig, consumeIds: number[]): void {
+    if (consumeIds.length) {
+      this.bus.emit('board:consume_items', { itemIds: consumeIds, reason: 'delivered' });
+    }
+    for (const req of order.requires) {
+      const banked = this.banked(order, req.chain, req.tier);
+      if (banked) this.state.addStat(orderGiveKey(order.id, req.chain, req.tier), -banked);
+    }
     this.bus.emit('economy:add', {
       coins: order.rewards.coins,
       keys: order.rewards.keys,

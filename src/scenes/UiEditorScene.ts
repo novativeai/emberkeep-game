@@ -46,7 +46,7 @@ export class UiEditorScene extends Phaser.Scene {
     const tooltip = new Tooltip(this, ctx.data.chains);
     tooltip.setDepth(55);
 
-    const ledger = new LedgerPanel(this, ctx.bus, ctx.systems.order, ctx.systems.tasks, ctx.state);
+    const ledger = new LedgerPanel(this, ctx.bus, ctx.systems.order, ctx.systems.tasks, ctx.state, ctx.systems.regard);
     ledger.setDepth(60);
 
     const shop = new ShopPanel(this, ctx.bus, ctx.state);

@@ -34,10 +34,19 @@ describe('RegardSystem — the five hearts', () => {
     expect(ctx.systems.regard.given('eleanor', 'emberberry', 2)).toBe(1);
     expect(ctx.systems.regard.points('eleanor')).toBe(REGARD_GIFT_POINTS);
 
-    // Nothing on her list asks for a Gem Shard, however useful it is.
+    // A Gem Shard is not on her gift list — but her own live ORDER (the
+    // brazier) asks for six, so the give is taken as a delivery in singles:
+    // the given-counter moves, and no Regard is paid (the Deliver button pays
+    // none either — the two verbs stay worth the same).
     ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'flame_gem', tier: 1 });
+    expect(declined).toHaveLength(0);
+    expect(ctx.systems.regard.given('eleanor', 'flame_gem', 1)).toBe(1);
+    expect(ctx.systems.regard.points('eleanor')).toBe(REGARD_GIFT_POINTS); // unchanged
+
+    // A Quartz Pebble is on NOBODY's list — no gift step, no live order.
+    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'quartz', tier: 1 });
     expect(declined.at(-1)).toMatchObject({ reason: 'not_wanted' });
-    expect(ctx.systems.regard.given('eleanor', 'flame_gem', 1)).toBe(0);
+    expect(ctx.systems.regard.given('eleanor', 'quartz', 1)).toBe(0);
   });
 
   it('stops wanting a piece once the subquest that asked for it is satisfied', () => {
@@ -117,7 +126,8 @@ describe('RegardSystem — the five hearts', () => {
     // to be finishable. What changes is the sentence she declines the REST with:
     // "I have everything I need from you" is a different refusal from "that
     // isn't what I asked for", and at five hearts it is the only true one.
-    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'flame_gem', tier: 1 });
+    // (Quartz: her orders never ask for it either, so it is a pure decline.)
+    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'quartz', tier: 1 });
     expect(declined.at(-1)).toMatchObject({ reason: 'complete' });
     ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
     expect(ctx.systems.regard.given('eleanor', 'emberberry', 2)).toBe(1);

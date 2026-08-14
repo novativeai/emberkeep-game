@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import charactersDoc from '../../src/data/characters.json';
+import { ZONES } from '../../src/core/world';
 import {
   CHARACTER_ANIMS,
   clipFor,
@@ -41,8 +42,19 @@ describe('character-anims.json', () => {
     const wardrobe = new Set(
       (charactersDoc as { characters: { id: string; art?: string }[] }).characters.map((c) => c.art ?? c.id)
     );
+    // A DECOR clip set is named after a map-decor piece rather than a person
+    // (Runevault's `cauldron`), so it is held to the same rule against a
+    // different roster — a clip under a name nothing on any map places is just
+    // as unshowable as one under a name nobody wears.
+    const props = new Set(
+      ZONES.worlds.flatMap((w) => (w.map.mapDecor ?? []).map((d) => d.name))
+    );
     for (const [id, c] of Object.entries(CHARACTER_ANIMS.characters)) {
       if (c.board) continue; // board dragons (redwhelp, redadult…), not world characters
+      if (Object.values(c.clips).every((clip) => clip.stage === 'decor')) {
+        expect(props.has(id), `${id} is not placed as map decor by any world`).toBe(true);
+        continue;
+      }
       expect(wardrobe.has(id), `${id} is not worn by anyone in characters.json`).toBe(true);
     }
   });

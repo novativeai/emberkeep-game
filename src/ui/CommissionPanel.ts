@@ -212,6 +212,9 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     this.setVisible(true);
     this.setAlpha(0);
     this.scene.tweens.add({ targets: this, alpha: 1, duration: TIMINGS.bubbleIn, ease: 'Sine.easeOut' });
+    // Announced so guided beats (the merge-hint gauntlet) can yield the stage
+    // while the chooser is up and take it back when it closes.
+    this.bus.emit('ui:commission_toggled', { open: true });
   }
 
   requestClose(): void {
@@ -219,6 +222,7 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     this.isOpen = false;
     this.forItemId = 0;
     this.closeChooser();
+    this.bus.emit('ui:commission_toggled', { open: false });
     this.scene.tweens.add({
       targets: this,
       alpha: 0,

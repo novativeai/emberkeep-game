@@ -26,6 +26,8 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | fog:tapped | BoardScene | UnlockSystem |
 | chest:open | BoardScene | ChestSystem, TutorialDirector (gate) |
 | ui:deliver_requested | LedgerPanel (per-card, TWO orders visible) | OrderSystem |
+| ui:gift_deliver_requested | LedgerPanel (the GIFT-ASK card — the active quest's give step worn as an order) | RegardSystem (accepts each piece as a bag give would, THEN consumes it from the board) |
+| order:give | RegardSystem (a give no gift step wants, but the giver's live order needs — decided via OrderSystem.giveTarget, read-only) | OrderSystem (banks it under `orderGiveKey`; a FULLY-given order completes on the spot) |
 | ui:sell_requested | Tooltip | EconomySystem (refuses `sellable:false` tiers — golden egg/Elder) |
 | ui:shop_requested | Hud (energy/coins only — keys are never sold) | UIScene |
 | elder:tapped | BoardScene (communing at the GOLDEN ALTAR — the scenic fixture at GOLDEN_ALTAR.cell (-2,2), NOT a board item; egg appears on order `cindra_brazier`, Elder awakens at L3, all derived from save state) | TaskSystem |
@@ -71,7 +73,7 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | energy:changed | EnergySystem, BoardSystem | Hud, Save |
 | economy:changed | EconomySystem, BoardSystem | Hud, AudioManager, Save |
 | keeper:leveled | EconomySystem | UnlockSystem (level regions lift), RewardSystem (Gold + refill + **chest from level 3**), BoardScene (camera fly to the opened region — skipped for perk-only levels and for the altar's level pre-awakening), UIScene (banner), AudioManager |
-| order:progress | OrderSystem (one per VISIBLE order — payload orderId matters) | Hud (dot = ANY deliverable), LedgerPanel |
+| order:progress | OrderSystem (one per VISIBLE order — payload orderId matters; `have` counts board + hand-given bank), RegardSystem (the active quest's gift asks under `gift:<stepId>` ids, incl. a final deliverable:false when an ask retires — the Hud dot has no other off-switch for them) | Hud (dot = ANY deliverable), LedgerPanel |
 | order:completed | OrderSystem | Hud, LedgerPanel, UIScene (celebration banner), AudioManager, TutorialDirector, TaskSystem, Save |
 | tasks:all_complete | TaskSystem (reward already paid) | UIScene (banner + Cindra line), LedgerPanel (Tasks-tab refresh) |
 | cookbook:discovered | MergeSystem (first merge of a chain:fromTier>resultTier; `state.discoveredRecipes`) | UIScene (cookbook-button dot + pulse), CookbookPanel (refresh while open) |
@@ -178,6 +180,32 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   discovers **13** recipes, and **27** rows are reachable by the time the
   checklist is asked. A target at or below 13 is a task that is already done.
 
+- **TOUCH map decor's `at`/`scale`/`anchor` in build-zones' `DECOR`, or a decor
+  clip → CHECK the prop against its PAINTING, not against the grid.** `at` is a
+  point on the backdrop; the cell is only the index that point falls in, which is
+  why the ground shadow is drawn under the SPRITE and not under the cell (they
+  are a nudge apart on the authored isle and most of a tile apart for Runevault's
+  cauldron). A decor piece's animation lives in `character-anims.json` under a
+  key equal to the DECOR NAME (`pink_cauldron`, not `cauldron`) with
+  `stage: 'decor'` — that key is what `clipsFor(d.name)` looks up in worldArt,
+  PreloadScene and `BoardScene.playDecorClip`, so a mismatched key costs the
+  motion silently and the still just stands there. `CharacterAnims.spec` holds
+  the key to the map-decor roster for that reason. The clip registers onto the
+  STILL (scale = still px per atlas px, dx/dy = the frame's top-left in still
+  px), so re-cutting the art means re-deriving all three.
+- **TOUCH a cauldron recipe's inputs, or a `brew` quest step → RUN `pnpm quests`
+  AND check `RUNEVAULT_QUESTS_NEEDED`.** Three couplings, none of them visible
+  from the recipe: (1) a brew step is CHARGED its recipe's inputs × `count` in
+  the world that asks, so widening a recipe can make a northern quest
+  UNREACHABLE — and a recipe reaching for another world's goods would send the
+  player back through a portal mid-step with no word of it on screen
+  (`chainHiddenIn` is asserted over every quest-brewed input). (2) The pot stands
+  through the Rune Way, whose gate counts FINISHED Selyna quests; it must clear
+  before the ladder's first brew quest, which is why the constant is 2 and the
+  first brew is quest 3. (3) The north's rhythm is merge/cauldron alternation
+  from that quest on — `QuestAvailability.spec` fails the build if two brews
+  land back to back, or if the first one leaves the 15–20% window. Free-play
+  recipes (the eggs, Hearth Cake) that no quest names carry none of this.
 - **TOUCH a `legendary` chain, a quest's `rewards.spawn`, or the ORDER of quests
   in quests.json → RUN `pnpm quests`.** The legendary egg arc is a directive
   (Constants §LEGENDARY_EGG_COUNT, docs/quest-ladder.md §6) enforced by
@@ -379,14 +407,18 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   never wakes a sleeper, and the harvest it decorates has ALREADY paid out.
 - **TOUCH `CHEST_GIFTS` → CHECK what the audit loses.** The chest is a permanent renewable
   SOURCE in `availability.ts`, so deleting a gift can strand a quest that had no other
-  supply: dropping the Emeralds is what made `the_emerald_brood` and the old `hatch_4`'s
+  supply: dropping the Emeralds is what made the old brood quest and `hatch_4`'s
   Green Dragon UNREACHABLE, and both had to be retargeted onto `ember_dragon`.
-  `hatch_4` is gone entirely now — see the counter-task rule below. The `anyItem`
+  Both are gone entirely now — `hatch_4` to the counter-task rule below, and
+  `the_emerald_brood` because dragons are RARE (the red one is meant to be
+  unique and the Dragon Ruby is leaving the merge board, so "Make 4 Red Eggs"
+  was asking for a thing the game no longer wants to exist four of). The `anyItem`
   wildcard is deliberately NOT counted as a source (it names no chain, so nothing can
   rely on it), and `chestWildcardChains` is the only thing standing between a random
   table and the Legendary Egg Directive — `pnpm quests` asserts the roster itself, not
-  just the written gift lines. `the_emerald_brood` KEEPS its id though its title and goal
-  are now the Ember Brood: a renamed quest id re-opens the quest in every existing save.
+  just the written gift lines. Deleting a quest id has the same save consequence a
+  RENAME does — its `q:done:` latch is orphaned and the per-world counter
+  `q:world:<id>:done` runs one short for anyone mid-chapter.
 - **TOUCH `generator.bonus` on the Fir Tree → CHECK** the loop closes. `firgrain_3` is
   now the ONLY tree the isle has: `bigtree_1` was removed from `level_2`'s contents
   because a free Ancient Tree made the fir loop the tutorial teaches pointless. The chain
@@ -409,6 +441,20 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   now `level_5`. Plot `(col-row, col+row)` before believing a region reads as one mass —
   a grid-order tile list gives no hint of it. Keep `src/data/world-map.json`
   (`startClearing` / `fogRegions[].cells`) in step, or the next ingest re-opens the hole.
+- **TOUCH the ORDER of `quests.json` → CHECK four things that are positional, not
+  written down in the quest.** (1) The legendary eggs are chosen by completable
+  INDEX — re-ordering re-chooses which quests must carry `rewards.spawn`, and
+  `auditLegendaryArc` fails on gaps outside 3–4 or a last egg that is not
+  second-to-last. (2) `orders.json`'s scripted list is served two at a time in
+  FILE order, so a quest must not sit ahead of the order it waits on; keep the
+  file in the order its quests consume it. (3) A moved quest is asked at a
+  different Level with fewer regions open — `pnpm quests` is the only thing that
+  knows whether its chain is reachable there (Moonwater at slot 2 is not).
+  (4) `what_she_keeps` and `north_terms` gate on hearts the earlier quests must
+  already have paid (see the Regard entry below). Unit tests pin the first two
+  ladder positions by id, so a reorder that breaks nothing still reddens
+  `QuestSystem.spec` / `OrderSystem.spec` — that is the reorder telling you it
+  moved something the game reads by position.
 - **TOUCH a `gift` step's chain/tier/count, or `REGARD_QUEST_POINTS`/
   `REGARD_POINTS_PER_HEART` → CHECK** `RegardSystem.spec`, which asserts BOTH that the
   gauge still fills in 15–20 quests and that no authored `regard` goal or
@@ -417,6 +463,15 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   a quest or a gift pays Regard, so the player cannot grind past it. Gift progress is a
   LIFETIME counter (`gift:<who>:<chain>:<tier>` in `stats`), so changing a step's chain or
   tier re-opens it for every existing save exactly the way renaming a step id does.
+- **TOUCH the deliver or give path → RULE** they are ONE verb in two grammars and must
+  stay interchangeable both ways: a bag GIVE of a piece the giver's live order needs is
+  banked toward that order (`order:give` → `orderGiveKey` stat; a fully-given order
+  completes on the spot, and `progressFor` counts board + bank so the Deliver button
+  lights either way), and the Ledger's Deliver works on a live GIFT step too (the
+  gift-ask card → `ui:gift_deliver_requested` → RegardSystem accepts per piece, then
+  consumes from the board). Order-gives pay NO Regard (points 0 — the button pays none
+  either); gift-step delivers pay full per-piece Regard (a bag give would). The bank is
+  cleared on completion so a repeatable's encore starts from zero.
 - **TOUCH which pieces a person is asked for → RULE** the `gift` subquest is the ONLY
   want-list. `RegardSystem.wants()` derives it from the live ladder; do not add a second
   table in `characters.json` or the two will disagree about what she will take.

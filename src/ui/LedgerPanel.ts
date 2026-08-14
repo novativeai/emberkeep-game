@@ -7,6 +7,7 @@ import { discTextureFor } from '../entities/PortraitAnimator';
 import type { GameState } from '../core/GameState';
 import type { OrderConfig } from '../core/types';
 import type { OrderSystem } from '../systems/OrderSystem';
+import type { GiftAsk, RegardSystem } from '../systems/RegardSystem';
 import type { TaskSystem } from '../systems/TaskSystem';
 import { uiRegistry } from './theme';
 
@@ -63,6 +64,9 @@ interface OrderCard {
   rewardCoin: Phaser.GameObjects.Image;
   deliverButton: Phaser.GameObjects.Container;
   order: OrderConfig | null;
+  /** When set, the card is a GIFT ASK — the active quest's give step wearing
+   *  the Ledger's clothes, so the Deliver button works on it too. */
+  gift: GiftAsk | null;
   deliverable: boolean;
 }
 
@@ -122,7 +126,10 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     private bus: EventBus,
     private orderSystem: OrderSystem,
     private taskSystem: TaskSystem,
-    private gameState: GameState
+    private gameState: GameState,
+    /** For the gift-ask card: the active quest's give step worn as an order,
+     *  so the Deliver button works on it too (reads only; the press emits). */
+    private regardSystem: RegardSystem
   ) {
     super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
     this.owner = scene;
@@ -356,6 +363,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       rewardCoin,
       deliverButton,
       order: null,
+      gift: null,
       deliverable: false
     };
     deliverBg.on('pointerup', () => this.onDeliverPressed(card));
@@ -480,9 +488,12 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.deliverAllowed = allowed;
   }
 
-  /** Deliver a card's order, or shake its button if it isn't ready. */
+  /** Deliver a card's order (or its gift ask), or shake if it isn't ready. */
   private onDeliverPressed(card: OrderCard): void {
-    if (card.deliverable && this.deliverAllowed && card.order) {
+    if (card.deliverable && this.deliverAllowed && card.gift) {
+      const { characterId, chain, tier } = card.gift;
+      this.bus.emit('ui:gift_deliver_requested', { characterId, chain, tier });
+    } else if (card.deliverable && this.deliverAllowed && card.order) {
       this.bus.emit('ui:deliver_requested', { orderId: card.order.id });
     } else if (!card.deliverable) {
       this.scene.tweens.add({
@@ -568,9 +579,18 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
 
   private refresh(): void {
     const orders = this.orderSystem.activeOrders;
-    this.emptyText.setVisible(orders.length === 0);
-    this.blurb.setVisible(orders.length > 0);
-    this.blurb.setText(orders[0] ? `”${orders[0].blurb}”` : '');
+    // The active quest's live GIFT step leads the card row, worn as an order —
+    // she is asking for it herself, so the book she keeps shows it with the
+    // same Deliver button everything else gets. An order the ask displaces
+    // returns the moment the step completes.
+    const slots: Array<{ order: OrderConfig | null; gift: GiftAsk | null }> = [
+      ...this.regardSystem.giftAsks().map((gift) => ({ order: null, gift })),
+      ...orders.map((order) => ({ order, gift: null as GiftAsk | null }))
+    ].slice(0, this.cards.length);
+    this.emptyText.setVisible(slots.length === 0);
+    this.blurb.setVisible(slots.length > 0);
+    const lead = slots[0];
+    this.blurb.setText(lead?.gift ? lead.gift.label : lead?.order ? `”${lead.order.blurb}”` : '');
 
     // The Ledger belongs to whoever keeps it HERE: Selyna's board in the north
     // wears her name and her face, Eleanor's at home wears hers. Derived from
@@ -582,20 +602,59 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     );
 
     this.cards.forEach((card, i) => {
-      const order = orders[i] ?? null;
+      const slot = slots[i] ?? null;
+      const order = slot?.order ?? null;
+      const gift = slot?.gift ?? null;
       card.order = order;
-      card.root.setVisible(order !== null);
-      if (!order) {
+      card.gift = gift;
+      card.root.setVisible(slot !== null);
+      if (!slot) {
         card.deliverable = false;
         return;
       }
-      this.setMedallionGiver(card, order.giver ?? host);
-      const requirement = order.requires[0];
-      if (!requirement) return;
-      const { have, deliverable } = this.orderSystem.progressFor(order);
+
+      let deliverable: boolean;
+      let slotKey: string;
+      if (gift) {
+        this.setMedallionGiver(card, gift.characterId);
+        deliverable = gift.deliverable;
+        card.title.setText(gift.label);
+        slotKey = `item_${gift.chain}_${gift.tier}`;
+        card.slotCount.setText(`${gift.onBoard}/${gift.remaining}`);
+        // A gift pays the heart, not the purse.
+        card.rewardText.setText('♥ Regard');
+        card.rewardCoin.setVisible(false);
+        card.rewardText.setX(0);
+      } else if (order) {
+        this.setMedallionGiver(card, order.giver ?? host);
+        const requirement = order.requires[0];
+        if (!requirement) return;
+        const progress = this.orderSystem.progressFor(order);
+        deliverable = progress.deliverable;
+        card.title.setText(order.title);
+        slotKey = `item_${requirement.chain}_${requirement.tier}`;
+        card.slotCount.setText(`${progress.have[0] ?? 0}/${requirement.count}`);
+        const parts: string[] = [];
+        if (order.rewards.coins) parts.push(`${order.rewards.coins}`);
+        if (order.rewards.xp) parts.push(`✦ ${order.rewards.xp} XP`);
+        if (order.rewards.spawn) parts.push('🎁 ???');
+        if (order.rewards.tease) parts.push(order.rewards.tease);
+        card.rewardText.setText(parts.join('   '));
+        // The Gold figure leads the line, so its coin hangs off the line's left
+        // edge — measured after setText, since the width moves with the rewards.
+        const paysGold = !!order.rewards.coins;
+        card.rewardCoin.setVisible(paysGold);
+        if (paysGold) {
+          const half = card.rewardText.width / 2;
+          card.rewardCoin.setX(-half - 24);
+          card.rewardText.setX(card.rewardCoin.displayWidth / 2 + 2);
+        } else {
+          card.rewardText.setX(0);
+        }
+      } else {
+        return;
+      }
       card.deliverable = deliverable;
-      card.title.setText(order.title);
-      const slotKey = `item_${requirement.chain}_${requirement.tier}`;
       // Contain-fit into the requirement SLOT, never the item's board scale:
       // board scale is tuned to a tile footprint, and doubling it put a
       // Radiant Gem at 230 units on a 144-unit slot — over the card's title.
@@ -603,24 +662,6 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       card.slotIcon.setScale(
         SLOT_ICON_FIT / Math.max(card.slotIcon.width, card.slotIcon.height)
       );
-      card.slotCount.setText(`${have[0] ?? 0}/${requirement.count}`);
-      const parts: string[] = [];
-      if (order.rewards.coins) parts.push(`${order.rewards.coins}`);
-      if (order.rewards.xp) parts.push(`✦ ${order.rewards.xp} XP`);
-      if (order.rewards.spawn) parts.push('🎁 ???');
-      if (order.rewards.tease) parts.push(order.rewards.tease);
-      card.rewardText.setText(parts.join('   '));
-      // The Gold figure leads the line, so its coin hangs off the line's left
-      // edge — measured after setText, since the width moves with the rewards.
-      const paysGold = !!order.rewards.coins;
-      card.rewardCoin.setVisible(paysGold);
-      if (paysGold) {
-        const half = card.rewardText.width / 2;
-        card.rewardCoin.setX(-half - 24);
-        card.rewardText.setX(card.rewardCoin.displayWidth / 2 + 2);
-      } else {
-        card.rewardText.setX(0);
-      }
       card.slotIcon.setAlpha(deliverable ? 1 : 0.75);
       card.deliverButton.setAlpha(deliverable ? 1 : 0.55);
     });

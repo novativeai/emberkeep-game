@@ -521,6 +521,24 @@
         }
       },
       "board": "golden_egg:2"
+    },
+    "pink_cauldron": {
+      "clips": {
+        "boil": {
+          "file": "sprites/anims/cauldron/boil.webp",
+          "frames": 59,
+          "frameWidth": 375,
+          "frameHeight": 511,
+          "fps": 12,
+          "loop": true,
+          "scale": 2.15903,
+          "dx": 6.68,
+          "dy": -107.75,
+          "srcFrameWidth": 375,
+          "srcFrameHeight": 511,
+          "stage": "decor"
+        }
+      }
     }
   }
 }

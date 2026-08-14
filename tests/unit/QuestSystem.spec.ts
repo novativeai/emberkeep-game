@@ -77,20 +77,22 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
     });
 
     expect(completed.map((q) => q.questId)).toContain('rekindle_brazier');
-    expect(ctx.systems.quests.activeQuest!.id).toBe('raise_the_roofs');
+    expect(ctx.systems.quests.activeQuest!.id).toBe('fill_the_larder');
   });
 
   it('skips a quest the player satisfied out of order (the Ledger shows two at once)', () => {
     const ctx = createTestContext();
-    // Quest 4 (Catch the Moonwater) is finished before quest 3 (Warm the Long
-    // Hearth): its order was deliverable alongside the hearth's, both visible.
+    // Quest 2 (Fill the Larder) wants nothing from the Ledger, so a player
+    // stocking preserves while quest 1's delivery is outstanding finishes it
+    // early — and quest 8 (Catch the Moonwater) can be settled ahead of its
+    // turn too, because the Ledger shows two orders at once.
     ctx.state.completedOrderIds.push('eleanor_brazier', 'eleanor_moonwater');
     place(ctx, 'flame_gem', 1, 6);
+    place(ctx, 'emberberry', 3, 2);
     place(ctx, 'moonwater', 3, 1);
-    place(ctx, 'lumber', 3, 2); // quest 2 (Raise the Roofs) satisfied too
     merges(ctx, 10);
 
-    // Quest 4 is complete, so the ladder stops on quest 3 and will jump past it.
+    // Quest 2 is complete, so the ladder jumps it and stops on quest 3.
     expect(ctx.systems.quests.activeQuest!.id).toBe('warm_the_hearth');
     place(ctx, 'flame_gem', 2, 3);
     ctx.state.completedOrderIds.push('eleanor_hearth');
@@ -98,7 +100,7 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
       orderId: 'eleanor_hearth',
       rewards: { coins: 75, keys: 0, xp: 35 }
     });
-    expect(ctx.systems.quests.activeQuest!.id).toBe('what_she_keeps');
+    expect(ctx.systems.quests.activeQuest!.id).toBe('raise_the_roofs');
   });
 
   it("mirrors the Keeper's Tasks from tasks.json — one definition, two readouts", () => {
@@ -215,21 +217,21 @@ describe("two givers on one board — the Golden Elder's track", () => {
 });
 
 describe('quest rewards — the legendary egg arrives, once, and cannot be lost', () => {
-  /** Drive the first Emberkeep egg quest (`raise_the_roofs`) to completion:
-   *  its single step is holding 2 Houses. */
-  const finishRoofs = (ctx: ReturnType<typeof createTestContext>): void => {
+  /** Drive the first Emberkeep egg quest (`fill_the_larder`) to completion:
+   *  its single step is holding 2 Emberberry Preserves. */
+  const finishLarder = (ctx: ReturnType<typeof createTestContext>): void => {
     for (let i = 0; i < 2; i++) {
-      ctx.state.addItem({ chain: 'lumber', tier: 3, col: i, row: 0, kind: 'item' });
+      ctx.state.addItem({ chain: 'emberberry', tier: 3, col: i, row: 0, kind: 'item' });
     }
     ctx.bus.emit('item:spawned', {
-      item: { id: 0, chain: 'lumber', tier: 3, col: 0, row: 0, kind: 'item' },
+      item: { id: 0, chain: 'emberberry', tier: 3, col: 0, row: 0, kind: 'item' },
       cause: 'init'
     });
   };
 
   it('pays the egg on completion, exactly once, no matter how often state moves', () => {
     const ctx = createTestContext();
-    finishRoofs(ctx);
+    finishLarder(ctx);
     const eggs = (): number => ctx.state.countItems('ashdrake', 1) + bagCount(ctx, 'ashdrake', 1);
     expect(eggs()).toBe(1);
 
@@ -248,7 +250,7 @@ describe('quest rewards — the legendary egg arrives, once, and cannot be lost'
         ctx.state.addItem({ chain: 'lumber', tier: 1, col, row, kind: 'item' });
       }
     }
-    finishRoofs(ctx);
+    finishLarder(ctx);
     // Nowhere on the board — so it is in the satchel, not gone. A legendary egg
     // exists three times in a zone; losing one costs the dragon for good.
     expect(ctx.state.countItems('ashdrake', 1)).toBe(0);
@@ -273,3 +275,47 @@ function bagCount(
 ): number {
   return ctx.state.bag.find((s) => s.chain === chain && s.tier === tier)?.count ?? 0;
 }
+
+describe('brew goals — the cauldron as a quest driver', () => {
+  const brew = (ctx: GameContext, recipeId: string, times: number): void => {
+    for (let i = 0; i < times; i++) {
+      ctx.bus.emit('cauldron:brewed', {
+        recipeId,
+        output: { chain: 'keel', tier: 1, count: 1 }
+      });
+    }
+  };
+
+  it('counts brews, and spending what was brewed cannot un-do the step', () => {
+    const ctx = createTestContext();
+    const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
+    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 0, need: 4, done: false });
+
+    brew(ctx, 'broken_strake', 3);
+    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 3, done: false });
+    brew(ctx, 'broken_strake', 1);
+    expect(ctx.systems.quests.progressFor(step).done).toBe(true);
+
+    // The output is meant to be SPENT — four strakes merged away is the quest
+    // working, not the quest coming undone.
+    ctx.bus.emit('bag:consume', { chain: 'keel', tier: 1, count: 4 });
+    expect(ctx.systems.quests.progressFor(step).done).toBe(true);
+  });
+
+  it('counts only the recipe it names', () => {
+    const ctx = createTestContext();
+    const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
+    brew(ctx, 'frost_thread', 4);
+    expect(ctx.systems.quests.progressFor(step).have).toBe(0);
+  });
+
+  it('names an unlabelled brew step by what comes out of the pot', () => {
+    const ctx = createTestContext();
+    expect(
+      ctx.systems.quests.progressFor({
+        id: 'unlabelled',
+        goal: { kind: 'brew', recipeId: 'broken_strake', count: 2 }
+      }).label
+    ).toBe('Brew 2 × Broken Strake');
+  });
+});

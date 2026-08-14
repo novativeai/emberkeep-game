@@ -592,9 +592,19 @@ export const regardKey = (characterId: string): string => `regard:${characterId}
  *  reads. A counter, so the goal keeps no state of its own (QuestSystem law 1). */
 export const giftKey = (characterId: string, chain: string, tier: number): string =>
   `gift:${characterId}:${chain}:${tier}`;
+/** Pieces GIVEN (hand to hand, out of the satchel) toward one requirement of
+ *  one order — the deliver verb's twin. Counted per order so a repeatable can
+ *  clear it on completion, and a stat so it survives a reload like any other
+ *  handing-over the game remembers. */
+export const orderGiveKey = (orderId: string, chain: string, tier: number): string =>
+  `ogive:${orderId}:${chain}:${tier}`;
 /** Latch so a quest's Regard is paid exactly once, however often
  *  `quest:completed` is re-derived. */
 export const regardPaidKey = (questId: string): string => `regard:paid:${questId}`;
+/** Lifetime count of one cauldron recipe brewed — what a `brew` goal reads.
+ *  Same shape and same reason as `giftKey`: the goal keeps no state of its own,
+ *  and spending the output cannot un-brew it. */
+export const brewKey = (recipeId: string): string => `brew:${recipeId}`;
 
 export const heartsForPoints = (points: number): number =>
   Math.min(REGARD_HEARTS, Math.floor(Math.max(0, points) / REGARD_POINTS_PER_HEART));
@@ -986,6 +996,27 @@ export const NEST_POINTS_PER_DAY = 3;
  * adults by merging and start becoming adults by being raised. */
 export const TRUST_MAX = 5;
 export const MEALS_PER_DAY = 3;
+
+/* ---------------- Feed cycles (the Dragon Codex's clock) ----------------
+ *
+ * A CYCLE is the window a board dragon must be fed inside: when it rolls over,
+ * the hunger gauge returns to zero and the window starts again. It is the
+ * period the care record's meal/green tallies live on (DragonSystem.careOf) —
+ * ONE clock, shared by the gauge, the roar and the Codex, because a second
+ * hunger clock would drift from the gauge the player is looking at. Trust
+ * stays on the slower `dayIndexAt` day: a relationship is not an appetite.
+ *
+ * A cycle in which the dragon reached a FULL gauge (MEALS_PER_DAY) is a
+ * WELL-FED cycle, counted once per cycle into its lifetime record — the number
+ * the Codex shows, and the coin the evolution condition is priced in.
+ */
+export const DRAGON_CYCLE_MS = 10 * 60_000;
+export const cycleIndexAt = (ms: number): number => Math.floor(ms / DRAGON_CYCLE_MS);
+/** Well-fed cycles a breed needs before it can evolve (the Codex's condition
+ *  page). Absent = the Codex shows no evolution for that breed. */
+export const WELL_FED_EVOLUTION: Record<string, number> = {
+  ember_dragon: 6
+};
 /** Meal value by tier: a snack, a meal, a feast (merge-chains §1.4). */
 export const MEAL_VALUE: Record<number, number> = { 1: 1 / 3, 2: 1, 3: 1 };
 
@@ -1491,7 +1522,7 @@ export const GATE_FX_HEIGHT = 380;
  * Portal colours, keyed by DESTINATION — the door wears where it goes, so the
  * player learns the routes by colour before they learn them by name:
  * flame red/pink carries you home to Emberkeep, forest green to Roothold,
- * ice blue north (Borealis and Selyna's Hatchery both).
+ * ice blue north (Borealis and Selyna's Runevault both).
  */
 export interface PortalTints {
   glow: number;
@@ -1526,7 +1557,7 @@ export const PORTAL_TINTS: Record<string, PortalTints> = {
     sparks: [0xe8fbff, 0xa9e7ff, 0x5fb8f0],
     motes: [0xa9e7ff, 0x6fc0f0]
   },
-  hatchery: {
+  runevault: {
     glow: 0x2f7fd6,
     core: 0x6fd0ff,
     heart: 0xeafaff,
@@ -1536,10 +1567,18 @@ export const PORTAL_TINTS: Record<string, PortalTints> = {
   }
 };
 
-/** Selyna quests that must be DONE before the Rune Way (Borealis → Hatchery)
- *  opens — counted off the per-world `q:world:borealis:done` stat, so the gate
- *  never keeps a quest-id list that could drift. */
-export const HATCHERY_QUESTS_NEEDED = 3;
+/**
+ * Selyna quests that must be DONE before the Rune Way opens — counted off the
+ * per-world `q:world:borealis:done` stat, so the gate never keeps a quest-id
+ * list that could drift.
+ *
+ * TWO, and that number is the ladder's, not a feel: the north's third quest is
+ * its first CAULDRON quest (`north_strakes`), and the pot stands through this
+ * door. One quest later and the ladder would ask for a brew the player cannot
+ * reach; much earlier and the door opens onto a hub before the north has taught
+ * anything to carry through it. See docs/quest-ladder.md §5.
+ */
+export const RUNEVAULT_QUESTS_NEEDED = 2;
 
 /** The Roothold house — the Emporium's painted storefront — as a world-px
  *  rect: roothold.webp [755, 205, 330, 340] through the shared art→world
@@ -1603,7 +1642,7 @@ export const DRAG = {
 } as const;
 
 /** The authored decor piece (zones.json `decor` name) that opens Selyna's
- *  Cauldron when tapped. It stands in the hatchery hub; the panel itself is
+ *  Cauldron when tapped. It stands in the runevault hub; the panel itself is
  *  world-agnostic because the cauldron trades only in the Bag. */
 export const CAULDRON_DECOR = 'pink_cauldron';
 
@@ -1874,7 +1913,7 @@ export const SAVE_KEY = 'emberkeep_save';
 // those lines already carries the stump as a board item, and the new spawn
 // effect firing over it would seed a SECOND free generator — wipe, same rule
 // as v12 itself.
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 
 /** The opening's held silence: the board is visible and quiet before Eleanor's
  *  first line, so the player sees the ash before anyone frames it

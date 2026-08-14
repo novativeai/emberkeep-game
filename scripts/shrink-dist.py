@@ -268,14 +268,18 @@ def verify_dimensions():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="report without writing")
-    # 81 MB (was 50, raised twice on 2026-08-12 with the user): six dragons
-    # (red/frost/storm × baby/adult) are now fully clip-animated — ~25 MB of
-    # atlases even after segment compaction and the 1.25× oversample cap.
-    # The 80 figure included "headroom for one more breed"; that breed (the
-    # Golden Elder, 2026-08-13) landed the build at 80.3, so the estimate was
-    # 0.3 MB short — corrected here rather than shaving her atlases. Texture-
-    # DIMENSION limits (4096, old devices) are untouched by this.
-    ap.add_argument("--budget", type=float, default=81.0, help="fail over this many MB")
+    # 84 MB (was 50, raised on 2026-08-12 and twice since, each time with the
+    # user): six dragons (red/frost/storm × baby/adult) are fully clip-animated
+    # — ~25 MB of atlases even after segment compaction and the 1.25×
+    # oversample cap. The 80 figure included "headroom for one more breed";
+    # that breed (the Golden Elder, 2026-08-13) landed the build at 80.3, so
+    # the estimate was 0.3 MB short and 81 was the correction. Runevault's
+    # boiling cauldron (2026-08-13) is the first ANIMATED MAP DECOR — 3.1 MB of
+    # atlas for one prop — which took it to 82.3; 84 restores the ~1.5 MB of
+    # slack the 81 figure had, rather than leaving the next asset to trip a
+    # budget with none. Texture-DIMENSION limits (4096, old devices) are
+    # untouched by this: the boil sheet is 3000×4088.
+    ap.add_argument("--budget", type=float, default=84.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():

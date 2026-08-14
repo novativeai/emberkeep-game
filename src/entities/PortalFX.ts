@@ -59,6 +59,31 @@ export class PortalFX extends Phaser.GameObjects.Container {
     this.buildIdle(1);
   }
 
+  /**
+   * A momentary SURGE of the live door — the light intensifying to receive
+   * something (the hatchling flying through). The idle layers swell past their
+   * rest alpha and a spark burst rides the peak, then everything settles back
+   * to the breathing it was doing; nothing is created or left behind, so it
+   * can never fight `bloom`'s one-shot ignition.
+   */
+  flare(durationMs = 1200): void {
+    if (!this.live) return;
+    const scene = this.scene;
+    for (const img of this.layers) {
+      const rest = img.getData('restAlpha') as number;
+      scene.tweens.add({
+        targets: img,
+        alpha: Math.min(1, rest * 1.8 + 0.2),
+        scaleX: img.scaleX * 1.18,
+        scaleY: img.scaleY * 1.12,
+        duration: durationMs * 0.4,
+        yoyo: true,
+        ease: 'Sine.easeInOut'
+      });
+    }
+    this.rim.explode(18, 0, 0);
+  }
+
   /** The ceremony path: ignition, then the idle portal establishes. */
   bloom(): void {
     if (this.live) return;

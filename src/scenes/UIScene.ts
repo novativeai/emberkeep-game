@@ -33,6 +33,7 @@ import { CommissionPanel } from '../ui/CommissionPanel';
 import { CauldronPanel } from '../ui/CauldronPanel';
 import { StorePanel } from '../ui/StorePanel';
 import { CookbookPanel } from '../ui/CookbookPanel';
+import { DragonCodexPanel } from '../ui/DragonCodexPanel';
 import { Hud } from '../ui/Hud';
 import { NamePanel } from '../ui/NamePanel';
 import { TravelPrompt } from '../ui/TravelPrompt';
@@ -88,6 +89,8 @@ export class UIScene extends Phaser.Scene {
    *  where it is set. Re-created with the scene, so a reset clears it. */
   private statusTaught = false;
   private cookbookButton!: Phaser.GameObjects.Container;
+  private codex!: DragonCodexPanel;
+  private codexButton!: Phaser.GameObjects.Container;
   private cookbookDot!: Phaser.GameObjects.Arc;
   private bubble!: CharacterBubble;
   /** The awakening finale is running — suppress competing banners. */
@@ -96,6 +99,9 @@ export class UIScene extends Phaser.Scene {
   private hintShown = new Set<string>();
   /** Active recipe mini-tutorial (`chain:from>to`), if one is demonstrating. */
   private recipeHint: string | null = null;
+  /** The one-shot hint key the live demonstration belongs to — so a beat the
+   *  commission chooser interrupts can be UN-latched and replayed in full. */
+  private recipeHintKey: string | null = null;
   private recipeHintTimer: Phaser.Time.TimerEvent | null = null;
   private hand!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
@@ -176,7 +182,7 @@ export class UIScene extends Phaser.Scene {
     this.tooltip = new Tooltip(this, this.ctx.data.chains);
     this.tooltip.setDepth(DEPTH_PANEL - 5);
 
-    this.ledger = new LedgerPanel(this, this.ctx.bus, this.ctx.systems.order, this.ctx.systems.tasks, this.ctx.state);
+    this.ledger = new LedgerPanel(this, this.ctx.bus, this.ctx.systems.order, this.ctx.systems.tasks, this.ctx.state, this.ctx.systems.regard);
     this.ledger.setDepth(DEPTH_PANEL);
 
     this.bag = new BagPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
@@ -197,7 +203,7 @@ export class UIScene extends Phaser.Scene {
     this.store = new StorePanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.store, this.ctx);
     this.store.setDepth(DEPTH_PANEL + 7);
 
-    // Selyna's Cauldron — opened by tapping the pot decor in the hatchery hub.
+    // Selyna's Cauldron — opened by tapping the pot decor in the runevault hub.
     this.cauldron = new CauldronPanel(this, this.ctx.bus, this.ctx);
     this.cauldron.setDepth(DEPTH_PANEL + 7);
     this.offBus.push(this.ctx.bus.on('ui:cauldron_tapped', () => this.cauldron.open()));
@@ -208,6 +214,13 @@ export class UIScene extends Phaser.Scene {
     });
     this.cookbook.setDepth(DEPTH_PANEL + 4);
     this.cookbookButton = this.buildCookbookButton();
+
+    // The Dragon Codex — the keepsake record behind the dragon-head button.
+    // Both appear only once a dragon has been NAMED: the roster is the reason
+    // the button exists, so an empty book never opens.
+    this.codex = new DragonCodexPanel(this, this.ctx.bus, this.ctx.systems.dragons, this.ctx.data.dragondex);
+    this.codex.setDepth(DEPTH_PANEL + 4);
+    this.codexButton = this.buildCodexButton();
 
     // On-screen quest readout, top-right. Backgroundless HUD summary of the
     // quest ladder — the active quest over its own ordered subquests.
@@ -262,7 +275,10 @@ export class UIScene extends Phaser.Scene {
     const named = this.ctx.systems.dragons.firstNamed();
     if (named) this.bubble.setToken('dragon', named.name);
     this.offBus.push(
-      this.ctx.bus.on('dragon:named', ({ name }) => this.bubble.setToken('dragon', name))
+      this.ctx.bus.on('dragon:named', ({ name }) => {
+        this.bubble.setToken('dragon', name);
+        this.revealCodexButton();
+      })
     );
 
     this.hand = this.add.image(0, 0, 'ui_hand').setDepth(DEPTH_TUTORIAL + 2).setVisible(false);
@@ -303,6 +319,7 @@ export class UIScene extends Phaser.Scene {
       this.hud.teardown();
       this.ledger.teardown();
       this.cookbook.teardown();
+      this.codex.teardown();
       this.shop.teardown();
       this.commission.teardown();
       this.questTracker.teardown();
@@ -426,6 +443,20 @@ export class UIScene extends Phaser.Scene {
         this.refreshRecipeHint();
       }),
       bus.on('item:moved', () => this.refreshRecipeHint()),
+      // The chooser and the merge gauntlet must never share the stage: the
+      // chooser opening clears a hint already up (the second House completing
+      // is exactly when both want to speak), and its close re-runs the check
+      // so the deferred lesson still lands — after, not through, the panel.
+      bus.on('ui:commission_toggled', ({ open }) => {
+        if (open) {
+          // A lesson the chooser cuts off barely began — un-latch its one-shot
+          // key so the re-check after close replays it whole.
+          if (this.recipeHintKey) this.hintShown.delete(this.recipeHintKey);
+          this.clearRecipeHint();
+        } else {
+          this.time.delayedCall(650, () => this.checkRecipeHints());
+        }
+      }),
       bus.on('item:merged', (payload) => {
         this.tooltip.close();
         // A fresh Flame Gem flies toward the Ledger (where the magic happens) —
@@ -693,6 +724,51 @@ export class UIScene extends Phaser.Scene {
     });
     button.setVisible(this.ctx.state.tutorialDone);
     return button;
+  }
+
+  /**
+   * The Dragon Codex button — slot 3 of the shared column, directly ABOVE the
+   * Cookbook. Same plate, same pitch, same gates as its neighbour; the one
+   * difference is WHEN it exists: not until a dragon has been named, because
+   * the book records dragons the Keeper knows, and before the naming there is
+   * nothing it could open onto.
+   */
+  private buildCodexButton(): Phaser.GameObjects.Container {
+    const button = this.add
+      .container(HUD_COLUMN_X, hudColumnY(3))
+      .setScale(UI_SCALE)
+      .setDepth(DEPTH_HUD);
+    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.5);
+    const icon = this.textures.exists('ui_icon_dragondex')
+      ? this.add.image(0, -12, 'ui_icon_dragondex').setDisplaySize(125, 125)
+      : this.add.text(0, -12, '🐉', { fontSize: '76px' }).setOrigin(0.5);
+    button.add([bg, icon]);
+    button.setSize(192, 192);
+    button.setInteractive({ useHandCursor: true });
+    button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
+    button.on('pointerout', () => button.setScale(UI_SCALE));
+    button.on('pointerup', () => {
+      // Mid-tutorial the script owns the stage — same contract as the
+      // Cookbook button beside it.
+      if (!(this.lastStep?.done ?? this.ctx.state.tutorialDone)) return;
+      if (this.codex.isOpen) this.codex.requestClose();
+      else this.codex.open();
+    });
+    button.setVisible(this.ctx.systems.dragons.namedDragons().length > 0);
+    return button;
+  }
+
+  /** The button's debut — it pops in the moment the first dragon is named. */
+  private revealCodexButton(): void {
+    if (this.codexButton.visible) return;
+    this.codexButton.setVisible(true);
+    this.codexButton.setScale(UI_SCALE * 0.3);
+    this.tweens.add({
+      targets: this.codexButton,
+      scale: UI_SCALE,
+      duration: 420,
+      ease: 'Back.easeOut'
+    });
   }
 
   /** Cosmetic: a Flame Gem arcs from the merge cell into the Ledger button and
@@ -1095,6 +1171,10 @@ export class UIScene extends Phaser.Scene {
    */
   private checkRecipeHints(): void {
     if (!this.ctx.state.tutorialDone || this.finaleActive || this.recipeHint) return;
+    // The House's produce chooser owns the stage while it is up: the merge
+    // gauntlet at tutorial depth would point THROUGH the panel — the hand
+    // "merging" behind glass. The chooser's close re-runs this check.
+    if (this.commission.isOpen) return;
     const candidates = [
       { key: 'twoDragons', recipe: 'ember_dragon:3>4', chain: 'ember_dragon', tier: 3 },
       { key: 'twoHouses', recipe: 'lumber:3>4', chain: 'lumber', tier: 3 }
@@ -1107,6 +1187,7 @@ export class UIScene extends Phaser.Scene {
       );
       if (pieces.length < 2) continue;
       this.recipeHint = c.recipe;
+      this.recipeHintKey = c.key;
       this.showHint(c.key, 6500);
       // The gauntlet demonstrates the exact drag: piece B onto piece A.
       this.placeHand({
@@ -1123,6 +1204,7 @@ export class UIScene extends Phaser.Scene {
   private clearRecipeHint(): void {
     if (!this.recipeHint) return;
     this.recipeHint = null;
+    this.recipeHintKey = null;
     this.recipeHintTimer?.remove();
     this.recipeHintTimer = null;
     this.clearMarkers();
@@ -1310,7 +1392,7 @@ export class UIScene extends Phaser.Scene {
    * her reaction is TO it, not over it.
    */
   /**
-   * The hub tours — Eleanor walks Roothold's Emporium, Selyna the Hatchery's
+   * The hub tours — Eleanor walks Roothold's Emporium, Selyna the Runevault's
    * cauldron, each ONCE ever (stats `tour:<world>`, save-derivable). Not
    * TutorialDirector beats: the tutorial is long over, nothing here gates
    * input, and every wait state is armed on an event that stays live — a
@@ -1321,8 +1403,8 @@ export class UIScene extends Phaser.Scene {
     if (worldId === 'roothold' && this.ctx.state.stat('tour:roothold') === 0) {
       this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runRootholdTour());
     }
-    if (worldId === 'hatchery' && this.ctx.state.stat('tour:hatchery') === 0) {
-      this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runHatcheryTour());
+    if (worldId === 'runevault' && this.ctx.state.stat('tour:runevault') === 0) {
+      this.time.delayedCall(TIMINGS.chapterBeatDelay, () => this.runRunevaultTour());
     }
   }
 
@@ -1371,12 +1453,12 @@ export class UIScene extends Phaser.Scene {
     this.offBus.push(offClose);
   }
 
-  private runHatcheryTour(): void {
-    const t = this.ctx.data.dialogue.tours?.hatchery;
+  private runRunevaultTour(): void {
+    const t = this.ctx.data.dialogue.tours?.runevault;
     if (!t) return;
     const bus = this.ctx.bus;
     this.bubble.sequence('selyna', t.intro, () => {
-      bus.emit('tour:point', { target: 'hatchery_cauldron' });
+      bus.emit('tour:point', { target: 'runevault_cauldron' });
       this.bubble.say('selyna', t.cauldron, 120000);
       const offOpen = bus.on('ui:cauldron_toggled', ({ open }) => {
         if (!open) return;
@@ -1389,8 +1471,8 @@ export class UIScene extends Phaser.Scene {
           if (o) return;
           offClose();
           this.clearUiPointer();
-          this.ctx.state.addStat('tour:hatchery', 1);
-          this.ctx.bus.emit('tour:completed', { id: 'hatchery' });
+          this.ctx.state.addStat('tour:runevault', 1);
+          this.ctx.bus.emit('tour:completed', { id: 'runevault' });
         });
         this.offBus.push(offClose);
       });

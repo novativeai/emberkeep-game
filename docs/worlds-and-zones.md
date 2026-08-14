@@ -121,7 +121,7 @@ pixels off its island.
 | `emberkeep` | 1 | 1 dense + 17 | 46 authored + 36 | `emberkeep` (nb2 render) | sanctuary |
 | `roothold` | 1 | 19 | 141 | `roothold` | **hub** — Eleanor's home |
 | `borealis` | 3 | 38 | 141 | `borealis` | sanctuary |
-| `hatchery` | 3 | 2 | 246 | `hatchery` | **hub** — Selyna's home |
+| `runevault` | 3 | 2 | 254 | `runevault` | **hub** — Selyna's home |
 
 They come in pairs: a **sanctuary**, where you do things, and its **hub**, where
 you change something about yourself — buy, decorate, read, talk. Each pair is
@@ -131,18 +131,18 @@ The three worlds that are not Emberkeep carry their whole `MapData`, generated
 (all cells `invisible`, because the backdrop already paints the slabs — no new
 tile art needed) and placed with the same backdrop calibration Emberkeep uses.
 
-**Hatchery's ground was measured, not imported.** It is the one world with no
+**Runevault's ground was measured, not imported.** It is the one world with no
 grid in the map editor's export — only a painting. So `scripts/fit-deck-grid.py`
 recovers the flagstone lattice from the backdrop itself: autocorrelation for the
 tile steps, the Fourier phase for where the stones sit, a stone-vs-forest probe
-and a flood fill for the extent. Out comes `assets/map/hatchery-deck.json` (246
-cells across the deck and its 2×3 outpost, in backdrop px), which
+and a flood fill for the extent. Out comes `assets/map/runevault-deck.json` (254
+cells — 241 on the plaza, 13 on its outpost — in backdrop px), which
 `build-zones.mjs` puts through the same `artToWorld` every editor zone goes
 through — so a measured world and an authored one land in one coordinate system
 by construction. Re-run it with `--overlay` and the fit is checkable by eye:
 
 ```
-python3 scripts/fit-deck-grid.py hatchery --overlay /tmp/fit.png
+python3 scripts/fit-deck-grid.py runevault --overlay /tmp/fit.png
 ```
 
 **Per-world boards.** `GameState` keeps `{ items, grid, nests }` per world; the
@@ -216,8 +216,8 @@ a door as tall as the art.
 | `emberkeep` | The North Crossing (by the Golden Altar) | ice blue | `borealis` | the Elder wakes |
 | `roothold` | The Vine Arch | flame red/pink | `emberkeep` | always |
 | `borealis` | The Ash Road (by the landing shore) | flame red/pink | `emberkeep` | always |
-| `borealis` | The Rune Way (the circular inlay, mainland top) | ice blue | `hatchery` | 3 Selyna quests |
-| `hatchery` | The Rune Circle | ice blue | `borealis` | always |
+| `borealis` | The Rune Way (the circular inlay, mainland top) | ice blue | `runevault` | 2 Selyna quests |
+| `runevault` | The Rune Circle (the astral rune the cauldron stands on) | ice blue | `borealis` | always |
 
 **Every door wears a `PortalFX` coloured by its DESTINATION** (Constants
 `PORTAL_TINTS`: flame home, green to Roothold, ice north) — the exception to
@@ -228,8 +228,19 @@ all three keys are save-derivable stats — and `Zones.spec.ts` pins the exact
 six routes, the round trips, and each gate. The North Crossing is
 ceremony-lit (`gate:opened`, Eleanor's lines after the finale); the hubs run
 first-arrival tours (UIScene `tours`: Roothold's Emporium walkthrough unlocks
-the shop button, Hatchery's cauldron lesson). The editor's `teleport` record
+the shop button, Runevault's cauldron lesson). The editor's `teleport` record
 stays registry data only.
+
+**The Rune Circle carries a door AND a prop, on purpose.** Runevault has one
+rune, and Selyna's cauldron stands in the middle of it — so the same painted
+circle is both the way home and the brew screen. That resolves itself rather
+than needing a rule: a portal is the LOWEST interactive band on the board, so
+the pot takes any tap that lands inside its own art and only bare stone travels.
+The tour leans on it (*"The cauldron, on the rune. Tap it."*). Both are measured
+off the painting — the rune's outer ring is 630 × 380 backdrop px at centre
+(727, 613), and `DECOR.runevault` puts the pot's toe tips on that centre at 72%
+of the ring's width, which is the proportion the art was re-cut to at
+Runevault's own ~40° camera (a shallower view than the board's 2:1 iso).
 
 Authored in the World Builder (⭘ Portal, `P`) or in `PORTALS` in
 `scripts/build-zones.mjs`, where they are written in **backdrop pixels** — read
@@ -261,7 +272,7 @@ reference grid through `gameOrigin`.
 - **Re-export `map.json`** → re-run `scripts/build-zones.mjs`, or the
   `baseSignature` guard silently drops every extra zone.
 - **Regenerate a backdrop** → if a world's ground was MEASURED from it
-  (Hatchery), re-run `scripts/fit-deck-grid.py <name> --overlay …`, then
+  (Runevault), re-run `scripts/fit-deck-grid.py <name> --overlay …`, then
   `build-zones.mjs`. A backdrop at a different size or crop moves every cell.
 - **Add a world** → `WORLDS` in `build-zones.mjs`, a `background_<id>` entry in
   `assets.json`, and check `PreloadScene`'s backdrop trim still skips it at boot.

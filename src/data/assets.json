@@ -853,6 +853,12 @@
       "file": "sprites/ui/icon_cookbook.webp"
     },
     {
+      "key": "ui_icon_dragondex",
+      "source": "file",
+      "generator": "icon",
+      "file": "sprites/ui/icon_dragondex.webp"
+    },
+    {
       "key": "ui_icon_bag",
       "source": "file",
       "file": "sprites/ui/icon_bag.webp"
@@ -929,10 +935,10 @@
       "file": "sprites/background/roothold.webp"
     },
     {
-      "key": "background_hatchery",
+      "key": "background_runevault",
       "source": "file",
       "generator": "decor",
-      "file": "sprites/background/hatchery.webp"
+      "file": "sprites/background/runevault.webp"
     },
     {
       "key": "decor_pink_cauldron",

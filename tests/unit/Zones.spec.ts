@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import realMap from '../../src/data/map.json';
-import { LEVEL_XP, SAVE_VERSION, WORLD_ID } from '../../src/core/Constants';
+import { RUNEVAULT_QUESTS_NEEDED, LEVEL_XP, SAVE_VERSION, WORLD_ID } from '../../src/core/Constants';
 import { GameContext } from '../../src/core/Context';
 import { GameState } from '../../src/core/GameState';
 import type { TextureBin } from '../../src/core/worldArt';
@@ -248,8 +248,8 @@ describe('zones — new ground beside the isle', () => {
         }
       }
     }
-    // emberkeep's new ground + borealis + roothold + hatchery's measured deck
-    expect(checked).toBe(36 + 141 + 141 + 246);
+    // emberkeep's new ground + borealis + roothold + runevault's measured deck
+    expect(checked).toBe(36 + 141 + 141 + 254);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {
@@ -345,7 +345,7 @@ describe('portals — every world has a way out of it', () => {
    *
    *   Emberkeep → Roothold (the Ember Gate) and → Borealis (the North
    *   Crossing); Roothold → Emberkeep (the Vine Arch); Borealis → Emberkeep
-   *   (the Ash Road) and → Hatchery (the Rune Way); Hatchery → Borealis (the
+   *   (the Ash Road) and → Runevault (the Rune Way); Runevault → Borealis (the
    *   Rune Circle). WorldSystem's story gates decide WHEN each opens — the
    *   topology's job is only that nowhere can strand the Keeper.
    */
@@ -372,11 +372,11 @@ describe('portals — every world has a way out of it', () => {
       .sort();
     expect(routes).toEqual([
       'borealis->emberkeep',
-      'borealis->hatchery',
+      'borealis->runevault',
       'emberkeep->borealis',
       'emberkeep->roothold',
-      'hatchery->borealis',
-      'roothold->emberkeep'
+      'roothold->emberkeep',
+      'runevault->borealis'
     ]);
   });
 
@@ -435,21 +435,23 @@ describe('portals — every world has a way out of it', () => {
     expect(ctx.state.worldId).toBe('roothold');
   });
 
-  /** The Rune Way: Hatchery opens on the per-world quest counter QuestSystem
-   *  keeps, never on an id list that could drift. */
-  it('holds the Hatchery shut until three Selyna quests are done', () => {
+  /** The Rune Way: the hub opens on the per-world quest counter QuestSystem
+   *  keeps, never on an id list that could drift. The number is the LADDER's —
+   *  the north's third quest is its first cauldron quest, and the pot is through
+   *  this door (QuestLadder.spec pins the two together). */
+  it('holds the cauldron hub shut until RUNEVAULT_QUESTS_NEEDED Selyna quests are done', () => {
     const ctx = createTestContext();
     ctx.state.tutorialDone = true;
     ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
-    ctx.state.addStat('q:world:borealis:done', 2);
-    expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('hatchery');
-    ctx.bus.emit('world:switch', { to: 'hatchery' });
+    ctx.state.addStat('q:world:borealis:done', RUNEVAULT_QUESTS_NEEDED - 1);
+    expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('runevault');
+    ctx.bus.emit('world:switch', { to: 'runevault' });
     expect(ctx.state.worldId).toBe(WORLD_ID);
 
     ctx.state.addStat('q:world:borealis:done', 1);
-    expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('hatchery');
-    ctx.bus.emit('world:switch', { to: 'hatchery' });
-    expect(ctx.state.worldId).toBe('hatchery');
+    expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('runevault');
+    ctx.bus.emit('world:switch', { to: 'runevault' });
+    expect(ctx.state.worldId).toBe('runevault');
   });
 });
 
@@ -580,7 +582,7 @@ describe('world art — visiting a world never leaves the others worse off', () 
     for (const id of ctx.state.worlds.keys()) {
       for (const key of worldArtKeys(ctx, id)) {
         // Backdrop, standee banks, Align-Studio atlas idles, and (since the
-        // Hatchery cauldron) map decor.
+        // Runevault cauldron) map decor.
         expect(key).toMatch(/^(background_|decor_|canim_|[a-z]+_world_)/);
       }
     }

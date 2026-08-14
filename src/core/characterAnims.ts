@@ -35,8 +35,13 @@ export interface CharacterClip {
    * Where the clip plays. 'board' (default) = on the standee/board anchor.
    * 'portrait' = the dialogue bubble's ring ONLY — talking/blinking sets live
    * there (they replace the disc-atlas animation) and never on the board.
+   * 'decor' = a MAP DECOR piece's own loop (Runevault's boiling cauldron). Its
+   * clips are registered under a character id of the SAME name as the decor
+   * (`character-anims.json` → `cauldron`), and `scale`/`dx`/`dy` register the
+   * frame onto the STILL texture rather than onto a board anchor: scale is
+   * still-px per atlas-px, dx/dy the frame's top-left in still px.
    */
-  stage?: 'board' | 'portrait';
+  stage?: 'board' | 'portrait' | 'decor';
   /**
    * Named frame sub-ranges [start, endExclusive] — the fly clip's
    * takeoff/loop/landing phases. Absent = the clip plays whole. (Typed as
@@ -186,8 +191,13 @@ export function validateCharacterAnims(data: CharacterAnimsData, maxTexture = 40
         if (!Number.isFinite(clip[k])) errors.push(`${at}: ${k} must be finite`);
       }
       if (typeof clip.loop !== 'boolean') errors.push(`${at}: loop must be boolean`);
-      if (clip.stage !== undefined && clip.stage !== 'board' && clip.stage !== 'portrait') {
-        errors.push(`${at}: stage must be 'board' or 'portrait'`);
+      if (
+        clip.stage !== undefined &&
+        clip.stage !== 'board' &&
+        clip.stage !== 'portrait' &&
+        clip.stage !== 'decor'
+      ) {
+        errors.push(`${at}: stage must be 'board', 'portrait' or 'decor'`);
       }
       for (const [seg, range] of Object.entries(clip.segments ?? {})) {
         if (

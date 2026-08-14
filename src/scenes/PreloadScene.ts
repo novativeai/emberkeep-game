@@ -153,6 +153,19 @@ export class PreloadScene extends Phaser.Scene {
         });
       }
     }
+    // Map-decor clips — Runevault's boiling cauldron. A decor piece's clips live
+    // under a character id of the same name (character-anims.json `cauldron`),
+    // and follow the characters' discipline exactly: only the ACTIVE map's decor
+    // is fetched, and travel exchanges them at the door (worldArt lists them).
+    for (const d of ctx.state.map.mapDecor ?? []) {
+      for (const [clipId, clip] of Object.entries(clipsFor(d.name))) {
+        if (this.textures.exists(clipKey(d.name, clipId))) continue;
+        this.load.spritesheet(clipKey(d.name, clipId), clip.file, {
+          frameWidth: clip.frameWidth,
+          frameHeight: clip.frameHeight
+        });
+      }
+    }
     // …and the BOARD-DRAGON clip sets (fly / tosleep): dragons are merge pieces
     // that can stand on any world's board, so their clips ride the boot
     // preload rather than any one world's art list.

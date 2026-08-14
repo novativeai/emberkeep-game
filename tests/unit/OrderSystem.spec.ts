@@ -140,3 +140,75 @@ describe('OrderSystem', () => {
     expect(ctx.state.countItems('flame_gem', 1)).toBe(6);
   });
 });
+
+describe('give and Deliver are one verb in two grammars', () => {
+  /** Pocket a shard and hand it to Eleanor, the way the bag's Give does. */
+  const giveShard = (ctx: ReturnType<typeof createTestContext>): void => {
+    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'flame_gem', tier: 1 });
+  };
+
+  it('a give banks toward the giver’s live order and lights the Deliver button', () => {
+    const ctx = createTestContext();
+    const progress = capture(ctx.bus, 'order:progress');
+    // Two given hand to hand + four standing on the board = a full brazier.
+    giveShard(ctx);
+    giveShard(ctx);
+    spawnGemShards(ctx, 4);
+    const brazier = progress.filter((p) => p.orderId === 'eleanor_brazier').at(-1);
+    expect(brazier).toMatchObject({ have: [6], need: [6], deliverable: true });
+
+    // The button consumes only the REMAINDER — what was given is not on the
+    // board and must not be collected twice.
+    ctx.bus.emit('ui:deliver_requested', { orderId: 'eleanor_brazier' });
+    expect(ctx.state.completedOrderIds).toContain('eleanor_brazier');
+    expect(ctx.state.countItems('flame_gem', 1)).toBe(0);
+  });
+
+  it('giving EVERY required piece completes the order by itself — no button', () => {
+    const ctx = createTestContext();
+    const completed = capture(ctx.bus, 'order:completed');
+    for (let i = 0; i < 6; i++) giveShard(ctx);
+    expect(completed.map((c) => c.orderId)).toContain('eleanor_brazier');
+    // The reward pays exactly as a button delivery would.
+    expect(ctx.state.coins).toBe(25);
+    // The bank is spent by the completion: the NEXT order of the same piece
+    // starts from zero, not from the old change.
+    const hearth = ctx.systems.order.activeOrders.find((o) => o.id === 'eleanor_hearth')!;
+    expect(ctx.systems.order.progressFor(hearth).have.reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
+  it('a give never pays a piece the giver’s orders do not ask for', () => {
+    const ctx = createTestContext();
+    const declined = capture(ctx.bus, 'regard:gift_declined');
+    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'quartz', tier: 1 });
+    expect(declined.at(-1)).toMatchObject({ reason: 'not_wanted' });
+    expect(ctx.state.completedOrderIds).toHaveLength(0);
+  });
+
+  it('the Deliver verb pays a GIFT step straight off the board', () => {
+    const ctx = createTestContext();
+    // `what_she_keeps` opens asking Eleanor for 2 Emberberry Baskets.
+    expect(ctx.systems.regard.wants('eleanor', 'emberberry', 2)).toBe(true);
+    ctx.systems.board.spawn('emberberry', 2, 1, 1, 'init');
+    ctx.systems.board.spawn('emberberry', 2, 2, 1, 'init');
+    const accepted = capture(ctx.bus, 'regard:gift_accepted');
+
+    ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
+
+    // Both pieces handed over exactly as two bag gives would be: counter,
+    // Regard points per piece, and the board is clear of them.
+    expect(accepted).toHaveLength(2);
+    expect(ctx.systems.regard.given('eleanor', 'emberberry', 2)).toBe(2);
+    expect(ctx.state.countItems('emberberry', 2)).toBe(0);
+    expect(ctx.systems.regard.wants('eleanor', 'emberberry', 2)).toBe(false);
+  });
+
+  it('a board deliver takes only what she still wants, and a dry board takes nothing', () => {
+    const ctx = createTestContext();
+    for (const col of [1, 2, 3]) ctx.systems.board.spawn('emberberry', 2, col, 1, 'init');
+    ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
+    expect(ctx.state.countItems('emberberry', 2)).toBe(1); // the third stays — she asked for two
+    ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'eleanor', chain: 'quartz', tier: 1 });
+    expect(ctx.systems.regard.given('eleanor', 'quartz', 1)).toBe(0);
+  });
+});

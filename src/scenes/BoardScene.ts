@@ -471,6 +471,7 @@ export class BoardScene extends Phaser.Scene {
     this.buildMapDecor();
     this.buildMapDecor3d(); // authored Three.js 3D-decor placements
     this.buildWorldCharacters(); // Eleanor & co, standing in the world
+    this.buildHubDragon(); // the named hatchling at Eleanor's side in Roothold
     this.buildWorldEmitters(); // authored fire / smoke, burning in the world
     this.buildWeather(); // this world's sky and its weather (data-driven)
     this.buildCompanions(); // named dragons, from any loaded save
@@ -2490,20 +2491,28 @@ export class BoardScene extends Phaser.Scene {
         anchor: { x: 0.5, y: 0 }
       };
       const baseY = y + (cal.offsetY + (d.dy ?? 0)) * ratio; // + free-move offset (Move tool)
+      const dispScale = cal.scale * ratio * (DECOR_SCALE[d.name] ?? 1);
       const sprite = this.add
-        .image(x + (cal.offsetX + (d.dx ?? 0)) * ratio, baseY, key)
+        .sprite(x + (cal.offsetX + (d.dx ?? 0)) * ratio, baseY, key)
         .setOrigin(cal.anchor.x, cal.anchor.y)
-        .setScale(cal.scale * ratio * (DECOR_SCALE[d.name] ?? 1))
+        .setScale(dispScale)
         .setDepth(DEPTHS.itemBase + y);
-      // Ground shadow sized to the art, on the cell so the spring lifts off it.
-      this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
+      this.playDecorClip(sprite, d.name, cal, dispScale);
+      // Ground shadow under the PROP, not under its cell. `at` in build-zones'
+      // DECOR is a point on the BACKDROP, and the cell is only the index that
+      // point happens to fall in — so the two are a nudge apart for the authored
+      // isle and most of a tile apart for Runevault's cauldron, whose rune sits
+      // where it sits. The anchor IS the ground contact by the calibration's own
+      // definition, so the sprite's position is the right place to put it. Depth
+      // still keys off the CELL: the shadow sorts with the tile it belongs to.
+      this.addGroundShadow(sprite.x, sprite.y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
       // Slow spring-bounce (not a smooth float): lazy spring, staggered, calm.
       this.settleSprite(sprite, (i % 8) * 35); // one-time landing settle
       // The one piece of scenery that IS a screen: Selyna's pot opens the brew
       // panel. Same shape as a world character — map decor with a tap handler.
       if (d.name === CAULDRON_DECOR) {
-        // The Hatchery tour points here ("The cauldron, on the rune — tap it").
-        this.tourTargets.set('hatchery_cauldron', { x: sprite.x, y: baseY - sprite.displayHeight * 0.55 });
+        // The Runevault tour points here ("The cauldron, on the rune — tap it").
+        this.tourTargets.set('runevault_cauldron', { x: sprite.x, y: baseY - sprite.displayHeight * 0.55 });
         sprite.setInteractive({ useHandCursor: true });
         sprite.on(
           'pointerup',
@@ -2515,6 +2524,46 @@ export class BoardScene extends Phaser.Scene {
         );
       }
     });
+  }
+
+  /**
+   * A decor piece's staged loop — the cauldron's boil. The still texture is the
+   * clip's own base frame (the plate ships as both start and end image), so the
+   * swap is invisible: the animated sprite occupies exactly the rectangle the
+   * still did, and the still remains the fallback whenever the sheet is not
+   * resident (same degrade rule as the dragon clips — the art stood there before
+   * the clips existed, so a missing sheet costs motion, never the pot).
+   *
+   * Registration is the 'decor' stage convention (characterAnims.ts): clip
+   * scale is STILL px per atlas px, dx/dy the frame's top-left in still px. The
+   * anchor must land on the same world point either way, so the origin is the
+   * anchor's still-px position mapped into the frame.
+   */
+  private playDecorClip(
+    sprite: Phaser.GameObjects.Sprite,
+    name: string,
+    cal: { anchor: { x: number; y: number } },
+    dispScale: number
+  ): void {
+    const clip = clipFor(name, 'boil');
+    const key = clipKey(name, 'boil');
+    if (!clip || !this.textures.exists(key)) return;
+    const still = this.textures.get(`decor_${name}`).getSourceImage() as HTMLImageElement;
+    if (!this.anims.exists(key)) {
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+        frameRate: clip.fps,
+        repeat: -1
+      });
+    }
+    sprite.setTexture(key, 0);
+    sprite.setScale(dispScale * clip.scale);
+    sprite.setOrigin(
+      (cal.anchor.x * still.width - clip.dx) / clip.scale / clip.frameWidth,
+      (cal.anchor.y * still.height - clip.dy) / clip.scale / clip.frameHeight
+    );
+    sprite.play(key);
   }
 
   /**
@@ -3426,7 +3475,7 @@ export class BoardScene extends Phaser.Scene {
       // speaks it open, and `gate:opened` lights it — never the latch alone.
       this.ctx.bus.on('gate:opened', () => this.ignitePortal('emberkeep_altar_gate')),
       // The Ember Gate (→ Roothold) opens on Order 1; the Rune Way
-      // (→ Hatchery) on the third Selyna quest. Both are plain availability
+      // (→ Runevault) on the third Selyna quest. Both are plain availability
       // flips, so one sync serves them — and any future gate — unchanged.
       this.ctx.bus.on('order:completed', () => this.syncPortalFx(true)),
       this.ctx.bus.on('quest:completed', () => this.syncPortalFx(true))
@@ -3454,6 +3503,140 @@ export class BoardScene extends Phaser.Scene {
     });
     // The tour's arrow lands over the roofline.
     this.tourTargets.set('roothold_house', { x: r.x + r.width / 2, y: r.y + 40 });
+  }
+
+  /** The hub hatchling's sprite + roam bookkeeping — reset every build, since
+   *  the scene instance survives world switches. */
+  private hubDragon: Phaser.GameObjects.Sprite | null = null;
+  private hubDragonArt = '';
+  private hubDragonHome = { x: 0, y: 0 };
+  private hubRoamLeg = 0;
+  private hubRoaming = false;
+
+  /** A character/dragon clip with its Phaser anim registered — the generic
+   *  form of `elderClip`, for clips that need no segment phasing. */
+  private charClip(art: string, clipId: string): { clip: CharacterClip; key: string } | null {
+    const clip = clipFor(art, clipId);
+    const key = clipKey(art, clipId);
+    if (!clip || !this.textures.exists(key)) return null;
+    if (!this.anims.exists(key)) {
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+        frameRate: clip.fps,
+        repeat: clip.loop ? -1 : 0
+      });
+    }
+    return { clip, key };
+  }
+
+  /**
+   * The named hatchling, at Eleanor's side in her own hub.
+   *
+   * He flew through the Ember Gate ahead of the Keeper (`playGateFlight`), so
+   * Roothold receives you with him already there: standing on his own spot of
+   * yard beside her standee, ROARING a greeting, then settling into his idle.
+   * Once the arrival dialogue has run dry — the tour's last line, or a few
+   * breaths after landing when the tour has already been given — he takes to
+   * ROAMING the yard, because sitting still is not in his personality.
+   *
+   * Scenery, not state: he is a sprite over the painting like the standees,
+   * never a board item — the REAL dragon still stands on the Emberkeep board.
+   */
+  private buildHubDragon(): void {
+    this.hubDragon = null;
+    this.hubRoaming = false;
+    this.hubRoamLeg = 0;
+    if (this.ctx.state.worldId !== 'roothold') return;
+    const named = this.ctx.systems.dragons.namedDragons()[0];
+    if (!named) return;
+    const eleanor = this.characterSprites.get('eleanor_home');
+    if (!eleanor) return;
+    const art = dragonClipCharacter(named.chain, named.tier, this.ctx.state.dragonSkins[named.chain] ?? null);
+    const idle = art && this.charClip(art, 'idle');
+    if (!art || !idle) return;
+
+    // His own tile of yard, a stride to her right — near her, never on her.
+    const x = eleanor.x + 310;
+    const y = eleanor.y + 70;
+    this.hubDragonArt = art;
+    this.hubDragonHome = { x, y };
+    const origin = originFor(idle.clip, false);
+    this.hubDragon = this.add
+      .sprite(x, y, idle.key, 0)
+      .setOrigin(origin.x, origin.y)
+      .setScale(idle.clip.scale)
+      .setDepth(DEPTHS.itemBase + y);
+
+    // Roar first — a greeting, not an alarm — then the idle loop.
+    const roar = this.charClip(art, 'roar');
+    this.time.delayedCall(900, () => {
+      const sprite = this.hubDragon;
+      if (!sprite?.active) return;
+      if (roar) {
+        sprite.play(roar.key);
+        sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+          if (sprite.active) sprite.play(idle.key);
+        });
+      } else {
+        sprite.play(idle.key);
+      }
+    });
+
+    if (this.ctx.state.stat('tour:roothold') > 0) {
+      // The dialogue was exhausted on an earlier visit — a few breaths of
+      // manners, then off he goes.
+      this.time.delayedCall(7000, () => this.startHubRoam());
+    } else {
+      this.offBus.push(
+        this.ctx.bus.on('tour:completed', ({ id }) => {
+          if (id === 'roothold') this.startHubRoam();
+        })
+      );
+    }
+  }
+
+  /** The roam loop: fly a leg between yard waypoints, rest, repeat. Fixed
+   *  waypoints and rests — ambience wants character, not entropy. */
+  private startHubRoam(): void {
+    if (this.hubRoaming || !this.hubDragon?.active) return;
+    this.hubRoaming = true;
+    this.time.delayedCall(1400, () => this.hubRoamStep());
+  }
+
+  private hubRoamStep(): void {
+    const sprite = this.hubDragon;
+    if (!sprite?.active || !this.hubRoaming) return;
+    const legs: Array<[number, number]> = [
+      [300, 70],
+      [560, 190],
+      [180, 260],
+      [-80, 120],
+      [80, -10]
+    ];
+    const [dx, dy] = legs[this.hubRoamLeg % legs.length]!;
+    this.hubRoamLeg++;
+    const to = { x: this.hubDragonHome.x + dx - 300, y: this.hubDragonHome.y + dy - 70 };
+    const idle = this.charClip(this.hubDragonArt, 'idle');
+    const fly = this.charClip(this.hubDragonArt, 'fly');
+    // Source art faces LEFT — flip when the leg heads right.
+    sprite.setFlipX(to.x > sprite.x);
+    if (fly) sprite.play(fly.key);
+    const dist = Math.hypot(to.x - sprite.x, to.y - sprite.y);
+    this.tweens.add({
+      targets: sprite,
+      x: to.x,
+      y: to.y,
+      duration: Math.max(900, dist * 6),
+      ease: 'Sine.easeInOut',
+      onUpdate: () => sprite.setDepth(DEPTHS.itemBase + sprite.y),
+      onComplete: () => {
+        if (!sprite.active) return;
+        if (idle) sprite.play(idle.key);
+        // Rest length varies by leg, so the wander never reads as a patrol.
+        this.time.delayedCall(2600 + (this.hubRoamLeg % 3) * 1400, () => this.hubRoamStep());
+      }
+    });
   }
 
   /** The hub tours' bouncing pointer over a board landmark. */
@@ -3492,11 +3675,95 @@ export class BoardScene extends Phaser.Scene {
     for (const [id, door] of this.portalDoors) {
       if (door.fx.isLive || !open.has(door.to)) continue;
       if (bloom && id === 'emberkeep_altar_gate') continue;
-      if (bloom) door.fx.bloom();
-      else door.fx.standIdle();
+      if (bloom) {
+        door.fx.bloom();
+        // The Ember Gate's REVEAL carries a passenger: once the ignition has
+        // played out, the named hatchling flies through to scout the hub on
+        // the far side. Hooked to the bloom transition, so it happens exactly
+        // once per save — a reload finds the door standing open (standIdle)
+        // and the flight already flown.
+        if (id === 'emberkeep_gate') {
+          this.time.delayedCall(2100, () => this.playGateFlight(door));
+        }
+      } else {
+        door.fx.standIdle();
+      }
       this.widenDoor(door);
     }
     this.refreshPortals();
+  }
+
+  /**
+   * The hatchling's first crossing — the Ember Gate's reveal flourish.
+   *
+   * He lifts off, arcs into the door as its light SURGES to take him, and
+   * fades into the glare as he enters; a few breaths later he wings back out
+   * and settles exactly where he was. Purely theatrical: the item never moves
+   * in `state`, so the board, the save and the audit are untouched — but the
+   * player who then follows him through finds him already at Eleanor's side
+   * in the hub (`buildHubDragon`), which is the story the flight is telling.
+   */
+  private playGateFlight(door: { fx: PortalFX; zone: Phaser.GameObjects.Zone }): void {
+    const named = this.ctx.systems.dragons.firstNamed();
+    if (!named) return;
+    const sprite = this.itemSprites.get(named.itemId);
+    if (!sprite?.active) return;
+    const home = { x: sprite.x, y: sprite.y };
+    const target = { x: door.zone.x, y: door.zone.y - 30 };
+    // Arc control point well above the straight line — a flight, not a slide.
+    const peak = {
+      x: (home.x + target.x) / 2,
+      y: Math.min(home.y, target.y) - 320
+    };
+    if ('setFacing' in sprite) {
+      (sprite as { setFacing(dir: 'left' | 'right'): unknown }).setFacing(target.x > home.x ? 'right' : 'left');
+    }
+    const flight = { t: 0 };
+    this.tweens.add({
+      targets: flight,
+      t: 1,
+      duration: 1800,
+      ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        const t = flight.t;
+        const u = 1 - t;
+        sprite.x = u * u * home.x + 2 * u * t * peak.x + t * t * target.x;
+        sprite.y = u * u * home.y + 2 * u * t * peak.y + t * t * target.y;
+        // The door's glare swallows him over the last third — the light takes
+        // him rather than the sprite blinking off.
+        sprite.setAlpha(t > 0.66 ? Math.max(0, 1 - (t - 0.66) / 0.3) : 1);
+      },
+      onComplete: () => {
+        sprite.setAlpha(0);
+        // The return: back out of the glare along the same arc, home exactly.
+        this.time.delayedCall(2600, () => {
+          if (!sprite.active) return;
+          const back = { t: 0 };
+          this.tweens.add({
+            targets: back,
+            t: 1,
+            duration: 1500,
+            ease: 'Sine.easeInOut',
+            onUpdate: () => {
+              const t = back.t;
+              const u = 1 - t;
+              sprite.x = u * u * target.x + 2 * u * t * peak.x + t * t * home.x;
+              sprite.y = u * u * target.y + 2 * u * t * peak.y + t * t * home.y;
+              sprite.setAlpha(Math.min(1, t / 0.3));
+            },
+            onComplete: () => {
+              sprite.setPosition(home.x, home.y);
+              sprite.setAlpha(1);
+              if ('setFacing' in sprite) {
+                (sprite as { setFacing(dir: 'left' | 'right'): unknown }).setFacing('left');
+              }
+            }
+          });
+        });
+      }
+    });
+    // The light intensifies to receive him, timed to his arrival at the door.
+    this.time.delayedCall(1100, () => door.fx.flare(1400));
   }
 
   private ignitePortal(id: string): void {

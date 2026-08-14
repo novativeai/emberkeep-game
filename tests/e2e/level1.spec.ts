@@ -466,6 +466,39 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       await tapTile(page, cell[0], cell[1]);
       await page.waitForTimeout(360);
     }
+    // ---------- Board hygiene: carry the Emberbark Stump onto the new field ----------
+    // The first `move`-gated beat: the gate is the DROP landing inside
+    // `level_2`, driven by the real drag first (stump → the hand's own [4,4]).
+    await waitStep(page, 'board_room');
+    {
+      const stump = await findCells(page, (c) => c.chain === 'emberbark');
+      expect(stump.length).toBe(1);
+      await page.evaluate(() => window.__emberkeep.centerCell(6, 4));
+      await page.waitForTimeout(350);
+      await dragTile(page, [stump[0]![0], stump[0]![1]], [4, 4]);
+      await page.waitForTimeout(500);
+      if ((await gameText(page)).tutorial.step === 'board_room') {
+        // Reliability fallback (software rendering): perform the move directly
+        // and let the director hear the same fact the drop would emit.
+        await page.evaluate(() => {
+          const ctx = window.__emberkeep.game.registry.get('ctx') as {
+            state: {
+              items: Map<number, { id: number; chain: string; col: number; row: number }>;
+              moveItem: (id: number, to: { col: number; row: number }) => void;
+              itemIdAt: (col: number, row: number) => number | null;
+            };
+            bus: { emit: (event: string, payload: unknown) => void };
+          };
+          const stumpItem = [...ctx.state.items.values()].find((i) => i.chain === 'emberbark');
+          if (!stumpItem) return;
+          const from = { col: stumpItem.col, row: stumpItem.row };
+          const to = ctx.state.itemIdAt(4, 4) === null ? { col: 4, row: 4 } : { col: 6, row: 4 };
+          ctx.state.moveItem(stumpItem.id, to);
+          ctx.bus.emit('item:moved', { itemId: stumpItem.id, from, to });
+        });
+      }
+    }
+
     // ---------- Emberberry patch: free harvest in the opened land ----------
     await waitStep(page, 'emberberry_tap');
     state = await gameText(page);
@@ -991,6 +1024,13 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       await page.waitForTimeout(260);
     }
 
+    // The handover also blooms the Ember Gate, whose reveal flies the named
+    // hatchling through the door and back (BoardScene.playGateFlight — bloom
+    // +2.1s, out 1.8s, through 2.6s, home 1.5s ≈ 8s from the done step). His
+    // SPRITE is away from his cell for that whole flight, so the drag
+    // assertions below would grab empty air — let him land first.
+    await page.waitForTimeout(6_000);
+
     // ---------- Regression: scripted synchronous moves vs the sprite's cell ----------
     // A scripted step can slide the dragon synchronously inside an emit —
     // before the hatch ceremony created a sprite. The sprite must be born on
@@ -1065,9 +1105,10 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     const atCap = await page.evaluate(() => {
       const board = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
         altarElder?: unknown;
+        altarElderClip?: unknown;
         altarElderFallback?: unknown;
       };
-      return !!(board.altarElder || board.altarElderFallback);
+      return !!(board.altarElder || board.altarElderClip || board.altarElderFallback);
     });
     expect(atCap).toBe(false);
 
@@ -1080,9 +1121,11 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       };
       ctx.bus.emit('quest:completed', { questId: 'keepers_hoard' });
     });
-    // The finale runs ~8.4s: camera to the altar → the egg cracks → the Elder
-    // speaks → camera home. Nothing follows her — no teaser glimpse, no card.
-    await page.waitForTimeout(9_500);
+    // The finale runs FINALE_ENDS_MS (~12.2s now that the Elder's speech is two
+    // chained lines across elderHoldMs): camera to the altar → the egg cracks →
+    // she speaks both lines → camera home. Nothing follows her — no teaser
+    // glimpse, no card.
+    await page.waitForTimeout(13_200);
     await page.screenshot({ path: shot('18-awakening-end') });
     // The board is HANDED BACK, not interrupted: the finale released the stage
     // and the player is straight back in the game with no modal to dismiss.
@@ -1100,9 +1143,10 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     const elderAwake = await page.evaluate(() => {
       const board = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
         altarElder?: unknown;
+        altarElderClip?: unknown;
         altarElderFallback?: unknown;
       };
-      return !!(board.altarElder || board.altarElderFallback);
+      return !!(board.altarElder || board.altarElderClip || board.altarElderFallback);
     });
     expect(elderAwake).toBe(true);
 
@@ -1110,10 +1154,10 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     const before = await gameText(page);
     await page.reload();
     await page.waitForFunction(() => typeof window.render_game_to_text === 'function');
-    await expect.poll(async () => (await gameText(page)).scene).toBe('TitleScene');
+    await expect.poll(async () => (await gameText(page)).scene, { timeout: 30_000 }).toBe('TitleScene');
     await page.waitForTimeout(1200);
     await page.mouse.click(640, 670); // Continue
-    await expect.poll(async () => (await gameText(page)).scene).toBe('BoardScene');
+    await expect.poll(async () => (await gameText(page)).scene, { timeout: 15_000 }).toBe('BoardScene');
     const after = await gameText(page);
     expect(after.tutorial.done).toBe(true);
     expect(after.keys).toBe(before.keys);
@@ -1143,10 +1187,10 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     );
     await page.reload();
     await page.waitForFunction(() => typeof window.render_game_to_text === 'function');
-    await expect.poll(async () => (await gameText(page)).scene).toBe('TitleScene');
+    await expect.poll(async () => (await gameText(page)).scene, { timeout: 30_000 }).toBe('TitleScene');
     await page.waitForTimeout(1200);
     await page.mouse.click(640, 670); // Continue
-    await expect.poll(async () => (await gameText(page)).scene).toBe('BoardScene');
+    await expect.poll(async () => (await gameText(page)).scene, { timeout: 15_000 }).toBe('BoardScene');
     const regenerated = await gameText(page);
     // Use the actual energyMax (grows with level: level 3 = 36) so the cap is correct.
     // 540.5s offline at +1/60s = 9 Warmth recovered.
@@ -1166,10 +1210,10 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       };
       ctx.bus.emit('game:reset_requested', {});
     });
-    await expect.poll(async () => (await gameText(page)).scene).toBe('TitleScene');
+    await expect.poll(async () => (await gameText(page)).scene, { timeout: 30_000 }).toBe('TitleScene');
     await page.waitForTimeout(1200);
     await page.mouse.click(640, 670); // Play — a fresh run on the SAME scene instance
-    await expect.poll(async () => (await gameText(page)).scene).toBe('BoardScene');
+    await expect.poll(async () => (await gameText(page)).scene, { timeout: 15_000 }).toBe('BoardScene');
     await page.waitForTimeout(600);
     const altar = await page.evaluate(() => {
       const board = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {

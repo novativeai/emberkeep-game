@@ -394,6 +394,13 @@ The order board is the narrative + XP/Gold engine.
 ### 11.1 Structure **[L1 one order → full board]**
 - Orders **wait on the board — they never fail** (cozy: no timer pressure). **[L1]**
 - Each order: *"deliver N of {chain,tier}"* → pays **Gold + XP**. **[L1]**
+- **Deliver and Give are one verb in two grammars [L1]:** a piece GIVEN hand to
+  hand that the giver's live order needs is banked toward the delivery (the
+  card's count and the Deliver button read board + bank as one tally; giving
+  every required piece completes the order by itself), and a live GIFT step of
+  the active quest appears in the Ledger as its own card whose Deliver button
+  hands the pieces over straight off the board — same counter, same per-piece
+  Regard as a bag give.
 - **Shipped:** four authored Eleanor orders forming the demo's difficulty ramp —
   *Rekindle the Brazier* (6× Gem Shard → 25 G / 30 XP, **and the Golden Egg
   appears**) → *Warm the Long Hearth* (3× Flame Gem → 75 G / 35 XP) → *The
@@ -427,7 +434,7 @@ edit. **[L1]**
 
 ## 11b. Selyna's Cauldron — brewing **[L1]**
 
-The pot standing in the **hatchery hub** opens a brew screen on tap
+The pot standing in the **Runevault hub** opens a brew screen on tap
 (`ui:cauldron_tapped` → `CauldronPanel`). Recipes live in
 `src/data/cauldron.json`; `CauldronSystem` owns the trade.
 
@@ -447,6 +454,15 @@ The pot standing in the **hatchery hub** opens a brew screen on tap
   formula right — flavor, use, one ingredient card per input showing need and
   the in-bag count in **red when short** — and a BREW button that sleeps until
   the Bag covers everything.
+- **The pot is Borealis's second verb, and its ladder is built on that.** Seven
+  all-northern recipes (Broken Strake, Frost Thread, Pitch Cake, Oil Lamp,
+  Lodestone, Spun Skein, Rune Shard) each turn an ABUNDANCE into a SCARCITY,
+  which is the one trade a merge board cannot make — merges only ever climb one
+  chain. Seven Borealis quests brew them, alternating with merge quests from
+  quest 3 to 16; a `brew` quest goal counts a lifetime `brew:<recipeId>` stat
+  and is charged its recipe's inputs by the availability audit. See
+  `docs/quest-ladder.md` §2 (Borealis) for the rhythm and why each recipe exists.
+  The southern recipes are free-play: no quest names them.
 
 ## 12. Keys & region unlocks
 
