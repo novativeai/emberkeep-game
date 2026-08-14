@@ -1545,9 +1545,19 @@
       "file": "sprites/characters/dragon/reveals/ashdrake.webp"
     },
     {
+      "key": "reveal_ashdrake_adult",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/ashdrake_adult.webp"
+    },
+    {
       "key": "reveal_rimewyrm",
       "source": "file",
       "file": "sprites/characters/dragon/reveals/rimewyrm.webp"
+    },
+    {
+      "key": "reveal_rimewyrm_adult",
+      "source": "file",
+      "file": "sprites/characters/dragon/reveals/rimewyrm_adult.webp"
     },
     {
       "key": "reveal_moonwhisker",
