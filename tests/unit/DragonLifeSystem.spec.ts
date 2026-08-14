@@ -4,9 +4,9 @@ import {
   DRAGON_HUNGER_GRACE_MS,
   DRAGON_NAP_CYCLE_MS,
   DRAGON_REST_MS,
+  DRAGON_SLEEP_MAX_MS,
   DRAGON_WORK_MS,
   DRAGON_WANDER_EVERY_MS,
-  DRAGON_WANDER_MIN_DIST,
   DRAGON_WANDER_SPREAD_MS,
   PHASE_MS
 } from '../../src/core/Constants';
@@ -36,23 +36,19 @@ function atPhase(ctx: Ctx, index: number): void {
 }
 
 describe('DragonLifeSystem — a dragon that lives on the isle', () => {
-  it('wanders to a tile far enough away to read as a journey', () => {
+  it('NEVER relocates itself — the board is the player’s arrangement', () => {
+    // The guarantee behind "a rejoin lands on the board you left". Wandering
+    // ran on the clock, and the clock keeps ticking while the tab is merely
+    // hidden — so pieces walked off on their own while the player was in
+    // another tab, which from the outside is indistinguishable from a save bug.
     const ctx = createTestContext();
     const dragon = dragonAt(ctx, 1, 1);
     const wandered = capture(ctx.bus, 'dragon:wandered');
 
-    tick(ctx, 0); // first sight: schedule only, never an instant departure
+    for (let i = 0; i < 12; i++) tick(ctx, A_WHILE);
     expect(wandered).toHaveLength(0);
-
-    tick(ctx, A_WHILE);
-    expect(wandered).toHaveLength(1);
-    const move = wandered[0]!;
-    const dist = Math.abs(move.to.col - move.from.col) + Math.abs(move.to.row - move.from.row);
-    expect(dist).toBeGreaterThanOrEqual(DRAGON_WANDER_MIN_DIST);
-    // The MOVE is already applied — the scene only has to animate it.
-    expect(ctx.state.items.get(dragon.id)).toMatchObject({ col: move.to.col, row: move.to.row });
-    expect(ctx.state.itemIdAt(move.to.col, move.to.row)).toBe(dragon.id);
-    expect(ctx.state.itemIdAt(move.from.col, move.from.row)).toBeNull();
+    expect(ctx.state.items.get(dragon.id)).toMatchObject({ col: 1, row: 1 });
+    expect(ctx.state.itemIdAt(1, 1)).toBe(dragon.id);
   });
 
   it('NEVER walks out of a group the player could merge', () => {
@@ -252,10 +248,13 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     // Walk a whole nap cycle in slices and record when each one sleeps. Fed
     // every slice: the walk crosses feed cycles (hunger returns each
     // DRAGON_CYCLE_MS), and a hungry dragon never naps — this test is about
-    // the nap windows, not the appetite.
+    // the nap windows, not the appetite. The slice has to be well under
+    // DRAGON_NAP_LENGTH_MS (a doze is ten seconds now) or the sampling steps
+    // straight over the whole nap and reports that it never happened.
     const seen = { a: 0, b: 0, together: 0 };
-    const slice = DRAGON_NAP_CYCLE_MS / 60;
-    for (let i = 0; i < 60; i++) {
+    const slice = 2500;
+    const slices = Math.ceil(DRAGON_NAP_CYCLE_MS / slice);
+    for (let i = 0; i < slices; i++) {
       tick(ctx, slice);
       for (const d of [a, b]) {
         ctx.bus.emit('ui:feed_dragon_requested', { itemId: d.id, chain: 'emberberry', tier: 3 });
@@ -270,6 +269,52 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(seen.b).toBeGreaterThan(0);
     // The whole point of hashing the offset off the id: their windows differ.
     expect(seen.together).toBeLessThan(Math.min(seen.a, seen.b));
+  });
+
+  it('never sleeps longer than the ceiling, whatever put it down', () => {
+    // Ten seconds of real time is the whole budget. Night is a phase long and a
+    // shift-rest is minutes; neither may park the animal as an unusable curled
+    // painting, so the MOOD is capped even where its cause is not.
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    atPhase(ctx, 3); // night — the longest-standing cause there is
+
+    let asleepFor = 0;
+    let longest = 0;
+    for (let i = 0; i < 200; i++) {
+      tick(ctx, 500);
+      ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+      if (ctx.systems.dragonLife.moodOf(dragon.id) === 'asleep') {
+        asleepFor += 500;
+        longest = Math.max(longest, asleepFor);
+      } else {
+        asleepFor = 0;
+      }
+    }
+    expect(longest).toBeGreaterThan(0); // it does still doze
+    // One tick of slack: the cap is enforced on the tick that crosses it.
+    expect(longest).toBeLessThanOrEqual(DRAGON_SLEEP_MAX_MS + 500);
+  });
+
+  it('a shift-rest still costs the shift — the cap shortens the NAP, not the timer', () => {
+    // The rest timer is what the player paid for working the dragon; only the
+    // curled-up look is capped. Blur the two and working becomes free.
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 3, row: 3, kind: 'item' });
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+    tick(ctx, DRAGON_WORK_MS + 1);
+    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBeGreaterThan(0);
+
+    // Past the sleep ceiling it is on its feet again...
+    for (let i = 0; i < 40; i++) {
+      tick(ctx, 500);
+      ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    }
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).not.toBe('asleep');
+    // ...and still owes the rest.
+    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBeGreaterThan(0);
   });
 
   it('announces a mood once per change, not once per tick', () => {

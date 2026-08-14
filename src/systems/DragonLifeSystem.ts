@@ -2,6 +2,9 @@ import {
   DRAGON_HUNGER_GRACE_MS,
   DRAGON_NAP_CYCLE_MS,
   DRAGON_NAP_LENGTH_MS,
+  DRAGON_WANDER_ENABLED,
+  DRAGON_SLEEP_GAP_MS,
+  DRAGON_SLEEP_MAX_MS,
   DRAGON_WANDER_EVERY_MS,
   DRAGON_WANDER_MAX_DIST,
   DRAGON_WANDER_MIN_DIST,
@@ -58,6 +61,9 @@ export class DragonLifeSystem {
    *  needs it on its feet. Transient like every other schedule here: it lasts
    *  as long as the reason does and nothing persists it. */
   private awakeUntil = new Map<number, number>();
+  /** Clock time the CURRENT sleep bout began, per dragon — cleared the moment
+   *  it is awake again. The ceiling (DRAGON_SLEEP_MAX_MS) is measured off it. */
+  private asleepSince = new Map<number, number>();
 
   constructor(
     private state: GameState,
@@ -73,6 +79,7 @@ export class DragonLifeSystem {
       this.firstSeenAt.clear();
       this.lastMood.clear();
       this.awakeUntil.clear();
+      this.asleepSince.clear();
     });
   }
 
@@ -81,6 +88,7 @@ export class DragonLifeSystem {
     this.firstSeenAt.delete(itemId);
     this.lastMood.delete(itemId);
     this.awakeUntil.delete(itemId);
+    this.asleepSince.delete(itemId);
   }
 
   /**
@@ -133,6 +141,30 @@ export class DragonLifeSystem {
     if (from === mood) return;
     this.lastMood.set(itemId, mood);
     this.bus.emit('dragon:mood', { itemId, mood, from });
+  }
+
+  /**
+   * Enforce the ten-second ceiling on a sleep bout.
+   *
+   * Sleep here is DERIVED, so there is nothing to expire — the night is still
+   * the night when the dragon has had enough of it. The bout is therefore
+   * ended the only way a derived state can be: by opening a `keepAwake` window
+   * over it, which also buys the gap that stops the same standing cause
+   * re-seating the animal on the very next tick.
+   */
+  private capSleepBout(itemId: number): void {
+    if (this.moodOf(itemId) !== 'asleep') {
+      this.asleepSince.delete(itemId);
+      return;
+    }
+    const since = this.asleepSince.get(itemId);
+    if (since === undefined) {
+      this.asleepSince.set(itemId, this.clock.now());
+      return;
+    }
+    if (this.clock.now() - since < DRAGON_SLEEP_MAX_MS) return;
+    this.asleepSince.delete(itemId);
+    this.keepAwake(itemId, DRAGON_SLEEP_GAP_MS);
   }
 
   /** Is this dragon inside a `keepAwake` window? */
@@ -224,6 +256,10 @@ export class DragonLifeSystem {
    * its own kind stays exactly where it is.
    */
   private mayWander(item: BoardItemState): boolean {
+    // The board is the PLAYER'S arrangement and nothing ambient may rewrite it
+    // (DRAGON_WANDER_ENABLED). This is the guard that makes a rejoin land on
+    // the same board that was left.
+    if (!DRAGON_WANDER_ENABLED) return false;
     // The tutorial is a script and the board is its stage; a piece moving on its
     // own would walk out from under a scripted step.
     if (!this.state.tutorialDone) return false;
@@ -269,6 +305,7 @@ export class DragonLifeSystem {
       if (!this.firstSeenAt.has(item.id)) this.firstSeenAt.set(item.id, now);
 
       // ---- mood, announced only when it changes ------------------------
+      this.capSleepBout(item.id);
       this.announceMood(item.id);
 
       // ---- wandering ---------------------------------------------------

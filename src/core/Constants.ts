@@ -1173,6 +1173,24 @@ export const DRAGON_ROAR_EVERY_MS = 64_000;
  *  reproducible, and a randomly-timed board move is exactly what would break it. */
 export const DRAGON_WANDER_EVERY_MS = 72_000;
 export const DRAGON_WANDER_SPREAD_MS = 48_000;
+
+/**
+ * May a dragon RELOCATE itself? No.
+ *
+ * The board is the player's arrangement — a row lined up for a merge, a
+ * generator parked out of the way — and it is the one thing they expect to
+ * find untouched. Wandering ran on the clock, which keeps ticking while the
+ * tab is merely hidden (the power governor throttles the frame rate, it does
+ * not stop time), so a player who left for ten minutes came back to pieces
+ * that had walked off on their own. From the outside that is indistinguishable
+ * from a save bug, and it is the reason a rejoin "drifted".
+ *
+ * The rest of the ambient life is untouched: dragons still doze, stretch,
+ * bellow when hungry and fly their work errands. They simply do it where they
+ * were left. Flip this to re-enable relocation — `mayWander`'s other guards
+ * (never out of a mergeable group, never during the tutorial) still apply.
+ */
+export const DRAGON_WANDER_ENABLED = false;
 /** A wander must actually GO somewhere: the target tile is at least this many
  *  cells away, so the dragon crosses the isle instead of shuffling sideways. */
 export const DRAGON_WANDER_MIN_DIST = 3;
@@ -1203,10 +1221,29 @@ export const SLEEP_BREATH = {
 } as const;
 
 /** A dragon naps of its own accord: a window this long, once per cycle, with
- *  the offset derived from its id so a pair never sleeps in lockstep. Cozy
- *  cadence — it is asleep for roughly one minute in five. */
-export const DRAGON_NAP_CYCLE_MS = 300_000;
-export const DRAGON_NAP_LENGTH_MS = 58_000;
+ *  the offset derived from its id so a pair never sleeps in lockstep. A DOZE,
+ *  not a nap — asleep for ten seconds in fifteen minutes. It used to be a
+ *  minute in five, which meant a fifth of the time the animal the player came
+ *  to look at was a curled painting they could not use. */
+export const DRAGON_NAP_CYCLE_MS = 900_000;
+export const DRAGON_NAP_LENGTH_MS = 10_000;
+
+/**
+ * The hard ceiling on being asleep — ten seconds of real time, whatever put
+ * the animal down.
+ *
+ * Night is a whole phase long and a shift-rest is minutes; either would park a
+ * dragon as an unusable curled painting for far longer than anyone wants to
+ * watch. So the MOOD is capped even where its cause is not: the dragon dozes,
+ * gets up, and the cause carries on meaning what it meant. A shift-rest still
+ * blocks working (that timer is the cost of the shift and is untouched), it
+ * simply no longer looks like a coma; and the night still reads as night
+ * through the sky, not through a motionless board.
+ */
+export const DRAGON_SLEEP_MAX_MS = 10_000;
+/** After a bout hits the ceiling, the animal stays up at least this long, so a
+ *  standing cause (the night) cannot re-seat it on the very next tick. */
+export const DRAGON_SLEEP_GAP_MS = 120_000;
 
 /** One bellow, and the stretch it takes to get up afterwards. */
 export const DRAGON_ROAR_MS = 1500;

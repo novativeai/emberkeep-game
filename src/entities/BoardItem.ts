@@ -38,6 +38,13 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** The art's own scale, so the breath can modulate it without drifting. */
   private artBaseX = 1;
   private artBaseY = 1;
+  /** Is the piece over ground it could be put down on? The ground shadow
+   *  answers to this while dragging — see `setOverGround`. */
+  private overGround = true;
+  /** Whether the ground shadow was showing when the lift began, so coming back
+   *  over the isle restores it WITHOUT lighting one under a rig host or a
+   *  sleeping dragon that had deliberately hidden its own. */
+  private groundShadowBeforeLift = true;
   private cooling = false;
   /** Art hidden behind a live rig — cooldown/ready visuals are suppressed
    *  (they'd render UNDER the rig); BoardScene floats a badge instead. */
@@ -286,6 +293,34 @@ export class BoardItem extends Phaser.GameObjects.Container {
   }
 
   /**
+   * Is the piece being carried over ground it could actually be put down on?
+   *
+   * A shadow is cast BY something ONTO something. Carried out over the open sky
+   * between two islands there is no floor to darken, so a shadow there is the
+   * same lie the drop-target diamond used to tell before it learned to hide —
+   * and on a zoned world, where most of the frame is sky, it is the lie you see
+   * most often. `BoardScene.updateDrag` is the one place that knows whether the
+   * cell under the drag is real; this is that answer reaching the piece itself,
+   * so the diamond and the shadow can never disagree.
+   *
+   * Written STRAIGHT, not tweened: the lift and the settle already own this
+   * property either side of the drag, and a third animation racing them is how
+   * a shadow ends up stuck half-faded. Snapping is also the honest reading —
+   * the floor is there or it is not, and the edge the piece crosses is a hard
+   * one.
+   *
+   * Driven every frame, so it early-outs on no change.
+   */
+  setOverGround(on: boolean): void {
+    if (on === this.overGround) return;
+    this.overGround = on;
+    // `groundShadowBeforeLift` is what keeps this from LIGHTING a shadow: a rig
+    // host (or a sleeping dragon) hid its own on purpose, and coming back over
+    // the isle must not undo that.
+    this.groundShadow.setVisible(on && this.groundShadowBeforeLift);
+  }
+
+  /**
    * Show the art but NOT its own ground shadow.
    *
    * One caller: a sleeping dragon. The curled painting replaces a rig that was
@@ -299,6 +334,10 @@ export class BoardItem extends Phaser.GameObjects.Container {
 
   liftForDrag(): void {
     this.bobPaused = true;
+    // Remember the shadow's state at pick-up, and start the journey assumed to
+    // be over ground — a drag always begins on a cell the piece was sitting on.
+    this.groundShadowBeforeLift = this.groundShadow.visible;
+    this.overGround = true;
     this.setDepth(DEPTHS.dragged);
     this.scene.tweens.add({
       targets: this,
@@ -335,6 +374,9 @@ export class BoardItem extends Phaser.GameObjects.Container {
   }
 
   settleFromDrag(): void {
+    // Wherever the piece landed it is standing on something again — a drop over
+    // the void snaps it home. Restore the shadow it had before the lift.
+    this.setOverGround(true);
     this.scene.tweens.add({
       targets: this,
       scale: 1,

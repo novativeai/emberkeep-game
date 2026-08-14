@@ -4224,7 +4224,7 @@ export class BoardScene extends Phaser.Scene {
         // item's tracked position), NOT the raw pointer — the two differ by the
         // grab offset, so pointer-based drops could land one tile off and
         // bounce home even though the item hovered a free tile.
-        const to = worldToGrid(this.dragTarget.x, this.dragTarget.y + 24);
+        const to = this.dropCellUnderDrag();
 
         // Food dragged onto a DRAGON → feed it. The mirror of the gesture just
         // below (a dragon dragged onto a House), so the board has one verb for
@@ -4425,9 +4425,35 @@ export class BoardScene extends Phaser.Scene {
     const k = 1 - Math.exp(-delta / DRAG.followTau);
     s.x += (this.dragTarget.x - s.x) * k;
     s.y += (this.dragTarget.y - s.y) * k;
-    const cell = worldToGrid(this.dragTarget.x, this.dragTarget.y + 24);
+    const cell = this.dropCellUnderDrag();
+    // ONE question — "is there floor here?" — and three things obeying the
+    // answer: the target diamond, the piece's own shadow, and the drop itself.
+    // On a zoned world most of the frame is open sky between islands, so a
+    // diamond that drew anywhere and a shadow that never lifted were both
+    // promising a landing the board would refuse.
+    const live = this.ctx.state.isTileActive(cell.col, cell.row);
+    s.setOverGround(live);
+    if (!live) {
+      this.dragCell.setVisible(false);
+      return;
+    }
     const { x, y } = gridToWorld(cell.col, cell.row);
-    this.dragCell.setPosition(x, y);
+    this.dragCell
+      .setPosition(x, y)
+      // The diamond is drawn at the authored tile, so on a zone with a smaller
+      // one it has to shrink to the ground it is pointing at.
+      .setScale(artScaleAt(this.ctx.state.world, cell.col, cell.row))
+      .setVisible(true);
+  }
+
+  /**
+   * The address under the dragged item — the ONE resolver the highlight and the
+   * drop both read, so the diamond can never show one cell while the drop takes
+   * another. The `+24` is the grab offset: the piece is carried a little above
+   * the pointer, and the cell that matters is the one under its FEET.
+   */
+  private dropCellUnderDrag(): TilePos {
+    return worldToGrid(this.dragTarget.x, this.dragTarget.y + 24);
   }
 
   /**
@@ -4995,32 +5021,6 @@ export class BoardScene extends Phaser.Scene {
     if (DRAGON_RIGS[item.chain] && isGenerator && (this.tutorialDone || this.allow.dragonWork)) {
       this.selectSubject('dragon', String(item.id), false);
     }
-    // A SLEEPING dragon is not a button. The tap wakes it — and only wakes it:
-    // it does not also harvest, because the wake is the whole gesture and its
-    // animation has to finish before the animal is a working generator again.
-    //
-    // Which sleep it is decides whether the tap does anything at all. A NAP is
-    // the player's to interrupt; a shift-rest is not — that sleep was bought
-    // with the work, and shaking it off would hand the cost back.
-    if (this.ctx.systems.dragons.isBoardDragon(item)) {
-      const kind = this.ctx.systems.dragonLife.sleepKindOf(item.id);
-      if (kind === 'nap' || kind === 'night') {
-        this.wakeDragonByTap(sprite, item.id);
-        return;
-      }
-      if (kind === 'rest') {
-        scalePulse(this, sprite, 1.04, 120); // it stirs, and goes back to sleep
-        this.floatText(sprite.x, sprite.y - 150, 'Worn out — let it rest', PALETTE.cream);
-        return;
-      }
-      // Awake, but still folding out of a sleep: the wake clip owns these
-      // frames, and harvesting through it would pay out over a dragon that is
-      // visibly still getting up.
-      if (this.liveDragons.get(item.id)?.waking) {
-        scalePulse(this, sprite, 1.04, 120);
-        return;
-      }
-    }
     // An undecided House asks what it should make — and keeps asking, because a
     // player who dismissed the chooser must have a way back to it. Once
     // committed this stops firing and the tap falls through to the skip offer,
@@ -5041,8 +5041,38 @@ export class BoardScene extends Phaser.Scene {
     // with the time left); a ready tap-generator harvests as usual.
     const timer = isGenerator ? this.genTimer(item) : null;
     if (timer) {
+      // BEFORE any sleep handling: the skip buttons are the only way to buy a
+      // cooling generator back, and a dragon that is also asleep must not
+      // swallow the offer — "he is napping" is no answer to a player trying to
+      // pay to re-enable him.
       this.showSkipButton(sprite, timer.remaining, timer.total, cfg?.skipMaxGold);
       return;
+    }
+    // Nothing to skip. Now the sleep decides what this tap means.
+    //
+    // A SLEEPING dragon is not a button: the tap wakes it and only wakes it,
+    // because the wake is the whole gesture and its animation has to finish
+    // before the animal is a working generator again. Which sleep it is decides
+    // whether the tap does anything at all — a NAP is the player's to
+    // interrupt; a shift-rest is not, that sleep was bought with the work.
+    if (this.ctx.systems.dragons.isBoardDragon(item)) {
+      const kind = this.ctx.systems.dragonLife.sleepKindOf(item.id);
+      if (kind === 'nap' || kind === 'night') {
+        this.wakeDragonByTap(sprite, item.id);
+        return;
+      }
+      if (kind === 'rest') {
+        scalePulse(this, sprite, 1.04, 120); // it stirs, and goes back to sleep
+        this.floatText(sprite.x, sprite.y - 150, 'Worn out — let it rest', PALETTE.cream);
+        return;
+      }
+      // Awake, but still folding out of a sleep: the wake clip owns these
+      // frames, and harvesting through it would pay out over a dragon that is
+      // visibly still getting up.
+      if (this.liveDragons.get(item.id)?.waking) {
+        scalePulse(this, sprite, 1.04, 120);
+        return;
+      }
     }
     // Passive-only generators (house, big tree) never tap-harvest — they pay out
     // on their own timer; a ready tap does nothing.
