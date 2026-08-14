@@ -39,6 +39,21 @@ const RING_HOLE_RADIUS = RING_SIZE * (200 / 512);
 /** A static speaker's disc (the Golden Elder, Selyna) fits INSIDE the hole like
  *  a medallion photo — the fully-contained treatment. */
 const STATIC_DISC_SIZE = RING_SIZE * 0.98;
+/**
+ * Stand-in ring art for a speaker with no `portrait_<id>` texture of its own.
+ *
+ * Without an entry here the ring kept whatever sheet the LAST speaker mounted,
+ * and the mismatch broke the frame rather than merely showing the wrong face:
+ * `layout` branches on the mounted texture's key, so Eleanor's `eleanor_disc`
+ * took the split (bottom-anchored, bust-scaled, shifted a half-height DOWN)
+ * treatment while `setSpeakerArt` had already centre-origined it and dropped
+ * the circular mask — so her bust drew at full size, below the hole, with
+ * nothing clipping it. That is what the Golden Elder's finale lines showed.
+ * He IS the golden dragon, so his own reveal plate is the honest medallion.
+ */
+const STATIC_PORTRAIT_ART: Record<string, string> = {
+  golden_elder: 'reveal_golden_adult'
+};
 /** Align-Studio PORTRAIT clips (character-anims.json, stage 'portrait') get
  *  the SAME split treatment the guide's disc has — body copy masked BEHIND the
  *  ring band, head copy (cropped at the neck) drawn ABOVE it — with per-
@@ -372,13 +387,35 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       return;
     }
     this.portraitAnim.rest();
-    const staticKey = `portrait_${speaker}`;
-    if (this.scene.textures.exists(staticKey)) this.portrait.setTexture(staticKey);
     this.portrait.setOrigin(0.5, 0.5);
     this.portrait.setCrop();
-    this.portrait.clearMask();
     this.portraitTop.setVisible(false);
-    this.portraitBack.setVisible(false);
+    // The moss interior fills the window behind a medallion, exactly as it does
+    // behind the guide — otherwise the board shows through beside the disc.
+    this.portraitBack.setVisible(true);
+    const key = this.staticPortraitKey(speaker);
+    if (!key) {
+      // No art for this speaker: show an EMPTY ring rather than leaving the
+      // last speaker's sheet mounted. A stale sheet is both the wrong face and
+      // a broken frame, because `layout` reads the mounted texture's key.
+      this.portrait.setVisible(false);
+      return;
+    }
+    if (this.portrait.texture.key !== key) this.portrait.setTexture(key, 0);
+    this.portrait.setVisible(true);
+    // Keep the circular clip on a medallion too. It is meant to sit inside the
+    // window, so the mask is only a backstop — but it is the backstop that
+    // stops any future portrait plate from spilling over the frame.
+    this.portrait.setMask(this.portraitMask);
+  }
+
+  /** The ring art for a speaker with no disc/clip animation: its own painted
+   *  portrait if one exists, else its authored stand-in, else nothing. */
+  private staticPortraitKey(speaker: string): string | null {
+    const own = `portrait_${speaker}`;
+    if (this.scene.textures.exists(own)) return own;
+    const standIn = STATIC_PORTRAIT_ART[speaker];
+    return standIn && this.scene.textures.exists(standIn) ? standIn : null;
   }
 
   /**
@@ -796,7 +833,8 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     } else {
       // Static speaker disc: centred, fully CONTAINED inside the hole
       // like a medallion photo — the original look.
-      const s = (STATIC_DISC_SIZE / Math.max(1, this.portrait.width)) * oPortrait.scale;
+      const fit = Math.max(1, this.portrait.width, this.portrait.height);
+      const s = (STATIC_DISC_SIZE / fit) * oPortrait.scale;
       this.portrait.setPosition(ringX + oPortrait.dx, ringY + oPortrait.dy);
       this.portraitAnim.applyBaseScale(s, s);
     }

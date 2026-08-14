@@ -422,28 +422,42 @@ export const ITEM_SCALE: Record<string, number> = {
   moonwater_2: 0.20,
   moonwater_3: 0.20,
   nest_1: 0.33, // a Cold Nest is furniture a dragon sits in, not a merge piece
-  // ---- Selyna's Borealis roster (merge-chains.md §2.4) ----
-  // Same 66 / 88 / 112 tiering as the Emberkeep chains above, so a Drift Spar
-  // reads at the size of a Gem Shard and the board stays legible across worlds.
-  driftwood_1: 0.16,
-  driftwood_2: 0.17,
-  driftwood_3: 0.22,
-  tarknot_1: 0.20,
-  tarknot_2: 0.18,
-  tarknot_3: 0.22,
-  rimebloom_1: 0.21,
-  rimebloom_2: 0.19,
-  rimebloom_3: 0.22,
-  frostsilk_1: 0.16,
-  frostsilk_2: 0.17,
-  frostsilk_3: 0.22,
-  // The north's fixtures + the Wreck Timber ladder (target units / alpha bbox).
-  wrackline_1: 0.299, // The Wrack Line — low wide tide-heap landmark, 635px → ~190 units
-  frostfont_1: 0.29, // Hoarfrost Font — working font, 518px tall → ~150 units
-  keel_1: 0.177, // Broken Strake, 418px → 74 units (the Cut Wood class)
-  keel_2: 0.21, // Lashed Frame, 476px → 100 units (the Plank Set class)
-  keel_3: 0.409, // Upturned Hull, 635px → 260 units (the House class)
-  keel_4: 0.49 // Longhall, 714px → 350 units (the Manor class)
+  // ---- The north's FIVE FARMS (docs/merge-chains.md §2.4.1c) ----
+  // Every piece is authored at 6x its on-board size, so the scale is 1/6 flat
+  // and the LADDER lives in the art instead: `gen-borealis-farms.py` cuts a
+  // product to 66 / 88 / 118 units and a fixture to 66 / 92 / 170, because the
+  // top of a fixture chain is a machine you build a farm around and the top of
+  // a product chain is a thing you carry.
+  glasskiln_1: 0.1667, // Fire Brick
+  glasskiln_2: 0.1667, // Kiln Grate
+  glasskiln_3: 0.1667, // The Glass Kiln
+  seaglass_1: 0.1667, // Glass Float
+  seaglass_2: 0.1667, // Glass Buoy
+  seaglass_3: 0.1667, // The Bottled Ship
+  starbench_1: 0.1667, // Brass Cog
+  starbench_2: 0.1667, // Gear Ring
+  starbench_3: 0.1667, // The Starwright's Bench
+  orrery_1: 0.1667, // Ground Lens
+  orrery_2: 0.1667, // Spyglass
+  orrery_3: 0.1667, // The Orrery
+  wreckforge_1: 0.1667, // Iron Billet
+  wreckforge_2: 0.1667, // Forge Bellows
+  wreckforge_3: 0.1667, // The Wreck Forge
+  warhelm_1: 0.1667, // Iron Cap
+  warhelm_2: 0.1667, // Banded Helm
+  warhelm_3: 0.1667, // The Horned Helm
+  tarkiln_1: 0.1667, // Tar Spile
+  tarkiln_2: 0.1667, // Tar Bucket
+  tarkiln_3: 0.1667, // The Tar Kiln
+  emberheart_1: 0.1667, // Pitch Bead
+  emberheart_2: 0.1667, // Pitch Loaf
+  emberheart_3: 0.1667, // The Ember Heart
+  auroraloom_1: 0.1667, // Silver Spindle
+  auroraloom_2: 0.1667, // Loom Comb
+  auroraloom_3: 0.1667, // The Aurora Loom
+  auroraweave_1: 0.1667, // Light Thread
+  auroraweave_2: 0.1667, // Woven Bolt
+  auroraweave_3: 0.1667 // The Aurora Cloak
 };
 
 /** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
@@ -1111,17 +1125,17 @@ export const DRAGON_RARITY: Record<string, DragonRarity> = {
  *
  * Every breed now has a favourite of its OWN — five breeds, five reachable
  * chains — which is what `stormcap` and `nightbloom` were added for. Before
- * them the roster held three usable favourites for five dragons (`tarknot` is
+ * them the roster held three usable favourites for five dragons (`emberheart` is
  * Borealis-only, so an Emberkeep dragon could never reach it), and two pairs of
  * breeds shared a taste. A favourite the player has to discover is only worth
  * discovering if it tells one dragon apart from another.
  */
 export const DRAGON_DIET: Record<string, { favourite: string; refuses: string }> = {
-  ember_dragon: { favourite: 'resin', refuses: 'tarknot' },
-  emerald: { favourite: 'emberberry', refuses: 'tarknot' },
+  ember_dragon: { favourite: 'resin', refuses: 'emberheart' },
+  emerald: { favourite: 'emberberry', refuses: 'emberheart' },
   frost: { favourite: 'ashmoss', refuses: 'resin' },
   storm: { favourite: 'stormcap', refuses: 'emberberry' },
-  moonwhisker: { favourite: 'nightbloom', refuses: 'tarknot' },
+  moonwhisker: { favourite: 'nightbloom', refuses: 'emberheart' },
   // The legendaries. Each favours a food of its HOME world (the ashdrake eats
   // the isle's cinders; the rimewyrm — a cold thing — craves the one drop of
   // fire the north distils), which is what the diet test's per-breed world

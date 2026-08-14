@@ -90,7 +90,27 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
    *  waiting to fade in, and `getClosePos` answers null so the tutorial arrow
    *  cannot point at the ✕ until the reveal has been SEEN. */
   private revealPending = false;
+  /** The reveal is ARMED and waiting for the player to turn to the dragon's own
+   *  page — the lesson opens on the roster, so the bloom belongs to the card
+   *  they choose, not to a page that opened itself. */
+  private revealArmed = false;
   private favouriteRow: Phaser.GameObjects.Container | null = null;
+  /**
+   * The tutorial is HOLDING the book open.
+   *
+   * The lesson walks three pages, and every beat of it is gated on the player
+   * getting to the next one — so a book that could be dismissed is a book that
+   * strands the script (tutorial-design law 4). While held, the scrim ignores
+   * taps and both exits are off the page, leaving exactly one thing to do.
+   * Phaser hands a pointerup to EVERY interactive object under it, so without
+   * this the tap that answers Eleanor's bubble also lands on the scrim behind
+   * her and shuts the panel the step is waiting on.
+   */
+  private held = false;
+  /** Roster cards by chain, for the lesson's first pointer. */
+  private cards = new Map<string, Phaser.GameObjects.Container>();
+  /** The detail page's EVOLUTION button, for the lesson's second. */
+  private evolutionBtn: Phaser.GameObjects.Container | null = null;
   /** Idle tweens owned by the live page — killed on every re-render, so a
    *  breathing sprite cannot outlive the page that started it. */
   private pageTweens: Phaser.Tweens.Tween[] = [];
@@ -107,7 +127,10 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     const dim = scene.add
       .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
-    dim.on('pointerup', () => this.requestClose());
+    dim.on('pointerup', () => {
+      if (this.held) return; // the lesson owns the book — see `held`
+      this.requestClose();
+    });
     this.add(dim);
 
     const frame = scene.add.image(0, 40, 'ui_store_panel');
@@ -153,7 +176,10 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     this.closeBtn.setInteractive({ useHandCursor: true });
     this.closeBtn.on('pointerover', () => this.closeBtn.setScale(1.08));
     this.closeBtn.on('pointerout', () => this.closeBtn.setScale(1));
-    this.closeBtn.on('pointerup', () => this.requestClose());
+    this.closeBtn.on('pointerup', () => {
+      if (this.held) return;
+      this.requestClose();
+    });
     this.add(this.closeBtn);
 
     scene.add.existing(this);
@@ -178,6 +204,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
   open(): void {
     this.isOpen = true;
     this.revealPending = false;
+    this.revealArmed = false;
     this.showPage('roster');
     this.setVisible(true);
     this.setAlpha(0);
@@ -196,6 +223,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     if (!this.isOpen) return;
     this.isOpen = false;
     this.revealPending = false;
+    this.revealArmed = false;
     this.scene.tweens.add({
       targets: this,
       alpha: 0,
@@ -221,6 +249,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
 
   private showPage(page: Page): void {
     this.killPageTweens();
+    const turned = page !== this.page;
     this.page = page;
     this.pageRoster.setVisible(page === 'roster');
     this.pageDetail.setVisible(page === 'detail');
@@ -228,6 +257,24 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     if (page === 'roster') this.renderRoster();
     if (page === 'detail') this.renderDetail();
     if (page === 'evolution') this.renderEvolution();
+    // Announced only when the book actually TURNS: the live re-render on
+    // `dragon:well_fed` re-shows the page it is already on, and a gate that
+    // fired on that would advance the lesson on a feeding somewhere else.
+    if (turned && this.isOpen) this.bus.emit('ui:codex_page', { page });
+  }
+
+  /**
+   * Hold the book open for the tutorial's lesson (or let it go again).
+   *
+   * Both exits go with it, rather than being left live-but-refusing: a ✕ that
+   * answers nothing reads as a broken button, and the lesson's whole shape is
+   * "there is one thing on this page to do".
+   */
+  setHeld(held: boolean): void {
+    if (this.held === held) return;
+    this.held = held;
+    this.closeBtn.setVisible(!held);
+    if (this.isOpen) this.showPage(this.page); // re-cuts the ‹ BACK pill
   }
 
   private entryFor(chain: string): DragondexEntry | undefined {
@@ -265,6 +312,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
    */
   private renderRoster(): void {
     this.pageRoster.removeAll(true);
+    this.cards.clear();
     this.setHeading('Dragon Codex');
     const named = new Map(this.dragons.namedDragons().map((d) => [d.chain, d]));
     const breeds = Object.keys(this.dex.dragons);

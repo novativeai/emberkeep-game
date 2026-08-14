@@ -70,7 +70,7 @@ describe('feed cycles — the 10-minute window behind the Dragon Codex', () => {
     const itemId = placeDragon(ctx);
     expect(ctx.systems.dragons.tasteKnowledge(itemId)).toMatchObject({
       favourite: { chain: 'resin', known: false },
-      dislike: { chain: 'tarknot', known: false }
+      dislike: { chain: 'emberheart', known: false }
     });
 
     feed(ctx, itemId); // resin — his favourite, and now the player knows it
@@ -78,7 +78,7 @@ describe('feed cycles — the 10-minute window behind the Dragon Codex', () => {
     expect(ctx.systems.dragons.tasteKnowledge(itemId).dislike.known).toBe(false);
 
     // The head turns away — nothing eaten, but the book writes it down.
-    ctx.bus.emit('ui:feed_dragon_requested', { itemId, chain: 'tarknot', tier: 1 });
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId, chain: 'emberheart', tier: 1 });
     expect(ctx.systems.dragons.tasteKnowledge(itemId).dislike.known).toBe(true);
   });
 

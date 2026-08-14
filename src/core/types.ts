@@ -853,7 +853,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'ui:codex_closed' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'ui:codex_closed' | 'ui:codex_dragon_opened' | 'ui:codex_evolution_opened' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number }
   /** A piece of `chain` CARRIED into `region` — the board-hygiene lesson. The
    *  gate is the drop landing inside the named region's tiles, so a wiggle on
@@ -903,14 +903,37 @@ export interface TutorialAllow {
  */
 export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: number; tier?: number };
 
+/**
+ * A UI landmark the tutorial's hand or arrow can point at.
+ *
+ * One list, named once: it is read by the hand config, the arrow config and
+ * both of their resolved forms, and four copies of the same union is how a
+ * target lands in the data with nowhere in `UIScene.uiTarget` to answer it.
+ * The three `codex_*` entries walk the Codex lesson in order — the dragon's
+ * card on the roster, the EVOLUTION button on its page, then the ✕.
+ */
+export type TutorialUiTarget =
+  | 'ledger'
+  | 'deliver'
+  | 'marketplace'
+  | 'cookbook'
+  | 'cookbook_close'
+  | 'codex_card'
+  | 'codex_evolution'
+  | 'codex_close'
+  | 'bag'
+  | 'bag_give'
+  | 'status'
+  | 'commission';
+
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: TutorialUiTarget }
   | { fogRegion: string };
 
 export type TutorialArrowConfig =
   | { tile: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: TutorialUiTarget }
   | { fogRegion: string }
   /** A world character by id. NEVER point at one with a literal `tile` — where
    *  she stands is authored in the World Builder (`characters.json` anchor +
@@ -1224,9 +1247,13 @@ export interface EventMap {
   'ui:commission_toggled': { open: boolean };
   /** The Dragon Codex opened/closed. */
   'ui:codex_toggled': { open: boolean };
-  /** Intent: open the Codex on the first named dragon's detail page — the
-   *  tutorial's `openCodex` effect. UIScene owns the panel and answers. */
+  /** Intent: open the Codex on the first named dragon's page for the lesson —
+   *  the tutorial's `openCodex` effect. UIScene owns the panel and answers. */
   'ui:codex_open_requested': { reveal?: 'favourite' };
+  /** Fact: the Codex turned to a page. The tutorial's codex lesson walks the
+   *  player roster → dragon → evolution, so the PAGE is what its gates read;
+   *  `open`/`closed` alone cannot tell those three beats apart. */
+  'ui:codex_page': { page: 'roster' | 'detail' | 'evolution' };
   /** Command: brew this recipe. CauldronSystem validates the Bag and owns the
    *  outcome — the panel only asks. */
   'cauldron:brew': { recipeId: string };
@@ -1614,12 +1641,12 @@ export interface EventMap {
 
 export type ResolvedHand =
   | { from: TilePos; to: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: TutorialUiTarget }
   | { fogRegion: string };
 
 export type ResolvedArrow =
   | { tile: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: TutorialUiTarget }
   | { fogRegion: string }
   /** Stays an id through the payload, exactly like `ui`: the UI re-reads her
    *  position every frame, so she can move (World Builder, or a future walk)

@@ -2,139 +2,323 @@
   "recipes": [
     {
       "id": "hearth_cake",
-      "output": { "chain": "resin", "tier": 3, "count": 1 },
+      "output": {
+        "chain": "resin",
+        "tier": 3,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "emberberry", "tier": 2, "count": 2 },
-        { "chain": "flame_gem", "tier": 2, "count": 1 }
+        {
+          "chain": "emberberry",
+          "tier": 2,
+          "count": 2
+        },
+        {
+          "chain": "flame_gem",
+          "tier": 2,
+          "count": 1
+        }
       ],
       "flavor": "Selyna's everyday brew — berries baked over gem-heat until they hold together.",
       "use": "A full meal for any dragon, and Eleanor never refuses one."
     },
     {
-      "id": "broken_strake",
-      "output": { "chain": "keel", "tier": 1, "count": 1 },
-      "inputs": [{ "chain": "driftwood", "tier": 2, "count": 1 }],
-      "flavor": "Boil a bound faggot until the salt lets go, and it comes out the shape a hull wants.",
-      "use": "The wrecks give up strakes far too slowly to build on."
-    },
-    {
-      "id": "frost_thread",
-      "output": { "chain": "frostsilk", "tier": 1, "count": 1 },
-      "inputs": [{ "chain": "rimebloom", "tier": 2, "count": 1 }],
-      "flavor": "A cluster of frost flowers, simmered until only the fibre is left.",
-      "use": "Thread without waiting on a full Rime Bloom to grow one."
-    },
-    {
-      "id": "pitch_cake",
-      "output": { "chain": "tarknot", "tier": 2, "count": 1 },
+      "id": "iron_cap",
+      "output": {
+        "chain": "warhelm",
+        "tier": 1,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "tarknot", "tier": 1, "count": 2 },
-        { "chain": "driftwood", "tier": 1, "count": 2 }
+        {
+          "chain": "seaglass",
+          "tier": 2,
+          "count": 1
+        }
       ],
-      "flavor": "Two knots of tar and two spars of wood: the wood is what makes it burn slow.",
-      "use": "The north's fuel. Dragons eat it; boats are sealed with it."
+      "flavor": "Two glass floats, cracked back down and the metal off their nets drawn out of the melt.",
+      "use": "The wrecks give up iron far too slowly to arm anyone."
+    },
+    {
+      "id": "light_thread",
+      "output": {
+        "chain": "auroraweave",
+        "tier": 1,
+        "count": 1
+      },
+      "inputs": [
+        {
+          "chain": "orrery",
+          "tier": 2,
+          "count": 1
+        }
+      ],
+      "flavor": "A ground lens held against the lights until the colour comes off it in a strand.",
+      "use": "Thread without waiting on a whole Orrery to be built."
+    },
+    {
+      "id": "pitch_loaf",
+      "output": {
+        "chain": "emberheart",
+        "tier": 2,
+        "count": 1
+      },
+      "inputs": [
+        {
+          "chain": "emberheart",
+          "tier": 1,
+          "count": 2
+        },
+        {
+          "chain": "seaglass",
+          "tier": 1,
+          "count": 2
+        }
+      ],
+      "flavor": "Two beads of pitch and two floats of glass: the glass is what makes it burn slow.",
+      "use": "The north's fuel. Dragons eat it; hulls are sealed with it."
     },
     {
       "id": "oil_lamp",
-      "output": { "chain": "hearthlamp", "tier": 1, "count": 1 },
+      "output": {
+        "chain": "hearthlamp",
+        "tier": 1,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "tarknot", "tier": 2, "count": 1 },
-        { "chain": "emberdram", "tier": 1, "count": 2 }
+        {
+          "chain": "emberheart",
+          "tier": 2,
+          "count": 1
+        },
+        {
+          "chain": "emberdram",
+          "tier": 1,
+          "count": 2
+        }
       ],
       "flavor": "Pitch for the burning, spirit for the light, and a wick of anything to hand.",
       "use": "Three make a Storm Lantern. Only a handful were ever left on the ice."
     },
     {
       "id": "lodestone",
-      "output": { "chain": "wayfinder", "tier": 1, "count": 1 },
+      "output": {
+        "chain": "wayfinder",
+        "tier": 1,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "manastone", "tier": 1, "count": 2 },
-        { "chain": "keel", "tier": 1, "count": 1 }
+        {
+          "chain": "manastone",
+          "tier": 1,
+          "count": 2
+        },
+        {
+          "chain": "warhelm",
+          "tier": 1,
+          "count": 1
+        }
       ],
-      "flavor": "Two mana pebbles quarrelling over one strake of wreck timber, until one of them wins and points.",
-      "use": "The road to a Wayfinder, which pays in coin forever."
+      "flavor": "Two mana pebbles quarrelling over one iron cap, until one of them wins and points.",
+      "use": "The road to a Wayfinder, which pays in helms forever."
     },
     {
-      "id": "spun_skein",
-      "output": { "chain": "frostsilk", "tier": 2, "count": 1 },
+      "id": "woven_bolt",
+      "output": {
+        "chain": "auroraweave",
+        "tier": 2,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "frostsilk", "tier": 1, "count": 2 },
-        { "chain": "rimebloom", "tier": 2, "count": 1 }
+        {
+          "chain": "auroraweave",
+          "tier": 1,
+          "count": 2
+        },
+        {
+          "chain": "orrery",
+          "tier": 2,
+          "count": 1
+        }
       ],
-      "flavor": "Two threads and a cluster to hold them apart while they set.",
-      "use": "Three make a Light-Fast Spindle — what Selyna's last order asks for."
+      "flavor": "Two threads and a lens to hold them apart while they set.",
+      "use": "Three make an Aurora Cloak — what Selyna's last order asks for."
     },
     {
       "id": "rune_shard",
-      "output": { "chain": "runestone", "tier": 1, "count": 3 },
+      "output": {
+        "chain": "runestone",
+        "tier": 1,
+        "count": 3
+      },
       "inputs": [
-        { "chain": "manastone", "tier": 2, "count": 1 },
-        { "chain": "tarknot", "tier": 3, "count": 1 }
+        {
+          "chain": "manastone",
+          "tier": 2,
+          "count": 1
+        },
+        {
+          "chain": "emberheart",
+          "tier": 3,
+          "count": 1
+        }
       ],
-      "flavor": "A Black Ember burns hot enough to split a nodule clean, and clean is the whole art.",
-      "use": "Three shards begin a second Runestone — and a Runestone makes tar forever."
+      "flavor": "An Ember Heart burns hot enough to split a nodule clean, and clean is the whole art.",
+      "use": "Three shards begin a second Runestone — and a Runestone makes fuel forever."
     },
     {
       "id": "treasure_chest",
-      "output": { "chain": "chest", "tier": 1, "count": 1 },
+      "output": {
+        "chain": "chest",
+        "tier": 1,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "lumber", "tier": 1, "count": 3 },
-        { "chain": "flame_gem", "tier": 2, "count": 1 }
+        {
+          "chain": "lumber",
+          "tier": 1,
+          "count": 3
+        },
+        {
+          "chain": "flame_gem",
+          "tier": 2,
+          "count": 1
+        }
       ],
       "flavor": "Board the wood, seal it with a warm gem, and the isle fills it on its own.",
       "use": "Opens into coins, rubies, or a rare find."
     },
     {
       "id": "red_egg",
-      "output": { "chain": "ember_dragon", "tier": 2, "count": 1 },
+      "output": {
+        "chain": "ember_dragon",
+        "tier": 2,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "ember_dragon", "tier": 1, "count": 2 },
-        { "chain": "flame_gem", "tier": 2, "count": 1 },
-        { "chain": "emberberry", "tier": 3, "count": 1 }
+        {
+          "chain": "ember_dragon",
+          "tier": 1,
+          "count": 2
+        },
+        {
+          "chain": "flame_gem",
+          "tier": 2,
+          "count": 1
+        },
+        {
+          "chain": "emberberry",
+          "tier": 3,
+          "count": 1
+        }
       ],
       "flavor": "Two rubies remember being one heart. The preserve is for the first thing it asks.",
       "use": "Three Red Eggs merge into a Red Dragon."
     },
     {
       "id": "green_egg",
-      "output": { "chain": "emerald", "tier": 2, "count": 1 },
+      "output": {
+        "chain": "emerald",
+        "tier": 2,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "moonwater", "tier": 3, "count": 2 },
-        { "chain": "emberberry", "tier": 3, "count": 2 }
+        {
+          "chain": "moonwater",
+          "tier": 3,
+          "count": 2
+        },
+        {
+          "chain": "emberberry",
+          "tier": 3,
+          "count": 2
+        }
       ],
       "flavor": "Moonwater poured over sweetness until something green agrees to grow a shell.",
       "use": "Three Green Eggs merge into a Green Dragon."
     },
     {
       "id": "ashdrake_egg",
-      "output": { "chain": "ashdrake", "tier": 1, "count": 1 },
+      "output": {
+        "chain": "ashdrake",
+        "tier": 1,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "tarknot", "tier": 3, "count": 2 },
-        { "chain": "tarknot", "tier": 2, "count": 2 },
-        { "chain": "flame_gem", "tier": 3, "count": 1 }
+        {
+          "chain": "emberheart",
+          "tier": 3,
+          "count": 2
+        },
+        {
+          "chain": "emberheart",
+          "tier": 2,
+          "count": 2
+        },
+        {
+          "chain": "flame_gem",
+          "tier": 3,
+          "count": 1
+        }
       ],
       "flavor": "Ash wants tar, tar wants fire, and a Radiant Gem is the only fire that burns slow enough.",
       "use": "Legendary. Three Ashdrake Eggs wake the Ashdrake."
     },
     {
       "id": "rimewyrm_egg",
-      "output": { "chain": "rimewyrm", "tier": 1, "count": 1 },
+      "output": {
+        "chain": "rimewyrm",
+        "tier": 1,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "rimebloom", "tier": 3, "count": 2 },
-        { "chain": "frostsilk", "tier": 3, "count": 1 },
-        { "chain": "moonwater", "tier": 3, "count": 2 }
+        {
+          "chain": "orrery",
+          "tier": 3,
+          "count": 2
+        },
+        {
+          "chain": "auroraweave",
+          "tier": 3,
+          "count": 1
+        },
+        {
+          "chain": "moonwater",
+          "tier": 3,
+          "count": 2
+        }
       ],
-      "flavor": "Wind the spindle, sink it in moonwater, and let the frost do the remembering.",
+      "flavor": "Wind the bolt, sink it in moonwater, and let the frost do the remembering.",
       "use": "Legendary. Three Rimewyrm Eggs wake the Rimewyrm."
     },
     {
       "id": "golden_egg",
-      "output": { "chain": "golden_egg", "tier": 1, "count": 1 },
+      "output": {
+        "chain": "golden_egg",
+        "tier": 1,
+        "count": 1
+      },
       "inputs": [
-        { "chain": "flame_gem", "tier": 3, "count": 2 },
-        { "chain": "tarknot", "tier": 3, "count": 1 },
-        { "chain": "rimebloom", "tier": 3, "count": 1 },
-        { "chain": "moonwater", "tier": 3, "count": 3 }
+        {
+          "chain": "flame_gem",
+          "tier": 3,
+          "count": 2
+        },
+        {
+          "chain": "emberheart",
+          "tier": 3,
+          "count": 1
+        },
+        {
+          "chain": "orrery",
+          "tier": 3,
+          "count": 1
+        },
+        {
+          "chain": "moonwater",
+          "tier": 3,
+          "count": 3
+        }
       ],
       "flavor": "Fire that keeps, frost that keeps, and enough moonlight to make them agree. Gold is what agreement looks like.",
       "use": "Mythic. The rarest shell the cauldron knows."

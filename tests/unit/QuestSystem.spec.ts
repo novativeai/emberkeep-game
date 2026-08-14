@@ -281,7 +281,7 @@ describe('brew goals — the cauldron as a quest driver', () => {
     for (let i = 0; i < times; i++) {
       ctx.bus.emit('cauldron:brewed', {
         recipeId,
-        output: { chain: 'keel', tier: 1, count: 1 }
+        output: { chain: 'warhelm', tier: 1, count: 1 }
       });
     }
   };
@@ -291,14 +291,14 @@ describe('brew goals — the cauldron as a quest driver', () => {
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
     expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 0, need: 4, done: false });
 
-    brew(ctx, 'broken_strake', 3);
+    brew(ctx, 'iron_cap', 3);
     expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 3, done: false });
-    brew(ctx, 'broken_strake', 1);
+    brew(ctx, 'iron_cap', 1);
     expect(ctx.systems.quests.progressFor(step).done).toBe(true);
 
     // The output is meant to be SPENT — four strakes merged away is the quest
     // working, not the quest coming undone.
-    ctx.bus.emit('bag:consume', { chain: 'keel', tier: 1, count: 4 });
+    ctx.bus.emit('bag:consume', { chain: 'warhelm', tier: 1, count: 4 });
     expect(ctx.systems.quests.progressFor(step).done).toBe(true);
   });
 
@@ -314,8 +314,8 @@ describe('brew goals — the cauldron as a quest driver', () => {
     expect(
       ctx.systems.quests.progressFor({
         id: 'unlabelled',
-        goal: { kind: 'brew', recipeId: 'broken_strake', count: 2 }
+        goal: { kind: 'brew', recipeId: 'iron_cap', count: 2 }
       }).label
-    ).toBe('Brew 2 × Broken Strake');
+    ).toBe('Brew 2 × Iron Cap');
   });
 });

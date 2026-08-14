@@ -179,8 +179,22 @@ export class GeneratorSystem {
     return this.tierConfig(chain, tier)?.generator;
   }
 
-  /** The timer a tap should offer to skip: a live tap-cooldown, else a live
-   *  passive wait. Returns null when nothing is pending. */
+  /**
+   * The timer a tap should offer to skip: a live tap-cooldown, else a live
+   * passive wait. Returns null when nothing is pending.
+   *
+   * A TAPPABLE generator never offers its PASSIVE clock. Its contract with the
+   * player is ready → tap → item (Emberkeep's Theme Crystal, which has no
+   * passive clock at all to get in the way), and skipping a passive wait sets
+   * `passiveAt = now`, which hands the item over on the next tick with no tap —
+   * so a paid skip produced the goods itself instead of returning the piece to
+   * a tappable ready state. Every Borealis generator carries BOTH `tappable`
+   * and a `passiveMs`, which is why it showed up there and nowhere else.
+   *
+   * This is the rule `BoardScene.genTimer` already draws when it decides
+   * whether to paint a countdown at all — the two disagreeing is what let a
+   * skip be sold for a timer the board was not showing.
+   */
   private activeTimer(
     item: BoardItemState,
     cfg: GeneratorConfig,
@@ -189,7 +203,7 @@ export class GeneratorSystem {
     if (item.readyAt !== undefined && now < item.readyAt) {
       return { at: item.readyAt, total: cfg.cooldownMs, kind: 'ready' };
     }
-    if (cfg.passiveMs && item.passiveAt !== undefined && now < item.passiveAt) {
+    if (cfg.tappable === false && cfg.passiveMs && item.passiveAt !== undefined && now < item.passiveAt) {
       return { at: item.passiveAt, total: cfg.passiveMs, kind: 'passive' };
     }
     return null;

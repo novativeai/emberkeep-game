@@ -373,7 +373,7 @@ describe('the diet roster (Constants DRAGON_DIET × chains.json)', () => {
       expect(ids, `${breed} refusal`).toContain(diet.refuses);
       expect(isDragonFood(diet.favourite, 1), `${breed}'s favourite is not food`).toBe(true);
       // A favourite in another world is a favourite the dragon never gets: its
-      // adult would cost 4x what the roster says it does. This is why tarknot
+      // adult would cost 4x what the roster says it does. This is why emberheart
       // cannot be an Emberkeep breed's — it is Borealis vocabulary. The home
       // world is the BREED's chain world (a skin breed like frost/storm is not
       // a chain and lives on the Emberkeep red chain); the rimewyrm is

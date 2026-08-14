@@ -159,7 +159,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
 
   it('a chain that belongs to another world is unreachable here, and says so', () => {
     const { finalAvailability } = auditLadder(data);
-    for (const id of ['driftwood', 'rimebloom', 'tarknot', 'frostsilk']) {
+    for (const id of ['seaglass', 'orrery', 'emberheart', 'auroraweave']) {
       const entry = finalAvailability.get(pieceKey(id, 1))!;
       expect(entry.reachable, id).toBe(false);
       // The reason is the WORLD, not the chapter — the two are different
@@ -170,7 +170,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
   });
 
   it('chainHiddenIn separates "wrong world" from "wrong chapter"', () => {
-    const frozen = { id: 'driftwood', world: 'borealis' };
+    const frozen = { id: 'seaglass', world: 'borealis' };
     expect(chainHiddenIn(frozen, 'emberkeep')).toBe(true);
     expect(chainHiddenIn(frozen, 'borealis')).toBe(false); // the north turns itself on
     // A chapter-gated chain is withheld in EVERY world until its chapter lands.
@@ -202,7 +202,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
     expect(messages.some((m) => m.includes('nothing arrives on this board'))).toBe(true);
     // Its chains are not world-blocked there — they are simply unseeded, which
     // is the actionable difference.
-    const spar = roothold.audit.finalAvailability.get(pieceKey('driftwood', 1))!;
+    const spar = roothold.audit.finalAvailability.get(pieceKey('seaglass', 1))!;
     expect(spar.reachable).toBe(false);
   });
 
@@ -216,7 +216,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
     const north = auditWorlds(data, data.map, ZONES.worlds).find((w) => w.worldId === 'borealis')!;
     expect(north.questCount).toBeGreaterThan(0);
     expect(north.audit.findings.filter((f) => f.severity === 'error')).toEqual([]);
-    for (const chain of ['driftwood', 'rimebloom', 'tarknot', 'frostsilk', 'keel', 'coin']) {
+    for (const chain of ['seaglass', 'orrery', 'emberheart', 'auroraweave', 'warhelm', 'coin']) {
       const top = chains.chains.find((c) => c.id === chain)!.tiers.at(-1)!.tier;
       const piece = north.audit.finalAvailability.get(pieceKey(chain, top))!;
       expect(piece?.renewable, `${chain} T${top} in the north`).toBe(true);
@@ -225,7 +225,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
     const south = auditWorlds(data, data.map, ZONES.worlds).find(
       (w) => w.worldId === 'emberkeep'
     )!;
-    expect(south.audit.finalAvailability.get(pieceKey('keel', 1))?.reachable).toBe(false);
+    expect(south.audit.finalAvailability.get(pieceKey('warhelm', 1))?.reachable).toBe(false);
   });
 
   /** The north's islands are opened with Gold Keys, and the only source of one

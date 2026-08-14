@@ -224,34 +224,67 @@ That is measurable, so it is a rule with a number behind it
 > **The ice band** is saturation 0.30–0.51 AND value 0.54–0.78. A northern piece
 > must escape it — saturated (≥0.55), dark (≤0.52) or bright (≥0.80).
 
-The shipped pale roster was grandfathered by name rather than skipped, so the
-list of offenders stayed visible and could not quietly grow. **It has since been
-worked off** — `scripts/gen-borealis-legacy.py` redrew all seven old chains, and
-the test now measures every northern tier but `rimewyrm`, whose art comes off the
-breed pipeline rather than a chain sheet.
+The pale roster was grandfathered by name rather than skipped, so the list of
+offenders stayed visible and could not quietly grow. **It has since been deleted
+outright.** Redrawing those seven chains was tried first and did not help,
+because the problem was never the paint: a heap of wood, a heap of weed and a
+heap of crystals are THE SAME KIND OF THING, and no amount of colour gives a
+pile a shape you can name. The whole materials yard — driftwood, wreck timber,
+the wrack line, the tar knot, the frost thread, the rime flower, the ice font —
+is gone, and the boat-and-timber family went first: nothing in this game should
+ask a player to tell a Broken Strake from a Lashed Frame from a Drift Spar.
 
-The redraw changed no OBJECT — a drift spar is still a drift spar, the Longhall
-is still the Longhall, and `chains.json`, the tier names, the generators and the
-supply graph are untouched. What it changed was the palette and the finish, and
-it did that by **allocating colour rather than picking it**: twelve northern
-chains share one board, so each takes a lane nothing else owns.
+#### 2.4.1c The farm structure, and the five farms built on it
 
-| lane | chains |
-|---|---|
-| the five farms | `runestone` orange · `emberdram` rose · `hearthlamp` gold · `manastone` turquoise · `wayfinder` ivory+rose |
-| the redraw | `driftwood` chestnut · `keel` red-ochre · `rimebloom` violet · `frostsilk` cobalt · `wrackline` olive · `frostfont` basalt · `tarknot` black |
+**Six pieces, and every northern farm has all six.**
 
-Two of those are worth the note. **Driftwood is waterlogged, not sun-dried** —
-the sea really does bleach wood silver, which is precisely why the old art
-vanished, so this wood is what the sea soaked rather than what the sun cured.
-And **`keel` is painted**: tarred black with a red-ochre strake, because worked
-ship timber having been worked by somebody is the one thing that separates it
-from `driftwood`, which is the same material nobody touched.
+    FIXTURE chain   part  ->  assembly  ->  THE MACHINE   (tier 3 is the generator)
+    PRODUCT chain   small ->  bigger    ->  THE ICON      (what it makes)
 
-Sizes did not move. Every northern `ITEM_SCALE` is hand-tuned against a specific
-pixel size (`keel_3` is the House class, not another log), so the cut resamples
-each new cell to the SAME maximum dimension as the piece it replaces —
-`TARGET_PX` in that script. Constants.ts was not touched.
+The machine produces the product's tier 1 on its cooldown, and every **twelfth**
+production also drops the fixture's OWN tier 1. So a working farm slowly pays
+out the parts for a second farm: three parts merge to an assembly, three
+assemblies to a whole new machine. That loop is the only way the north grows a
+generator, and it is the reason a fixture ladder is two tiers rather than one —
+a one-tier fixture can be seeded but it can never be BUILT.
+
+| lane | machine (fixture) | icon (product) |
+|---|---|---|
+| bottle green + terracotta | Fire Brick → Kiln Grate → **The Glass Kiln** | Glass Float → Glass Buoy → **The Bottled Ship** |
+| brass + midnight blue | Brass Cog → Gear Ring → **The Starwright's Bench** | Ground Lens → Spyglass → **The Orrery** |
+| crimson + black iron | Iron Billet → Forge Bellows → **The Wreck Forge** | Iron Cap → Banded Helm → **The Horned Helm** |
+| black + hot orange | Tar Spile → Tar Bucket → **The Tar Kiln** | Pitch Bead → Pitch Loaf → **The Ember Heart** |
+| violet + silver | Silver Spindle → Loom Comb → **The Aurora Loom** | Light Thread → Woven Bolt → **The Aurora Cloak** |
+
+Colour is still ALLOCATED, not picked — fifteen northern chains now share one
+board, and the compass wave already holds orange, rose, gold, turquoise and
+ivory-rose, so these five take the five lanes left that clear the ice band.
+
+**Roles are inherited, so the graph did not move.** `emberheart` took
+`tarknot`'s job as the north's dragon fuel and `auroraweave` took `frostsilk`'s
+as Selyna's recipient-locked material, so the diet and the locks are unchanged
+in shape — only the objects moved. Every dead chain handed its exact job to a
+live one, tier for tier (`scripts/migrate-borealis-farms.py` has the map), which
+is what let orders, quests and the cauldron follow in one pass.
+
+**The compass wave was already fixture-shaped** — a two-tier ladder under a
+generator — but three of its five produced THEMSELVES and had no product ladder
+to feed. Each is now pointed at a product it has a reason to make: the
+Runestone's heat-runes melt the buried tar (`emberheart`), the Cordial Cask's
+trade is a glass trade (`seaglass`), the Manastone powers the instrument
+(`orrery`). All five gained the every-12 self-seed.
+
+**Two documented exceptions.** `reward` short-circuits `produces` in
+`GeneratorSystem`, so a machine either makes an item or pays a currency, never
+both. The Hearthlamp is the north's only energy pump and the Wayfinder its only
+coin pump; both keep paying and take just the self-seed half of the structure.
+Removing either to force the shape would have cost the north an entire currency.
+
+**Sizes.** Every farm piece is authored at 6× its on-board size, so `ITEM_SCALE`
+is a flat 1/6 and the ladder lives in the art: `gen-borealis-farms.py` cuts a
+product to 66 / 88 / 118 units and a fixture to 66 / 92 / **170**, because the
+top of a fixture chain is a machine you build a farm around and the top of a
+product chain is a thing you carry.
 
 **Shape.** Colour was only half of it. A heap of wood, a heap of crystals and a
 heap of salt are all THE SAME KIND OF THING: raw material in a pile. Nothing in

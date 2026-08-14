@@ -3,7 +3,7 @@
     {
       "id": "skins",
       "title": "Manor Skins",
-      "blurb": "Rebuild the Manor as something else entirely. Cosmetic only \u2014 it earns exactly what it earned before.",
+      "blurb": "Rebuild the Manor as something else entirely. Cosmetic only — it earns exactly what it earned before.",
       "kind": "skin",
       "items": [
         {
@@ -39,7 +39,7 @@
     {
       "id": "decor",
       "title": "Decorations",
-      "blurb": "Placed on the first free tile when you buy it. Purely yours \u2014 nothing merges with it. The landmarks at the end are monuments: they are meant to be seen from across the isle.",
+      "blurb": "Placed on the first free tile when you buy it. Purely yours — nothing merges with it. The landmarks at the end are monuments: they are meant to be seen from across the isle.",
       "kind": "decor",
       "items": [
         {
@@ -94,7 +94,7 @@
         {
           "id": "drift_cairn",
           "name": "Drift Cairn",
-          "blurb": "Stones, a driftwood spar, a ribbon of spun light. A greeting.",
+          "blurb": "Stones, a float of green glass, a ribbon of woven light. A greeting.",
           "art": "decor_drift_cairn",
           "gold": 420
         },
@@ -138,7 +138,7 @@
     {
       "id": "dragons",
       "title": "Dragons",
-      "blurb": "A dragon is still coaxed, never bought \u2014 but the ones already yours can be dressed in any breed the sanctuary has met. Cosmetic only: same eggs, same gifts, same wait.",
+      "blurb": "A dragon is still coaxed, never bought — but the ones already yours can be dressed in any breed the sanctuary has met. Cosmetic only: same eggs, same gifts, same wait.",
       "kind": "dragon_skin",
       "items": [
         {
@@ -163,7 +163,7 @@
         {
           "id": "moonwhisker",
           "name": "Moonwhisker",
-          "blurb": "The Moonhold's own \u2014 all trailing ribbons and starlight, and far too shy to land near you.",
+          "blurb": "The Moonhold's own — all trailing ribbons and starlight, and far too shy to land near you.",
           "art": "card_moonwhisker",
           "gold": 900,
           "dragon": "emerald",

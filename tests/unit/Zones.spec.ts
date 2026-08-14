@@ -666,12 +666,12 @@ describe('worlds — a first arrival puts the opening board out', () => {
 
     const standing = [...ctx.state.items.values()].map((i) => i.chain).sort();
     expect(standing).toEqual([
-      'driftwood',
-      'driftwood',
-      'driftwood',
-      'driftwood',
-      'driftwood',
-      'wrackline'
+      'glasskiln',
+      'seaglass',
+      'seaglass',
+      'seaglass',
+      'seaglass',
+      'seaglass'
     ]);
     // Every piece is on ground that is actually open…
     for (const item of ctx.state.items.values()) {

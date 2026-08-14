@@ -1085,24 +1085,6 @@
       "file": "sprites/items/chains/dew_basin_3.webp"
     },
     {
-      "key": "item_driftwood_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/driftwood_1.webp"
-    },
-    {
-      "key": "item_driftwood_2",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/driftwood_2.webp"
-    },
-    {
-      "key": "item_driftwood_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/driftwood_3.webp"
-    },
-    {
       "key": "item_emberberry_1",
       "source": "file",
       "generator": "item",
@@ -1131,6 +1113,156 @@
       "source": "file",
       "generator": "item",
       "file": "sprites/items/chains/firepine_2.webp"
+    },
+    {
+      "key": "item_glasskiln_1",
+      "source": "file",
+      "file": "sprites/items/chains/glasskiln_1.webp"
+    },
+    {
+      "key": "item_glasskiln_2",
+      "source": "file",
+      "file": "sprites/items/chains/glasskiln_2.webp"
+    },
+    {
+      "key": "item_glasskiln_3",
+      "source": "file",
+      "file": "sprites/items/chains/glasskiln_3.webp"
+    },
+    {
+      "key": "item_seaglass_1",
+      "source": "file",
+      "file": "sprites/items/chains/seaglass_1.webp"
+    },
+    {
+      "key": "item_seaglass_2",
+      "source": "file",
+      "file": "sprites/items/chains/seaglass_2.webp"
+    },
+    {
+      "key": "item_seaglass_3",
+      "source": "file",
+      "file": "sprites/items/chains/seaglass_3.webp"
+    },
+    {
+      "key": "item_starbench_1",
+      "source": "file",
+      "file": "sprites/items/chains/starbench_1.webp"
+    },
+    {
+      "key": "item_starbench_2",
+      "source": "file",
+      "file": "sprites/items/chains/starbench_2.webp"
+    },
+    {
+      "key": "item_starbench_3",
+      "source": "file",
+      "file": "sprites/items/chains/starbench_3.webp"
+    },
+    {
+      "key": "item_orrery_1",
+      "source": "file",
+      "file": "sprites/items/chains/orrery_1.webp"
+    },
+    {
+      "key": "item_orrery_2",
+      "source": "file",
+      "file": "sprites/items/chains/orrery_2.webp"
+    },
+    {
+      "key": "item_orrery_3",
+      "source": "file",
+      "file": "sprites/items/chains/orrery_3.webp"
+    },
+    {
+      "key": "item_wreckforge_1",
+      "source": "file",
+      "file": "sprites/items/chains/wreckforge_1.webp"
+    },
+    {
+      "key": "item_wreckforge_2",
+      "source": "file",
+      "file": "sprites/items/chains/wreckforge_2.webp"
+    },
+    {
+      "key": "item_wreckforge_3",
+      "source": "file",
+      "file": "sprites/items/chains/wreckforge_3.webp"
+    },
+    {
+      "key": "item_warhelm_1",
+      "source": "file",
+      "file": "sprites/items/chains/warhelm_1.webp"
+    },
+    {
+      "key": "item_warhelm_2",
+      "source": "file",
+      "file": "sprites/items/chains/warhelm_2.webp"
+    },
+    {
+      "key": "item_warhelm_3",
+      "source": "file",
+      "file": "sprites/items/chains/warhelm_3.webp"
+    },
+    {
+      "key": "item_tarkiln_1",
+      "source": "file",
+      "file": "sprites/items/chains/tarkiln_1.webp"
+    },
+    {
+      "key": "item_tarkiln_2",
+      "source": "file",
+      "file": "sprites/items/chains/tarkiln_2.webp"
+    },
+    {
+      "key": "item_tarkiln_3",
+      "source": "file",
+      "file": "sprites/items/chains/tarkiln_3.webp"
+    },
+    {
+      "key": "item_emberheart_1",
+      "source": "file",
+      "file": "sprites/items/chains/emberheart_1.webp"
+    },
+    {
+      "key": "item_emberheart_2",
+      "source": "file",
+      "file": "sprites/items/chains/emberheart_2.webp"
+    },
+    {
+      "key": "item_emberheart_3",
+      "source": "file",
+      "file": "sprites/items/chains/emberheart_3.webp"
+    },
+    {
+      "key": "item_auroraloom_1",
+      "source": "file",
+      "file": "sprites/items/chains/auroraloom_1.webp"
+    },
+    {
+      "key": "item_auroraloom_2",
+      "source": "file",
+      "file": "sprites/items/chains/auroraloom_2.webp"
+    },
+    {
+      "key": "item_auroraloom_3",
+      "source": "file",
+      "file": "sprites/items/chains/auroraloom_3.webp"
+    },
+    {
+      "key": "item_auroraweave_1",
+      "source": "file",
+      "file": "sprites/items/chains/auroraweave_1.webp"
+    },
+    {
+      "key": "item_auroraweave_2",
+      "source": "file",
+      "file": "sprites/items/chains/auroraweave_2.webp"
+    },
+    {
+      "key": "item_auroraweave_3",
+      "source": "file",
+      "file": "sprites/items/chains/auroraweave_3.webp"
     },
     {
       "key": "item_runestone_1",
@@ -1206,24 +1338,6 @@
       "key": "item_wayfinder_3",
       "source": "file",
       "file": "sprites/items/chains/wayfinder_3.webp"
-    },
-    {
-      "key": "item_frostsilk_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/frostsilk_1.webp"
-    },
-    {
-      "key": "item_frostsilk_2",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/frostsilk_2.webp"
-    },
-    {
-      "key": "item_frostsilk_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/frostsilk_3.webp"
     },
     {
       "key": "item_moonwater_1",
@@ -1304,24 +1418,6 @@
       "file": "sprites/items/chains/resin_3.webp"
     },
     {
-      "key": "item_rimebloom_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/rimebloom_1.webp"
-    },
-    {
-      "key": "item_rimebloom_2",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/rimebloom_2.webp"
-    },
-    {
-      "key": "item_rimebloom_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/rimebloom_3.webp"
-    },
-    {
       "key": "item_stormcap_1",
       "source": "file",
       "generator": "item",
@@ -1338,24 +1434,6 @@
       "source": "file",
       "generator": "item",
       "file": "sprites/items/chains/stormcap_3.webp"
-    },
-    {
-      "key": "item_tarknot_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/tarknot_1.webp"
-    },
-    {
-      "key": "item_tarknot_2",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/tarknot_2.webp"
-    },
-    {
-      "key": "item_tarknot_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/tarknot_3.webp"
     },
     {
       "key": "item_firepine_3",
@@ -1668,42 +1746,6 @@
       "source": "file",
       "generator": "item",
       "file": "sprites/characters/dragon/red-dragon/sleep/red_adult_sleep.webp"
-    },
-    {
-      "key": "item_wrackline_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/wrackline_1.webp"
-    },
-    {
-      "key": "item_frostfont_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/frostfont_1.webp"
-    },
-    {
-      "key": "item_keel_1",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/keel_1.webp"
-    },
-    {
-      "key": "item_keel_2",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/keel_2.webp"
-    },
-    {
-      "key": "item_keel_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/keel_3.webp"
-    },
-    {
-      "key": "item_keel_4",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/chains/keel_4.webp"
     }
   ]
 }

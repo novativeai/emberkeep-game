@@ -359,8 +359,8 @@ const BOREALIS_PLAN = {
     // Faggots for Selyna's signal fire are one haul away, so the door quest
     // never stalls on the tide.
     seeds: [
-      ['wrackline', 1, 1],
-      ['driftwood', 1, 5]
+      ['glasskiln', 3, 1],
+      ['seaglass', 1, 5]
     ]
   },
   3: {
@@ -383,9 +383,9 @@ const BOREALIS_PLAN = {
     // reseeds its own tier-1: 3 × t1 + 2 × t2 is exactly one build, with both
     // Cookbook rows discovered on the way (the dew_basin precedent).
     seeds: [
-      ['frostfont', 1, 1],
-      ['wrackline', 1, 1],
-      ['keel', 1, 3],
+      ['starbench', 3, 1],
+      ['auroraloom', 3, 1],
+      ['warhelm', 1, 3],
       ['manastone', 3, 1],
       ['wayfinder', 1, 3],
       ['wayfinder', 2, 2],
@@ -414,8 +414,10 @@ const BOREALIS_PLAN = {
     // moment the farm does. That is what lets them keep the coast's
     // generators-only law instead of arriving as a scatter of parts.
     seeds: [
-      ['wrackline', 1, 2],
-      ['frostfont', 1, 2],
+      ['glasskiln', 3, 2],
+      ['starbench', 3, 1],
+      ['wreckforge', 3, 1],
+      ['tarkiln', 3, 1],
       ['runestone', 3, 1],
       ['emberdram', 3, 1],
       ['chest', 1, 1]

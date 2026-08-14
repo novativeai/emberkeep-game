@@ -83,6 +83,70 @@ describe('skip cooldown for Warmth', () => {
     expect(skipEnergyCost(0, 10_000)).toBe(0); // nothing left
   });
 
+  /**
+   * The Borealis contract, and the reason `activeTimer` refuses a tappable
+   * generator's passive clock.
+   *
+   * Every Borealis generator carries BOTH `tappable: true` and a `passiveMs`,
+   * so a fresh one — never tapped, `readyAt` unset — was sitting on a live
+   * passive countdown. A skip bought against THAT set `passiveAt = now`, which
+   * drops the item on the next tick with no tap at all: the piece produced
+   * itself instead of returning to a tappable ready state. Emberkeep's Theme
+   * Crystal never showed it because it has no passive clock to be sold.
+   */
+  it('a tappable generator skips its TAP cooldown, never its passive clock', () => {
+    const ctx = createTestContext();
+    const gen = ctx.state.addItem({
+      chain: 'ember_dragon', // tappable AND passive — the Borealis shape
+      tier: 3,
+      col: 2,
+      row: 2,
+      kind: 'item',
+      readyAt: ctx.clock.now()
+    });
+    // Never tapped, but its passive clock is already running. `now` is captured
+    // ONCE: the clock is real time here, so reading it again in the assertion
+    // below made the test fail by a millisecond whenever the suite ran hot.
+    const armedAt = ctx.clock.now() + 120_000;
+    gen.passiveAt = armedAt;
+    ctx.state.coins = 999;
+    const coinsBefore = ctx.state.coins;
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
+
+    // Nothing was pending to sell: it is tappable RIGHT NOW, so the skip is a
+    // no-op rather than a purchase that hands the goods over.
+    expect(ctx.state.coins).toBe(coinsBefore);
+    expect(gen.passiveAt).toBe(armedAt); // passive clock untouched
+
+    // Tap it: now there IS a tap cooldown, and THAT is what a skip clears —
+    // back to ready, with the item still owed to a tap.
+    ctx.bus.emit('item:tapped', { itemId: gen.id });
+    expect(gen.readyAt!).toBeGreaterThan(ctx.clock.now());
+    const produced = capture(ctx.bus, 'item:produced');
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
+
+    expect(gen.readyAt!).toBeLessThanOrEqual(ctx.clock.now()); // ready, not produced
+    expect(produced).toEqual([]); // the skip itself handed over nothing
+    expect(ctx.state.coins).toBeLessThan(coinsBefore); // this one was a real purchase
+  });
+
+  it('a PASSIVE-only generator (the House) still sells its passive wait', () => {
+    // The tutorial's `house_skip` beat depends on this: a piece with no tap
+    // verb has only its passive clock to skip, so that path must stay live.
+    const ctx = createTestContext();
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
+    house.passiveAt = ctx.clock.now() + 210_000;
+    ctx.state.coins = 999;
+    const coinsBefore = ctx.state.coins;
+
+    ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'gold' });
+
+    expect(house.passiveAt!).toBeLessThanOrEqual(ctx.clock.now());
+    expect(ctx.state.coins).toBeLessThan(coinsBefore);
+  });
+
   it('refuses to skip without enough Warmth (and keeps the cooldown)', () => {
     const ctx = createTestContext();
     const gen = ctx.state.addItem({
