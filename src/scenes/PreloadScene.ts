@@ -4,7 +4,7 @@ import type { GameContext } from '../core/Context';
 import { clipKey, clipsFor } from '../core/characterAnims';
 import {
   decorClipCharacter,
-  GAME_WIDTH,
+  LIVE_GAME_WIDTH,
   LIVE_GAME_HEIGHT,
   num,
   PALETTE,
@@ -88,10 +88,10 @@ export class PreloadScene extends Phaser.Scene {
 
     if (fileEntries.length > 0) {
       const barBg = this.add
-        .rectangle(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
+        .rectangle(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
         .setStrokeStyle(2, num(PALETTE.gold));
       const bar = this.add.rectangle(
-        GAME_WIDTH / 2 - 176,
+        LIVE_GAME_WIDTH / 2 - 176,
         LIVE_GAME_HEIGHT / 2,
         4,
         10,

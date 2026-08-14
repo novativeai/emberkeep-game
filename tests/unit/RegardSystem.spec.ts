@@ -27,33 +27,44 @@ describe('RegardSystem — the five hearts', () => {
     const accepted = capture(ctx.bus, 'regard:gift_accepted');
     const declined = capture(ctx.bus, 'regard:gift_declined');
 
-    // `what_she_keeps` opens asking for Emberberry Baskets.
-    expect(ctx.systems.regard.wants('eleanor', 'emberberry', 2)).toBe(true);
-    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
+    // `what_she_will_take` asks Selyna for Ground Lenses. Eleanor's baskets are
+    // a DELIVERY now — the keepsake asks are what stayed gifts, and a gift step
+    // is the only thing `wants()` is derived from.
+    expect(ctx.systems.regard.wants('selyna', 'orrery', 1)).toBe(true);
+    ctx.bus.emit('ui:gift_requested', { characterId: 'selyna', chain: 'orrery', tier: 1 });
     expect(accepted).toHaveLength(1);
-    expect(ctx.systems.regard.given('eleanor', 'emberberry', 2)).toBe(1);
-    expect(ctx.systems.regard.points('eleanor')).toBe(REGARD_GIFT_POINTS);
+    expect(ctx.systems.regard.given('selyna', 'orrery', 1)).toBe(1);
+    expect(ctx.systems.regard.points('selyna')).toBe(REGARD_GIFT_POINTS);
 
-    // Nothing on her list asks for a Gem Shard, however useful it is.
+    // A Gem Shard is not on her gift list — but her own live ORDER (the
+    // brazier) asks for six, so the give is taken as a delivery in singles:
+    // the given-counter moves, and no Regard is paid (the Deliver button pays
+    // none either — the two verbs stay worth the same).
     ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'flame_gem', tier: 1 });
+    expect(declined).toHaveLength(0);
+    expect(ctx.systems.regard.given('eleanor', 'flame_gem', 1)).toBe(1);
+    expect(ctx.systems.regard.points('eleanor')).toBe(0); // a delivery pays no Regard
+
+    // A Quartz Pebble is on NOBODY's list — no gift step, no live order.
+    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'quartz', tier: 1 });
     expect(declined.at(-1)).toMatchObject({ reason: 'not_wanted' });
-    expect(ctx.systems.regard.given('eleanor', 'flame_gem', 1)).toBe(0);
+    expect(ctx.systems.regard.given('eleanor', 'quartz', 1)).toBe(0);
   });
 
   it('stops wanting a piece once the subquest that asked for it is satisfied', () => {
     const ctx = createTestContext();
-    const need = 2; // what_she_keeps → keeps_basket
+    const need = 3; // what_she_will_take → take_flowers
     for (let i = 0; i < need; i++) {
-      ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
+      ctx.bus.emit('ui:gift_requested', { characterId: 'selyna', chain: 'orrery', tier: 1 });
     }
-    expect(ctx.systems.regard.given('eleanor', 'emberberry', 2)).toBe(need);
-    expect(ctx.systems.regard.wants('eleanor', 'emberberry', 2)).toBe(false);
+    expect(ctx.systems.regard.given('selyna', 'orrery', 1)).toBe(need);
+    expect(ctx.systems.regard.wants('selyna', 'orrery', 1)).toBe(false);
 
-    // …and a third offering is politely handed back rather than eaten.
+    // …and one more offering is politely handed back rather than eaten.
     const declined = capture(ctx.bus, 'regard:gift_declined');
-    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
+    ctx.bus.emit('ui:gift_requested', { characterId: 'selyna', chain: 'orrery', tier: 1 });
     expect(declined).toHaveLength(1);
-    expect(ctx.systems.regard.given('eleanor', 'emberberry', 2)).toBe(need);
+    expect(ctx.systems.regard.given('selyna', 'orrery', 1)).toBe(need);
   });
 
   it('a gift step locked behind hearts is neither asked for nor accepted', () => {
@@ -95,17 +106,17 @@ describe('RegardSystem — the five hearts', () => {
     const hearts = capture(ctx.bus, 'regard:heart');
 
     // One point short of the first heart: nothing has been crossed yet.
-    ctx.state.stats[regardKey('eleanor')] = REGARD_POINTS_PER_HEART - 1;
-    expect(ctx.systems.regard.hearts('eleanor')).toBe(0);
+    ctx.state.stats[regardKey('selyna')] = REGARD_POINTS_PER_HEART - 1;
+    expect(ctx.systems.regard.hearts('selyna')).toBe(0);
 
-    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
-    expect(hearts).toEqual([{ characterId: 'eleanor', hearts: 1 }]);
+    ctx.bus.emit('ui:gift_requested', { characterId: 'selyna', chain: 'orrery', tier: 1 });
+    expect(hearts).toEqual([{ characterId: 'selyna', hearts: 1 }]);
 
     // The cap holds, and nothing beyond the fifth heart is ever announced.
-    ctx.state.stats[regardKey('eleanor')] = REGARD_MAX_POINTS;
-    ctx.bus.emit('quest:completed', { questId: 'radiant_centerpiece' });
-    expect(ctx.systems.regard.points('eleanor')).toBe(REGARD_MAX_POINTS);
-    expect(ctx.systems.regard.hearts('eleanor')).toBe(REGARD_HEARTS);
+    ctx.state.stats[regardKey('selyna')] = REGARD_MAX_POINTS;
+    ctx.bus.emit('quest:completed', { questId: 'north_landing' });
+    expect(ctx.systems.regard.points('selyna')).toBe(REGARD_MAX_POINTS);
+    expect(ctx.systems.regard.hearts('selyna')).toBe(REGARD_HEARTS);
     expect(hearts).toHaveLength(1);
   });
 
@@ -117,10 +128,13 @@ describe('RegardSystem — the five hearts', () => {
     // to be finishable. What changes is the sentence she declines the REST with:
     // "I have everything I need from you" is a different refusal from "that
     // isn't what I asked for", and at five hearts it is the only true one.
-    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'flame_gem', tier: 1 });
+    // (Quartz: her orders never ask for it either, so it is a pure decline.)
+    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'quartz', tier: 1 });
     expect(declined.at(-1)).toMatchObject({ reason: 'complete' });
-    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 2 });
-    expect(ctx.systems.regard.given('eleanor', 'emberberry', 2)).toBe(1);
+    // Her keepsake ask (the Preserve) is unlocked long before five hearts, so
+    // the wanted piece is still taken at the cap.
+    ctx.bus.emit('ui:gift_requested', { characterId: 'eleanor', chain: 'emberberry', tier: 3 });
+    expect(ctx.systems.regard.given('eleanor', 'emberberry', 3)).toBe(1);
   });
 
   it('survives a reload: the points persist and unpaid quests settle silently', () => {

@@ -5,7 +5,9 @@ import {
   ENERGY_REGEN_MS,
   FINALE,
   FINALE_ENDS_MS,
-  GAME_WIDTH,
+  FIRST_CONTACT,
+  FIRST_CONTACT_RETRY_MS,
+  LIVE_GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_TREMBLE_PROGRESS,
   HUD_COLUMN_X,
@@ -24,7 +26,15 @@ import {
 import { FONT } from '../art/design';
 import { iapBridge } from '../core/iapBridge';
 import { gridToWorld } from '../core/iso';
-import type { EventMap, ResolvedArrow, ResolvedHand, SpeakerId, TilePos, TutorialStepEvent } from '../core/types';
+import type {
+  EventMap,
+  ResolvedArrow,
+  ResolvedHand,
+  SpeakerId,
+  TilePos,
+  TutorialStepEvent,
+  TutorialUiTarget
+} from '../core/types';
 import type { BoardScene } from './BoardScene';
 import { CharacterBubble } from '../entities/CharacterBubble';
 import { BagPanel } from '../ui/BagPanel';
@@ -235,10 +245,15 @@ export class UIScene extends Phaser.Scene {
     // plays the favourite-meal beat. Deferred a breath so whatever celebration
     // triggered it lands first — the popup follows the moment, never overlaps it.
     this.offBus.push(
-      this.ctx.bus.on('ui:codex_open_requested', () => {
+      this.ctx.bus.on('ui:codex_open_requested', ({ reveal, page }) => {
         const first = this.ctx.systems.dragons.namedDragons()[0];
-        if (!first) return;
-        this.time.delayedCall(700, () => this.codex.openReveal(first.itemId));
+        if (!first || this.codex.isOpen) return; // every lesson beat asks; the first one opens
+        const at = page ?? 'roster';
+        this.time.delayedCall(reveal ? 700 : 0, () => {
+          if (this.codex.isOpen) return;
+          if (reveal) this.codex.openReveal(first.itemId);
+          else this.codex.openAt(first.itemId, at);
+        });
       })
     );
 
@@ -274,7 +289,7 @@ export class UIScene extends Phaser.Scene {
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
     // cover, over the empty bottom-right margin during tutorial steps.
-    this.bubble.setPosition(GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
+    this.bubble.setPosition(LIVE_GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
     this.bubble.setDepth(DEPTH_TUTORIAL);
     this.bubble.registerUi();
     // GIVE is a two-part act: the bag arms it, the board delivers it. The panel
@@ -475,7 +490,12 @@ export class UIScene extends Phaser.Scene {
         // the pop settle, then offer the recipe demonstration.
         this.time.delayedCall(700, () => this.checkRecipeHints());
       }),
-      bus.on('gold:collected', ({ at, coins }) => this.flyCoinToGold(at, coins ?? 1)),
+      // A Coin is a PIECE now, so gold arrives when one is sold out of the Bag
+      // rather than when it is tapped on the board — the flight follows it.
+      bus.on('item:sold', ({ chain, tier }) => {
+        if (chain !== 'coin') return;
+        this.flyCoinToGold(undefined, tier === 2 ? 3 : 1);
+      }),
       bus.on('bag:stored', ({ chain, tier, at }) => this.flyItemToBag(chain, tier, at)),
       bus.on('bag:changed', ({ used }) => this.hud.setBagCount(used)),
       bus.on('bag:store_failed', ({ reason }) =>
@@ -574,7 +594,23 @@ export class UIScene extends Phaser.Scene {
         // script, and a button appearing under the guided hand would compete
         // with it. It debuts with the rest of the HUD when the script ends.
         this.codexButton.setVisible(step.done && this.ctx.systems.dragons.namedDragons().length > 0);
-        if (!step.done && this.codex.isOpen) this.codex.requestClose();
+        // The Codex lesson holds its own book open — every beat of it is gated
+        // on turning a page, and a tap on Eleanor's bubble also reaches the
+        // panel's scrim. The beat that teaches CLOSING drops the hold, which is
+        // what puts the ✕ back on the page for its arrow to point at.
+        this.codex.setHeld(!step.done && step.allow.codexHold === true);
+        // ...and the same safety net the satchel and the Ledger carry: a beat
+        // that is not the lesson finds the book SHUT. The one exception is the
+        // beat that teaches closing it — there the ✕ is the gate, and shutting
+        // the panel for the player would answer their own lesson for them.
+        if (
+          !step.done &&
+          !step.allow.codexHold &&
+          !(step.arrow && 'ui' in step.arrow && step.arrow.ui === 'codex_close') &&
+          this.codex.isOpen
+        ) {
+          this.codex.requestClose();
+        }
         this.hud.storeButton.setVisible(step.done && this.shopUnlocked());
         // Safety net only — the cookbook_close step has the player close the
         // book themselves; any later step that disallows it just shuts it.
@@ -582,6 +618,7 @@ export class UIScene extends Phaser.Scene {
           this.cookbook.requestClose();
         }
       }),
+      bus.on('item:spawned', () => this.sweepFirstContact()),
       bus.on('tutorial:nudge', () => this.nudgeMarkers()),
       // The popup offers Gold AND Warmth; the tutorial only ever demonstrated
       // Warmth on the House, so name the cheaper option the first time it shows.
@@ -608,7 +645,10 @@ export class UIScene extends Phaser.Scene {
       // over the network — without this the player taps a door and the game
       // simply does nothing for a second or two.
       bus.on('world:switched', ({ to }) => this.showTravelVeil(to)),
-      bus.on('world:ready', () => this.hideTravelVeil()),
+      bus.on('world:ready', () => {
+        this.hideTravelVeil();
+        this.sweepFirstContact();
+      }),
       // The Roothold house is the Emporium's storefront — its tap opens the
       // same panel the (later-unlocked) HUD button does.
       bus.on('ui:emporium_requested', () => this.store.open()),
@@ -651,11 +691,11 @@ export class UIScene extends Phaser.Scene {
     // Interactive so a tap during the load cannot reach the board underneath —
     // the board it would reach is the one being replaced.
     const scrim = this.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.97)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.97)
       .setOrigin(0)
       .setInteractive();
     const label = this.add
-      .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 30, name, {
+      .text(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 30, name, {
         fontFamily: FONT.ui,
         fontSize: '64px',
         fontStyle: 'bold',
@@ -671,7 +711,7 @@ export class UIScene extends Phaser.Scene {
     // blob rather than reading as a count.
     for (let i = 0; i < 3; i++) {
       const dot = this.add
-        .circle(GAME_WIDTH / 2 + (i - 1) * 74, LIVE_GAME_HEIGHT / 2 + 74, 13, num(PALETTE.goldAccent))
+        .circle(LIVE_GAME_WIDTH / 2 + (i - 1) * 74, LIVE_GAME_HEIGHT / 2 + 74, 13, num(PALETTE.goldAccent))
         .setAlpha(0.22);
       this.tweens.add({
         targets: dot,
@@ -895,7 +935,7 @@ export class UIScene extends Phaser.Scene {
    *  or a retrieval could not happen, so the tap is never silently ignored. */
   private floatWarning(text: string): void {
     const label = this.add
-      .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.62, text, {
+      .text(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.62, text, {
         fontFamily: FONT.display,
         fontSize: '54px',
         fontStyle: 'bold',
@@ -915,8 +955,11 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  private flyCoinToGold(at: TilePos, count = 1): void {
-    const start = this.cellToScreen(at.col, at.row);
+  /** Coins arcing to the gauge. `at` is a board cell when something on the
+   *  board paid out; without one the flight starts at the satchel, which is
+   *  where a sold Coin leaves from. */
+  private flyCoinToGold(at: TilePos | undefined, count = 1): void {
+    const start = at ? this.cellToScreen(at.col, at.row) : this.hud.getBagPos();
     const end = this.hud.getCoinPos();
     for (let i = 0; i < count; i++) {
       const coin = this.add
@@ -1047,7 +1090,7 @@ export class UIScene extends Phaser.Scene {
   /** Shared warm banner (order complete / tasks complete) — the level-up
    *  banner's language, one tier smaller. */
   private buildCelebrationBanner(title: string, rewardLine: string, quote: string): void {
-    const cx = GAME_WIDTH / 2;
+    const cx = LIVE_GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT * 0.3;
     const height = quote ? 236 : 180;
     const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);
@@ -1123,7 +1166,7 @@ export class UIScene extends Phaser.Scene {
     this.add
       .image(0, 0, KEY)
       .setOrigin(0)
-      .setDisplaySize(GAME_WIDTH, LIVE_GAME_HEIGHT)
+      .setDisplaySize(LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT)
       .setAlpha(ATMOSPHERE.vignette.alpha)
       .setDepth(DEPTH_HUD - 1); // over the board render, under every UI element
   }
@@ -1212,7 +1255,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private buildLevelUpBanner(level: number): void {
-    const cx = GAME_WIDTH / 2;
+    const cx = LIVE_GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT * 0.34;
     const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);
     const g = this.add.graphics();
@@ -1569,7 +1612,7 @@ export class UIScene extends Phaser.Scene {
     const view = this.scene.get(SCENES.board)?.cameras?.main?.worldView;
     if (view && view.width > 0 && view.height > 0) {
       return {
-        x: ((wx - view.x) / view.width) * GAME_WIDTH,
+        x: ((wx - view.x) / view.width) * LIVE_GAME_WIDTH,
         y: ((wy - view.y) / view.height) * LIVE_GAME_HEIGHT
       };
     }
@@ -1656,11 +1699,58 @@ export class UIScene extends Phaser.Scene {
     else if (step.arrow) this.placeArrow(step.arrow);
   }
 
+  /**
+   * FIRST CONTACT — name a machine the first time one is standing on the board.
+   *
+   * The north has no tutorial by design and must not grow one, but that left
+   * four of its five machines unnamed in every string the player could read,
+   * while two quests asked for pieces off the fifth. These lines are the
+   * introduction, spoken by the world's own giver: what it is called, what
+   * comes out of it, and — on the first one only — that every twelfth firing
+   * grows the next machine.
+   *
+   * Latched in `stats` (`fc:<chain>`), so it is said once ever and survives a
+   * reload. A region can seed several farms at once, so the fresh ones are
+   * spoken as ONE tap-advanced sequence per speaker rather than as a pile of
+   * timed bubbles racing each other for the same card.
+   */
+  private sweepFirstContact(): void {
+    if (!this.ctx.state.tutorialDone) return;
+    // Somebody is already talking — the Borealis arrival speech owns the stage
+    // on the very first visit, and the kiln's introduction belongs after it.
+    if (this.bubble.visible) {
+      this.time.delayedCall(FIRST_CONTACT_RETRY_MS, () => this.sweepFirstContact());
+      return;
+    }
+    const fresh = FIRST_CONTACT.filter(
+      (c) =>
+        this.ctx.state.stat(`fc:${c.chain}`) === 0 &&
+        [...this.ctx.state.items.values()].some(
+          (i) => i.kind === 'item' && i.chain === c.chain && i.tier === c.tier
+        )
+    );
+    if (!fresh.length) return;
+
+    // Grouped by speaker and played back to back: the table is per world today,
+    // but a shared region would otherwise interleave two voices in one bubble.
+    const groups = new Map<string, string[]>();
+    for (const c of fresh) {
+      this.ctx.state.addStat(`fc:${c.chain}`, 1);
+      const line = this.ctx.data.dialogue.hints[c.hint as keyof typeof this.ctx.data.dialogue.hints];
+      if (!line) continue;
+      groups.set(c.speaker, [...(groups.get(c.speaker) ?? []), line]);
+    }
+    const queue = [...groups.entries()];
+    const playNext = (): void => {
+      const next = queue.shift();
+      if (!next) return;
+      this.bubble.sequence(next[0] as SpeakerId, next[1], playNext);
+    };
+    playNext();
+  }
+
   private uiTarget(
-    ref:
-      | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
-      | { fogRegion: string }
-      | { character: string }
+    ref: { ui: TutorialUiTarget } | { fogRegion: string } | { character: string }
   ): { x: number; y: number; height?: number } | null {
     if ('character' in ref) {
       // Ask the board for her LIVE standee — she is authored in the World
@@ -1690,6 +1780,12 @@ export class UIScene extends Phaser.Scene {
       // hearts it is pointing at (same `height` contract the standee uses).
       if (ref.ui === 'status') return this.statusPanel.getMarkerPos();
       if (ref.ui === 'cookbook') return { x: this.cookbookButton.x, y: this.cookbookButton.y };
+      // The Codex lesson's three pointers, each null off its own page so the
+      // arrow walks the book (card → EVOLUTION → ✕) instead of hanging over a
+      // spread that has already been turned.
+      if (ref.ui === 'codex_card') return this.codex.getCardPos();
+      if (ref.ui === 'codex_evolution') return this.codex.getEvolutionPos();
+      if (ref.ui === 'codex_close') return this.codex.isOpen ? this.codex.getClosePos() : null;
       if (ref.ui === 'cookbook_close') return this.cookbook.isOpen ? this.cookbook.getClosePos() : null;
       // Same smart-target shape as `marketplace`: the satchel button until the
       // bag is open, then the chosen slot's Sell plate inside it. Re-evaluated
@@ -1867,9 +1963,9 @@ export class UIScene extends Phaser.Scene {
 
   private openResetDialog(): void {
     if (this.dialog) return;
-    const container = this.add.container(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
+    const container = this.add.container(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
     const dim = this.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
       .setInteractive();
     const panel = this.add.graphics();
     panel.fillStyle(num(PALETTE.night), 0.25);
@@ -2033,9 +2129,9 @@ export class UIScene extends Phaser.Scene {
 
   /** Shared chrome for the purchase dialogs — cream card, gold keyline. */
   private iapCard(height: number): Phaser.GameObjects.Container {
-    const container = this.add.container(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
+    const container = this.add.container(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
     const dim = this.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
       .setInteractive();
     const panel = this.add.graphics();
     panel.fillStyle(num(PALETTE.night), 0.25);
@@ -2178,7 +2274,7 @@ export class UIScene extends Phaser.Scene {
       UIScene.describeGrant(grant),
       `${grant.name} — thank you, Keeper!`
     );
-    this.confettiBurst(GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.3);
+    this.confettiBurst(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.3);
   }
 
   /** Paper-slip confetti in the celebration palette, raining over the banner. */

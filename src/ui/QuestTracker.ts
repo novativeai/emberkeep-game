@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import {
-  GAME_WIDTH,
+  LIVE_GAME_WIDTH,
   num,
   PALETTE,
   QUEST_LIST_TOP_Y,
@@ -50,6 +50,22 @@ const VIEW_W = 900;
 /** Gap between a row's label and its `n/target` counter. */
 const COUNT_GAP = 14;
 
+/**
+ * The leading item icon on a sub row — the piece the step actually spends (a
+ * `recipe` goal shows the TO-BE-MERGED tier, never the result: the row tells
+ * the player what to go touch, and what they touch is the input).
+ *
+ * Icon-with-title rules, so seven rows read as one list and not seven
+ * stickers: every icon contain-fits the SAME square box, sized to the text's
+ * own line (26px type ≈ 34px line) so the art never dominates the words; one
+ * fixed gap to the label; vertically centred on the line, not the row. Each
+ * sits on a soft dark disc — this HUD is background-free, and the disc is to
+ * the art what the stroke-and-shadow is to the glyphs.
+ */
+const ICON_BOX = 34;
+const ICON_GAP = 12;
+const ICON_CHIP_PAD = 6;
+
 /** Strike-through baseline, measured from a row's top. */
 const STRIKE_Y = 18;
 const MAIN_STRIKE_Y = 20;
@@ -62,6 +78,9 @@ interface Row {
   root: Phaser.GameObjects.Container;
   label: Phaser.GameObjects.Text;
   count: Phaser.GameObjects.Text;
+  /** Leading item icon + its contrast disc — null when the goal names no piece. */
+  icon: Phaser.GameObjects.Image | null;
+  chip: Phaser.GameObjects.Arc | null;
   strike: Phaser.GameObjects.Graphics;
   /** Playing its completion beat — frozen in place until it is spliced out. */
   retiring: boolean;
@@ -129,7 +148,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     bus: EventBus,
     private quests: QuestSystem
   ) {
-    super(scene, GAME_WIDTH - QUEST_TRACKER_RIGHT, QUEST_TRACKER_TOP_Y);
+    super(scene, LIVE_GAME_WIDTH - QUEST_TRACKER_RIGHT, QUEST_TRACKER_TOP_Y);
     this.owner = scene;
     this.setScale(UI_SCALE); // magnifies down-left from the top-right anchor
 
@@ -388,6 +407,17 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.layoutRows();
   }
 
+  /** The piece a step's goal spends, as an item texture key — for a merge
+   *  (`recipe`) goal that is the FROM tier: the row points at what the player
+   *  must gather, and they gather inputs, not results. Null when the goal is
+   *  not about a piece (a level, a region, a person's regard). */
+  private iconKeyFor(step: QuestStepConfig): string | null {
+    const goal = step.goal;
+    if (goal.kind === 'recipe') return `item_${goal.chain}_${goal.fromTier}`;
+    if (goal.kind === 'have' || goal.kind === 'gift') return `item_${goal.chain}_${goal.tier}`;
+    return null;
+  }
+
   private addRow(questId: string, step: QuestStepConfig): void {
     const root = this.scene.add.container(0, 0).setAlpha(0);
     const count = this.styleText(
@@ -409,6 +439,17 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     );
     const strike = this.scene.add.graphics();
     root.add([label, count, strike]);
+    let icon: Phaser.GameObjects.Image | null = null;
+    let chip: Phaser.GameObjects.Arc | null = null;
+    const key = this.iconKeyFor(step);
+    if (key && this.scene.textures.exists(key)) {
+      chip = this.scene.add
+        .circle(0, 0, ICON_BOX / 2 + ICON_CHIP_PAD, num(PALETTE.night), 0.32)
+        .setOrigin(0.5);
+      icon = this.scene.add.image(0, 0, key);
+      icon.setScale(ICON_BOX / Math.max(icon.width, icon.height));
+      root.add([chip, icon]);
+    }
     this.rowsGroup.add(root);
     const row: Row = {
       questId,
@@ -416,6 +457,8 @@ export class QuestTracker extends Phaser.GameObjects.Container {
       root,
       label,
       count,
+      icon,
+      chip,
       strike,
       retiring: false,
       slot: this.rows.length,
@@ -442,11 +485,24 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     row.count.setText(`${progress.have} / ${progress.need}`);
     row.root.setScale(1);
     row.label.setX(-(row.count.width + COUNT_GAP));
+    this.seatIcon(row);
     row.root.setScale(this.fitScale(this.rowWidth(row)));
   }
 
+  /** Seat the leading icon (and its disc) against the label's left edge,
+   *  centred on the TEXT LINE rather than the row — an icon aligned to the row
+   *  box drifts visibly against a single line of type. */
+  private seatIcon(row: Row): void {
+    if (!row.icon || !row.chip) return;
+    const x = -(row.count.width + COUNT_GAP + row.label.width + ICON_GAP + ICON_BOX / 2);
+    const y = row.label.height / 2;
+    row.icon.setPosition(x, y);
+    row.chip.setPosition(x, y);
+  }
+
   private rowWidth(row: Row): number {
-    return row.count.width + COUNT_GAP + row.label.width;
+    const iconW = row.icon ? ICON_GAP + ICON_BOX + ICON_CHIP_PAD : 0;
+    return row.count.width + COUNT_GAP + row.label.width + iconW;
   }
 
   private retireRow(row: Row): void {
@@ -455,6 +511,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     row.count.setText(`${need} / ${need}`);
     row.root.setScale(1);
     row.label.setX(-(row.count.width + COUNT_GAP));
+    this.seatIcon(row);
     row.root.setScale(this.fitScale(this.rowWidth(row)));
     this.strike(row.strike, this.rowWidth(row), STRIKE_Y, () => {
       row.label.setColor(PALETTE.moss);

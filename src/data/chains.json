@@ -112,7 +112,14 @@
             },
             "cooldownMs": 45000,
             "energyCost": 1,
-            "passiveMs": 120000
+            "passiveMs": 120000,
+            "bonus": {
+              "every": 10,
+              "produces": {
+                "chain": "ember_dragon",
+                "tier": 1
+              }
+            }
           }
         },
         {
@@ -128,7 +135,14 @@
             },
             "cooldownMs": 30000,
             "energyCost": 1,
-            "passiveMs": 90000
+            "passiveMs": 90000,
+            "bonus": {
+              "every": 8,
+              "produces": {
+                "chain": "ember_dragon",
+                "tier": 1
+              }
+            }
           }
         }
       ]
@@ -198,7 +212,8 @@
             "energyCost": 0,
             "passiveMs": 210000,
             "tappable": false
-          }
+          },
+          "produceMaxTier": 1
         },
         {
           "tier": 4,
@@ -206,7 +221,6 @@
           "name": "Manor",
           "sell": 0,
           "xp": 20,
-          "chooseProduce": true,
           "generator": {
             "produces": {
               "chain": "coin",
@@ -216,7 +230,9 @@
             "energyCost": 0,
             "passiveMs": 210000,
             "tappable": false
-          }
+          },
+          "chooseProduce": true,
+          "produceMaxTier": 2
         }
       ]
     },
@@ -325,14 +341,14 @@
           "tier": 1,
           "id": "coin_1",
           "name": "Gold Coin",
-          "sell": 0,
+          "sell": 5,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "coin_2",
           "name": "Gold Pouch",
-          "sell": 5,
+          "sell": 15,
           "xp": 60
         }
       ]
@@ -390,6 +406,134 @@
             "cooldownMs": 30000,
             "energyCost": 1,
             "passiveMs": 120000
+          }
+        }
+      ]
+    },
+    {
+      "id": "frost",
+      "name": "Frost Dragons",
+      "hatchAtTier": 2,
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "frost_1",
+          "name": "Frost Egg",
+          "sell": 10,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "frost_2",
+          "name": "Frost Dragon",
+          "sell": 25,
+          "xp": 26,
+          "merge": {
+            "group": 2,
+            "outputs": 1
+          },
+          "generator": {
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
+            "cooldownMs": 45000,
+            "energyCost": 1,
+            "passiveMs": 120000,
+            "bonus": {
+              "every": 10,
+              "produces": {
+                "chain": "frost",
+                "tier": 1
+              }
+            }
+          }
+        },
+        {
+          "tier": 3,
+          "id": "frost_3",
+          "name": "Adult Frost Dragon",
+          "sell": 60,
+          "xp": 40,
+          "generator": {
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
+            "cooldownMs": 30000,
+            "energyCost": 1,
+            "passiveMs": 90000,
+            "bonus": {
+              "every": 8,
+              "produces": {
+                "chain": "frost",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "storm",
+      "name": "Storm Dragons",
+      "hatchAtTier": 2,
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "storm_1",
+          "name": "Storm Egg",
+          "sell": 10,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "storm_2",
+          "name": "Storm Dragon",
+          "sell": 25,
+          "xp": 26,
+          "merge": {
+            "group": 2,
+            "outputs": 1
+          },
+          "generator": {
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
+            "cooldownMs": 45000,
+            "energyCost": 1,
+            "passiveMs": 120000,
+            "bonus": {
+              "every": 10,
+              "produces": {
+                "chain": "storm",
+                "tier": 1
+              }
+            }
+          }
+        },
+        {
+          "tier": 3,
+          "id": "storm_3",
+          "name": "Adult Storm Dragon",
+          "sell": 60,
+          "xp": 40,
+          "generator": {
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
+            "cooldownMs": 30000,
+            "energyCost": 1,
+            "passiveMs": 90000,
+            "bonus": {
+              "every": 8,
+              "produces": {
+                "chain": "storm",
+                "tier": 1
+              }
+            }
           }
         }
       ]
@@ -765,247 +909,592 @@
       ]
     },
     {
-      "id": "driftwood",
-      "name": "Driftwood",
+      "id": "glasskiln",
+      "name": "Glass Kiln",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
-          "id": "driftwood_1",
-          "name": "Drift Spar",
-          "sell": 1,
-          "xp": 0
-        },
-        {
-          "tier": 2,
-          "id": "driftwood_2",
-          "name": "Bound Faggot",
-          "sell": 3,
-          "xp": 6
-        },
-        {
-          "tier": 3,
-          "id": "driftwood_3",
-          "name": "Drift Stack",
-          "sell": 9,
-          "xp": 16,
-          "generator": {
-            "produces": {
-              "chain": "tarknot",
-              "tier": 1
-            },
-            "cooldownMs": 120000,
-            "energyCost": 0,
-            "passiveMs": 120000
-          }
-        }
-      ]
-    },
-    {
-      "id": "rimebloom",
-      "name": "Rime Bloom",
-      "world": "borealis",
-      "tiers": [
-        {
-          "tier": 1,
-          "id": "rimebloom_1",
-          "name": "Frost Flower",
-          "sell": 1,
-          "xp": 0
-        },
-        {
-          "tier": 2,
-          "id": "rimebloom_2",
-          "name": "Rime Cluster",
-          "sell": 4,
-          "xp": 7
-        },
-        {
-          "tier": 3,
-          "id": "rimebloom_3",
-          "name": "Rime Bloom",
-          "sell": 11,
-          "xp": 18,
-          "generator": {
-            "produces": {
-              "chain": "frostsilk",
-              "tier": 1
-            },
-            "cooldownMs": 300000,
-            "energyCost": 0,
-            "passiveMs": 300000
-          }
-        }
-      ]
-    },
-    {
-      "id": "tarknot",
-      "name": "Pitch",
-      "world": "borealis",
-      "tiers": [
-        {
-          "tier": 1,
-          "id": "tarknot_1",
-          "name": "Tar Knot",
+          "id": "glasskiln_1",
+          "name": "Fire Brick",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
-          "id": "tarknot_2",
-          "name": "Pitch Cake",
+          "id": "glasskiln_2",
+          "name": "Kiln Grate",
+          "sell": 6,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "glasskiln_3",
+          "name": "The Glass Kiln",
+          "sell": 0,
+          "xp": 18,
+          "generator": {
+            "produces": {
+              "chain": "seaglass",
+              "tier": 1
+            },
+            "cooldownMs": 150000,
+            "energyCost": 1,
+            "passiveMs": 150000,
+            "tappable": true,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "glasskiln",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "seaglass",
+      "name": "Sea Glass",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "seaglass_1",
+          "name": "Glass Float",
+          "sell": 1,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "seaglass_2",
+          "name": "Glass Buoy",
+          "sell": 4,
+          "xp": 6
+        },
+        {
+          "tier": 3,
+          "id": "seaglass_3",
+          "name": "The Bottled Ship",
+          "sell": 14,
+          "xp": 16
+        }
+      ]
+    },
+    {
+      "id": "starbench",
+      "name": "Starwright's Bench",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "starbench_1",
+          "name": "Brass Cog",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "starbench_2",
+          "name": "Gear Ring",
+          "sell": 6,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "starbench_3",
+          "name": "The Starwright's Bench",
+          "sell": 0,
+          "xp": 18,
+          "generator": {
+            "produces": {
+              "chain": "orrery",
+              "tier": 1
+            },
+            "cooldownMs": 240000,
+            "energyCost": 1,
+            "passiveMs": 240000,
+            "tappable": true,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "starbench",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "orrery",
+      "name": "Orrery",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "orrery_1",
+          "name": "Ground Lens",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "orrery_2",
+          "name": "Spyglass",
+          "sell": 6,
+          "xp": 8
+        },
+        {
+          "tier": 3,
+          "id": "orrery_3",
+          "name": "The Orrery",
+          "sell": 18,
+          "xp": 18
+        }
+      ]
+    },
+    {
+      "id": "wreckforge",
+      "name": "Wreck Forge",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "wreckforge_1",
+          "name": "Iron Billet",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "wreckforge_2",
+          "name": "Forge Bellows",
+          "sell": 6,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "wreckforge_3",
+          "name": "The Wreck Forge",
+          "sell": 0,
+          "xp": 18,
+          "generator": {
+            "produces": {
+              "chain": "warhelm",
+              "tier": 1
+            },
+            "cooldownMs": 180000,
+            "energyCost": 1,
+            "passiveMs": 180000,
+            "tappable": true,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "wreckforge",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "warhelm",
+      "name": "War Helm",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "warhelm_1",
+          "name": "Iron Cap",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "warhelm_2",
+          "name": "Banded Helm",
+          "sell": 6,
+          "xp": 6
+        },
+        {
+          "tier": 3,
+          "id": "warhelm_3",
+          "name": "The Horned Helm",
+          "sell": 18,
+          "xp": 18
+        }
+      ]
+    },
+    {
+      "id": "tarkiln",
+      "name": "Tar Kiln",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "tarkiln_1",
+          "name": "Tar Spile",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "tarkiln_2",
+          "name": "Tar Bucket",
+          "sell": 6,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "tarkiln_3",
+          "name": "The Tar Kiln",
+          "sell": 0,
+          "xp": 18,
+          "generator": {
+            "produces": {
+              "chain": "emberheart",
+              "tier": 1
+            },
+            "cooldownMs": 150000,
+            "energyCost": 1,
+            "passiveMs": 150000,
+            "tappable": true,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "tarkiln",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "emberheart",
+      "name": "Ember Heart",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "emberheart_1",
+          "name": "Pitch Bead",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "emberheart_2",
+          "name": "Pitch Loaf",
           "sell": 7,
           "xp": 9
         },
         {
           "tier": 3,
-          "id": "tarknot_3",
-          "name": "Black Ember",
+          "id": "emberheart_3",
+          "name": "The Ember Heart",
           "sell": 20,
           "xp": 20
         }
       ]
     },
     {
-      "id": "frostsilk",
-      "name": "Frostsilk",
+      "id": "auroraloom",
+      "name": "Aurora Loom",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
-          "id": "frostsilk_1",
-          "name": "Frost Thread",
+          "id": "auroraloom_1",
+          "name": "Silver Spindle",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
-          "id": "frostsilk_2",
-          "name": "Spun Skein",
+          "id": "auroraloom_2",
+          "name": "Loom Comb",
+          "sell": 6,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "auroraloom_3",
+          "name": "The Aurora Loom",
+          "sell": 0,
+          "xp": 18,
+          "generator": {
+            "produces": {
+              "chain": "auroraweave",
+              "tier": 1
+            },
+            "cooldownMs": 300000,
+            "energyCost": 1,
+            "passiveMs": 300000,
+            "tappable": true,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "auroraloom",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "auroraweave",
+      "name": "Aurora Weave",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "auroraweave_1",
+          "name": "Light Thread",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "auroraweave_2",
+          "name": "Woven Bolt",
           "sell": 8,
           "xp": 10
         },
         {
           "tier": 3,
-          "id": "frostsilk_3",
-          "name": "Light-Fast Spindle",
+          "id": "auroraweave_3",
+          "name": "The Aurora Cloak",
           "sell": 24,
           "xp": 22
         }
       ]
     },
     {
-      "id": "wrackline",
-      "name": "The Wrack Line",
+      "id": "runestone",
+      "name": "Runestone",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
-          "id": "wrackline_1",
-          "name": "The Wrack Line",
-          "sell": 0,
-          "xp": 0,
-          "sellable": false,
+          "id": "runestone_1",
+          "name": "Rune Shard",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "runestone_2",
+          "name": "Carved Stone",
+          "sell": 6,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "runestone_3",
+          "name": "Runestone",
+          "sell": 16,
+          "xp": 17,
           "generator": {
             "produces": {
-              "chain": "driftwood",
+              "chain": "emberheart",
               "tier": 1
             },
+            "cooldownMs": 150000,
+            "energyCost": 1,
+            "passiveMs": 150000,
+            "tappable": true,
             "bonus": {
-              "every": 3,
+              "every": 12,
               "produces": {
-                "chain": "keel",
+                "chain": "runestone",
                 "tier": 1
               }
-            },
-            "cooldownMs": 300000,
-            "energyCost": 0,
-            "passiveMs": 300000,
-            "tappable": false
+            }
           }
         }
       ]
     },
     {
-      "id": "frostfont",
-      "name": "Hoarfrost Font",
+      "id": "emberdram",
+      "name": "Emberdram",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
-          "id": "frostfont_1",
-          "name": "Hoarfrost Font",
-          "sell": 0,
-          "xp": 0,
-          "sellable": false,
+          "id": "emberdram_1",
+          "name": "Dram Vial",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "emberdram_2",
+          "name": "Cordial Flask",
+          "sell": 7,
+          "xp": 8
+        },
+        {
+          "tier": 3,
+          "id": "emberdram_3",
+          "name": "Cordial Cask",
+          "sell": 18,
+          "xp": 18,
           "generator": {
             "produces": {
-              "chain": "rimebloom",
+              "chain": "seaglass",
               "tier": 1
             },
-            "cooldownMs": 300000,
-            "energyCost": 0,
-            "passiveMs": 300000,
-            "tappable": false
+            "cooldownMs": 180000,
+            "energyCost": 1,
+            "passiveMs": 180000,
+            "tappable": true,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "emberdram",
+                "tier": 1
+              }
+            }
           }
         }
       ]
     },
     {
-      "id": "keel",
-      "name": "Wreck Timber",
+      "id": "hearthlamp",
+      "name": "Hearthlamp",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
-          "id": "keel_1",
-          "name": "Broken Strake",
+          "id": "hearthlamp_1",
+          "name": "Oil Lamp",
           "sell": 1,
           "xp": 0
         },
         {
           "tier": 2,
-          "id": "keel_2",
-          "name": "Lashed Frame",
-          "sell": 3,
-          "xp": 5
+          "id": "hearthlamp_2",
+          "name": "Storm Lantern",
+          "sell": 4,
+          "xp": 7
         },
         {
           "tier": 3,
-          "id": "keel_3",
-          "name": "Upturned Hull",
+          "id": "hearthlamp_3",
+          "name": "Hearthlamp",
           "sell": 0,
-          "xp": 0,
-          "merge": {
-            "group": 2,
-            "outputs": 1
-          },
+          "xp": 18,
+          "sellable": false,
+          "generator": {
+            "reward": {
+              "energy": 3
+            },
+            "cooldownMs": 420000,
+            "energyCost": 0,
+            "passiveMs": 420000,
+            "tappable": true,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "hearthlamp",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "manastone",
+      "name": "Manastone",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "manastone_1",
+          "name": "Mana Pebble",
+          "sell": 3,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "manastone_2",
+          "name": "Mana Nodule",
+          "sell": 10,
+          "xp": 9
+        },
+        {
+          "tier": 3,
+          "id": "manastone_3",
+          "name": "Manastone Cairn",
+          "sell": 26,
+          "xp": 20,
+          "generator": {
+            "produces": {
+              "chain": "orrery",
+              "tier": 1
+            },
+            "cooldownMs": 300000,
+            "energyCost": 1,
+            "passiveMs": 300000,
+            "tappable": true,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "manastone",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "wayfinder",
+      "name": "Wayfinder",
+      "world": "borealis",
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "wayfinder_1",
+          "name": "Lodestone",
+          "sell": 2,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "wayfinder_2",
+          "name": "Boxed Needle",
+          "sell": 6,
+          "xp": 7
+        },
+        {
+          "tier": 3,
+          "id": "wayfinder_3",
+          "name": "The Wayfinder",
+          "sell": 0,
+          "xp": 18,
+          "sellable": false,
           "generator": {
             "produces": {
               "chain": "coin",
               "tier": 1
             },
-            "cooldownMs": 210000,
-            "energyCost": 0,
-            "passiveMs": 210000,
-            "tappable": false
-          }
-        },
-        {
-          "tier": 4,
-          "id": "keel_4",
-          "name": "Longhall",
-          "sell": 0,
-          "xp": 20,
-          "generator": {
-            "produces": {
-              "chain": "coin",
-              "tier": 2
-            },
-            "cooldownMs": 210000,
-            "energyCost": 0,
-            "passiveMs": 210000,
-            "tappable": false
+            "cooldownMs": 240000,
+            "energyCost": 1,
+            "passiveMs": 240000,
+            "tappable": true,
+            "bonus": {
+              "every": 12,
+              "produces": {
+                "chain": "wayfinder",
+                "tier": 1
+              }
+            }
           }
         }
       ]
@@ -1069,218 +1558,13 @@
           "sellable": false,
           "generator": {
             "produces": {
-              "chain": "frostsilk",
+              "chain": "auroraweave",
               "tier": 1
             },
             "cooldownMs": 120000,
             "energyCost": 0,
             "passiveMs": 120000,
             "tappable": true
-          }
-        }
-      ]
-    },
-    {
-      "id": "runestone",
-      "name": "Runestone",
-      "world": "borealis",
-      "tiers": [
-        {
-          "tier": 1,
-          "id": "runestone_1",
-          "name": "Rune Shard",
-          "sell": 2,
-          "xp": 0
-        },
-        {
-          "tier": 2,
-          "id": "runestone_2",
-          "name": "Carved Stone",
-          "sell": 6,
-          "xp": 7
-        },
-        {
-          "tier": 3,
-          "id": "runestone_3",
-          "name": "Runestone",
-          "sell": 16,
-          "xp": 17,
-          "generator": {
-            "produces": {
-              "chain": "tarknot",
-              "tier": 1
-            },
-            "cooldownMs": 150000,
-            "energyCost": 1,
-            "passiveMs": 150000,
-            "tappable": true,
-            "bonus": {
-              "every": 10,
-              "produces": {
-                "chain": "runestone",
-                "tier": 1
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
-      "id": "emberdram",
-      "name": "Emberdram",
-      "world": "borealis",
-      "tiers": [
-        {
-          "tier": 1,
-          "id": "emberdram_1",
-          "name": "Dram Vial",
-          "sell": 2,
-          "xp": 0
-        },
-        {
-          "tier": 2,
-          "id": "emberdram_2",
-          "name": "Cordial Flask",
-          "sell": 7,
-          "xp": 8
-        },
-        {
-          "tier": 3,
-          "id": "emberdram_3",
-          "name": "Cordial Cask",
-          "sell": 18,
-          "xp": 18,
-          "generator": {
-            "produces": {
-              "chain": "emberdram",
-              "tier": 1
-            },
-            "cooldownMs": 180000,
-            "energyCost": 1,
-            "passiveMs": 180000,
-            "tappable": true
-          }
-        }
-      ]
-    },
-    {
-      "id": "hearthlamp",
-      "name": "Hearthlamp",
-      "world": "borealis",
-      "tiers": [
-        {
-          "tier": 1,
-          "id": "hearthlamp_1",
-          "name": "Oil Lamp",
-          "sell": 1,
-          "xp": 0
-        },
-        {
-          "tier": 2,
-          "id": "hearthlamp_2",
-          "name": "Storm Lantern",
-          "sell": 4,
-          "xp": 7
-        },
-        {
-          "tier": 3,
-          "id": "hearthlamp_3",
-          "name": "Hearthlamp",
-          "sell": 0,
-          "xp": 18,
-          "sellable": false,
-          "generator": {
-            "reward": {
-              "energy": 3
-            },
-            "cooldownMs": 420000,
-            "energyCost": 0,
-            "passiveMs": 420000,
-            "tappable": true
-          }
-        }
-      ]
-    },
-    {
-      "id": "manastone",
-      "name": "Manastone",
-      "world": "borealis",
-      "tiers": [
-        {
-          "tier": 1,
-          "id": "manastone_1",
-          "name": "Mana Pebble",
-          "sell": 3,
-          "xp": 0
-        },
-        {
-          "tier": 2,
-          "id": "manastone_2",
-          "name": "Mana Nodule",
-          "sell": 10,
-          "xp": 9
-        },
-        {
-          "tier": 3,
-          "id": "manastone_3",
-          "name": "Manastone Cairn",
-          "sell": 26,
-          "xp": 20,
-          "generator": {
-            "produces": {
-              "chain": "manastone",
-              "tier": 1
-            },
-            "cooldownMs": 300000,
-            "energyCost": 1,
-            "passiveMs": 300000,
-            "tappable": true
-          }
-        }
-      ]
-    },
-    {
-      "id": "wayfinder",
-      "name": "Wayfinder",
-      "world": "borealis",
-      "tiers": [
-        {
-          "tier": 1,
-          "id": "wayfinder_1",
-          "name": "Lodestone",
-          "sell": 2,
-          "xp": 0
-        },
-        {
-          "tier": 2,
-          "id": "wayfinder_2",
-          "name": "Boxed Needle",
-          "sell": 6,
-          "xp": 7
-        },
-        {
-          "tier": 3,
-          "id": "wayfinder_3",
-          "name": "The Wayfinder",
-          "sell": 0,
-          "xp": 18,
-          "sellable": false,
-          "generator": {
-            "produces": {
-              "chain": "coin",
-              "tier": 1
-            },
-            "cooldownMs": 240000,
-            "energyCost": 1,
-            "passiveMs": 240000,
-            "tappable": true,
-            "bonus": {
-              "every": 8,
-              "produces": {
-                "chain": "wayfinder",
-                "tier": 1
-              }
-            }
           }
         }
       ]

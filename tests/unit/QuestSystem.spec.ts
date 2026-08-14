@@ -77,18 +77,22 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
     });
 
     expect(completed.map((q) => q.questId)).toContain('rekindle_brazier');
-    expect(ctx.systems.quests.activeQuest!.id).toBe('warm_the_hearth');
+    expect(ctx.systems.quests.activeQuest!.id).toBe('fill_the_larder');
   });
 
   it('skips a quest the player satisfied out of order (the Ledger shows two at once)', () => {
     const ctx = createTestContext();
-    // Order 3 is deliverable before Order 2 — both cost nine shards.
-    ctx.state.completedOrderIds.push('eleanor_brazier', 'eleanor_centerpiece');
+    // Quest 2 (Fill the Larder) wants nothing from the Ledger, so a player
+    // stocking preserves while quest 1's delivery is outstanding finishes it
+    // early — and quest 8 (Catch the Moonwater) can be settled ahead of its
+    // turn too, because the Ledger shows two orders at once.
+    ctx.state.completedOrderIds.push('eleanor_brazier', 'eleanor_moonwater');
     place(ctx, 'flame_gem', 1, 6);
-    place(ctx, 'flame_gem', 3, 1);
+    place(ctx, 'emberberry', 3, 2);
+    place(ctx, 'moonwater', 3, 1);
     merges(ctx, 10);
 
-    // Quest 3 is complete, so the ladder stops on quest 2 and will jump past it.
+    // Quest 2 is complete, so the ladder jumps it and stops on quest 3.
     expect(ctx.systems.quests.activeQuest!.id).toBe('warm_the_hearth');
     place(ctx, 'flame_gem', 2, 3);
     ctx.state.completedOrderIds.push('eleanor_hearth');
@@ -96,7 +100,7 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
       orderId: 'eleanor_hearth',
       rewards: { coins: 75, keys: 0, xp: 35 }
     });
-    expect(ctx.systems.quests.activeQuest!.id).toBe('keepers_hoard');
+    expect(ctx.systems.quests.activeQuest!.id).toBe('raise_the_roofs');
   });
 
   it("mirrors the Keeper's Tasks from tasks.json — one definition, two readouts", () => {
@@ -156,24 +160,78 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
   });
 });
 
+describe("two givers on one board — the Golden Elder's track", () => {
+  it('is dormant until keepers_hoard wakes him: not tracked, and never pre-latched', () => {
+    const ctx = createTestContext();
+    expect(ctx.systems.quests.giversHere).toEqual(['eleanor']);
+    expect(ctx.systems.quests.activeQuestFor('golden_elder')).toBeNull();
+
+    // A board that satisfies his first ask, long before he wakes…
+    place(ctx, 'quartz', 2, 2);
+    expect(ctx.state.stat('q:elder_stones')).toBe(0);
+    // …and the wake must not inherit that stale board either.
+    for (const item of ctx.state.itemsMatching('quartz', 2)) ctx.state.removeItem(item.id);
+
+    ctx.state.addStat('q:done:keepers_hoard', 1);
+    ctx.bus.emit('economy:changed', { coins: 0, keys: 0, xp: 0, level: 1 });
+
+    expect(ctx.systems.quests.giversHere).toEqual(['eleanor', 'golden_elder']);
+    expect(ctx.systems.quests.activeQuestFor('golden_elder')!.id).toBe('elder_seeing_stones');
+    expect(ctx.state.stat('q:elder_stones')).toBe(0);
+    // Eleanor's own pointer is untouched by his arrival.
+    expect(ctx.systems.quests.activeQuest!.id).toBe('rekindle_brazier');
+  });
+
+  it('announces each track separately, naming the giver, and advances his ladder independently', () => {
+    const ctx = createTestContext();
+    const advanced = capture(ctx.bus, 'quest:advanced');
+    ctx.state.addStat('q:done:keepers_hoard', 1);
+    ctx.bus.emit('economy:changed', { coins: 0, keys: 0, xp: 0, level: 1 });
+
+    const elder = advanced.find((a) => a.giver === 'golden_elder')!;
+    expect(elder).toMatchObject({ questId: 'elder_seeing_stones', index: 1, total: 12 });
+
+    place(ctx, 'quartz', 2, 2); // his first ask — Eleanor's ladder wants none of it
+    const after = advanced.filter((a) => a.giver === 'golden_elder').at(-1)!;
+    expect(after.questId).toBe('elder_green_over_ash');
+    expect(ctx.systems.quests.activeQuest!.id).toBe('rekindle_brazier');
+  });
+
+  it('a gated track is gated WHOLE — every quest of the giver carries the same gate', () => {
+    // The dormancy that stops pre-latching is per QUEST, but the property it
+    // protects is per TRACK: one ungated quest in a sleeping giver's ladder
+    // silently pre-completes off Eleanor-era board states, with no on-screen
+    // symptom until he wakes into a half-finished ladder. Authored data has to
+    // hold the invariant, so this test states it.
+    const ctx = createTestContext();
+    const byTrack = new Map<string, Array<string | undefined>>();
+    for (const quest of ctx.systems.quests.all) {
+      const track = `${quest.world ?? 'emberkeep'}:${quest.giver}`;
+      if (!byTrack.has(track)) byTrack.set(track, []);
+      byTrack.get(track)!.push(quest.lockedUntil?.quest);
+    }
+    for (const [track, gates] of byTrack) {
+      expect(new Set(gates).size, `track ${track} mixes gates: ${[...new Set(gates)].join(', ')}`).toBe(1);
+    }
+  });
+});
+
 describe('quest rewards — the legendary egg arrives, once, and cannot be lost', () => {
-  /** Drive the first Emberkeep egg quest (`warm_the_hearth`) to completion. */
-  const finishHearth = (ctx: ReturnType<typeof createTestContext>): void => {
-    // Its two steps: hold 3 Flame Gems, then deliver the order.
-    for (let i = 0; i < 3; i++) {
-      ctx.state.addItem({ chain: 'flame_gem', tier: 2, col: i, row: 0, kind: 'item' });
+  /** Drive the first Emberkeep egg quest (`fill_the_larder`) to completion:
+   *  its single step is holding 2 Emberberry Preserves. */
+  const finishLarder = (ctx: ReturnType<typeof createTestContext>): void => {
+    for (let i = 0; i < 2; i++) {
+      ctx.state.addItem({ chain: 'emberberry', tier: 3, col: i, row: 0, kind: 'item' });
     }
     ctx.bus.emit('item:spawned', {
-      item: { id: 0, chain: 'flame_gem', tier: 2, col: 0, row: 0, kind: 'item' },
+      item: { id: 0, chain: 'emberberry', tier: 3, col: 0, row: 0, kind: 'item' },
       cause: 'init'
     });
-    ctx.state.completedOrderIds.push('eleanor_brazier', 'eleanor_hearth');
-    ctx.bus.emit('order:completed', { orderId: 'eleanor_hearth', rewards: { coins: 0, keys: 0 } });
   };
 
   it('pays the egg on completion, exactly once, no matter how often state moves', () => {
     const ctx = createTestContext();
-    finishHearth(ctx);
+    finishLarder(ctx);
     const eggs = (): number => ctx.state.countItems('ashdrake', 1) + bagCount(ctx, 'ashdrake', 1);
     expect(eggs()).toBe(1);
 
@@ -192,7 +250,7 @@ describe('quest rewards — the legendary egg arrives, once, and cannot be lost'
         ctx.state.addItem({ chain: 'lumber', tier: 1, col, row, kind: 'item' });
       }
     }
-    finishHearth(ctx);
+    finishLarder(ctx);
     // Nowhere on the board — so it is in the satchel, not gone. A legendary egg
     // exists three times in a zone; losing one costs the dragon for good.
     expect(ctx.state.countItems('ashdrake', 1)).toBe(0);
@@ -217,3 +275,47 @@ function bagCount(
 ): number {
   return ctx.state.bag.find((s) => s.chain === chain && s.tier === tier)?.count ?? 0;
 }
+
+describe('brew goals — the cauldron as a quest driver', () => {
+  const brew = (ctx: GameContext, recipeId: string, times: number): void => {
+    for (let i = 0; i < times; i++) {
+      ctx.bus.emit('cauldron:brewed', {
+        recipeId,
+        output: { chain: 'warhelm', tier: 1, count: 1 }
+      });
+    }
+  };
+
+  it('counts brews, and spending what was brewed cannot un-do the step', () => {
+    const ctx = createTestContext();
+    const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
+    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 0, need: 4, done: false });
+
+    brew(ctx, 'iron_cap', 3);
+    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 3, done: false });
+    brew(ctx, 'iron_cap', 1);
+    expect(ctx.systems.quests.progressFor(step).done).toBe(true);
+
+    // The output is meant to be SPENT — four strakes merged away is the quest
+    // working, not the quest coming undone.
+    ctx.bus.emit('bag:consume', { chain: 'warhelm', tier: 1, count: 4 });
+    expect(ctx.systems.quests.progressFor(step).done).toBe(true);
+  });
+
+  it('counts only the recipe it names', () => {
+    const ctx = createTestContext();
+    const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
+    brew(ctx, 'frost_thread', 4);
+    expect(ctx.systems.quests.progressFor(step).have).toBe(0);
+  });
+
+  it('names an unlabelled brew step by what comes out of the pot', () => {
+    const ctx = createTestContext();
+    expect(
+      ctx.systems.quests.progressFor({
+        id: 'unlabelled',
+        goal: { kind: 'brew', recipeId: 'iron_cap', count: 2 }
+      }).label
+    ).toBe('Brew 2 × Iron Cap');
+  });
+});

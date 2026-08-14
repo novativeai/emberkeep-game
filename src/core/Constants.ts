@@ -2,6 +2,7 @@
  * Every tunable in Emberkeep lives here or in src/data/*.json.
  * Systems and scenes must not contain magic numbers.
  */
+import type { SpeakerId } from './types';
 
 /** Emberkeep palette (string form for Canvas2D, use num() for Phaser). */
 export const PALETTE = {
@@ -94,19 +95,59 @@ export function panelMobileScale(frameWidth: number): number {
 }
 
 /**
- * Viewport height in game-space units.
- * On desktop stays at GAME_HEIGHT (1600) — no change (e2e/landscape untouched).
- * On mobile the game is PORTRAIT: GAME_WIDTH (2560) spans the phone's SHORT side
- * (full width) and the coordinate space grows TALLER to match the portrait aspect,
- * so FIT fills the screen with zero bars and the board pans vertically. The 2.4×
- * cap keeps a near-square tablet (or an extreme aspect) from a runaway backing.
+ * The LIVE coordinate space, in game-space units.
+ *
+ * The space is AUTHORED at 2560×1600, but a window is rarely 16:10 and FIT just
+ * letterboxes whatever does not match: a 16:9 desktop threw away 10% of the
+ * screen to pillarbox bars and a 21:9 monitor a full third of it.
+ *
+ * So the SHORT axis is pinned to its design constant and the LONG axis GROWS to
+ * meet the real aspect — a 16:9 window is 2844×1600, a 3:2 window 2560×1706,
+ * and a 16:10 window is 2560×1600 exactly as before (which is why the e2e run,
+ * authored at 16:10, is byte-identical). Growing rather than shrinking means the
+ * reclaimed space shows MORE of the world instead of scaling the art down, and
+ * nothing has to be re-tuned for it: the board camera already refuses to look
+ * past the authored backdrop (`minZoom` is the backdrop-fit), so a wider
+ * viewport simply holds a slightly closer frame.
+ *
+ * Mobile is unchanged. There the game is PORTRAIT: GAME_WIDTH spans the phone's
+ * SHORT side whichever way it is held, the space grows taller to match, and 2.4
+ * caps a near-square tablet (or an extreme aspect) from a runaway backing.
+ *
+ * Both axes are read at BOOT. A desktop window resized afterwards re-FITs (and
+ * re-letterboxes) until reload — the scenes lay out once.
  */
-export const LIVE_GAME_HEIGHT: number = (() => {
-  if (typeof window === 'undefined' || !IS_MOBILE) return GAME_HEIGHT;
-  const shortSide = Math.min(window.innerWidth, window.innerHeight); // portrait width
-  const longSide = Math.max(window.innerWidth, window.innerHeight); // portrait height
-  return Math.round(GAME_WIDTH * Math.min(2.4, longSide / shortSide));
-})();
+/** The pure half of the rule above — exported so the invariants (short axis
+ *  pinned, 16:10 identity, clamp) are unit-testable without a DOM. */
+export function liveSpaceFor(
+  winW: number,
+  winH: number,
+  isMobile: boolean
+): { w: number; h: number } {
+  if (isMobile) {
+    const shortSide = Math.min(winW, winH); // portrait width
+    const longSide = Math.max(winW, winH); // portrait height
+    return { w: GAME_WIDTH, h: Math.round(GAME_WIDTH * Math.min(2.4, longSide / shortSide)) };
+  }
+  // Clamped the same 2.4 either way, so one absurd axis cannot inflate the
+  // backing; past the clamp the leftover simply letterboxes as it always did.
+  const aspect = Math.min(2.4, Math.max(1 / 2.4, winW / winH));
+  return {
+    w: Math.round(Math.max(GAME_WIDTH, GAME_HEIGHT * aspect)),
+    h: Math.round(Math.max(GAME_HEIGHT, GAME_WIDTH / aspect))
+  };
+}
+
+const LIVE_SPACE: { w: number; h: number } =
+  typeof window === 'undefined'
+    ? { w: GAME_WIDTH, h: GAME_HEIGHT }
+    : liveSpaceFor(window.innerWidth, window.innerHeight, IS_MOBILE);
+
+/** Viewport WIDTH in game-space units. Anchor every screen-space x to this —
+ *  `GAME_WIDTH` is the authoring constant and is only correct at 16:10. */
+export const LIVE_GAME_WIDTH: number = LIVE_SPACE.w;
+/** Viewport HEIGHT in game-space units. See LIVE_GAME_WIDTH. */
+export const LIVE_GAME_HEIGHT: number = LIVE_SPACE.h;
 
 /**
  * The bottom-right button column — Ledger, Bag, Cookbook, Store, Dragon Codex,
@@ -164,7 +205,7 @@ export const STATUS_READOUT_H = 126;
 export const STATUS_READOUT_BOTTOM_Y: number =
   QUEST_TRACKER_TOP_Y + (QUEST_TRACKER_BOTTOM + STATUS_READOUT_GAP + STATUS_READOUT_H) * UI_SCALE;
 
-export const HUD_COLUMN_X: number = GAME_WIDTH - (IS_MOBILE ? 190 : 156);
+export const HUD_COLUMN_X: number = LIVE_GAME_WIDTH - (IS_MOBILE ? 190 : 156);
 
 /**
  * FIVE DOORS, AND A CEILING THEY MAY NOT CROSS.
@@ -402,13 +443,14 @@ export const ITEM_SCALE: Record<string, number> = {
   sleep_ember_dragon_3: 0.134, // curled whelp, alpha bbox 1193 → 160 units
   sleep_ember_dragon_4: 0.216, // curled adult, 1602 → 346 units
   bigtree_1: 0.17, // the level-2 wood tree — reduced again on request (0.22 → 0.17)
-  // The Fir loop — what the Ancient Tree drops as it is worked, and what that
-  // grows back into. Sized so the three steps READ as growth at a glance:
-  // 66 → 88 → 140 units, the last of which is the Ancient Tree's own size,
-  // because tier 3 IS a working tree (same art, same produce, same bonus).
-  firgrain_1: 0.183, // Fir Grain, alpha bbox 291×360 → 66 units
-  firgrain_2: 0.116, // Small Fir Tree, 617×758 → 88 units
-  firgrain_3: 0.17, // shares bigtree.webp with the landmark bigtree_1
+  // The Fir loop. Retuned on playtest: the three steps must read as SEED →
+  // SAPLING → LANDMARK at a glance, and at 66/88/140 the grain out-bulked a
+  // berry while the trees under-read. Now 43 → 120 → 181 units — the grain is
+  // pocket-sized, the Small Fir is a real sapling, and the Fir Tree reads as
+  // the landmark it is (the only tree Chapter One has).
+  firgrain_1: 0.12, // Fir Grain, alpha bbox 291×360 → 43 units
+  firgrain_2: 0.158, // Small Fir Tree, 617×758 → 120 units
+  firgrain_3: 0.22, // Fir Tree — shares bigtree.webp (823px → 181 units)
   chest_1: 0.19, // a treasure chest (chest.png) — reduced again on request (0.24 → 0.19)
   // The Emberberry plant, redrawn so its fruit IS the shipped Emberberry (cut
   // from assets/raw/merge-chains/emberberry_plant-seedream-pro.png). Each scale
@@ -419,13 +461,21 @@ export const ITEM_SCALE: Record<string, number> = {
   strawberry_3: 0.252, // the ripe plant, 620×618 → 156 units; t3 reads biggest
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
-  // Emberbark Stump (emberbark.png 620×520) — low wide landmark, ~200 units.
-  // Its anchor (anchors.json) is 0.8, NOT the 0.9 it shipped with, and the
-  // number comes from the SILHOUETTE, not the bbox: the wide dark base ends at
-  // 0.83 of the canvas and only thin root tips reach the 0.927 alpha bottom.
-  // Anchoring off the bbox bottom left that whole visual base ABOVE the tile
-  // origin — the stump hovered over its shadow with just a root grazing it.
-  // At 0.8 the base sits ~5 units below the origin and the roots ~21, planted.
+  // The Ash Moss farm (emberbark.png 340×641) — a STANDING silver reliquary
+  // vase, not the burned stump it used to be. The isle was a field of magic
+  // grass the dragons rested in and ate; it burned, and what stands here is the
+  // last of it, in a vessel somebody thought was worth the silver.
+  //
+  // 205 units on its LONGEST axis, which is now its height rather than its
+  // width — same on-board presence, turned upright. Its anchor (anchors.json)
+  // moved 0.66 → 0.94 with the shape: 0.66 was eyeballed for a low wide stump
+  // whose mass sat well above its alpha bottom, and a vase contacts the ground
+  // at its own foot. Re-derived the same way and for the same reason — an
+  // isometric object's visual ground contact is where its mass meets the
+  // shadow's CENTRE, not where its alpha ends, so the foot's base ellipse is
+  // centred on the tile diamond. When a landmark floats, composite
+  // art-over-shadow and EYEBALL it; deriving this from the bbox has failed
+  // three times now.
   emberbark_1: 0.32,
   emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
@@ -436,6 +486,16 @@ export const ITEM_SCALE: Record<string, number> = {
   ashdrake_2: 0.21, // young ashdrake: static art (1054px) at the board dragons' size
   rimewyrm_1: 0.064, // Rimewyrm Egg (rimewyrm-egg.png 1160×1440) — same scale as red/green egg
   rimewyrm_2: 0.21, // young rimewyrm: static art (1054px) at the board dragons' size
+  // The store breeds as their OWN chains (egg → baby → adult). Tiers 2–3 reuse
+  // the baked skin art, which bake-dragon-skin.py fitted onto the ember rig's
+  // canvases — so they wear ember's own scales, and the clip overlays (aligned
+  // at those same board scales) land exactly on the art they replace.
+  frost_1: 0.064, // Frost Egg (frost-egg.png 1109×1440)
+  frost_2: 0.21, // Frost Dragon: skin bake on the whelp canvas (1054px)
+  frost_3: 0.45, // Adult Frost Dragon: skin bake on the adult canvas (836px)
+  storm_1: 0.064, // Storm Egg (storm-egg.png 1127×1440)
+  storm_2: 0.21, // Storm Dragon: skin bake on the whelp canvas (1054px)
+  storm_3: 0.45, // Adult Storm Dragon: skin bake on the adult canvas (836px)
   coin_1: 0.12, // SMALLER than an egg, per spec
   coin_2: 0.15, // Gold Pouch — reduced 25% on request (0.20 → 0.15); still bigger than the coin (0.12)
   // ---- merge-chains.md roster (art registered in assets.json) ----
@@ -472,42 +532,18 @@ export const ITEM_SCALE: Record<string, number> = {
   nightbloom_1: 0.21, // Night Bud, 235×314 — the tall one, matched on height
   nightbloom_2: 0.263, // Night Bloom, 335×304
   nightbloom_3: 0.224, // Cooling Wreath, 501×426
-  quartz_1: 0.20,
-  quartz_2: 0.19,
-  quartz_3: 0.21,
-  moonwater_1: 0.16,
-  moonwater_2: 0.20,
-  moonwater_3: 0.20,
-  nest_1: 0.33, // a Cold Nest is furniture a dragon sits in, not a merge piece
-  // ---- Selyna's Borealis roster (merge-chains.md §2.4) ----
-  // Same 66 / 88 / 112 tiering as the Emberkeep chains above, so a Drift Spar
-  // reads at the size of a Gem Shard and the board stays legible across worlds.
-  driftwood_1: 0.16,
-  driftwood_2: 0.17,
-  driftwood_3: 0.22,
-  tarknot_1: 0.20,
-  tarknot_2: 0.18,
-  tarknot_3: 0.22,
-  rimebloom_1: 0.21,
-  rimebloom_2: 0.19,
-  rimebloom_3: 0.22,
-  frostsilk_1: 0.16,
-  frostsilk_2: 0.17,
-  frostsilk_3: 0.22,
-  // The north's fixtures + the Wreck Timber ladder (target units / alpha bbox).
-  wrackline_1: 0.299, // The Wrack Line — low wide tide-heap landmark, 635px → ~190 units
-  frostfont_1: 0.29, // Hoarfrost Font — working font, 518px tall → ~150 units
-  keel_1: 0.177, // Broken Strake, 418px → 74 units (the Cut Wood class)
-  keel_2: 0.21, // Lashed Frame, 476px → 100 units (the Plank Set class)
-  keel_3: 0.409, // Upturned Hull, 635px → 260 units (the House class)
-  keel_4: 0.49, // Longhall, 714px → 350 units (the Manor class)
-  // Selyna's second roster — five chains cut in one pass, and ONE number for
-  // all fifteen pieces rather than fifteen measured ones. That is not laziness:
-  // the cut step resamples every cell to exactly six times its on-board size
-  // (main's gen-borealis-chains.py, `TARGET * 6`), so the scale is 1/6 BY
-  // CONSTRUCTION and a re-cut cannot silently resize a piece on the board. The
-  // chains above still carry per-piece values because their art was cut before
-  // that rule existed — leave them measured, they are not wrong.
+  // The five Borealis farms. Same 66 → 88 ladder as every other chain at tiers
+  // 1–2, but their tier 3 is a WORKING FIXTURE — a standing stone, a cask, a
+  // lamp post, a cairn, an instrument on its block — so it goes to 118 rather
+  // than 112: it has to read as something standing on the land, not as the
+  // biggest of three collectibles.
+  //
+  // One number for all fifteen, because the cut step now RESAMPLES each cell to
+  // exactly six times its on-board size (gen-borealis-chains.py, `TARGET * 6`)
+  // instead of leaving whatever the sheet happened to return. The scale is
+  // therefore 1/6 by construction, and a re-cut can never silently resize a
+  // piece on the board. Older chains above still carry per-piece values because
+  // their art was cut before that rule existed.
   runestone_1: 0.1667, // Rune Shard
   runestone_2: 0.1667, // Carved Stone
   runestone_3: 0.1667, // Runestone
@@ -522,14 +558,98 @@ export const ITEM_SCALE: Record<string, number> = {
   manastone_3: 0.1667, // Manastone Cairn
   wayfinder_1: 0.1667, // Lodestone
   wayfinder_2: 0.1667, // Boxed Needle
-  wayfinder_3: 0.1667 // The Wayfinder
+  wayfinder_3: 0.1667, // The Wayfinder
+  quartz_1: 0.20,
+  quartz_2: 0.19,
+  quartz_3: 0.21,
+  moonwater_1: 0.16,
+  moonwater_2: 0.20,
+  moonwater_3: 0.20,
+  nest_1: 0.33, // a Cold Nest is furniture a dragon sits in, not a merge piece
+  // ---- The north's FIVE FARMS (docs/merge-chains.md §2.4.1c) ----
+  // Every piece is authored at 6x its on-board size, so the scale is 1/6 flat
+  // and the LADDER lives in the art instead: `gen-borealis-farms.py` cuts a
+  // product to 66 / 88 / 118 units and a fixture to 66 / 92 / 170, because the
+  // top of a fixture chain is a machine you build a farm around and the top of
+  // a product chain is a thing you carry.
+  glasskiln_1: 0.1667, // Fire Brick
+  glasskiln_2: 0.1667, // Kiln Grate
+  glasskiln_3: 0.1667, // The Glass Kiln
+  seaglass_1: 0.1667, // Glass Float
+  seaglass_2: 0.1667, // Glass Buoy
+  seaglass_3: 0.1667, // The Bottled Ship
+  starbench_1: 0.1667, // Brass Cog
+  starbench_2: 0.1667, // Gear Ring
+  starbench_3: 0.1667, // The Starwright's Bench
+  orrery_1: 0.1667, // Ground Lens
+  orrery_2: 0.1667, // Spyglass
+  orrery_3: 0.1667, // The Orrery
+  wreckforge_1: 0.1667, // Iron Billet
+  wreckforge_2: 0.1667, // Forge Bellows
+  wreckforge_3: 0.1667, // The Wreck Forge
+  warhelm_1: 0.1667, // Iron Cap
+  warhelm_2: 0.1667, // Banded Helm
+  warhelm_3: 0.1667, // The Horned Helm
+  tarkiln_1: 0.1667, // Tar Spile
+  tarkiln_2: 0.1667, // Tar Bucket
+  tarkiln_3: 0.1667, // The Tar Kiln
+  emberheart_1: 0.1667, // Pitch Bead
+  emberheart_2: 0.1667, // Pitch Loaf
+  emberheart_3: 0.1667, // The Ember Heart
+  auroraloom_1: 0.1667, // Silver Spindle
+  auroraloom_2: 0.1667, // Loom Comb
+  auroraloom_3: 0.1667, // The Aurora Loom
+  auroraweave_1: 0.1667, // Light Thread
+  auroraweave_2: 0.1667, // Woven Bolt
+  auroraweave_3: 0.1667 // The Aurora Cloak
 };
 
-/** Chains collected by TAP into a currency. Coin → +1 Gold (flies to the gauge). */
-export const COLLECTIBLE_REWARD: Record<string, { coins: number }> = {
-  coin: { coins: 5 }, // Gold Coin — the House drops one each cycle
-  coin_2: { coins: 10 } // Gold Pouch (3 coins merged) — worth the merge
-};
+/**
+ * The DENOMINATION of Gold: a Gold Coin is five Gold.
+ *
+ * It is the unit the whole currency is counted in, so any balance the player
+ * holds can be handed over as coins (35 Gold is seven of them) and a House pays
+ * in the same money the player spends. Every scripted Gold award is authored as
+ * a multiple of it — a quest paying 26 could not be handed over. The per-piece
+ * worth lives in `chains.json` as each coin tier's `sell`, because a Coin is a
+ * PIECE now: the House drops one, the player pockets it like anything else, and
+ * the Bag is where it turns back into money.
+ *
+ * The Pouch is three Coins merged, so it sells for three Coins. It used to pay
+ * ten, which quietly burned five Gold every time the player made one — the
+ * merge the Manor exists to feed was the one merge in the game that lost money.
+ *
+ * Coins used to be COLLECTIBLES: a tap banked the gold and destroyed the piece,
+ * which meant they could never reach the Bag — and the commission chooser reads
+ * the Bag, so a House could never be told to make Gold Coins again once it had
+ * been commissioned to anything else. A currency you cannot hold is a currency
+ * the rest of the game cannot see.
+ */
+export const GOLD_UNIT = 5;
+/** A Gold Pouch — three Coins merged, and worth exactly that. */
+export const POUCH_UNIT = GOLD_UNIT * 3;
+
+/**
+ * The PURSE: the Gold balance, expressed as the coins it is made of.
+ *
+ * There is one pile of money in this game and two ways to look at it. The
+ * number in the HUD and the coins in the satchel are the SAME Gold — a purse
+ * that had to be filled by pocketing pieces would be a second, shadow balance
+ * the player has to reconcile by hand.
+ *
+ * The denomination depends on who is looking. The Bag shows the largest that
+ * fills: 500 Gold is 33 Pouches. A commission chooser shows the rank the
+ * BUILDING can work — a House caps at tier one, so the same money reads to it
+ * as 100 Gold Coins, and a House is never offered a Pouch it could not make.
+ */
+export function goldPurse(
+  coins: number,
+  maxTier = 2
+): { chain: 'coin'; tier: 1 | 2; count: number } | null {
+  const tier: 1 | 2 = maxTier >= 2 && coins >= POUCH_UNIT ? 2 : 1;
+  const count = Math.floor(coins / (tier === 2 ? POUCH_UNIT : GOLD_UNIT));
+  return count > 0 ? { chain: 'coin', tier, count } : null;
+}
 
 /**
  * Chains that exist in chains.json (the unit tests use `sparkweed` as their
@@ -676,7 +796,17 @@ export const giftKey = (characterId: string, chain: string, tier: number): strin
   `gift:${characterId}:${chain}:${tier}`;
 /** Latch so a quest's Regard is paid exactly once, however often
  *  `quest:completed` is re-derived. */
+/** Pieces GIVEN (hand to hand, out of the satchel) toward one requirement of
+ *  one order — the deliver verb's twin. Counted per order so a repeatable can
+ *  clear it on completion, and a stat so it survives a reload like any other
+ *  handing-over the game remembers. */
+export const orderGiveKey = (orderId: string, chain: string, tier: number): string =>
+  `ogive:${orderId}:${chain}:${tier}`;
 export const regardPaidKey = (questId: string): string => `regard:paid:${questId}`;
+/** Lifetime count of one cauldron recipe brewed — what a `brew` goal reads.
+ *  Same shape and same reason as `giftKey`: the goal keeps no state of its own,
+ *  and spending the output cannot un-brew it. */
+export const brewKey = (recipeId: string): string => `brew:${recipeId}`;
 
 export const heartsForPoints = (points: number): number =>
   Math.min(REGARD_HEARTS, Math.floor(Math.max(0, points) / REGARD_POINTS_PER_HEART));
@@ -1151,17 +1281,17 @@ export const DRAGON_RARITY: Record<string, DragonRarity> = {
  *
  * Every breed now has a favourite of its OWN — five breeds, five reachable
  * chains — which is what `stormcap` and `nightbloom` were added for. Before
- * them the roster held three usable favourites for five dragons (`tarknot` is
+ * them the roster held three usable favourites for five dragons (`emberheart` is
  * Borealis-only, so an Emberkeep dragon could never reach it), and two pairs of
  * breeds shared a taste. A favourite the player has to discover is only worth
  * discovering if it tells one dragon apart from another.
  */
 export const DRAGON_DIET: Record<string, { favourite: string; refuses: string }> = {
-  ember_dragon: { favourite: 'resin', refuses: 'tarknot' },
-  emerald: { favourite: 'emberberry', refuses: 'tarknot' },
+  ember_dragon: { favourite: 'resin', refuses: 'emberheart' },
+  emerald: { favourite: 'emberberry', refuses: 'emberheart' },
   frost: { favourite: 'ashmoss', refuses: 'resin' },
   storm: { favourite: 'stormcap', refuses: 'emberberry' },
-  moonwhisker: { favourite: 'nightbloom', refuses: 'tarknot' }
+  moonwhisker: { favourite: 'nightbloom', refuses: 'emberheart' }
 };
 /* ---------------- Ambient life: what a dragon does when nobody asks --------
  *
@@ -1440,9 +1570,13 @@ export function legendaryChainIn<T extends { id: string; world?: string; legenda
 export const CHEST_GIFTS_BY_WORLD: Readonly<Record<string, ReadonlyArray<ChestGift>>> = {
   borealis: [
     { kind: 'coins', amount: 15, label: '+15' },
-    { kind: 'item', chain: 'driftwood', tier: 1, count: 3, label: '3 Drift Spars!' },
-    { kind: 'item', chain: 'rimebloom', tier: 1, count: 3, label: '3 Frost Flowers!' },
-    { kind: 'item', chain: 'keel', tier: 1, count: 2, label: '2 Broken Strakes!' }
+    // Migrated tier for tier with the roster (migrate-borealis-farms.py's map):
+    // driftwood → seaglass, rimebloom → orrery, keel → warhelm. The northern
+    // chest still pays northern stock, which is the whole point of it being a
+    // per-world table.
+    { kind: 'item', chain: 'seaglass', tier: 1, count: 3, label: '3 Glass Floats!' },
+    { kind: 'item', chain: 'orrery', tier: 1, count: 3, label: '3 Ground Lenses!' },
+    { kind: 'item', chain: 'warhelm', tier: 1, count: 2, label: '2 Iron Caps!' }
   ]
 };
 
@@ -1647,10 +1781,18 @@ export const PORTAL_TINTS: Record<string, PortalTints> = {
   }
 };
 
-/** Selyna quests that must be DONE before the Rune Way (Borealis → Runevault)
- *  opens — counted off the per-world `q:world:borealis:done` stat, so the gate
- *  never keeps a quest-id list that could drift. */
-export const RUNEVAULT_QUESTS_NEEDED = 3;
+/**
+ * Selyna quests that must be DONE before the Rune Way opens — counted off the
+ * per-world `q:world:borealis:done` stat, so the gate never keeps a quest-id
+ * list that could drift.
+ *
+ * TWO, and that number is the ladder's, not a feel: the north's third quest is
+ * its first CAULDRON quest (`north_strakes`), and the pot stands through this
+ * door. One quest later and the ladder would ask for a brew the player cannot
+ * reach; much earlier and the door opens onto a hub before the north has taught
+ * anything to carry through it. See docs/quest-ladder.md §5.
+ */
+export const RUNEVAULT_QUESTS_NEEDED = 2;
 
 /** The Roothold house — the Emporium's painted storefront — as a world-px
  *  rect: roothold.webp [755, 205, 330, 340] through the shared art→world
@@ -2122,7 +2264,11 @@ export const SAVE_KEY = 'emberkeep_save';
 // those lines already carries the stump as a board item, and the new spawn
 // effect firing over it would seed a SECOND free generator — wipe, same rule
 // as v12 itself.
-export const SAVE_VERSION = 13;
+// v14: the north's seven old chains are DELETED and five farms stand in their
+// place, so any board holding a Drift Spar, a Broken Strake or a Hoarfrost Font
+// is holding pieces no chain can name — and the Codex lesson grew from one beat
+// to six, which moves every persisted `tutorialIndex` after it.
+export const SAVE_VERSION = 14;
 
 /** The opening's held silence: the board is visible and quiet before Eleanor's
  *  first line, so the player sees the ash before anyone frames it
@@ -2167,3 +2313,69 @@ export const SCENES = {
   ui: 'UIScene',
   uiEditor: 'UiEditorScene'
 } as const;
+
+/**
+ * Display names, one table for every surface that prints a person's name —
+ * the bubble's name tag, a subquest's "Deliver … to Eleanor", a HUD line.
+ * A second copy of this table drifts the first time somebody is renamed.
+ */
+export const SPEAKER_NAMES: Record<SpeakerId, string> = {
+  eleanor: 'Eleanor',
+  selyna: 'Selyna',
+  golden_elder: 'The Golden Elder'
+};
+
+/**
+ * Hard cap for any single line in `dialogue.json` — a bubble is one breath,
+ * not a paragraph, and past this length the card grows tall enough to crowd
+ * the board. A longer speech is authored as an ARRAY of lines (a tap-advanced
+ * sequence, or the finale's chained says). Enforced by
+ * `tests/unit/Dialogue.spec.ts`, so an over-long line fails the build rather
+ * than shipping as a wall of text.
+ */
+export const DIALOGUE_MAX_CHARS = 190;
+
+/**
+ * FIRST CONTACT — the line a world's own giver says the first time a machine of
+ * theirs is standing on the player's board.
+ *
+ * The north is entered by a taught player and must not grow a tutorial
+ * (`docs/tutorial-coverage.md`), but "no tutorial" was read as "no words": its
+ * five farms shipped with four of the five machines never named anywhere the
+ * player could read them, while `north_terms` asked for an Orrery and
+ * `what_she_will_take` gifted three Ground Lenses. A quest that asks for an
+ * object nobody has named is the defect the coverage ledger exists to catch.
+ *
+ * These are INTRODUCTIONS, not rules. The structure needs no lesson — parts
+ * merging into a building is `wood_merge`→`plank_merge`, and a generator whose
+ * rarer yield becomes another generator is `emberberry_merge`, the same
+ * every-twelfth drop and all. So the first machine says the growth rule out
+ * loud once (nine bricks, a second kiln) and the rest simply say their name and
+ * what comes out of them.
+ *
+ * `tier` is the MACHINE — the fixture ladder's top, the piece that produces.
+ * Latched once ever in `stats` under `fc:<chain>`, so the line survives a
+ * reload without repeating. Each row's speaker is the giver whose world seeds
+ * that machine; UIScene groups a multi-machine reveal by speaker, so a mixed
+ * table is legal (a region can seed several farms at once — `borealis_coast`
+ * seeds three).
+ */
+export const FIRST_CONTACT: ReadonlyArray<{
+  chain: string;
+  tier: number;
+  /** Key into `dialogue.json` → `hints`. */
+  hint: string;
+  speaker: string;
+}> = [
+  { chain: 'glasskiln', tier: 3, hint: 'glassKiln', speaker: 'selyna' },
+  { chain: 'starbench', tier: 3, hint: 'starBench', speaker: 'selyna' },
+  { chain: 'wreckforge', tier: 3, hint: 'wreckForge', speaker: 'selyna' },
+  { chain: 'tarkiln', tier: 3, hint: 'tarKiln', speaker: 'selyna' },
+  { chain: 'auroraloom', tier: 3, hint: 'auroraLoom', speaker: 'selyna' }
+];
+
+/** How long a first-contact line holds, and how long the sweep waits when the
+ *  bubble is busy — the Borealis arrival speech owns the stage on the very
+ *  first visit, and the kiln's introduction belongs after it, not over it. */
+export const FIRST_CONTACT_HOLD_MS = 6200;
+export const FIRST_CONTACT_RETRY_MS = 1500;

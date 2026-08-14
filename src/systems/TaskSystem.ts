@@ -1,3 +1,4 @@
+import { brewKey } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { TaskConfig, TasksData } from '../core/types';
@@ -27,6 +28,14 @@ export class TaskSystem {
     // a FIRST merge of that pair), so this counter cannot be farmed by redoing
     // a merge — which is what makes it safe to put a target on.
     bus.on('cookbook:discovered', () => this.bump('recipes', 1));
+    // Not a Keeper's Task — a PER-RECIPE lifetime counter, which a `brew` quest
+    // goal reads. It lives here because this system owns the lifetime counters
+    // and CauldronSystem deliberately owns nothing in GameState; and it is
+    // bumped off `cauldron:brewed`, which only fires after a brew has actually
+    // been paid for, so it cannot run ahead of the ingredients.
+    bus.on('cauldron:brewed', ({ recipeId }) => {
+      this.state.addStat(brewKey(recipeId), 1);
+    });
   }
 
   /** Progress toward one task, clamped to its target. */

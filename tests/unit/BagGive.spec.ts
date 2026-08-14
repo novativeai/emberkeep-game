@@ -78,7 +78,7 @@ describe('giving a pocketed piece', () => {
 
   it('a dragon that refuses the food leaves it in the bag', () => {
     const ctx = createTestContext();
-    pocket(ctx, 'tarknot', 2); // the Red's refusal
+    pocket(ctx, 'emberheart', 2); // the Red's refusal
     const free = ctx.state.freeActiveTilesNear(0, 0)[0]!;
     const dragon = ctx.state.addItem({
       chain: 'ember_dragon',
@@ -89,11 +89,11 @@ describe('giving a pocketed piece', () => {
     });
     const refused = capture(ctx.bus, 'dragon:refused');
 
-    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'tarknot', tier: 2 });
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberheart', tier: 2 });
 
     expect(refused).toHaveLength(1);
     expect(ctx.systems.dragons.careOf(dragon.id).meals).toBe(0);
-    expect(heldCount(ctx, 'tarknot', 2)).toBe(1);
+    expect(heldCount(ctx, 'emberheart', 2)).toBe(1);
   });
 });
 

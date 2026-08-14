@@ -14,6 +14,7 @@ const ALLOW_NOTHING: Required<TutorialAllow> = {
   dragonWork: false,
   marketplace: false,
   cookbook: false,
+  codexHold: false,
   bag: false,
   character: false,
   feed: false,
@@ -35,6 +36,7 @@ function tutorialStep(ctx: GameContext, done: boolean): void {
     highlight: [],
     hand: null,
     arrow: null,
+    arrowThen: null,
     allow: ALLOW_NOTHING
   });
 }

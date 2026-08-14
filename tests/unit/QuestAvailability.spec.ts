@@ -12,8 +12,15 @@ import {
   type Finding
 } from '../../src/core/availability';
 import type { QuestConfig } from '../../src/core/types';
-import { chainHiddenIn, HIDDEN_CHAINS, LEVEL_XP, WORLD_ID } from '../../src/core/Constants';
+import {
+  chainHiddenIn,
+  RUNEVAULT_QUESTS_NEEDED,
+  HIDDEN_CHAINS,
+  LEVEL_XP,
+  WORLD_ID
+} from '../../src/core/Constants';
 import { ZONES } from '../../src/core/world';
+import cauldron from '../../src/data/cauldron.json';
 import chains from '../../src/data/chains.json';
 import map from '../../src/data/map.json';
 import orders from '../../src/data/orders.json';
@@ -28,7 +35,8 @@ const data = {
   orders,
   tasks,
   tutorial,
-  quests
+  quests,
+  cauldron
 } as unknown as AuditData;
 
 describe('Quest availability (the offline proof — `pnpm quests`)', () => {
@@ -151,7 +159,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
 
   it('a chain that belongs to another world is unreachable here, and says so', () => {
     const { finalAvailability } = auditLadder(data);
-    for (const id of ['driftwood', 'rimebloom', 'tarknot', 'frostsilk']) {
+    for (const id of ['seaglass', 'orrery', 'emberheart', 'auroraweave']) {
       const entry = finalAvailability.get(pieceKey(id, 1))!;
       expect(entry.reachable, id).toBe(false);
       // The reason is the WORLD, not the chapter — the two are different
@@ -162,7 +170,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
   });
 
   it('chainHiddenIn separates "wrong world" from "wrong chapter"', () => {
-    const frozen = { id: 'driftwood', world: 'borealis' };
+    const frozen = { id: 'seaglass', world: 'borealis' };
     expect(chainHiddenIn(frozen, 'emberkeep')).toBe(true);
     expect(chainHiddenIn(frozen, 'borealis')).toBe(false); // the north turns itself on
     // A chapter-gated chain is withheld in EVERY world until its chapter lands.
@@ -194,7 +202,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
     expect(messages.some((m) => m.includes('nothing arrives on this board'))).toBe(true);
     // Its chains are not world-blocked there — they are simply unseeded, which
     // is the actionable difference.
-    const spar = roothold.audit.finalAvailability.get(pieceKey('driftwood', 1))!;
+    const spar = roothold.audit.finalAvailability.get(pieceKey('seaglass', 1))!;
     expect(spar.reachable).toBe(false);
   });
 
@@ -208,7 +216,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
     const north = auditWorlds(data, data.map, ZONES.worlds).find((w) => w.worldId === 'borealis')!;
     expect(north.questCount).toBeGreaterThan(0);
     expect(north.audit.findings.filter((f) => f.severity === 'error')).toEqual([]);
-    for (const chain of ['driftwood', 'rimebloom', 'tarknot', 'frostsilk', 'keel', 'coin']) {
+    for (const chain of ['seaglass', 'orrery', 'emberheart', 'auroraweave', 'warhelm', 'coin']) {
       const top = chains.chains.find((c) => c.id === chain)!.tiers.at(-1)!.tier;
       const piece = north.audit.finalAvailability.get(pieceKey(chain, top))!;
       expect(piece?.renewable, `${chain} T${top} in the north`).toBe(true);
@@ -217,7 +225,7 @@ describe('Quest availability (the offline proof — `pnpm quests`)', () => {
     const south = auditWorlds(data, data.map, ZONES.worlds).find(
       (w) => w.worldId === 'emberkeep'
     )!;
-    expect(south.audit.finalAvailability.get(pieceKey('keel', 1))?.reachable).toBe(false);
+    expect(south.audit.finalAvailability.get(pieceKey('warhelm', 1))?.reachable).toBe(false);
   });
 
   /** The north's islands are opened with Gold Keys, and the only source of one
@@ -291,8 +299,12 @@ describe('the legendary egg directive (Constants §LEGENDARY_EGG_COUNT)', () => 
       expect(payers.length, `${worldId} egg quests`).toBe(3);
       for (const q of payers) expect(q.rewards?.spawn?.count).toBe(1);
 
+      // The arc lives in its GIVER's own ladder — a second giver's track on the
+      // same board (the woken Elder's twelve) is another story, not this one's
+      // trailing quests. Mirrors auditLegendaryArc.
+      const arcGiver = payers[0]!.giver;
       const ladder = (quests.quests as unknown as QuestConfig[]).filter(
-        (q) => (q.world ?? WORLD_ID) === worldId
+        (q) => (q.world ?? WORLD_ID) === worldId && q.giver === arcGiver
       );
       const completable = ladder.filter((q) =>
         q.steps.some((s) => s.goal.kind !== 'active_order')
@@ -318,7 +330,7 @@ describe('the legendary egg directive (Constants §LEGENDARY_EGG_COUNT)', () => 
 
   it('catches two eggs from one quest', () => {
     const found = bent(WORLD_ID, (qs) => {
-      const q = qs.find((x) => x.id === 'warm_the_hearth')!;
+      const q = qs.find((x) => x.id === 'fill_the_larder')!;
       q.rewards!.spawn!.count = 2;
     });
     expect(found.some((f) => f.message.includes('one quest, one egg'))).toBe(true);
@@ -326,10 +338,10 @@ describe('the legendary egg directive (Constants §LEGENDARY_EGG_COUNT)', () => 
 
   it('catches eggs that arrive back to back', () => {
     const found = bent(WORLD_ID, (qs) => {
-      // Move the middle egg next to the first.
-      qs.find((x) => x.id === 'raise_the_roofs')!.rewards!.spawn = undefined;
-      qs.find((x) => x.id === 'radiant_centerpiece')!.rewards = {
-        coins: 60,
+      // Move the middle egg next to the first (larder is quest 2, hearth quest 3).
+      qs.find((x) => x.id === 'catch_the_moonwater')!.rewards!.spawn = undefined;
+      qs.find((x) => x.id === 'warm_the_hearth')!.rewards = {
+        coins: 40,
         spawn: { chain: 'ashdrake', tier: 1, count: 1 }
       };
     });
@@ -338,7 +350,7 @@ describe('the legendary egg directive (Constants §LEGENDARY_EGG_COUNT)', () => 
 
   it('catches a zone that hands over too few eggs to ever merge the dragon', () => {
     const found = bent(WORLD_ID, (qs) => {
-      qs.find((x) => x.id === 'the_emerald_brood')!.rewards!.spawn = undefined;
+      qs.find((x) => x.id === 'catch_the_moonwater')!.rewards!.spawn = undefined;
     });
     expect(found.some((f) => f.message.includes('never be assembled'))).toBe(true);
   });
@@ -379,5 +391,105 @@ describe('the legendary egg directive (Constants §LEGENDARY_EGG_COUNT)', () => 
 
   it('is silent for a world with no legendary chain authored yet', () => {
     expect(auditLegendaryArc({ ...data, worldId: 'roothold' } as unknown as AuditData)).toEqual([]);
+  });
+});
+
+/**
+ * The north's rhythm, made checkable.
+ *
+ * Borealis runs on TWO kinds of work — merging on its islands and brewing at
+ * Selyna's Cauldron through the Rune Way — and the design is that they take
+ * turns. That is a property of the ladder's ORDER, so nothing in the game can
+ * notice it breaking; these tests are what notices. See docs/quest-ladder.md §5.
+ */
+describe('Borealis — merge quests and cauldron quests ping-pong', () => {
+  const ladder = (quests.quests as unknown as QuestConfig[]).filter((q) => q.world === 'borealis');
+  /** The endless Ledger tail never finishes, so it is not a beat in the rhythm. */
+  const asked = ladder.filter((q) => q.steps.some((s) => s.goal.kind !== 'active_order'));
+  const brews = (q: QuestConfig): boolean => q.steps.some((s) => s.goal.kind === 'brew');
+  const firstBrew = asked.findIndex(brews);
+
+  it('hands the cauldron its first quest 15–20% of the way down the ladder', () => {
+    expect(firstBrew, 'no Borealis quest brews anything').toBeGreaterThan(-1);
+    const at = (firstBrew + 1) / asked.length;
+    expect(at, `first brew is quest ${firstBrew + 1} of ${asked.length}`).toBeGreaterThanOrEqual(
+      0.15
+    );
+    expect(at).toBeLessThanOrEqual(0.2);
+  });
+
+  it('alternates the two kinds of work from there to the end', () => {
+    // The hatch closes the zone and belongs to neither side, so it is excluded.
+    const beats = asked.slice(firstBrew, asked.length - 1).map((q) => (brews(q) ? 'C' : 'M'));
+    const runs = beats.filter((k, i) => i > 0 && k === beats[i - 1]);
+    // Never two brews back to back — a second trip through the Rune Way with no
+    // merging between them is the failure this rhythm exists to prevent.
+    expect(runs.filter((k) => k === 'C'), `rhythm: ${beats.join('')}`).toEqual([]);
+    // The merge side is allowed ONE double, and has exactly one: the Longhall
+    // and the Spindles both sit in front of the hatch by the legendary arc's
+    // rule that the last egg is the second-to-last quest.
+    expect(runs.length, `rhythm: ${beats.join('')}`).toBeLessThanOrEqual(1);
+  });
+
+  it('opens the Rune Way before the ladder asks for the first brew', () => {
+    // The gate counts FINISHED quests, so it must clear on the quest before.
+    expect(RUNEVAULT_QUESTS_NEEDED).toBeLessThanOrEqual(firstBrew);
+  });
+
+  it('brews nothing whose ingredients belong to another world', () => {
+    for (const quest of ladder) {
+      for (const step of quest.steps) {
+        const goal = step.goal;
+        if (goal.kind !== 'brew') continue;
+        const recipe = cauldron.recipes.find((r) => r.id === goal.recipeId);
+        expect(recipe, `${step.id} brews an id cauldron.json does not have`).toBeDefined();
+        for (const input of recipe!.inputs) {
+          const chain = chains.chains.find((c) => c.id === input.chain)!;
+          // A recipe reaching south would send the player back through a portal
+          // mid-quest with no word of it on screen — and would audit UNREACHABLE.
+          expect(chainHiddenIn(chain, 'borealis'), `${step.id} wants ${input.chain}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('gives the pot seven different jobs — no brew repeats another quest\u2019s ask', () => {
+    // Alternating is not enough on its own. Quest 7 used to brew three Pitch
+    // Loaves, the exact piece quest 4 had just asked the player to MERGE three
+    // of: the pot's turn came round on schedule and asked for something they
+    // had finished making two quests earlier. A rhythm you can feel is a
+    // rhythm of different work, not of the same work in a different room.
+    const merged = new Set<string>();
+    for (const quest of ladder) {
+      for (const step of quest.steps) {
+        const goal = step.goal;
+        if (goal.kind === 'have') merged.add(pieceKey(goal.chain, goal.tier));
+      }
+    }
+    const brewed = new Set<string>();
+    for (const quest of ladder) {
+      for (const step of quest.steps) {
+        const goal = step.goal;
+        if (goal.kind !== 'brew') continue;
+        expect(brewed.has(goal.recipeId), `${goal.recipeId} is brewed twice`).toBe(false);
+        brewed.add(goal.recipeId);
+        const out = cauldron.recipes.find((r) => r.id === goal.recipeId)!.output;
+        expect(
+          merged.has(pieceKey(out.chain, out.tier)),
+          `${step.id} brews ${pieceKey(out.chain, out.tier)}, which another quest already asks the player to merge`
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('a brew step that names no real recipe is an error, not a silent free pass', () => {
+    const bent = JSON.parse(JSON.stringify(quests));
+    bent.quests.find((q: QuestConfig) => q.id === 'north_strakes').steps[0].goal.recipeId = 'nope';
+    const found = auditLadder({
+      ...data,
+      worldId: 'borealis',
+      quests: bent
+    } as unknown as AuditData).findings;
+    expect(found.some((f) => f.message.includes('not a recipe in cauldron.json'))).toBe(true);
   });
 });

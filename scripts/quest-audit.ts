@@ -24,6 +24,7 @@ import {
   type WorldLadderAudit
 } from '../src/core/availability';
 import { ZONES } from '../src/core/world';
+import cauldron from '../src/data/cauldron.json';
 import chains from '../src/data/chains.json';
 import map from '../src/data/map.json';
 import orders from '../src/data/orders.json';
@@ -41,7 +42,7 @@ const C = {
   cyan: '[36m'
 };
 
-const base = { chains, orders, tasks, tutorial, quests } as unknown as Omit<
+const base = { chains, orders, tasks, tutorial, quests, cauldron } as unknown as Omit<
   AuditData,
   'worldId' | 'map'
 >;

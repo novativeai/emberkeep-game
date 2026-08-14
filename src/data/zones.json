@@ -2435,7 +2435,15 @@
             ],
             "contents": [
               {
-                "chain": "wrackline",
+                "chain": "glasskiln",
+                "tier": 3,
+                "at": [
+                  62,
+                  1
+                ]
+              },
+              {
+                "chain": "seaglass",
                 "tier": 1,
                 "at": [
                   72,
@@ -2443,7 +2451,7 @@
                 ]
               },
               {
-                "chain": "driftwood",
+                "chain": "seaglass",
                 "tier": 1,
                 "at": [
                   72,
@@ -2451,7 +2459,7 @@
                 ]
               },
               {
-                "chain": "driftwood",
+                "chain": "seaglass",
                 "tier": 1,
                 "at": [
                   73,
@@ -2459,7 +2467,7 @@
                 ]
               },
               {
-                "chain": "driftwood",
+                "chain": "seaglass",
                 "tier": 1,
                 "at": [
                   72,
@@ -2467,19 +2475,11 @@
                 ]
               },
               {
-                "chain": "driftwood",
+                "chain": "seaglass",
                 "tier": 1,
                 "at": [
                   73,
                   1
-                ]
-              },
-              {
-                "chain": "driftwood",
-                "tier": 1,
-                "at": [
-                  74,
-                  2
                 ]
               }
             ]
@@ -2882,162 +2882,42 @@
             ],
             "contents": [
               {
-                "chain": "wrackline",
-                "tier": 1,
+                "chain": "starbench",
+                "tier": 3,
                 "at": [
-                  36,
-                  1
-                ]
-              },
-              {
-                "chain": "wrackline",
-                "tier": 1,
-                "at": [
-                  30,
+                  70,
                   2
                 ]
               },
               {
-                "chain": "frostfont",
-                "tier": 1,
+                "chain": "wreckforge",
+                "tier": 3,
                 "at": [
-                  32,
+                  3,
                   0
                 ]
               },
               {
-                "chain": "frostfont",
-                "tier": 1,
+                "chain": "tarkiln",
+                "tier": 3,
                 "at": [
-                  36,
+                  28,
                   0
                 ]
               },
               {
-                "chain": "driftwood",
-                "tier": 1,
+                "chain": "runestone",
+                "tier": 3,
                 "at": [
-                  36,
-                  2
+                  61,
+                  3
                 ]
               },
               {
-                "chain": "driftwood",
-                "tier": 1,
+                "chain": "emberdram",
+                "tier": 3,
                 "at": [
-                  46,
-                  0
-                ]
-              },
-              {
-                "chain": "driftwood",
-                "tier": 1,
-                "at": [
-                  43,
-                  1
-                ]
-              },
-              {
-                "chain": "driftwood",
-                "tier": 1,
-                "at": [
-                  24,
-                  2
-                ]
-              },
-              {
-                "chain": "driftwood",
-                "tier": 1,
-                "at": [
-                  30,
-                  1
-                ]
-              },
-              {
-                "chain": "rimebloom",
-                "tier": 1,
-                "at": [
-                  24,
-                  1
-                ]
-              },
-              {
-                "chain": "rimebloom",
-                "tier": 1,
-                "at": [
-                  32,
-                  1
-                ]
-              },
-              {
-                "chain": "rimebloom",
-                "tier": 1,
-                "at": [
-                  26,
-                  0
-                ]
-              },
-              {
-                "chain": "rimebloom",
-                "tier": 1,
-                "at": [
-                  46,
-                  1
-                ]
-              },
-              {
-                "chain": "rimebloom",
-                "tier": 1,
-                "at": [
-                  43,
-                  0
-                ]
-              },
-              {
-                "chain": "keel",
-                "tier": 1,
-                "at": [
-                  47,
-                  0
-                ]
-              },
-              {
-                "chain": "keel",
-                "tier": 1,
-                "at": [
-                  34,
-                  2
-                ]
-              },
-              {
-                "chain": "keel",
-                "tier": 1,
-                "at": [
-                  38,
-                  0
-                ]
-              },
-              {
-                "chain": "keel",
-                "tier": 1,
-                "at": [
-                  47,
-                  1
-                ]
-              },
-              {
-                "chain": "keel",
-                "tier": 1,
-                "at": [
-                  44,
-                  1
-                ]
-              },
-              {
-                "chain": "keel",
-                "tier": 1,
-                "at": [
-                  20,
+                  11,
                   0
                 ]
               },
@@ -3045,7 +2925,7 @@
                 "chain": "chest",
                 "tier": 1,
                 "at": [
-                  24,
+                  14,
                   0
                 ]
               }
@@ -3177,7 +3057,15 @@
             ],
             "contents": [
               {
-                "chain": "frostfont",
+                "chain": "auroraloom",
+                "tier": 3,
+                "at": [
+                  76,
+                  1
+                ]
+              },
+              {
+                "chain": "warhelm",
                 "tier": 1,
                 "at": [
                   85,
@@ -3185,7 +3073,7 @@
                 ]
               },
               {
-                "chain": "wrackline",
+                "chain": "warhelm",
                 "tier": 1,
                 "at": [
                   85,
@@ -3193,7 +3081,7 @@
                 ]
               },
               {
-                "chain": "rimebloom",
+                "chain": "warhelm",
                 "tier": 1,
                 "at": [
                   86,
@@ -3201,7 +3089,15 @@
                 ]
               },
               {
-                "chain": "rimebloom",
+                "chain": "manastone",
+                "tier": 3,
+                "at": [
+                  94,
+                  0
+                ]
+              },
+              {
+                "chain": "wayfinder",
                 "tier": 1,
                 "at": [
                   80,
@@ -3209,7 +3105,7 @@
                 ]
               },
               {
-                "chain": "rimebloom",
+                "chain": "wayfinder",
                 "tier": 1,
                 "at": [
                   89,
@@ -3217,7 +3113,7 @@
                 ]
               },
               {
-                "chain": "driftwood",
+                "chain": "wayfinder",
                 "tier": 1,
                 "at": [
                   88,
@@ -3225,23 +3121,23 @@
                 ]
               },
               {
-                "chain": "driftwood",
-                "tier": 1,
+                "chain": "wayfinder",
+                "tier": 2,
                 "at": [
                   83,
                   0
                 ]
               },
               {
-                "chain": "driftwood",
-                "tier": 1,
+                "chain": "wayfinder",
+                "tier": 2,
                 "at": [
                   86,
                   1
                 ]
               },
               {
-                "chain": "keel",
+                "chain": "hearthlamp",
                 "tier": 1,
                 "at": [
                   91,
@@ -3249,7 +3145,7 @@
                 ]
               },
               {
-                "chain": "keel",
+                "chain": "hearthlamp",
                 "tier": 1,
                 "at": [
                   80,
@@ -3257,7 +3153,7 @@
                 ]
               },
               {
-                "chain": "keel",
+                "chain": "hearthlamp",
                 "tier": 1,
                 "at": [
                   91,
@@ -3265,11 +3161,27 @@
                 ]
               },
               {
-                "chain": "chest",
-                "tier": 1,
+                "chain": "hearthlamp",
+                "tier": 2,
                 "at": [
                   79,
                   1
+                ]
+              },
+              {
+                "chain": "hearthlamp",
+                "tier": 2,
+                "at": [
+                  91,
+                  2
+                ]
+              },
+              {
+                "chain": "chest",
+                "tier": 1,
+                "at": [
+                  92,
+                  2
                 ]
               }
             ]
@@ -8247,7 +8159,7 @@
             "row": 0,
             "z": 0,
             "dx": 60.3,
-            "dy": -8.15
+            "dy": 102.67
           }
         ],
         "decorCalibration": {

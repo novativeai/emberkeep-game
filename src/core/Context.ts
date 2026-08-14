@@ -146,6 +146,7 @@ export class GameContext {
       this.bus,
       this.data.quests,
       this.data.chains,
+      this.data.cauldron,
       order,
       tasks
     );
@@ -171,7 +172,7 @@ export class GameContext {
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains),
       tasks,
       quests,
-      regard: new RegardSystem(this.state, this.bus, this.data.characters, quests),
+      regard: new RegardSystem(this.state, this.bus, this.data.characters, quests, order),
       bag: new BagSystem(this.state, this.bus),
       store: new StoreSystem(this.state, this.bus, this.data.store),
       story: new StorySystem(this.state, this.bus, this.data.dialogue),

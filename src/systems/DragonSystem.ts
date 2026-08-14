@@ -26,17 +26,17 @@ import type { BoardItemState, ChainsData, Companion, DragonCare } from '../core/
  *  a dragon's meal cannot be spent on Eleanor, and NOTHING of hers is ever food.
  *  Quartz and moonwater are her chains end to end — no tier of either feeds a
  *  dragon, not even the raw pebble. */
-const FUEL = ['emberberry', 'resin', 'tarknot', 'stormcap', 'emberdram', 'cinder_vein'];
+const FUEL = ['emberberry', 'resin', 'emberheart', 'stormcap', 'emberdram', 'cinder_vein'];
 const GREEN = ['ashmoss', 'nightbloom'];
 // Recipient-locked to a named character, and therefore never dragon food.
 // Eleanor catches light and holds it in GLASS; Selyna reads what the ice kept,
 // so hers are the things that remember: spun light, raw mana and the needle
 // that points at what is still down there.
-const MAGE_ONLY = ['quartz', 'moonwater', 'frostsilk', 'manastone', 'wayfinder'];
+const MAGE_ONLY = ['quartz', 'moonwater', 'auroraweave', 'manastone', 'wayfinder'];
 
 /**
  * Chains a dragon standing in `world` can ever be handed. A Borealis chain is
- * vocabulary an Emberkeep dragon never meets, which is why `tarknot` can be a
+ * vocabulary an Emberkeep dragon never meets, which is why `emberheart` can be a
  * refusal here but could never be anyone's favourite.
  *
  * The WORLD axis only — deliberately not `chainHiddenIn`, which also folds in
@@ -212,7 +212,7 @@ export class DragonSystem {
       // Book fills in by experiment, never by being told (merge-chains §2.1).
       // Two breeds eat differently, which is what makes the Book worth filling.
       favourite: DRAGON_DIET[chain]?.favourite ?? 'emberberry',
-      dislike: DRAGON_DIET[chain]?.refuses ?? 'tarknot',
+      dislike: DRAGON_DIET[chain]?.refuses ?? 'emberheart',
       discovered: [],
       meals: 0,
       mealDay: -1,

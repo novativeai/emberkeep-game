@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
+import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameContext } from '../core/Context';
 import type { CauldronRecipeConfig } from '../core/types';
@@ -61,11 +61,11 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     private bus: EventBus,
     private ctx: GameContext
   ) {
-    super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
     this.selectedId = this.recipes[0]?.id ?? '';
 
     this.dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 

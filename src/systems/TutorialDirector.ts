@@ -5,6 +5,7 @@ import type {
   ResolvedArrow,
   ResolvedHand,
   TileRef,
+  TutorialArrowConfig,
   TilePos,
   TutorialAllow,
   TutorialData,
@@ -23,6 +24,7 @@ const ALLOW_NOTHING: Required<TutorialAllow> = {
   dragonWork: false,
   marketplace: false,
   cookbook: false,
+  codexHold: false,
   bag: false,
   character: false,
   feed: false,
@@ -41,6 +43,9 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
   dragonWork: true,
   marketplace: true,
   cookbook: true,
+  // Nothing HOLDS the book once the script is done — the player opens and shuts
+  // it as they like, which is the whole point of handing the game over.
+  codexHold: false,
   bag: true,
   character: true,
   feed: true,
@@ -111,8 +116,29 @@ export class TutorialDirector {
     });
     bus.on('ui:cookbook_opened', () => this.onGateEvent('ui:cookbook_opened'));
     bus.on('ui:cookbook_closed', () => this.onGateEvent('ui:cookbook_closed'));
+    bus.on('ui:codex_toggled', ({ open }) => {
+      if (!open) this.onGateEvent('ui:codex_closed');
+    });
+    // The Codex lesson is a walk through the book, so its gates are the PAGES:
+    // the roster card opened, then Evolution. Closing it is the last beat and
+    // has its own event above.
+    bus.on('ui:codex_page', ({ page }) => {
+      if (page === 'detail') this.onGateEvent('ui:codex_dragon_opened');
+      if (page === 'evolution') this.onGateEvent('ui:codex_evolution_opened');
+    });
     bus.on('item:spawned', () => this.checkCountGate());
     bus.on('item:removed', () => this.checkCountGate());
+    // The board-hygiene lesson: a piece CARRIED into a region. Gated on the
+    // drop landing inside the named region's tiles, so a wiggle on the spot
+    // cannot satisfy it.
+    bus.on('item:moved', ({ itemId, to }) => {
+      const step = this.currentStep;
+      if (!step || step.gate.type !== 'move') return;
+      if (this.state.items.get(itemId)?.chain !== step.gate.chain) return;
+      const region = this.state.map.regions.find((r) => r.id === (step.gate as { region: string }).region);
+      if (!region?.tiles.some(([c, r]) => c === to.col && r === to.row)) return;
+      this.advance();
+    });
     bus.on('tutorial:advance_requested', ({ stepId }) => {
       const step = this.currentStep;
       if (step && step.id === stepId && step.gate.type === 'tap') {
@@ -142,17 +168,19 @@ export class TutorialDirector {
    *
    * Most effects are grants — a spawn, some XP, a key — and their results are in
    * the save, which is why `advance()` runs them once and `begin()` does not.
-   * Two are not grants. `nameDragon` opens a prompt, and `wantGift` stages a
-   * want that is deliberately never persisted; neither leaves anything behind
-   * for a reload to find. A step gated on answering a prompt that no longer
-   * exists is a dead save, so those two are re-applied on resume.
+   * Three are not grants. `nameDragon` opens a prompt, `wantGift` stages a want
+   * that is deliberately never persisted, and `openCodex` opens a panel; none
+   * leaves anything behind for a reload to find. A step gated on answering a
+   * prompt — or on turning a page of a book that is not on screen — is a dead
+   * save, so those three are re-applied on resume.
    *
-   * Both are idempotent by construction: `nameDragon` looks for a dragon with no
-   * name yet, and `wantGift` overwrites the single scripted want.
+   * All three are idempotent by construction: `nameDragon` looks for a dragon
+   * with no name yet, `wantGift` overwrites the single scripted want, and
+   * `openCodex` re-opens a panel that is either already open or shut.
    */
   private replayPrompts(step: TutorialStepConfig | undefined): void {
     for (const effect of step?.effects ?? []) {
-      if (!('nameDragon' in effect) && !('wantGift' in effect)) continue;
+      if (!('nameDragon' in effect) && !('wantGift' in effect) && !('openCodex' in effect)) continue;
       try {
         this.applyEffect(effect);
       } catch (err) {
@@ -244,6 +272,10 @@ export class TutorialDirector {
         this.bus.emit('generator:set_timer', effect.setTimer);
       } else if ('wantGift' in effect) {
         this.bus.emit('tutorial:want_gift', effect.wantGift);
+      } else if ('openCodex' in effect) {
+        // The book opens ITSELF for the lesson — UIScene owns the panel and
+        // plays the favourite-meal reveal the previous beat's feed earned.
+        this.bus.emit('ui:codex_open_requested', effect.openCodex);
       } else if ('nameDragon' in effect) {
         const { chain, tier } = effect.nameDragon;
         const dragon = [...this.state.items.values()].find(
@@ -275,6 +307,7 @@ export class TutorialDirector {
       highlight: [],
       hand: null,
       arrow: null,
+      arrowThen: null,
       allow: { ...ALLOW_EVERYTHING }
     };
     this.bus.emit('tutorial:step', payload);
@@ -296,15 +329,19 @@ export class TutorialDirector {
       }
     }
 
-    let arrow: ResolvedArrow | null = null;
-    if (step.arrow) {
-      if ('tile' in step.arrow) {
-        const tile = this.resolveTileRef(step.arrow.tile);
-        if (tile) arrow = { tile };
-      } else {
-        arrow = step.arrow;
+    const resolveArrow = (ref: TutorialArrowConfig | undefined): ResolvedArrow | null => {
+      if (!ref) return null;
+      if ('tile' in ref) {
+        const tile = this.resolveTileRef(ref.tile);
+        return tile ? { tile } : null;
       }
-    }
+      return ref;
+    };
+    const arrow = resolveArrow(step.arrow);
+    // Resolved WITH the step, not when the character is armed: the tile it
+    // names is the one the beat set up (the House it just slowed down), and by
+    // the time she is armed the board may hold a second one.
+    const arrowThen = resolveArrow(step.arrowThen);
 
     return {
       id: step.id,
@@ -317,6 +354,7 @@ export class TutorialDirector {
       highlight,
       hand,
       arrow,
+      arrowThen,
       allow: { ...ALLOW_NOTHING, ...(step.allow ?? {}) }
     };
   }

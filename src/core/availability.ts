@@ -14,6 +14,8 @@ import {
   WORLD_ID
 } from './Constants';
 import type {
+  CauldronData,
+  CauldronRecipeConfig,
   ChainConfig,
   ChainsData,
   MapData,
@@ -133,6 +135,9 @@ export interface AuditData {
   tasks: TasksData;
   tutorial: TutorialData;
   quests: QuestsData;
+  /** Selyna's Cauldron. Needed because a `brew` step's cost is written in the
+   *  RECIPE, not in the quest — the ladder names an id and nothing else. */
+  cauldron: CauldronData;
 }
 
 export type Severity = 'error' | 'warning' | 'info';
@@ -263,7 +268,9 @@ export function solveAvailability(world: WorldModel, data: AuditData): Availabil
 
   // ---- the treasure chest: a PERMANENT fixture that readies a fresh gift on a
   //      timer, so anything in this world's gift table is renewable once one
-  //      stands. The table is per world — a northern chest pays northern goods.
+  //      stands. The table is PER WORLD here (`chestGiftsIn`) where main keeps a
+  //      single all-wildcard one — a northern chest pays northern goods, which
+  //      is why the fixed `item` gifts below are still credited.
   if ((world.board.get(pieceKey('chest', 1)) ?? 0) > 0) {
     for (const gift of chestGiftsIn(data.worldId)) {
       // `anyItem` is skipped ON PURPOSE. It rolls one chain out of the whole
@@ -730,6 +737,28 @@ function satisfyGate(
   const gate = step.gate;
   if (gate.type === 'tap') return;
 
+  // A carry costs nothing and consumes nothing — the gate only needs the piece
+  // to exist and the destination ground to be open when it asks.
+  if (gate.type === 'move') {
+    const key = [...world.board.keys()].find((k) => k.startsWith(`${gate.chain}:`) && (world.board.get(k) ?? 0) > 0);
+    if (!key) {
+      findings.push({
+        severity: 'error',
+        at,
+        message: `move gate wants a '${gate.chain}' carried, but none is on the board`
+      });
+    } else if (!world.regions.has(gate.region)) {
+      findings.push({
+        severity: 'error',
+        at,
+        message: `move gate wants '${gate.chain}' carried into region '${gate.region}', which is not open yet — the tutorial deadlocks here`
+      });
+    } else {
+      actions.push(`carry ${key} into region '${gate.region}'`);
+    }
+    return;
+  }
+
   if (gate.type === 'count') {
     const held = world.board.get(pieceKey(gate.chain, gate.tier)) ?? 0;
     if (held < gate.count) {
@@ -896,7 +925,8 @@ export function questStepNeeds(
   step: QuestStepConfig,
   scripted: readonly OrderConfig[],
   encore: readonly Omit<OrderConfig, 'id'>[],
-  tasks: readonly TaskConfig[]
+  tasks: readonly TaskConfig[],
+  recipes: readonly CauldronRecipeConfig[]
 ): OrderRequirement[] {
   const goal = step.goal;
   const own: OrderRequirement[] = [];
@@ -924,6 +954,23 @@ export function questStepNeeds(
       // authored, since a keepsake reads like flavour rather than like a cost.
       own.push({ chain: goal.chain, tier: goal.tier, count: goal.count });
       break;
+    case 'brew': {
+      // A brew is CONSUMED too, `count` times over. The cauldron takes from the
+      // Bag rather than off a board, but the Bag is filled FROM the board the
+      // player is standing on, so charging the step its ingredients in the world
+      // that asks is the honest reading — and it is what makes a northern brew
+      // quest provable at the point it is asked. (A recipe reaching for another
+      // world's goods would read UNREACHABLE here, which is the correct verdict:
+      // it would send the player back across a portal mid-quest with no
+      // on-screen word of it.)
+      const recipe = recipes.find((r) => r.id === goal.recipeId);
+      if (recipe) {
+        own.push(
+          ...recipe.inputs.map((i) => ({ chain: i.chain, tier: i.tier, count: i.count * goal.count }))
+        );
+      }
+      break;
+    }
     default:
       break;
   }
@@ -1043,10 +1090,30 @@ export function auditLegendaryArc(data: AuditData): Finding[] {
   }
 
   // Rules 3–5 — how many, how spaced, and where the arc ends.
-  const ladder = questsIn(data);
-  const completable = ladder.filter((q) => q.steps.some((step) => step.goal.kind !== 'active_order'));
+  //
+  // Measured over the ARC-GIVER's own ladder, not the whole world's: a world
+  // can host a second quest-giver whose track runs past the finale (the woken
+  // Golden Elder's twelve), and rule 5's "the zone ends on the hatch" is about
+  // the ladder that TELLS the dragon's story — appending another giver's
+  // post-game track must not read as the arc trailing off. One giver per arc is
+  // asserted first, because eggs split across two tracks would let the spacing
+  // rules pass on each half while the player experiences the interleaving.
+  const worldLadder = questsIn(data);
   const paysEgg = (q: QuestConfig): number =>
     q.rewards?.spawn?.chain === legendary.id ? q.rewards.spawn.count : 0;
+  const eggGivers = [...new Set(worldLadder.filter((q) => paysEgg(q) > 0).map((q) => q.giver))];
+  if (eggGivers.length > 1) {
+    findings.push({
+      severity: 'error',
+      at,
+      message: `${legendary.name} eggs are paid by ${eggGivers.length} different givers (${eggGivers.join(', ')}) — one ladder tells a dragon's story`
+    });
+    return findings;
+  }
+  // No egg-paying giver at all falls back to the whole world ladder — the
+  // `total !== LEGENDARY_EGG_COUNT` error below fires first in that case.
+  const ladder = eggGivers.length ? worldLadder.filter((q) => q.giver === eggGivers[0]) : worldLadder;
+  const completable = ladder.filter((q) => q.steps.some((step) => step.goal.kind !== 'active_order'));
   const eggAt = completable
     .map((q, i) => ({ q, i, n: paysEgg(q) }))
     .filter((e) => e.n > 0);
@@ -1240,6 +1307,8 @@ function stepLabel(step: QuestStepConfig, data: AuditData): string {
       return `give ${goal.characterId} ${goal.count} × ${goal.chain} T${goal.tier}`;
     case 'regard':
       return `reach ${goal.hearts} heart(s) with ${goal.characterId}`;
+    case 'brew':
+      return `brew '${goal.recipeId}' ×${goal.count} at the cauldron`;
   }
 }
 
@@ -1320,8 +1389,21 @@ export function auditLadder(input: AuditData): LadderAudit {
         step,
         data.orders.orders,
         data.orders.repeatable ?? [],
-        data.tasks.tasks
+        data.tasks.tasks,
+        data.cauldron.recipes
       );
+
+      // A `brew` step names a recipe id and nothing else, so a typo would cost
+      // it every one of its ingredients and audit clean — the same silent hole
+      // a counter task had before its target was checked.
+      const brewed = step.goal;
+      if (brewed.kind === 'brew' && !data.cauldron.recipes.some((r) => r.id === brewed.recipeId)) {
+        stepFindings.push({
+          severity: 'error',
+          at,
+          message: `brews '${brewed.recipeId}', which is not a recipe in cauldron.json — the step can never be finished`
+        });
+      }
 
       const rows: StepAudit['needs'] = [];
       for (const requirement of needs) {

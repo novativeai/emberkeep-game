@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, panelMobileScale } from '../core/Constants';
+import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { uiRegistry } from './theme';
 
@@ -37,7 +37,7 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
     this.setVisible(false);
     this.setDepth(60001);
 
-    const cx = GAME_WIDTH / 2;
+    const cx = LIVE_GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT / 2;
     // The dim is a SIBLING below the panel, never a child beside the buttons:
     // inside one container Phaser's input sort is ambiguous between a
@@ -52,7 +52,7 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
     // So each piece's hit area EXCLUDES the others': the dim is tappable only
     // outside the frame, the frame-blocker only outside the buttons.
     const pScale = panelMobileScale(FRAME_W);
-    const dimW = GAME_WIDTH * 2;
+    const dimW = LIVE_GAME_WIDTH * 2;
     const dimH = LIVE_GAME_HEIGHT * 2;
     this.dim = scene.add
       .rectangle(cx, cy, dimW, dimH, num(PALETTE.night), 0.7)

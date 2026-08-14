@@ -670,6 +670,39 @@
       }
     },
     {
+      "id": "board_room",
+      "speaker": "eleanor",
+      "text": "One habit before we go on: workers work ANYWHERE. When the hearthside gets crowded, drag the Emberbark Stump onto the new field — it drips moss just as well out there.",
+      "gate": {
+        "type": "move",
+        "chain": "emberbark",
+        "region": "level_2"
+      },
+      "highlight": [
+        {
+          "chain": "emberbark",
+          "nth": 0,
+          "tier": 1
+        }
+      ],
+      "hand": {
+        "from": {
+          "chain": "emberbark",
+          "nth": 0,
+          "tier": 1
+        },
+        "to": [
+          6,
+          2
+        ]
+      },
+      "allow": {
+        "drag": [
+          "emberbark"
+        ]
+      }
+    },
+    {
       "id": "emberberry_tap",
       "speaker": "eleanor",
       "text": "A wild Emberberry patch grew in the opened land! It feeds you for FREE — tapping it never costs Warmth. Tap the patch to pick a berry.",
@@ -1339,6 +1372,125 @@
       }
     },
     {
+      "id": "codex_meal",
+      "speaker": "eleanor",
+      "text": "The Codex felt that! Every dragon you name keeps a page in here. Tap {dragon}'s card to open hers.",
+      "gate": {
+        "type": "event",
+        "event": "ui:codex_dragon_opened"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "reveal": "favourite",
+            "page": "roster"
+          }
+        }
+      ],
+      "arrow": {
+        "ui": "codex_card"
+      },
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_taste",
+      "speaker": "eleanor",
+      "text": "There — FAVOURITE MEAL, written the moment she ate it. This book only records what you have tested. Now tap EVOLUTION.",
+      "gate": {
+        "type": "event",
+        "event": "ui:codex_evolution_opened"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "page": "detail"
+          }
+        }
+      ],
+      "arrow": {
+        "ui": "codex_evolution"
+      },
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_evolution",
+      "speaker": "eleanor",
+      "text": "That shadow is what she grows into. The Codex keeps her true colours hidden until you have earned the sight of them.",
+      "gate": {
+        "type": "tap"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "page": "evolution"
+          }
+        }
+      ],
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_cycles",
+      "speaker": "eleanor",
+      "text": "Under her is the count. Fill her hunger gauge inside one cycle and that cycle is banked — and a banked cycle never slips away.",
+      "gate": {
+        "type": "tap"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "page": "evolution"
+          }
+        }
+      ],
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_reward",
+      "speaker": "eleanor",
+      "text": "Six banked and the shadow lifts: her grown form, her true name, in full colour. It is the longest promise this book keeps.",
+      "gate": {
+        "type": "tap"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "page": "evolution"
+          }
+        }
+      ],
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_shut",
+      "speaker": "eleanor",
+      "text": "That is the book, and it is yours to open whenever you like. Tap ✕ to close it.",
+      "gate": {
+        "type": "event",
+        "event": "ui:codex_closed"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "page": "evolution"
+          }
+        }
+      ],
+      "arrow": {
+        "ui": "codex_close"
+      },
+      "allow": {}
+    },
+    {
       "id": "cake_loved",
       "speaker": "eleanor",
       "text": "Look at her. Resin is a Red's one favourite, and a favourite moves her twice as far in a day as anything else you could have given her.",
@@ -1407,62 +1559,9 @@
       }
     },
     {
-      "id": "house_merge",
-      "speaker": "eleanor",
-      "text": "A second House went up beside yours while you worked the resin. Two hearths joined make a MANOR, Keeper — and a Manor takes orders a House is too small to keep. Drag them together.",
-      "gate": {
-        "type": "event",
-        "event": "item:merged",
-        "chain": "lumber"
-      },
-      "effects": [
-        {
-          "spawn": {
-            "chain": "lumber",
-            "tier": 3,
-            "count": 1,
-            "nearChain": "lumber",
-            "nearTier": 3
-          }
-        }
-      ],
-      "highlight": [
-        {
-          "chain": "lumber",
-          "nth": 0,
-          "tier": 3
-        },
-        {
-          "chain": "lumber",
-          "nth": 1,
-          "tier": 3
-        }
-      ],
-      "hand": {
-        "from": {
-          "chain": "lumber",
-          "nth": 1,
-          "tier": 3
-        },
-        "to": {
-          "chain": "lumber",
-          "nth": 0,
-          "tier": 3
-        }
-      },
-      "allow": {
-        "drag": [
-          "ember_dragon",
-          "emerald",
-          "lumber"
-        ],
-        "tapGenerators": true
-      }
-    },
-    {
       "id": "house_commission",
       "speaker": "eleanor",
-      "text": "Now tell it what to make. Tap your Manor, pick from your satchel, and it makes that forever. Take the Resin Bead.",
+      "text": "Tap your House, pick from your satchel — it makes that forever. Take the Resin Bead. A House works simple pieces; a Manor takes finer too. A second thing needs a second House.",
       "gate": {
         "type": "event",
         "event": "generator:produce_set"
@@ -1474,7 +1573,7 @@
         {
           "chain": "lumber",
           "nth": 0,
-          "tier": 4
+          "tier": 3
         }
       ],
       "allow": {
@@ -1487,7 +1586,7 @@
     {
       "id": "house_skip",
       "speaker": "eleanor",
-      "text": "Even a Manor with its orders keeps you waiting. Tap it, then spend Warmth (⚡) to skip the wait — and watch your Warmth drop for it.",
+      "text": "Even a House with its orders keeps you waiting. Tap it, then spend Warmth (⚡) to skip the wait — and watch your Warmth drop for it.",
       "gate": {
         "type": "event",
         "event": "generator:skipped",
@@ -1498,7 +1597,7 @@
         {
           "setTimer": {
             "chain": "lumber",
-            "tier": 4,
+            "tier": 3,
             "remainingMs": 120000
           }
         }
@@ -1507,7 +1606,7 @@
         "tile": {
           "chain": "lumber",
           "nth": 0,
-          "tier": 4
+          "tier": 3
         }
       },
       "allow": {
@@ -1516,6 +1615,44 @@
           "ember_dragon",
           "emerald"
         ]
+      }
+    },
+    {
+      "id": "eleanor_helps",
+      "speaker": "eleanor",
+      "text": "I can't wake anything on this isle — that is your hands, not mine. But I can stand over a slow thing and hurry it. Tap me, then tap the House.",
+      "gate": {
+        "type": "event",
+        "event": "character:action_used"
+      },
+      "effects": [
+        {
+          "setTimer": {
+            "chain": "lumber",
+            "tier": 3,
+            "remainingMs": 150000
+          }
+        }
+      ],
+      "arrow": {
+        "character": "eleanor"
+      },
+      "arrowThen": {
+        "tile": {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "highlight": [
+        {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 3
+        }
+      ],
+      "allow": {
+        "character": true
       }
     },
     {

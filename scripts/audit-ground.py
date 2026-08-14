@@ -104,6 +104,11 @@ ACCEPTED = [
     ("borealis", 2125, 501, "lamplight spill on the ice, right of the door"),
     ("roothold", 829, 621, "the brazier flame stands on this flagstone"),
     ("roothold", 1704, 385, "flagstone in the deep shade under the vine arch"),
+    # The one cell in the game that is not stone. Its footprint sits inside the
+    # railing with no overhang (checked on the overlay), and the two hanging
+    # lanterns are directly above it — so it reads warm and bright against a
+    # world of cold flagstone, which is light on real ground, not open air.
+    ("runevault", 1142, 1441, "lantern-lit planking on the stair's landing, inside the railing"),
 ]
 
 

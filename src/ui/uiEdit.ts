@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TextureFactory, UI_TEXTURE_PARAMS } from '../art/TextureFactory';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, PALETTE } from '../core/Constants';
+import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, PALETTE } from '../core/Constants';
 import { bodyMotions, CHARACTER_RIGS, faceMotions } from '../render/characterCatalog';
 import { BUILTIN_SEQUENCES } from '../render/sequenceCatalog';
 import type { CustomUiManager } from './customUi';
@@ -102,16 +102,16 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
   // game dimensions — the selected component floats centered on it.
   const backdrop = scene.add.graphics().setDepth(-100000).setVisible(true);
   backdrop.fillStyle(Phaser.Display.Color.HexStringToColor(PALETTE.night).color, 1);
-  backdrop.fillRect(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT);
+  backdrop.fillRect(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT);
   backdrop.fillStyle(0x342832, 1);
-  backdrop.fillRect(0, LIVE_GAME_HEIGHT - 6, GAME_WIDTH, 6);
-  for (let x = 0; x < GAME_WIDTH; x += 64) {
+  backdrop.fillRect(0, LIVE_GAME_HEIGHT - 6, LIVE_GAME_WIDTH, 6);
+  for (let x = 0; x < LIVE_GAME_WIDTH; x += 64) {
     backdrop.lineStyle(1, 0x4a3845, 0.16);
     backdrop.lineBetween(x, 0, x, LIVE_GAME_HEIGHT);
   }
   for (let y = 0; y < LIVE_GAME_HEIGHT; y += 64) {
     backdrop.lineStyle(1, 0x4a3845, 0.16);
-    backdrop.lineBetween(0, y, GAME_WIDTH, y);
+    backdrop.lineBetween(0, y, LIVE_GAME_WIDTH, y);
   }
 
   // Alignment grid: straight verticals/horizontals in GAME units, toggled from
@@ -122,17 +122,17 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
   const drawGrid = (size: number): void => {
     grid.clear();
     const minor = Math.max(16, size);
-    for (let x = 0, i = 0; x <= GAME_WIDTH; x += minor, i++) {
+    for (let x = 0, i = 0; x <= LIVE_GAME_WIDTH; x += minor, i++) {
       grid.lineStyle(2, 0xffffff, i % 4 === 0 ? 0.18 : 0.08);
       grid.lineBetween(x, 0, x, LIVE_GAME_HEIGHT);
     }
     for (let y = 0, i = 0; y <= LIVE_GAME_HEIGHT; y += minor, i++) {
       grid.lineStyle(2, 0xffffff, i % 4 === 0 ? 0.18 : 0.08);
-      grid.lineBetween(0, y, GAME_WIDTH, y);
+      grid.lineBetween(0, y, LIVE_GAME_WIDTH, y);
     }
     grid.lineStyle(2, 0xf7a437, 0.4);
-    grid.lineBetween(GAME_WIDTH / 2, 0, GAME_WIDTH / 2, LIVE_GAME_HEIGHT);
-    grid.lineBetween(0, LIVE_GAME_HEIGHT / 2, GAME_WIDTH, LIVE_GAME_HEIGHT / 2);
+    grid.lineBetween(LIVE_GAME_WIDTH / 2, 0, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT);
+    grid.lineBetween(0, LIVE_GAME_HEIGHT / 2, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT / 2);
   };
   drawGrid(64);
 
@@ -140,7 +140,7 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
   // Full-screen zone: in edit mode it swallows every pointer so game buttons
   // don't fire while designing; selection/drag runs on this zone.
   const blocker = scene.add
-    .zone(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT)
+    .zone(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT)
     .setOrigin(0)
     .setDepth(OVERLAY_DEPTH - 1)
     .setInteractive();
@@ -226,7 +226,7 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
     }
     if (snapGuides.h !== null) {
       overlay.lineStyle(3, SNAP_GUIDE_COLOR, 0.9);
-      overlay.lineBetween(0, snapGuides.h, GAME_WIDTH, snapGuides.h);
+      overlay.lineBetween(0, snapGuides.h, LIVE_GAME_WIDTH, snapGuides.h);
     }
     if (hoverId && hoverId !== selectedId) {
       const b = boundsOf(hoverId);
@@ -338,7 +338,7 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
       staged.x = def?.x ?? staged.origX;
       staged.y = def?.y ?? staged.origY;
     } else {
-      const cx = GAME_WIDTH / 2;
+      const cx = LIVE_GAME_WIDTH / 2;
       const cy = LIVE_GAME_HEIGHT / 2;
       el.node.setPosition(staged.origX, staged.origY); // measure from authored spot
       const b = el.node.getBounds();
@@ -488,7 +488,7 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
         node.setPosition(def.x, def.y);
         const b = node.getBounds();
         const bypass = snapBypassed(pointer);
-        def.x += snapAxis('v', b.centerX, [GAME_WIDTH / 2], bypass);
+        def.x += snapAxis('v', b.centerX, [LIVE_GAME_WIDTH / 2], bypass);
         def.y += snapAxis('h', b.centerY, [LIVE_GAME_HEIGHT / 2], bypass);
         if (staged?.id === rootDrag.id) {
           staged.x = def.x;
@@ -533,7 +533,7 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
           // (centre a layer inside its frame). Alt bypasses.
           const gb = boundsOfObj();
           if (gb) {
-            dx += Math.round(snapAxis('v', gb.centerX, [GAME_WIDTH / 2, el.node.x], bypass) / scale);
+            dx += Math.round(snapAxis('v', gb.centerX, [LIVE_GAME_WIDTH / 2, el.node.x], bypass) / scale);
             dy += Math.round(snapAxis('h', gb.centerY, [LIVE_GAME_HEIGHT / 2, el.node.y], bypass) / scale);
           }
           layer.x = dx;
@@ -545,7 +545,7 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
         // Built-in parts snap to the canvas centre lines the same way.
         const gb = boundsOfObj();
         if (gb) {
-          const cdx = Math.round(snapAxis('v', gb.centerX, [GAME_WIDTH / 2], bypass) / scale);
+          const cdx = Math.round(snapAxis('v', gb.centerX, [LIVE_GAME_WIDTH / 2], bypass) / scale);
           const cdy = Math.round(snapAxis('h', gb.centerY, [LIVE_GAME_HEIGHT / 2], bypass) / scale);
           if (cdx || cdy) {
             dx += cdx;
@@ -922,7 +922,7 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
         remember(`custom:create:${cid}`);
         uiRegistry.doc.custom[cid] = {
           label: String(msg.label ?? cid),
-          x: GAME_WIDTH / 2,
+          x: LIVE_GAME_WIDTH / 2,
           y: LIVE_GAME_HEIGHT / 2,
           layers: []
         };

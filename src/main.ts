@@ -4,7 +4,7 @@ import { recordedErrors, type RecordedError } from './core/crash';
 import Phaser from 'phaser';
 import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
-import { GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
+import { LIVE_GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
 import { createGameConfig } from './core/GameConfig';
 import { PowerGovernor } from './core/PowerGovernor';
 import { iapBridge } from './core/iapBridge';
@@ -295,7 +295,7 @@ const worldToPage = (world: { x: number; y: number }): { x: number; y: number } 
     };
   }
   return {
-    x: rect.left + (world.x / GAME_WIDTH) * rect.width,
+    x: rect.left + (world.x / LIVE_GAME_WIDTH) * rect.width,
     y: rect.top + (world.y / LIVE_GAME_HEIGHT) * rect.height
   };
 };

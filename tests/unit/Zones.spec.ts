@@ -509,11 +509,11 @@ describe('portals — every world has a way out of it', () => {
 
   /** The Rune Way: Runevault opens on the per-world quest counter QuestSystem
    *  keeps, never on an id list that could drift. */
-  it('holds Runevault shut until three Selyna quests are done', () => {
+  it('holds Runevault shut until two Selyna quests are done', () => {
     const ctx = createTestContext();
     ctx.state.tutorialDone = true;
     ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
-    ctx.state.addStat('q:world:borealis:done', 2);
+    ctx.state.addStat('q:world:borealis:done', 1);
     expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('runevault');
     ctx.bus.emit('world:switch', { to: 'runevault' });
     expect(ctx.state.worldId).toBe(WORLD_ID);
@@ -765,13 +765,16 @@ describe('worlds — a first arrival puts the opening board out', () => {
     ctx.bus.emit('world:switch', { to: 'borealis' });
 
     const standing = [...ctx.state.items.values()].map((i) => i.chain).sort();
+    // The shore's own farm: the Glass Kiln and the five Floats it makes. The
+    // boat-and-timber roster it replaced was deleted wholesale — a heap of wood,
+    // a heap of weed and a heap of crystals were the same kind of thing.
     expect(standing).toEqual([
-      'driftwood',
-      'driftwood',
-      'driftwood',
-      'driftwood',
-      'driftwood',
-      'wrackline'
+      'glasskiln',
+      'seaglass',
+      'seaglass',
+      'seaglass',
+      'seaglass',
+      'seaglass'
     ]);
     // Every piece is on ground that is actually open…
     for (const item of ctx.state.items.values()) {

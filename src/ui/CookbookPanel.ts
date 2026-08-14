@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { chainHiddenIn, GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
+import { chainHiddenIn, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import { reachableRecipeKeys, type AuditData } from '../core/availability';
@@ -89,11 +89,11 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     private gameState: GameState,
     data: AuditData
   ) {
-    super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
     const chains = data.chains;
 
     const dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
       .setInteractive();
     dim.on('pointerup', () => this.requestClose());
     this.add(dim);
@@ -425,7 +425,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   private seatMask(): void {
     const m = this.viewport.getWorldTransformMatrix();
     const h = VIEW_H * m.scaleY;
-    const w = GAME_WIDTH * m.scaleX; // only Y clips here
+    const w = LIVE_GAME_WIDTH * m.scaleX; // only Y clips here
     this.pageMask.clear();
     this.pageMask.fillStyle(0xffffff, 1);
     this.pageMask.fillRect(m.tx - w / 2, m.ty - h / 2, w, h);

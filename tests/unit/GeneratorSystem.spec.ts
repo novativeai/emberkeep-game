@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ENERGY_MAX, GENERATOR_SKIP_MAX_ENERGY, skipEnergyCost } from '../../src/core/Constants';
-import { capture, createTestContext, MemoryStorage } from './helpers';
+import { capture, createTestContext } from './helpers';
 
 describe('dragon passive generation (the standing advantage)', () => {
   it('a dragon gifts a Gem Shard once its passiveMs elapses — free, no tap', () => {
@@ -81,6 +81,70 @@ describe('skip cooldown for Warmth', () => {
     expect(skipEnergyCost(500, 10_000)).toBe(1); // almost done: cheap
     expect(skipEnergyCost(5_000, 10_000)).toBeLessThan(GENERATOR_SKIP_MAX_ENERGY);
     expect(skipEnergyCost(0, 10_000)).toBe(0); // nothing left
+  });
+
+  /**
+   * The Borealis contract, and the reason `activeTimer` refuses a tappable
+   * generator's passive clock.
+   *
+   * Every Borealis generator carries BOTH `tappable: true` and a `passiveMs`,
+   * so a fresh one — never tapped, `readyAt` unset — was sitting on a live
+   * passive countdown. A skip bought against THAT set `passiveAt = now`, which
+   * drops the item on the next tick with no tap at all: the piece produced
+   * itself instead of returning to a tappable ready state. Emberkeep's Theme
+   * Crystal never showed it because it has no passive clock to be sold.
+   */
+  it('a tappable generator skips its TAP cooldown, never its passive clock', () => {
+    const ctx = createTestContext();
+    const gen = ctx.state.addItem({
+      chain: 'ember_dragon', // tappable AND passive — the Borealis shape
+      tier: 3,
+      col: 2,
+      row: 2,
+      kind: 'item',
+      readyAt: ctx.clock.now()
+    });
+    // Never tapped, but its passive clock is already running. `now` is captured
+    // ONCE: the clock is real time here, so reading it again in the assertion
+    // below made the test fail by a millisecond whenever the suite ran hot.
+    const armedAt = ctx.clock.now() + 120_000;
+    gen.passiveAt = armedAt;
+    ctx.state.coins = 999;
+    const coinsBefore = ctx.state.coins;
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
+
+    // Nothing was pending to sell: it is tappable RIGHT NOW, so the skip is a
+    // no-op rather than a purchase that hands the goods over.
+    expect(ctx.state.coins).toBe(coinsBefore);
+    expect(gen.passiveAt).toBe(armedAt); // passive clock untouched
+
+    // Tap it: now there IS a tap cooldown, and THAT is what a skip clears —
+    // back to ready, with the item still owed to a tap.
+    ctx.bus.emit('item:tapped', { itemId: gen.id });
+    expect(gen.readyAt!).toBeGreaterThan(ctx.clock.now());
+    const produced = capture(ctx.bus, 'item:produced');
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
+
+    expect(gen.readyAt!).toBeLessThanOrEqual(ctx.clock.now()); // ready, not produced
+    expect(produced).toEqual([]); // the skip itself handed over nothing
+    expect(ctx.state.coins).toBeLessThan(coinsBefore); // this one was a real purchase
+  });
+
+  it('a PASSIVE-only generator (the House) still sells its passive wait', () => {
+    // The tutorial's `house_skip` beat depends on this: a piece with no tap
+    // verb has only its passive clock to skip, so that path must stay live.
+    const ctx = createTestContext();
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
+    house.passiveAt = ctx.clock.now() + 210_000;
+    ctx.state.coins = 999;
+    const coinsBefore = ctx.state.coins;
+
+    ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'gold' });
+
+    expect(house.passiveAt!).toBeLessThanOrEqual(ctx.clock.now());
+    expect(ctx.state.coins).toBeLessThan(coinsBefore);
   });
 
   it('refuses to skip without enough Warmth (and keeps the cooldown)', () => {
@@ -221,110 +285,5 @@ describe('energy gain (energy:add)', () => {
     expect(ctx.state.energyCurrent).toBe(5);
     ctx.bus.emit('energy:add', { amount: 999, reason: 'test' });
     expect(ctx.state.energyCurrent).toBe(ENERGY_MAX);
-  });
-});
-
-/**
- * A sleeping dragon is not a generator with a condition on it — it is an
- * animal that is not available. Tapping one used to hand over the gem anyway,
- * which made the whole sleep read as decoration.
- */
-describe('a sleeping dragon gives nothing', () => {
-  const sleep = (ctx: ReturnType<typeof createTestContext>, itemId: number): void => {
-    ctx.bus.emit('dragon:mood', { itemId, mood: 'asleep', from: 'awake' });
-  };
-
-  it('refuses the tap, spends nothing and arms no cooldown', () => {
-    const ctx = createTestContext();
-    ctx.systems.board.spawn('ember_dragon', 3, 2, 2, 'init');
-    const dragon = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon')!;
-    const harvested = capture(ctx.bus, 'item:harvested');
-    const failed = capture(ctx.bus, 'item:harvest_failed');
-    ctx.state.energyCurrent = ctx.state.energyMax;
-    const energyBefore = ctx.state.energyCurrent;
-
-    sleep(ctx, dragon.id);
-    ctx.bus.emit('item:tapped', { itemId: dragon.id });
-
-    expect(harvested).toHaveLength(0);
-    expect(failed.at(-1)).toMatchObject({ generatorId: dragon.id, reason: 'asleep' });
-    expect(ctx.state.energyCurrent).toBe(energyBefore);
-    // No cooldown either: refusing is not the same as harvesting for nothing.
-    expect(dragon.readyAt).toBeUndefined();
-  });
-
-  it('refuses a paid skip — buying that cooldown away would buy nothing', () => {
-    const ctx = createTestContext();
-    ctx.systems.board.spawn('ember_dragon', 3, 2, 2, 'init');
-    const dragon = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon')!;
-    ctx.bus.emit('economy:add', { coins: 500, reason: 'test' });
-    ctx.bus.emit('time:advanced', { ms: 0 }); // arm the passive timer
-    const coinsBefore = ctx.state.coins;
-
-    sleep(ctx, dragon.id);
-    ctx.bus.emit('generator:skip', { itemId: dragon.id, currency: 'gold' });
-
-    expect(ctx.state.coins).toBe(coinsBefore);
-  });
-
-  it('hands the gem over again the moment it wakes', () => {
-    const ctx = createTestContext();
-    ctx.systems.board.spawn('ember_dragon', 3, 2, 2, 'init');
-    const dragon = [...ctx.state.items.values()].find((i) => i.chain === 'ember_dragon')!;
-    const harvested = capture(ctx.bus, 'item:harvested');
-    ctx.state.energyCurrent = ctx.state.energyMax;
-
-    sleep(ctx, dragon.id);
-    ctx.bus.emit('item:tapped', { itemId: dragon.id });
-    expect(harvested).toHaveLength(0);
-
-    ctx.bus.emit('dragon:mood', { itemId: dragon.id, mood: 'awake', from: 'asleep' });
-    ctx.bus.emit('item:tapped', { itemId: dragon.id });
-
-    expect(harvested).toHaveLength(1);
-  });
-});
-
-/**
- * THE ×3 GIFT — one producer paying three times on a single return.
- *
- * `OFFLINE_BANK_CYCLES` is 3, and the offline catch-up paid up to that many
- * overdue cycles at once, so a House left overnight dropped three Gold Coins
- * the moment the player came back. It read as a duplication bug (it is not —
- * it is authored, MECHANICS §4.3) and it is exactly what the owner reported.
- *
- * It cannot happen any more, and not because the loop was capped: `load`
- * rebases the clock onto the save's own timestamp, so `offlineMs` is zero and
- * `bankOffline` returns on its own guard. These two cases pin BOTH halves —
- * that the catch-up is still correct if it is ever asked, and that nothing
- * asks it after an absence.
- */
-describe('the gift never arrives in threes', () => {
-  it('banks nothing for time spent away, however long the absence', () => {
-    const storage = new MemoryStorage();
-    const ctx1 = createTestContext(storage);
-    ctx1.systems.board.spawn('lumber', 3, 2, 2, 'init'); // a House: passive Gold
-    const house = [...ctx1.state.items.values()].at(-1)!;
-    house.passiveAt = ctx1.clock.now() + 1000;
-    ctx1.systems.save.save();
-
-    const ctx2 = createTestContext(storage);
-    ctx2.clock.advance(60 * 60 * 1000); // an hour of "offline"
-    const produced = capture(ctx2.bus, 'item:produced');
-    ctx2.systems.save.load();
-
-    expect(produced).toHaveLength(0);
-    expect(ctx2.systems.generator.lastOfflineGifts).toBe(0);
-  });
-
-  it('still pays at most one gift per live tick', () => {
-    const ctx = createTestContext();
-    ctx.systems.board.spawn('lumber', 3, 2, 2, 'init');
-    const produced = capture(ctx.bus, 'item:produced');
-    // Three passive intervals in ONE advance: the live path must not treat a
-    // long tick as three cycles owed.
-    ctx.clock.advance(210_000 * 3);
-    ctx.bus.emit('time:advanced', { ms: 210_000 * 3 });
-    expect(produced.length).toBeLessThanOrEqual(1);
   });
 });

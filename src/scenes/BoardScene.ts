@@ -5,7 +5,6 @@ import {
   ATMOSPHERE,
   CAULDRON_DECOR,
   CHEST_INTERVAL_MS,
-  COLLECTIBLE_REWARD,
   DECOR_SCALE,
   DEPTHS,
   DRAG,
@@ -23,7 +22,7 @@ import {
   ROOTHOLD_HOUSE,
   FINALE_ENDS_MS,
   FINALE_REGION,
-  GAME_WIDTH,
+  LIVE_GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_CHAIN,
   GOLDEN_ELDER_TIER,
@@ -252,6 +251,7 @@ const baseScaleOf = (sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Imag
 
 const NO_ALLOW: Required<TutorialAllow> = {
   drag: [],
+  codexHold: false,
   feed: false,
   commission: false,
   status: false,
@@ -701,7 +701,7 @@ export class BoardScene extends Phaser.Scene {
     if (aurora) {
       this.aurora = new AuroraFX(this, aurora, {
         now,
-        width: GAME_WIDTH,
+        width: LIVE_GAME_WIDTH,
         height: LIVE_GAME_HEIGHT * (spec.auroraBand ?? 0.5),
         depth: DEPTHS.skyFx
       });
@@ -712,7 +712,7 @@ export class BoardScene extends Phaser.Scene {
     if (snow) {
       this.snow = new SnowFX(this, snow, {
         now,
-        width: GAME_WIDTH,
+        width: LIVE_GAME_WIDTH,
         height: LIVE_GAME_HEIGHT,
         depth: DEPTHS.weather
       });
@@ -2195,7 +2195,7 @@ export class BoardScene extends Phaser.Scene {
     const zoomCfg = this.ctx.state.map.cameraZoom ?? { min: 0.2, max: 1.4 };
     if (bgRect) {
       cam.setBounds(bgRect.x, bgRect.y, bgRect.w, bgRect.h);
-      const fitZoom = Math.max(GAME_WIDTH / bgRect.w, LIVE_GAME_HEIGHT / bgRect.h);
+      const fitZoom = Math.max(LIVE_GAME_WIDTH / bgRect.w, LIVE_GAME_HEIGHT / bgRect.h);
       this.minZoom = Math.max(zoomCfg.min, fitZoom);
     } else {
       // Fallback (no backdrop): hold to the playable extent, the old behaviour.
@@ -2746,7 +2746,7 @@ export class BoardScene extends Phaser.Scene {
     // multiplier tweaks did nothing. Lower ceiling = a real zoom-out: the start
     // area fills the view comfortably without being right on top of it.
     const zoom = Phaser.Math.Clamp(
-      Math.min((GAME_WIDTH / 2 - pad) / halfW, (LIVE_GAME_HEIGHT / 2 - pad) / halfH) * 1.15,
+      Math.min((LIVE_GAME_WIDTH / 2 - pad) / halfW, (LIVE_GAME_HEIGHT / 2 - pad) / halfH) * 1.15,
       0.45,
       1.05
     );
@@ -2786,7 +2786,7 @@ export class BoardScene extends Phaser.Scene {
       const f = this.levelFrames.get(l);
       if (f) return f;
     }
-    return this.levelFrames.get(1) ?? { x: GAME_WIDTH / 2, y: LIVE_GAME_HEIGHT / 2, zoom: 0.5 };
+    return this.levelFrames.get(1) ?? { x: LIVE_GAME_WIDTH / 2, y: LIVE_GAME_HEIGHT / 2, zoom: 0.5 };
   }
 
   private flyToLevel(level: number): void {
@@ -2833,7 +2833,7 @@ export class BoardScene extends Phaser.Scene {
 
     // Warm sun haze, upper-left.
     this.add
-      .image(GAME_WIDTH * 0.3, 130, 'fx_glow')
+      .image(LIVE_GAME_WIDTH * 0.3, 130, 'fx_glow')
       .setScale(7, 4.4)
       .setTint(num(PALETTE.goldAccent))
       .setAlpha(0.16)
@@ -2848,7 +2848,7 @@ export class BoardScene extends Phaser.Scene {
       callback: () => {
         const star = this.add
           .image(
-            Phaser.Math.Between(80, GAME_WIDTH - 80),
+            Phaser.Math.Between(80, LIVE_GAME_WIDTH - 80),
             Phaser.Math.Between(60, LIVE_GAME_HEIGHT * 0.45),
             'fx_spark'
           )
@@ -5343,7 +5343,8 @@ export class BoardScene extends Phaser.Scene {
   private isStorable(itemId: number): boolean {
     const item = this.ctx.state.items.get(itemId);
     if (!item || item.kind !== 'item') return false;
-    if (COLLECTIBLE_REWARD[`${item.chain}_${item.tier}`] ?? COLLECTIBLE_REWARD[item.chain]) return false;
+    // A Coin has its own tap (it banks into the purse), handled before this.
+    if (item.chain === 'coin') return false;
     if (item.chain === 'chest') return false;
     if (this.generatorConfigFor(item.chain, item.tier)) return false;
     const tier = this.ctx.data.chains.chains
@@ -5398,18 +5399,13 @@ export class BoardScene extends Phaser.Scene {
       this.onNestTapped(item.id, item.col, item.row);
       return;
     }
-    // Collectible (a Gold coin): tap banks it — +Gold, a coin flies to the gauge
-    // (UIScene), and the board coin is consumed.
-    const collect = COLLECTIBLE_REWARD[`${item.chain}_${item.tier}`] ?? COLLECTIBLE_REWARD[item.chain];
-    if (collect) {
-      // Always collectable (even mid-tutorial) — banking a coin never interferes.
-      this.ctx.bus.emit('economy:add', { coins: collect.coins, reason: 'collect' });
-      // The Pouch bursts into THREE coins riding to the gauge (one gauge pulse
-      // per arrival); a single coin sends one.
-      const flight = item.chain === 'coin' && item.tier === 2 ? 3 : 1;
-      this.ctx.bus.emit('gold:collected', { at: { col: item.col, row: item.row }, coins: flight });
+    // A Gold Coin (or a Pouch): tap banks it into the purse — the HUD number and
+    // the satchel's purse tile are the same money, so there is nothing to store
+    // and no second balance to reconcile. Always bankable, even mid-tutorial:
+    // pocketing money never interferes with a scripted step.
+    if (item.chain === 'coin') {
       this.sparks.explode(8, sprite.x, sprite.y - 40);
-      this.ctx.bus.emit('board:consume_items', { itemIds: [item.id], reason: 'sold' });
+      this.ctx.bus.emit('ui:store_requested', { itemId: item.id });
       return;
     }
     // A treasure chest: a standing gift box (never disappears). Tap it READY to

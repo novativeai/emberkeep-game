@@ -47,8 +47,14 @@
       "The gold burns bright — she is almost awake!"
     ]
   },
-  "finaleElder": "…Keeper. I have slept an age, and I woke to YOUR hands. So hear it from the only one still living who SAW: the Great Flame did not die. It was TAKEN. And it was carried NORTH. There is a woman on that ice who kept a light burning while the rest of us slept — she will not be glad to see you. Go anyway.",
-  "finaleElderProphecy": "…Keeper. I stir, but I do not rise — the altar is still cold, and Eleanor's first request goes unanswered. Finish it, and I will tell you what no one else living can: the Great Flame did not die. It was TAKEN.",
+  "finaleElder": [
+    "…Keeper. I have slept an age, and I woke to YOUR hands. So hear it from the only one still living who SAW: the Great Flame did not die. It was TAKEN. And it was carried NORTH.",
+    "There is a woman on that ice who kept a light burning while the rest of us slept — she will not be glad to see you. Go anyway."
+  ],
+  "finaleElderProphecy": [
+    "…Keeper. I stir, but I do not rise — the altar is still cold, and Eleanor's first request goes unanswered.",
+    "Finish it, and I will tell you what no one else living can: the Great Flame did not die. It was TAKEN."
+  ],
   "goldenArrival": "“The old altar ANSWERS you, Keeper. So the stories about that egg were true.” — Eleanor",
   "gateOpens": {
     "speaker": "eleanor",
@@ -84,6 +90,24 @@
     }
   },
   "lateAwakening": "…At last. I waited for YOU, Keeper — not for her. The Elder rises, just as the stories promised.",
+  "eggGift": {
+    "ashdrake": {
+      "speaker": "eleanor",
+      "lines": [
+        "An Ashdrake egg — for you, Keeper. The old nests never truly cooled, whatever the books say. Keep it close; it takes three to wake what sleeps inside.",
+        "Another Ashdrake egg! Set it beside the first — eggs hatch braver in company. One more and you will hear wings in the ash.",
+        "The last Ashdrake egg. Bring all three together and merge them — this isle has not seen a drake break its shell in a hundred years."
+      ]
+    },
+    "rimewyrm": {
+      "speaker": "selyna",
+      "lines": [
+        "A Rimewyrm egg, out of the deep ice. It has waited down there longer than this harbour has had a name. It takes three to wake it.",
+        "The ice gives up a second Rimewyrm egg. Set them close together — frost remembers company. One more.",
+        "The last Rimewyrm egg. Merge the three and let the north meet what it froze — gently, Keeper."
+      ]
+    }
+  },
   "hints": {
     "zeroWarmth": "Out of Warmth? Rest by the fire — it returns on its own. The emberberry patch never needs any!",
     "boardFull": "The board is crowded! Sell a spare piece, or deliver to my Ledger to make room.",
@@ -91,9 +115,72 @@
     "twoDragons": "TWO grown Red Dragons?! Keeper, bring them together — when two flames meet, an ELDER rises!",
     "twoHouses": "Two Houses standing… join them! Emberkeep folk raise a MANOR when hearths unite — grander gold within.",
     "goldSkip": "Two ways past a wait, Keeper: gold or Warmth. Gold is the cheaper of the two — and patience is cheaper still, for both prices fall as the timer runs down.",
-    "houseCommission": "A House is a workshop, Keeper — pick ONE thing from your bag and it will make that, and only that, forever. Want a second? Build a second House."
+    "houseCommission": "A House is a workshop, Keeper — pick ONE thing from your bag and it will make that, and only that, forever. Want a second? Build a second House.",
+    "glassKiln": "That is the Glass Kiln. Wrack sand in, glass floats out — and every twelfth firing it drops a Fire Brick. Keep those. Nine of them is a second kiln.",
+    "starBench": "The Starwright's Bench. It grinds lenses. Three to a Spyglass, nine to an Orrery — and I will be asking for an Orrery before we are done.",
+    "wreckForge": "The Wreck Forge. Iron off the hulls in, caps out. Iron is the one thing the ice does not eat, so it is the one thing worth carrying.",
+    "tarKiln": "The Tar Kiln. It digs the fire out of the ground in beads. Mine eat pitch, not berries — you will be running this one for the dragons.",
+    "auroraLoom": "The Aurora Loom. It catches the lights on a warp and holds them there. Slowest thing on this shore. Set it going and leave it be."
   },
   "tasksComplete": "“Every task, done. The Keep hasn't been this warm in an age… you've earned your rest, Keeper.” — Eleanor",
+  "elder": {
+    "greeting": [
+      "You stayed. Good. An age of sleep teaches patience — sixty years of ash teach who is worth waking for.",
+      "Eleanor keeps her ledger. I keep something older: the MEASURE of a Keeper. From today, my asks stand beside hers.",
+      "Look to your quests, top right — the small arrow beside them turns the page between her work and mine. Begin."
+    ],
+    "quests": {
+      "elder_seeing_stones": {
+        "start": "First, eyes. Cut me two crystals from the old quartz — I have slept an age, and I would SEE this isle again.",
+        "done": "Clear. Sharp. The isle looks smaller than I remember, and better kept."
+      },
+      "elder_green_over_ash": {
+        "start": "The ash took the green first. Bale the moss that dares grow back — two bales, Keeper. Proof the ground forgives.",
+        "done": "Green over ash. The oldest trade there is."
+      },
+      "elder_old_forest": {
+        "start": "Before the court, before even the flame — the firs. Grow two tall again, and the wind will have something to speak through.",
+        "done": "They creak the way the old ones did. Close enough that I stopped to listen."
+      },
+      "elder_kindle_brood": {
+        "start": "One dragon is a survivor. TWO are a brood. Raise a second Red Dragon, and the sky starts owing us again.",
+        "done": "Two fires in the air at once. I had forgotten how that sounds."
+      },
+      "elder_gold_in_hand": {
+        "start": "Gold is patience made metal. Do not spend what the houses mint — HOLD it. Two full pouches, untouched.",
+        "done": "You can hold gold without spending it. Rarer than any dragon, that."
+      },
+      "elder_grow_keeper": {
+        "start": "Enough errands. Grow, Keeper — reach the fourth rank, and the land past the old fence will answer you.",
+        "done": "The fourth rank. The ground felt it — more of the isle stands open to you now."
+      },
+      "elder_berry_mother": {
+        "start": "The berry line fed the court through the last winter of the age. Grow two mother plants — we will want winters' worth.",
+        "done": "The line endures. Sweetness is also a supply, Keeper. The court knew it."
+      },
+      "elder_cold_light": {
+        "start": "Eleanor catches the moon's water; I ask for the step before the miracle. Three vials of dew, cold and honest.",
+        "done": "Cold and honest. She will make wonders of these — that is HER craft, and it deserves feeding."
+      },
+      "elder_far_sight": {
+        "start": "Now the far-sight. A full Crystal Ball, Keeper — I would look NORTH, where the Flame was carried.",
+        "done": "…Ice. A shore. A woman who does not sleep. It is as I told you — the north keeps what we lost."
+      },
+      "elder_rise_higher": {
+        "start": "Higher, Keeper. The fifth rank. The last of the fenced land waits on it — and so, in my way, do I.",
+        "done": "The fifth rank, and the isle whole beneath you. Nearly there now."
+      },
+      "elder_two_flames": {
+        "start": "Two grown flames, made one crown. Merge your Red Dragons into an Adult — this isle needs an heir to my watch.",
+        "done": "An Adult of the old blood. My watch has an heir; Emberkeep will not go dark again."
+      },
+      "elder_true_keeper": {
+        "start": "One thing remains, and it is nothing I can hand you. The sixth rank. Become what the stories call a TRUE Keeper.",
+        "done": "It is done."
+      }
+    },
+    "allDone": "It is done. A true Keeper stands on Emberkeep, and I saw it with waking eyes. Whatever the north asks of you now — you are ready. My watch is yours."
+  },
   "regard": {
     "eleanor": {
       "giftAccepted": [
@@ -217,8 +304,9 @@
         "So you're the one she found.",
         "Don't come any closer yet — the ice between us is thinner than it looks, and I have not decided anything about you.",
         "You'll want to know what I have. Don't ask me that yet.",
-        "Nine feet of shingle and whatever the tide left on it. That is the whole of your holding, Keeper. Nothing grows here — every stick of wood you see arrived on the water.",
-        "Bind two faggots of it and I'll light a fire you can steer by. That buys you the coast, Keeper — the door comes when I say it does."
+        "Nine feet of shingle and whatever the tide left on it. That is the whole of your holding, Keeper.",
+        "Nothing grows here — so nothing here was grown. It was made, or it was salvaged off somebody's wreck.",
+        "That kiln behind you still draws. Melt two floats out of it and I'll hang them where the light carries. That buys you the coast, Keeper — the door comes when I say it does."
       ]
     }
   }

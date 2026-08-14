@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
+import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { speakerName } from '../entities/CharacterBubble';
 import { discTextureFor } from '../entities/PortraitAnimator';
@@ -124,11 +124,11 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     private taskSystem: TaskSystem,
     private gameState: GameState
   ) {
-    super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
     this.owner = scene;
 
     this.dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.55)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.55)
       .setInteractive(); // swallow board input behind the panel
     this.dim.on('pointerup', () => this.requestClose());
 

@@ -1,15 +1,17 @@
 import { questStepNeeds } from '../core/availability';
-import { giftKey, heartsForPoints, regardKey, WORLD_ID } from '../core/Constants';
+import { brewKey, giftKey, heartsForPoints, regardKey, SPEAKER_NAMES, WORLD_ID } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type {
+  CauldronData,
   ChainsData,
   OrderConfig,
   OrderRequirement,
   QuestConfig,
   QuestGoal,
   QuestStepConfig,
-  QuestsData
+  QuestsData,
+  SpeakerId
 } from '../core/types';
 import type { OrderSystem } from './OrderSystem';
 import type { TaskSystem } from './TaskSystem';
@@ -18,6 +20,11 @@ import type { TaskSystem } from './TaskSystem';
  *  already persisted — the ladder adds no field to the save schema and so needs
  *  no SAVE_VERSION bump (ripple-map: TOUCH GameState fields → CHECK SaveSystem). */
 const latchKey = (stepId: string): string => `q:${stepId}`;
+
+/** The once-ever completion latch for a whole quest (`q:done:<id>`) — the key
+ *  `evaluate` writes, `questLocked` gates on, and WorldSystem's story doors
+ *  read. One derivation, because it is a PERSISTED save key. */
+const doneLatchKey = (questId: string): string => latchKey(`done:${questId}`);
 
 /** Plain-English verb per lifetime counter, so an unlabelled `stat` step reads
  *  "Hatch 4" rather than leaking the counter's field name onto the HUD. */
@@ -39,7 +46,7 @@ const STAT_VERB: Record<string, string> = {
  * never set foot in Borealis and never will (story-bible §5).
  */
 const giverName = (giver: string | undefined): string =>
-  giver ? giver.charAt(0).toUpperCase() + giver.slice(1) : 'the Ledger';
+  giver ? (SPEAKER_NAMES[giver as keyof typeof SPEAKER_NAMES] ?? giver) : 'the Ledger';
 
 export interface StepProgress {
   have: number;
@@ -105,13 +112,16 @@ export class QuestSystem {
     'regard:changed'
   ] as const;
 
-  private lastAnnounced: string | null = null;
+  /** Per GIVER — two people can hand out quests on one board (Eleanor and the
+   *  woken Elder), and each track announces its own advances. */
+  private lastAnnounced = new Map<SpeakerId, string>();
 
   constructor(
     private state: GameState,
     private bus: EventBus,
     private quests: QuestsData,
     private chains: ChainsData,
+    private cauldron: CauldronData,
     private orders: OrderSystem,
     private tasks: TaskSystem
   ) {
@@ -122,7 +132,7 @@ export class QuestSystem {
     // three must not replay two quests' worth of completion beats.
     bus.on('state:loaded', () => this.evaluate(false));
     bus.on('game:reset', () => {
-      this.lastAnnounced = null;
+      this.lastAnnounced.clear();
     });
   }
 
@@ -144,17 +154,67 @@ export class QuestSystem {
     return this.quests.quests.filter((q) => (q.world ?? WORLD_ID) === this.state.worldId);
   }
 
-  /** The quest the HUD tracks: the first one in THIS world not finished. The
-   *  authored world's ladder ends in the endless Ledger tail, so it is never
-   *  null there; a world with no ladder yet returns null and the HUD stays
-   *  empty rather than showing another world's business. */
+  /** The quest the HUD tracks by default: the first LIVE one in THIS world not
+   *  finished. The authored world's ladder ends in the endless Ledger tail, so
+   *  it is never null there; a world with no ladder yet returns null and the
+   *  HUD stays empty rather than showing another world's business. */
   get activeQuest(): QuestConfig | null {
-    return this.tracked.find((q) => !this.isComplete(q)) ?? null;
+    return this.tracked.find((q) => this.isLive(q)) ?? null;
   }
 
-  /** Its 1-based position within its own world's ladder. */
+  /**
+   * A quest whose `lockedUntil.quest` gate has not flipped is DORMANT: not
+   * latched, not completed, not announced, invisible to the HUD. The gate reads
+   * the same `q:done:<id>` latch the ladder itself writes, so it is derived
+   * state and survives reloads for free.
+   */
+  questLocked(quest: QuestConfig): boolean {
+    const gate = quest.lockedUntil?.quest;
+    return !!gate && this.state.stat(doneLatchKey(gate)) === 0;
+  }
+
+  /** The one predicate behind every track pointer: askable right now — awake
+   *  and unfinished. */
+  private isLive(quest: QuestConfig): boolean {
+    return !this.questLocked(quest) && !this.isComplete(quest);
+  }
+
+  /**
+   * Each giver's live track head in this world, one ladder pass, in ladder
+   * (file) order. A giver is on the roster once any of their quests is unlocked
+   * and unfinished: Eleanor is always here (her ladder ends in the endless
+   * tail), the Elder joins when `keepers_hoard` wakes him and leaves when his
+   * twelfth quest is done. Derived per call — the `q:done:` fast path in
+   * `isComplete` makes the pass a handful of map reads.
+   */
+  private liveTracks(): Map<SpeakerId, QuestConfig> {
+    const tracks = new Map<SpeakerId, QuestConfig>();
+    for (const quest of this.tracked) {
+      if (!tracks.has(quest.giver) && this.isLive(quest)) tracks.set(quest.giver, quest);
+    }
+    return tracks;
+  }
+
+  /** The roster the tracker's track arrow cycles through. */
+  get giversHere(): SpeakerId[] {
+    return [...this.liveTracks().keys()];
+  }
+
+  /** One giver's ladder in this world, dormant quests included (positions are
+   *  authored; a locked quest is still rung N of the ladder it belongs to). */
+  trackedFor(giver: SpeakerId): QuestConfig[] {
+    return this.tracked.filter((q) => q.giver === giver);
+  }
+
+  /** The quest a giver's own track is on — what the HUD shows when the player
+   *  has switched the tracker to that giver. */
+  activeQuestFor(giver: SpeakerId): QuestConfig | null {
+    return this.liveTracks().get(giver) ?? null;
+  }
+
+  /** Its 1-based position within its own GIVER's ladder in this world. */
   indexOf(quest: QuestConfig): number {
-    return this.tracked.findIndex((q) => q.id === quest.id) + 1;
+    return this.trackedFor(quest.giver).findIndex((q) => q.id === quest.id) + 1;
   }
 
   /** The quest's title — the endless tail borrows the live order's. */
@@ -165,6 +225,10 @@ export class QuestSystem {
   }
 
   isComplete(quest: QuestConfig): boolean {
+    // The done latch answers first: completion is monotone (steps latch), so a
+    // set latch is the whole truth, and the track pointers that prefix-scan the
+    // ladder pay one map read per finished rung instead of re-walking its steps.
+    if (this.state.stat(doneLatchKey(quest.id)) > 0) return true;
     return quest.steps.every((step) => this.stepDone(step));
   }
 
@@ -230,13 +294,22 @@ export class QuestSystem {
    * actually asks for.
    */
   needsFor(step: QuestStepConfig): OrderRequirement[] {
-    return questStepNeeds(step, this.orders.scripted, this.orders.encorePool, this.tasks.tasks);
+    return questStepNeeds(
+      step,
+      this.orders.scripted,
+      this.orders.encorePool,
+      this.tasks.tasks,
+      this.cauldron.recipes
+    );
   }
 
   // ------------------------------------------------------------- evaluation
 
   private evaluate(announce: boolean): void {
     for (const quest of this.quests.quests) {
+      // A dormant quest is deaf: its steps must not latch off board state that
+      // happens to satisfy them while its giver is still asleep.
+      if (this.questLocked(quest)) continue;
       for (const step of quest.steps) {
         if (this.state.stat(latchKey(step.id)) > 0) continue;
         if (!this.meets(step.goal)) continue;
@@ -244,11 +317,11 @@ export class QuestSystem {
         this.state.addStat(latchKey(step.id), 1);
         if (announce) this.bus.emit('quest:step_completed', { questId: quest.id, stepId: step.id });
       }
-      const doneKey = latchKey(`done:${quest.id}`);
+      const doneKey = doneLatchKey(quest.id);
       if (this.isComplete(quest) && this.state.stat(doneKey) === 0) {
         this.state.addStat(doneKey, 1);
         // The per-world completion counter WorldSystem's Rune Way gate reads
-        // (`q:world:borealis:done` >= HATCHERY_QUESTS_NEEDED). A counter, not
+        // (`q:world:borealis:done` >= RUNEVAULT_QUESTS_NEEDED). A counter, not
         // an id list, so renaming a quest can never silently re-lock a door.
         this.state.addStat(`q:world:${quest.world ?? 'emberkeep'}:done`, 1);
         // Paid on the LATCH flipping, not on `announce`. A save resumed past
@@ -259,14 +332,19 @@ export class QuestSystem {
         if (announce) this.bus.emit('quest:completed', { questId: quest.id });
       }
     }
-    const active = this.activeQuest;
-    if (active && active.id !== this.lastAnnounced) {
-      this.lastAnnounced = active.id;
+    // Each giver's track announces its own pointer moves — the Elder starting
+    // his first quest must not wait for (or interfere with) wherever Eleanor's
+    // ladder happens to be.
+    for (const [giver, active] of this.liveTracks()) {
+      if (active.id === this.lastAnnounced.get(giver)) continue;
+      this.lastAnnounced.set(giver, active.id);
       if (announce) {
+        const ladder = this.trackedFor(giver);
         this.bus.emit('quest:advanced', {
           questId: active.id,
-          index: this.indexOf(active),
-          total: this.tracked.length
+          giver,
+          index: ladder.findIndex((q) => q.id === active.id) + 1,
+          total: ladder.length
         });
       }
     }
@@ -293,7 +371,7 @@ export class QuestSystem {
         reason: `quest:${quest.id}`
       });
     }
-    if (rewards.spawn) this.bus.emit('board:spawn', { ...rewards.spawn, overflow: 'bag' });
+    if (rewards.spawn) this.bus.emit('board:spawn', { ...rewards.spawn, overflow: 'bag', cause: 'quest' });
   }
 
   /** The endless tail never latches — it has no end to record. */
@@ -344,6 +422,14 @@ export class QuestSystem {
         const key = `${goal.chain}:${goal.fromTier}>${goal.toTier}`;
         return { have: this.state.discoveredRecipes.includes(key) ? 1 : 0, need: 1 };
       }
+      case 'brew':
+        // Counts BREWS, not the pieces they made — the output is meant to be
+        // spent, and a step that un-finished when the player used what they
+        // brewed would be a trap.
+        return {
+          have: Math.min(this.state.stat(brewKey(goal.recipeId)), goal.count),
+          need: goal.count
+        };
       case 'world':
         // Standing there IS the goal. It latches on arrival, so coming home
         // never re-opens the crossing.
@@ -409,6 +495,13 @@ export class QuestSystem {
         return 'Clear the ash';
       case 'recipe':
         return `Discover ${this.pieceName(goal.chain, goal.toTier)}`;
+      case 'brew': {
+        // Named by what comes OUT, because that is the word on the pot's card —
+        // the recipe id is an authoring handle and never reaches the HUD.
+        const output = this.cauldron.recipes.find((r) => r.id === goal.recipeId)?.output;
+        const what = output ? this.pieceName(output.chain, output.tier) : goal.recipeId;
+        return `Brew ${goal.count} × ${what}`;
+      }
       case 'world':
         return 'Travel to the next world';
       case 'gift':

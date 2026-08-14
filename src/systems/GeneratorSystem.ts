@@ -3,7 +3,8 @@ import {
   OFFLINE_BANK_CYCLES,
   REWARD_SPAWN_RADIUS,
   skipEnergyCost,
-  skipWarmthCost
+  skipWarmthCost,
+  goldPurse
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
@@ -31,10 +32,6 @@ export class GeneratorSystem {
    *  "While you were away" card reads it right after load. */
   lastOfflineGifts = 0;
 
-  /** Board dragons currently asleep (`dragon:mood`). A sleeping animal is not
-   *  a vending machine: tapping one wakes nothing and yields nothing. */
-  private sleeping = new Set<number>();
-
   /**
    * Is a scripted tutorial step on screen right now?
    *
@@ -54,14 +51,6 @@ export class GeneratorSystem {
     private chains: ChainsData
   ) {
     bus.on('item:tapped', ({ itemId }) => this.onTapped(itemId));
-    // Who is asleep, learned as a FACT off the bus rather than by asking
-    // DragonLifeSystem — mood is derived there from the day clock, the job
-    // rota and the care record, and none of that is this system's business.
-    bus.on('dragon:mood', ({ itemId, mood }) => {
-      if (mood === 'asleep') this.sleeping.add(itemId);
-      else this.sleeping.delete(itemId);
-    });
-    bus.on('item:removed', ({ itemId }) => this.sleeping.delete(itemId));
     bus.on('generator:skip', ({ itemId, currency }) => this.onSkip(itemId, currency));
     bus.on('time:advanced', () => this.tickPassive());
     bus.on('generator:set_timer', ({ chain, tier, remainingMs }) =>
@@ -81,6 +70,13 @@ export class GeneratorSystem {
   awaitingChoice(item: BoardItemState): boolean {
     if (item.kind !== 'item' || item.produces) return false;
     return this.tierConfig(item.chain, item.tier)?.chooseProduce === true;
+  }
+
+  /** The highest tier this generator may be commissioned to make (default 1).
+   *  Public because the chooser reads it to lock over-rank bag slots — one
+   *  number, read by the gate and the view, so the two can never disagree. */
+  produceMaxTierOf(item: Pick<BoardItemState, 'chain' | 'tier'>): number {
+    return this.tierConfig(item.chain, item.tier)?.produceMaxTier ?? 1;
   }
 
   /** What a generator actually makes: its own commission if it has one, else
@@ -113,7 +109,23 @@ export class GeneratorSystem {
       this.bus.emit('generator:produce_refused', { itemId, reason: 'already_set' });
       return;
     }
-    if (!this.state.bag.some((s) => s.chain === chain && s.tier === tier && s.count > 0)) {
+    // The rank of the building is the rank of the work: a House takes tier-1
+    // commissions only, a Manor tiers 1–2 (`produceMaxTier`). The chooser
+    // renders over-rank stacks locked, so this refusal is the belt to that
+    // brace — the rule must hold even for a caller that never opened the panel.
+    if (tier > this.produceMaxTierOf(item)) {
+      this.bus.emit('generator:produce_refused', { itemId, reason: 'tier_too_high' });
+      return;
+    }
+    // The Bag is the roster, and the purse is part of it: Gold is held as the
+    // balance rather than as a stack, so a coin is "in the bag" when the
+    // balance covers one of that rank. Without this a House could never be
+    // pointed back at Gold Coins — the one thing every House starts out making.
+    const held =
+      chain === 'coin'
+        ? (goldPurse(this.state.coins, tier)?.tier ?? 0) === tier
+        : this.state.bag.some((s) => s.chain === chain && s.tier === tier && s.count > 0);
+    if (!held) {
       this.bus.emit('generator:produce_refused', { itemId, reason: 'not_in_bag' });
       return;
     }
@@ -176,8 +188,22 @@ export class GeneratorSystem {
     return this.tierConfig(chain, tier)?.generator;
   }
 
-  /** The timer a tap should offer to skip: a live tap-cooldown, else a live
-   *  passive wait. Returns null when nothing is pending. */
+  /**
+   * The timer a tap should offer to skip: a live tap-cooldown, else a live
+   * passive wait. Returns null when nothing is pending.
+   *
+   * A TAPPABLE generator never offers its PASSIVE clock. Its contract with the
+   * player is ready → tap → item (Emberkeep's Theme Crystal, which has no
+   * passive clock at all to get in the way), and skipping a passive wait sets
+   * `passiveAt = now`, which hands the item over on the next tick with no tap —
+   * so a paid skip produced the goods itself instead of returning the piece to
+   * a tappable ready state. Every Borealis generator carries BOTH `tappable`
+   * and a `passiveMs`, which is why it showed up there and nowhere else.
+   *
+   * This is the rule `BoardScene.genTimer` already draws when it decides
+   * whether to paint a countdown at all — the two disagreeing is what let a
+   * skip be sold for a timer the board was not showing.
+   */
   private activeTimer(
     item: BoardItemState,
     cfg: GeneratorConfig,
@@ -186,7 +212,7 @@ export class GeneratorSystem {
     if (item.readyAt !== undefined && now < item.readyAt) {
       return { at: item.readyAt, total: cfg.cooldownMs, kind: 'ready' };
     }
-    if (cfg.passiveMs && item.passiveAt !== undefined && now < item.passiveAt) {
+    if (cfg.tappable === false && cfg.passiveMs && item.passiveAt !== undefined && now < item.passiveAt) {
       return { at: item.passiveAt, total: cfg.passiveMs, kind: 'passive' };
     }
     return null;
@@ -199,13 +225,6 @@ export class GeneratorSystem {
     if (!item || item.kind !== 'item') return;
     const cfg = this.generatorConfig(item.chain, item.tier);
     if (!cfg) return;
-    // Same rule as the tap, and it matters more here: skipping costs Gold or
-    // Warmth, and buying a sleeping dragon's cooldown away buys nothing —
-    // the harvest at the end of it would be refused too.
-    if (this.sleeping.has(itemId)) {
-      this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'asleep' });
-      return;
-    }
     const now = this.clock.now();
     const timer = this.activeTimer(item, cfg, now);
     if (!timer) return; // already ready
@@ -247,15 +266,6 @@ export class GeneratorSystem {
     if (!generator) return; // not a generator; tooltip handling lives in UI
     if (generator.tappable === false) return; // passive-only: tap only skips (board-side)
 
-    // Asleep BEFORE the cooldown and the wallet: a sleeping dragon is not a
-    // generator with a condition on it, it is an animal that is not available.
-    // Nothing is spent, no cooldown is armed, nothing is produced — the answer
-    // is simply "later". (Its PASSIVE gift is untouched: ambience must never
-    // cost the player anything, which is the same rule that lets it nap at all.)
-    if (this.sleeping.has(itemId)) {
-      this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'asleep' });
-      return;
-    }
     const now = this.clock.now();
     if (item.readyAt !== undefined && now < item.readyAt) {
       this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'cooldown' });

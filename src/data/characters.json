@@ -39,6 +39,20 @@
       "cooldownMs": 900000,
       "dx": 10,
       "dy": -45
+    },
+    {
+      "id": "selyna_home",
+      "speaker": "selyna",
+      "art": "selyna",
+      "world": "runevault",
+      "anchor": [
+        11,
+        0
+      ],
+      "action": "give_back",
+      "cooldownMs": 900000,
+      "dx": 33,
+      "dy": 80
     }
   ]
 }

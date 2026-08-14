@@ -106,7 +106,7 @@ export interface DragonCare {
 
 export type RegionStatus = 'active' | 'unlockable' | 'locked';
 
-export type SpawnCause = 'init' | 'merge' | 'generator' | 'unlock' | 'load';
+export type SpawnCause = 'init' | 'merge' | 'generator' | 'unlock' | 'load' | 'quest' | 'store';
 
 export interface ItemSnapshot {
   id: number;
@@ -175,6 +175,15 @@ export interface ChainTierConfig {
    * ornament.
    */
   chooseProduce?: boolean;
+  /**
+   * The highest tier this generator may be COMMISSIONED to make (default 1).
+   * The rank of the building is the rank of the work: a House works simple
+   * pieces — tier 1 — and a Manor takes tier 2 as well. Enforced in
+   * `GeneratorSystem.commission` (reason `tier_too_high`), mirrored by the
+   * chooser (ineligible bag slots render locked), and cited by the
+   * `house_commission` tutorial beat.
+   */
+  produceMaxTier?: number;
 }
 
 /** Per-chain merge recipe override (e.g. 5 wood → 1 house). */
@@ -603,6 +612,16 @@ export type QuestGoal =
   | { kind: 'level'; level: number }
   | { kind: 'region'; regionId: string }
   | { kind: 'recipe'; chain: string; fromTier: number; toTier: number }
+  /**
+   * Brewed at Selyna's Cauldron, `count` times (`cauldron.json` recipe ids).
+   *
+   * A LIFETIME counter (`brew:<recipeId>` in `stats`), like `gift` and unlike
+   * `have`: brewing is a thing that happened, so spending the output cannot
+   * un-do the step and it never needs latching. The cauldron trades Bag→Bag,
+   * so this goal is world-agnostic by construction — but the audit still
+   * charges the step its recipe's inputs, in the world that asks.
+   */
+  | { kind: 'brew'; recipeId: string; count: number }
   | { kind: 'world'; worldId: string }
   | { kind: 'gift'; characterId: string; chain: string; tier: number; count: number }
   | { kind: 'regard'; characterId: string; hearts: number };
@@ -650,6 +669,17 @@ export interface QuestConfig {
    */
   world?: string;
   giver: SpeakerId;
+  /**
+   * The whole QUEST is dormant until another quest's done-latch flips
+   * (`q:done:<id>` in stats). Distinct from a step's `lockedUntil`: a locked
+   * step still belongs to a live quest, whereas a locked quest is not tracked,
+   * not latched and not announced — its giver does not exist yet as far as the
+   * HUD is concerned. This is what keeps the Golden Elder's ladder from
+   * pre-completing during Eleanor's: steps latch wherever they are met, so
+   * without the gate his "hold two Gold Pouches" would silently latch weeks
+   * before he wakes.
+   */
+  lockedUntil?: { quest?: string };
   /** HUD title. Omitted only by the endless tail, which borrows the live
    *  order's title. */
   title?: string;
@@ -814,8 +844,12 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
-  | { type: 'count'; chain: string; tier: number; count: number };
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'ui:codex_closed' | 'ui:codex_dragon_opened' | 'ui:codex_evolution_opened' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
+  | { type: 'count'; chain: string; tier: number; count: number }
+  /** A piece of `chain` CARRIED into `region` — the board-hygiene lesson. The
+   *  gate is the drop landing inside the named region's tiles, so a wiggle on
+   *  the spot cannot satisfy it. Requires `allow.drag` to include the chain. */
+  | { type: 'move'; chain: string; region: string };
 
 export interface TutorialAllow {
   /** Chain ids the player may drag ('*' = all). */
@@ -831,6 +865,17 @@ export interface TutorialAllow {
   marketplace?: boolean;
   /** Allow tapping the Emberkeep Cookbook button during tutorial. */
   cookbook?: boolean;
+  /**
+   * The Codex lesson is mid-walk: the book is HELD open.
+   *
+   * Its beats are gated on turning pages, and Phaser delivers a pointerup to
+   * every interactive object under it — so the tap that answers Eleanor also
+   * lands on the panel's scrim, and without this the book shuts under the step
+   * waiting on it. While set, the scrim ignores taps and both exits leave the
+   * page, so the beat has exactly one thing to do. The beat that teaches
+   * CLOSING the book deliberately omits it.
+   */
+  codexHold?: boolean;
   /** Allow tap-to-pocket (BagSystem). Off by default mid-tutorial: pocketing a
    *  scripted piece would strand the step that wants it merged. */
   bag?: boolean;
@@ -860,14 +905,37 @@ export interface TutorialAllow {
  */
 export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: number; tier?: number };
 
+/**
+ * A UI landmark the tutorial's hand or arrow can point at.
+ *
+ * One list, named once: it is read by the hand config, the arrow config and
+ * both of their resolved forms, and four copies of the same union is how a
+ * target lands in the data with nowhere in `UIScene.uiTarget` to answer it.
+ * The three `codex_*` entries walk the Codex lesson in order — the dragon's
+ * card on the roster, the EVOLUTION button on its page, then the ✕.
+ */
+export type TutorialUiTarget =
+  | 'ledger'
+  | 'deliver'
+  | 'marketplace'
+  | 'cookbook'
+  | 'cookbook_close'
+  | 'codex_card'
+  | 'codex_evolution'
+  | 'codex_close'
+  | 'bag'
+  | 'bag_give'
+  | 'status'
+  | 'commission';
+
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: TutorialUiTarget }
   | { fogRegion: string };
 
 export type TutorialArrowConfig =
   | { tile: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: TutorialUiTarget }
   | { fogRegion: string }
   /** A world character by id. NEVER point at one with a literal `tile` — where
    *  she stands is authored in the World Builder (`characters.json` anchor +
@@ -889,6 +957,18 @@ export type TutorialEffect =
   | { setEnergy: number }
   | { move: { chain: string; tier: number; to: [number, number] } }
   | { setTimer: { chain: string; tier: number; remainingMs: number } }
+  /**
+   * Open the Dragon Codex on the first named dragon — the lesson that shows the
+   * book writing itself. `reveal: 'favourite'` opens on the roster and arms the
+   * cinematic fade-in of the favourite-meal row (just discovered by the feed the
+   * previous beat scripted) for the page the player then opens.
+   *
+   * `page` is what a RESUME needs: every beat of the lesson carries this effect
+   * with the page its bubble is standing on, so a save reloaded mid-book comes
+   * back to the same spread instead of to a gate on a panel that is not there.
+   * The effect is idempotent — an already-open Codex ignores it.
+   */
+  | { openCodex: { reveal?: 'favourite'; page?: 'roster' | 'detail' | 'evolution' } }
   /** Open the naming prompt on the first board dragon of this chain+tier. The
    *  panel is not dismissible, so this is only ever authored on a step whose
    *  gate is the naming itself. */
@@ -925,6 +1005,17 @@ export type TutorialEffect =
  */
 export type SpeakerId = 'eleanor' | 'selyna' | 'golden_elder';
 
+/**
+ * Where the arrow goes ONCE THE CHARACTER IS ARMED, for a beat whose lesson is
+ * two-handed ("tap me, then tap the House").
+ *
+ * Without it the arrow sits on her for the whole step: the player taps her,
+ * nothing about the pointer changes, and the only new signal is a tile
+ * highlight they have no reason to connect to the gesture they just made. The
+ * hand must follow the lesson — she is done, the House is next.
+ */
+export type TutorialArrowThenConfig = TutorialArrowConfig;
+
 export interface TutorialStepConfig {
   id: string;
   speaker: SpeakerId;
@@ -933,6 +1024,9 @@ export interface TutorialStepConfig {
   highlight?: TileRef[];
   hand?: TutorialHandConfig;
   arrow?: TutorialArrowConfig;
+  /** Where the arrow moves once the step's character is ARMED (see
+   *  TutorialArrowThenConfig). Only meaningful beside `arrow: { character }`. */
+  arrowThen?: TutorialArrowThenConfig;
   allow?: TutorialAllow;
   /** Side-effects fired once, when this step becomes the active step. */
   effects?: TutorialEffect[];
@@ -1098,6 +1192,9 @@ export interface EventMap {
   'item:tapped': { itemId: number };
   /** Intent: stash the tapped board piece in the Bag (BagSystem handles it). */
   'ui:store_requested': { itemId: number };
+  /** The commission chooser opened/closed — the tutorial's `house_commission`
+   *  beat reads it, and the HUD dims behind it. */
+  'ui:commission_toggled': { open: boolean };
   /** Intent: DROP one of this stack back out onto the board. */
   'ui:bag_retrieve_requested': { chain: string; tier: number };
 
@@ -1123,7 +1220,7 @@ export interface EventMap {
   'generator:produce_set': { itemId: number; chain: string; tier: number };
   'generator:produce_refused': {
     itemId: number;
-    reason: 'already_set' | 'not_commissionable' | 'not_in_bag';
+    reason: 'already_set' | 'not_commissionable' | 'not_in_bag' | 'tier_too_high';
   };
   /** Intent: SELL one of this stack for coins. Selling lives in the Bag and
    *  nowhere else — a piece on the board can be dragged, merged or pocketed,
@@ -1165,6 +1262,7 @@ export interface EventMap {
   /** Fact: the brew was refused, and why — never silently. */
   'cauldron:brew_failed': { recipeId: string; reason: 'ingredients' | 'bag_full' };
   'ui:deliver_requested': { orderId: string };
+  'ui:gift_deliver_requested': { characterId: string; chain: string; tier: number };
   /** A gauge "+" button opened the currency shop for that currency. */
   'ui:shop_requested': { currency: 'energy' | 'coins' };
   /** Intent: a real-money pack's price plate was tapped in the Emporium.
@@ -1216,7 +1314,7 @@ export interface EventMap {
    * a legendary egg exists exactly three times in a zone, so a full board must
    * never be able to destroy one.
    */
-  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number]; overflow?: 'bag' };
+  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number]; overflow?: 'bag'; cause?: SpawnCause };
   /** Transform one on-board item of `chain`+`fromTier` into `toTier` in place. */
   'board:retier': { chain: string; fromTier: number; toTier: number };
   /** Relocate one on-board item of `chain`+`tier` to a cell (tutorial staging). */
@@ -1289,7 +1387,6 @@ export interface EventMap {
   'generator:skipped': { itemId: number; chain: string; currency: 'gold' | 'warmth' | 'gift' };
   /** A Gold coin was tapped to bank it — UI flies coin(s) to the Gold gauge,
    *  one gauge pulse per arrival (the Pouch sends 3; default 1). */
-  'gold:collected': { at: TilePos; coins?: number };
   /** A piece went into the Bag — UIScene flies it to the satchel and pulses it. */
   'bag:stored': { chain: string; tier: number; at: TilePos };
   /** Nothing was stored. `full` = no free slot; `no_room` = nowhere to put it back. */
@@ -1367,11 +1464,15 @@ export interface EventMap {
    *  `cycles` is the lifetime count the Codex shows, `needed` the evolution
    *  condition's bar, so a listener never has to look either up. */
   'dragon:well_fed': { itemId: number; chain: string; cycles: number; needed: number };
+  /** Fact: the Codex turned to a page. The tutorial's codex lesson walks the
+   *  player roster → dragon → evolution, so the PAGE is what its gates read;
+   *  `open`/`closed` alone cannot tell those three beats apart. */
+  'ui:codex_page': { page: 'roster' | 'detail' | 'evolution' };
   /** The Dragon Codex opened/closed. */
   'ui:codex_toggled': { open: boolean };
   /** Intent: open the Codex on the first named dragon's detail page — for a
    *  scripted reveal. UIScene owns the panel and answers. */
-  'ui:codex_open_requested': { reveal?: 'favourite' };
+  'ui:codex_open_requested': { reveal?: 'favourite'; page?: 'roster' | 'detail' | 'evolution' };
   /** Intent: open the naming prompt for the dragon standing on the board as
    *  `itemId`. The tutorial's `nameDragon` effect is the only caller today. */
   'ui:name_dragon_requested': { itemId: number };
@@ -1425,6 +1526,7 @@ export interface EventMap {
   /** Nothing is waiting any more — delivered, refused off, or tapped away. */
   'bag:give_cancelled': Record<string, never>;
   'ui:gift_requested': { characterId: string; chain: string; tier: number };
+  'order:give': { characterId: string; chain: string; tier: number };
   /** She took it — a live `gift` subquest wanted exactly this. */
   'regard:gift_accepted': { characterId: string; chain: string; tier: number; points: number };
   /** She did not: nothing on her list asks for it, or her hearts are already
@@ -1479,7 +1581,7 @@ export interface EventMap {
    *  quest takes the HUD. */
   'quest:completed': { questId: string };
   /** The tracked quest changed (advance, or a load landing mid-ladder). */
-  'quest:advanced': { questId: string; index: number; total: number };
+  'quest:advanced': { questId: string; giver: SpeakerId; index: number; total: number };
   'order:completed': { orderId: string; rewards: { coins: number; keys: number; xp?: number } };
   'order:all_done': Record<string, never>;
   /**
@@ -1551,12 +1653,12 @@ export interface EventMap {
 
 export type ResolvedHand =
   | { from: TilePos; to: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: TutorialUiTarget }
   | { fogRegion: string };
 
 export type ResolvedArrow =
   | { tile: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: TutorialUiTarget }
   | { fogRegion: string }
   /** Stays an id through the payload, exactly like `ui`: the UI re-reads her
    *  position every frame, so she can move (World Builder, or a future walk)
@@ -1574,6 +1676,9 @@ export interface TutorialStepEvent {
   highlight: TilePos[];
   hand: ResolvedHand | null;
   arrow: ResolvedArrow | null;
+  /** Where the arrow moves once this step's character is armed — null when the
+   *  beat does not hand the pointer on (see TutorialArrowThenConfig). */
+  arrowThen: ResolvedArrow | null;
   allow: Required<TutorialAllow>;
 }
 

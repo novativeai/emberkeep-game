@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import {
   BAG_SLOTS,
-  GAME_WIDTH,
+  goldPurse,
   LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
   num,
   PALETTE,
   panelMobileScale,
@@ -77,6 +78,8 @@ export class BagPanel extends Phaser.GameObjects.Container {
   private dim: Phaser.GameObjects.Rectangle;
   private slots: Phaser.GameObjects.Container[] = [];
   private capacityText: Phaser.GameObjects.Text;
+  /** The Gold balance, drawn as Pouches (or Coins below a Pouch's worth). */
+  private purse!: Phaser.GameObjects.Container;
   private baseScale = 1;
   /** The Drop/Sell chooser, parented to the slot it belongs to (null = none
    *  open). Only one is ever live: opening another closes this one. */
@@ -104,16 +107,16 @@ export class BagPanel extends Phaser.GameObjects.Container {
     this.baseScale = panelMobileScale(FRAME_W);
 
     // The AUTHORED space, never `scene.scale.*`: the canvas backing is
-    // GAME_WIDTH × renderScale (the Graphics setting picks the factor at boot,
+    // LIVE_GAME_WIDTH × renderScale (the Graphics setting picks the factor at boot,
     // off the SAVED profile), and the cameras zoom to compensate — so on a
     // resumed session `scale.width/2` is the centre of the BACKING, which
     // parked this panel in the top-left. UI coordinates live in 2560×1600.
-    const cx = GAME_WIDTH / 2;
+    const cx = LIVE_GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT / 2;
 
     // Tap-anywhere-outside closes. The dim sits in the panel so it fades with it.
     this.dim = scene.add
-      .rectangle(cx, cy, GAME_WIDTH * 2, LIVE_GAME_HEIGHT * 2, num(PALETTE.night), 0.62)
+      .rectangle(cx, cy, LIVE_GAME_WIDTH * 2, LIVE_GAME_HEIGHT * 2, num(PALETTE.night), 0.62)
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
@@ -169,7 +172,11 @@ export class BagPanel extends Phaser.GameObjects.Container {
       this.requestClose();
     });
 
-    body.add([frame, banner, title, capIcon, this.capacityText, close, closeX]);
+    // The PURSE: the Gold balance, in the coins it is made of. It is not a
+    // storage slot — money is the balance, so it costs no capacity and can
+    // never push a pocketed piece out of the grid.
+    this.purse = scene.add.container(-FRAME_W / 2 + 250, -FRAME_H / 2 + 92);
+    body.add([frame, banner, title, capIcon, this.capacityText, close, closeX, this.purse]);
 
     const gridW = COLS * SLOT + (COLS - 1) * GAP;
     const gridH = ROWS * SLOT + (ROWS - 1) * GAP;
@@ -202,6 +209,11 @@ export class BagPanel extends Phaser.GameObjects.Container {
     this.offBus.push(
       bus.on('bag:changed', () => {
         if (this.isOpen) this.render();
+      }),
+      // The purse is a view of the balance, so it follows the money rather than
+      // the satchel — a coin banked while the panel is open must show at once.
+      bus.on('economy:changed', () => {
+        if (this.isOpen) this.paintPurse();
       })
     );
     this.once(Phaser.GameObjects.Events.DESTROY, () => {
@@ -237,6 +249,7 @@ export class BagPanel extends Phaser.GameObjects.Container {
     this.closeChooser();
     const stacks = this.gameState.bag;
     this.capacityText.setText(`${stacks.length}/${BAG_SLOTS}`);
+    this.paintPurse();
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i]!;
       slot.removeAll(true);
@@ -244,6 +257,33 @@ export class BagPanel extends Phaser.GameObjects.Container {
       if (stack) this.paintFilled(slot, stack);
       else this.paintEmpty(slot);
     }
+  }
+
+  /**
+   * The purse tile: the same Gold the HUD counts, shown as the largest coin it
+   * fills — 500 Gold is 33 Pouches. Empty of art below one Coin's worth, so a
+   * player with 3 Gold is not shown a coin they cannot spend as one.
+   */
+  private paintPurse(): void {
+    this.purse.removeAll(true);
+    const held = goldPurse(this.gameState.coins);
+    if (!held) return;
+    const key = `item_coin_${held.tier}`;
+    if (this.scene.textures.exists(key)) {
+      const art = this.scene.add.image(-46, 0, key);
+      art.setScale(Math.min(84 / art.width, 84 / art.height));
+      this.purse.add(art);
+    }
+    this.purse.add(
+      this.scene.add
+        .text(4, 0, `x${held.count}`, {
+          fontFamily: FONT.display,
+          fontSize: '46px',
+          fontStyle: 'bold',
+          color: PALETTE.cream
+        })
+        .setOrigin(0, 0.5)
+    );
   }
 
   /** An unfilled slot: a recessed square with a faint gold DASHED outline and
@@ -367,15 +407,21 @@ export class BagPanel extends Phaser.GameObjects.Container {
 
     const bx = BTN_W + BTN_GAP;
     const by = POP_H / 2 - BTN_H / 2 - 26;
+    // A piece the game refuses to sell (`sellable:false` — the legendary eggs)
+    // gets NO Sell plate at all: a button that only nudges is a dead button,
+    // and EconomySystem would refuse the sale anyway. Two fates centre up.
+    const sellHere = tier?.sellable !== false;
+    const dropX = sellHere ? -bx : -bx / 2;
+    const giveX = sellHere ? 0 : bx / 2;
     // Three fates, ordered by how far they take the piece from the player:
     // Drop puts it back where it came from, Give hands it to somebody, Sell ends
     // it. Drop is reversible so it is the quiet one; Sell is final and wears the
     // coin it pays, which is also the only place the value is ever shown.
-    const drop = this.chooserButton('Drop', -bx, by, PALETTE.plumHighlight, PALETTE.plumShade, () => {
+    const drop = this.chooserButton('Drop', dropX, by, PALETTE.plumHighlight, PALETTE.plumShade, () => {
       this.bus.emit('ui:bag_retrieve_requested', { chain: stack.chain, tier: stack.tier });
       this.closeChooser();
     });
-    const give = this.chooserButton('Give', 0, by, PALETTE.lava, PALETTE.lavaShade, () => {
+    const give = this.chooserButton('Give', giveX, by, PALETTE.lava, PALETTE.lavaShade, () => {
       if (!this.giveAllowed) {
         this.bus.emit('tutorial:nudge', {});
         return;
@@ -386,23 +432,26 @@ export class BagPanel extends Phaser.GameObjects.Container {
       this.closeChooser();
     });
     give.setAlpha(this.giveAllowed ? 1 : 0.5);
-    const sell = this.chooserButton(`+${value}`, bx, by, PALETTE.gold, PALETTE.night, () => {
-      if (!this.sellAllowed) {
-        this.bus.emit('tutorial:nudge', {});
-        return;
-      }
-      this.bus.emit('ui:bag_sell_requested', { chain: stack.chain, tier: stack.tier });
-      this.closeChooser();
-    }, true);
-    sell.setAlpha(this.sellAllowed ? 1 : 0.5);
-    chooser.add([drop, give, sell]);
+    let sell: Phaser.GameObjects.Container | undefined;
+    if (sellHere) {
+      sell = this.chooserButton(`+${value}`, bx, by, PALETTE.gold, PALETTE.night, () => {
+        if (!this.sellAllowed) {
+          this.bus.emit('tutorial:nudge', {});
+          return;
+        }
+        this.bus.emit('ui:bag_sell_requested', { chain: stack.chain, tier: stack.tier });
+        this.closeChooser();
+      }, true);
+      sell.setAlpha(this.sellAllowed ? 1 : 0.5);
+    }
+    chooser.add(sell ? [drop, give, sell] : [drop, give]);
 
     slot.add(chooser);
     // Above every other slot: the plate is wider than its own slot and would
     // otherwise be painted under the ones drawn after it.
     slot.parentContainer.bringToTop(slot);
     this.chooser = chooser;
-    this.sellButton = sell;
+    this.sellButton = sell ?? null;
     this.giveButton = give;
     this.dimOthers(slot);
 

@@ -38,6 +38,24 @@
       }
     },
     {
+      "id": "eleanor_moonwater",
+      "giver": "eleanor",
+      "title": "Catch the Moonwater",
+      "blurb": "The basin on the high ground fills whether anyone watches it or not. Three drops make a vial, three vials make Moonwater — bring me one, and I will show you what the moon does with borrowed light.",
+      "requires": [
+        {
+          "chain": "moonwater",
+          "tier": 3,
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 130,
+        "keys": 0,
+        "xp": 60
+      }
+    },
+    {
       "id": "eleanor_centerpiece",
       "giver": "eleanor",
       "title": "Craft the Radiant Centerpiece",
@@ -53,6 +71,24 @@
         "coins": 110,
         "keys": 0,
         "xp": 80
+      }
+    },
+    {
+      "id": "eleanor_keeps",
+      "giver": "eleanor",
+      "title": "What She Keeps",
+      "blurb": "Two baskets, and I will put them by rather than eat them. A larder is not what you have — it is what you did not need today.",
+      "requires": [
+        {
+          "chain": "emberberry",
+          "tier": 2,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 60,
+        "keys": 0,
+        "xp": 40
       }
     },
     {
@@ -74,32 +110,14 @@
       }
     },
     {
-      "id": "eleanor_moonwater",
-      "giver": "eleanor",
-      "title": "Catch the Moonwater",
-      "blurb": "The basin on the high ground fills whether anyone watches it or not. Three drops make a vial, three vials make Moonwater — bring me one, and I will show you what the moon does with borrowed light.",
-      "requires": [
-        {
-          "chain": "moonwater",
-          "tier": 3,
-          "count": 1
-        }
-      ],
-      "rewards": {
-        "coins": 130,
-        "keys": 0,
-        "xp": 60
-      }
-    },
-    {
       "id": "selyna_signal",
       "giver": "selyna",
       "world": "borealis",
-      "title": "Bank a Signal Fire",
-      "blurb": "You came a long way to stand on nine feet of ice. Bind me two faggots of that driftwood and I will light something you can steer by — then the coast is yours to walk. The door comes later, if I like what you do with it.",
+      "title": "Set Two Marks",
+      "blurb": "You came a long way to stand on nine feet of ice. Bring me two of the netted floats and I will hang them where the light carries — then the coast is yours to walk. The door comes later, if I like what you do with it.",
       "requires": [
         {
-          "chain": "driftwood",
+          "chain": "seaglass",
           "tier": 2,
           "count": 2
         }
@@ -115,10 +133,10 @@
       "giver": "selyna",
       "world": "borealis",
       "title": "Feed the Northern Dragons",
-      "blurb": "Mine eat pitch, not berries. Nothing grows here, so the fire has to be built before it can be fed — a woodpile first, then three cakes of it. That is the whole north in one errand.",
+      "blurb": "Mine eat pitch, not berries. Nothing grows here, so the fire has to be dug up before it can be fed — three loaves of it. That is the whole north in one errand.",
       "requires": [
         {
-          "chain": "tarknot",
+          "chain": "emberheart",
           "tier": 2,
           "count": 3
         }
@@ -134,10 +152,10 @@
       "giver": "selyna",
       "world": "borealis",
       "title": "Salvage the Wrecks",
-      "blurb": "Two lashed frames. You will want to live under something eventually, and out here that means turning over what the sea has already finished with.",
+      "blurb": "Two banded helms. Every wreck brings iron ashore, and iron is the one thing the ice does not eat. Bring them up before the tide has another think.",
       "requires": [
         {
-          "chain": "keel",
+          "chain": "warhelm",
           "tier": 2,
           "count": 2
         }
@@ -149,14 +167,32 @@
       }
     },
     {
+      "id": "selyna_buoys",
+      "giver": "selyna",
+      "title": "What She Will Take",
+      "blurb": "Two buoys, netted and hung. Bring them up the shingle yourself — I want to see whether you carry a load the same way you merge one.",
+      "requires": [
+        {
+          "chain": "seaglass",
+          "tier": 2,
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 70,
+        "keys": 0,
+        "xp": 40
+      }
+    },
+    {
       "id": "selyna_spindle",
       "giver": "selyna",
       "world": "borealis",
-      "title": "Spin the Light-Fast Spindles",
-      "blurb": "Two spindles, wound tight. My sister catches light and keeps it in glass; I spin it into thread and it keeps something warm. Bring me these and I will tell you what I have been keeping.",
+      "title": "Weave the Aurora",
+      "blurb": "Two cloaks, woven tight. My sister catches light and keeps it in glass; I catch it on a warp and it keeps something warm. Bring me these and I will tell you what I have been keeping.",
       "requires": [
         {
-          "chain": "frostsilk",
+          "chain": "auroraweave",
           "tier": 3,
           "count": 2
         }
@@ -240,11 +276,11 @@
     {
       "giver": "selyna",
       "world": "borealis",
-      "title": "More Drift Spars",
-      "blurb": "Eight spars off the tide line. The fire does not keep itself.",
+      "title": "More Glass Floats",
+      "blurb": "Eight floats off the tide line. The marks do not hang themselves.",
       "requires": [
         {
-          "chain": "driftwood",
+          "chain": "seaglass",
           "tier": 1,
           "count": 8
         }
@@ -258,11 +294,11 @@
     {
       "giver": "selyna",
       "world": "borealis",
-      "title": "More Pitch Cakes",
-      "blurb": "Two more cakes. They have been out in it all night and they are not sentimental about who feeds them.",
+      "title": "More Pitch Loaves",
+      "blurb": "Two more loaves. They have been out in it all night and they are not sentimental about who feeds them.",
       "requires": [
         {
-          "chain": "tarknot",
+          "chain": "emberheart",
           "tier": 2,
           "count": 2
         }
@@ -276,11 +312,11 @@
     {
       "giver": "selyna",
       "world": "borealis",
-      "title": "More Frost Threads",
-      "blurb": "Five threads. I spin in the evenings. It is not a hobby.",
+      "title": "More Light Threads",
+      "blurb": "Five threads. I weave in the evenings. It is not a hobby.",
       "requires": [
         {
-          "chain": "frostsilk",
+          "chain": "auroraweave",
           "tier": 1,
           "count": 5
         }
@@ -294,11 +330,11 @@
     {
       "giver": "selyna",
       "world": "borealis",
-      "title": "Another Black Ember",
-      "blurb": "One black ember. Keep it away from the thread, and away from me.",
+      "title": "Another Ember Heart",
+      "blurb": "One ember heart. Keep it away from the weave, and away from me.",
       "requires": [
         {
-          "chain": "tarknot",
+          "chain": "emberheart",
           "tier": 3,
           "count": 1
         }
