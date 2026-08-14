@@ -287,7 +287,13 @@ def main():
     # the levers are idle-clip fps decimation (idles are the largest sheets)
     # or fetching dragon clips lazily on ownership instead of at boot — not
     # quality shaving at this gate.
-    ap.add_argument("--budget", type=float, default=96.0, help="fail over this many MB")
+    #
+    # 108 (2026-08-14, the legendaries): ashdrake + rimewyrm young idle+roar —
+    # young-ONLY breeds, so ~5.3 MB each (no adult set, no fly clip), measured
+    # 95.2 → 105.8. 108 keeps the customary ~2 MB of slack. This completes the
+    # clip roster for every breed that exists in chains.json; the next raise
+    # should come with legendary ADULT tiers or a new breed, nothing else.
+    ap.add_argument("--budget", type=float, default=108.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():

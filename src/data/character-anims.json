@@ -626,6 +626,68 @@
       },
       "board": "emerald:4",
       "skin": "moonwhisker"
+    },
+    "ashdrake_young": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/ashdrake_young/idle.webp",
+          "frames": 155,
+          "frameWidth": 315,
+          "frameHeight": 231,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.00781,
+          "dx": -6.45,
+          "dy": 12.32,
+          "srcFrameWidth": 315,
+          "srcFrameHeight": 231
+        },
+        "roar": {
+          "file": "sprites/anims/ashdrake_young/roar.webp",
+          "frames": 66,
+          "frameWidth": 279,
+          "frameHeight": 279,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8022556272401434,
+          "dx": 0.41,
+          "dy": 12.56,
+          "srcFrameWidth": 359,
+          "srcFrameHeight": 359
+        }
+      },
+      "board": "ashdrake:2"
+    },
+    "rimewyrm_young": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/rimewyrm_young/idle.webp",
+          "frames": 142,
+          "frameWidth": 334,
+          "frameHeight": 341,
+          "fps": 24,
+          "loop": true,
+          "scale": 0.84885,
+          "dx": 22.81,
+          "dy": 33.8,
+          "srcFrameWidth": 334,
+          "srcFrameHeight": 341
+        },
+        "roar": {
+          "file": "sprites/anims/rimewyrm_young/roar.webp",
+          "frames": 66,
+          "frameWidth": 269,
+          "frameHeight": 285,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8023620817843866,
+          "dx": -3.28,
+          "dy": 16.81,
+          "srcFrameWidth": 340,
+          "srcFrameHeight": 360
+        }
+      },
+      "board": "rimewyrm:2"
     }
   }
 }

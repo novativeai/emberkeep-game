@@ -83,6 +83,31 @@ def sprite_reference_box(root: Path, ref: dict) -> dict:
     }
 
 
+def item_reference_box(root: Path, ref: dict) -> dict:
+    """Rest-pose content box of a RIG-LESS breed, in game px relative to the
+    clip overlay's anchor.
+
+    Some breeds are clip-only from birth — the legendaries have no rig, only the
+    static board art the clips replace. That art IS the rest pose, so it is the
+    reference: its alpha box, measured off its own board anchor and scaled by
+    ITEM_SCALE. The overlay hangs `groundLift` above the item art's anchor
+    (BoardScene.syncDragon), so the box shifts by that to land in overlay space.
+    """
+    img = Image.open(root / 'assets' / ref['image'])
+    box = content_box(img)
+    if box is None:
+        fail(f"reference {ref['image']} is fully transparent")
+    ax, ay = ref['anchorX'] * img.width, ref['anchorY'] * img.height
+    s = ref['scale']
+    lift = ref.get('groundLift', 0)
+    return {
+        'left': (box[0] - ax) * s,
+        'top': (box[1] - ay) * s + lift,
+        'right': (box[2] - ax) * s,
+        'bottom': (box[3] - ay) * s + lift,
+    }
+
+
 def rig_reference_box(root: Path, ref: dict) -> dict:
     """Rest-pose content box of a rig, in game px relative to its root point.
 
@@ -155,6 +180,16 @@ def align_clip(meta: dict, box: tuple, target: dict, mode: str) -> dict:
     return {'scale': round(scale, 5), 'dx': round(dx, 2), 'dy': round(dy, 2)}
 
 
+#: What a character's idle registers against — one entry per reference `kind`
+#: apply-anim-align.mjs's referenceOf can emit. A missing kind raises here
+#: rather than silently aligning against the wrong thing.
+REFERENCE_BOX = {
+    'sprite': sprite_reference_box,
+    'rig': rig_reference_box,
+    'item': item_reference_box,
+}
+
+
 def cmd_auto() -> None:
     spec = json.load(sys.stdin)
     root = Path(spec['root'])
@@ -166,7 +201,7 @@ def cmd_auto() -> None:
         if only_char and char_id != only_char:
             continue
         ref = char['reference']
-        target = sprite_reference_box(root, ref) if ref['kind'] == 'sprite' else rig_reference_box(root, ref)
+        target = REFERENCE_BOX[ref['kind']](root, ref)
         atlas_dir = root / char['atlasDir']
         anims = char['animations']
         modes = char.get('modes', {})

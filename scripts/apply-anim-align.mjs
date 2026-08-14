@@ -241,6 +241,30 @@ const ROSTER = {
       }
     }
   },
+  // The two LEGENDARIES. Neither has a rig — they are clip-only from birth, so
+  // their idle registers against the static board art the clips replace
+  // (`item`, not `rig`). Young only: both chains are two tiers, egg then
+  // animal, so there is no adult to animate and no fly clip to phase.
+  ashdrake_young: {
+    label: 'Ashdrake (young)',
+    rawDir: `${RAW_BASE}/ashdrake_young_atlasses`,
+    item: 'ashdrake:2',
+    board: 'ashdrake:2',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded (also stands in for flight — no fly clip)' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + hatch intro', loop: false }
+    }
+  },
+  rimewyrm_young: {
+    label: 'Rimewyrm (young)',
+    rawDir: `${RAW_BASE}/rimewyrm_young_atlasses`,
+    item: 'rimewyrm:2',
+    board: 'rimewyrm:2',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded (also stands in for flight — no fly clip)' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + hatch intro', loop: false }
+    }
+  },
   storm_adult: {
     label: 'Storm Dragon (adult)',
     rawDir: `${RAW_BASE}/storm_adult_atlasses`,
@@ -294,11 +318,40 @@ function readConstants(root) {
     STANDEE_SCALE_TRIM: readConstLiteral(src, 'STANDEE_SCALE_TRIM'),
     DRAGON_ANIM: readConstLiteral(src, 'DRAGON_ANIM'),
     DRAGON_RIG_SCALE: readConstLiteral(src, 'DRAGON_RIG_SCALE'),
+    ITEM_SCALE: readConstLiteral(src, 'ITEM_SCALE'), // rig-less breeds register against their item art
     GOLDEN_ALTAR: readConstLiteral(src, 'GOLDEN_ALTAR') // the Elder's altar display scale
   };
 }
 
+/** The board art a rig-less breed's clips must register against: the item
+ *  texture's file + its board anchor, resolved exactly as BoardScene resolves
+ *  them (assets.json for the file, anchors.json for the origin, ITEM_SCALE for
+ *  the size — `chain_tier` first, then the bare chain, as acquireSprite does). */
+function itemReference(root, entry, C) {
+  const [chain, tier] = entry.item.split(':');
+  const key = `item_${chain}_${tier}`;
+  const assets = JSON.parse(readFileSync(path.resolve(root, 'src/data/assets.json'), 'utf8'));
+  const image = assets.images.find((img) => img.key === key)?.file;
+  if (!image) throw new Error(`no assets.json image for "${key}" — the item art must ship before its clips`);
+  const anchors = JSON.parse(readFileSync(path.resolve(root, 'src/data/anchors.json'), 'utf8'));
+  const [anchorX, anchorY] = anchors.byKey[key] ?? anchors.default;
+  const scale = C.ITEM_SCALE[`${chain}_${tier}`] ?? C.ITEM_SCALE[chain] ?? 1;
+  return {
+    kind: 'item',
+    image,
+    anchorX,
+    anchorY,
+    scale,
+    // The clip overlay hangs at `host.y - groundLift` while the item art hangs
+    // at `host.y` (BoardScene.syncDragon vs BoardItem), so the reference box —
+    // measured off the art — carries that offset to land in the overlay's own
+    // space. Miss it and every rig-less breed sits 20px off the tile.
+    groundLift: C.DRAGON_ANIM.groundLift
+  };
+}
+
 function referenceOf(root, id, entry, C) {
+  if (entry.item) return itemReference(root, entry, C);
   if (entry.standee) {
     const bank = C.STANDEE_BANKS[entry.standee];
     if (!bank) throw new Error(`no STANDEE_BANKS entry for "${entry.standee}"`);

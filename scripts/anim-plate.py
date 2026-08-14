@@ -56,7 +56,12 @@ ROSTER = {
     # Moonwhisker — the Emporium's emerald-chain skin, last of the store breeds
     # to get clips. Violet/rose animal on the green plate: no key conflict.
     'moonwhisker_baby': (f'{DRAGONS}/moonwhisker-dragon/sprite/moonwhisker-dragon-baked.png', 'baby'),
-    'moonwhisker_adult': (f'{DRAGONS}/moonwhisker-dragon/sprite-adult/moonwhisker-dragon-adult-baked.png', 'adult')
+    'moonwhisker_adult': (f'{DRAGONS}/moonwhisker-dragon/sprite-adult/moonwhisker-dragon-adult-baked.png', 'adult'),
+    # The legendaries. No rig and no bake behind them — the shipped board art
+    # IS the rest pose (it is what the clips replace), so it plates directly.
+    # Young only: both chains stop at the animal, so there is no adult stage.
+    'ashdrake_young': (f'{DRAGONS}/ashdrake/ashdrake-young.png', 'baby'),
+    'rimewyrm_young': (f'{DRAGONS}/rimewyrm/rimewyrm-young.png', 'baby')
 }
 
 

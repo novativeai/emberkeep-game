@@ -126,7 +126,11 @@ PLATE_STAGES = {
     'ember_adult': 'adult',
     'golden_adult': 'adult',  # the Golden Elder — same three adult clips
     'moonwhisker_baby': 'baby',
-    'moonwhisker_adult': 'adult'
+    'moonwhisker_adult': 'adult',
+    # The legendaries — young only (neither chain has an adult tier), so two
+    # clips each: the grounded idle and the bellow.
+    'ashdrake_young': 'baby',
+    'rimewyrm_young': 'baby'
 }
 
 
