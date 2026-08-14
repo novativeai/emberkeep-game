@@ -113,6 +113,16 @@
             "tier": 3,
             "count": 2
           }
+        },
+        {
+          "id": "roofs_thatch",
+          "label": "Thatch them with 2 Moss Bundles",
+          "goal": {
+            "kind": "have",
+            "chain": "ashmoss",
+            "tier": 2,
+            "count": 2
+          }
         }
       ]
     },

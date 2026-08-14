@@ -368,13 +368,21 @@ export const ITEM_SCALE: Record<string, number> = {
   strawberry_3: 0.252, // the ripe plant, 620×618 → 156 units; t3 reads biggest
   // Crystal landmark (803×902), diamond reward (518×387), gold coin (432×357).
   crystal_1: 0.4, // ~1.3 tiles
-  // Emberbark Stump (emberbark.png 620×520) — low wide landmark, ~200 units.
-  // Its anchor (anchors.json) is 0.66, set by RENDERING the sprite over its
-  // own ground shadow and looking, after two failed passes derived from
-  // numbers: the bbox bottom (0.927) is thin root tips and even the "wide
-  // base" line (0.83) reads high, because an isometric object's visual ground
-  // contact is where its mass meets the shadow's centre, not where its alpha
-  // ends. When a landmark floats, composite art-over-shadow and EYEBALL it.
+  // The Ash Moss farm (emberbark.png 340×641) — a STANDING silver reliquary
+  // vase, not the burned stump it used to be. The isle was a field of magic
+  // grass the dragons rested in and ate; it burned, and what stands here is the
+  // last of it, in a vessel somebody thought was worth the silver.
+  //
+  // 205 units on its LONGEST axis, which is now its height rather than its
+  // width — same on-board presence, turned upright. Its anchor (anchors.json)
+  // moved 0.66 → 0.94 with the shape: 0.66 was eyeballed for a low wide stump
+  // whose mass sat well above its alpha bottom, and a vase contacts the ground
+  // at its own foot. Re-derived the same way and for the same reason — an
+  // isometric object's visual ground contact is where its mass meets the
+  // shadow's CENTRE, not where its alpha ends, so the foot's base ellipse is
+  // centred on the tile diamond. When a landmark floats, composite
+  // art-over-shadow and EYEBALL it; deriving this from the bbox has failed
+  // three times now.
   emberbark_1: 0.32,
   emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)

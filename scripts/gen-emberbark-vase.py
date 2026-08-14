@@ -58,12 +58,50 @@ WORK = ROOT / 'assets/raw/merge-chains/emberbark-vase'
 MOSS_REF = ROOT / 'assets/sprites/items/chains/ashmoss_3.webp'
 #: On-board units on the longest axis, matched to the stump it replaces.
 TARGET_UNITS = 205
+#: Sum-of-channels distance from the sampled background that still counts as
+#: background. The maroon field sits at ~94 and the vase's keyline at ~12, so
+#: there is a wide gap to sit in.
+BG_TOLERANCE = 45
 ITEM_SCALE = 0.32
 
 sys.path.insert(0, str(ROOT / 'scripts'))
-from merge_style import TAIL_MAGENTA, dekey, head, style_ref  # noqa: E402
+from merge_style import TAIL_MAGENTA, head, style_ref  # noqa: E402
+
+#: The one thing only Seedream got on the first shoot, so it is now stated as a
+#: measurable fact rather than left to the house CAMERA block. The board is a 2:1
+#: isometric projection (TILE_W 256 / TILE_H 128), so a circle lying flat on it
+#: photographs as an ellipse HALF as tall as it is wide. The mouth of the vase is
+#: such a circle, and the moss filling it is the disc that proves it — which is
+#: why `mouth_ratio()` below measures the moss and not the metal.
+CAMERA = (
+    'CAMERA — THIS IS THE MOST IMPORTANT INSTRUCTION. Isometric three-quarter view from ABOVE, '
+    'looking DOWN onto the vase at roughly 30 degrees, in a 2:1 isometric projection. You are '
+    'looking down INTO THE MOUTH of the vase and you can see the whole moss surface inside it as '
+    'a full oval disc, not as a thin sliver at the top edge. The circular rim of the mouth '
+    'therefore draws as a WIDE OPEN ELLIPSE exactly HALF as tall as it is wide, and the circular '
+    'foot draws as the same shape. The top surface of the moss is a broad oval facing up toward '
+    'the viewer.\n\n'
+    'DO NOT draw this straight on from the side, at eye level, or as a flat front elevation. A '
+    'side view where the mouth is a narrow slot or a straight line across the top is WRONG. Tilt '
+    'the whole object forward so its top is presented to the camera.\n\n'
+)
+#: The other correction: Seedream's first pass was a photograph of a real urn.
+NOT_REAL = (
+    'THIS IS A HAND-PAINTED GAME ICON, NOT A PHOTOGRAPH OF A REAL URN. Build the entire vase from '
+    'SIX OR EIGHT LARGE SIMPLE MASSES with smooth gradients inside them — never from hundreds of '
+    'small ones. NO photographic metal, no micro-scratches, no hammer stipple, no speckle, no '
+    'grain, no surface noise, no engraved hairlines, no fine filigree, no mirror reflections, no '
+    'ray-tracing, no studio product lighting, no 3D render.\n\n'
+    'LIGHT IT LIKE A MERGE-GAME ICON — a warm key light from the upper left giving one broad '
+    'glossy highlight band down the lit side and ONE crisp white specular on the shoulder; a '
+    'BRIGHT COOL RIM LIGHT running down the whole opposite edge, separating the silhouette from '
+    'the background in a single clean stroke; and a warm bounce along the lower edge so the form '
+    'stays round. Deep, simple shadow on the shaded side. A heavy even near-black outline all the '
+    'way around the silhouette. Glossy, clean and smooth, with no visible brushwork.\n\n'
+)
 
 BRIEF = (
+    CAMERA + NOT_REAL +
     'A SILVER RELIQUARY VASE holding the last of the magic grass.\n\n'
     'THE STORY THE OBJECT TELLS — this isle was once a vast field of magic grass, where the '
     'dragons lay down to rest and what the dragons ate, and it burned. This vase holds what '
@@ -78,12 +116,11 @@ BRIEF = (
     'embossed knotwork running around the rim and around the foot. The relief is BOLD AND '
     'CHUNKY — a few large raised forms that read as a dragon at a glance, never fine engraving '
     'or filigree or scratched line-work.\n\n'
-    'THE SILVER — old silver, not chrome and not white. Warm pale grey metal with deep near-black '
-    'tarnish pooling in every recess of the repoussé, and bright polished highlights riding along '
-    'the raised edges — the contrast between tarnished hollows and polished ridges is what makes '
-    'the dragon readable. Broad soft highlight bands, one crisp white specular on the shoulder, '
-    'and a warm bounce along the lower edge. Painted metal, never a mirror and never a '
-    'ray-traced reflection.\n\n'
+    'THE SILVER — old silver, not chrome and not white. Warm pale grey metal painted as a few '
+    'broad flat masses, with deep near-black tarnish pooled as SIMPLE SHAPES in the hollows of '
+    'the repoussé and bright polished light riding along the raised edges. The contrast between '
+    'dark hollow and bright ridge is what makes the dragon readable at icon size, so keep it '
+    'strong and keep it simple.\n\n'
     'THE MOSS — Image 2 is the moss REFERENCE: match its colour and its soft clumped texture '
     'exactly, the same yellow-green magic moss with its deeper green shadows and its few bright '
     'dew beads. It sits INSIDE the mouth of the vase as one rounded cushion, filling the opening '
@@ -127,6 +164,86 @@ def do_gen(only: set) -> None:
             print(f'   ! {name} failed, continuing')
 
 
+def plate_alpha(src: pathlib.Path) -> Image.Image:
+    """Cut the subject off a plate whose background is NOT the key colour.
+
+    Seedream ignores the magenta BACKGROUND block on this prompt and returns a
+    dark maroon field instead. `merge_style.dekey` measures the most common
+    colour and keys THAT — which here is the maroon, and the maroon is close
+    enough in value to the vase's own near-black keyline that keying it ate the
+    outline and left the silhouette dissolving into the board.
+
+    So the cut is by CONNECTIVITY, not by colour alone: flood from the border
+    over pixels near the sampled background, and stop at the keyline. Interior
+    darks — tarnish in the repoussé, the shadow inside the mouth — are never
+    reached, because nothing connects them to the edge.
+    """
+    import numpy as np
+    from collections import deque
+
+    rgb = np.array(Image.open(src).convert('RGB')).astype(np.int16)
+    h, w, _ = rgb.shape
+    # The background colour, taken from the four corners rather than assumed.
+    bg = np.median(np.stack([rgb[0, 0], rgb[0, -1], rgb[-1, 0], rgb[-1, -1]]), axis=0)
+    near = (np.abs(rgb - bg).sum(axis=2) <= BG_TOLERANCE)
+
+    out = np.zeros((h, w), dtype=bool)
+    q = deque()
+    for x in range(w):
+        for y in (0, h - 1):
+            if near[y, x] and not out[y, x]:
+                out[y, x] = True
+                q.append((y, x))
+    for y in range(h):
+        for x in (0, w - 1):
+            if near[y, x] and not out[y, x]:
+                out[y, x] = True
+                q.append((y, x))
+    while q:
+        y, x = q.popleft()
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny, nx = y + dy, x + dx
+            if 0 <= ny < h and 0 <= nx < w and near[ny, nx] and not out[ny, nx]:
+                out[ny, nx] = True
+                q.append((ny, nx))
+
+    alpha = np.where(out, 0, 255).astype(np.uint8)
+    im = Image.fromarray(np.dstack([rgb.astype(np.uint8), alpha]), 'RGBA')
+    # One-pixel feather so the hard flood edge does not alias on the board.
+    from PIL import ImageFilter
+    a = Image.fromarray(alpha).filter(ImageFilter.GaussianBlur(0.6))
+    im.putalpha(a)
+    return im
+
+
+def mouth_ratio(im: Image.Image) -> float:
+    """How foreshortened the mouth is, measured off the MOSS disc filling it.
+
+    A circle lying flat on a 2:1 isometric board draws as an ellipse whose minor
+    axis is HALF its major — so 0.50 is the target and a number near 0.2 means
+    the model drew a side elevation. Measured by SECOND MOMENTS rather than a
+    bounding box: for a filled ellipse the covariance eigenvalue ratio is
+    exactly (minor/major)^2 whatever the rotation, and it survives the rim
+    clipping the far edge of the disc.
+    """
+    import numpy as np
+
+    a = np.array(im)
+    rgb, alpha = a[..., :3].astype(float), a[..., 3]
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    # The moss is the only thing in the frame with a green cast, and the silver
+    # is neutral-to-warm, so `g` standing well clear of `b` isolates it. Do NOT
+    # also require g > r: this moss is YELLOW-green, r and g run neck and neck,
+    # and that clause returned an empty mask on a perfectly good plate.
+    moss = (alpha > 128) & (g > b + 30) & (g > 70)
+    ys, xs = np.nonzero(moss)
+    if len(xs) < 200:
+        return float('nan')
+    cov = np.cov(np.stack([xs, ys]).astype(float))
+    ev = np.linalg.eigvalsh(cov)
+    return float(np.sqrt(max(ev[0], 0.0) / ev[1]))
+
+
 def do_cut(only: set) -> None:
     px = round(TARGET_UNITS / ITEM_SCALE)
     for name in MODELS:
@@ -136,13 +253,16 @@ def do_cut(only: set) -> None:
         if not src.exists():
             print(f'  - {name}: no plate')
             continue
-        im = dekey(src, WORK / f'{name}-keyed.png')
+        im = plate_alpha(src)
+        im.save(WORK / f'{name}-keyed.png')
         bb = im.getbbox()
         im = im.crop(bb)
         s = px / max(im.size)
         im = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
         im.save(WORK / f'{name}-cut.png')
-        print(f'  {name:<14s} {im.size}  ({TARGET_UNITS} units at ITEM_SCALE {ITEM_SCALE})')
+        ratio = mouth_ratio(im)
+        flag = '' if ratio >= 0.38 else '   <-- FLAT: drawn from the side'
+        print(f'  {name:<14s} {str(im.size):<12s} mouth {ratio:.2f} (2:1 iso wants 0.50){flag}')
     print('\npick one, then copy it to assets/sprites/items/emberbark.png + .webp')
     print('and RE-DERIVE its anchors.json value — 0.66 was eyeballed for a low wide stump.')
 

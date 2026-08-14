@@ -43,7 +43,7 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 | 1 | **Light the Brazier** | `eleanor_brazier` | gems | **T1** | Merge 10 times · Collect 6 Gem Shards · Deliver 6 Gem Shards to Eleanor |
 | 2 🥚 | **Fill the Larder** | — | berries | T3 | Make 1 Emberberry Preserve |
 | 3 | **Warm the Long Hearth** | `eleanor_hearth` | gems | **T2** | Make 2 Flame Gems · Deliver 2 Flame Gems to Eleanor |
-| 4 | **Raise the Roofs** | — | timber | T3 | Build 2 Houses |
+| 4 | **Raise the Roofs** | — | timber · moss | T3 | Build 2 Houses · Thatch them with 2 Moss Bundles |
 | 5 | **Light the Long Gallery** | — | quartz | **T2** | Make 2 Cut Crystals |
 | 6 🥚 | **Catch the Moonwater** | `eleanor_moonwater` | moonwater | T3 | Make 1 Moonwater · Deliver 1 Moonwater to Eleanor |
 | 7 | **What She Keeps** | — | berries | **T2** | Give Eleanor 2 Emberberry Baskets · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart — long paid by here)* |
@@ -96,6 +96,18 @@ player "three vials make true Moonwater, and that is what I will ask you for",
 and this is the order that asks. Moonwater and quartz are `MAGE_ONLY` — no
 dragon eats any tier of either — so without a sink each chain and the producer
 that feeds it would be dead stock.
+
+**Quest 4 carries the moss, because nothing else in the chapter did.** Ashmoss
+is the first thing the player ever farms — the Emberbark Stump is live from
+frame one, `moss_stump` → `ash_green` open the game on it, and Eleanor's arrival
+line asks for "the warmth, the green, and whatever's still asleep". Yet the
+green was never asked for again until `elder_green_over_ash`, a whole chapter
+past the finale, which left the game's cheapest renewable farm with nothing to
+do the moment the tutorial ended. It is a STEP rather than a quest of its own on
+purpose: the legendary eggs sit at completable indices 1 / 5 / 9 with gaps of
+three, audit-enforced, so a tenth quest anywhere before the Tasks would push the
+last egg off its mark. A second step costs the ladder nothing and thatch on a
+new roof is the same beat as the roof.
 
 **Quest 5 is quartz's sink, and it used to be a fourth gem beat.** "Make 4 Flame
 Gems" asked for the same piece quest 3 had just asked for, one quest later, with
