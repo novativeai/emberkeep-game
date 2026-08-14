@@ -94,6 +94,48 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
   });
 
+  it('tells the two sleeps apart: a shift-rest is earned, a nap is the player’s', () => {
+    // The distinction is the whole point — one is a cost the player chose to
+    // pay by working the dragon, the other is the animal being an animal. Only
+    // the second may be shaken off.
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+
+    atPhase(ctx, 3); // night
+    tick(ctx, 0);
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('night');
+
+    atPhase(ctx, 1); // daylight, so only a nap or fatigue can put it down
+    // Worked a full shift → the rest outranks everything and is NOT a nap.
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 3, row: 3, kind: 'item' });
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+    tick(ctx, DRAGON_WORK_MS + 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('rest');
+  });
+
+  it('keepAwake ends a sleep at once and announces it — the tap is answered now', () => {
+    // A tap that waits for the next tick to uncurl the animal reads as a
+    // dropped input, so the mood change rides the call itself.
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    atPhase(ctx, 3);
+    tick(ctx, 0);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+
+    const moods = capture(ctx.bus, 'dragon:mood');
+    ctx.systems.dragonLife.keepAwake(dragon.id, 60_000);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBeNull();
+    expect(moods.at(-1)).toMatchObject({ itemId: dragon.id, mood: 'awake', from: 'asleep' });
+
+    // It is a WINDOW, not a flag: past it the same night puts it back down.
+    ctx.clock.advance(60_001);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+  });
+
   it('is reproducible: the same clock lands the same dragon on the same tile', () => {
     const run = (): string => {
       const ctx = createTestContext();

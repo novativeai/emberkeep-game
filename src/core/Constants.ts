@@ -1537,6 +1537,20 @@ export const ELDER_VOICE = {
 } as const;
 
 /**
+ * The Ember Gate flight — the named dragon goes through the portal ahead of the
+ * Keeper. A SLEEPING dragon has to be woken before it can fly (a curled
+ * painting on a bezier arrives at the door still asleep and sticks there), so
+ * the wake is the ceremony's opening beat and the flight follows it.
+ */
+export const GATE_FLIGHT = {
+  /** Held awake across the whole round trip — out, the pause inside the glare,
+   *  and back — so the nap it was taking cannot re-assert mid-air. */
+  keepAwakeMs: 20_000,
+  /** Wake first, fly after: long enough for the uncurl to read as its own beat. */
+  wakeLeadMs: 2000
+} as const;
+
+/**
  * The quest-reward egg ceremony — a legendary egg NEVER lands silently.
  * One timeline, read by both scenes so camera and voice stay in step:
  * BoardScene flies the camera (glide out → flare → glide home) while UIScene

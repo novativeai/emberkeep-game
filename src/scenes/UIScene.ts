@@ -298,6 +298,18 @@ export class UIScene extends Phaser.Scene {
         this.revealCodexButton();
       })
     );
+    // She is holding the favour — hand the pointer on to what she must be aimed
+    // at (the step's `arrowThen`). Consumed, so a later disarm/re-arm inside the
+    // same beat cannot make the arrow flick back and forth.
+    this.offBus.push(
+      this.ctx.bus.on('character:armed', () => {
+        const next = this.armedArrow;
+        if (!next) return;
+        this.armedArrow = null;
+        this.clearMarkers();
+        this.placeArrow(next);
+      })
+    );
     // A quest-reward egg never lands silently: while BoardScene flies the
     // camera to it (the shared EGG_GIFT timeline), the giver says what just
     // arrived. Line n of the chain's eggGift bank belongs to the n-th
@@ -1688,7 +1700,16 @@ export class UIScene extends Phaser.Scene {
     // the hand (data should define exactly one).
     if (step.hand) this.placeHand(step.hand);
     else if (step.arrow) this.placeArrow(step.arrow);
+    // "Tap me, then tap the House" is two gestures, so the pointer has two
+    // homes. The first is her; the moment she is ARMED the lesson has moved on
+    // and so must the arrow — left on her it reads as "tap her again", with the
+    // tile highlight the only clue, and that clue is not connected to the
+    // gesture the player just made.
+    this.armedArrow = step.arrowThen ?? null;
   }
+
+  /** Where the arrow goes when the current step's character is armed. */
+  private armedArrow: ResolvedArrow | null = null;
 
   private uiTarget(
     ref:

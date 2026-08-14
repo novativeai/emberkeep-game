@@ -919,6 +919,17 @@ export type TutorialArrowConfig =
   | { character: string };
 
 /**
+ * Where the arrow goes ONCE THE CHARACTER IS ARMED, for a beat whose lesson is
+ * two-handed ("tap me, then tap the House").
+ *
+ * Without it the arrow sits on her for the whole step: the player taps her,
+ * nothing about the pointer changes, and the only new signal is a tile
+ * highlight they have no reason to connect to the gesture they just made. The
+ * hand must follow the lesson — she is done, the House is next.
+ */
+export type TutorialArrowThenConfig = TutorialArrowConfig;
+
+/**
  * Scripted side-effects a tutorial step runs the moment it becomes active —
  * the spec's "reward" beats: spawn the dragon eggs after the plant merge, ripen
  * the bush after the hatch, hand over the key before the fog lesson.
@@ -981,6 +992,9 @@ export interface TutorialStepConfig {
   highlight?: TileRef[];
   hand?: TutorialHandConfig;
   arrow?: TutorialArrowConfig;
+  /** Where the arrow moves once the step's character is ARMED (see
+   *  TutorialArrowThenConfig). Only meaningful beside `arrow: { character }`. */
+  arrowThen?: TutorialArrowThenConfig;
   allow?: TutorialAllow;
   /** Side-effects fired once, when this step becomes the active step. */
   effects?: TutorialEffect[];
@@ -1437,6 +1451,12 @@ export interface EventMap {
   'ui:subject_cleared': Record<string, never>;
 
   'ui:character_tapped': { characterId: string };
+  /** Fact: a character is now ARMED and waiting to be pointed at something —
+   *  the halfway point of "tap me, then tap the House". Distinct from
+   *  `ui:character_tapped`, which also fires on the tap that puts her away and
+   *  on a tap her cooldown refuses; the tutorial pointer may only move when she
+   *  is actually holding the favour. */
+  'character:armed': { characterId: string };
   /** Intent: use an armed action, optionally on a board target. */
   'ui:character_action_requested': { characterId: string; target?: number };
 
@@ -1617,6 +1637,9 @@ export interface TutorialStepEvent {
   highlight: TilePos[];
   hand: ResolvedHand | null;
   arrow: ResolvedArrow | null;
+  /** Where the arrow moves once this step's character is armed — null when the
+   *  beat does not hand the pointer on (see TutorialArrowThenConfig). */
+  arrowThen: ResolvedArrow | null;
   allow: Required<TutorialAllow>;
 }
 

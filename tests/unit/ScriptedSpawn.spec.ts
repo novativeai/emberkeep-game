@@ -35,6 +35,7 @@ function tutorialStep(ctx: GameContext, done: boolean): void {
     highlight: [],
     hand: null,
     arrow: null,
+    arrowThen: null,
     allow: ALLOW_NOTHING
   });
 }

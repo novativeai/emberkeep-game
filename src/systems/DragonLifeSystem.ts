@@ -53,6 +53,11 @@ export class DragonLifeSystem {
   private firstSeenAt = new Map<number, number>();
   /** Last mood announced per dragon, so `dragon:mood` fires on CHANGE only. */
   private lastMood = new Map<number, DragonMood>();
+  /** Clock time until which a dragon is held AWAKE whatever the sky, the nap
+   *  schedule or its fatigue say — the player shook it awake, or a cinematic
+   *  needs it on its feet. Transient like every other schedule here: it lasts
+   *  as long as the reason does and nothing persists it. */
+  private awakeUntil = new Map<number, number>();
 
   constructor(
     private state: GameState,
@@ -67,6 +72,7 @@ export class DragonLifeSystem {
       this.nextWanderAt.clear();
       this.firstSeenAt.clear();
       this.lastMood.clear();
+      this.awakeUntil.clear();
     });
   }
 
@@ -74,6 +80,68 @@ export class DragonLifeSystem {
     this.nextWanderAt.delete(itemId);
     this.firstSeenAt.delete(itemId);
     this.lastMood.delete(itemId);
+    this.awakeUntil.delete(itemId);
+  }
+
+  /**
+   * WHY this dragon is asleep — the two sleeps are not the same promise.
+   *
+   *   • `rest`  — it worked a shift and is sleeping it off (DragonJobSystem).
+   *               Earned, timed, and NOT the player's to cancel: shaking it
+   *               awake would hand back the cost of working it.
+   *   • `night` — the sky. Also not cancellable; morning is what ends it.
+   *   • `nap`   — it simply felt like it. This one IS the player's: a tap
+   *               wakes it, because a nap the player cannot interrupt is an
+   *               animal that ignores them.
+   *
+   * Null when awake (or hungry — a hungry dragon does not sleep through it).
+   */
+  sleepKindOf(itemId: number): 'rest' | 'night' | 'nap' | null {
+    if (this.moodOf(itemId) !== 'asleep') return null;
+    if (this.jobs.restRemaining(itemId) > 0) return 'rest';
+    if (phaseAt(this.clock.now()) === 'night') return 'night';
+    return 'nap';
+  }
+
+  /**
+   * Hold this dragon awake for `ms`, whatever the sky or the nap schedule says.
+   *
+   * Two callers: the player shaking a napper awake, and a cinematic that needs
+   * the animal on its feet before it starts (the Ember Gate flight — a sleeper
+   * flown at the portal arrives as a curled painting and sticks there).
+   *
+   * A WINDOW rather than a flag, because both sleeps it overrides are windows
+   * themselves: clearing a boolean would let the very next tick re-derive the
+   * same nap and put it straight back down.
+   */
+  keepAwake(itemId: number, ms: number): void {
+    const until = this.clock.now() + ms;
+    if ((this.awakeUntil.get(itemId) ?? 0) >= until) return;
+    this.awakeUntil.set(itemId, until);
+    // Announce immediately rather than waiting for the next tick: the wake is
+    // an answer to a tap, and an animal that uncurls a beat later reads as a
+    // dropped input. `announceMood` is the same one-writer path the tick uses,
+    // so the change is never reported twice.
+    this.announceMood(itemId);
+  }
+
+  /** Emit `dragon:mood` if this dragon's derived mood has changed since the
+   *  last announcement. The ONLY writer of `lastMood`. */
+  private announceMood(itemId: number): void {
+    const mood = this.moodOf(itemId);
+    const from = this.lastMood.get(itemId) ?? 'awake';
+    if (from === mood) return;
+    this.lastMood.set(itemId, mood);
+    this.bus.emit('dragon:mood', { itemId, mood, from });
+  }
+
+  /** Is this dragon inside a `keepAwake` window? */
+  private heldAwake(itemId: number): boolean {
+    const until = this.awakeUntil.get(itemId);
+    if (until === undefined) return false;
+    if (this.clock.now() < until) return true;
+    this.awakeUntil.delete(itemId);
+    return false;
   }
 
   /**
@@ -102,6 +170,9 @@ export class DragonLifeSystem {
     // (scripted advanceTime jumps land in night/nap windows at random) is a
     // lesson that soft-locks. Hunger stays: the feeding beat depends on it.
     if (!this.state.tutorialDone) return 'awake';
+    // Shaken awake, or wanted on its feet by a cinematic — outranks all three
+    // sleeps for the length of the window (see keepAwake).
+    if (this.heldAwake(itemId)) return 'awake';
     // Fatigue outranks the sky: a dragon that just came off a shift sleeps at
     // noon, and this is the path the player sees most often.
     if (this.jobs.restRemaining(itemId) > 0) return 'asleep';
@@ -198,12 +269,7 @@ export class DragonLifeSystem {
       if (!this.firstSeenAt.has(item.id)) this.firstSeenAt.set(item.id, now);
 
       // ---- mood, announced only when it changes ------------------------
-      const mood = this.moodOf(item.id);
-      if (this.lastMood.get(item.id) !== mood) {
-        const from = this.lastMood.get(item.id) ?? 'awake';
-        this.lastMood.set(item.id, mood);
-        this.bus.emit('dragon:mood', { itemId: item.id, mood, from });
-      }
+      this.announceMood(item.id);
 
       // ---- wandering ---------------------------------------------------
       const due = this.nextWanderAt.get(item.id);

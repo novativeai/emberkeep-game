@@ -5,6 +5,7 @@ import type {
   ResolvedArrow,
   ResolvedHand,
   TileRef,
+  TutorialArrowConfig,
   TilePos,
   TutorialAllow,
   TutorialData,
@@ -293,6 +294,7 @@ export class TutorialDirector {
       highlight: [],
       hand: null,
       arrow: null,
+      arrowThen: null,
       allow: { ...ALLOW_EVERYTHING }
     };
     this.bus.emit('tutorial:step', payload);
@@ -314,15 +316,19 @@ export class TutorialDirector {
       }
     }
 
-    let arrow: ResolvedArrow | null = null;
-    if (step.arrow) {
-      if ('tile' in step.arrow) {
-        const tile = this.resolveTileRef(step.arrow.tile);
-        if (tile) arrow = { tile };
-      } else {
-        arrow = step.arrow;
+    const resolveArrow = (ref: TutorialArrowConfig | undefined): ResolvedArrow | null => {
+      if (!ref) return null;
+      if ('tile' in ref) {
+        const tile = this.resolveTileRef(ref.tile);
+        return tile ? { tile } : null;
       }
-    }
+      return ref;
+    };
+    const arrow = resolveArrow(step.arrow);
+    // Resolved WITH the step, not when the character is armed: the tile it
+    // names is the one the beat set up (the House it just slowed down), and by
+    // the time she is armed the board may hold a second one.
+    const arrowThen = resolveArrow(step.arrowThen);
 
     return {
       id: step.id,
@@ -335,6 +341,7 @@ export class TutorialDirector {
       highlight,
       hand,
       arrow,
+      arrowThen,
       allow: { ...ALLOW_NOTHING, ...(step.allow ?? {}) }
     };
   }

@@ -166,7 +166,7 @@ export class GameContext {
       order,
       economy: new EconomySystem(this.state, this.bus, this.data.chains),
       iap: new IapSystem(this.state, this.bus),
-      reward: new RewardSystem(this.bus),
+      reward: new RewardSystem(this.bus, this.state),
       reveal: new RevealSystem(this.state, this.bus),
       chest: new ChestSystem(this.state, this.bus, this.clock, this.data.chains),
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains),

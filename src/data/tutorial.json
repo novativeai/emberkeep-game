@@ -1535,6 +1535,13 @@
       "arrow": {
         "character": "eleanor"
       },
+      "arrowThen": {
+        "tile": {
+          "chain": "lumber",
+          "nth": 0,
+          "tier": 3
+        }
+      },
       "highlight": [
         {
           "chain": "lumber",

@@ -42,6 +42,41 @@ describe('level-up rewards (the addictive beat)', () => {
     expect(chests[0]!.item.tier).toBe(1);
   });
 
+  it('grants exactly ONE chest ever — later levels do not pop a second', () => {
+    // The chest is a permanent fixture that recharges its own gift and is never
+    // consumed, so a second is not a second reward — it is a duplicate landing
+    // unannounced on a board where space is the scarce resource. Levels follow
+    // quests, which is why the old per-level grant read as chests popping at
+    // random after a quest.
+    const ctx = createTestContext();
+    const spawned = capture(ctx.bus, 'item:spawned');
+    ctx.bus.emit('economy:add', { xp: LEVEL_XP[2], reason: 'test' }); // → level 3
+    expect(spawned.filter((s) => s.item.chain === 'chest')).toHaveLength(1);
+
+    // Every later level: gold and warmth, no second chest.
+    for (let i = 3; i < LEVEL_XP.length; i++) {
+      ctx.bus.emit('economy:add', { xp: LEVEL_XP[i]! - LEVEL_XP[i - 1]!, reason: 'test' });
+    }
+    expect(ctx.state.level).toBeGreaterThan(3);
+    expect(spawned.filter((s) => s.item.chain === 'chest')).toHaveLength(1);
+  });
+
+  it('re-grants the chest only if the Keeper has none — banked in the bag still counts', () => {
+    const ctx = createTestContext();
+    const spawned = capture(ctx.bus, 'item:spawned');
+    ctx.bus.emit('economy:add', { xp: LEVEL_XP[2], reason: 'test' });
+    const chest = [...ctx.state.items.values()].find((i) => i.chain === 'chest');
+    expect(chest).toBeDefined();
+
+    // A chest sitting in the BAG (board was full when it dropped) is owned just
+    // as much as one on a tile — levelling again must not mint a spare.
+    ctx.bus.emit('board:consume_items', { itemIds: [chest!.id], reason: 'delivered' });
+    ctx.bus.emit('bag:bank', { chain: 'chest', tier: 1, count: 1 });
+    const before = spawned.filter((s) => s.item.chain === 'chest').length;
+    ctx.bus.emit('economy:add', { xp: LEVEL_XP[3]! - LEVEL_XP[2]!, reason: 'test' });
+    expect(spawned.filter((s) => s.item.chain === 'chest')).toHaveLength(before);
+  });
+
   it('coins-only adds never trigger a level-up (no feedback loop)', () => {
     const ctx = createTestContext();
     const levels = capture(ctx.bus, 'keeper:leveled');

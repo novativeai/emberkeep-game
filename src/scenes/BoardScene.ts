@@ -10,6 +10,7 @@ import {
   DEPTHS,
   DRAG,
   DRAGON_ANIM,
+  DRAGON_NAP_LENGTH_MS,
   DRAGON_RIG_SCALE,
   EGG_GIFT,
   EMBER_MOTES,
@@ -19,6 +20,7 @@ import {
   FINALE_ENDS_MS,
   FINALE_REGION,
   GAME_WIDTH,
+  GATE_FLIGHT,
   GOLDEN_ALTAR,
   GOLDEN_CHAIN,
   GOLDEN_ELDER_TIER,
@@ -141,6 +143,11 @@ interface LiveDragon {
    *  dragon is airborne — falling asleep mid-flight is how it once slept in
    *  the air (and how a cleared transition once left it fully invisible). */
   sleepState: 'none' | 'transition' | 'seated';
+  /** True from the moment a sleep starts unfolding until the wake clip has
+   *  finished. A dragon is not a working generator during it — the tap that
+   *  woke it is the whole gesture, and harvesting through the uncurl would
+   *  pay out over an animal still visibly getting up. */
+  waking: boolean;
 }
 
 /** Where the camera sits to frame a given Keeper level (world centre + zoom). */
@@ -935,7 +942,8 @@ export class BoardScene extends Phaser.Scene {
       mood: 'awake',
       roarInMs: DRAGON_ROAR_EVERY_MS,
       flightPhase: null,
-      sleepState: 'none'
+      sleepState: 'none',
+      waking: false
     };
     this.liveDragons.set(host.itemId, ld);
     this.syncDragon(ld);
@@ -1324,7 +1332,7 @@ export class BoardScene extends Phaser.Scene {
    * leg too short for the full ramp skips the takeoff and cruises at once.
    * No duration = hold the loop until `dragonLand` (drag release, burst end).
    */
-  private dragonHover(ld: LiveDragon, durationMs?: number): void {
+  private dragonHover(ld: LiveDragon, durationMs?: number, onAirborne?: () => void): void {
     // A dragon taking wing is by definition not curled on a tile. A flight
     // ordered over a sleeper (work drop, wander race) used to strand
     // `sleepState` at seated/transition, and every later seatDragonSleep
@@ -1345,6 +1353,7 @@ export class BoardScene extends Phaser.Scene {
         } else {
           this.dragonIdle(ld);
         }
+        onAirborne?.(); // no wings to unfold — the journey may start at once
         return;
       }
       const overlay = this.dressOverlay(ld, whole);
@@ -1352,6 +1361,7 @@ export class BoardScene extends Phaser.Scene {
       overlay.setVisible(true);
       overlay.play(whole.key, true);
       ld.player?.container.setVisible(false);
+      onAirborne?.(); // an unphased loop is airborne from its first frame
       return;
     }
     const overlay = this.dressOverlay(ld, f);
@@ -1368,11 +1378,19 @@ export class BoardScene extends Phaser.Scene {
           if (ld.flightPhase !== 'takeoff') return;
           ld.flightPhase = 'loop';
           overlay.play(this.segKey(f.key, 'loop'));
+          // The wings are up and cycling — NOW the journey may start. A caller
+          // that translated the sprite immediately instead skated it across the
+          // board through its own unfold, which is what made a work trip read
+          // as too fast to follow.
+          onAirborne?.();
         });
       } else {
         ld.flightPhase = 'loop';
         overlay.play(this.segKey(f.key, 'loop'));
+        onAirborne?.();
       }
+    } else {
+      onAirborne?.(); // already on the wing (the return leg) — carry straight on
     }
     if (durationMs !== undefined) {
       const lead = Math.min(DRAGON_ANIM.landingLeadMs, durationMs * 0.6);
@@ -1622,11 +1640,16 @@ export class BoardScene extends Phaser.Scene {
     // the whelp uncurls, then the rig stands. Without it, the rig returns at
     // once and stretches, exactly as before.
     const t = seated ? this.dragonClip(ld, 'tosleep') : null;
+    // It is not a working generator until it is back on its feet — the tap
+    // that woke it does not also harvest, and neither does one thrown at the
+    // uncurl (see onItemTapped).
+    ld.waking = true;
     if (t) {
       ld.mode = 'idle';
       ld.remainMs = DRAGON_WAKE_MS;
       this.playDragonTransition(ld, t, true, () => {
         ld.player?.container.setAlpha(1);
+        ld.waking = false;
         this.dragonIdle(ld); // the atlas idle when pushed, the rig otherwise
       });
       return;
@@ -1639,6 +1662,25 @@ export class BoardScene extends Phaser.Scene {
     }
     ld.mode = 'idle';
     ld.remainMs = DRAGON_WAKE_MS;
+    // No wake CLIP to end on, so the stretch's own span is the wake.
+    this.time.delayedCall(DRAGON_WAKE_MS, () => {
+      if (this.liveDragons.get(ld.host.itemId) === ld) ld.waking = false;
+    });
+  }
+
+  /**
+   * The player shook it awake.
+   *
+   * `keepAwake` is what actually ends the sleep: both the nap and the night are
+   * derived windows, so clearing a flag would let the very next tick put the
+   * animal straight back down. The mood flip that follows drives the uncurl
+   * through the ordinary `dragon:mood` path — this never animates anything
+   * itself, so there is one wake in the codebase and not two.
+   */
+  private wakeDragonByTap(sprite: BoardItem, itemId: number): void {
+    this.ctx.systems.dragonLife.keepAwake(itemId, DRAGON_NAP_LENGTH_MS);
+    scalePulse(this, sprite, 1.06, 130);
+    this.sparks.explode(6, sprite.x, sprite.y - 40);
   }
 
   /**
@@ -2974,6 +3016,9 @@ export class BoardScene extends Phaser.Scene {
       return;
     }
     this.armed = { kind: 'character', id: characterId };
+    // She is holding the favour now — the tutorial pointer moves on to what she
+    // must be aimed at (TutorialArrowThenConfig).
+    this.ctx.bus.emit('character:armed', { characterId });
     sprite.setTint(0xffd84d);
     this.armedTween?.remove();
     // Relative to her OWN scale — a standee is rendered well under 1 and a
@@ -3142,6 +3187,12 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.bus.emit('ui:gift_requested', { characterId: target.id, chain, tier });
       taken = this.ctx.systems.regard.given(target.id, chain, tier) > before;
       if (taken) this.selectSubject('character', target.id, false);
+    } else if (this.ctx.systems.dragonLife.sleepKindOf(target.id)) {
+      // Asleep: it will not eat from the satchel either. `taken` stays false,
+      // so the refusal below hands the piece back to the bag — the same
+      // "offered and declined" shape the drag path gives it.
+      const sprite = this.itemSprites.get(target.id);
+      if (sprite) this.floatText(sprite.x, sprite.y - 190, 'Fast asleep…', PALETTE.cream);
     } else {
       const before = this.ctx.systems.dragons.careOf(target.id).meals;
       this.ctx.bus.emit('ui:feed_dragon_requested', { itemId: target.id, chain, tier });
@@ -3746,10 +3797,35 @@ export class BoardScene extends Phaser.Scene {
    * player who then follows him through finds him already at Eleanor's side
    * in the hub (`buildHubDragon`), which is the story the flight is telling.
    */
+  /**
+   * The Ember Gate flight, with the WAKING as its opening beat.
+   *
+   * A sleeping dragon flown at the portal is a curled painting on a bezier: the
+   * rig is hidden behind the sleep art, none of the flight clips are mounted,
+   * and it arrives at the door still asleep — which is what left it stuck
+   * there and drifting back. So the sleep ends FIRST. `keepAwake` covers the
+   * whole cinematic (it outranks the nap, the night and a shift-rest alike),
+   * the uncurl plays on the ordinary mood path, and only once it is on its
+   * feet — GATE_FLIGHT.wakeLeadMs later — does the flight begin.
+   */
   private playGateFlight(door: { fx: PortalFX; zone: Phaser.GameObjects.Zone }): void {
     const named = this.ctx.systems.dragons.firstNamed();
     if (!named) return;
-    const sprite = this.itemSprites.get(named.itemId);
+    const asleep = this.ctx.systems.dragonLife.sleepKindOf(named.itemId) !== null;
+    this.ctx.systems.dragonLife.keepAwake(named.itemId, GATE_FLIGHT.keepAwakeMs);
+    if (asleep) {
+      // Woken, not yet flying: the uncurl gets the stage to itself.
+      this.time.delayedCall(GATE_FLIGHT.wakeLeadMs, () => this.flyThroughGate(door, named.itemId));
+      return;
+    }
+    this.flyThroughGate(door, named.itemId);
+  }
+
+  private flyThroughGate(
+    door: { fx: PortalFX; zone: Phaser.GameObjects.Zone },
+    itemId: number
+  ): void {
+    const sprite = this.itemSprites.get(itemId);
     if (!sprite?.active) return;
     const home = { x: sprite.x, y: sprite.y };
     const target = { x: door.zone.x, y: door.zone.y - 30 };
@@ -4217,6 +4293,29 @@ export class BoardScene extends Phaser.Scene {
       return s.getBounds().contains(pointer.worldX, pointer.worldY);
     });
     if (!target) return false;
+
+    // ASLEEP: it will not eat, and the meal must not be left on its tile
+    // either — the piece goes home exactly where it was picked up. Returning
+    // TRUE claims the drop: falling through to the ordinary drop would drop
+    // the food on the board (or merge it) as if the gesture had been a move,
+    // when what the player did was offer a meal and get refused.
+    const kind = this.ctx.systems.dragonLife.sleepKindOf(target.itemId);
+    if (kind) {
+      const from = this.dragFrom ? gridToWorld(this.dragFrom.col, this.dragFrom.row) : null;
+      obj.settleFromDrag();
+      if (from) {
+        this.tweens.add({
+          targets: obj,
+          x: from.x,
+          y: from.y,
+          duration: TIMINGS.dragReturn,
+          ease: 'Back.easeOut',
+          onComplete: () => obj.settleDepth()
+        });
+      }
+      this.floatText(target.x, target.y - 190, 'Fast asleep…', PALETTE.cream);
+      return true;
+    }
 
     const before = dragons.careOf(target.itemId).meals;
     this.ctx.bus.emit('ui:feed_dragon_requested', {
@@ -4856,6 +4955,32 @@ export class BoardScene extends Phaser.Scene {
     if (DRAGON_RIGS[item.chain] && isGenerator && (this.tutorialDone || this.allow.dragonWork)) {
       this.selectSubject('dragon', String(item.id), false);
     }
+    // A SLEEPING dragon is not a button. The tap wakes it — and only wakes it:
+    // it does not also harvest, because the wake is the whole gesture and its
+    // animation has to finish before the animal is a working generator again.
+    //
+    // Which sleep it is decides whether the tap does anything at all. A NAP is
+    // the player's to interrupt; a shift-rest is not — that sleep was bought
+    // with the work, and shaking it off would hand the cost back.
+    if (this.ctx.systems.dragons.isBoardDragon(item)) {
+      const kind = this.ctx.systems.dragonLife.sleepKindOf(item.id);
+      if (kind === 'nap' || kind === 'night') {
+        this.wakeDragonByTap(sprite, item.id);
+        return;
+      }
+      if (kind === 'rest') {
+        scalePulse(this, sprite, 1.04, 120); // it stirs, and goes back to sleep
+        this.floatText(sprite.x, sprite.y - 150, 'Worn out — let it rest', PALETTE.cream);
+        return;
+      }
+      // Awake, but still folding out of a sleep: the wake clip owns these
+      // frames, and harvesting through it would pay out over a dragon that is
+      // visibly still getting up.
+      if (this.liveDragons.get(item.id)?.waking) {
+        scalePulse(this, sprite, 1.04, 120);
+        return;
+      }
+    }
     // An undecided House asks what it should make — and keeps asking, because a
     // player who dismissed the chooser must have a way back to it. Once
     // committed this stops firing and the tap falls through to the skip offer,
@@ -4964,11 +5089,6 @@ export class BoardScene extends Phaser.Scene {
     if (ld) {
       ld.busy = true;
       this.setDragonFacing(ld, landX <= plant.x ? 'right' : 'left');
-      // No duration: the wings must NOT fold at the plant. One takeoff, one
-      // cruise held across the visit, and the ONE landing is the return leg's
-      // (its dragonHover(ld, flyBackMs) schedules the fold near home) — a
-      // touch-and-go at the plant read as a stutter, not a landing.
-      this.dragonHover(ld);
     }
     const land = (): void => {
       this.glowFlash(plant.x, plant.y - 36, PALETTE.goldAccent, 0.6, 1.2);
@@ -4987,7 +5107,13 @@ export class BoardScene extends Phaser.Scene {
     // Depth FOLLOWS the flight (itemBase + y each frame) rather than jumping to
     // the always-on-top band: a dragon crossing the isle should slide behind
     // taller scenery like everything else does, not float over the whole board.
-    this.tweens.add({
+    //
+    // The journey waits for the WINGS. Takeoff plays in place; only once the
+    // cruise loop is running does the sprite leave its tile, and it does not
+    // touch down again until it is home — one takeoff, one flight out and
+    // back, one landing.
+    const journey = (): void => {
+      this.tweens.add({
       targets: dragon,
       x: landX,
       y: plant.y,
@@ -5011,7 +5137,10 @@ export class BoardScene extends Phaser.Scene {
           onComplete: done
         });
       }
-    });
+      });
+    };
+    if (ld) this.dragonHover(ld, undefined, journey);
+    else journey();
   }
 
   /** Two floating skip buttons under a waiting generator: GOLD (real coin art)
@@ -5148,19 +5277,18 @@ export class BoardScene extends Phaser.Scene {
     if (ld) {
       ld.busy = true;
       this.setDragonFacing(ld, 'left');
-      // No duration — the dragon stays ON THE WING for the whole errand,
-      // hovering over the House while the work-magic lands. The only landing
-      // is the return leg's (dragonHover(ld, flyBackMs) below schedules the
-      // fold as it reaches home); folding at the House and taking off again
-      // half a second later read as a hitch.
-      this.dragonHover(ld);
     }
     // Same beat as the harvest flourish: fly over, breathe a brief burst of
     // work-magic onto the building, and come STRAIGHT home. The job itself
     // (DragonJobSystem's speed-up + fatigue cycle) runs on its own clock and
     // never depended on the dragon standing there. Depth follows the flight
     // (see sendDragonFlourish) — never the always-on-top band.
-    this.tweens.add({
+    //
+    // The errand waits for the WINGS: takeoff plays in place, the sprite only
+    // travels once the cruise loop is running, it stays ON THE WING over the
+    // House while the work-magic lands, and it folds exactly once — at home.
+    const journey = (): void => {
+      this.tweens.add({
       targets: sprite,
       x: landX,
       y: house.y + 24,
@@ -5193,7 +5321,10 @@ export class BoardScene extends Phaser.Scene {
           }
         });
       }
-    });
+      });
+    };
+    if (ld) this.dragonHover(ld, undefined, journey);
+    else journey();
     this.ctx.bus.emit('dragon:work', { dragonId: sprite.itemId, houseId: house.itemId });
   }
 
