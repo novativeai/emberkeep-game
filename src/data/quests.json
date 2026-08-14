@@ -36,7 +36,7 @@
         }
       ],
       "rewards": {
-        "coins": 20
+        "coins": 25
       }
     },
     {
@@ -45,7 +45,7 @@
       "giver": "eleanor",
       "title": "Fill the Larder",
       "rewards": {
-        "coins": 110,
+        "coins": 145,
         "spawn": {
           "chain": "ashdrake",
           "tier": 1,
@@ -55,12 +55,12 @@
       "steps": [
         {
           "id": "larder_preserve",
-          "label": "Make 2 Emberberry Preserves",
+          "label": "Make 1 Emberberry Preserve",
           "goal": {
             "kind": "have",
             "chain": "emberberry",
             "tier": 3,
-            "count": 2
+            "count": 1
           }
         }
       ]
@@ -92,7 +92,7 @@
         }
       ],
       "rewards": {
-        "coins": 40
+        "coins": 50
       }
     },
     {
@@ -101,7 +101,7 @@
       "giver": "eleanor",
       "title": "Raise the Roofs",
       "rewards": {
-        "coins": 80
+        "coins": 105
       },
       "steps": [
         {
@@ -122,7 +122,7 @@
       "giver": "eleanor",
       "title": "Light the Long Gallery",
       "rewards": {
-        "coins": 100
+        "coins": 130
       },
       "steps": [
         {
@@ -164,7 +164,7 @@
         }
       ],
       "rewards": {
-        "coins": 45,
+        "coins": 60,
         "spawn": {
           "chain": "ashdrake",
           "tier": 1,
@@ -209,7 +209,7 @@
         }
       ],
       "rewards": {
-        "coins": 70
+        "coins": 90
       }
     },
     {
@@ -242,7 +242,7 @@
         }
       ],
       "rewards": {
-        "coins": 60
+        "coins": 80
       }
     },
     {
@@ -282,7 +282,7 @@
         }
       ],
       "rewards": {
-        "coins": 90
+        "coins": 115
       }
     },
     {
@@ -335,7 +335,7 @@
         }
       ],
       "rewards": {
-        "coins": 120,
+        "coins": 155,
         "spawn": {
           "chain": "ashdrake",
           "tier": 1,
@@ -349,7 +349,7 @@
       "giver": "eleanor",
       "title": "Wake the Ashdrake",
       "rewards": {
-        "coins": 250
+        "coins": 325
       },
       "steps": [
         {

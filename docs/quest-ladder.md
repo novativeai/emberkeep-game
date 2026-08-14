@@ -41,7 +41,7 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 | # | Quest | Order | Chain | Tier | Subquests |
 | --- | --- | --- | --- | --- | --- |
 | 1 | **Light the Brazier** | `eleanor_brazier` | gems | **T1** | Merge 10 times · Collect 6 Gem Shards · Deliver 6 Gem Shards to Eleanor |
-| 2 🥚 | **Fill the Larder** | — | berries | T3 | Make 2 Emberberry Preserves |
+| 2 🥚 | **Fill the Larder** | — | berries | T3 | Make 1 Emberberry Preserve |
 | 3 | **Warm the Long Hearth** | `eleanor_hearth` | gems | **T2** | Make 2 Flame Gems · Deliver 2 Flame Gems to Eleanor |
 | 4 | **Raise the Roofs** | — | timber | T3 | Build 2 Houses |
 | 5 | **Light the Long Gallery** | — | gems | **T2** | Make 4 Flame Gems |

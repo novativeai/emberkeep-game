@@ -341,14 +341,14 @@
           "tier": 1,
           "id": "coin_1",
           "name": "Gold Coin",
-          "sell": 0,
+          "sell": 5,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "coin_2",
           "name": "Gold Pouch",
-          "sell": 5,
+          "sell": 15,
           "xp": 60
         }
       ]
