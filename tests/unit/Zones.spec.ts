@@ -1,6 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import realMap from '../../src/data/map.json';
-import { LEVEL_XP, SAVE_VERSION, WORLD_ID } from '../../src/core/Constants';
+import {
+  CAULDRON_DECOR,
+  DECOR_SCALE,
+  decorClipCharacter,
+  LEVEL_XP,
+  SAVE_VERSION,
+  WORLD_ID
+} from '../../src/core/Constants';
+import { clipFor } from '../../src/core/characterAnims';
 import { GameContext } from '../../src/core/Context';
 import { GameState } from '../../src/core/GameState';
 import type { TextureBin } from '../../src/core/worldArt';
@@ -310,7 +319,9 @@ describe('zones — new ground beside the isle', () => {
     }
     // emberkeep's new ground + borealis + roothold + runevault, all four now
     // drawn in the editor (Runevault replaced the measured Hatchery deck).
-    expect(checked).toBe(38 + 140 + 144 + 4);
+    // Runevault's fifth is the wooden landing at the foot of the stair: the Rune
+    // Stair door stands on it, and a door needs ground under it to be reachable.
+    expect(checked).toBe(38 + 140 + 144 + 5);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {
@@ -793,5 +804,102 @@ describe('worlds — a first arrival puts the opening board out', () => {
       (r) => ctx.state.regionStatus.get(r.id) === 'active'
     );
     expect(open.map((r) => r.id)).toEqual(['borealis_shore']);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* the pot on the rune circle                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * THE CAULDRON IS THE ONLY THING IN RUNEVAULT YOU CAN TAP, and it went missing
+ * without a word.
+ *
+ * The editor keeps a two-way sync between a placement and its file in
+ * `asset3d/`: delete the file and the next restore prunes every placement that
+ * names it, then persists the prune (mapEditor.restoreToGame). So one removed
+ * `.webp` silently emptied `gameObjects`, the world's `assets` row and
+ * `project.assets` — and build-zones, which WARNS rather than throws so a
+ * missing prop can never cost a whole world, wrote a Runevault with no pot in
+ * it. A warning in a build log is not a thing anyone reads; the plateau just
+ * had nothing on it.
+ *
+ * And it went missing a SECOND way, which is the one that lasted. Re-solving the
+ * editor drop point by inverting the fitted affine moved it from (1078.7, 763.5)
+ * — the spot on the plateau he dropped it on — to (-1404.3, 66.6), which lands
+ * at world x -1388, some 2200 px left of the four cells the board camera frames.
+ * Nothing warned: the pot existed, stood on a cell, kept its anchor, boiled. It
+ * was simply somewhere nobody can look. `dx/dy` is a NUDGE off the nearest cell,
+ * and a nudge of nine tiles is not a nudge, it is a different place — so that is
+ * what the reader below measures.
+ *
+ * `zones.json` is generated, so none of this pins the numbers the editor chose.
+ * It pins that a pot exists, that it stands on ground, that it stands NEAR that
+ * ground, and that it is a size a player can see.
+ */
+describe('runevault — the cauldron is still on the rune circle', () => {
+  const RUNEVAULT = WORLDS.get('runevault')!;
+  const TILE = RUNEVAULT.map.tile?.width ?? 256;
+  /** World px per authored map px — BoardScene's own `ratio` for this world. */
+  const RATIO = 256 / TILE;
+  const pot = () => (RUNEVAULT.map.mapDecor ?? []).find((d) => d.name === CAULDRON_DECOR)!;
+
+  /** Pixel width of the shipped plate, from the WebP header — same trick as
+   *  scripts/build-zones.mjs, and for the same reason: the size the player sees
+   *  is the calibration times THIS, so a number typed here would only pin half
+   *  of it and would keep passing through the swap it exists to catch. */
+  const plateWidth = (): number => {
+    const b = readFileSync(`assets/sprites/environment/map/decor/${CAULDRON_DECOR}.webp`);
+    const fourcc = b.toString('ascii', 12, 16);
+    if (fourcc === 'VP8X') return 1 + b.readUIntLE(24, 3);
+    if (fourcc === 'VP8 ') return b.readUInt16LE(26) & 0x3fff;
+    if (fourcc === 'VP8L') return (b.readUInt32LE(21) & 0x3fff) + 1;
+    throw new Error('not a WebP the header reader understands');
+  };
+
+  it('places exactly one cauldron, and CAULDRON_DECOR is what names it', () => {
+    const decor = RUNEVAULT.map.mapDecor ?? [];
+    expect(decor.filter((d) => d.name === CAULDRON_DECOR)).toHaveLength(1);
+  });
+
+  it('stands it on a cell of the world, so its shadow has ground under it', () => {
+    expect(hasCell(RUNEVAULT, pot().col, pot().row)).toBe(true);
+  });
+
+  it('stands it NEAR that cell — the guard the off-screen pot walked past', () => {
+    // build-zones picks the NEAREST cell, so a prop the editor put on the ground
+    // the world was fitted to is always within about a tile of it. The pot that
+    // vanished was 2311 px out; this one is under 200.
+    const d = pot();
+    const off = Math.hypot((d.dx ?? 0) * RATIO, (d.dy ?? 0) * RATIO);
+    expect(off).toBeLessThan(TILE);
+  });
+
+  it('carries the anchor measured off the art — without it the pot floats', () => {
+    // Contact point, not centre: the swing handle hangs wide to the LEFT, which
+    // is why the foot ring is at 0.543 rather than 0.5 (scripts/build-zones.mjs).
+    expect(RUNEVAULT.map.decorCalibration?.[CAULDRON_DECOR]).toMatchObject({
+      anchor: { x: 0.543, y: 0.889 }
+    });
+  });
+
+  it('draws it at the size it was tuned to, measured against the real plate', () => {
+    // BoardScene: dispScale = cal.scale × ratio × DECOR_SCALE, against the art's
+    // OWN width — so the plate is read off disk rather than typed here. The two
+    // halves of that product live in different files and have twice been changed
+    // one at a time: re-solving the placement left the calibration at 2.99 (530
+    // units, two tiles across), and redrawing the plate 1050 → 822 px would have
+    // shrunk the pot by a fifth on its own. ~368 units is the authored answer.
+    const cal = RUNEVAULT.map.decorCalibration![CAULDRON_DECOR]!;
+    const units = cal.scale * RATIO * (DECOR_SCALE[CAULDRON_DECOR] ?? 1) * plateWidth();
+    expect(units).toBeGreaterThan(310);
+    expect(units).toBeLessThan(430);
+  });
+
+  it('has a boil to play, filed under the CHARACTER id and not the art name', () => {
+    // The two namespaces are different and were once assumed to be the same, so
+    // the lookup came back empty and the pot never boiled. Both halves pinned.
+    expect(decorClipCharacter(CAULDRON_DECOR)).toBe('cauldron');
+    expect(clipFor(decorClipCharacter(CAULDRON_DECOR), 'boil')).toBeTruthy();
   });
 });

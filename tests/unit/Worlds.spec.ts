@@ -28,7 +28,13 @@ describe('worlds registry — the ingest loses nothing', () => {
     const sourceZones = SOURCE.worlds.reduce((n, w) => n + w.grids.length, 0);
     expect(zones).toBe(sourceZones);
     expect(WORLDS.worlds.flatMap(worldCells)).toHaveLength(sourceCells.length);
-    expect(sourceCells.length).toBe(367); // the shipped level design, pinned
+    // The shipped level design, pinned. It MOVES when he draws: on 2026-08-14,
+    // 367 → 366 when Grille 2 of the emberkeep map dropped its level-3 cell, then
+    // 366 → 367 when Runevault's Grille 16 — the 1×1 on the wooden landing — was
+    // allocated so the Rune Stair door has ground under it. Update it with the
+    // export; the number is here to catch a count that changed when NOTHING was
+    // drawn, which is what a lost grid or a half-loaded pager looks like.
+    expect(sourceCells.length).toBe(367);
   });
 
   it('keeps each cell at the exact world point the editor placed it', () => {
@@ -132,7 +138,7 @@ describe('zone geometry — we can reproduce the editor, so a renderer can trust
         }
       }
     }
-    expect(checked).toBe(367);
+    expect(checked).toBe(sourceCells.length); // every drawn cell, whatever he drew
     // The export rounds its world points to whole pixels, so agreement to within
     // a pixel IS exact agreement. Anything larger would mean we had misread the
     // basis, the pivot or the rotation convention.

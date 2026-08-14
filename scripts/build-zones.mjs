@@ -652,25 +652,25 @@ const PORTALS = {
     { id: 'borealis_rune_gate', to: 'runevault', label: 'The Rune Way', art: [365, 235, 175, 205] }
   ],
   runevault: [
-    // THE STAIRCASE, which is where the way down belongs — not the rune circle
-    // inlaid in the plateau's west half (the spot Hatchery's door carried over),
-    // which read as floor decoration rather than an exit and stood in the
-    // cauldron's own light.
+    // THE LANDING AT THE FOOT OF THE STAIR — the lit wooden deck, not the steps
+    // above it and not the rune circle inlaid in the plateau (the spot the
+    // Hatchery's door carried over, which read as floor decoration rather than
+    // an exit and stood in the cauldron's own light).
     //
-    // ON THE UPPER STEPS, and that part is provisional. The step the editor
-    // actually marks out is the lantern landing at the FOOT of the stair —
-    // `Grille 16`, the only 1×1 grid on the map, centred on backdrop
-    // (1140, 1441). A door there is 742 world px from the nearest playable cell,
-    // because Runevault has 4 of its 187 drawn cells marked and all 4 are up on
-    // the plateau: the board camera frames those four, the landing is off the
-    // bottom of the screen, and the only way out of the world cannot be reached.
-    // `Zones.spec.ts` fails on exactly that, which is the invariant doing its job
-    // rather than an inconvenience.
+    // This rect is the DECK's own planking, measured off the painting: x
+    // 1035..1220, y 1390..1498, between the railing and the two hanging
+    // lanterns. It sat provisionally up on the steps because a door on the deck
+    // was 740 world px from anything the player could stand on, and
+    // `Zones.spec`'s "never out over open sky" was refusing it — correctly, on
+    // the evidence it had: Runevault had 4 of its 187 drawn cells marked and all
+    // four were up on the plateau.
     //
-    // So the door sits partway up the steps, 486 px from ground that exists
-    // today. Mark the staircase in the editor (Grille 14, 15 and 16) and this
-    // becomes `[1055, 1240, 170, 230]` — the landing, between the two lanterns.
-    { id: 'runevault_circle', to: 'borealis', label: 'The Rune Stair', art: [910, 1105, 180, 300] }
+    // The fix is not a looser limit, it is real ground. `Grille 16`, the 1×1 he
+    // drew on the deck, is now allocated, so the landing is a cell of the world
+    // like any other and the door stands 19 px from its centre. The camera's
+    // opening frame is the ACTIVE region's tiles, so the deck comes into view
+    // with it — the way down is somewhere the player can see and reach.
+    { id: 'runevault_circle', to: 'borealis', label: 'The Rune Stair', art: [1035, 1390, 185, 108] }
   ]
 };
 

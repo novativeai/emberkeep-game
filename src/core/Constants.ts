@@ -327,17 +327,26 @@ export const DECOR_SCALE: Record<string, number> = {
    * SELYNA'S POT, TRIMMED BY 65% — an authored call, not a correction.
    *
    * The editor→game size conversion is exact and stays that way: the pot he
-   * placed at 0.4 of a 993px source measures 324 backdrop px, and build-zones
-   * hands the renderer the calibration that reproduces exactly that against the
-   * painting. But exact is not the same as right. At full size it stands 1.55
-   * tiles wide, half again as wide as the cell it is meant to sit on and wider
-   * than the whelps that walk past it, so Runevault's one interactive fixture
-   * read as scenery the plateau was built around.
+   * placed measures what he drew it as, and build-zones hands the renderer the
+   * calibration that reproduces exactly that against the painting. But exact is
+   * not the same as right. At full size it stands 1.55 tiles wide, half again as
+   * wide as the cell it is meant to sit on and wider than the whelps that walk
+   * past it, so Runevault's one interactive fixture read as scenery the plateau
+   * was built around.
    *
-   * 0.35 lands it at ~139 units, a little over half a tile. Raise it here rather
-   * than in the editor — the editor's number is WHERE and HOW BIG on the
-   * PAINTING, which is the frame he places in; this is what the board makes of
-   * it, which is the frame the dragons are in.
+   * Raise it here rather than in the editor — the editor's number is WHERE and
+   * HOW BIG on the PAINTING, which is the frame he places in; this is what the
+   * board makes of it, which is the frame the dragons are in.
+   *
+   * THE SIZE IS A PRODUCT, and this is only one of its two halves: the other is
+   * the calibration build-zones derives from the editor's own scale. The pot
+   * stands ~368 world units today — nearly a tile and a half, feet on the
+   * bullseye of the rune circle, which is the size he settled on with it in
+   * front of him. Size changes go in the EDITOR, not here: the plate was redrawn
+   * (1050px → 822px) and the editor scale moved with it, because the drawing
+   * changing is not a reason for the pot to change size. `Zones.spec` measures
+   * the PRODUCT against the plate on disk, so touching either half alone fails
+   * there rather than on his screen.
    */
   pink_cauldron: 0.35
 };
