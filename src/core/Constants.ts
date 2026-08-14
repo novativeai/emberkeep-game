@@ -1227,11 +1227,51 @@ export const SLEEP_BREATH = {
   lift: 0
 } as const;
 
-/** A dragon naps of its own accord: a window this long, once per cycle, with
- *  the offset derived from its id so a pair never sleeps in lockstep. Cozy
- *  cadence — it is asleep for roughly one minute in five. */
-export const DRAGON_NAP_CYCLE_MS = 300_000;
-export const DRAGON_NAP_LENGTH_MS = 58_000;
+/**
+ * A dragon naps of its own accord: a SHORT window, on a period of its own.
+ *
+ * Thirty seconds, once every ten to fifteen minutes. Both halves are the tuning
+ * and both matter: a sleep long enough to be in the player's way is a sleep the
+ * player has to work around, and a sleep on a fixed period is a schedule rather
+ * than an animal. The nap is meant to be caught out of the corner of an eye —
+ * you look over, it is curled up, you look again and it is not.
+ *
+ * The PERIOD is drawn per dragon from its id (`napCycleOf`), so no two share a
+ * rhythm; the OFFSET inside it is drawn the same way, so no two doze in
+ * lockstep even when their periods happen to be close. Both are derived rather
+ * than stored: nothing to save, reproducible under `advanceTime`, and a reload
+ * puts the animal exactly where it was.
+ *
+ * This is now the ONLY sleep a dragon chooses. The night used to put the whole
+ * roster down for its eight-minute phase, which is not "thirty seconds" by any
+ * reading — the sky still turns, the Dew Basin still only runs after dark, but
+ * it no longer decides whether an animal is on its feet. What remains beside
+ * the nap is the shift-rest, and that one the player asked for by working it.
+ */
+/**
+ * THE GATE CROSSING — the hatchling goes ahead, and stays gone.
+ *
+ * When a door first opens, the named dragon flies into the light and comes out
+ * on the OTHER side: the piece leaves this world's board and stands on the
+ * destination's (`dragon:cross_gate`). It is not a flourish that loops back —
+ * a flight that says "he went" and then unsays it is the same picture with the
+ * meaning removed, and the player who follows him through must find him there.
+ */
+export const GATE_FLIGHT = {
+  /** After the door's ignition has played out — his beat, not the door's. */
+  startDelayMs: 2100,
+  /** Wake first, fly after: long enough for the uncurl to read as its own beat. */
+  wakeLeadMs: 2000,
+  /** Held awake across the whole crossing, so a nap cannot re-assert mid-air. */
+  keepAwakeMs: 12_000,
+  /** Out to the door, and the fade as the light takes him. */
+  flyMs: 1500,
+  fadeMs: 420
+} as const;
+
+export const DRAGON_NAP_LENGTH_MS = 30_000;
+export const DRAGON_NAP_CYCLE_MIN_MS = 600_000;
+export const DRAGON_NAP_CYCLE_MAX_MS = 900_000;
 
 /** One bellow, and the stretch it takes to get up afterwards. */
 export const DRAGON_ROAR_MS = 1500;

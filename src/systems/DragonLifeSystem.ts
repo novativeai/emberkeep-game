@@ -1,13 +1,13 @@
 import {
   DRAGON_HUNGER_GRACE_MS,
-  DRAGON_NAP_CYCLE_MS,
+  DRAGON_NAP_CYCLE_MAX_MS,
+  DRAGON_NAP_CYCLE_MIN_MS,
   DRAGON_NAP_LENGTH_MS,
   DRAGON_WANDER_EVERY_MS,
   DRAGON_WANDER_MAX_DIST,
   DRAGON_WANDER_MIN_DIST,
   DRAGON_WANDER_SPREAD_MS,
-  HUNGRY_UNFED_EPS,
-  phaseAt
+  HUNGRY_UNFED_EPS
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
@@ -29,7 +29,7 @@ export type DragonMood = 'awake' | 'hungry' | 'asleep';
  *
  * **Nothing here keeps a counter.** Hunger is `DragonSystem.careOf` — the same
  * record feeding writes and the status gauge draws — and sleep is the shipped
- * day clock's `night` phase (`phaseAt`). A second hunger clock would drift from
+ * nap window it draws for itself. A second hunger clock would drift from
  * the gauge the player is looking at, and a private sleep timer would put one
  * dragon to bed while the sky said noon.
  *
@@ -89,17 +89,16 @@ export class DragonLifeSystem {
    *   • `rest`  — it worked a shift and is sleeping it off (DragonJobSystem).
    *               Earned, timed, and NOT the player's to cancel: shaking it
    *               awake would hand back the cost of working it.
-   *   • `night` — the sky. Also not cancellable; morning is what ends it.
    *   • `nap`   — it simply felt like it. This one IS the player's: a tap
    *               wakes it, because a nap the player cannot interrupt is an
-   *               animal that ignores them.
+   *               animal that ignores them. The sky is no longer one of these:
+   *               the night stopped putting dragons down (see `moodOf`).
    *
    * Null when awake (or hungry — a hungry dragon does not sleep through it).
    */
-  sleepKindOf(itemId: number): 'rest' | 'night' | 'nap' | null {
+  sleepKindOf(itemId: number): 'rest' | 'nap' | null {
     if (this.moodOf(itemId) !== 'asleep') return null;
     if (this.jobs.restRemaining(itemId) > 0) return 'rest';
-    if (phaseAt(this.clock.now()) === 'night') return 'night';
     return 'nap';
   }
 
@@ -177,7 +176,12 @@ export class DragonLifeSystem {
     // noon, and this is the path the player sees most often.
     if (this.jobs.restRemaining(itemId) > 0) return 'asleep';
     if (this.jobs.isWorking(itemId)) return 'awake';
-    if (phaseAt(this.clock.now()) === 'night') return 'asleep';
+    // THE NIGHT NO LONGER PUTS IT DOWN. It used to sleep the whole eight-minute
+    // phase, which is a quarter of every day spent as a curled painting the
+    // player cannot use — and it is not "a short nap" by any reading. The sky
+    // still turns and the night still owns what belongs to it (the grade, the
+    // Dew Basin); it simply no longer decides whether an animal is on its feet.
+    // What a dragon chooses is the nap, and what it owes is the shift-rest.
     if (this.isNapping(itemId)) return 'asleep';
     return 'awake';
   }
@@ -189,11 +193,47 @@ export class DragonLifeSystem {
    * two dragons never doze in lockstep. Stateless and derived, so it survives a
    * reload, needs no save field, and stays reproducible under `advanceTime`.
    */
+  /**
+   * This dragon's nap schedule, laid out: how long its period is, where its
+   * window sits inside it, and how long the window lasts.
+   *
+   * Public because it is DERIVED, not stored — and something derived from a
+   * pair of hashes is only checkable if the hashes have one home. A test that
+   * re-implements them to park the clock inside a window is testing its own
+   * copy of the arithmetic, and would keep passing after this one changed.
+   */
+  napScheduleOf(itemId: number): { cycleMs: number; offsetMs: number; lengthMs: number } {
+    const cycleMs = this.napCycleOf(itemId);
+    return {
+      cycleMs,
+      offsetMs: Math.abs(((itemId * 2654435761) ^ 0x9e3779b9) >>> 0) % cycleMs,
+      lengthMs: DRAGON_NAP_LENGTH_MS
+    };
+  }
+
   private isNapping(itemId: number): boolean {
-    const offset = Math.abs((itemId * 2654435761) >>> 0) % DRAGON_NAP_CYCLE_MS;
-    const into = (((this.clock.now() - offset) % DRAGON_NAP_CYCLE_MS) + DRAGON_NAP_CYCLE_MS) %
-      DRAGON_NAP_CYCLE_MS;
+    const cycle = this.napCycleOf(itemId);
+    // A SECOND hash for the offset, salted differently from the period's. Using
+    // one number for both would tie them together — a dragon with a long period
+    // would always also nap late in it — and the two are meant to be
+    // independent draws.
+    const offset = Math.abs(((itemId * 2654435761) ^ 0x9e3779b9) >>> 0) % cycle;
+    const into = (((this.clock.now() - offset) % cycle) + cycle) % cycle;
     return into < DRAGON_NAP_LENGTH_MS;
+  }
+
+  /**
+   * This dragon's own nap period, somewhere in [MIN, MAX].
+   *
+   * Drawn from the id rather than rolled, for the same reason the offset is:
+   * the whole schedule has to be reproducible under `advanceTime` and survive a
+   * reload with nothing saved. Per DRAGON, so the isle has no shared rhythm —
+   * two animals side by side are on ten and fourteen minutes, and the player
+   * never learns a pattern to plan around.
+   */
+  private napCycleOf(itemId: number): number {
+    const span = DRAGON_NAP_CYCLE_MAX_MS - DRAGON_NAP_CYCLE_MIN_MS;
+    return DRAGON_NAP_CYCLE_MIN_MS + (Math.abs((itemId * 40503) >>> 0) % (span + 1));
   }
 
   /**

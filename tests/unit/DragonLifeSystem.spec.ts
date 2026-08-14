@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DAY_MS,
   DRAGON_HUNGER_GRACE_MS,
-  DRAGON_NAP_CYCLE_MS,
+  DRAGON_NAP_CYCLE_MAX_MS,
+  DRAGON_NAP_LENGTH_MS,
   DRAGON_REST_MS,
   DRAGON_WORK_MS,
   DRAGON_WANDER_EVERY_MS,
@@ -33,6 +34,21 @@ function atPhase(ctx: Ctx, index: number): void {
   const now = ctx.clock.now();
   const dayStart = Math.floor(now / DAY_MS) * DAY_MS;
   ctx.clock.advance(dayStart + DAY_MS + index * PHASE_MS + 1000 - now);
+}
+
+/**
+ * Park the clock at the first millisecond of THIS dragon's own nap window.
+ *
+ * Every dragon draws its own period (10-15 min) and its own offset inside it,
+ * both from its id — so there is no shared moment when "the dragons are
+ * asleep", and a test that wants one has to ask the system for the schedule
+ * rather than re-implement the hashes here. A copy would keep passing after the
+ * real one changed, which is the whole failure mode this avoids.
+ */
+function atNap(ctx: Ctx, itemId: number): void {
+  const { cycleMs, offsetMs } = ctx.systems.dragonLife.napScheduleOf(itemId);
+  const into = (((ctx.clock.now() - offsetMs) % cycleMs) + cycleMs) % cycleMs;
+  ctx.clock.advance(cycleMs - into); // forward to the next window's first ms
 }
 
 describe('DragonLifeSystem — a dragon that lives on the isle', () => {
@@ -86,7 +102,7 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
     ctx.state.tutorialDone = false;
     ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
-    atPhase(ctx, 3); // night — the strongest sleep pull there is
+    atNap(ctx, dragon.id); // squarely inside her own nap window
     tick(ctx, 0);
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
     // The moment the tutorial hands over, the same clock reads as bedtime.
@@ -102,11 +118,10 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     const dragon = dragonAt(ctx, 1, 1);
     ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
 
-    atPhase(ctx, 3); // night
+    atNap(ctx, dragon.id);
     tick(ctx, 0);
-    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('night');
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('nap');
 
-    atPhase(ctx, 1); // daylight, so only a nap or fatigue can put it down
     // Worked a full shift → the rest outranks everything and is NOT a nap.
     const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 3, row: 3, kind: 'item' });
     ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
@@ -121,18 +136,21 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     const ctx = createTestContext();
     const dragon = dragonAt(ctx, 1, 1);
     ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
-    atPhase(ctx, 3);
+    atNap(ctx, dragon.id);
     tick(ctx, 0);
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
 
     const moods = capture(ctx.bus, 'dragon:mood');
-    ctx.systems.dragonLife.keepAwake(dragon.id, 60_000);
+    // Held awake for a THIRD of the window, so the window is provably still
+    // open when the hold lapses — the point being that the hold ended, not
+    // that the nap did.
+    ctx.systems.dragonLife.keepAwake(dragon.id, DRAGON_NAP_LENGTH_MS / 3);
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
     expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBeNull();
     expect(moods.at(-1)).toMatchObject({ itemId: dragon.id, mood: 'awake', from: 'asleep' });
 
-    // It is a WINDOW, not a flag: past it the same night puts it back down.
-    ctx.clock.advance(60_001);
+    // It is a WINDOW, not a flag: past it the same nap puts it back down.
+    ctx.clock.advance(DRAGON_NAP_LENGTH_MS / 3 + 1);
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
   });
 
@@ -151,29 +169,46 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(run()).toBe(run());
   });
 
-  it('sleeps at night and wakes with the light', () => {
+  it('naps for THIRTY SECONDS and is up again — and the night never puts it down', () => {
+    // The shape the sleep is tuned to: short enough to be caught out of the
+    // corner of an eye, never long enough to be in the player's way. The night
+    // used to sleep the whole eight-minute phase, which is a quarter of every
+    // day spent as a curled painting — the sky no longer decides this.
     const ctx = createTestContext();
     const dragon = dragonAt(ctx, 1, 1);
     const moods = capture(ctx.bus, 'dragon:mood');
     // Fed, so hunger cannot outrank sleep in this test.
     ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
 
-    atPhase(ctx, 3); // night
+    atNap(ctx, dragon.id);
     tick(ctx, 0);
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
     expect(moods.at(-1)).toMatchObject({ mood: 'asleep' });
 
-    // Morning: it wakes. Bounded loop rather than a single tick, because an
-    // ambient nap can legitimately follow the night and this test is about the
-    // NIGHT ending, not about the nap never happening.
-    atPhase(ctx, 0);
-    let woke = false;
-    for (let i = 0; i < 60 && !woke; i++) {
-      tick(ctx, DRAGON_NAP_CYCLE_MS / 60);
+    // One second short of the window: still down.
+    tick(ctx, DRAGON_NAP_LENGTH_MS - 1000);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+
+    // One second past it: up, with no morning needed.
+    tick(ctx, 2000);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+
+    // And the deepest night is now just a colour: walk the whole phase and it
+    // never closes its eyes for anything but its own window.
+    atPhase(ctx, 3);
+    const { cycleMs } = ctx.systems.dragonLife.napScheduleOf(dragon.id);
+    let asleep = 0;
+    const slices = 120;
+    for (let i = 0; i < slices; i++) {
+      tick(ctx, cycleMs / slices);
       ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
-      if (ctx.systems.dragonLife.moodOf(dragon.id) === 'awake') woke = true;
+      if (ctx.systems.dragonLife.moodOf(dragon.id) === 'asleep') asleep++;
     }
-    expect(woke).toBe(true);
+    // A 30 s window inside a 10-15 min period is at most a few slices out of
+    // 120. Anything like a whole phase asleep would blow straight past this.
+    expect(asleep).toBeLessThan(slices / 10);
   });
 
   it('a dragon nobody fed is HUNGRY, and hunger outranks sleep', () => {
@@ -232,7 +267,7 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(ctx.systems.jobs.restRemaining(dragon.id)).toBe(0);
     let woke = false;
     for (let i = 0; i < 60 && !woke; i++) {
-      tick(ctx, DRAGON_NAP_CYCLE_MS / 60);
+      tick(ctx, DRAGON_NAP_CYCLE_MAX_MS / 60);
       // Keep it fed — hunger outranks sleep, and this test is about fatigue.
       ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
       if (ctx.systems.dragonLife.moodOf(dragon.id) === 'awake') woke = true;
@@ -253,9 +288,13 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     // every slice: the walk crosses feed cycles (hunger returns each
     // DRAGON_CYCLE_MS), and a hungry dragon never naps — this test is about
     // the nap windows, not the appetite.
+    // Two full MAX periods in fine slices: each dragon's own period is shorter
+    // than that, so both windows are guaranteed to come round, and a slice a
+    // quarter of the window long cannot step over one.
     const seen = { a: 0, b: 0, together: 0 };
-    const slice = DRAGON_NAP_CYCLE_MS / 60;
-    for (let i = 0; i < 60; i++) {
+    const slice = DRAGON_NAP_LENGTH_MS / 4;
+    const steps = Math.ceil((2 * DRAGON_NAP_CYCLE_MAX_MS) / slice);
+    for (let i = 0; i < steps; i++) {
       tick(ctx, slice);
       for (const d of [a, b]) {
         ctx.bus.emit('ui:feed_dragon_requested', { itemId: d.id, chain: 'emberberry', tier: 3 });
