@@ -32,6 +32,7 @@ import { CommissionPanel } from '../ui/CommissionPanel';
 import { CauldronPanel } from '../ui/CauldronPanel';
 import { StorePanel } from '../ui/StorePanel';
 import { CookbookPanel } from '../ui/CookbookPanel';
+import { DragonCodexPanel } from '../ui/DragonCodexPanel';
 import { Hud } from '../ui/Hud';
 import { NamePanel } from '../ui/NamePanel';
 import { TravelPrompt } from '../ui/TravelPrompt';
@@ -87,6 +88,8 @@ export class UIScene extends Phaser.Scene {
    *  where it is set. Re-created with the scene, so a reset clears it. */
   private statusTaught = false;
   private cookbookButton!: Phaser.GameObjects.Container;
+  private codex!: DragonCodexPanel;
+  private codexButton!: Phaser.GameObjects.Container;
   private cookbookDot!: Phaser.GameObjects.Arc;
   private bubble!: CharacterBubble;
   /** The awakening finale is running — suppress competing banners. */
@@ -216,6 +219,29 @@ export class UIScene extends Phaser.Scene {
     this.cookbook.setDepth(DEPTH_PANEL + 4);
     this.cookbookButton = this.buildCookbookButton();
 
+    // The Dragon Codex — the keepsake record behind the dragon-head button.
+    // Both appear only once a dragon has been NAMED: the roster is the reason
+    // the button exists, so an empty book never opens.
+    this.codex = new DragonCodexPanel(
+      this,
+      this.ctx.bus,
+      this.ctx.systems.dragons,
+      this.ctx.data.dragondex,
+      this.ctx.data.chains
+    );
+    this.codex.setDepth(DEPTH_PANEL + 4);
+    this.codexButton = this.buildCodexButton();
+    // A scripted reveal opens the book itself on the named dragon's page and
+    // plays the favourite-meal beat. Deferred a breath so whatever celebration
+    // triggered it lands first — the popup follows the moment, never overlaps it.
+    this.offBus.push(
+      this.ctx.bus.on('ui:codex_open_requested', () => {
+        const first = this.ctx.systems.dragons.namedDragons()[0];
+        if (!first) return;
+        this.time.delayedCall(700, () => this.codex.openReveal(first.itemId));
+      })
+    );
+
     // On-screen quest readout, top-right. Backgroundless HUD summary of the
     // quest ladder — the active quest over its own ordered subquests.
     this.questTracker = new QuestTracker(this, this.ctx.bus, this.ctx.systems.quests);
@@ -269,7 +295,10 @@ export class UIScene extends Phaser.Scene {
     const named = this.ctx.systems.dragons.firstNamed();
     if (named) this.bubble.setToken('dragon', named.name);
     this.offBus.push(
-      this.ctx.bus.on('dragon:named', ({ name }) => this.bubble.setToken('dragon', name))
+      this.ctx.bus.on('dragon:named', ({ name }) => {
+        this.bubble.setToken('dragon', name);
+        this.revealCodexButton();
+      })
     );
 
     this.hand = this.add.image(0, 0, 'ui_hand').setDepth(DEPTH_TUTORIAL + 2).setVisible(false);
@@ -310,6 +339,7 @@ export class UIScene extends Phaser.Scene {
       this.hud.teardown();
       this.ledger.teardown();
       this.cookbook.teardown();
+      this.codex.teardown();
       this.shop.teardown();
       this.commission.teardown();
       this.questTracker.teardown();
@@ -540,6 +570,11 @@ export class UIScene extends Phaser.Scene {
       bus.on('tutorial:step', (step) => {
         // Appears for its tutorial introduction, then permanently post-tutorial.
         this.cookbookButton.setVisible(step.done || step.allow.cookbook);
+        // The Codex is a post-tutorial keepsake: the naming beat happens mid-
+        // script, and a button appearing under the guided hand would compete
+        // with it. It debuts with the rest of the HUD when the script ends.
+        this.codexButton.setVisible(step.done && this.ctx.systems.dragons.namedDragons().length > 0);
+        if (!step.done && this.codex.isOpen) this.codex.requestClose();
         this.hud.storeButton.setVisible(step.done && this.shopUnlocked());
         // Safety net only — the cookbook_close step has the player close the
         // book themselves; any later step that disallows it just shuts it.
@@ -724,6 +759,54 @@ export class UIScene extends Phaser.Scene {
     });
     button.setVisible(this.ctx.state.tutorialDone);
     return button;
+  }
+
+  /**
+   * The Dragon Codex button — slot 4 of the shared column, the top of it
+   * (Ledger 0, Bag 1, Cookbook 2, Store 3). Same plate, same pitch, same gates
+   * as its neighbours; the one difference is WHEN it exists: not until a dragon
+   * has been named, because the book records dragons the Keeper knows, and
+   * before the naming there is nothing it could open onto.
+   */
+  private buildCodexButton(): Phaser.GameObjects.Container {
+    const button = this.add
+      .container(HUD_COLUMN_X, hudColumnY(4))
+      .setScale(UI_SCALE)
+      .setDepth(DEPTH_HUD);
+    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.5);
+    const icon = this.textures.exists('ui_icon_dragondex')
+      ? this.add.image(0, -12, 'ui_icon_dragondex').setDisplaySize(125, 125)
+      : this.add.text(0, -12, '🐉', { fontSize: '76px' }).setOrigin(0.5);
+    button.add([bg, icon]);
+    button.setSize(192, 192);
+    button.setInteractive({ useHandCursor: true });
+    button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
+    button.on('pointerout', () => button.setScale(UI_SCALE));
+    button.on('pointerup', () => {
+      // Mid-tutorial the script owns the stage — same contract as the
+      // Cookbook button beside it.
+      if (!(this.lastStep?.done ?? this.ctx.state.tutorialDone)) return;
+      if (this.codex.isOpen) this.codex.requestClose();
+      else this.codex.open();
+    });
+    button.setVisible(
+      this.ctx.state.tutorialDone && this.ctx.systems.dragons.namedDragons().length > 0
+    );
+    return button;
+  }
+
+  /** The button's debut — it pops in the moment the first dragon is named. */
+  private revealCodexButton(): void {
+    if (this.codexButton.visible) return;
+    if (!(this.lastStep?.done ?? this.ctx.state.tutorialDone)) return;
+    this.codexButton.setVisible(true);
+    this.codexButton.setScale(UI_SCALE * 0.3);
+    this.tweens.add({
+      targets: this.codexButton,
+      scale: UI_SCALE,
+      duration: 420,
+      ease: 'Back.easeOut'
+    });
   }
 
   /** Cosmetic: a Flame Gem arcs from the merge cell into the Ledger button and

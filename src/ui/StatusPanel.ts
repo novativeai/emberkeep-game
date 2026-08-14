@@ -7,6 +7,8 @@ import {
   STATUS_FADE_IN_MS,
   STATUS_FADE_OUT_MS,
   STATUS_FLASH_MS,
+  STATUS_READOUT_GAP,
+  STATUS_READOUT_H,
   UI_SCALE
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
@@ -20,12 +22,20 @@ import { HeartRow } from './HeartRow';
 import { QUEST_TRACKER_BOTTOM, QUEST_TRACKER_RIGHT, QUEST_TRACKER_TOP_Y } from './QuestTracker';
 import { uiRegistry } from './theme';
 
-/** Air between the quest cluster's last row and the name line under it. */
-const GAP = 44;
+/** Air between the quest cluster's last row and the name line under it, and
+ *  the readout's own height. Both live in Constants because the HUD COLUMN is
+ *  fitted to clear this readout — see HUD_COLUMN_PITCH. Moving a row here
+ *  without moving STATUS_READOUT_H there is how the Codex button ended up with
+ *  a dragon's name printed across it. */
+const GAP = STATUS_READOUT_GAP;
 
 const NAME_Y = 0;
 const HEARTS_Y = 58;
 const LINE_Y = 96;
+/** The rows above must fit inside the height the column clears. */
+if (LINE_Y + 30 > STATUS_READOUT_H) {
+  throw new Error(`StatusPanel is taller than STATUS_READOUT_H (${STATUS_READOUT_H})`);
+}
 
 /** Heart size here is smaller than the board's was: this is a readout in a
  *  column of text, not a badge worn over somebody's head. */

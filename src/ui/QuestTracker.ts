@@ -1,31 +1,33 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { GAME_WIDTH, IS_MOBILE, num, PALETTE, UI_SCALE } from '../core/Constants';
+import {
+  GAME_WIDTH,
+  num,
+  PALETTE,
+  QUEST_LIST_TOP_Y,
+  QUEST_ROW_H,
+  QUEST_TRACKER_RIGHT,
+  QUEST_TRACKER_TOP_Y,
+  QUEST_VIEW_H,
+  UI_SCALE
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { QuestConfig, QuestStepConfig } from '../core/types';
 import type { QuestSystem } from '../systems/QuestSystem';
 import { uiRegistry } from './theme';
 
 
-/** Right margin of the cluster — main line and sub rows share this edge, so
- *  every `x / n` counter sits in ONE right-aligned column. (An indent was tried
- *  here and dropped: with right-aligned lines whose counters ride the right
- *  edge, offsetting the parent offsets its COUNTER, and the column breaks.
- *  Hierarchy comes from the main line's larger type instead.) */
-const MARGIN_R = IS_MOBILE ? 64 : 56;
-/** Below the settings gear (y 104, a 128-unit plate → bottom ≈ 168). */
-const TOP_Y = IS_MOBILE ? 300 : 196;
-/** Exported so anything that hangs BELOW the cluster derives its own seat from
- *  the same two numbers rather than remembering a copy — the status readout does
- *  exactly that, and a change to the row pitch here must move it too. */
-export const QUEST_TRACKER_TOP_Y = TOP_Y;
-export const QUEST_TRACKER_RIGHT = MARGIN_R;
-
-const MAIN_TITLE_Y = 0;
-/** The main line's counter rides BESIDE its title, not under it. Parked on its
- *  own row it collided with the title's second line the moment a title wrapped,
- *  which is what put "2 / 3" underneath "Light the Brazier". */
-const LIST_TOP_Y = 62;
+/**
+ * The cluster's geometry lives in Constants — the HUD column has to clear the
+ * status readout that hangs under this, and that clearance has to be
+ * computable somewhere Phaser cannot reach. Re-exported under the old names so
+ * everything that already hangs off the tracker keeps its one source.
+ */
+export {
+  QUEST_TRACKER_BOTTOM,
+  QUEST_TRACKER_RIGHT,
+  QUEST_TRACKER_TOP_Y
+} from '../core/Constants';
 
 /**
  * Widest the cluster may grow leftward before it starts scaling down to fit.
@@ -35,21 +37,12 @@ const LIST_TOP_Y = 62;
  * Shrinking beats wrapping here: a wrapped line has nowhere to go in a
  * background-free cluster whose rows are pitched at a fixed height.
  */
+const MAIN_TITLE_Y = 0;
+
 const MAX_W = 720;
 /** Never shrink past this — below it the line stops being readable at a glance. */
 const MIN_FIT_SCALE = 0.72;
 
-/** Sub-row pitch, and how many are on screen before the list scrolls. */
-const ROW_H = 56;
-const VISIBLE_ROWS = 3;
-/** A sliver of the FOURTH row stays inside the viewport, half-faded. Cutting the
- *  list dead on the third row leaves no sign there is a fourth — the peek is the
- *  only scroll affordance a background-free cluster gets. */
-const PEEK_H = 26;
-const VIEW_H = ROW_H * VISIBLE_ROWS + PEEK_H;
-/** The cluster's own height in LOCAL units — where the list's viewport ends, and
- *  therefore the first free y under the whole tracker. */
-export const QUEST_TRACKER_BOTTOM = LIST_TOP_Y + VIEW_H;
 /** Mask width — rows are right-aligned and grow leftward, so this only has to
  *  be wider than the longest label can ever be. */
 const VIEW_W = 900;
@@ -136,7 +129,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     bus: EventBus,
     private quests: QuestSystem
   ) {
-    super(scene, GAME_WIDTH - MARGIN_R, TOP_Y);
+    super(scene, GAME_WIDTH - QUEST_TRACKER_RIGHT, QUEST_TRACKER_TOP_Y);
     this.owner = scene;
     this.setScale(UI_SCALE); // magnifies down-left from the top-right anchor
 
@@ -165,7 +158,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.mainGroup.add([this.mainTitle, this.mainProgress, this.mainStrike]);
 
     // ---- Sub-quest list: a clipped viewport with the rows scrolling inside ----
-    this.listViewport = scene.add.container(0, LIST_TOP_Y);
+    this.listViewport = scene.add.container(0, QUEST_LIST_TOP_Y);
     this.rowsGroup = scene.add.container(0, 0);
     this.listViewport.add(this.rowsGroup);
     this.listMask = scene.make.graphics();
@@ -486,7 +479,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
    *  finished row leaves), then re-clamp the scroll and re-run the fade ramp. */
   private layoutRows(): void {
     this.rows.forEach((row, i) => {
-      const y = i * ROW_H;
+      const y = i * QUEST_ROW_H;
       if (row.slot === i && row.root.y === y) return;
       row.slot = i;
       // The ramp is a function of the row's position, so it has to be re-run as
@@ -522,14 +515,14 @@ export class QuestTracker extends Phaser.GameObjects.Container {
       // A retiring row is mid-animation on its own alpha — never fight it.
       if (row.retiring) continue;
       const top = row.root.y - this.scrollY;
-      let a = Phaser.Math.Clamp((VIEW_H - top) / ROW_H, 0, 1);
-      if (scrolled) a = Math.min(a, Phaser.Math.Clamp((top + ROW_H) / ROW_H, 0, 1));
+      let a = Phaser.Math.Clamp((QUEST_VIEW_H - top) / QUEST_ROW_H, 0, 1);
+      if (scrolled) a = Math.min(a, Phaser.Math.Clamp((top + QUEST_ROW_H) / QUEST_ROW_H, 0, 1));
       row.root.setAlpha(a * row.reveal);
     }
   }
 
   private maxScroll(): number {
-    return Math.max(0, this.rows.length * ROW_H - VIEW_H);
+    return Math.max(0, this.rows.length * QUEST_ROW_H - QUEST_VIEW_H);
   }
 
   private scrollBy(delta: number): void {
@@ -546,12 +539,12 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   private overList(pointer: Phaser.Input.Pointer): boolean {
     if (!this.tasksVisible) return false;
     const left = this.x - VIEW_W * this.scaleX;
-    const top = this.y + LIST_TOP_Y * this.scaleY;
+    const top = this.y + QUEST_LIST_TOP_Y * this.scaleY;
     return (
       pointer.x >= left &&
       pointer.x <= this.x &&
       pointer.y >= top &&
-      pointer.y <= top + VIEW_H * this.scaleY
+      pointer.y <= top + QUEST_VIEW_H * this.scaleY
     );
   }
 
@@ -579,9 +572,9 @@ export class QuestTracker extends Phaser.GameObjects.Container {
    *  cluster's geometry could have moved (visibility flips, re-layout). */
   private seatMask(): void {
     const w = VIEW_W * this.scaleX;
-    const h = VIEW_H * this.scaleY;
+    const h = QUEST_VIEW_H * this.scaleY;
     const x = this.x - w;
-    const y = this.y + LIST_TOP_Y * this.scaleY;
+    const y = this.y + QUEST_LIST_TOP_Y * this.scaleY;
     this.listMask.clear();
     this.listMask.fillStyle(0xffffff, 1);
     this.listMask.fillRect(x, y, w, h);
