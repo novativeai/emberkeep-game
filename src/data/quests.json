@@ -388,7 +388,7 @@
       "steps": [
         {
           "id": "landing_faggot",
-          "label": "Merge 3 Drift Spars into a Bound Faggot",
+          "label": "Merge 3 Glass Floats into a Glass Buoy",
           "goal": {
             "kind": "have",
             "chain": "seaglass",
@@ -398,7 +398,7 @@
         },
         {
           "id": "landing_deliver",
-          "label": "Deliver 2 Bound Faggots to Selyna",
+          "label": "Deliver 2 Glass Buoys to Selyna",
           "goal": {
             "kind": "order",
             "orderId": "selyna_signal"
@@ -434,11 +434,11 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Strakes from Spars",
+      "title": "Caps from Glass",
       "steps": [
         {
           "id": "strakes_brew",
-          "label": "Brew 4 Broken Strakes",
+          "label": "Brew 4 Iron Caps from Glass Buoys",
           "goal": {
             "kind": "brew",
             "recipeId": "iron_cap",
@@ -460,7 +460,7 @@
       "steps": [
         {
           "id": "fuel_stack",
-          "label": "Build a Drift Stack from 9 Drift Spars",
+          "label": "Gather 3 Pitch Beads from the Tar Kiln",
           "goal": {
             "kind": "have",
             "chain": "emberheart",
@@ -470,7 +470,7 @@
         },
         {
           "id": "fuel_cakes",
-          "label": "Make 3 Pitch Cakes",
+          "label": "Make 3 Pitch Loaves",
           "goal": {
             "kind": "have",
             "chain": "emberheart",
@@ -480,7 +480,7 @@
         },
         {
           "id": "fuel_deliver",
-          "label": "Deliver 3 Pitch Cakes to Selyna",
+          "label": "Deliver 3 Pitch Loaves to Selyna",
           "goal": {
             "kind": "order",
             "orderId": "selyna_pitch"
@@ -500,7 +500,7 @@
       "steps": [
         {
           "id": "thread_brew",
-          "label": "Brew 4 Frost Threads",
+          "label": "Brew 4 Light Threads from Spyglasses",
           "goal": {
             "kind": "brew",
             "recipeId": "light_thread",
@@ -522,7 +522,7 @@
       "steps": [
         {
           "id": "salvage_frames",
-          "label": "Make 2 Lashed Frames",
+          "label": "Forge 2 Banded Helms at the Wreck Forge",
           "goal": {
             "kind": "have",
             "chain": "warhelm",
@@ -532,7 +532,7 @@
         },
         {
           "id": "salvage_deliver",
-          "label": "Deliver 2 Lashed Frames to Selyna",
+          "label": "Deliver 2 Banded Helms to Selyna",
           "goal": {
             "kind": "order",
             "orderId": "selyna_frames"
@@ -552,7 +552,7 @@
       "steps": [
         {
           "id": "pitchpot_brew",
-          "label": "Brew 3 Pitch Cakes",
+          "label": "Brew 3 Pitch Loaves",
           "goal": {
             "kind": "brew",
             "recipeId": "pitch_loaf",
@@ -619,7 +619,7 @@
       "steps": [
         {
           "id": "take_faggot",
-          "label": "Give Selyna 2 Bound Faggots",
+          "label": "Give Selyna 2 Glass Buoys",
           "goal": {
             "kind": "gift",
             "characterId": "selyna",
@@ -630,7 +630,7 @@
         },
         {
           "id": "take_flowers",
-          "label": "Give Selyna 3 Frost Flowers",
+          "label": "Give Selyna 3 Ground Lenses",
           "goal": {
             "kind": "gift",
             "characterId": "selyna",
@@ -689,7 +689,7 @@
       "steps": [
         {
           "id": "hulls_pair",
-          "label": "Make 2 Upturned Hulls",
+          "label": "Forge 2 Horned Helms",
           "goal": {
             "kind": "have",
             "chain": "warhelm",
@@ -708,7 +708,7 @@
       "steps": [
         {
           "id": "skeins_brew",
-          "label": "Brew 3 Spun Skeins",
+          "label": "Brew 3 Woven Bolts",
           "goal": {
             "kind": "brew",
             "recipeId": "woven_bolt",
@@ -732,7 +732,7 @@
       "steps": [
         {
           "id": "pitchworks_ember",
-          "label": "Make 1 Black Ember",
+          "label": "Render 1 Ember Heart",
           "goal": {
             "kind": "have",
             "chain": "emberheart",
@@ -751,7 +751,7 @@
       "steps": [
         {
           "id": "runeshards_brew",
-          "label": "Fire a Black Ember into shards",
+          "label": "Fire an Ember Heart into Rune Shards",
           "goal": {
             "kind": "brew",
             "recipeId": "rune_shard",
@@ -772,7 +772,7 @@
       "steps": [
         {
           "id": "longhall_hull",
-          "label": "Merge 2 Lashed Frames into an Upturned Hull",
+          "label": "Merge 3 Banded Helms into a Horned Helm",
           "goal": {
             "kind": "have",
             "chain": "warhelm",
@@ -782,7 +782,7 @@
         },
         {
           "id": "longhall_build",
-          "label": "Merge 2 Upturned Hulls into a Longhall",
+          "label": "Raise a 2nd Wreck Forge from 3 Bellows",
           "goal": {
             "kind": "have",
             "chain": "wreckforge",
@@ -814,7 +814,7 @@
         },
         {
           "id": "terms_bloom",
-          "label": "Grow a Rime Bloom from 9 Frost Flowers",
+          "label": "Build an Orrery from 9 Ground Lenses",
           "goal": {
             "kind": "have",
             "chain": "orrery",
@@ -824,7 +824,7 @@
         },
         {
           "id": "terms_spindle",
-          "label": "Make 2 Light-Fast Spindles",
+          "label": "Weave 2 Aurora Cloaks",
           "goal": {
             "kind": "have",
             "chain": "auroraweave",
@@ -834,7 +834,7 @@
         },
         {
           "id": "terms_deliver",
-          "label": "Deliver 2 Light-Fast Spindles to Selyna",
+          "label": "Deliver 2 Aurora Cloaks to Selyna",
           "goal": {
             "kind": "order",
             "orderId": "selyna_spindle"

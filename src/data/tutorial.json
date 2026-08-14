@@ -1371,7 +1371,106 @@
     {
       "id": "codex_meal",
       "speaker": "eleanor",
-      "text": "The Codex felt that! Every taste {dragon} shows you is written into his page — watch his favourite appear. Tap ✕ to close the book when you have read it.",
+      "text": "The Codex felt that! Every dragon you name keeps a page in here. Tap {dragon}'s card to open hers.",
+      "gate": {
+        "type": "event",
+        "event": "ui:codex_dragon_opened"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "reveal": "favourite",
+            "page": "roster"
+          }
+        }
+      ],
+      "arrow": {
+        "ui": "codex_card"
+      },
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_taste",
+      "speaker": "eleanor",
+      "text": "There — FAVOURITE MEAL, written the moment she ate it. This book only records what you have tested. Now tap EVOLUTION.",
+      "gate": {
+        "type": "event",
+        "event": "ui:codex_evolution_opened"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "page": "detail"
+          }
+        }
+      ],
+      "arrow": {
+        "ui": "codex_evolution"
+      },
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_evolution",
+      "speaker": "eleanor",
+      "text": "That shadow is what she grows into. The Codex keeps her true colours hidden until you have earned the sight of them.",
+      "gate": {
+        "type": "tap"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "page": "evolution"
+          }
+        }
+      ],
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_cycles",
+      "speaker": "eleanor",
+      "text": "Under her is the count. Fill her hunger gauge inside one cycle and that cycle is banked — and a banked cycle never slips away.",
+      "gate": {
+        "type": "tap"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "page": "evolution"
+          }
+        }
+      ],
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_reward",
+      "speaker": "eleanor",
+      "text": "Six banked and the shadow lifts: her grown form, her true name, in full colour. It is the longest promise this book keeps.",
+      "gate": {
+        "type": "tap"
+      },
+      "effects": [
+        {
+          "openCodex": {
+            "page": "evolution"
+          }
+        }
+      ],
+      "allow": {
+        "codexHold": true
+      }
+    },
+    {
+      "id": "codex_shut",
+      "speaker": "eleanor",
+      "text": "That is the book, and it is yours to open whenever you like. Tap ✕ to close it.",
       "gate": {
         "type": "event",
         "event": "ui:codex_closed"
@@ -1379,7 +1478,7 @@
       "effects": [
         {
           "openCodex": {
-            "reveal": "favourite"
+            "page": "evolution"
           }
         }
       ],

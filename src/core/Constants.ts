@@ -1561,6 +1561,51 @@ export const FINALE = {
  */
 export const DIALOGUE_MAX_CHARS = 190;
 
+/**
+ * FIRST CONTACT — the line a world's own giver says the first time a machine of
+ * theirs is standing on the player's board.
+ *
+ * The north is entered by a taught player and must not grow a tutorial
+ * (`docs/tutorial-coverage.md`), but "no tutorial" was read as "no words": its
+ * five farms shipped with four of the five machines never named anywhere the
+ * player could read them, while `north_terms` asked for an Orrery and
+ * `what_she_will_take` gifted three Ground Lenses. A quest that asks for an
+ * object nobody has named is the defect the coverage ledger exists to catch.
+ *
+ * These are INTRODUCTIONS, not rules. The structure needs no lesson — parts
+ * merging into a building is `wood_merge`→`plank_merge`, and a generator whose
+ * rarer yield becomes another generator is `emberberry_merge`, the same
+ * every-twelfth drop and all. So the first machine says the growth rule out
+ * loud once (nine bricks, a second kiln) and the rest simply say their name and
+ * what comes out of them.
+ *
+ * `tier` is the MACHINE — the fixture ladder's top, the piece that produces.
+ * Latched once ever in `stats` under `fc:<chain>`, so the line survives a
+ * reload without repeating. Each row's speaker is the giver whose world seeds
+ * that machine; UIScene groups a multi-machine reveal by speaker, so a mixed
+ * table is legal (a region can seed several farms at once — `borealis_coast`
+ * seeds three).
+ */
+export const FIRST_CONTACT: ReadonlyArray<{
+  chain: string;
+  tier: number;
+  /** Key into `dialogue.json` → `hints`. */
+  hint: string;
+  speaker: string;
+}> = [
+  { chain: 'glasskiln', tier: 3, hint: 'glassKiln', speaker: 'selyna' },
+  { chain: 'starbench', tier: 3, hint: 'starBench', speaker: 'selyna' },
+  { chain: 'wreckforge', tier: 3, hint: 'wreckForge', speaker: 'selyna' },
+  { chain: 'tarkiln', tier: 3, hint: 'tarKiln', speaker: 'selyna' },
+  { chain: 'auroraloom', tier: 3, hint: 'auroraLoom', speaker: 'selyna' }
+];
+
+/** How long a first-contact line holds, and how long the sweep waits when the
+ *  bubble is busy — the Borealis arrival speech owns the stage on the very
+ *  first visit, and the kiln's introduction belongs after it, not over it. */
+export const FIRST_CONTACT_HOLD_MS = 6200;
+export const FIRST_CONTACT_RETRY_MS = 1500;
+
 /** When the finale is over — her line's last frame. Both scenes measure "is the
  *  finale still running?" against this; it used to be the chapter card's cue. */
 export const FINALE_ENDS_MS = FINALE.elderAtMs + FINALE.elderHoldMs;
@@ -2055,7 +2100,10 @@ export const SAVE_KEY = 'emberkeep_save';
 // 15: frost/storm promoted from Emporium skins to their own chains — a v14
 // save's `dragonSkins` could point board items at skin ids that no longer
 // resolve, and its owned cards no longer mean what they meant.
-export const SAVE_VERSION = 15;
+// 16: the Codex lesson grew from one beat to six (the roster card, the taste
+// row, then Evolution, cycles and the payoff before the book shuts), so every
+// persisted `tutorialIndex` after it points at a different beat than it left.
+export const SAVE_VERSION = 16;
 
 /** The opening's held silence: the board is visible and quiet before Eleanor's
  *  first line, so the player sees the ash before anyone frames it

@@ -7,6 +7,8 @@ import {
   ENERGY_REGEN_MS,
   FINALE,
   FINALE_ENDS_MS,
+  FIRST_CONTACT,
+  FIRST_CONTACT_RETRY_MS,
   GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_TREMBLE_PROGRESS,
@@ -26,7 +28,15 @@ import {
 import { FONT } from '../art/design';
 import { iapBridge } from '../core/iapBridge';
 import { gridToWorld } from '../core/iso';
-import type { EventMap, ResolvedArrow, ResolvedHand, SpeakerId, TilePos, TutorialStepEvent } from '../core/types';
+import type {
+  EventMap,
+  ResolvedArrow,
+  ResolvedHand,
+  SpeakerId,
+  TilePos,
+  TutorialStepEvent,
+  TutorialUiTarget
+} from '../core/types';
 import type { BoardScene } from './BoardScene';
 import { CharacterBubble } from '../entities/CharacterBubble';
 import { BagPanel } from '../ui/BagPanel';
@@ -213,10 +223,15 @@ export class UIScene extends Phaser.Scene {
     // beat's own celebration (float text, the bubble hand-off) lands first —
     // the popup must follow the moment, never overlap it.
     this.offBus.push(
-      this.ctx.bus.on('ui:codex_open_requested', () => {
+      this.ctx.bus.on('ui:codex_open_requested', ({ reveal, page }) => {
         const named = this.ctx.systems.dragons.namedDragons()[0];
-        if (!named) return;
-        this.time.delayedCall(700, () => this.codex.openReveal(named.itemId));
+        if (!named || this.codex.isOpen) return; // every lesson beat asks; the first one opens
+        const at = page ?? 'roster';
+        this.time.delayedCall(reveal ? 700 : 0, () => {
+          if (this.codex.isOpen) return;
+          if (reveal) this.codex.openReveal(named.itemId);
+          else this.codex.openAt(named.itemId, at);
+        });
       })
     );
 
@@ -329,6 +344,11 @@ export class UIScene extends Phaser.Scene {
         );
       })
     );
+
+    // A machine can arrive on the board two ways: a region unlocking seeds it
+    // ready-built, or the player merges one up out of its own fixture parts.
+    // Both are spawns, so both are first contact.
+    this.offBus.push(this.ctx.bus.on('item:spawned', () => this.sweepFirstContact()));
 
     this.hand = this.add.image(0, 0, 'ui_hand').setDepth(DEPTH_TUTORIAL + 2).setVisible(false);
     // A replaced hand/arrow (UI Builder upload) may carry its own anchor so the
@@ -658,7 +678,10 @@ export class UIScene extends Phaser.Scene {
       // over the network — without this the player taps a door and the game
       // simply does nothing for a second or two.
       bus.on('world:switched', ({ to }) => this.showTravelVeil(to)),
-      bus.on('world:ready', () => this.hideTravelVeil()),
+      bus.on('world:ready', () => {
+        this.hideTravelVeil();
+        this.sweepFirstContact();
+      }),
       // The Roothold house is the Emporium's storefront — its tap opens the
       // same panel the (later-unlocked) HUD button does.
       bus.on('ui:emporium_requested', () => this.store.open()),
@@ -1212,6 +1235,56 @@ export class UIScene extends Phaser.Scene {
   }
 
   /**
+   * FIRST CONTACT — name a machine the first time one is standing on the board.
+   *
+   * The north has no tutorial by design and must not grow one, but that left
+   * four of its five machines unnamed in every string the player could read,
+   * while two quests asked for pieces off the fifth. These lines are the
+   * introduction, spoken by the world's own giver: what it is called, what
+   * comes out of it, and — on the first one only — that every twelfth firing
+   * grows the next machine.
+   *
+   * Latched in `stats` (`fc:<chain>`), so it is said once ever and survives a
+   * reload. A region can seed several farms at once, so the fresh ones are
+   * spoken as ONE tap-advanced sequence per speaker rather than as a pile of
+   * timed bubbles racing each other for the same card.
+   */
+  private sweepFirstContact(): void {
+    if (!this.ctx.state.tutorialDone || this.finaleActive) return;
+    // Somebody is already talking — the Borealis arrival speech owns the stage
+    // on the very first visit, and the kiln's introduction belongs after it.
+    if (this.bubble.visible) {
+      this.time.delayedCall(FIRST_CONTACT_RETRY_MS, () => this.sweepFirstContact());
+      return;
+    }
+    const fresh = FIRST_CONTACT.filter(
+      (c) =>
+        this.ctx.state.stat(`fc:${c.chain}`) === 0 &&
+        [...this.ctx.state.items.values()].some(
+          (i) => i.kind === 'item' && i.chain === c.chain && i.tier === c.tier
+        )
+    );
+    if (!fresh.length) return;
+
+    // Grouped by speaker and played back to back: the table is per world today,
+    // but a shared region would otherwise interleave two voices in one bubble.
+    const groups = new Map<string, string[]>();
+    for (const c of fresh) {
+      this.ctx.state.addStat(`fc:${c.chain}`, 1);
+      const line = this.ctx.data.dialogue.hints[c.hint as keyof typeof this.ctx.data.dialogue.hints];
+      if (!line) continue;
+      groups.set(c.speaker, [...(groups.get(c.speaker) ?? []), line]);
+    }
+    const queue = [...groups.entries()];
+    const playNext = (): void => {
+      const next = queue.shift();
+      if (!next) return;
+      this.bubble.sequence(next[0] as SpeakerId, next[1], playNext);
+    };
+    playNext();
+  }
+
+  /**
    * Contextual recipe mini-tutorials: the moment the board first holds the TWO
    * pieces of a 2→1 recipe (two Red Dragons → Adult, two Houses → Manor),
    * Eleanor teases the merge and the guiding gauntlet demonstrates the drag
@@ -1369,6 +1442,23 @@ export class UIScene extends Phaser.Scene {
     // satchel shuts it, so the panel's dim can never swallow the tap the next
     // step is waiting on (`sell_it` leaves the bag open behind it).
     if (!step.done && !step.allow.bag && this.bag.isOpen) this.bag.requestClose();
+    // The Codex lesson holds its own book open — every beat of it is gated on
+    // turning a page, and a tap on Eleanor's bubble also reaches the panel's
+    // scrim. The beat that teaches CLOSING drops the hold, which is what puts
+    // the ✕ back on the page for its arrow to point at.
+    this.codex.setHeld(!step.done && step.allow.codexHold === true);
+    // ...and the same safety net the satchel and the Ledger carry: a beat that
+    // is not the lesson finds the book SHUT. The one exception is the beat that
+    // teaches closing it — there the ✕ is the gate, and shutting the panel for
+    // the player would answer their own lesson for them.
+    if (
+      !step.done &&
+      !step.allow.codexHold &&
+      !(step.arrow && 'ui' in step.arrow && step.arrow.ui === 'codex_close') &&
+      this.codex.isOpen
+    ) {
+      this.codex.requestClose();
+    }
     // Show key pill only during the key_unlock step; hide it otherwise.
     this.hud.setKeyVisible(!step.done && step.id === 'key_unlock');
     // A step that no longer involves the Ledger closes it, so its dim never
@@ -1712,10 +1802,7 @@ export class UIScene extends Phaser.Scene {
   private armedArrow: ResolvedArrow | null = null;
 
   private uiTarget(
-    ref:
-      | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
-      | { fogRegion: string }
-      | { character: string }
+    ref: { ui: TutorialUiTarget } | { fogRegion: string } | { character: string }
   ): { x: number; y: number; height?: number } | null {
     if ('character' in ref) {
       // Ask the board for her LIVE standee — she is authored in the World
@@ -1746,6 +1833,11 @@ export class UIScene extends Phaser.Scene {
       if (ref.ui === 'status') return this.statusPanel.getMarkerPos();
       if (ref.ui === 'cookbook') return { x: this.cookbookButton.x, y: this.cookbookButton.y };
       if (ref.ui === 'cookbook_close') return this.cookbook.isOpen ? this.cookbook.getClosePos() : null;
+      // The Codex lesson's three pointers, each null off its own page so the
+      // arrow walks the book (card → EVOLUTION → ✕) instead of hanging over a
+      // spread that has already been turned.
+      if (ref.ui === 'codex_card') return this.codex.getCardPos();
+      if (ref.ui === 'codex_evolution') return this.codex.getEvolutionPos();
       // Null until the panel is open AND the favourite reveal has played — the
       // arrow appears after the cinematic, never through it.
       if (ref.ui === 'codex_close') return this.codex.getClosePos();

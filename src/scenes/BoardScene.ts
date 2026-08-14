@@ -237,6 +237,7 @@ const baseScaleOf = (sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Imag
 
 const NO_ALLOW: Required<TutorialAllow> = {
   drag: [],
+  codexHold: false,
   feed: false,
   commission: false,
   status: false,

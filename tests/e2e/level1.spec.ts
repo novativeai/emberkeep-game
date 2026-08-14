@@ -767,32 +767,59 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       if ((await gameText(page)).tutorial.step !== 'feed_dragon') break;
     }
 
-    // ---------- The Codex writes the favourite: popup, reveal, close ----------
-    // The book opens itself (+0.7s), the favourite row fades in (~1.7s more),
-    // and only then does getClosePos answer — the arrow's own gate.
+    // ---------- The Codex lesson: roster → her page → Evolution → shut --------
+    // The book opens itself on the ROSTER (+0.7s). Each beat is gated on the
+    // page turning, and each pointer answers null off its own page — so the
+    // walk is driven through those same accessors, one per beat.
     await waitStep(page, 'codex_meal');
-    await page.waitForTimeout(3200);
-    await page.screenshot({ path: shot('14b2-codex-reveal') });
-    {
-      const closePos = await page.evaluate(() => {
+    await page.waitForTimeout(1400);
+    await page.screenshot({ path: shot('14b1-codex-roster') });
+
+    /** Click a Codex pointer once it answers; report whether it did. */
+    const tapCodex = async (which: 'card' | 'evolution' | 'close'): Promise<boolean> => {
+      const at = await page.evaluate((target) => {
         const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
-          codex: { getClosePos: () => { x: number; y: number } | null };
-        };
-        return ui.codex.getClosePos();
-      });
-      if (closePos) {
-        await page.mouse.click(closePos.x / 2, closePos.y / 2);
-        await page.waitForTimeout(400);
-      }
-      if ((await gameText(page)).tutorial.step === 'codex_meal') {
-        // Reliability fallback: close through the panel's own contract.
-        await page.evaluate(() => {
-          const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
-            codex: { requestClose: () => void };
+          codex: {
+            getCardPos: () => { x: number; y: number } | null;
+            getEvolutionPos: () => { x: number; y: number } | null;
+            getClosePos: () => { x: number; y: number } | null;
           };
-          ui.codex.requestClose();
-        });
-      }
+        };
+        if (target === 'card') return ui.codex.getCardPos();
+        if (target === 'evolution') return ui.codex.getEvolutionPos();
+        return ui.codex.getClosePos();
+      }, which);
+      if (!at) return false;
+      await page.mouse.click(at.x / 2, at.y / 2);
+      await page.waitForTimeout(500);
+      return true;
+    };
+
+    expect(await tapCodex('card'), 'the roster card the lesson points at').toBe(true);
+    await waitStep(page, 'codex_taste');
+    // The favourite row blooms in on the page the player turned to (~1.6s).
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: shot('14b2-codex-reveal') });
+
+    expect(await tapCodex('evolution'), 'the EVOLUTION button').toBe(true);
+    await waitStep(page, 'codex_evolution');
+    await page.screenshot({ path: shot('14b3-codex-evolution') });
+    // Three tap-gated bubbles: the shadow, how cycles bank, the payoff at six.
+    for (const id of ['codex_evolution', 'codex_cycles', 'codex_reward']) {
+      await waitStep(page, id);
+      await tapBubble(page);
+    }
+    await waitStep(page, 'codex_shut');
+    // The hold drops here — the ✕ is back on the page, which is the lesson.
+    expect(await tapCodex('close'), 'the ✕ once the book is no longer held').toBe(true);
+    if ((await gameText(page)).tutorial.step === 'codex_shut') {
+      // Reliability fallback: close through the panel's own contract.
+      await page.evaluate(() => {
+        const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+          codex: { requestClose: () => void };
+        };
+        ui.codex.requestClose();
+      });
     }
     await waitStep(page, 'cake_loved');
     await page.screenshot({ path: shot('14c-cake-loved') });

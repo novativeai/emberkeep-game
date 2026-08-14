@@ -34,6 +34,11 @@ GATE_REQUIRES: dict[str, list[str]] = {
     "marketplace:purchased": ["marketplace"],
     "ui:cookbook_opened": ["cookbook"],
     "ui:cookbook_closed": ["cookbook"],
+    # Turning a page of a book that shuts on the first stray tap is unwinnable:
+    # Phaser delivers the bubble tap to the panel's scrim as well, so the beat
+    # that waits for the next page needs the book HELD open.
+    "ui:codex_dragon_opened": ["codexHold"],
+    "ui:codex_evolution_opened": ["codexHold"],
     "ui:ledger_opened": ["ledger"],
     "order:completed": ["ledger", "deliver"],
     "bag:stored": ["bag"],

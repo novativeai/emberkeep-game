@@ -14,6 +14,7 @@ const ALLOW_NOTHING: Required<TutorialAllow> = {
   dragonWork: false,
   marketplace: false,
   cookbook: false,
+  codexHold: false,
   bag: false,
   character: false,
   feed: false,

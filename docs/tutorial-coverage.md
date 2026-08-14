@@ -175,20 +175,37 @@ teach-points in the south, which is why the north needs no new *rule*:
   `emberberry_merge` — the patch pays a Sprout every 12 berries and nine Sprouts
   are a second patch. That is the northern every-12 drop exactly.
 
-### OPEN — the five farms have no first-contact beat
+### The five farms — first contact
 
-What is missing is not a rule but an **introduction**. Measured against
-player-facing text (`quests.json`, `orders.json`, `dialogue.json`), three of the
-ten new chains are never named anywhere the player can read them:
+What was missing was never a rule but an **introduction**: four of the five
+machines were named nowhere a player could read them, while `north_terms` asked
+for an Orrery and `what_she_will_take` gifted three Ground Lenses — a quest
+asking for an object nobody had named, which is the defect class this ledger
+exists to catch.
 
-| chain | named in player-facing text? |
-| --- | --- |
-| `seaglass`, `warhelm`, `emberheart`, `auroraweave` | yes — Selyna's order blurbs |
-| `glasskiln`, `wreckforge`, `tarkiln`, `auroraloom` | **no** — the machines themselves are never named |
-| `starbench`, `orrery` | **no** — and `north_terms` requires an Orrery, while `what_she_will_take` gifts three Ground Lenses |
+The teach-point is a FIRST-CONTACT line: `Constants.FIRST_CONTACT` maps each
+machine to a `dialogue.json` → `hints` key, and UIScene speaks it in the world
+giver's own voice the first time one is standing on the board (seeded by a
+region unlock, or merged up out of its own parts — both are spawns). Latched
+once ever in `stats` as `fc:<chain>`, so it survives a reload without
+repeating; several farms revealed at once are spoken as ONE tap-advanced
+sequence rather than a pile of timed bubbles, because `borealis_coast` seeds
+three at a stroke. It waits out any bubble already talking, so the arrival
+speech keeps the stage on the very first visit.
 
-A quest that asks for an Orrery the player has never heard named is the same
-defect class this ledger exists to catch. Authoring is owned by the
-`tutorial-design` pass; the rows above stay as they are until it lands, because
-a row whose teach-point does not exist would fail `ftuecheck.py` rather than
-record the gap.
+| Concept | First on screen | Taught at | Note |
+| --- | --- | --- | --- |
+| **The Glass Kiln** — the north's first machine | `borealis_shore`, free, seeded ready-built at arrival | `glassKiln` | also the one beat that says the GROWTH rule out loud — every twelfth firing drops a Fire Brick, nine bricks are a second kiln. Said once, on the first machine; the arrival beat has already pointed at it ("that kiln behind you still draws"), so the line names what the player is looking at |
+| **The Starwright's Bench** and the Orrery | `borealis_coast`, 1 key | `starBench` | the urgent one: `north_threadwork` brews from Spyglasses, `what_she_will_take` gifts Ground Lenses and `north_terms` requires the Orrery itself, so the line names all three rungs (three lenses to a Spyglass, nine to an Orrery) and says the ask is coming |
+| **The Wreck Forge** | `borealis_coast`, 1 key | `wreckForge` | reinforced in the ladder: `salvage_frames` reads "Forge 2 Banded Helms at the Wreck Forge", and `north_longhall` raises a second one from three Bellows — the every-12 loop, applied |
+| **The Tar Kiln** | `borealis_coast`, 1 key | `tarKiln` | carries the diet rule the `selyna_pitch` blurb states — pitch is dug, not grown. `fuel_stack` names the machine again as the place beads come from |
+| **The Aurora Loom** | `borealis_keep`, 2 keys | `auroraLoom` | the slowest machine in the game (300 s), and the line says so, because a generator that looks broken is the same defect as one that is unnamed |
+
+**The quest ladder names live pieces again.** Every Borealis step label was
+written against the seven chains deleted at b3a8c68 — the tracker asked for
+Drift Spars, Bound Faggots, Lashed Frames, Upturned Hulls, Frost Flowers and a
+Rime Bloom while the board held Glass Floats, Banded Helms and Ground Lenses.
+All 22 stale strings now name the piece their own goal resolves to, and two of
+them were wrong about the recipe as well: `longhall_hull` asked for a merge of
+two where every chain merges three, and `longhall_build` claimed a Wreck Forge
+is built from Horned Helms when it is raised from three Forge Bellows.

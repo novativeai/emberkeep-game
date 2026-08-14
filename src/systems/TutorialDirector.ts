@@ -24,6 +24,7 @@ const ALLOW_NOTHING: Required<TutorialAllow> = {
   dragonWork: false,
   marketplace: false,
   cookbook: false,
+  codexHold: false,
   bag: false,
   character: false,
   feed: false,
@@ -42,6 +43,9 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
   dragonWork: true,
   marketplace: true,
   cookbook: true,
+  // Nothing HOLDS the book once the script is done — the player opens and shuts
+  // it as they like, which is the whole point of handing the game over.
+  codexHold: false,
   bag: true,
   character: true,
   feed: true,
@@ -115,6 +119,13 @@ export class TutorialDirector {
     bus.on('ui:codex_toggled', ({ open }) => {
       if (!open) this.onGateEvent('ui:codex_closed');
     });
+    // The Codex lesson is a walk through the book, so its gates are the PAGES:
+    // the roster card opened, then Evolution. Closing it is the last beat and
+    // has its own event above.
+    bus.on('ui:codex_page', ({ page }) => {
+      if (page === 'detail') this.onGateEvent('ui:codex_dragon_opened');
+      if (page === 'evolution') this.onGateEvent('ui:codex_evolution_opened');
+    });
     bus.on('item:spawned', () => this.checkCountGate());
     bus.on('item:removed', () => this.checkCountGate());
     // The board-hygiene lesson: a piece CARRIED into a region. Gated on the
@@ -157,17 +168,19 @@ export class TutorialDirector {
    *
    * Most effects are grants — a spawn, some XP, a key — and their results are in
    * the save, which is why `advance()` runs them once and `begin()` does not.
-   * Two are not grants. `nameDragon` opens a prompt, and `wantGift` stages a
-   * want that is deliberately never persisted; neither leaves anything behind
-   * for a reload to find. A step gated on answering a prompt that no longer
-   * exists is a dead save, so those two are re-applied on resume.
+   * Three are not grants. `nameDragon` opens a prompt, `wantGift` stages a want
+   * that is deliberately never persisted, and `openCodex` opens a panel; none
+   * leaves anything behind for a reload to find. A step gated on answering a
+   * prompt — or on turning a page of a book that is not on screen — is a dead
+   * save, so those three are re-applied on resume.
    *
-   * Both are idempotent by construction: `nameDragon` looks for a dragon with no
-   * name yet, and `wantGift` overwrites the single scripted want.
+   * All three are idempotent by construction: `nameDragon` looks for a dragon
+   * with no name yet, `wantGift` overwrites the single scripted want, and
+   * `openCodex` re-opens a panel that is either already open or shut.
    */
   private replayPrompts(step: TutorialStepConfig | undefined): void {
     for (const effect of step?.effects ?? []) {
-      if (!('nameDragon' in effect) && !('wantGift' in effect)) continue;
+      if (!('nameDragon' in effect) && !('wantGift' in effect) && !('openCodex' in effect)) continue;
       try {
         this.applyEffect(effect);
       } catch (err) {

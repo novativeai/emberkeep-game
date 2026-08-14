@@ -874,6 +874,17 @@ export interface TutorialAllow {
   marketplace?: boolean;
   /** Allow tapping the Emberkeep Cookbook button during tutorial. */
   cookbook?: boolean;
+  /**
+   * The Codex lesson is mid-walk: the book is HELD open.
+   *
+   * Its beats are gated on turning pages, and Phaser delivers a pointerup to
+   * every interactive object under it — so the tap that answers Eleanor also
+   * lands on the panel's scrim, and without this the book shuts under the step
+   * waiting on it. While set, the scrim ignores taps and both exits leave the
+   * page, so the beat has exactly one thing to do. The beat that teaches
+   * CLOSING the book deliberately omits it.
+   */
+  codexHold?: boolean;
   /** Allow tap-to-pocket (BagSystem). Off by default mid-tutorial: pocketing a
    *  scripted piece would strand the step that wants it merged. */
   bag?: boolean;
@@ -966,11 +977,18 @@ export type TutorialEffect =
   | { setEnergy: number }
   | { move: { chain: string; tier: number; to: [number, number] } }
   | { setTimer: { chain: string; tier: number; remainingMs: number } }
-  /** Open the Dragon Codex on the first named dragon's own page — the lesson
-   *  that shows the book writing itself. `reveal: 'favourite'` plays the
-   *  cinematic fade-in of the favourite-meal row (just discovered by the feed
-   *  the previous beat scripted). */
-  | { openCodex: { reveal?: 'favourite' } }
+  /**
+   * Open the Dragon Codex on the first named dragon — the lesson that shows the
+   * book writing itself. `reveal: 'favourite'` opens on the roster and arms the
+   * cinematic fade-in of the favourite-meal row (just discovered by the feed the
+   * previous beat scripted) for the page the player then opens.
+   *
+   * `page` is what a RESUME needs: every beat of the lesson carries this effect
+   * with the page its bubble is standing on, so a save reloaded mid-book comes
+   * back to the same spread instead of to a gate on a panel that is not there.
+   * The effect is idempotent — an already-open Codex ignores it.
+   */
+  | { openCodex: { reveal?: 'favourite'; page?: 'roster' | 'detail' | 'evolution' } }
   /** Open the naming prompt on the first board dragon of this chain+tier. The
    *  panel is not dismissible, so this is only ever authored on a step whose
    *  gate is the naming itself. */
@@ -1249,7 +1267,7 @@ export interface EventMap {
   'ui:codex_toggled': { open: boolean };
   /** Intent: open the Codex on the first named dragon's page for the lesson —
    *  the tutorial's `openCodex` effect. UIScene owns the panel and answers. */
-  'ui:codex_open_requested': { reveal?: 'favourite' };
+  'ui:codex_open_requested': { reveal?: 'favourite'; page?: 'roster' | 'detail' | 'evolution' };
   /** Fact: the Codex turned to a page. The tutorial's codex lesson walks the
    *  player roster → dragon → evolution, so the PAGE is what its gates read;
    *  `open`/`closed` alone cannot tell those three beats apart. */
