@@ -12,6 +12,7 @@ import {
   DRAGON_ANIM,
   DRAGON_CLIPS,
   DRAGON_NAP_LENGTH_MS,
+  GATE_FLIGHT,
   decorClipCharacter,
   MERGE_HINT,
   DRAGON_RIG_SCALE,
@@ -1371,14 +1372,12 @@ export class BoardScene extends Phaser.Scene {
     const key = clipKey(id, clipId);
     if (!clip || !this.textures.exists(key)) return null;
     this.touchClip(id, clipId); // most-recently-needed, for the LRU
-    if (!this.anims.exists(key)) {
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
-        frameRate: clip.fps,
-        repeat: clip.loop ? -1 : 0
-      });
-    }
+    this.ensureAnimForLiveTexture(key, key, () => ({
+      key,
+      frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+      frameRate: clip.fps,
+      repeat: clip.loop ? -1 : 0
+    }));
     return { clip, key };
   }
 
@@ -1617,6 +1616,41 @@ export class BoardScene extends Phaser.Scene {
     return false;
   }
 
+  /**
+   * Register a spritesheet animation AGAINST THE TEXTURE THAT IS LIVE NOW,
+   * rebuilding it if the one on file was built from a texture since destroyed.
+   *
+   * `this.anims` is GAME-scoped: an animation outlives the scene that made it,
+   * and — the part that bites — it outlives the TEXTURE it was made from. Travel
+   * destroys textures (`releaseAwayWorldArt` hands back the departed world's
+   * art), and coming back re-creates them under the same keys as brand new
+   * Texture objects. So `anims.exists(key)` is the wrong idempotence test: it is
+   * true, and the animation it is true about still holds frames pointing into
+   * the destroyed texture. Playing that takes the scene down inside `create()`,
+   * and the travel veil never lifts — the game sits on the loading screen.
+   *
+   * That is the freeze. Every world-art animation has to go through here: a
+   * character's clips, her cast bank, a decor clip, and — ours, which main does
+   * not have — the flight SEGMENTS and the Elder's own clips, which are cut from
+   * the same evicted sheets.
+   */
+  private ensureAnimForLiveTexture(
+    animKey: string,
+    textureKey: string,
+    config: () => Phaser.Types.Animations.Animation
+  ): void {
+    const existing = this.anims.get(animKey);
+    if (existing) {
+      const first = existing.frames[0];
+      // Same Texture OBJECT, not the same key — the key is exactly what stayed
+      // the same across the eviction. `textureKey` is passed separately because
+      // a segment animation is keyed off its clip's sheet, not off its own name.
+      if (first && first.frame.texture === this.textures.get(textureKey)) return;
+      this.anims.remove(animKey);
+    }
+    this.anims.create(config());
+  }
+
   /** The overlay sprite that stands in for the rig while a clip plays. */
   private dragonOverlay(ld: LiveDragon, key: string): Phaser.GameObjects.Sprite {
     if (!ld.clipOverlay) {
@@ -1679,13 +1713,14 @@ export class BoardScene extends Phaser.Scene {
     if (!f?.clip.segments) return null;
     for (const [seg, [start, end]] of Object.entries(f.clip.segments)) {
       const key = this.segKey(f.key, seg);
-      if (this.anims.exists(key)) continue;
-      this.anims.create({
+      // Cut from the CLIP's sheet, so that is the texture its liveness is
+      // judged against — not its own name, which no texture is filed under.
+      this.ensureAnimForLiveTexture(key, f.key, () => ({
         key,
         frames: this.anims.generateFrameNumbers(f.key, { start, end: end - 1 }),
         frameRate: f.clip.fps,
         repeat: seg === 'loop' ? -1 : 0
-      });
+      }));
     }
     return f;
   }
@@ -2528,23 +2563,20 @@ export class BoardScene extends Phaser.Scene {
     const key = clipKey(art, clipId);
     if (!clip || !this.textures.exists(key)) return null;
     this.touchClip(art, clipId);
-    if (!this.anims.exists(key)) {
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
-        frameRate: clip.fps,
-        repeat: clip.loop ? -1 : 0
-      });
-    }
+    this.ensureAnimForLiveTexture(key, key, () => ({
+      key,
+      frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+      frameRate: clip.fps,
+      repeat: clip.loop ? -1 : 0
+    }));
     for (const [seg, range] of Object.entries(clip.segments ?? {})) {
       const sk = this.segKey(key, seg);
-      if (this.anims.exists(sk)) continue;
-      this.anims.create({
+      this.ensureAnimForLiveTexture(sk, key, () => ({
         key: sk,
         frames: this.anims.generateFrameNumbers(key, { start: range[0], end: range[1] - 1 }),
         frameRate: clip.fps,
         repeat: seg === 'loop' ? -1 : 0
-      });
+      }));
     }
     return { clip, key };
   }
@@ -3075,14 +3107,14 @@ export class BoardScene extends Phaser.Scene {
     const key = clipKey(art, 'boil');
     if (!clip || !this.textures.exists(key)) return;
     const still = this.textures.get(`decor_${name}`).getSourceImage() as HTMLImageElement;
-    if (!this.anims.exists(key)) {
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
-        frameRate: clip.fps,
-        repeat: -1
-      });
-    }
+    // Same rule as the character clips: the cauldron's sheet is evicted when you
+    // leave Runevault and re-created when you come back.
+    this.ensureAnimForLiveTexture(key, key, () => ({
+      key,
+      frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+      frameRate: clip.fps,
+      repeat: -1
+    }));
     sprite.setTexture(key, 0);
     sprite.setScale(dispScale * clip.scale);
     sprite.setOrigin(
@@ -3281,14 +3313,14 @@ export class BoardScene extends Phaser.Scene {
     const clip = clipFor(art, clipId);
     const key = clipKey(art, clipId);
     if (!clip || clip.stage === 'portrait' || !this.textures.exists(key)) return null;
-    if (!this.anims.exists(key)) {
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
-        frameRate: clip.fps,
-        repeat: clip.loop ? -1 : 0
-      });
-    }
+    // Rebuilt if the sheet was evicted and re-fetched — character clips are
+    // world art, so travel destroys and re-creates them under the same key.
+    this.ensureAnimForLiveTexture(key, key, () => ({
+      key,
+      frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+      frameRate: clip.fps,
+      repeat: clip.loop ? -1 : 0
+    }));
     return clip;
   }
 
@@ -3370,15 +3402,16 @@ export class BoardScene extends Phaser.Scene {
    */
   private ensureStandeeAnims(characterId: string, bank: (typeof STANDEE_BANKS)[string]): void {
     const key = this.standeeAnimKey(characterId, 'cast');
-    if (this.anims.exists(key)) return;
     const texture = bank.keys.cast;
     if (!this.textures.exists(texture)) return;
-    this.anims.create({
+    // Her cast BANK is world art as much as her clips are, so it is evicted and
+    // re-fetched by travel too — the animation must follow the live sheet.
+    this.ensureAnimForLiveTexture(key, texture, () => ({
       key,
       frames: this.anims.generateFrameNumbers(texture, { start: 0, end: bank.frameCount - 1 }),
       frameRate: bank.fps.cast,
       repeat: 0
-    });
+    }));
   }
 
   /**
@@ -3399,7 +3432,13 @@ export class BoardScene extends Phaser.Scene {
     }
     const sprite = this.characterSprites.get(characterId);
     const bank = STANDEE_BANKS[characterId];
-    if (!sprite || !bank || !this.anims.exists(this.standeeAnimKey(characterId, 'cast'))) return;
+    if (!sprite || !bank) return;
+    // Re-registered rather than merely LOOKED UP. `anims.exists` answers true
+    // for an animation whose frames point into a texture travel has since
+    // destroyed, and playing that one takes the scene down — the whole reason
+    // `ensureAnimForLiveTexture` exists. Asking for it is what makes it live.
+    this.ensureStandeeAnims(characterId, bank);
+    if (!this.anims.exists(this.standeeAnimKey(characterId, 'cast'))) return;
     sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       if (!sprite.active) return;
       sprite.stop();
@@ -4113,11 +4152,109 @@ export class BoardScene extends Phaser.Scene {
     for (const [id, door] of this.portalDoors) {
       if (door.fx.isLive || !open.has(door.to)) continue;
       if (bloom && id === 'emberkeep_altar_gate') continue;
-      if (bloom) door.fx.bloom();
-      else door.fx.standIdle();
+      if (bloom) {
+        door.fx.bloom();
+        // The gate's REVEAL carries a passenger: once the ignition has played
+        // out, the named hatchling flies through and stays through. Hooked to
+        // the bloom transition, so it happens exactly once per save — a reload
+        // finds the door standing open (standIdle) and him already over there.
+        this.time.delayedCall(GATE_FLIGHT.startDelayMs, () => this.playGateFlight(door));
+      } else {
+        door.fx.standIdle();
+      }
       this.widenDoor(door);
     }
     this.refreshPortals();
+  }
+
+  /**
+   * The hatchling's first crossing, with the WAKING as its opening beat.
+   *
+   * A sleeping dragon flown at a portal is a curled painting on a bezier — the
+   * rig is hidden behind the sleep art and none of the flight clips are
+   * mounted, so it arrives at the door still asleep and reads as stuck to it.
+   * The sleep therefore ends FIRST: `keepAwake` covers the whole crossing, the
+   * uncurl plays on the ordinary mood path, and only once it is on its feet
+   * does the flight begin.
+   */
+  private playGateFlight(door: { fx: PortalFX; zone: Phaser.GameObjects.Zone; to: string }): void {
+    const named = this.ctx.systems.dragons.firstNamed();
+    if (!named) return;
+    const asleep = this.ctx.systems.dragonLife.sleepKindOf(named.itemId) !== null;
+    this.ctx.systems.dragonLife.keepAwake(named.itemId, GATE_FLIGHT.keepAwakeMs);
+    if (asleep) {
+      this.time.delayedCall(GATE_FLIGHT.wakeLeadMs, () => this.flyThroughGate(door, named.itemId));
+      return;
+    }
+    this.flyThroughGate(door, named.itemId);
+  }
+
+  /**
+   * Into the light, and THROUGH.
+   *
+   * He lifts off, arcs into the door as it takes him, and fades into the
+   * glare — and that is where it ends. `dragon:cross_gate` moves the piece onto
+   * the far world's board (WorldSystem owns the landing cell), so following him
+   * through actually finds him waiting there. A flourish that flew back out
+   * would be prettier by one beat and a lie by the whole point.
+   */
+  private flyThroughGate(
+    door: { fx: PortalFX; zone: Phaser.GameObjects.Zone; to: string },
+    itemId: number
+  ): void {
+    const sprite = this.itemSprites.get(itemId);
+    if (!sprite?.active) return;
+    const ld = this.liveDragons.get(itemId);
+    const target = { x: door.zone.x, y: door.zone.y - 30 };
+    if (ld) {
+      ld.busy = true;
+      this.setDragonFacing(ld, target.x <= sprite.x ? 'left' : 'right');
+    }
+    const journey = (): void => {
+      // Arc control point well above the straight line — a flight, not a slide.
+      const peak = { x: (sprite.x + target.x) / 2, y: Math.min(sprite.y, target.y) - 260 };
+      const curve = new Phaser.Curves.QuadraticBezier(
+        new Phaser.Math.Vector2(sprite.x, sprite.y),
+        new Phaser.Math.Vector2(peak.x, peak.y),
+        new Phaser.Math.Vector2(target.x, target.y)
+      );
+      const path = { t: 0 };
+      this.tweens.add({
+        targets: path,
+        t: 1,
+        duration: GATE_FLIGHT.flyMs,
+        ease: 'Sine.easeInOut',
+        onUpdate: () => {
+          const at = curve.getPoint(path.t);
+          sprite.x = at.x;
+          sprite.y = at.y;
+          sprite.settleDepth();
+        },
+        onComplete: () => {
+          this.glowFlash(target.x, target.y, PALETTE.goldAccent, 0.8, 1.6);
+          this.sparks.explode(18, target.x, target.y);
+          this.tweens.add({
+            targets: sprite,
+            alpha: 0,
+            scale: sprite.scale * 0.7,
+            duration: GATE_FLIGHT.fadeMs,
+            ease: 'Sine.easeIn',
+            onComplete: () => {
+              // The piece leaves this board here, not before: the state move is
+              // what makes the crossing real, and doing it early would blink
+              // the animal out from under its own flight.
+              this.removeDragonRig(itemId);
+              this.detachItemAura(itemId);
+              this.itemSprites.delete(itemId);
+              sprite.release();
+              this.ctx.bus.emit('dragon:cross_gate', { itemId, to: door.to });
+            }
+          });
+        }
+      });
+    };
+    if (ld) this.dragonHover(ld, undefined, journey);
+    else journey();
   }
 
   private ignitePortal(id: string): void {
@@ -5326,7 +5463,7 @@ export class BoardScene extends Phaser.Scene {
     // with the work, and shaking it off would hand the cost back.
     if (this.ctx.systems.dragons.isBoardDragon(item)) {
       const kind = this.ctx.systems.dragonLife.sleepKindOf(item.id);
-      if (kind === 'nap' || kind === 'night') {
+      if (kind === 'nap') {
         this.wakeDragonByTap(sprite, item.id);
         return;
       }
