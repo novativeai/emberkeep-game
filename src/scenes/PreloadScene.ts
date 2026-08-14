@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
-import { boardClipCharacters, clipKey, clipsFor } from '../core/characterAnims';
+import { clipKey, clipsFor, dragonClipCharacter } from '../core/characterAnims';
 import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, PALETTE, SCENES, STANDEE_BANKS } from '../core/Constants';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
@@ -166,10 +166,30 @@ export class PreloadScene extends Phaser.Scene {
         });
       }
     }
-    // …and the BOARD-DRAGON clip sets (fly / tosleep): dragons are merge pieces
-    // that can stand on any world's board, so their clips ride the boot
-    // preload rather than any one world's art list.
-    for (const id of boardClipCharacters()) {
+    // …and the BOARD-DRAGON clip sets (idle / roar / fly / tosleep) — but ONLY
+    // for the breeds already standing on this board.
+    //
+    // Dragons are merge pieces that can stand on any world's board, which is why
+    // every breed's clips used to ride the boot preload. That reasoning is sound
+    // and the conclusion was still wrong: these are the heaviest textures in the
+    // game, and a spritesheet is uploaded as one 4096-wide RGBA surface, so the
+    // eleven breeds together decode to ~1 GB resident — enough on its own for
+    // WebKit to kill the tab, which is what iOS Chrome/Safari were doing right
+    // after the loader finished. A board holds one or two breeds, not eleven.
+    //
+    // So they follow the standee rule above instead: fetch what this board can
+    // actually show, and let `BoardScene.ensureDragonClips` pull a breed's set
+    // the first time one of its dragons appears (spawn, merge or restore).
+    const onBoard = new Set<string>();
+    for (const item of ctx.state.items.values()) {
+      const id = dragonClipCharacter(
+        item.chain,
+        item.tier,
+        ctx.state.dragonSkins[item.chain] ?? null
+      );
+      if (id) onBoard.add(id);
+    }
+    for (const id of onBoard) {
       for (const [clipId, clip] of Object.entries(clipsFor(id))) {
         if (this.textures.exists(clipKey(id, clipId))) continue;
         this.load.spritesheet(clipKey(id, clipId), clip.file, {

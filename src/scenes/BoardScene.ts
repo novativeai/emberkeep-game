@@ -353,6 +353,9 @@ export class BoardScene extends Phaser.Scene {
   /** The ember-dragon rig, loaded once and reused for every hatchling/whelp. */
   private dragonRigs = new Map<string, RigDoc>();
   private liveDragons = new Map<number, LiveDragon>();
+  /** Clip characters whose sheets have been requested this scene — see
+   *  `ensureDragonClips`. Membership means "asked for", not "resident". */
+  private clipsFetched = new Set<string>();
   /** Dragon item ids currently flying a cosmetic worker flourish. */
   private busyDragons = new Set<number>();
   /** Per-level camera framing + the active level-up glide. */
@@ -884,6 +887,57 @@ export class BoardScene extends Phaser.Scene {
    *  Emporium skin (a purchased Frost/Storm IS that breed on the board). */
   private clipCharacterFor(chain: string, tier: number): string | null {
     return dragonClipCharacter(chain, tier, this.ctx.state.dragonSkins[chain] ?? null);
+  }
+
+  /**
+   * Fetch this breed's Align-Studio clip sheets, once, the first time one of
+   * its dragons is on the board.
+   *
+   * These are by far the heaviest textures in the game: eleven breeds x ~3
+   * clips, and because a spritesheet is uploaded as one 4096-wide RGBA surface
+   * the set decodes to roughly a GIGABYTE resident — on its own enough for
+   * WebKit to kill the tab, which is exactly what iOS was doing. They used to
+   * ride the boot preload wholesale on the reasoning that a dragon can stand on
+   * any world's board. True, but it is not a reason to pay for ELEVEN breeds
+   * when a board holds one or two: this is the same discipline the standee
+   * banks and `ensureTextures` already follow — pay when the thing appears.
+   *
+   * Deferring is safe by construction. `clipComplete` tests residency, so a
+   * breed whose sheets have not landed yet simply wears its rig (or its static
+   * sprite, for the clip-only breeds) and is re-dressed by the COMPLETE handler
+   * below — the same "re-skin what spawned before the art arrived" pass the rig
+   * loader does.
+   */
+  private ensureDragonClips(chain: string, tier: number): void {
+    const id = this.clipCharacterFor(chain, tier);
+    if (!id || this.clipsFetched.has(id)) return;
+    this.clipsFetched.add(id);
+    let queued = 0;
+    for (const [clipId, clip] of Object.entries(clipsFor(id))) {
+      if (this.textures.exists(clipKey(id, clipId))) continue;
+      this.load.spritesheet(clipKey(id, clipId), clip.file, {
+        frameWidth: clip.frameWidth,
+        frameHeight: clip.frameHeight
+      });
+      queued++;
+    }
+    if (queued === 0) return;
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      if (!this.scene.isActive()) return;
+      // Re-dress anything already standing that this set completes.
+      for (const sprite of this.itemSprites.values()) {
+        if (
+          this.clipCharacterFor(sprite.chain, sprite.tier) === id &&
+          this.wearsRigTier(sprite.chain, sprite.tier) &&
+          !this.liveDragons.has(sprite.itemId)
+        ) {
+          this.attachDragon(sprite, false);
+        }
+      }
+    });
+    // A loader already in flight will pick these up when it drains; starting a
+    // second overlapping run is what wedges Phaser's queue (see loadDragonRigs).
+    if (!this.load.isLoading()) this.load.start();
   }
 
   /** True when this breed+skin's clip set carries the whole animal (an idle
@@ -5657,6 +5711,9 @@ export class BoardScene extends Phaser.Scene {
       bus.on('store:dragon_skin_changed', ({ dragon }) => this.applyDragonSkin(dragon)),
       bus.on('item:spawned', ({ item, cause }) => {
         const sprite = this.acquireSprite(item, false);
+        // Before the rig test: a clip-only breed does not read as a dragon at
+        // all until its sheets are resident.
+        this.ensureDragonClips(item.chain, item.tier);
         // Any dragon generator (ember or emerald) wears its live rig.
         if (this.wearsRigTier(item.chain, item.tier)) this.attachDragon(sprite, false);
         // A quest-reward piece (a legendary egg) earns the camera — it must
@@ -5881,6 +5938,7 @@ export class BoardScene extends Phaser.Scene {
         this.time.delayedCall(60 + i * 90, () => {
           // popIn's Back.easeOut overshoot IS the pop — never stack a second
           // scale tween on a spawning sprite, the longer one wins the final write.
+          this.ensureDragonClips(output.chain, output.tier);
           const isDragon = this.wearsRigTier(output.chain, output.tier);
           const sprite = this.acquireSprite(output, !isDragon);
           // A merged-up dragon (e.g. the Whelp) also wears the live rig and
@@ -6283,7 +6341,9 @@ export class BoardScene extends Phaser.Scene {
       const snap = this.ctx.state.snapshot(item, now);
       const sprite = this.acquireSprite(snap, false);
       // Restore the live rig for dragons already on the board (resting, not
-      // celebrating — they didn't just hatch).
+      // celebrating — they didn't just hatch). Their clip sheets are no longer
+      // in the boot preload, so ask for this breed's set before the rig test.
+      this.ensureDragonClips(snap.chain, snap.tier);
       if (this.wearsRigTier(snap.chain, snap.tier)) this.attachDragon(sprite, false);
     }
   }
