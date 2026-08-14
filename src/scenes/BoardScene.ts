@@ -423,6 +423,29 @@ export class BoardScene extends Phaser.Scene {
   }
 
   create(): void {
+    // ANNOUNCING THE BOARD IS NOT OPTIONAL.
+    //
+    // `world:ready` is what lowers the travelling veil, and the veil's scrim is
+    // interactive on purpose — so a build that throws on its way to the last
+    // line does not leave a half-drawn board, it leaves a curtain the player
+    // cannot dismiss, with no menu and no way back. Every other failure in this
+    // scene still leaves a game; this one ends the session.
+    //
+    // So the announcement is owed whatever happens. A board that failed to
+    // build is still handed back, and the error is re-thrown after the veil is
+    // down so it reaches the console with its stack intact instead of being
+    // swallowed by a rescue. `buildBoard` is the whole of what create() used to
+    // be; nothing about the build changed.
+    try {
+      this.buildBoard();
+    } catch (err) {
+      console.error('[board] create() failed to finish — handing the board back anyway', err);
+      this.ctx?.bus.emit('world:ready', { world: this.ctx.state.worldId });
+      throw err;
+    }
+  }
+
+  private buildBoard(): void {
     this.ctx = this.registry.get('ctx') as GameContext;
     // Point the ambient `gridToWorld`/`worldToGrid` at the world being shown, so
     // every call site below projects through the ZONE that owns each address.
