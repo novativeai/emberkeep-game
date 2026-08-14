@@ -1556,6 +1556,20 @@ export const DRAG = {
   settleMs: 150,
   /** Exponential-smoothing time constant (ms): lower = snappier follow. */
   followTau: 70,
+  /**
+   * WHERE A CARRIED PIECE IS CONSIDERED TO BE STANDING.
+   *
+   * `dropCellUnderDrag` samples the board a little BELOW the art it is carrying,
+   * so a piece lands on the cell its feet are over rather than the one its
+   * middle crosses. As a fraction of the piece's own displayed height rather
+   * than a flat number of pixels: the roster runs from a 48 px Dew Drop to
+   * pieces well past 120, and one constant that suits the tall ones is half a
+   * body on the short ones — the sample clears the art entirely and answers
+   * with the next cell down. The cap keeps the tallest pieces (Manors, adult
+   * dragons) from reaching a cell away.
+   */
+  dropBiasOfHeight: 0.28,
+  dropBiasMaxPx: 24,
   /** Ground shadow under a lifted item. */
   shadowRX: 58,
   shadowRY: 22,

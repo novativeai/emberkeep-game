@@ -4490,10 +4490,27 @@ export class BoardScene extends Phaser.Scene {
       .setVisible(true);
   }
 
-  /** The address under the dragged item — the ONE resolver the highlight and the
-   *  drop both read, so the diamond cannot show one cell and the drop take another. */
+  /**
+   * The address under the dragged item — the ONE resolver the highlight and the
+   * drop both read, so the diamond cannot show one cell and the drop take another.
+   *
+   * The downward bias moves the sample from where the art is CARRIED to where it
+   * would STAND, so a piece lands on the cell its feet are over rather than the
+   * one its middle happens to cross. It used to be a flat 24 px, which is a
+   * quiet assumption that every piece is the same height — and the roster is
+   * not. A Dew Drop renders 48 px tall against a median of 85, so 24 px was
+   * half its body: the sample fell clear of the art and resolved the cell BELOW
+   * the one under the player's finger. Dropping a Dew Drop on a Dew Drop
+   * therefore missed, over and over, while the same gesture worked everywhere
+   * else — which is exactly the "it will not merge" it was reported as.
+   *
+   * Read off the piece instead, so the bias means the same THING at every size
+   * and no future art can inherit the bug by being short.
+   */
   private dropCellUnderDrag(): TilePos {
-    return cellAtWorldPoint(this.ctx.state.world, this.dragTarget.x, this.dragTarget.y + 24);
+    const height = this.dragSprite?.artHitRect().height ?? 0;
+    const bias = height > 0 ? Math.min(DRAG.dropBiasMaxPx, height * DRAG.dropBiasOfHeight) : DRAG.dropBiasMaxPx;
+    return cellAtWorldPoint(this.ctx.state.world, this.dragTarget.x, this.dragTarget.y + bias);
   }
 
   /**
