@@ -33,6 +33,7 @@ import type {
   ChainsData,
   CharactersData,
   DialogueData,
+  DragondexData,
   MapData,
   OrdersData,
   QuestsData,
@@ -46,6 +47,7 @@ import cauldronJson from '../data/cauldron.json';
 import chainsJson from '../data/chains.json';
 import charactersJson from '../data/characters.json';
 import dialogueJson from '../data/dialogue.json';
+import dragondexJson from '../data/dragondex.json';
 import mapJson from '../data/map.json';
 import ordersJson from '../data/orders.json';
 import questsJson from '../data/quests.json';
@@ -66,6 +68,7 @@ export interface GameData {
   characters: CharactersData;
   store: StoreData;
   quests: QuestsData;
+  dragondex: DragondexData;
 }
 
 export interface GameSystems {
@@ -123,6 +126,7 @@ export class GameContext {
       tasks: tasksJson as unknown as TasksData,
       store: storeJson as unknown as StoreData,
       quests: questsJson as unknown as QuestsData,
+      dragondex: dragondexJson as unknown as DragondexData,
       ...overrides
     };
     this.state = new GameState(this.data.map);

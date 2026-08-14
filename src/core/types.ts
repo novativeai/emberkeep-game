@@ -75,16 +75,33 @@ export interface BoardItemState {
 /** Per-board-dragon care. `day`/`trustDay` are `dayIndexAt` stamps, so both
  *  daily allowances reset on the virtual clock like every other timer. */
 export interface DragonCare {
-  /** Day stamp the meal/green tallies below belong to. */
+  /**
+   * CYCLE stamp the meal/green tallies below belong to (`cycleIndexAt`, the
+   * 10-minute feed window). The field kept its old name when hunger moved from
+   * the 32-minute day onto the cycle: an old save's day stamp simply never
+   * matches a cycle index, so its stale tallies reset once on load — exactly
+   * what a rollover does anyway.
+   */
   day: number;
-  /** Servings eaten today, taste-weighted (MEALS_PER_DAY fills the day). */
+  /** Servings eaten this cycle, taste-weighted (MEALS_PER_DAY fills the gauge). */
   meals: number;
-  /** Cooling servings eaten today (DAILY_GREEN is the day's need). */
+  /** Cooling servings eaten this cycle (DAILY_GREEN is the cycle's need). */
   green: number;
-  /** 0..TRUST_MAX. Earned by feeding, at most once a day, and never decays. */
+  /** 0..TRUST_MAX. Earned by feeding, at most once a DAY (`dayIndexAt` — a
+   *  relationship is not an appetite), and never decays. */
   trust: number;
   /** Day stamp of the last trust gain — the once-a-day latch. */
   trustDay: number;
+  /** Lifetime count of WELL-FED cycles — cycles whose gauge reached full
+   *  (MEALS_PER_DAY). The Codex's number, and the evolution condition's coin. */
+  wellFedCycles?: number;
+  /** Cycle stamp of the last well-fed credit — the once-per-cycle latch. */
+  wellFedCycle?: number;
+  /** Taste knowledge, discovered by EXPERIMENT (merge-chains §2.1): the Codex
+   *  shows his favourite only after a meal he loved, and his dislike only
+   *  after he has actually turned his head away. Never told, always learned. */
+  favouriteKnown?: boolean;
+  dislikeKnown?: boolean;
 }
 
 export type RegionStatus = 'active' | 'unlockable' | 'locked';
@@ -944,6 +961,35 @@ export interface AnchorsData {
 }
 
 /* ------------------------------------------------------------------ */
+/* The Dragon Codex (src/data/dragondex.json)                           */
+/* ------------------------------------------------------------------ */
+
+/** One breed's Codex entry — the lore card behind its face. */
+export interface DragondexEntry {
+  /** Breed display title (the named dragon's own name headlines the card). */
+  title: string;
+  /** Kept SHORT by design — one or two sentences; the card is a keepsake,
+   *  not a wiki. */
+  story: string;
+  personality: string;
+  ability: string;
+  /** The Evolution page. `reveal` is the ADULT's reveal-art texture key,
+   *  shown as a silhouette until the condition is met; `wellFedCycles`
+   *  mirrors WELL_FED_EVOLUTION (the data states the words, Constants the
+   *  number the systems enforce — a mismatch is caught by the unit test). */
+  evolution?: {
+    wellFedCycles: number;
+    into: string;
+    reveal: string;
+    condition: string;
+  };
+}
+
+export interface DragondexData {
+  dragons: Record<string, DragondexEntry>;
+}
+
+/* ------------------------------------------------------------------ */
 /* Save schema                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -1317,6 +1363,15 @@ export interface EventMap {
   'dragon:refused': { itemId: number; chain: string; reason: 'dislike' | 'not_food' };
   /** Trust moved (at most once a day, +1, or +2 for a known favourite). */
   'dragon:trust_changed': { itemId: number; trust: number };
+  /** The gauge filled inside one feed cycle — a WELL-FED cycle, credited once.
+   *  `cycles` is the lifetime count the Codex shows, `needed` the evolution
+   *  condition's bar, so a listener never has to look either up. */
+  'dragon:well_fed': { itemId: number; chain: string; cycles: number; needed: number };
+  /** The Dragon Codex opened/closed. */
+  'ui:codex_toggled': { open: boolean };
+  /** Intent: open the Codex on the first named dragon's detail page — for a
+   *  scripted reveal. UIScene owns the panel and answers. */
+  'ui:codex_open_requested': { reveal?: 'favourite' };
   /** Intent: open the naming prompt for the dragon standing on the board as
    *  `itemId`. The tutorial's `nameDragon` effect is the only caller today. */
   'ui:name_dragon_requested': { itemId: number };
