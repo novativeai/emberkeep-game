@@ -539,6 +539,42 @@ export class GameState {
     this.grid[to.row]![to.col] = id;
   }
 
+  /**
+   * Carry a piece THROUGH — off this world's board and onto another's, keeping
+   * its identity.
+   *
+   * `moveItem` cannot do this and must not learn to: it moves a piece within
+   * `grid`, and there is one grid per world. Crossing is a different act — the
+   * piece leaves an occupancy map and joins another — and it is the ONLY way a
+   * board item changes world, so it is one funnel like `moveItem` is.
+   *
+   * The IDENTITY travels, not a copy. Item ids are unique across worlds by
+   * construction, so the same `id` on the far side means the same animal: the
+   * name the Keeper gave it, the care record the Codex counts, the ready timer
+   * a generator is running. Re-spawning it there would hand back a stranger
+   * wearing its art — and, for a NAMED dragon, break the one law the naming
+   * rests on (a named thing is never consumed and re-made).
+   *
+   * Returns false rather than throwing when the destination cannot take it: an
+   * unknown world, or a cell that is out of bounds or already occupied. A
+   * cinematic crossing is not worth a thrown exception inside the game loop.
+   */
+  crossItemToWorld(id: number, worldId: string, to: TilePos): boolean {
+    const item = this.items.get(id);
+    if (!item || !this.worlds.has(worldId) || worldId === this.activeId) return false;
+    const world = this.worlds.get(worldId)!;
+    if (to.col < 0 || to.row < 0 || to.col >= world.cols || to.row >= world.rows) return false;
+    const board = this.board(worldId); // materialises the far side if unvisited
+    if (board.grid[to.row]![to.col] !== null) return false;
+    this.grid[item.row]![item.col] = null;
+    this.items.delete(id);
+    item.col = to.col;
+    item.row = to.row;
+    board.items.set(id, item);
+    board.grid[to.row]![to.col] = id;
+    return true;
+  }
+
   removeItem(id: number): BoardItemState {
     const item = this.items.get(id);
     if (!item) throw new Error(`removeItem: unknown item ${id}`);

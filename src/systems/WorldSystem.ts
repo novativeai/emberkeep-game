@@ -1,6 +1,8 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { WorldRuntime } from '../core/world';
+import { cellAtWorldPoint } from '../core/world';
+import type { TilePos } from '../core/types';
 import { storyOpen, worldOpen } from '../core/worldGates';
 
 /**
@@ -30,7 +32,73 @@ export class WorldSystem {
     private bus: EventBus
   ) {
     bus.on('world:switch', ({ to }) => this.switchTo(to));
+    bus.on('dragon:cross_gate', ({ itemId, to }) => this.crossDragon(itemId, to));
   }
+
+  /**
+   * A dragon goes through a gate, and STAYS through.
+   *
+   * The Keeper does not travel — this is the animal scouting ahead, and the
+   * story it tells only works if following it later actually finds it there.
+   * A flourish that flew it into the light and back out again was the same
+   * picture with the meaning taken out: it says "he went" and then unsays it.
+   *
+   * The landing cell is chosen HERE rather than authored, because the far side
+   * may never have been visited and has no idea anyone is coming. The gate the
+   * two worlds share is the anchor — a dragon that crossed at the arch comes
+   * out beside the arch — and the search widens from there to the first free
+   * playable cell, so a busy hub simply seats it one tile over.
+   */
+  private crossDragon(itemId: number, to: string): void {
+    const from = this.state.worldId;
+    const world = this.state.worlds.get(to);
+    if (!world || to === from) return;
+    const at = this.landingCell(world, from);
+    if (!at || !this.state.crossItemToWorld(itemId, to, at)) return;
+    this.bus.emit('dragon:crossed', { itemId, from, to, at });
+  }
+
+  /**
+   * Where an arriving dragon comes out: beside the far side's own door back,
+   * else the first free playable cell. Never on top of something — the far
+   * board is live even while unwatched, and a crossing must not displace a
+   * piece the player left there.
+   */
+  private landingCell(world: WorldRuntime, from: string): TilePos | null {
+    const board = this.state.itemsIn(world.id);
+    const taken = new Set([...(board?.values() ?? [])].map((i) => `${i.col},${i.row}`));
+    const free = (col: number, row: number): boolean =>
+      world.playable.has(`${col},${row}`) && !taken.has(`${col},${row}`);
+
+    // The door BACK is the anchor: a dragon that crossed at the arch comes out
+    // beside the arch. Portals are authored as world-pixel rectangles, so the
+    // cell is whichever one their centre lands on.
+    const doorBack = world.portals.find((p) => p.to === from);
+    if (doorBack) {
+      const at = cellAtWorldPoint(
+        world,
+        doorBack.x + doorBack.width / 2,
+        doorBack.y + doorBack.height / 2
+      );
+      // Rings out from it, so "he is waiting at the arch" stays true even when
+      // the exact tile under the door is occupied or is not playable ground.
+      for (let r = 0; r <= 3; r++) {
+        for (let dc = -r; dc <= r; dc++) {
+          for (let dr = -r; dr <= r; dr++) {
+            if (Math.max(Math.abs(dc), Math.abs(dr)) !== r) continue;
+            if (free(at.col + dc, at.row + dr)) return { col: at.col + dc, row: at.row + dr };
+          }
+        }
+      }
+    }
+    // No door back, or the whole neighbourhood is full: anywhere it can stand.
+    for (const key of world.playable) {
+      const [col, row] = key.split(',').map(Number);
+      if (free(col!, row!)) return { col: col!, row: row! };
+    }
+    return null;
+  }
+
 
   /** Worlds the Keeper may travel to right now, in the order they open. The
    *  rule itself lives in `core/worldGates` — the Store shelves read the same

@@ -1516,6 +1516,14 @@ export interface EventMap {
   /* -- world travel (WorldSystem owns the switch; see src/core/world.ts) -- */
   /** Intent/command: show a different world. Refused mid-tutorial and below the
    *  destination's Keeper level; the board it leaves keeps standing. */
+  /**
+   * Command: carry this board dragon THROUGH a gate — it leaves this world's
+   * board and stands on the destination's. Not a travel: the Keeper stays put.
+   * WorldSystem owns the landing cell and answers with `dragon:crossed`.
+   */
+  'dragon:cross_gate': { itemId: number; to: string };
+  /** Fact: it went through, and this is where it came out. */
+  'dragon:crossed': { itemId: number; from: string; to: string; at: TilePos };
   'world:switch': { to: string };
   /** Fact: the active world changed. BoardScene rebuilds on this — which means
    *  fetching art over the network, so this is where the travel veil goes UP. */
