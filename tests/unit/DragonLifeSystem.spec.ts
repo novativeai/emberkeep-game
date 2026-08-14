@@ -77,6 +77,65 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(ctx.state.items.get(dragon.id)).toMatchObject({ col: 1, row: 1 });
   });
 
+  it('never sleeps during the tutorial — night, nap or fatigue, she stays awake', () => {
+    // A tutorial beat that points at the dragon cannot survive its subject
+    // curling up under the arrow; the scripted advanceTime jumps land in
+    // night/nap windows at random. Hunger is the one mood that may surface —
+    // the feeding lesson depends on it.
+    const ctx = createTestContext();
+    const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.state.tutorialDone = false;
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    atPhase(ctx, 3); // night — the strongest sleep pull there is
+    tick(ctx, 0);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+    // The moment the tutorial hands over, the same clock reads as bedtime.
+    ctx.state.tutorialDone = true;
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+  });
+
+  it('tells the two sleeps apart: a shift-rest is earned, a nap is the player\u2019s', () => {
+    // The distinction is the whole point — one is a cost the player chose to
+    // pay by working the dragon, the other is the animal being an animal. Only
+    // the second may be shaken off.
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+
+    atPhase(ctx, 3); // night
+    tick(ctx, 0);
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('night');
+
+    atPhase(ctx, 1); // daylight, so only a nap or fatigue can put it down
+    // Worked a full shift → the rest outranks everything and is NOT a nap.
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 3, row: 3, kind: 'item' });
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+    tick(ctx, DRAGON_WORK_MS + 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('rest');
+  });
+
+  it('keepAwake ends a sleep at once and announces it — the tap is answered now', () => {
+    // A tap that waits for the next tick to uncurl the animal reads as a
+    // dropped input, so the mood change rides the call itself.
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    atPhase(ctx, 3);
+    tick(ctx, 0);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+
+    const moods = capture(ctx.bus, 'dragon:mood');
+    ctx.systems.dragonLife.keepAwake(dragon.id, 60_000);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBeNull();
+    expect(moods.at(-1)).toMatchObject({ itemId: dragon.id, mood: 'awake', from: 'asleep' });
+
+    // It is a WINDOW, not a flag: past it the same night puts it back down.
+    ctx.clock.advance(60_001);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+  });
+
   it('is reproducible: the same clock lands the same dragon on the same tile', () => {
     const run = (): string => {
       const ctx = createTestContext();
@@ -157,8 +216,11 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     // On the job it is awake, whatever else is true.
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
 
-    // Work it to exhaustion; it flies home and sleeps it off.
+    // Work it to exhaustion; it flies home and sleeps it off. The shift spans
+    // feed CYCLES (hunger returns every DRAGON_CYCLE_MS now), so it is fed on
+    // clocking off — hunger outranks sleep, and this test is about fatigue.
     tick(ctx, DRAGON_WORK_MS + 1000);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
     expect(ctx.systems.jobs.restRemaining(dragon.id)).toBeGreaterThan(0);
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
 
@@ -187,11 +249,17 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
       ctx.bus.emit('ui:feed_dragon_requested', { itemId: d.id, chain: 'emberberry', tier: 3 });
     }
 
-    // Walk a whole nap cycle in slices and record when each one sleeps.
+    // Walk a whole nap cycle in slices and record when each one sleeps. Fed
+    // every slice: the walk crosses feed cycles (hunger returns each
+    // DRAGON_CYCLE_MS), and a hungry dragon never naps — this test is about
+    // the nap windows, not the appetite.
     const seen = { a: 0, b: 0, together: 0 };
     const slice = DRAGON_NAP_CYCLE_MS / 60;
     for (let i = 0; i < 60; i++) {
       tick(ctx, slice);
+      for (const d of [a, b]) {
+        ctx.bus.emit('ui:feed_dragon_requested', { itemId: d.id, chain: 'emberberry', tier: 3 });
+      }
       const sa = ctx.systems.dragonLife.moodOf(a.id) === 'asleep';
       const sb = ctx.systems.dragonLife.moodOf(b.id) === 'asleep';
       if (sa) seen.a++;
