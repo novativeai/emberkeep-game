@@ -100,6 +100,18 @@ export function releaseAwayWorldArt(bin: TextureBin, ctx: GameContext): string[]
     if (id === ctx.state.worldId || id === WORLD_ID) continue;
     for (const key of worldArtKeys(ctx, id)) {
       if (keep.has(key) || !bin.exists(key)) continue;
+      // AND NOTHING IS TAKEN OUT FROM UNDER A LIVE SPRITE. The `keep` set above
+      // is a rule about which WORLD owns a texture, and a rule is only as good
+      // as the list it is derived from: anything holding a world's art outside
+      // that list — a scene that does not restart, an overlay left standing, a
+      // tween mid-flight — is invisible to it. Being wrong here is not a leak
+      // and not a blank sprite; it is a null in the renderer, which ends the
+      // RAF chain and freezes the session. So the last word belongs to the
+      // texture manager, which knows who is actually drawing it.
+      if (bin.inUse?.(key)) {
+        console.warn(`[worldArt] kept "${key}" — still drawn by a live object`);
+        continue;
+      }
       bin.remove(key);
       freed.push(key);
     }
@@ -112,4 +124,8 @@ export function releaseAwayWorldArt(bin: TextureBin, ctx: GameContext): string[]
 export interface TextureBin {
   exists(key: string): boolean;
   remove(key: string): void;
+  /** Is any live Game Object still drawing this key? Optional so the unit
+   *  tests can state the world-ownership rule on its own; the runtime always
+   *  passes one, because it is the half the rule cannot see. */
+  inUse?(key: string): boolean;
 }

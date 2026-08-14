@@ -1,5 +1,6 @@
 // The Map Editor's chrome is drawn with FontAwesome glyphs (src/editor/EditorDom.ts).
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import { recordedErrors, type RecordedError } from './core/crash';
 import Phaser from 'phaser';
 import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
@@ -50,6 +51,7 @@ declare global {
       characterToPage: (characterId: string) => { x: number; y: number } | null;
       centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
+      errors: () => RecordedError[];
       reset: () => void;
       saveKey: string;
       game: Phaser.Game;
@@ -304,6 +306,9 @@ window.__emberkeep = {
   // Test/diagnostic: award XP so a level-up (and its camera fly) can be driven
   // deterministically without grinding merges.
   grantXp: (xp: number) => ctx.bus.emit('economy:add', { xp, reason: 'debug:grantXp' }),
+  /** Everything the game caught rather than let end the RAF chain — see
+   *  `src/core/crash.ts`. Empty is the healthy answer. */
+  errors: () => recordedErrors(),
   // Dev/diagnostic: wipe the save and hard-reload, so a fresh newGame() runs and
   // any change to startingItems/startingDecor (e.g. the L1 dragon) shows again.
   // A loaded save otherwise masks new-game seeding.

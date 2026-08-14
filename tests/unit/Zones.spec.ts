@@ -681,6 +681,23 @@ describe('world art — visiting a world never leaves the others worse off', () 
     expect([...b.held].sort()).toEqual(['background_borealis', 'background_emberkeep']);
   });
 
+  it('never takes a texture out from under a live sprite, whatever the rule says', () => {
+    // The rule above is about which WORLD owns a texture, and it is only as
+    // good as the list it reads: anything holding world art OUTSIDE that list —
+    // a scene that never restarts, an overlay left standing, a tween in flight —
+    // is invisible to it. Being wrong is not a leak and not a blank sprite; it
+    // is a null in the renderer, which ends Phaser's RAF chain and freezes the
+    // session with the veil still up. So the texture manager gets the last word.
+    const ctx = new GameContext(new MemoryStorage());
+    const b = bin(backdrops);
+    const drawn = 'background_borealis';
+    const freed = releaseAwayWorldArt({ ...b, inUse: (key: string) => key === drawn }, ctx);
+    expect(freed).not.toContain(drawn);
+    expect(b.held.has(drawn)).toBe(true);
+    // …and it withholds ONLY that one — a veto, not an amnesty.
+    expect(freed).toContain('background_roothold');
+  });
+
   it('can always re-fetch whatever it released — one list, both directions', () => {
     const ctx = new GameContext(new MemoryStorage());
     const freed = releaseAwayWorldArt(bin(backdrops), ctx);
