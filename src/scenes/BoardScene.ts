@@ -900,7 +900,15 @@ export class BoardScene extends Phaser.Scene {
     const scale =
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
       (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1);
-    const calm = clipOnly ? host.tier >= 4 : CALM_DRAGONS.has(rig!.character);
+    // A clip-only animal is a calm ADULT when it carries a fly clip — the
+    // adults are the ones that were given flight. `tier >= 4` stopped being a
+    // usable proxy when frost/storm became their own 3-tier chains: their
+    // adults sit at tier 3, and the ember adult stays at 4, so no one tier
+    // number means "grown" across chains any more.
+    const clipArt = clipOnly ? this.clipCharacterFor(host.chain, host.tier) : null;
+    const calm = clipOnly
+      ? clipArt !== null && clipFor(clipArt, 'fly') !== null
+      : CALM_DRAGONS.has(rig!.character);
     let player: RigPlayer | null = null;
     if (!clipOnly) {
       player = new RigPlayer(this, rig!, (layer) => `rig:${rig!.character}:${layer}`, {

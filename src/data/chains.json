@@ -411,6 +411,134 @@
       ]
     },
     {
+      "id": "frost",
+      "name": "Frost Dragons",
+      "hatchAtTier": 2,
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "frost_1",
+          "name": "Frost Egg",
+          "sell": 10,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "frost_2",
+          "name": "Frost Dragon",
+          "sell": 25,
+          "xp": 26,
+          "merge": {
+            "group": 2,
+            "outputs": 1
+          },
+          "generator": {
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
+            "cooldownMs": 45000,
+            "energyCost": 1,
+            "passiveMs": 120000,
+            "bonus": {
+              "every": 10,
+              "produces": {
+                "chain": "frost",
+                "tier": 1
+              }
+            }
+          }
+        },
+        {
+          "tier": 3,
+          "id": "frost_3",
+          "name": "Adult Frost Dragon",
+          "sell": 60,
+          "xp": 40,
+          "generator": {
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
+            "cooldownMs": 30000,
+            "energyCost": 1,
+            "passiveMs": 90000,
+            "bonus": {
+              "every": 8,
+              "produces": {
+                "chain": "frost",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "storm",
+      "name": "Storm Dragons",
+      "hatchAtTier": 2,
+      "tiers": [
+        {
+          "tier": 1,
+          "id": "storm_1",
+          "name": "Storm Egg",
+          "sell": 10,
+          "xp": 0
+        },
+        {
+          "tier": 2,
+          "id": "storm_2",
+          "name": "Storm Dragon",
+          "sell": 25,
+          "xp": 26,
+          "merge": {
+            "group": 2,
+            "outputs": 1
+          },
+          "generator": {
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
+            "cooldownMs": 45000,
+            "energyCost": 1,
+            "passiveMs": 120000,
+            "bonus": {
+              "every": 10,
+              "produces": {
+                "chain": "storm",
+                "tier": 1
+              }
+            }
+          }
+        },
+        {
+          "tier": 3,
+          "id": "storm_3",
+          "name": "Adult Storm Dragon",
+          "sell": 60,
+          "xp": 40,
+          "generator": {
+            "produces": {
+              "chain": "flame_gem",
+              "tier": 1
+            },
+            "cooldownMs": 30000,
+            "energyCost": 1,
+            "passiveMs": 90000,
+            "bonus": {
+              "every": 8,
+              "produces": {
+                "chain": "storm",
+                "tier": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "id": "golden_egg",
       "name": "Golden Dragons",
       "hatchAtTier": 2,

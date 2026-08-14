@@ -893,6 +893,36 @@
       "file": "sprites/characters/dragon/rimewyrm/rimewyrm-young.webp"
     },
     {
+      "key": "item_frost_1",
+      "source": "file",
+      "file": "sprites/items/frost-egg.webp"
+    },
+    {
+      "key": "item_frost_2",
+      "source": "file",
+      "file": "sprites/items/skins/dragons/frost_3.webp"
+    },
+    {
+      "key": "item_frost_3",
+      "source": "file",
+      "file": "sprites/items/skins/dragons/frost_4.webp"
+    },
+    {
+      "key": "item_storm_1",
+      "source": "file",
+      "file": "sprites/items/storm-egg.webp"
+    },
+    {
+      "key": "item_storm_2",
+      "source": "file",
+      "file": "sprites/items/skins/dragons/storm_3.webp"
+    },
+    {
+      "key": "item_storm_3",
+      "source": "file",
+      "file": "sprites/items/skins/dragons/storm_4.webp"
+    },
+    {
       "key": "item_emerald_1",
       "source": "file",
       "generator": "item",

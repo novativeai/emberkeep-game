@@ -155,6 +155,15 @@ Every file that lands in `assets/raw/` gets a line here: source, license, date.
   violet head to tail and keys green — the same call the face banks and the
   human portraits make. Trimmed to a 1400px long side. SynthID-watermarked.
   2026-08-06.
+- **Frost & Storm dragon eggs** (`sprites/items/{frost,storm}-egg.webp`) — tier 1
+  of the store breeds' own chains (egg → baby → adult) since their promotion
+  from Emporium skins. AI-generated in-house via `.claude/skills/nano-banana/`
+  (`artgen.py character`) on **ByteDance Seedream 5.0 Pro** on fal.ai, one egg
+  per plate, style-referenced on a composite of the four SHIPPED eggs (red,
+  green, ashdrake, rimewyrm) so the clutch reads as one family; house blocks
+  imported from `scripts/merge_style.py`, keyed magenta, cut to the family's
+  1440px canvas. Prompts and raws in `raw/dragons/eggs/`; reproducible with
+  `scripts/gen-dragon-eggs.py gen|cut`. SynthID-watermarked. 2026-08-13.
 - **Five new Borealis farm chains** (`sprites/items/chains/{runestone,emberdram,
   hearthlamp,manastone,wayfinder}_{1,2,3}.webp`) — Runestone, Emberdram,
   Hearthlamp, Manastone and Wayfinder. Briefed on two measurements at once: over

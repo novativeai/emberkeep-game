@@ -58,6 +58,17 @@ export class StoreSystem {
       return;
     }
     this.commit(itemId, entry.kind, entry.item.gold);
+    // A CHAIN-GRANT card (frost/storm): the purchase is a clutch of three
+    // tier-1 eggs — one 3-merge from the animal — spawned through the same
+    // contract every reward uses, with the bag as overflow so a full board can
+    // never eat the purchase. One-time (owns() above): more eggs come from the
+    // grown dragon's own bonus drip, so a bought line sustains itself.
+    if (entry.item.chain) {
+      this.bus.emit('board:spawn', {
+        chain: entry.item.chain, tier: 1, count: 3, overflow: 'bag', cause: 'store'
+      });
+      return;
+    }
     // A skin you just bought is a skin you want to see.
     if (entry.kind === 'skin' || entry.kind === 'dragon_skin') this.equip(itemId);
   }

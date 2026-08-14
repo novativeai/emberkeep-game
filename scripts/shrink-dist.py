@@ -279,7 +279,15 @@ def main():
     # slack the 81 figure had, rather than leaving the next asset to trip a
     # budget with none. Texture-DIMENSION limits (4096, old devices) are
     # untouched by this: the boil sheet is 3000×4088.
-    ap.add_argument("--budget", type=float, default=84.0, help="fail over this many MB")
+    #
+    # 96 (2026-08-13, moonwhisker): the honest per-breed arithmetic, now that
+    # four two-stage breeds are shipped, is ~13–17 MB EACH (storm 17,
+    # moonwhisker 15, frost 14, red 16) — moonwhisker moved the build 80.3 →
+    # 95.2 together with its baby set. If this number ever has to come DOWN,
+    # the levers are idle-clip fps decimation (idles are the largest sheets)
+    # or fetching dragon clips lazily on ownership instead of at boot — not
+    # quality shaving at this gate.
+    ap.add_argument("--budget", type=float, default=96.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():

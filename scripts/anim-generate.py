@@ -124,7 +124,9 @@ PLATE_STAGES = {
     'storm_baby': 'baby',
     'storm_adult': 'adult',
     'ember_adult': 'adult',
-    'golden_adult': 'adult'  # the Golden Elder — same three adult clips
+    'golden_adult': 'adult',  # the Golden Elder — same three adult clips
+    'moonwhisker_baby': 'baby',
+    'moonwhisker_adult': 'adult'
 }
 
 

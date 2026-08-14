@@ -52,7 +52,11 @@ ROSTER = {
     # The Golden Elder. Its baked composite is produced the dragonbreed way —
     # rig layers composited by z at their own offsets — because golden predates
     # the breeds pipeline and never had one on disk before the clip work.
-    'golden_adult': (f'{DRAGONS}/golden-dragon/sprite-adult/golden-dragon-adult-baked.png', 'adult')
+    'golden_adult': (f'{DRAGONS}/golden-dragon/sprite-adult/golden-dragon-adult-baked.png', 'adult'),
+    # Moonwhisker — the Emporium's emerald-chain skin, last of the store breeds
+    # to get clips. Violet/rose animal on the green plate: no key conflict.
+    'moonwhisker_baby': (f'{DRAGONS}/moonwhisker-dragon/sprite/moonwhisker-dragon-baked.png', 'baby'),
+    'moonwhisker_adult': (f'{DRAGONS}/moonwhisker-dragon/sprite-adult/moonwhisker-dragon-adult-baked.png', 'adult')
 }
 
 

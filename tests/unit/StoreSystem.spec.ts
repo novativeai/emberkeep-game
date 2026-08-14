@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { RARITY } from '../../src/core/Constants';
 import assetsDoc from '../../src/data/assets.json';
+import chainsDoc from '../../src/data/chains.json';
 import storeDoc from '../../src/data/store.json';
-import type { StoreData } from '../../src/core/types';
+import type { ChainsData, StoreData } from '../../src/core/types';
 import { capture, createTestContext } from './helpers';
 
 const SKIN = 'manor_mushroom'; // 250 gold
@@ -160,6 +161,7 @@ describe("the Keeper's Store shelves (src/data/store.json)", () => {
   const store = storeDoc as StoreData;
   const keys = new Set(assetsDoc.images.map((image) => image.key));
   const dragons = store.sections.find((section) => section.id === 'dragons')!;
+  const chains = chainsDoc as unknown as ChainsData;
 
   it('every priced card points at art that is actually registered', () => {
     for (const section of store.sections) {
@@ -167,14 +169,28 @@ describe("the Keeper's Store shelves (src/data/store.json)", () => {
     }
   });
 
-  it('every dragon skin names a wardrobe slot and ships board art for it', () => {
+  it('every dragon card either dresses a chain or grants one — never neither', () => {
     expect(dragons.items.length).toBeGreaterThan(0);
     for (const item of dragons.items) {
-      expect(item.dragon, `${item.id} has no chain`).toBeTruthy();
-      // Tiers 3 and 4 are the whelp and the adult — the only dragon tiers with
-      // rig art to wear. A skin covering neither would be an empty purchase.
-      const worn = [3, 4].filter((tier) => keys.has(`skin_${item.id}_${tier}`));
-      expect(worn, `${item.id} re-skins nothing`).toEqual([3, 4]);
+      if (item.chain) {
+        // A CHAIN GRANT (frost/storm since their promotion): buying it spawns
+        // the chain's tier-1 eggs, so the chain must exist, hatch, and ship
+        // art for every tier — an egg that merges into a missing texture is a
+        // worse empty purchase than a skin that dresses nothing.
+        expect(item.dragon, `${item.id} is both a grant and a skin`).toBeUndefined();
+        const chain = chains.chains.find((c) => c.id === item.chain);
+        expect(chain, `${item.id} grants a chain that does not exist`).toBeTruthy();
+        expect(chain!.hatchAtTier, `${item.chain} never hatches`).toBeGreaterThan(0);
+        for (const tier of chain!.tiers) {
+          expect(keys.has(`item_${item.chain}_${tier.tier}`), `item_${item.chain}_${tier.tier} art`).toBe(true);
+        }
+      } else {
+        expect(item.dragon, `${item.id} has no chain`).toBeTruthy();
+        // Tiers 3 and 4 are the whelp and the adult — the only dragon tiers with
+        // rig art to wear. A skin covering neither would be an empty purchase.
+        const worn = [3, 4].filter((tier) => keys.has(`skin_${item.id}_${tier}`));
+        expect(worn, `${item.id} re-skins nothing`).toEqual([3, 4]);
+      }
     }
   });
 

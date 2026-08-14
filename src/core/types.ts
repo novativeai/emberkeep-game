@@ -106,7 +106,7 @@ export interface DragonCare {
 
 export type RegionStatus = 'active' | 'unlockable' | 'locked';
 
-export type SpawnCause = 'init' | 'merge' | 'generator' | 'unlock' | 'load' | 'quest';
+export type SpawnCause = 'init' | 'merge' | 'generator' | 'unlock' | 'load' | 'quest' | 'store';
 
 export interface ItemSnapshot {
   id: number;
@@ -525,6 +525,11 @@ export interface StoreItem {
   /** `dragon_skin` only: the merge chain this skin re-dresses ('ember_dragon',
    *  'emerald'). It is the wardrobe slot — one worn skin per dragon. */
   dragon?: string;
+  /** A card that GRANTS A CHAIN instead of dressing one: buying it spawns the
+   *  chain's tier-1 eggs (a hatch-ready clutch of three, overflow to the bag)
+   *  and nothing is ever worn. `frost` and `storm` — real breeds with their own
+   *  egg → baby → adult ladder, not skins. Mutually exclusive with `dragon`. */
+  chain?: string;
   /** Absent = the plain cream card the Manor skins and decorations use. */
   rarity?: StoreRarity;
   /** The one showcase card in a section: full grid height, art full-bleed, and

@@ -311,8 +311,7 @@
           "srcFrameHeight": 400
         }
       },
-      "board": "ember_dragon:3",
-      "skin": "frost"
+      "board": "frost:2"
     },
     "frost_adult": {
       "clips": {
@@ -370,8 +369,7 @@
           "srcFrameHeight": 188
         }
       },
-      "board": "ember_dragon:4",
-      "skin": "frost"
+      "board": "frost:3"
     },
     "storm_baby": {
       "clips": {
@@ -402,8 +400,7 @@
           "srcFrameHeight": 400
         }
       },
-      "board": "ember_dragon:3",
-      "skin": "storm"
+      "board": "storm:2"
     },
     "storm_adult": {
       "clips": {
@@ -461,8 +458,7 @@
           "srcFrameHeight": 189
         }
       },
-      "board": "ember_dragon:4",
-      "skin": "storm"
+      "board": "storm:3"
     },
     "golden_adult": {
       "clips": {
@@ -539,6 +535,97 @@
           "stage": "decor"
         }
       }
+    },
+    "moonwhisker_baby": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/moonwhisker_baby/idle.webp",
+          "frames": 162,
+          "frameWidth": 315,
+          "frameHeight": 231,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.0626,
+          "dx": 19.49,
+          "dy": -12.1,
+          "srcFrameWidth": 315,
+          "srcFrameHeight": 231
+        },
+        "roar": {
+          "file": "sprites/anims/moonwhisker_baby/roar.webp",
+          "frames": 66,
+          "frameWidth": 263,
+          "frameHeight": 254,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8009315589353613,
+          "dx": 3.87,
+          "dy": -12.03,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 360
+        }
+      },
+      "board": "emerald:3",
+      "skin": "moonwhisker"
+    },
+    "moonwhisker_adult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/moonwhisker_adult/idle.webp",
+          "frames": 114,
+          "frameWidth": 372,
+          "frameHeight": 232,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.34614,
+          "dx": 60.3,
+          "dy": 33.55,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 232
+        },
+        "roar": {
+          "file": "sprites/anims/moonwhisker_adult/roar.webp",
+          "frames": 66,
+          "frameWidth": 442,
+          "frameHeight": 360,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.56933,
+          "dx": 59.14,
+          "dy": 32.43,
+          "srcFrameWidth": 442,
+          "srcFrameHeight": 360
+        },
+        "fly": {
+          "file": "sprites/anims/moonwhisker_adult/fly.webp",
+          "frames": 215,
+          "frameWidth": 256,
+          "frameHeight": 195,
+          "fps": 24,
+          "loop": true,
+          "segments": {
+            "takeoff": [
+              0,
+              124
+            ],
+            "loop": [
+              124,
+              187
+            ],
+            "landing": [
+              187,
+              215
+            ]
+          },
+          "scale": 2.99883,
+          "dx": 7.07,
+          "dy": 51.85,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 195
+        }
+      },
+      "board": "emerald:4",
+      "skin": "moonwhisker"
     }
   }
 }

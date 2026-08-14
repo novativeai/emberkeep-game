@@ -138,13 +138,17 @@ const ROSTER = {
   // the clips ARE the whole animal — no rig. Alignment registers each breed's
   // idle onto ITS OWN rig-file rest pose at the RED's board display scale
   // (same board slot, same footprint).
+  // ---- The store breeds are CHAINS now (frost/storm: egg → baby → adult),
+  // not Emporium skins of the ember chain. Their boards bind to their own
+  // tiers; the rigScaleOf stays the EMBER formula on purpose — the skin bakes
+  // these items draw were fitted onto ember's canvases, so ember's display
+  // scale IS their display scale, and the alignment must keep matching it.
   frost_baby: {
     label: 'Frost Dragon (baby)',
     rawDir: `${RAW_BASE}/frost_baby_atlasses`,
     rig: 'sprites/characters/dragon/frost-dragon/rig/dragon-frost.rig.json',
     rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE.ember_dragon,
-    board: 'ember_dragon:3',
-    skin: 'frost',
+    board: 'frost:2',
     clipInfo: {
       idle: { trigger: 'board rest, grounded (also stands in for flight — no baby fly clip)' },
       roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false }
@@ -156,8 +160,7 @@ const ROSTER = {
     rig: 'sprites/characters/dragon/frost-dragon/rig-adult/frost-dragon.rig.json',
     rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE['ember_dragon:4'],
     modes: { fly: 'center' },
-    board: 'ember_dragon:4',
-    skin: 'frost',
+    board: 'frost:3',
     clipInfo: {
       idle: { trigger: 'board rest, grounded' },
       roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false },
@@ -173,11 +176,42 @@ const ROSTER = {
     rawDir: `${RAW_BASE}/storm_baby_atlasses`,
     rig: 'sprites/characters/dragon/storm-dragon/rig/dragon-storm.rig.json',
     rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE.ember_dragon,
-    board: 'ember_dragon:3',
-    skin: 'storm',
+    board: 'storm:2',
     clipInfo: {
       idle: { trigger: 'board rest, grounded (also stands in for flight — no baby fly clip)' },
       roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false }
+    }
+  },
+  moonwhisker_baby: {
+    label: 'Moonwhisker (baby)',
+    rawDir: `${RAW_BASE}/moonwhisker_baby_atlasses`,
+    rig: 'sprites/characters/dragon/moonwhisker-dragon/rig/dragon-moonwhisker.rig.json',
+    // Moonwhisker is the EMERALD chain's Emporium skin (store.json `dragon`),
+    // so it aligns at the emerald board scales — not ember's like frost/storm.
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE.emerald,
+    board: 'emerald:3',
+    skin: 'moonwhisker',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded (also stands in for flight — no baby fly clip)' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false }
+    }
+  },
+  moonwhisker_adult: {
+    label: 'Moonwhisker (adult)',
+    rawDir: `${RAW_BASE}/moonwhisker_adult_atlasses`,
+    rig: 'sprites/characters/dragon/moonwhisker-dragon/rig-adult/moonwhisker-dragon.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE['emerald:4'],
+    modes: { fly: 'center' },
+    board: 'emerald:4',
+    skin: 'moonwhisker',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false },
+      fly: {
+        trigger: 'flight: unfold → wingbeat cruise → fold',
+        // Measured (segments.json): 63f wingbeat @ RMSE 17.6, fold from 206.
+        segments: { takeoff: [0, 124], loop: [124, 187], landing: [206, 234] }
+      }
     }
   },
   golden_adult: {
@@ -213,8 +247,7 @@ const ROSTER = {
     rig: 'sprites/characters/dragon/storm-dragon/rig-adult/storm-dragon.rig.json',
     rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE['ember_dragon:4'],
     modes: { fly: 'center' },
-    board: 'ember_dragon:4',
-    skin: 'storm',
+    board: 'storm:3',
     clipInfo: {
       idle: { trigger: 'board rest, grounded' },
       roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false },

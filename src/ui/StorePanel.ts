@@ -525,7 +525,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
     fontPx: number
   ): Phaser.GameObjects.Container {
     const btn = this.scene.add.container(0, y);
-    const skinAction = (section.kind === 'skin' || section.kind === 'dragon_skin') && owned && !worn;
+    // A chain-grant card (frost/storm — real breeds, not skins) has nothing to
+    // wear: once bought it reads OWNED, and the dragons come from the eggs.
+    const skinAction =
+      (section.kind === 'skin' || section.kind === 'dragon_skin') && owned && !worn && !item.chain;
     const isPrice = !worn && !owned;
     const text = worn ? 'WORN' : owned ? (skinAction ? 'WEAR' : 'OWNED') : `${item.gold}`;
     const btnImg = this.scene.add.image(0, 0, owned && !skinAction ? 'ui_btn_free' : 'ui_btn_price');
