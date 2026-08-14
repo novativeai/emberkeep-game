@@ -376,14 +376,20 @@ const BOREALIS_PLAN = {
     // affordable, so the march cannot be spent out of order.
     // The loose rimebloom/driftwood stock came OFF this island: both are
     // renewable from the Font and the Wrack Line standing right here, and the
-    // freed tiles carry the last three of the five farms (merge-chains
-    // §2.4.1b) instead. Selyna's two — the Cairn ready-built (it reseeds
-    // itself), the Wayfinder as parts — and the Hearthlamp as parts salvaged
-    // among the wreck timbers, because neither the lamp nor the compass ever
-    // reseeds its own tier-1: 3 × t1 + 2 × t2 is exactly one build, with both
-    // Cookbook rows discovered on the way (the dew_basin precedent).
+    // freed tiles carry the LAST of the five farms (merge-chains §2.4.1b)
+    // instead — the Aurora Loom, the slowest machine in the game, which is why
+    // it is the reward for the last fog rather than something the player is
+    // handed early and watches. The Bench that used to stand beside it moved
+    // to the coast: nothing in the north may be seeded twice, and its lenses
+    // are wanted three quests before this door is affordable.
+    // Selyna's two — the Cairn ready-built (it reseeds itself), the Wayfinder
+    // as parts — and the Hearthlamp as parts salvaged among the wreck timbers,
+    // because neither the lamp nor the compass ever reseeds its own tier-1:
+    // 3 × t1 + 2 × t2 is exactly one build, with both Cookbook rows discovered
+    // on the way (the dew_basin precedent). They are the two northern machines
+    // the player BUILDS rather than finds, and that is the whole of the quests
+    // `north_lodestones` and `north_lamplight`.
     seeds: [
-      ['starbench', 3, 1],
       ['auroraloom', 3, 1],
       ['warhelm', 1, 3],
       ['manastone', 3, 1],
@@ -413,8 +419,15 @@ const BOREALIS_PLAN = {
     // seeded t3 here strands no Cookbook row — the parts stream starts the
     // moment the farm does. That is what lets them keep the coast's
     // generators-only law instead of arriving as a scatter of parts.
+    // ONE OF EACH, ACROSS THE WHOLE NORTH. A second Glass Kiln here (there were
+    // two, on top of the shore's) was not a bigger farm, it was the same farm
+    // twice: the north GROWS its generators — every twelfth firing drops a Fire
+    // Brick, nine bricks are the next kiln — so a duplicate seed hands over the
+    // reward the loop exists to pay and takes a rim tile the next farm wanted.
+    // The Starwright's Bench belongs on THIS island rather than the keep:
+    // `north_threadwork` brews Light Threads out of Spyglasses, and it is asked
+    // three quests before the keep's two keys are affordable.
     seeds: [
-      ['glasskiln', 3, 2],
       ['starbench', 3, 1],
       ['wreckforge', 3, 1],
       ['tarkiln', 3, 1],

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import chainsData from '../../src/data/chains.json';
 import realMap from '../../src/data/map.json';
 import { RUNEVAULT_QUESTS_NEEDED, LEVEL_XP, SAVE_VERSION, WORLD_ID } from '../../src/core/Constants';
 import { GameContext } from '../../src/core/Context';
@@ -7,7 +8,7 @@ import type { TextureBin } from '../../src/core/worldArt';
 import { releaseAwayWorldArt, worldArtKeys } from '../../src/core/worldArt';
 import { project, projectionOf } from '../../src/core/iso';
 import { mapSignature } from '../../src/core/mapSpace';
-import type { MapData, SaveDataV1 } from '../../src/core/types';
+import type { ChainsData, MapData, SaveDataV1 } from '../../src/core/types';
 import { createTestContext, MemoryStorage } from './helpers';
 import {
   buildWorlds,
@@ -704,5 +705,70 @@ describe('worlds — a first arrival puts the opening board out', () => {
       (r) => ctx.state.regionStatus.get(r.id) === 'active'
     );
     expect(open.map((r) => r.id)).toEqual(['borealis_shore']);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* the north's machines                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ONE OF EACH, ACROSS THE WHOLE NORTH.
+ *
+ * A northern farm GROWS: every twelfth production drops the machine's own
+ * tier 1, and nine of those are the next machine. So a second seeded copy is
+ * not a bigger farm — it is the reward the loop exists to pay, handed over for
+ * free, on a rim tile the farm that has no copy at all was going to stand on.
+ * Borealis shipped with three Glass Kilns and two Starwright's Benches while
+ * every other machine had one.
+ */
+describe('borealis seeds each machine exactly once', () => {
+  const CHAINS = new Map(
+    (chainsData as unknown as ChainsData).chains.map((c) => [c.id, c] as const)
+  );
+  const isMachine = (chain: string, tier: number): boolean =>
+    Boolean(CHAINS.get(chain)?.tiers.find((t) => t.tier === tier)?.generator);
+
+  /** Every seeded piece in the north, region by region. */
+  const seeded = (): Array<{ chain: string; tier: number }> => {
+    const world = WORLDS.get('borealis')!;
+    return world.map.regions.flatMap((r) =>
+      (r.contents ?? []).map((c) => ({ chain: c.chain, tier: c.tier ?? 1 }))
+    );
+  };
+
+  it('never seeds the same generator twice', () => {
+    const counts = new Map<string, number>();
+    for (const piece of seeded()) {
+      if (!isMachine(piece.chain, piece.tier)) continue;
+      counts.set(piece.chain, (counts.get(piece.chain) ?? 0) + 1);
+    }
+    const dupes = [...counts.entries()].filter(([, n]) => n > 1).map(([c, n]) => `${c} x${n}`);
+    expect(dupes).toEqual([]);
+  });
+
+  it('seeds all five farms — a farm with no machine is a chain with no source', () => {
+    const machines = new Set(
+      seeded()
+        .filter((p) => isMachine(p.chain, p.tier))
+        .map((p) => p.chain)
+    );
+    for (const farm of ['glasskiln', 'starbench', 'wreckforge', 'tarkiln', 'auroraloom']) {
+      expect(machines, `${farm} has no machine anywhere in the north`).toContain(farm);
+    }
+  });
+
+  it('leaves the Wayfinder and the Hearthlamp as PARTS — building them is the quest', () => {
+    // The only two northern machines the player raises rather than finds:
+    // neither reseeds its own tier 1, so the keep seeds exactly one build of
+    // each (3 x t1 + 2 x t2) and `north_lodestones` / `north_lamplight` are
+    // what turn them into generators. Seeded ready-built, both quests would be
+    // handed their own answer.
+    for (const chain of ['wayfinder', 'hearthlamp']) {
+      const built = seeded().filter((p) => p.chain === chain && isMachine(p.chain, p.tier));
+      expect(built, `${chain} is seeded ready-built`).toEqual([]);
+      const parts = seeded().filter((p) => p.chain === chain);
+      expect(parts.length, `${chain} has no parts to build from`).toBeGreaterThan(0);
+    }
   });
 });

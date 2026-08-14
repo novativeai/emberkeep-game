@@ -8,14 +8,28 @@ import { ensureTextures } from '../core/lazyTextures';
 import { uiRegistry } from './theme';
 
 
-/* Recipe list (left column), in the 2560-space. Seven rows fit the frame
- * without scrolling — the roster is authored, not player-grown. */
+/* Recipe list (left column), in the 2560-space.
+ *
+ * It SCROLLS. The roster is authored rather than player-grown, but authored
+ * does not mean small: the north's five farms brought their own parts into the
+ * pot and the book went from seven recipes to nineteen, so the fixed column
+ * that once "fit the frame" was drawing its last ten rows through the floor
+ * and out onto the board. Same viewport-and-mask treatment the Store's shelf
+ * and the Cookbook's pages use. */
 const LIST_X = -640;
-const LIST_TOP = -400;
 const ROW_W = 700;
 const ROW_H = 104;
 const ROW_GAP = 122;
 const ROW_ICON = 80;
+/** The clipped window: under the plaque, down to the panel's inner floor. */
+const LIST_VIEW_TOP = -458;
+const LIST_VIEW_H = 1090;
+/** Centre of that window — where the viewport container sits. */
+const LIST_VIEW_MID = LIST_VIEW_TOP + LIST_VIEW_H / 2;
+/** First row's centre inside the scrolling content. */
+const LIST_TOP = -LIST_VIEW_H / 2 + ROW_GAP / 2;
+/** Past this much drag the gesture is a scroll, not a pick. */
+const DRAG_SLOP = 12;
 
 /* Detail column (right of the list). */
 const DETAIL_X = 350;
@@ -47,6 +61,16 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
   private titleText: Phaser.GameObjects.Text;
   private titleBg: Phaser.GameObjects.Graphics;
   private listGroup: Phaser.GameObjects.Container;
+  /** Clipped window the recipe column scrolls inside. */
+  private listViewport!: Phaser.GameObjects.Container;
+  private listMask!: Phaser.GameObjects.Graphics;
+  private scrollY = 0;
+  private maxScroll = 0;
+  private dragFrom: number | null = null;
+  private dragScrollFrom = 0;
+  /** True once a pointer has travelled past DRAG_SLOP — read by the row's tap
+   *  handler so a scroll that ends on a recipe does not also select it. */
+  private dragged = false;
   private detailGroup: Phaser.GameObjects.Container;
   private brewBtn!: Phaser.GameObjects.Container;
   private brewBg!: Phaser.GameObjects.Image;
@@ -92,10 +116,16 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     close.on('pointerout', () => close.setScale(1));
     close.on('pointerup', () => this.requestClose());
 
-    this.listGroup = scene.add.container(LIST_X, 0);
+    this.listViewport = scene.add.container(LIST_X, LIST_VIEW_MID);
+    this.listGroup = scene.add.container(0, 0);
+    this.listViewport.add(this.listGroup);
+    // Geometry masks live in WORLD space, so this is re-seated from the
+    // container's own world transform whenever the panel moves or scales.
+    this.listMask = scene.make.graphics();
+    this.listGroup.setMask(this.listMask.createGeometryMask());
     this.detailGroup = scene.add.container(DETAIL_X, 0);
 
-    this.add([this.dim, frame, this.titleBg, this.titleText, close, this.listGroup, this.detailGroup]);
+    this.add([this.dim, frame, this.titleBg, this.titleText, close, this.listViewport, this.detailGroup]);
     scene.add.existing(this);
     this.setVisible(false);
     this.drawBanner(this.titleText.width + 200);
@@ -106,15 +136,30 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     this.offBus.push(bus.on('cauldron:brewed', ({ output }) => this.isOpen && this.celebrate(output)));
     this.offBus.push(bus.on('cauldron:brew_failed', () => this.isOpen && this.refuse()));
 
+    // Scene-level input rather than an interactive Zone over the column: a Zone
+    // big enough to catch the drag would sit on top of every row and swallow
+    // the taps that pick them. The handlers gate on `isOpen` instead.
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
+    scene.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
+    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp, this);
+
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       for (const off of this.offBus) off();
       this.offBus = [];
+      scene.input.off(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
+      scene.input.off(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
+      scene.input.off(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this);
+      scene.input.off(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
+      scene.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp, this);
+      this.listMask.destroy();
     });
 
     uiRegistry.register(scene, 'panel.cauldron', "Selyna's Cauldron panel", 'Panels', this, {
       frame,
       title: this.titleText,
-      recipes: this.listGroup,
+      recipes: this.listViewport,
       detail: this.detailGroup
     });
   }
@@ -145,7 +190,8 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       alpha: 1,
       scale: this.baseScale,
       duration: 200,
-      ease: 'Back.easeOut'
+      ease: 'Back.easeOut',
+      onUpdate: () => this.seatListMask()
     });
     this.bus.emit('ui:cauldron_toggled', { open: true });
   }
@@ -249,13 +295,75 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
 
       row.setSize(ROW_W, ROW_H).setInteractive({ useHandCursor: true });
       row.on('pointerup', () => {
+        if (this.dragged) return; // the player was scrolling the book, not picking
         if (this.selectedId === recipe.id) return;
         this.selectedId = recipe.id;
         this.refresh();
       });
       this.listGroup.add(row);
     });
+    const contentH = this.recipes.length * ROW_GAP;
+    this.maxScroll = Math.max(0, contentH - LIST_VIEW_H);
+    this.setScroll(this.scrollY); // re-clamp: the roster may have shrunk
+    this.seatListMask();
   }
+
+  /* ------------------------------- scrolling ------------------------------ */
+
+  private setScroll(y: number): void {
+    this.scrollY = Phaser.Math.Clamp(y, 0, this.maxScroll);
+    this.listGroup.setY(-this.scrollY);
+  }
+
+  /** Re-cut the clip rect from the viewport's live world transform — the panel
+   *  is centred, scaled by `panelMobileScale`, and scaled again by its own
+   *  open/close tween, and a mask left in local units clips the wrong band. */
+  private seatListMask(): void {
+    const m = this.listViewport.getWorldTransformMatrix();
+    const w = (ROW_W + 60) * m.scaleX;
+    const h = LIST_VIEW_H * m.scaleY;
+    this.listMask.clear();
+    this.listMask.fillStyle(0xffffff, 1);
+    this.listMask.fillRect(m.tx - w / 2, m.ty - h / 2, w, h);
+  }
+
+  /** Is the pointer over the recipe column? Pointer coords arrive in the same
+   *  2560-space the UI is authored in, so this is a plain rect test. */
+  private overList(p: Phaser.Input.Pointer): boolean {
+    const m = this.listViewport.getWorldTransformMatrix();
+    const w = ROW_W * m.scaleX;
+    const h = LIST_VIEW_H * m.scaleY;
+    return (
+      p.x >= m.tx - w / 2 && p.x <= m.tx + w / 2 && p.y >= m.ty - h / 2 && p.y <= m.ty + h / 2
+    );
+  }
+
+  private onWheel = (p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number): void => {
+    if (!this.isOpen || this.maxScroll <= 0 || !this.overList(p)) return;
+    this.setScroll(this.scrollY + dy);
+  };
+
+  private onPointerDown = (p: Phaser.Input.Pointer): void => {
+    if (!this.isOpen || !this.overList(p)) return;
+    this.dragFrom = p.y;
+    this.dragScrollFrom = this.scrollY;
+    this.dragged = false;
+  };
+
+  private onPointerMove = (p: Phaser.Input.Pointer): void => {
+    if (this.dragFrom === null || this.maxScroll <= 0) return;
+    const dy = p.y - this.dragFrom;
+    if (Math.abs(dy) > DRAG_SLOP) this.dragged = true;
+    const scale = this.listViewport.getWorldTransformMatrix().scaleY || 1;
+    this.setScroll(this.dragScrollFrom - dy / scale);
+  };
+
+  private onPointerUp = (): void => {
+    this.dragFrom = null;
+    // Cleared a frame later so the row's pointerup, which fires on this same
+    // event, still sees that the gesture was a drag.
+    this.scene.time.delayedCall(0, () => (this.dragged = false));
+  };
 
   /* ----------------------------- detail column ---------------------------- */
 

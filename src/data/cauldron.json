@@ -53,7 +53,7 @@
           "count": 1
         }
       ],
-      "flavor": "A ground lens held against the lights until the colour comes off it in a strand.",
+      "flavor": "A spyglass broken back to its lenses and held against the lights until the colour comes off in a strand.",
       "use": "Thread without waiting on a whole Orrery to be built."
     },
     {
@@ -165,6 +165,116 @@
       ],
       "flavor": "An Ember Heart burns hot enough to split a nodule clean, and clean is the whole art.",
       "use": "Three shards begin a second Runestone — and a Runestone makes fuel forever."
+    },
+    {
+      "id": "fire_brick",
+      "output": {
+        "chain": "glasskiln",
+        "tier": 1,
+        "count": 1
+      },
+      "inputs": [
+        {
+          "chain": "emberheart",
+          "tier": 1,
+          "count": 2
+        },
+        {
+          "chain": "warhelm",
+          "tier": 1,
+          "count": 1
+        }
+      ],
+      "flavor": "Clay is nothing without a fire under it and an iron collar to hold its shape.",
+      "use": "Nine bricks raise a second Glass Kiln."
+    },
+    {
+      "id": "tar_spile",
+      "output": {
+        "chain": "tarkiln",
+        "tier": 1,
+        "count": 1
+      },
+      "inputs": [
+        {
+          "chain": "seaglass",
+          "tier": 1,
+          "count": 2
+        },
+        {
+          "chain": "warhelm",
+          "tier": 1,
+          "count": 1
+        }
+      ],
+      "flavor": "A glass throat and an iron tooth. That is the whole of a spile, and the glass is the part that matters.",
+      "use": "Nine spiles raise a second Tar Kiln."
+    },
+    {
+      "id": "iron_billet",
+      "output": {
+        "chain": "wreckforge",
+        "tier": 1,
+        "count": 1
+      },
+      "inputs": [
+        {
+          "chain": "warhelm",
+          "tier": 1,
+          "count": 3
+        },
+        {
+          "chain": "emberheart",
+          "tier": 1,
+          "count": 1
+        }
+      ],
+      "flavor": "Three caps back into the melt, and pitch enough to keep it honest — the forge eats its own work to grow.",
+      "use": "Nine billets raise a second Wreck Forge."
+    },
+    {
+      "id": "brass_cog",
+      "output": {
+        "chain": "starbench",
+        "tier": 1,
+        "count": 1
+      },
+      "inputs": [
+        {
+          "chain": "warhelm",
+          "tier": 1,
+          "count": 2
+        },
+        {
+          "chain": "emberheart",
+          "tier": 1,
+          "count": 1
+        }
+      ],
+      "flavor": "Helms melted down and poured fine. A tooth this small will not cast unless the crucible stays angry.",
+      "use": "Nine cogs raise a second Starwright's Bench."
+    },
+    {
+      "id": "silver_spindle",
+      "output": {
+        "chain": "auroraloom",
+        "tier": 1,
+        "count": 1
+      },
+      "inputs": [
+        {
+          "chain": "orrery",
+          "tier": 1,
+          "count": 2
+        },
+        {
+          "chain": "warhelm",
+          "tier": 1,
+          "count": 1
+        }
+      ],
+      "flavor": "Iron drawn out to a thread's width and set in a collar cut from two lenses.",
+      "use": "Nine spindles raise a second Aurora Loom."
     },
     {
       "id": "treasure_chest",
