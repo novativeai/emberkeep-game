@@ -67,7 +67,16 @@ from pathlib import Path
 try:
     from PIL import Image
 except ImportError:
-    sys.exit("shrink-dist: Pillow is required (pip3 install pillow)")
+    # Deliberately FATAL, never a skip: without the re-encode the deploy ships
+    # ~150 MB instead of ~106, and the budget check — the thing that stops a
+    # regression shipping quietly — never runs. On a CI box the fix is the
+    # install, not a bypass: vercel.json's `installCommand` adds Pillow, and
+    # every Vercel build from 2026-08-07 to 2026-08-14 failed exactly here
+    # because it did not.
+    sys.exit(
+        "shrink-dist: Pillow is required (pip3 install pillow; CI installs it "
+        "via vercel.json installCommand)"
+    )
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
