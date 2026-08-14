@@ -113,9 +113,20 @@ silently drops `checklist` writes, so everything goes in `notes`.
 - Everything tweens; nothing teleports. BoardItems and particles are pooled.
 
 ## Rendering & coordinates
-- Canvas renders at 2560×1600 (`RES = 2`) and FIT-scales; ALL coordinates/fonts are
-  in that hi-res space. CSS/e2e coordinates are half the game-space values.
-  TextureFactory paints logical units ×RES.
+- Canvas is AUTHORED at 2560×1600 (`RES = 2`) and FIT-scales; ALL coordinates/fonts
+  are in that hi-res space. TextureFactory paints logical units ×RES.
+- The LIVE space is `LIVE_GAME_WIDTH × LIVE_GAME_HEIGHT`, not 2560×1600: the SHORT
+  axis is pinned to its design constant and the LONG axis grows to the window's
+  real aspect (16:9 → 2844×1600, 3:2 → 2560×1706, phone portrait → 2560×tall), so
+  FIT leaves NO letterbox on any device. At 16:10 both equal the authored constants,
+  which is why e2e (1280×800) is byte-identical. **Anchor every screen-space
+  coordinate to the LIVE_* pair** — raw `GAME_WIDTH`/`GAME_HEIGHT` are only correct
+  at 16:10. The one deliberate exception is `BOARD_ORIGIN_X`, which is WORLD space:
+  `iso.ts`/`world.ts` and every persisted position derive from it, so it stays on
+  the authoring width. Read at BOOT — a window resized later re-letterboxes until
+  reload, since scenes lay out once.
+- CSS/e2e coordinates are the game-space values ÷ (LIVE_GAME_WIDTH / canvas CSS
+  width) — half, at the 16:10 sizes the e2e run uses.
 - e2e Chromium runs WITH GPU (`--use-angle=metal`) — SwiftShader can't push 2560×1600.
 - Depth: items at `itemBase + y` (board spans ~5100 screenY), fog +2, always-on-top
   bands (dragged/particles/flash) at 50000+ — never tie those to a small const.

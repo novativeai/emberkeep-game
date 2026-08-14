@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import {
-  GAME_WIDTH,
   HUD_COLUMN_X,
   hudColumnY,
   IS_MOBILE,
   LEVEL_XP,
   LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
   num,
   PALETTE,
   UI_SCALE
@@ -93,7 +93,7 @@ export class Hud {
 
     // Settings gear — top-right corner (nudged in on mobile for the fat pixels).
     this.gearButton = this.roundIconButton(
-      GAME_WIDTH - (IS_MOBILE ? 150 : 112),
+      LIVE_GAME_WIDTH - (IS_MOBILE ? 150 : 112),
       IS_MOBILE ? 150 : 104,
       'ui_icon_gear',
       1,

@@ -126,13 +126,13 @@
       },
       "steps": [
         {
-          "id": "gallery_gems",
-          "label": "Make 4 Flame Gems",
+          "id": "gallery_crystals",
+          "label": "Make 2 Cut Crystals",
           "goal": {
             "kind": "have",
-            "chain": "flame_gem",
+            "chain": "quartz",
             "tier": 2,
-            "count": 4
+            "count": 2
           }
         }
       ]
@@ -548,14 +548,14 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Boil the Pitch",
+      "title": "Bricks for a Second Kiln",
       "steps": [
         {
           "id": "pitchpot_brew",
-          "label": "Brew 3 Pitch Loaves",
+          "label": "Brew 3 Fire Bricks",
           "goal": {
             "kind": "brew",
-            "recipeId": "pitch_loaf",
+            "recipeId": "fire_brick",
             "count": 3
           }
         }

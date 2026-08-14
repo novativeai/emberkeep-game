@@ -453,6 +453,35 @@ describe('Borealis — merge quests and cauldron quests ping-pong', () => {
     }
   });
 
+  it('gives the pot seven different jobs — no brew repeats another quest\u2019s ask', () => {
+    // Alternating is not enough on its own. Quest 7 used to brew three Pitch
+    // Loaves, the exact piece quest 4 had just asked the player to MERGE three
+    // of: the pot's turn came round on schedule and asked for something they
+    // had finished making two quests earlier. A rhythm you can feel is a
+    // rhythm of different work, not of the same work in a different room.
+    const merged = new Set<string>();
+    for (const quest of ladder) {
+      for (const step of quest.steps) {
+        const goal = step.goal;
+        if (goal.kind === 'have') merged.add(pieceKey(goal.chain, goal.tier));
+      }
+    }
+    const brewed = new Set<string>();
+    for (const quest of ladder) {
+      for (const step of quest.steps) {
+        const goal = step.goal;
+        if (goal.kind !== 'brew') continue;
+        expect(brewed.has(goal.recipeId), `${goal.recipeId} is brewed twice`).toBe(false);
+        brewed.add(goal.recipeId);
+        const out = cauldron.recipes.find((r) => r.id === goal.recipeId)!.output;
+        expect(
+          merged.has(pieceKey(out.chain, out.tier)),
+          `${step.id} brews ${pieceKey(out.chain, out.tier)}, which another quest already asks the player to merge`
+        ).toBe(false);
+      }
+    }
+  });
+
   it('a brew step that names no real recipe is an error, not a silent free pass', () => {
     const bent = JSON.parse(JSON.stringify(quests));
     bent.quests.find((q: QuestConfig) => q.id === 'north_strakes').steps[0].goal.recipeId = 'nope';

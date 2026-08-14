@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, IS_IOS, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
+import { LIVE_GAME_WIDTH, IS_IOS, IS_LOW_END, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE } from './Constants';
 import { graphics } from './graphicsState';
 import { renderScale } from './render-scale';
 import { BoardScene } from '../scenes/BoardScene';
@@ -34,7 +34,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   const dispH = IS_MOBILE ? Math.max(window.innerWidth, window.innerHeight) : window.innerHeight;
   // Backing needed to match the device pixels the FIT canvas spans, in game-units.
   const need = Math.min(
-    (dispW * dpr) / GAME_WIDTH,
+    (dispW * dpr) / LIVE_GAME_WIDTH,
     (dispH * dpr) / LIVE_GAME_HEIGHT
   );
   // Quantise to 1/8 steps (keeps 2560×1600 × R integral) and clamp. Desktop floors
@@ -56,7 +56,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   // portrait backing is the tall axis (LIVE_GAME_HEIGHT up to 2.4×2560 = 6144
   // game-units; ×0.75 floor = 4608 > 4096 on 20:9 phones). Quantised DOWN to
   // 1/8 so the backing stays integral; desktop (1600-tall) is untouched.
-  const gpuCap = Math.floor(((4096 / Math.max(GAME_WIDTH, LIVE_GAME_HEIGHT)) * 8)) / 8;
+  const gpuCap = Math.floor(((4096 / Math.max(LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT)) * 8)) / 8;
   renderScale.value = Phaser.Math.Clamp(
     Math.round(need * 8) / 8,
     // A profile ceiling below the device floor must win — on Low the whole
@@ -68,7 +68,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   return {
     type: Phaser.AUTO,
     parent,
-    width: GAME_WIDTH * renderScale.value,
+    width: LIVE_GAME_WIDTH * renderScale.value,
     height: LIVE_GAME_HEIGHT * renderScale.value,
     // Transparent canvas: the authored backdrop is painted in-canvas + as the page
     // background (index.html). backgroundColor is the fallback if transparency is

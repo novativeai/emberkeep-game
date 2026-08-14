@@ -19,7 +19,6 @@ import {
   ROOTHOLD_HOUSE,
   FINALE_ENDS_MS,
   FINALE_REGION,
-  GAME_WIDTH,
   GATE_FLIGHT,
   GOLDEN_ALTAR,
   GOLDEN_CHAIN,
@@ -29,6 +28,7 @@ import {
   IS_IOS,
   ITEM_SCALE,
   LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
   num,
   PALETTE,
   POWER,
@@ -624,7 +624,7 @@ export class BoardScene extends Phaser.Scene {
     if (aurora) {
       this.aurora = new AuroraFX(this, aurora, {
         now,
-        width: GAME_WIDTH,
+        width: LIVE_GAME_WIDTH,
         height: LIVE_GAME_HEIGHT * (spec.auroraBand ?? 0.5),
         depth: DEPTHS.skyFx
       });
@@ -635,7 +635,7 @@ export class BoardScene extends Phaser.Scene {
     if (snow) {
       this.snow = new SnowFX(this, snow, {
         now,
-        width: GAME_WIDTH,
+        width: LIVE_GAME_WIDTH,
         height: LIVE_GAME_HEIGHT,
         depth: DEPTHS.weather
       });
@@ -1776,7 +1776,7 @@ export class BoardScene extends Phaser.Scene {
     const zoomCfg = this.ctx.state.map.cameraZoom ?? { min: 0.2, max: 1.4 };
     if (bgRect) {
       cam.setBounds(bgRect.x, bgRect.y, bgRect.w, bgRect.h);
-      const fitZoom = Math.max(GAME_WIDTH / bgRect.w, LIVE_GAME_HEIGHT / bgRect.h);
+      const fitZoom = Math.max(LIVE_GAME_WIDTH / bgRect.w, LIVE_GAME_HEIGHT / bgRect.h);
       this.minZoom = Math.max(zoomCfg.min, fitZoom);
     } else {
       // Fallback (no backdrop): hold to the playable extent, the old behaviour.
@@ -2311,7 +2311,7 @@ export class BoardScene extends Phaser.Scene {
     // multiplier tweaks did nothing. Lower ceiling = a real zoom-out: the start
     // area fills the view comfortably without being right on top of it.
     const zoom = Phaser.Math.Clamp(
-      Math.min((GAME_WIDTH / 2 - pad) / halfW, (LIVE_GAME_HEIGHT / 2 - pad) / halfH) * 1.15,
+      Math.min((LIVE_GAME_WIDTH / 2 - pad) / halfW, (LIVE_GAME_HEIGHT / 2 - pad) / halfH) * 1.15,
       0.45,
       1.05
     );
@@ -2351,7 +2351,7 @@ export class BoardScene extends Phaser.Scene {
       const f = this.levelFrames.get(l);
       if (f) return f;
     }
-    return this.levelFrames.get(1) ?? { x: GAME_WIDTH / 2, y: LIVE_GAME_HEIGHT / 2, zoom: 0.5 };
+    return this.levelFrames.get(1) ?? { x: LIVE_GAME_WIDTH / 2, y: LIVE_GAME_HEIGHT / 2, zoom: 0.5 };
   }
 
   private flyToLevel(level: number): void {
@@ -2408,7 +2408,7 @@ export class BoardScene extends Phaser.Scene {
 
     // Warm sun haze, upper-left.
     this.add
-      .image(GAME_WIDTH * 0.3, 130, 'fx_glow')
+      .image(LIVE_GAME_WIDTH * 0.3, 130, 'fx_glow')
       .setScale(7, 4.4)
       .setTint(num(PALETTE.goldAccent))
       .setAlpha(0.16)
@@ -2423,7 +2423,7 @@ export class BoardScene extends Phaser.Scene {
       callback: () => {
         const star = this.add
           .image(
-            Phaser.Math.Between(80, GAME_WIDTH - 80),
+            Phaser.Math.Between(80, LIVE_GAME_WIDTH - 80),
             Phaser.Math.Between(60, LIVE_GAME_HEIGHT * 0.45),
             'fx_spark'
           )

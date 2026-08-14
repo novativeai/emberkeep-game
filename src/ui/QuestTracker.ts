@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { GAME_WIDTH, GIVER_MARK, IS_MOBILE, num, PALETTE, UI_SCALE } from '../core/Constants';
+import { LIVE_GAME_WIDTH, GIVER_MARK, IS_MOBILE, num, PALETTE, UI_SCALE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { QuestConfig, QuestStepConfig, SpeakerId } from '../core/types';
 import type { QuestSystem } from '../systems/QuestSystem';
@@ -171,7 +171,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     bus: EventBus,
     private quests: QuestSystem
   ) {
-    super(scene, GAME_WIDTH - MARGIN_R, TOP_Y);
+    super(scene, LIVE_GAME_WIDTH - MARGIN_R, TOP_Y);
     this.owner = scene;
     this.setScale(UI_SCALE); // magnifies down-left from the top-right anchor
 

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
 import { boardClipCharacters, clipKey, clipsFor } from '../core/characterAnims';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES, STANDEE_BANKS } from '../core/Constants';
+import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, PALETTE, SCENES, STANDEE_BANKS } from '../core/Constants';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
 import { ANIMATED_SPEAKERS, discTextureFor } from '../entities/PortraitAnimator';
@@ -80,10 +80,10 @@ export class PreloadScene extends Phaser.Scene {
 
     if (fileEntries.length > 0) {
       const barBg = this.add
-        .rectangle(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
+        .rectangle(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
         .setStrokeStyle(2, num(PALETTE.gold));
       const bar = this.add.rectangle(
-        GAME_WIDTH / 2 - 176,
+        LIVE_GAME_WIDTH / 2 - 176,
         LIVE_GAME_HEIGHT / 2,
         4,
         10,

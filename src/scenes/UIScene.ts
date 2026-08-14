@@ -9,12 +9,12 @@ import {
   FINALE_ENDS_MS,
   FIRST_CONTACT,
   FIRST_CONTACT_RETRY_MS,
-  GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_TREMBLE_PROGRESS,
   HUD_COLUMN_X,
   hudColumnY,
   LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
   num,
   PALETTE,
   OPENING_HOLD_MS,
@@ -287,7 +287,7 @@ export class UIScene extends Phaser.Scene {
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
     // cover, over the empty bottom-right margin during tutorial steps.
-    this.bubble.setPosition(GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
+    this.bubble.setPosition(LIVE_GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
     this.bubble.setDepth(DEPTH_TUTORIAL);
     this.bubble.registerUi();
     // GIVE is a two-part act: the bag arms it, the board delivers it. The panel
@@ -705,11 +705,11 @@ export class UIScene extends Phaser.Scene {
     // Interactive so a tap during the load cannot reach the board underneath —
     // the board it would reach is the one being replaced.
     const scrim = this.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.97)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.97)
       .setOrigin(0)
       .setInteractive();
     const label = this.add
-      .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 30, name, {
+      .text(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 30, name, {
         fontFamily: FONT.ui,
         fontSize: '64px',
         fontStyle: 'bold',
@@ -725,7 +725,7 @@ export class UIScene extends Phaser.Scene {
     // blob rather than reading as a count.
     for (let i = 0; i < 3; i++) {
       const dot = this.add
-        .circle(GAME_WIDTH / 2 + (i - 1) * 74, LIVE_GAME_HEIGHT / 2 + 74, 13, num(PALETTE.goldAccent))
+        .circle(LIVE_GAME_WIDTH / 2 + (i - 1) * 74, LIVE_GAME_HEIGHT / 2 + 74, 13, num(PALETTE.goldAccent))
         .setAlpha(0.22);
       this.tweens.add({
         targets: dot,
@@ -929,7 +929,7 @@ export class UIScene extends Phaser.Scene {
    *  or a retrieval could not happen, so the tap is never silently ignored. */
   private floatWarning(text: string): void {
     const label = this.add
-      .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.62, text, {
+      .text(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.62, text, {
         fontFamily: FONT.display,
         fontSize: '54px',
         fontStyle: 'bold',
@@ -1146,7 +1146,7 @@ export class UIScene extends Phaser.Scene {
   /** Shared warm banner (order complete / tasks complete) — the level-up
    *  banner's language, one tier smaller. */
   private buildCelebrationBanner(title: string, rewardLine: string, quote: string): void {
-    const cx = GAME_WIDTH / 2;
+    const cx = LIVE_GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT * 0.3;
     const height = quote ? 236 : 180;
     const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);
@@ -1222,7 +1222,7 @@ export class UIScene extends Phaser.Scene {
     this.add
       .image(0, 0, KEY)
       .setOrigin(0)
-      .setDisplaySize(GAME_WIDTH, LIVE_GAME_HEIGHT)
+      .setDisplaySize(LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT)
       .setAlpha(ATMOSPHERE.vignette.alpha)
       .setDepth(DEPTH_HUD - 1); // over the board render, under every UI element
   }
@@ -1367,7 +1367,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private buildLevelUpBanner(level: number): void {
-    const cx = GAME_WIDTH / 2;
+    const cx = LIVE_GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT * 0.34;
     const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);
     const g = this.add.graphics();
@@ -1706,7 +1706,7 @@ export class UIScene extends Phaser.Scene {
     const view = this.scene.get(SCENES.board)?.cameras?.main?.worldView;
     if (view && view.width > 0 && view.height > 0) {
       return {
-        x: ((wx - view.x) / view.width) * GAME_WIDTH,
+        x: ((wx - view.x) / view.width) * LIVE_GAME_WIDTH,
         y: ((wy - view.y) / view.height) * LIVE_GAME_HEIGHT
       };
     }
@@ -2017,9 +2017,9 @@ export class UIScene extends Phaser.Scene {
 
   private openResetDialog(): void {
     if (this.dialog) return;
-    const container = this.add.container(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
+    const container = this.add.container(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
     const dim = this.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
       .setInteractive();
     const panel = this.add.graphics();
     panel.fillStyle(num(PALETTE.night), 0.25);
@@ -2174,9 +2174,9 @@ export class UIScene extends Phaser.Scene {
 
   /** Shared chrome for the purchase dialogs — cream card, gold keyline. */
   private iapCard(height: number): Phaser.GameObjects.Container {
-    const container = this.add.container(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
+    const container = this.add.container(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
     const dim = this.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
       .setInteractive();
     const panel = this.add.graphics();
     panel.fillStyle(num(PALETTE.night), 0.25);
@@ -2319,7 +2319,7 @@ export class UIScene extends Phaser.Scene {
       UIScene.describeGrant(grant),
       `${grant.name} — thank you, Keeper!`
     );
-    this.confettiBurst(GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.3);
+    this.confettiBurst(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.3);
   }
 
   /** Paper-slip confetti in the celebration palette, raining over the banner. */

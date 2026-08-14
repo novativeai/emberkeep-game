@@ -95,19 +95,59 @@ export function panelMobileScale(frameWidth: number): number {
 }
 
 /**
- * Viewport height in game-space units.
- * On desktop stays at GAME_HEIGHT (1600) — no change (e2e/landscape untouched).
- * On mobile the game is PORTRAIT: GAME_WIDTH (2560) spans the phone's SHORT side
- * (full width) and the coordinate space grows TALLER to match the portrait aspect,
- * so FIT fills the screen with zero bars and the board pans vertically. The 2.4×
- * cap keeps a near-square tablet (or an extreme aspect) from a runaway backing.
+ * The LIVE coordinate space, in game-space units.
+ *
+ * The space is AUTHORED at 2560×1600, but a window is rarely 16:10 and FIT just
+ * letterboxes whatever does not match: a 16:9 desktop threw away 10% of the
+ * screen to pillarbox bars and a 21:9 monitor a full third of it.
+ *
+ * So the SHORT axis is pinned to its design constant and the LONG axis GROWS to
+ * meet the real aspect — a 16:9 window is 2844×1600, a 3:2 window 2560×1706,
+ * and a 16:10 window is 2560×1600 exactly as before (which is why the e2e run,
+ * authored at 16:10, is byte-identical). Growing rather than shrinking means the
+ * reclaimed space shows MORE of the world instead of scaling the art down, and
+ * nothing has to be re-tuned for it: the board camera already refuses to look
+ * past the authored backdrop (`minZoom` is the backdrop-fit), so a wider
+ * viewport simply holds a slightly closer frame.
+ *
+ * Mobile is unchanged. There the game is PORTRAIT: GAME_WIDTH spans the phone's
+ * SHORT side whichever way it is held, the space grows taller to match, and 2.4
+ * caps a near-square tablet (or an extreme aspect) from a runaway backing.
+ *
+ * Both axes are read at BOOT. A desktop window resized afterwards re-FITs (and
+ * re-letterboxes) until reload — the scenes lay out once.
  */
-export const LIVE_GAME_HEIGHT: number = (() => {
-  if (typeof window === 'undefined' || !IS_MOBILE) return GAME_HEIGHT;
-  const shortSide = Math.min(window.innerWidth, window.innerHeight); // portrait width
-  const longSide = Math.max(window.innerWidth, window.innerHeight); // portrait height
-  return Math.round(GAME_WIDTH * Math.min(2.4, longSide / shortSide));
-})();
+/** The pure half of the rule above — exported so the invariants (short axis
+ *  pinned, 16:10 identity, clamp) are unit-testable without a DOM. */
+export function liveSpaceFor(
+  winW: number,
+  winH: number,
+  isMobile: boolean
+): { w: number; h: number } {
+  if (isMobile) {
+    const shortSide = Math.min(winW, winH); // portrait width
+    const longSide = Math.max(winW, winH); // portrait height
+    return { w: GAME_WIDTH, h: Math.round(GAME_WIDTH * Math.min(2.4, longSide / shortSide)) };
+  }
+  // Clamped the same 2.4 either way, so one absurd axis cannot inflate the
+  // backing; past the clamp the leftover simply letterboxes as it always did.
+  const aspect = Math.min(2.4, Math.max(1 / 2.4, winW / winH));
+  return {
+    w: Math.round(Math.max(GAME_WIDTH, GAME_HEIGHT * aspect)),
+    h: Math.round(Math.max(GAME_HEIGHT, GAME_WIDTH / aspect))
+  };
+}
+
+const LIVE_SPACE: { w: number; h: number } =
+  typeof window === 'undefined'
+    ? { w: GAME_WIDTH, h: GAME_HEIGHT }
+    : liveSpaceFor(window.innerWidth, window.innerHeight, IS_MOBILE);
+
+/** Viewport WIDTH in game-space units. Anchor every screen-space x to this —
+ *  `GAME_WIDTH` is the authoring constant and is only correct at 16:10. */
+export const LIVE_GAME_WIDTH: number = LIVE_SPACE.w;
+/** Viewport HEIGHT in game-space units. See LIVE_GAME_WIDTH. */
+export const LIVE_GAME_HEIGHT: number = LIVE_SPACE.h;
 
 /**
  * The bottom-right button column — Ledger, Bag, Cookbook, Store, bottom-up
@@ -127,7 +167,7 @@ export const LIVE_GAME_HEIGHT: number = (() => {
  * anything closer than that overlaps its neighbour. UI_SCALE magnifies each
  * button about its own centre, so the pitch scales with it.
  */
-export const HUD_COLUMN_X: number = GAME_WIDTH - (IS_MOBILE ? 190 : 156);
+export const HUD_COLUMN_X: number = LIVE_GAME_WIDTH - (IS_MOBILE ? 190 : 156);
 export const HUD_COLUMN_PITCH: number = 200 * UI_SCALE;
 export const hudColumnY = (slot: number): number =>
   LIVE_GAME_HEIGHT - (IS_MOBILE ? 260 : 168) - slot * HUD_COLUMN_PITCH;
@@ -137,7 +177,10 @@ export const TILE_W = 256;
 export const TILE_H = 128;
 export const BOARD_COLS = 8;
 export const BOARD_ROWS = 8;
-/** World position of the centre of tile (0,0). */
+/** World position of the centre of tile (0,0). WORLD space, not screen: `iso.ts`
+ *  and `world.ts` derive every grid↔world address from it and saves persist
+ *  against it, so it stays pinned to the AUTHORING width — a viewport-dependent
+ *  origin would move every stored position when the window aspect changed. */
 export const BOARD_ORIGIN_X = GAME_WIDTH / 2;
 export const BOARD_ORIGIN_Y = 316;
 

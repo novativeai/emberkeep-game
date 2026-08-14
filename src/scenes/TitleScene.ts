@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
+import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, PALETTE, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
 
 
@@ -40,7 +40,7 @@ export class TitleScene extends Phaser.Scene {
     } else {
       // Fallback wordmark on the (transparent) canvas if the DOM logo is absent.
       this.add
-        .text(GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 120, 'EMBERKEEP', {
+        .text(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 120, 'EMBERKEEP', {
           fontFamily: FONT.ui,
           fontSize: '192px',
           fontStyle: 'bold',
@@ -69,7 +69,7 @@ export class TitleScene extends Phaser.Scene {
     // Play sits low, in the clear sky below the banner (e2e taps it here).
     // 1340/1600 = 0.8375 — same ratio keeps the button in the sky on any AR.
     const playY = Math.round(LIVE_GAME_HEIGHT * 0.8375);
-    const play = this.add.container(GAME_WIDTH / 2, playY);
+    const play = this.add.container(LIVE_GAME_WIDTH / 2, playY);
     // A ROUND button (drawn — the round-button PNG is only a placeholder): a gold
     // disc with a darker rim + inner ring, with the PLAY triangle on top. No text.
     const R = 116;

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT, INK, TYPE } from '../art/design';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, REVEAL } from '../core/Constants';
+import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, REVEAL } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 
 /**
@@ -117,14 +117,14 @@ export class DragonReveal {
     if (!this.scene.textures.exists(card.art)) return; // no plate, no card
 
     this.elapsed = 0;
-    const cx = GAME_WIDTH / 2;
+    const cx = LIVE_GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT * REVEAL.plateCentreFrac;
     const layer = this.scene.add.container(0, 0).setDepth(DEPTH_REVEAL);
     this.layer = layer;
 
     // 1. The board goes dim, not away.
     const scrim = this.scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 1)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 1)
       .setOrigin(0)
       .setAlpha(0)
       .setInteractive();
@@ -140,7 +140,7 @@ export class DragonReveal {
     const plate = this.scene.add.image(cx, cy, card.art).setAlpha(0);
     const target = Math.min(
       (LIVE_GAME_HEIGHT * REVEAL.plateHeightFrac) / plate.height,
-      (GAME_WIDTH * REVEAL.plateWidthFrac) / plate.width
+      (LIVE_GAME_WIDTH * REVEAL.plateWidthFrac) / plate.width
     );
     const shown = plate.height * target;
 
@@ -176,7 +176,7 @@ export class DragonReveal {
     // 4. The hit: a white flash, a shove of sparks, and the camera kicks.
     this.after(REVEAL.roarAtMs, () => {
       const flash = this.scene.add
-        .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, 0xffffff, 0.55)
+        .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, 0xffffff, 0.55)
         .setOrigin(0)
         .setBlendMode(Phaser.BlendModes.ADD);
       layer.add(flash);
@@ -196,7 +196,7 @@ export class DragonReveal {
       sparks.explode(64);
       // A slow updraft of embers keeps the card alive while it holds.
       const embers = this.scene.add.particles(cx, LIVE_GAME_HEIGHT + 40, 'fx_spark', {
-        x: { min: -GAME_WIDTH * 0.34, max: GAME_WIDTH * 0.34 },
+        x: { min: -LIVE_GAME_WIDTH * 0.34, max: LIVE_GAME_WIDTH * 0.34 },
         speedY: { min: -260, max: -90 }, speedX: { min: -40, max: 40 },
         lifespan: { min: 1600, max: 2800 }, scale: { start: 0.5, end: 0 },
         alpha: { start: 0.85, end: 0 }, frequency: 70, blendMode: Phaser.BlendModes.ADD

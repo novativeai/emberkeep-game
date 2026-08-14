@@ -44,7 +44,7 @@ is not finished. The rows are that quest's steps. Nothing else can appear there.
 | 2 🥚 | **Fill the Larder** | — | berries | T3 | Make 1 Emberberry Preserve |
 | 3 | **Warm the Long Hearth** | `eleanor_hearth` | gems | **T2** | Make 2 Flame Gems · Deliver 2 Flame Gems to Eleanor |
 | 4 | **Raise the Roofs** | — | timber | T3 | Build 2 Houses |
-| 5 | **Light the Long Gallery** | — | gems | **T2** | Make 4 Flame Gems |
+| 5 | **Light the Long Gallery** | — | quartz | **T2** | Make 2 Cut Crystals |
 | 6 🥚 | **Catch the Moonwater** | `eleanor_moonwater` | moonwater | T3 | Make 1 Moonwater · Deliver 1 Moonwater to Eleanor |
 | 7 | **What She Keeps** | — | berries | **T2** | Give Eleanor 2 Emberberry Baskets · Give Eleanor 1 Emberberry Preserve *(locked until 1 heart — long paid by here)* |
 | 8 | **Craft the Radiant Centerpiece** | `eleanor_centerpiece` | gems | T3 | Make 1 Radiant Gem · Deliver 1 Radiant Gem to Eleanor |
@@ -94,31 +94,50 @@ alternation on its first step.
 Quest 6 is the tutorial's `moonwater_merge` promise kept: Eleanor tells the
 player "three vials make true Moonwater, and that is what I will ask you for",
 and this is the order that asks. Moonwater and quartz are `MAGE_ONLY` — no
-dragon eats any tier of either — so without this sink the chain and the Dew
-Basin that feeds it would be dead stock.
+dragon eats any tier of either — so without a sink each chain and the producer
+that feeds it would be dead stock.
+
+**Quest 5 is quartz's sink, and it used to be a fourth gem beat.** "Make 4 Flame
+Gems" asked for the same piece quest 3 had just asked for, one quest later, with
+nothing new in it — the ladder's one pure repeat. Quartz is the better ask on
+every count: the tutorial teaches it end to end (`crystal_tap` → `quartz_merge`
+→ `quartz_ball`), the Theme Crystal keeps producing it, and Eleanor's own motive
+is the Crystal Ball she says she will keep asking for. Gems stay the chapter's
+spine at 1 / 3 / 8 / 9 — every one of them order-bearing, which is what makes
+them the currency rather than the filler.
+
+**Resin cannot carry a quest, and this is where that gets written down.** The
+tutorial teaches it end to end and the Red Dragon's favourite is a Hearth Cake,
+so it looks like the obvious fifth chain — but its only guaranteed source is the
+tutorial's own spawns. `house_commission` POINTS at a Resin Bead and the player
+may pick anything else in the bag, so a quest asking for a Cake is unwinnable
+for anyone who commissioned their House to Cut Wood. Its real producer, the
+Firepine, is in `HIDDEN_CHAINS` for the nest chapter. Promoting it is a chapter
+decision, not a pacing one; until then `availability.ts` is right to call resin
+FINITE and the ladder is right to leave it alone.
 
 *Borealis (`world: "borealis"`). 🍲 marks a CAULDRON quest — brewed at Selyna's
 pot through the Rune Way, not merged on an island.*
 
 | # | Quest | Order | Subquests |
 | --- | --- | --- | --- |
-| 1 | **Make Camp on the Ice** | `selyna_signal` | Merge 3 Drift Spars into a Bound Faggot · Deliver 2 Bound Faggots to Selyna |
+| 1 | **Make Camp on the Ice** | `selyna_signal` | Merge 3 Glass Floats into a Glass Buoy · Deliver 2 Glass Buoys to Selyna |
 | 2 | **Open the Wrack Coast** | — | Spend 1 Gold Key on the fog along the coast |
-| 3 🍲 | **Strakes from Spars** | — | Brew 4 Broken Strakes |
-| 4 | **Feed the Northern Dragons** | `selyna_pitch` | Build a Drift Stack from 9 Drift Spars · Make 3 Pitch Cakes · Deliver 3 Pitch Cakes to Selyna |
-| 5 🍲 | **Thread from the Frost** | — | Brew 4 Frost Threads |
-| 6 | **Salvage the Wrecks** | `selyna_frames` | Make 2 Lashed Frames · Deliver 2 Lashed Frames to Selyna |
-| 7 🍲 | **Boil the Pitch** | — | Brew 3 Pitch Cakes |
+| 3 🍲 | **Caps from Glass** | — | Brew 4 Iron Caps from Glass Buoys |
+| 4 | **Feed the Northern Dragons** | `selyna_pitch` | Gather 3 Pitch Beads from the Tar Kiln · Make 3 Pitch Loaves · Deliver 3 Pitch Loaves to Selyna |
+| 5 🍲 | **Thread from the Frost** | — | Brew 4 Light Threads from Spyglasses |
+| 6 | **Salvage the Wrecks** | `selyna_frames` | Forge 2 Banded Helms at the Wreck Forge · Deliver 2 Banded Helms to Selyna |
+| 7 🍲 | **Bricks for a Second Kiln** | — | Brew 3 Fire Bricks |
 | 8 🥚 | **Open Selyna's Keep** | — | Spend 2 Gold Keys on the fog around the keep |
 | 9 🍲 | **Light for the Long Dark** | — | Brew 3 Oil Lamps |
-| 10 | **What She Will Take** | — | Give Selyna 2 Bound Faggots · Give Selyna 3 Frost Flowers |
+| 10 | **What She Will Take** | — | Give Selyna 2 Glass Buoys · Give Selyna 3 Ground Lenses |
 | 11 🍲 | **Something That Points** | — | Brew 3 Lodestones |
-| 12 🥚 | **Turn Two Hulls** | — | Make 2 Upturned Hulls |
-| 13 🍲 | **Spin It Fine** | — | Brew 3 Spun Skeins |
-| 14 | **Stock the Pitchworks** | — | Make 1 Black Ember |
-| 15 🍲 | **Split the Nodule** | — | Fire a Black Ember into shards |
-| 16 | **Raise a Longhall** | — | Merge 2 Lashed Frames into an Upturned Hull · Merge 2 Upturned Hulls into a Longhall — the two hulls from quest 12 are exactly what it merges |
-| 17 🥚 | **Spin the Light-Fast Spindles** | `selyna_spindle` | Earn a place at Selyna's fire · Grow a Rime Bloom · Make 2 Light-Fast Spindles · Deliver 2 to Selyna |
+| 12 🥚 | **Forge Two Helms** | — | Forge 2 Horned Helms |
+| 13 🍲 | **Spin It Fine** | — | Brew 3 Woven Bolts |
+| 14 | **Stock the Pitchworks** | — | Render 1 Ember Heart |
+| 15 🍲 | **Split the Nodule** | — | Fire an Ember Heart into Rune Shards |
+| 16 | **Raise a Second Forge** | — | Merge 3 Banded Helms into a Horned Helm · Raise a 2nd Wreck Forge from 3 Bellows |
+| 17 🥚 | **Weave the Aurora** | `selyna_spindle` | Earn a place at Selyna's fire · Build an Orrery from 9 Ground Lenses · Weave 2 Aurora Cloaks · Deliver 2 Aurora Cloaks to Selyna |
 | 18 | **Wake the Rimewyrm** | — | Merge 3 Rimewyrm Eggs into the Rimewyrm |
 | 19 | *(the live order's title)* | the encore | whatever her Ledger asks |
 
@@ -130,6 +149,17 @@ alternates **M C M C M C M C M C M C M M** — never two brews back to back (a
 second trip through the Rune Way with nothing merged between them is the thing
 this rhythm exists to prevent), and exactly one merge double at the end, because
 the legendary arc puts the last egg on the second-to-last quest.
+
+**Alternating is not enough on its own — the brews also have to be seven
+different jobs.** Quest 7 used to brew three Pitch Loaves, which is the piece
+quest 4 had just merged three of: the pot's turn came round on schedule and
+asked for something the player had finished making two quests earlier. It brews
+Fire Bricks now, and that is the one recipe family the ladder had never touched
+— the FIXTURE parts. Three Bricks are a Kiln Grate, nine are a second Glass
+Kiln, so the beat teaches by hand what the north's every-twelfth drop teaches
+slowly: up here you build the machines. The other six brews are already six
+distinct outputs (Iron Caps, Light Threads, Oil Lamps, Lodestones, Woven Bolts,
+Rune Shards), and none of them duplicates a merge goal.
 
 **The first brew lands at quest 3 of 18 — 17% of the way down.** That number is
 authored, not incidental: `RUNEVAULT_QUESTS_NEEDED = 2` opens the Rune Way on

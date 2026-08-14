@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
+import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelMobileScale } from '../core/Constants';
 import { FONT, INK } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
@@ -138,13 +138,13 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     private bus: EventBus,
     private gameState: GameState
   ) {
-    super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
     // Near-opaque scrim. The concept shows the world reduced to a dark blur
     // beyond the frame; a light dim would leave the board competing with goods
     // it is not selling.
     this.dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.fieldDeep), 0.88)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.fieldDeep), 0.88)
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 

@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
 import {
   FOIL,
-  GAME_WIDTH,
   LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
   num,
   panelMobileScale,
   RARITY
@@ -108,11 +108,11 @@ export class StorePanel extends Phaser.GameObjects.Container {
     data: StoreData,
     private ctx: GameContext
   ) {
-    super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
     this.sections = data.sections;
 
     this.dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
@@ -435,7 +435,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
   private seatMask(): void {
     const m = this.viewport.getWorldTransformMatrix();
     const h = VIEW_H * m.scaleY;
-    const w = GAME_WIDTH * m.scaleX; // wider than the frame — only Y clips here
+    const w = LIVE_GAME_WIDTH * m.scaleX; // wider than the frame — only Y clips here
     this.shelfMask.clear();
     this.shelfMask.fillStyle(0xffffff, 1);
     this.shelfMask.fillRect(m.tx - w / 2, m.ty - h / 2, w, h);

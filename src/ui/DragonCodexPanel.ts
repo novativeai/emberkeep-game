@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { FONT, INK, RADIUS, TYPE } from '../art/design';
 import {
-  GAME_WIDTH,
   LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
   num,
   panelMobileScale,
   WELL_FED_EVOLUTION
@@ -122,10 +122,10 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     private dex: DragondexData,
     private chains: ChainsData
   ) {
-    super(scene, GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
     const dim = scene.add
-      .rectangle(0, 0, GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
     dim.on('pointerup', () => {
       if (this.held) return; // the lesson owns the book — see `held`

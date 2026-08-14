@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { FONT, INK, TYPE } from '../art/design';
 import {
   DAILY_GREEN,
-  GAME_WIDTH,
+  LIVE_GAME_WIDTH,
   MEALS_PER_DAY,
   STATUS_FADE_IN_MS,
   STATUS_FADE_OUT_MS,
@@ -110,7 +110,7 @@ export class StatusPanel extends Phaser.GameObjects.Container {
   ) {
     super(
       scene,
-      GAME_WIDTH - QUEST_TRACKER_RIGHT,
+      LIVE_GAME_WIDTH - QUEST_TRACKER_RIGHT,
       QUEST_TRACKER_TOP_Y + (QUEST_TRACKER_BOTTOM + GAP) * UI_SCALE
     );
     this.owner = scene;

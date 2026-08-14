@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
-import { GAME_WIDTH, LIVE_GAME_HEIGHT, SCENES } from '../core/Constants';
+import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
 import { CharacterBubble } from '../entities/CharacterBubble';
 import { CustomUiManager } from '../ui/customUi';
@@ -53,7 +53,7 @@ export class UiEditorScene extends Phaser.Scene {
     shop.setDepth(68);
 
     const bubble = new CharacterBubble(this, ctx.bus);
-    bubble.setPosition(GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
+    bubble.setPosition(LIVE_GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
     bubble.setDepth(100);
     bubble.registerUi();
 
