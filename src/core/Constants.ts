@@ -1585,6 +1585,18 @@ export const DRAG = {
 /** The authored decor piece (zones.json `decor` name) that opens Selyna's
  *  Cauldron when tapped. It stands in the Runevault hub; the panel itself is
  *  world-agnostic because the cauldron trades only in the Bag. */
+/**
+ * THE IDLE MERGE HINT — how long a board sits untouched before the hand offers
+ * a move, and how long it waits again after one is made.
+ *
+ * Ten seconds is long enough that a player who is thinking is never
+ * interrupted, and short enough that one who looked away comes back to help
+ * rather than to a puzzle. The two numbers are separate on purpose: the first
+ * is the cost of distraction, the second the cost of interrupting momentum,
+ * and they are free to diverge if either turns out wrong in play.
+ */
+export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000 } as const;
+
 export const CAULDRON_DECOR = 'pink_cauldron';
 
 /**

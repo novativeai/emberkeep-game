@@ -12,6 +12,7 @@ import {
   DRAGON_ANIM,
   DRAGON_CLIPS,
   decorClipCharacter,
+  MERGE_HINT,
   DRAGON_RIG_SCALE,
   CRYSTAL_3D,
   EMBER_MOTES,
@@ -73,6 +74,7 @@ import {
   originFor
 } from '../core/characterAnims';
 import { type ClipRef, clipLoadTiers, planClipEviction } from '../core/dragonClips';
+import { type MergeHint, nextMergeHint } from '../core/mergeHints';
 import { LoadQueue } from '../core/LoadQueue';
 import { gridToWorld } from '../core/iso';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
@@ -820,6 +822,8 @@ export class BoardScene extends Phaser.Scene {
       }
     }
 
+    this.tickMergeHint(delta);
+
     this.regenAccum += delta;
     if (this.regenAccum >= 500) {
       // Pass the REAL elapsed ms (not 0): regen/passive read the clock, but the
@@ -828,6 +832,56 @@ export class BoardScene extends Phaser.Scene {
       this.regenAccum = 0;
       this.ctx.bus.emit('time:advanced', { ms: elapsed });
     }
+  }
+
+  /* --------------------------- the idle hand ----------------------------- */
+
+  /** Untouched time on this board, in ms — reset by anything the player does. */
+  private hintIdleMs = 0;
+  /** The hint currently on screen, so it is offered once and taken back once. */
+  private hintShown: MergeHint | null = null;
+
+  /**
+   * Offer a merge when the board has gone quiet.
+   *
+   * The RULE — which merge is worth pointing at — is `nextMergeHint`, pure and
+   * unit-tested. This is only the clock around it, and it is deliberately made
+   * of the two things a distracted player actually does: nothing at all, or
+   * something. Any drag resets the wait and takes the hand back, because a
+   * player with a piece in their hand does not need to be told about another.
+   *
+   * Silent for the whole tutorial. The tutorial has its own hand and its own
+   * script, and a second hand pointing somewhere else during a scripted beat
+   * is worse than no help at all — UIScene enforces that too, so neither side
+   * can hand the player two gestures at once.
+   */
+  private tickMergeHint(delta: number): void {
+    if (!this.tutorialDone || this.dragSprite) {
+      this.hintIdleMs = 0;
+      this.takeBackHint();
+      return;
+    }
+    if (this.hintShown) return; // already offered; it stands until acted on
+    this.hintIdleMs += delta;
+    if (this.hintIdleMs < MERGE_HINT.idleMs) return;
+
+    const hint = nextMergeHint(this.ctx.state.items.values(), this.ctx.data.chains);
+    if (!hint) return;
+    const from = this.ctx.state.items.get(hint.ids[0]!);
+    const to = this.ctx.state.items.get(hint.ids[1]!);
+    if (!from || !to) return;
+    this.hintShown = hint;
+    this.ctx.bus.emit('hint:merge', {
+      from: { col: from.col, row: from.row },
+      to: { col: to.col, row: to.row }
+    });
+  }
+
+  /** Take the hand back — after a merge, on a drag, or when the board goes. */
+  private takeBackHint(): void {
+    if (!this.hintShown) return;
+    this.hintShown = null;
+    this.ctx.bus.emit('hint:merge', null);
   }
 
   /* ------------------------- live rigged dragons ------------------------- */
@@ -5724,7 +5778,14 @@ export class BoardScene extends Phaser.Scene {
         const { x, y } = gridToWorld(at.col, at.row);
         this.settleAfterDrag(sprite, x, y);
       }),
-      bus.on('item:merged', (payload) => this.onMerged(payload)),
+      bus.on('item:merged', (payload) => {
+        // A merge is the answer to the hint, whether or not it was the one
+        // offered — the player is playing, so the clock starts over and the
+        // next offer waits out `restMs` rather than arriving on their heels.
+        this.takeBackHint();
+        this.hintIdleMs = MERGE_HINT.idleMs - MERGE_HINT.restMs;
+        this.onMerged(payload);
+      }),
       bus.on('item:hatched', ({ item }) => this.hatchSequence(item)),
       bus.on('item:harvested', ({ generatorId, output }) => this.onHarvested(generatorId, output)),
       bus.on('item:produced', ({ generatorId, output }) => this.onProduced(generatorId, output)),

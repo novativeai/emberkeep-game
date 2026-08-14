@@ -120,6 +120,9 @@ export class UIScene extends Phaser.Scene {
   // its current on-screen spot (update()). Otherwise a marker would appear glued
   // to the screen and slide off its target the moment the camera moves.
   private handDrag: { from: TilePos; to: TilePos } | null = null;
+  /** True while the HAND is showing an idle merge hint rather than a tutorial
+   *  beat — so the hint only ever takes back what the hint put there. */
+  private hintHand = false;
   private handProg = { t: 0 }; // 0..1 along from→to, driven by a looping tween
   private handPoint: (() => { x: number; y: number } | null) | null = null;
   /** `height` = how far the target extends below the anchor point (0 for a
@@ -578,7 +581,22 @@ export class UIScene extends Phaser.Scene {
       // …and anything a speaker could not say from the world we just left. On
       // `world:ready`, not `world:switched`: the board has to exist under the
       // bubble, or she talks over the travelling curtain.
-      bus.on('world:ready', () => this.flushAwayBeats())
+      bus.on('world:ready', () => this.flushAwayBeats()),
+      // The idle merge hint. UIScene owns the hand, so it — not the board —
+      // is what decides the hand is free: the tutorial's own gestures always
+      // win, and two hands pointing at different things is worse than none.
+      bus.on('hint:merge', (hint) => {
+        if (!hint) {
+          if (!this.hintHand) return;
+          this.hintHand = false;
+          this.clearMarkers();
+          return;
+        }
+        if (this.hand.visible && !this.hintHand) return; // the tutorial is using it
+        if (!this.ctx.state.tutorialDone) return;
+        this.hintHand = true;
+        this.placeHand({ from: hint.from, to: hint.to });
+      })
     );
   }
 
@@ -1527,6 +1545,7 @@ export class UIScene extends Phaser.Scene {
     this.handDrag = null;
     this.handPoint = null;
     this.arrowAnchor = null;
+    this.hintHand = false;
   }
 
   /** Register a looping marker tween-chain so clearMarkers() can destroy it.

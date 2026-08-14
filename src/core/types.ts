@@ -1202,6 +1202,10 @@ export interface EventMap {
   /** Fact: the checkout ended without a delivery, and why. `pending` means the
    *  gateway hasn't confirmed yet — the hub delivers it on a later visit. */
   'iap:failed': { packId: string; reason: 'cancelled' | 'declined' | 'pending' | 'unavailable' };
+  /** The idle hand: a merge worth pointing at, or null to take the hand back.
+   *  BoardScene decides WHICH (src/core/mergeHints.ts) and WHEN; UIScene owns
+   *  the hand and refuses while the tutorial is still using it. */
+  'hint:merge': { from: TilePos; to: TilePos } | null;
   'item:spawned': { item: ItemSnapshot; cause: SpawnCause };
   'item:moved': { itemId: number; from: TilePos; to: TilePos };
   'item:move_bounced': { itemId: number; at: TilePos };
