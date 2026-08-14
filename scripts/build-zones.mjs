@@ -413,7 +413,6 @@ const BOREALIS_PLAN = {
     // Wrack Lines, rimebloom from the Fonts, and the chest's own gift table
     // (which pays Strakes too), so the frames order funds itself without a
     // scatter of freebies undercutting the farms.
-    layout: 'perimeter',
     // The Runestone and the Cordial Cask join the rim WORKING (tier 3): both
     // reseed their own tier-1 (the rune bonus / the cask's own produce), so a
     // seeded t3 here strands no Cookbook row — the parts stream starts the
@@ -438,16 +437,38 @@ const BOREALIS_PLAN = {
   }
 };
 
+/** Tiers that hold a `generator` — the machines, read off the shipped chain
+ *  data so this never drifts from what the game actually treats as a farm. */
+const GENERATOR_TIERS = new Set(
+  read('src/data/chains.json').chains.flatMap((c) =>
+    c.tiers.filter((t) => t.generator).map((t) => `${c.id}:${t.tier}`)
+  )
+);
+/** A permanent fixture: a machine, or the chest (a standing gift box that is
+ *  never consumed). Both are furniture — they want the rim. */
+const isFixture = (chain, tier) => GENERATOR_TIERS.has(`${chain}:${tier}`) || chain === 'chest';
+
 /**
- * Lay a region's seeds out from its middle outwards.
+ * Lay a region's seeds out: FIXTURES around the rim, evenly; stock in the middle.
  *
  * Placement is DERIVED, never pasted: a re-export moves every cell, and a
  * hand-written `[col,row]` would then be either a hole in the sky or on top of
- * the landmark beside it. Ordering by distance from the island's centre also
- * puts the producers where their output has somewhere to land, which is the
- * only thing the choice actually has to get right.
+ * the landmark beside it.
+ *
+ * The rim rule is what keeps an island playable. A machine laid mid-out walls
+ * off the exact tiles its own produce needs to land on, and two of them laid
+ * mid-out land beside each other in the middle — which is what the keep
+ * shipped as, the Loom and the Cairn ninety pixels apart on a 29-cell island.
+ *
+ * Even spacing is FARTHEST-POINT selection, not compass directions. The old
+ * rule gave seed k the bearing k·(2π/N) and took the cell reaching furthest
+ * that way, which assumes a roughly circular island: on the coast's real shape
+ * three machines collapsed onto the southern shore 350 px apart and left a
+ * 134° hole. Max-min asks a different question — "which free rim cell is
+ * furthest from everything already placed?" — and that answers correctly for
+ * any outline, because it never mentions a direction at all.
  */
-function seedRegion(cells, seeds, taken, layout) {
+function seedRegion(cells, seeds, taken) {
   if (!seeds?.length || !cells.length) return [];
   const cx = cells.reduce((n, c) => n + c.at.x, 0) / cells.length;
   const cy = cells.reduce((n, c) => n + c.at.y, 0) / cells.length;
@@ -455,51 +476,90 @@ function seedRegion(cells, seeds, taken, layout) {
   // scenery rather than a board item — so nothing stops a Hoarfrost Font from
   // being dropped through her. Leave her cell alone.
   const free = cells.filter((c) => !taken.has(`${c.col},${c.row}`));
+  // The RIM: the outermost cells by distance from the island's centre.
+  //
+  // Not "a cell with a neighbour off the island" — that is the ENGINE's rim
+  // (adjacency never leaves a zone) and every zone seam satisfies it, so on
+  // Borealis, which the editor delivered as 38 grids, cells in the dead middle
+  // of the coast qualified. The Cordial Cask duly landed seven pixels from the
+  // centroid: max-min had covered the four extremes and the most "isolated"
+  // point left really was the middle.
+  //
+  // The band is sized off the island instead of a pixel threshold, so it holds
+  // for a 9-cell shore and a 103-cell mainland alike, and always offers at
+  // least three candidates per fixture for the spacing to choose between.
+  const fixtures = seeds.reduce((n, [chain, tier, count]) => n + (isFixture(chain, tier) ? count : 0), 0);
+  const rim = [...free]
+    .sort(
+      (a, b) =>
+        Math.hypot(b.at.x - cx, b.at.y - cy) - Math.hypot(a.at.x - cx, a.at.y - cy) ||
+        a.col - b.col ||
+        a.row - b.row
+    )
+    .slice(0, Math.max(3 * fixtures, Math.ceil(free.length * 0.35)));
 
-  // PERIMETER layout: each seed on its own side of the island. Seed k gets the
-  // compass direction k·(2π/N), and takes the free cell that reaches FURTHEST
-  // from the centroid in that direction (max dot product) — which is the rim by
-  // construction, derived from the cells like everything else here, so a
-  // re-export moves the ring with the island. Generators belong on the rim:
-  // laid mid-out they wall off the exact tiles their own produce needs.
-  if (layout === 'perimeter') {
-    const total = seeds.reduce((n, [, , count]) => n + count, 0);
-    const used = new Set();
+  // Ties broken by address so a rebuild is reproducible to the cell.
+  const byAddress = (a, b) => a.col - b.col || a.row - b.row;
+  const gap = (a, b) => Math.hypot(a.at.x - b.at.x, a.at.y - b.at.y);
+  const used = new Set();
+  const placed = [];
+
+  /** Take `n` rim cells, each as far as possible from everything placed. */
+  const spread = (n) => {
     const out = [];
-    let k = 0;
-    for (const [chain, tier, count] of seeds) {
-      for (let i = 0; i < count; i++, k++) {
-        const th = (k / total) * Math.PI * 2 - Math.PI / 2; // start north, go clockwise
-        const dir = { x: Math.cos(th), y: Math.sin(th) };
-        let best;
-        let bestD = -Infinity;
-        for (const c of free) {
-          if (used.has(c)) continue;
-          const d = (c.at.x - cx) * dir.x + (c.at.y - cy) * dir.y;
-          if (d > bestD) {
-            bestD = d;
-            best = c;
-          }
+    for (let i = 0; i < n; i++) {
+      const candidates = rim.filter((c) => !used.has(c)).sort(byAddress);
+      if (!candidates.length) return out;
+      let best = null;
+      let bestScore = -Infinity;
+      for (const c of candidates) {
+        // The first fixture on an empty island has nothing to be far from, so
+        // it takes the furthest point OUT — a corner, never a centre.
+        const score = placed.length
+          ? Math.min(...placed.map((p) => gap(c, p)))
+          : Math.hypot(c.at.x - cx, c.at.y - cy);
+        if (score > bestScore) {
+          bestScore = score;
+          best = c;
         }
-        if (!best) throw new Error(`build-zones: ${chain} has no room — island holds ${cells.length}`);
-        used.add(best);
-        out.push({ chain, tier, at: [best.col, best.row] });
       }
+      used.add(best);
+      placed.push(best);
+      out.push(best);
     }
     return out;
-  }
+  };
 
-  const order = [...free].sort(
-    (a, b) => Math.hypot(a.at.x - cx, a.at.y - cy) - Math.hypot(b.at.x - cx, b.at.y - cy)
+  // Machines first, so the even spacing is THEIRS; the chest then falls into
+  // the largest gap they left rather than stealing one of their sides.
+  const units = seeds.flatMap(([chain, tier, count]) =>
+    Array.from({ length: count }, () => ({ chain, tier }))
   );
   const out = [];
+  for (const pass of [
+    (u) => GENERATOR_TIERS.has(`${u.chain}:${u.tier}`),
+    (u) => isFixture(u.chain, u.tier)
+  ]) {
+    const wanted = units.filter((u) => pass(u) && !u.at);
+    const spots = spread(wanted.length);
+    wanted.forEach((u, i) => {
+      if (spots[i]) u.at = [spots[i].col, spots[i].row];
+    });
+  }
+
+  // Everything else fills from the middle outwards — loose stock belongs where
+  // the player is already merging, which is the centre the fixtures left clear.
+  const mid = free
+    .filter((c) => !used.has(c))
+    .sort((a, b) => Math.hypot(a.at.x - cx, a.at.y - cy) - Math.hypot(b.at.x - cx, b.at.y - cy));
   let n = 0;
-  for (const [chain, tier, count] of seeds) {
-    for (let k = 0; k < count; k++) {
-      const cell = order[n++];
-      if (!cell) throw new Error(`build-zones: ${chain} has no room — island holds ${cells.length}`);
-      out.push({ chain, tier, at: [cell.col, cell.row] });
+  for (const unit of units) {
+    if (!unit.at) {
+      const cell = mid[n++];
+      if (!cell) throw new Error(`build-zones: ${unit.chain} has no room — island holds ${cells.length}`);
+      unit.at = [cell.col, cell.row];
     }
+    out.push({ chain: unit.chain, tier: unit.tier, at: unit.at });
   }
   return out;
 }
@@ -757,7 +817,7 @@ for (const spec of WORLDS) {
       const tiles = cells.map((c) => [c.col, c.row]);
       const planned = spec.plan?.[lvl];
       if (planned) {
-        const contents = seedRegion(cells, planned.seeds, standing, planned.layout);
+        const contents = seedRegion(cells, planned.seeds, standing);
         return {
           id: planned.id,
           status: planned.status,

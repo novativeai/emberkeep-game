@@ -2384,6 +2384,14 @@
                 "chain": "glasskiln",
                 "tier": 3,
                 "at": [
+                  72,
+                  2
+                ]
+              },
+              {
+                "chain": "seaglass",
+                "tier": 1,
+                "at": [
                   73,
                   1
                 ]
@@ -2418,14 +2426,6 @@
                 "at": [
                   73,
                   2
-                ]
-              },
-              {
-                "chain": "seaglass",
-                "tier": 1,
-                "at": [
-                  72,
-                  0
                 ]
               }
             ]
@@ -2855,7 +2855,7 @@
                 "chain": "starbench",
                 "tier": 3,
                 "at": [
-                  3,
+                  70,
                   0
                 ]
               },
@@ -2863,7 +2863,7 @@
                 "chain": "wreckforge",
                 "tier": 3,
                 "at": [
-                  28,
+                  11,
                   0
                 ]
               },
@@ -2871,7 +2871,7 @@
                 "chain": "tarkiln",
                 "tier": 3,
                 "at": [
-                  70,
+                  22,
                   0
                 ]
               },
@@ -2879,24 +2879,24 @@
                 "chain": "runestone",
                 "tier": 3,
                 "at": [
-                  68,
-                  1
+                  61,
+                  3
                 ]
               },
               {
                 "chain": "emberdram",
                 "tier": 3,
                 "at": [
-                  61,
-                  3
+                  0,
+                  1
                 ]
               },
               {
                 "chain": "chest",
                 "tier": 1,
                 "at": [
-                  11,
-                  0
+                  68,
+                  1
                 ]
               }
             ]
@@ -3030,6 +3030,14 @@
                 "chain": "auroraloom",
                 "tier": 3,
                 "at": [
+                  76,
+                  1
+                ]
+              },
+              {
+                "chain": "warhelm",
+                "tier": 1,
+                "at": [
                   85,
                   2
                 ]
@@ -3051,7 +3059,15 @@
                 ]
               },
               {
-                "chain": "warhelm",
+                "chain": "manastone",
+                "tier": 3,
+                "at": [
+                  94,
+                  0
+                ]
+              },
+              {
+                "chain": "wayfinder",
                 "tier": 1,
                 "at": [
                   80,
@@ -3059,8 +3075,8 @@
                 ]
               },
               {
-                "chain": "manastone",
-                "tier": 3,
+                "chain": "wayfinder",
+                "tier": 1,
                 "at": [
                   89,
                   0
@@ -3076,7 +3092,7 @@
               },
               {
                 "chain": "wayfinder",
-                "tier": 1,
+                "tier": 2,
                 "at": [
                   83,
                   0
@@ -3084,23 +3100,23 @@
               },
               {
                 "chain": "wayfinder",
-                "tier": 1,
+                "tier": 2,
                 "at": [
                   86,
                   1
                 ]
               },
               {
-                "chain": "wayfinder",
-                "tier": 2,
+                "chain": "hearthlamp",
+                "tier": 1,
                 "at": [
                   80,
                   0
                 ]
               },
               {
-                "chain": "wayfinder",
-                "tier": 2,
+                "chain": "hearthlamp",
+                "tier": 1,
                 "at": [
                   91,
                   1
@@ -3116,7 +3132,7 @@
               },
               {
                 "chain": "hearthlamp",
-                "tier": 1,
+                "tier": 2,
                 "at": [
                   79,
                   1
@@ -3124,34 +3140,18 @@
               },
               {
                 "chain": "hearthlamp",
-                "tier": 1,
+                "tier": 2,
                 "at": [
                   91,
                   2
                 ]
               },
               {
-                "chain": "hearthlamp",
-                "tier": 2,
-                "at": [
-                  79,
-                  0
-                ]
-              },
-              {
-                "chain": "hearthlamp",
-                "tier": 2,
-                "at": [
-                  83,
-                  1
-                ]
-              },
-              {
                 "chain": "chest",
                 "tier": 1,
                 "at": [
-                  86,
-                  0
+                  92,
+                  2
                 ]
               }
             ]

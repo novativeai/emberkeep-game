@@ -30,6 +30,10 @@ const LIST_VIEW_MID = LIST_VIEW_TOP + LIST_VIEW_H / 2;
 const LIST_TOP = -LIST_VIEW_H / 2 + ROW_GAP / 2;
 /** Past this much drag the gesture is a scroll, not a pick. */
 const DRAG_SLOP = 12;
+/** The scroll rail down the column's right edge — the only cue that the book
+ *  runs past its window, so it is drawn whenever there is anywhere to go. */
+const BAR_X = ROW_W / 2 + 26;
+const BAR_W = 10;
 
 /* Detail column (right of the list). */
 const DETAIL_X = 350;
@@ -64,6 +68,8 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
   /** Clipped window the recipe column scrolls inside. */
   private listViewport!: Phaser.GameObjects.Container;
   private listMask!: Phaser.GameObjects.Graphics;
+  /** Track + thumb, drawn OUTSIDE `listGroup` so the mask never eats it. */
+  private listBar!: Phaser.GameObjects.Graphics;
   private scrollY = 0;
   private maxScroll = 0;
   private dragFrom: number | null = null;
@@ -118,7 +124,8 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
 
     this.listViewport = scene.add.container(LIST_X, LIST_VIEW_MID);
     this.listGroup = scene.add.container(0, 0);
-    this.listViewport.add(this.listGroup);
+    this.listBar = scene.add.graphics();
+    this.listViewport.add([this.listGroup, this.listBar]);
     // Geometry masks live in WORLD space, so this is re-seated from the
     // container's own world transform whenever the panel moves or scales.
     this.listMask = scene.make.graphics();
@@ -313,6 +320,23 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
   private setScroll(y: number): void {
     this.scrollY = Phaser.Math.Clamp(y, 0, this.maxScroll);
     this.listGroup.setY(-this.scrollY);
+    this.drawScrollBar();
+  }
+
+  /** Rail + thumb, sized by how much of the book the window holds and seated by
+   *  how far down it we are. Nothing to scroll ⇒ nothing drawn. */
+  private drawScrollBar(): void {
+    const g = this.listBar;
+    g.clear();
+    if (this.maxScroll <= 0) return;
+    const top = -LIST_VIEW_H / 2;
+    const contentH = LIST_VIEW_H + this.maxScroll;
+    const thumbH = Math.max(90, LIST_VIEW_H * (LIST_VIEW_H / contentH));
+    const thumbY = top + (LIST_VIEW_H - thumbH) * (this.scrollY / this.maxScroll);
+    g.fillStyle(num(INK.fieldDeep), 0.85);
+    g.fillRoundedRect(BAR_X - BAR_W / 2, top, BAR_W, LIST_VIEW_H, BAR_W / 2);
+    g.fillStyle(num(INK.gold), 0.9);
+    g.fillRoundedRect(BAR_X - BAR_W / 2, thumbY, BAR_W, thumbH, BAR_W / 2);
   }
 
   /** Re-cut the clip rect from the viewport's live world transform — the panel
@@ -331,7 +355,8 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
    *  2560-space the UI is authored in, so this is a plain rect test. */
   private overList(p: Phaser.Input.Pointer): boolean {
     const m = this.listViewport.getWorldTransformMatrix();
-    const w = ROW_W * m.scaleX;
+    // Wide enough to take in the rail, so a wheel over the scrollbar scrolls.
+    const w = (ROW_W + 80) * m.scaleX;
     const h = LIST_VIEW_H * m.scaleY;
     return (
       p.x >= m.tx - w / 2 && p.x <= m.tx + w / 2 && p.y >= m.ty - h / 2 && p.y <= m.ty + h / 2

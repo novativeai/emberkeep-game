@@ -772,3 +772,75 @@ describe('borealis seeds each machine exactly once', () => {
     }
   });
 });
+
+/**
+ * ON THE SIDES, AND EVENLY.
+ *
+ * A machine dropped in the middle walls off the tiles its own produce lands on,
+ * and two dropped in the middle land on top of each other — which is what the
+ * keep shipped as, the Loom and the Cairn 91 px apart on a 29-cell island while
+ * three of the coast's five bunched onto one shore 350 px apart with a 134°
+ * hole opposite. Placement is farthest-point selection over the island's outer
+ * band, so both properties below hold for any outline the editor delivers.
+ */
+describe('borealis spaces its machines around the island', () => {
+  const CHAINS = new Map(
+    (chainsData as unknown as ChainsData).chains.map((c) => [c.id, c] as const)
+  );
+  const isMachine = (chain: string, tier: number): boolean =>
+    Boolean(CHAINS.get(chain)?.tiers.find((t) => t.tier === tier)?.generator);
+
+  /** Each region with its centroid, its radius, and where its machines stand. */
+  const islands = (): Array<{
+    id: string;
+    radius: number;
+    machines: Array<{ chain: string; x: number; y: number; out: number }>;
+  }> => {
+    const world = WORLDS.get('borealis')!;
+    return world.map.regions.map((region) => {
+      const points = region.tiles.map(([col, row]) => worldPointOf(world, col, row));
+      const cx = points.reduce((n, p) => n + p.x, 0) / points.length;
+      const cy = points.reduce((n, p) => n + p.y, 0) / points.length;
+      const radius = Math.max(...points.map((p) => Math.hypot(p.x - cx, p.y - cy)));
+      const machines = (region.contents ?? [])
+        .filter((c) => isMachine(c.chain, c.tier ?? 1) && c.at)
+        .map((c) => {
+          const p = worldPointOf(world, c.at![0], c.at![1]);
+          return { chain: c.chain, x: p.x, y: p.y, out: Math.hypot(p.x - cx, p.y - cy) / radius };
+        });
+      return { id: region.id, radius, machines };
+    });
+  };
+
+  it('stands every machine on the rim, never in the middle', () => {
+    const inland: string[] = [];
+    for (const island of islands()) {
+      for (const m of island.machines) {
+        // Two thirds of the way out is the loosest reading of "on a side" —
+        // the Cask that provoked this was at 1%.
+        if (m.out < 0.66) inland.push(`${island.id}/${m.chain} at ${Math.round(m.out * 100)}% out`);
+      }
+    }
+    expect(inland).toEqual([]);
+  });
+
+  it('leaves roughly the same distance between neighbours', () => {
+    for (const island of islands()) {
+      if (island.machines.length < 3) continue; // two machines are trivially spaced
+      const nearest = island.machines.map((m) =>
+        Math.min(
+          ...island.machines
+            .filter((o) => o !== m)
+            .map((o) => Math.hypot(m.x - o.x, m.y - o.y))
+        )
+      );
+      const spread = Math.max(...nearest) / Math.min(...nearest);
+      // An outline is not a circle, so this is a bound on CLUMPING, not a
+      // demand for a perfect ring: the shipped coast was 3.4 before this.
+      expect(spread, `${island.id} machines are unevenly spaced (${spread.toFixed(2)}x)`).toBeLessThan(2);
+      // And nothing may sit in another's lap: half the island's radius apart
+      // at the very least.
+      expect(Math.min(...nearest)).toBeGreaterThan(island.radius * 0.5);
+    }
+  });
+});
