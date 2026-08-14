@@ -342,6 +342,16 @@ export const ITEM_SCALE: Record<string, number> = {
   ashdrake_2: 0.21, // young ashdrake: static art (1054px) at the board dragons' size
   rimewyrm_1: 0.064, // Rimewyrm Egg (rimewyrm-egg.png 1160×1440) — same scale as red/green egg
   rimewyrm_2: 0.21, // young rimewyrm: static art (1054px) at the board dragons' size
+  // The store breeds as their OWN chains (egg → baby → adult). Tiers 2–3 reuse
+  // the baked skin art, which bake-dragon-skin.py fitted onto the ember rig's
+  // canvases — so they wear ember's own scales, and the clip overlays (aligned
+  // at those same board scales) land exactly on the art they replace.
+  frost_1: 0.064, // Frost Egg (frost-egg.png 1109×1440)
+  frost_2: 0.21, // Frost Dragon: skin bake on the whelp canvas (1054px)
+  frost_3: 0.45, // Adult Frost Dragon: skin bake on the adult canvas (836px)
+  storm_1: 0.064, // Storm Egg (storm-egg.png 1127×1440)
+  storm_2: 0.21, // Storm Dragon: skin bake on the whelp canvas (1054px)
+  storm_3: 0.45, // Adult Storm Dragon: skin bake on the adult canvas (836px)
   coin_1: 0.12, // SMALLER than an egg, per spec
   coin_2: 0.15, // Gold Pouch — reduced 25% on request (0.20 → 0.15); still bigger than the coin (0.12)
   // ---- merge-chains.md roster (art registered in assets.json) ----
@@ -1083,7 +1093,13 @@ export const DRAGON_DIET: Record<string, { favourite: string; refuses: string }>
   emerald: { favourite: 'emberberry', refuses: 'tarknot' },
   frost: { favourite: 'ashmoss', refuses: 'resin' },
   storm: { favourite: 'stormcap', refuses: 'emberberry' },
-  moonwhisker: { favourite: 'nightbloom', refuses: 'tarknot' }
+  moonwhisker: { favourite: 'nightbloom', refuses: 'tarknot' },
+  // The legendaries. Each favours a food of its HOME world (the ashdrake eats
+  // the isle's cinders; the rimewyrm — a cold thing — craves the one drop of
+  // fire the north distils), which is what the diet test's per-breed world
+  // rule exists to allow.
+  ashdrake: { favourite: 'cinder_vein', refuses: 'emberberry' },
+  rimewyrm: { favourite: 'emberdram', refuses: 'resin' }
 };
 /* ---------------- Ambient life: what a dragon does when nobody asks --------
  *
@@ -1490,6 +1506,25 @@ export const ELDER_VOICE = {
   askHoldMs: 5600,
   doneHoldMs: 4600,
   allDoneHoldMs: 7200
+} as const;
+
+/**
+ * The quest-reward egg ceremony — a legendary egg NEVER lands silently.
+ * One timeline, read by both scenes so camera and voice stay in step:
+ * BoardScene flies the camera (glide out → flare → glide home) while UIScene
+ * has the giver speak over the flare (dialogue.json `eggGift`).
+ */
+export const EGG_GIFT = {
+  /** After `item:spawned` — the quest-complete banner gets its beat first. */
+  glideDelayMs: 700,
+  glideMs: 900,
+  /** glideDelayMs + glideMs: the flash lands exactly as the camera arrives. */
+  flareDelayMs: 1600,
+  /** The giver starts speaking over the flare. */
+  sayDelayMs: 1600,
+  sayHoldMs: 5600,
+  /** Long enough to read the float text, short enough to hand the board back. */
+  homeDelayMs: 3600
 } as const;
 
 /**

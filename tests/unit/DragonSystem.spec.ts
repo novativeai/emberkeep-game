@@ -367,16 +367,20 @@ describe('the diet roster (Constants DRAGON_DIET × chains.json)', () => {
   const ids = new Set(chains.chains.map((chain) => chain.id));
   const breeds = Object.entries(DRAGON_DIET);
 
-  it('every breed has a favourite it can actually reach in Emberkeep', () => {
+  it('every breed has a favourite it can actually reach in its HOME world', () => {
     for (const [breed, diet] of breeds) {
       expect(ids, `${breed} favourite`).toContain(diet.favourite);
       expect(ids, `${breed} refusal`).toContain(diet.refuses);
       expect(isDragonFood(diet.favourite, 1), `${breed}'s favourite is not food`).toBe(true);
       // A favourite in another world is a favourite the dragon never gets: its
       // adult would cost 4x what the roster says it does. This is why tarknot
-      // cannot be one — it is Borealis vocabulary.
+      // cannot be an Emberkeep breed's — it is Borealis vocabulary. The home
+      // world is the BREED's chain world (a skin breed like frost/storm is not
+      // a chain and lives on the Emberkeep red chain); the rimewyrm is
+      // Borealis-born, so Borealis vocabulary is exactly its own.
+      const home = chains.chains.find((c) => c.id === breed)?.world ?? 'emberkeep';
       const chain = chains.chains.find((c) => c.id === diet.favourite)!;
-      expect(chain.world ?? 'emberkeep', `${breed} favours another world`).toBe('emberkeep');
+      expect(chain.world ?? 'emberkeep', `${breed} favours another world`).toBe(home);
     }
   });
 

@@ -90,6 +90,24 @@
     }
   },
   "lateAwakening": "…At last. I waited for YOU, Keeper — not for her. The Elder rises, just as the stories promised.",
+  "eggGift": {
+    "ashdrake": {
+      "speaker": "eleanor",
+      "lines": [
+        "An Ashdrake egg — for you, Keeper. The old nests never truly cooled, whatever the books say. Keep it close; it takes three to wake what sleeps inside.",
+        "Another Ashdrake egg! Set it beside the first — eggs hatch braver in company. One more and you will hear wings in the ash.",
+        "The last Ashdrake egg. Bring all three together and merge them — this isle has not seen a drake break its shell in a hundred years."
+      ]
+    },
+    "rimewyrm": {
+      "speaker": "selyna",
+      "lines": [
+        "A Rimewyrm egg, out of the deep ice. It has waited down there longer than this harbour has had a name. It takes three to wake it.",
+        "The ice gives up a second Rimewyrm egg. Set them close together — frost remembers company. One more.",
+        "The last Rimewyrm egg. Merge the three and let the north meet what it froze — gently, Keeper."
+      ]
+    }
+  },
   "hints": {
     "zeroWarmth": "Out of Warmth? Rest by the fire — it returns on its own. The emberberry patch never needs any!",
     "boardFull": "The board is crowded! Sell a spare piece, or deliver to my Ledger to make room.",

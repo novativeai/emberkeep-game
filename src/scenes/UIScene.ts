@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
   ATMOSPHERE,
+  EGG_GIFT,
   ELDER_VOICE,
   ENERGY_REGEN_MS,
   FINALE,
@@ -295,6 +296,25 @@ export class UIScene extends Phaser.Scene {
       this.ctx.bus.on('dragon:named', ({ name }) => {
         this.bubble.setToken('dragon', name);
         this.revealCodexButton();
+      })
+    );
+    // A quest-reward egg never lands silently: while BoardScene flies the
+    // camera to it (the shared EGG_GIFT timeline), the giver says what just
+    // arrived. Line n of the chain's eggGift bank belongs to the n-th
+    // spawning quest — derived from the done latches, so a reload can never
+    // repeat or skip a line.
+    this.offBus.push(
+      this.ctx.bus.on('item:spawned', ({ item, cause }) => {
+        if (cause !== 'quest') return;
+        const gift = this.ctx.data.dialogue.eggGift[item.chain];
+        if (!gift || gift.lines.length === 0) return;
+        const granted = this.ctx.data.quests.quests.filter(
+          (q) => q.rewards?.spawn?.chain === item.chain && this.ctx.state.stat(`q:done:${q.id}`) > 0
+        ).length;
+        const line = gift.lines[Math.min(Math.max(granted - 1, 0), gift.lines.length - 1)];
+        this.time.delayedCall(EGG_GIFT.sayDelayMs, () =>
+          this.bubble.say(gift.speaker as SpeakerId, line, EGG_GIFT.sayHoldMs)
+        );
       })
     );
 

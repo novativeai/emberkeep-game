@@ -26,7 +26,7 @@ import type { BoardItemState, ChainsData, Companion, DragonCare } from '../core/
  *  a dragon's meal cannot be spent on Eleanor, and NOTHING of hers is ever food.
  *  Quartz and moonwater are her chains end to end — no tier of either feeds a
  *  dragon, not even the raw pebble. */
-const FUEL = ['emberberry', 'resin', 'tarknot', 'stormcap', 'emberdram'];
+const FUEL = ['emberberry', 'resin', 'tarknot', 'stormcap', 'emberdram', 'cinder_vein'];
 const GREEN = ['ashmoss', 'nightbloom'];
 // Recipient-locked to a named character, and therefore never dragon food.
 // Eleanor catches light and holds it in GLASS; Selyna reads what the ice kept,

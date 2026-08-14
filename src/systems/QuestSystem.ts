@@ -371,7 +371,7 @@ export class QuestSystem {
         reason: `quest:${quest.id}`
       });
     }
-    if (rewards.spawn) this.bus.emit('board:spawn', { ...rewards.spawn, overflow: 'bag' });
+    if (rewards.spawn) this.bus.emit('board:spawn', { ...rewards.spawn, overflow: 'bag', cause: 'quest' });
   }
 
   /** The endless tail never latches — it has no end to record. */

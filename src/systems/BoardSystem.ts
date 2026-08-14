@@ -57,7 +57,8 @@ export class BoardSystem {
     nearChain,
     nearTier,
     at,
-    overflow
+    overflow,
+    cause
   }: {
     chain: string;
     tier: number;
@@ -66,6 +67,7 @@ export class BoardSystem {
     nearTier?: number;
     at?: [number, number];
     overflow?: 'bag';
+    cause?: SpawnCause;
   }): void {
     /** Whatever would not fit. Dropped by default (a generator pays again);
      *  banked when the caller says the piece is too scarce to lose. */
@@ -77,7 +79,7 @@ export class BoardSystem {
     // tile to it), regardless of where other items sit.
     if (at) {
       const cells = this.freeBlobNear(at[0], at[1], count);
-      for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, 'unlock');
+      for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, cause ?? 'unlock');
       spill(cells.length);
       return;
     }
@@ -111,7 +113,7 @@ export class BoardSystem {
     // No else: for non-nearChain spawns with an anchor the start col/row is the
     // anchor's own tile (offset=0) — freeBlobNear resolves adjacency from there.
     const cells = this.freeBlobNear(anchorCol, anchorRow, count);
-    for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, 'unlock');
+    for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, cause ?? 'unlock');
     spill(cells.length);
   }
 

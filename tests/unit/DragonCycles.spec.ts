@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DRAGON_CYCLE_MS, MEALS_PER_DAY, WELL_FED_EVOLUTION } from '../../src/core/Constants';
+import type { DragondexData } from '../../src/core/types';
 import dragondex from '../../src/data/dragondex.json';
 import { capture, createTestContext } from './helpers';
 
@@ -84,7 +85,7 @@ describe('feed cycles — the 10-minute window behind the Dragon Codex', () => {
     // The data file says the words on the Evolution page; Constants holds the
     // number the systems enforce. A retune that moves one without the other
     // ships a page that lies.
-    for (const [chain, entry] of Object.entries(dragondex.dragons)) {
+    for (const [chain, entry] of Object.entries((dragondex as unknown as DragondexData).dragons)) {
       if (!entry.evolution) continue;
       expect(WELL_FED_EVOLUTION[chain], `WELL_FED_EVOLUTION.${chain}`).toBe(entry.evolution.wellFedCycles);
       expect(entry.evolution.condition).toContain(String(entry.evolution.wellFedCycles));

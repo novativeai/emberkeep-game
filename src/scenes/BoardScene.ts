@@ -11,6 +11,7 @@ import {
   DRAG,
   DRAGON_ANIM,
   DRAGON_RIG_SCALE,
+  EGG_GIFT,
   EMBER_MOTES,
   FINALE,
   GATE_FX_HEIGHT,
@@ -1954,6 +1955,40 @@ export class BoardScene extends Phaser.Scene {
       this.floatText(p.x, p.y - 40, '???', PALETTE.goldAccent);
     });
     this.time.delayedCall(2600, () => this.glideToWorld(home.x, home.y, 900));
+  }
+
+  /** One quest-egg flight at a time — a second grant in the same breath keeps
+   *  its flare but must not yank the camera mid-glide. */
+  private questEggFlying = false;
+
+  /**
+   * A quest-reward egg NEVER lands silently: hold a beat for the quest
+   * banner, glide to the egg, flare and name it, glide home — the altar
+   * ceremony's grammar, at whatever tile the reward landed on. The giver's
+   * spoken line rides the same EGG_GIFT timeline from UIScene, so camera and
+   * voice arrive together.
+   */
+  private questEggCeremony(snap: ItemSnapshot): void {
+    const { x, y } = gridToWorld(snap.col, snap.row);
+    const tierName =
+      this.ctx.data.chains.chains.find((c) => c.id === snap.chain)?.tiers[snap.tier - 1]?.name ?? '';
+    const flare = (): void => {
+      this.glowFlash(x, y - 40, PALETTE.goldAccent, 0.85, 1.6);
+      this.sparks.explode(22, x, y - 40);
+      if (tierName) this.floatText(x, y - 80, tierName, PALETTE.goldAccent);
+    };
+    if (this.questEggFlying) {
+      this.time.delayedCall(EGG_GIFT.flareDelayMs, flare);
+      return;
+    }
+    this.questEggFlying = true;
+    const home = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
+    this.time.delayedCall(EGG_GIFT.glideDelayMs, () => this.glideToWorld(x, y + 60, EGG_GIFT.glideMs));
+    this.time.delayedCall(EGG_GIFT.flareDelayMs, flare);
+    this.time.delayedCall(EGG_GIFT.homeDelayMs, () => {
+      this.questEggFlying = false;
+      this.glideToWorld(home.x, home.y, EGG_GIFT.glideMs);
+    });
   }
 
   /** The Elder stands on the altar — her Align-Studio clip set when resident
@@ -5377,10 +5412,13 @@ export class BoardScene extends Phaser.Scene {
       bus.on('world:switched', () => this.fetchWorldArt(() => this.scene.restart())),
       bus.on('store:skin_changed', () => this.applyManorSkin()),
       bus.on('store:dragon_skin_changed', ({ dragon }) => this.applyDragonSkin(dragon)),
-      bus.on('item:spawned', ({ item }) => {
+      bus.on('item:spawned', ({ item, cause }) => {
         const sprite = this.acquireSprite(item, false);
         // Any dragon generator (ember or emerald) wears its live rig.
         if (this.wearsRigTier(item.chain, item.tier)) this.attachDragon(sprite, false);
+        // A quest-reward piece (a legendary egg) earns the camera — it must
+        // never appear behind the player's back.
+        if (cause === 'quest') this.questEggCeremony(item);
       }),
       bus.on('economy:changed', () => this.updateGoldenTremble()),
       // A key arriving (or being spent) moves which gates the player can pay —
@@ -5696,6 +5734,21 @@ export class BoardScene extends Phaser.Scene {
       this.shells.explode(7, x, y - 52);
       this.sparks.explode(24, x, y - 48);
       this.burst.explode(12, x, y - 44);
+      // A dragon that hatches OUTSIDE the tutorial asks for its name as soon
+      // as it stands — the same write-once naming the tutorial scripts for
+      // the Red Dragon (TutorialDirector owns that beat; this covers the
+      // legendaries, whose hatch is a quest chain, not a scripted step).
+      const hatched = this.ctx.state.items.get(snap.id);
+      if (
+        this.tutorialDone &&
+        hatched &&
+        !hatched.dragonName &&
+        this.ctx.systems.dragons.isBoardDragon(hatched)
+      ) {
+        this.time.delayedCall(TIMINGS.hatchPop + 500, () =>
+          this.ctx.bus.emit('ui:name_dragon_requested', { itemId: snap.id })
+        );
+      }
       const sprite = this.acquireSprite(snap, false);      // A live rigged dragon bursts in facing LEFT (un-mirrored), mid-celebration; the host
       // sprite becomes its invisible interactive anchor. Falls back to the
       // pooled sprite pop-in if the rig hasn't loaded.

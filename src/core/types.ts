@@ -106,7 +106,7 @@ export interface DragonCare {
 
 export type RegionStatus = 'active' | 'unlockable' | 'locked';
 
-export type SpawnCause = 'init' | 'merge' | 'generator' | 'unlock' | 'load';
+export type SpawnCause = 'init' | 'merge' | 'generator' | 'unlock' | 'load' | 'quest';
 
 export interface ItemSnapshot {
   id: number;
@@ -349,6 +349,11 @@ export interface DialogueData {
   };
   /** The Elder's line when Order 1 completes AFTER Level 3 — the late awakening. */
   lateAwakening: string;
+  /** What the giver says as a QUEST-REWARD egg lands on the board, keyed by the
+   *  egg's chain. `lines` runs in grant order — line n plays when the n-th
+   *  spawning quest completes (derived from the `q:done:` latches, so a reload
+   *  can never repeat or skip a line) — and the last line covers any overflow. */
+  eggGift: Record<string, { speaker: string; lines: string[] }>;
   /** One-shot Eleanor nudges post-tutorial. */
   hints: {
     zeroWarmth: string;
@@ -1263,7 +1268,7 @@ export interface EventMap {
    * a legendary egg exists exactly three times in a zone, so a full board must
    * never be able to destroy one.
    */
-  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number]; overflow?: 'bag' };
+  'board:spawn': { chain: string; tier: number; count: number; nearChain?: string; nearTier?: number; at?: [number, number]; overflow?: 'bag'; cause?: SpawnCause };
   /** Transform one on-board item of `chain`+`fromTier` into `toTier` in place. */
   'board:retier': { chain: string; fromTier: number; toTier: number };
   /** Relocate one on-board item of `chain`+`tier` to a cell (tutorial staging). */

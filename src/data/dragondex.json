@@ -11,6 +11,18 @@
         "reveal": "reveal_ember_adult",
         "condition": "Fully fed for 6 cycles"
       }
+    },
+    "ashdrake": {
+      "title": "Ashdrake",
+      "story": "The old nests never truly cooled. Three eggs kept warm under a hundred years of ash — and the Keeper who gathered them woke the first drake Emberkeep has seen in living memory.",
+      "personality": "Patient and watchful, the way embers are. She remembers every hand that fed her, and settles nowhere the wind hasn't told her about first.",
+      "ability": "Breathes a slow ember-glow that rekindles anything the cold has taken — a hearth, a lantern, a heart. Cracked stone is a meal to her; she eats the cinder right out of the seam."
+    },
+    "rimewyrm": {
+      "title": "Rimewyrm",
+      "story": "It waited in the deep ice under Borealis longer than the harbour has had a name. Three eggs, given up one by one — and what the north froze finally met the Keeper it was keeping itself for.",
+      "personality": "Quiet and deliberate. He moves the way glaciers do — slowly, then all at once — and keeps to the cold light where the ice shows him what it remembers.",
+      "ability": "Breathes rime-mist that holds a moment perfectly still — frost that preserves rather than kills. A cold thing at heart, he craves the one drop of fire the north distils."
     }
   }
 }
