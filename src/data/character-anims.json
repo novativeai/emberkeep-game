@@ -522,16 +522,16 @@
       "clips": {
         "boil": {
           "file": "sprites/anims/cauldron/boil.webp",
-          "frames": 59,
-          "frameWidth": 375,
-          "frameHeight": 511,
+          "frames": 56,
+          "frameWidth": 303,
+          "frameHeight": 360,
           "fps": 12,
           "loop": true,
-          "scale": 2.15903,
-          "dx": 6.68,
-          "dy": -107.75,
-          "srcFrameWidth": 375,
-          "srcFrameHeight": 511,
+          "scale": 2.74115,
+          "dx": -2.74,
+          "dy": 7.26,
+          "srcFrameWidth": 303,
+          "srcFrameHeight": 360,
           "stage": "decor"
         }
       }
