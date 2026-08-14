@@ -243,7 +243,15 @@ export const RADIUS = {
   md: 28,
   lg: 44,
   xl: 60,
-  /** Anything larger than half the shorter side gives a capsule. */
+  /**
+   * Capsule, for the CANVAS painters only.
+   *
+   * `roundRectPath` clamps to `min(r, w/2, h/2)`, so an absurd radius is safe
+   * there. **Phaser's `Graphics.fillRoundedRect` does NOT clamp** — handed 999
+   * on an 84-tall rect it throws stray geometry clear across the screen (the
+   * Codex shipped a session with orange lines over the whole canvas for
+   * exactly this). In a Graphics call, write `h / 2` instead.
+   */
   pill: 999
 } as const;
 

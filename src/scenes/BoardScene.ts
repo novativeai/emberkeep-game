@@ -2634,14 +2634,14 @@ export class BoardScene extends Phaser.Scene {
     const key = clipKey(name, 'boil');
     if (!clip || !this.textures.exists(key)) return;
     const still = this.textures.get(`decor_${name}`).getSourceImage() as HTMLImageElement;
-    if (!this.anims.exists(key)) {
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
-        frameRate: clip.fps,
-        repeat: -1
-      });
-    }
+    // Same rule as the character clips: the cauldron's sheet is evicted when you
+    // leave Runevault and re-created when you come back.
+    this.ensureAnimForLiveTexture(key, key, () => ({
+      key,
+      frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+      frameRate: clip.fps,
+      repeat: -1
+    }));
     sprite.setTexture(key, 0);
     sprite.setScale(dispScale * clip.scale);
     sprite.setOrigin(
@@ -2832,6 +2832,44 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /**
+   * Register a spritesheet animation AGAINST THE TEXTURE THAT IS LIVE NOW,
+   * rebuilding it if the one on file was built from a texture since destroyed.
+   *
+   * `this.anims` is GAME-scoped: an animation outlives the scene that made it,
+   * and — the part that bites — it outlives the TEXTURE it was made from. Travel
+   * destroys textures (`releaseAwayWorldArt` hands back the departed world's
+   * art), and coming back re-creates them under the same keys as brand new
+   * Texture objects. So `anims.exists(key)` is the wrong idempotence test: it is
+   * true, and the animation it is true about still holds frames pointing into
+   * the destroyed texture. Playing that takes the scene down inside `create()`,
+   * and because `world:ready` is emitted at the END of `create`, the travel veil
+   * never lifts — the game simply sits on the loading screen.
+   *
+   * That was the Runevault → Borealis freeze. Selyna is the only wardrobe
+   * eviction can actually reach (Eleanor's is pinned by the authored world's
+   * exemption and by standing in two worlds at once), and Runevault is the only
+   * place you can go from Borealis that is not home — so hers were the only
+   * clips that ever got destroyed and re-created, and that one trip was the only
+   * one that froze.
+   */
+  private ensureAnimForLiveTexture(
+    animKey: string,
+    textureKey: string,
+    config: () => Phaser.Types.Animations.Animation
+  ): void {
+    const existing = this.anims.get(animKey);
+    if (existing) {
+      const first = existing.frames[0];
+      // Same Texture OBJECT, not the same key — the key is exactly what stayed
+      // the same across the eviction. `textureKey` is passed separately because
+      // a segment animation is keyed off its clip's sheet, not off its own name.
+      if (first && first.frame.texture === this.textures.get(textureKey)) return;
+      this.anims.remove(animKey);
+    }
+    this.anims.create(config());
+  }
+
+  /**
    * Register (idempotently) a BOARD-stage Align-Studio clip's Phaser animation
    * and hand back its data — null when the clip does not exist, is portrait
    * framing (the bubble's, never the board's), or its sheet is not resident.
@@ -2840,14 +2878,12 @@ export class BoardScene extends Phaser.Scene {
     const clip = clipFor(art, clipId);
     const key = clipKey(art, clipId);
     if (!clip || clip.stage === 'portrait' || !this.textures.exists(key)) return null;
-    if (!this.anims.exists(key)) {
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
-        frameRate: clip.fps,
-        repeat: clip.loop ? -1 : 0
-      });
-    }
+    this.ensureAnimForLiveTexture(key, key, () => ({
+      key,
+      frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+      frameRate: clip.fps,
+      repeat: clip.loop ? -1 : 0
+    }));
     return clip;
   }
 
@@ -2929,15 +2965,16 @@ export class BoardScene extends Phaser.Scene {
    */
   private ensureStandeeAnims(characterId: string, bank: (typeof STANDEE_BANKS)[string]): void {
     const key = this.standeeAnimKey(characterId, 'cast');
-    if (this.anims.exists(key)) return;
     const texture = bank.keys.cast;
     if (!this.textures.exists(texture)) return;
-    this.anims.create({
+    // Her cast BANK is world art as much as her clips are, so it is evicted and
+    // re-fetched by travel too — the animation must follow the live sheet.
+    this.ensureAnimForLiveTexture(key, texture, () => ({
       key,
       frames: this.anims.generateFrameNumbers(texture, { start: 0, end: bank.frameCount - 1 }),
       frameRate: bank.fps.cast,
       repeat: 0
-    });
+    }));
   }
 
   /**
@@ -3613,14 +3650,14 @@ export class BoardScene extends Phaser.Scene {
     const clip = clipFor(art, clipId);
     const key = clipKey(art, clipId);
     if (!clip || !this.textures.exists(key)) return null;
-    if (!this.anims.exists(key)) {
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
-        frameRate: clip.fps,
-        repeat: clip.loop ? -1 : 0
-      });
-    }
+    // Rebuilt if the sheet was evicted and re-fetched — see
+    // `ensureAnimForLiveTexture`. Character clips are world art.
+    this.ensureAnimForLiveTexture(key, key, () => ({
+      key,
+      frames: this.anims.generateFrameNumbers(key, { start: 0, end: clip.frames - 1 }),
+      frameRate: clip.fps,
+      repeat: clip.loop ? -1 : 0
+    }));
     return { clip, key };
   }
 
