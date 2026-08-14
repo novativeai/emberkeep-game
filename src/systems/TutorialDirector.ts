@@ -111,6 +111,9 @@ export class TutorialDirector {
     });
     bus.on('ui:cookbook_opened', () => this.onGateEvent('ui:cookbook_opened'));
     bus.on('ui:cookbook_closed', () => this.onGateEvent('ui:cookbook_closed'));
+    bus.on('ui:codex_toggled', ({ open }) => {
+      if (!open) this.onGateEvent('ui:codex_closed');
+    });
     bus.on('item:spawned', () => this.checkCountGate());
     bus.on('item:removed', () => this.checkCountGate());
     // The board-hygiene lesson: a piece CARRIED into a region. Gated on the
@@ -255,6 +258,10 @@ export class TutorialDirector {
         this.bus.emit('generator:set_timer', effect.setTimer);
       } else if ('wantGift' in effect) {
         this.bus.emit('tutorial:want_gift', effect.wantGift);
+      } else if ('openCodex' in effect) {
+        // The book opens ITSELF for the lesson — UIScene owns the panel and
+        // plays the favourite-meal reveal the previous beat's feed earned.
+        this.bus.emit('ui:codex_open_requested', effect.openCodex);
       } else if ('nameDragon' in effect) {
         const { chain, tier } = effect.nameDragon;
         const dragon = [...this.state.items.values()].find(

@@ -765,6 +765,34 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       await page.waitForTimeout(600);
       if ((await gameText(page)).tutorial.step !== 'feed_dragon') break;
     }
+
+    // ---------- The Codex writes the favourite: popup, reveal, close ----------
+    // The book opens itself (+0.7s), the favourite row fades in (~1.7s more),
+    // and only then does getClosePos answer — the arrow's own gate.
+    await waitStep(page, 'codex_meal');
+    await page.waitForTimeout(3200);
+    await page.screenshot({ path: shot('14b2-codex-reveal') });
+    {
+      const closePos = await page.evaluate(() => {
+        const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+          codex: { getClosePos: () => { x: number; y: number } | null };
+        };
+        return ui.codex.getClosePos();
+      });
+      if (closePos) {
+        await page.mouse.click(closePos.x / 2, closePos.y / 2);
+        await page.waitForTimeout(400);
+      }
+      if ((await gameText(page)).tutorial.step === 'codex_meal') {
+        // Reliability fallback: close through the panel's own contract.
+        await page.evaluate(() => {
+          const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+            codex: { requestClose: () => void };
+          };
+          ui.codex.requestClose();
+        });
+      }
+    }
     await waitStep(page, 'cake_loved');
     await page.screenshot({ path: shot('14c-cake-loved') });
     await tapBubble(page);

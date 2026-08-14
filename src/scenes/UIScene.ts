@@ -207,6 +207,17 @@ export class UIScene extends Phaser.Scene {
     this.cauldron = new CauldronPanel(this, this.ctx.bus, this.ctx);
     this.cauldron.setDepth(DEPTH_PANEL + 7);
     this.offBus.push(this.ctx.bus.on('ui:cauldron_tapped', () => this.cauldron.open()));
+    // The tutorial's codex lesson: the book opens itself on the named dragon's
+    // page and plays the favourite-meal reveal. Deferred a breath so the feed
+    // beat's own celebration (float text, the bubble hand-off) lands first —
+    // the popup must follow the moment, never overlap it.
+    this.offBus.push(
+      this.ctx.bus.on('ui:codex_open_requested', () => {
+        const named = this.ctx.systems.dragons.namedDragons()[0];
+        if (!named) return;
+        this.time.delayedCall(700, () => this.codex.openReveal(named.itemId));
+      })
+    );
 
     this.cookbook = new CookbookPanel(this, this.ctx.bus, this.ctx.state, {
       ...this.ctx.data,
@@ -218,7 +229,13 @@ export class UIScene extends Phaser.Scene {
     // The Dragon Codex — the keepsake record behind the dragon-head button.
     // Both appear only once a dragon has been NAMED: the roster is the reason
     // the button exists, so an empty book never opens.
-    this.codex = new DragonCodexPanel(this, this.ctx.bus, this.ctx.systems.dragons, this.ctx.data.dragondex);
+    this.codex = new DragonCodexPanel(
+      this,
+      this.ctx.bus,
+      this.ctx.systems.dragons,
+      this.ctx.data.dragondex,
+      this.ctx.data.chains
+    );
     this.codex.setDepth(DEPTH_PANEL + 4);
     this.codexButton = this.buildCodexButton();
 
@@ -1655,7 +1672,7 @@ export class UIScene extends Phaser.Scene {
 
   private uiTarget(
     ref:
-      | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+      | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
       | { fogRegion: string }
       | { character: string }
   ): { x: number; y: number; height?: number } | null {
@@ -1688,6 +1705,9 @@ export class UIScene extends Phaser.Scene {
       if (ref.ui === 'status') return this.statusPanel.getMarkerPos();
       if (ref.ui === 'cookbook') return { x: this.cookbookButton.x, y: this.cookbookButton.y };
       if (ref.ui === 'cookbook_close') return this.cookbook.isOpen ? this.cookbook.getClosePos() : null;
+      // Null until the panel is open AND the favourite reveal has played — the
+      // arrow appears after the cinematic, never through it.
+      if (ref.ui === 'codex_close') return this.codex.getClosePos();
       // Same smart-target shape as `marketplace`: the satchel button until the
       // bag is open, then the chosen slot's Sell plate inside it. Re-evaluated
       // every frame, so the arrow walks the player through open → tap → Sell

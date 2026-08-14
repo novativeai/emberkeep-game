@@ -63,6 +63,23 @@ describe('feed cycles — the 10-minute window behind the Dragon Codex', () => {
     expect(ctx.systems.dragons.wellFedCyclesOf(itemId)).toBe(2);
   });
 
+  it('taste rows fill in by EXPERIMENT: a loved meal names the favourite, a refusal names the dislike', () => {
+    const ctx = createTestContext();
+    const itemId = placeDragon(ctx);
+    expect(ctx.systems.dragons.tasteKnowledge(itemId)).toMatchObject({
+      favourite: { chain: 'resin', known: false },
+      dislike: { chain: 'tarknot', known: false }
+    });
+
+    feed(ctx, itemId); // resin — his favourite, and now the player knows it
+    expect(ctx.systems.dragons.tasteKnowledge(itemId).favourite.known).toBe(true);
+    expect(ctx.systems.dragons.tasteKnowledge(itemId).dislike.known).toBe(false);
+
+    // The head turns away — nothing eaten, but the book writes it down.
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId, chain: 'tarknot', tier: 1 });
+    expect(ctx.systems.dragons.tasteKnowledge(itemId).dislike.known).toBe(true);
+  });
+
   it('dragondex.json and WELL_FED_EVOLUTION state the same bar — words and law agree', () => {
     // The data file says the words on the Evolution page; Constants holds the
     // number the systems enforce. A retune that moves one without the other

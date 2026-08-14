@@ -97,6 +97,11 @@ export interface DragonCare {
   wellFedCycles?: number;
   /** Cycle stamp of the last well-fed credit — the once-per-cycle latch. */
   wellFedCycle?: number;
+  /** Taste knowledge, discovered by EXPERIMENT (merge-chains §2.1): the Codex
+   *  shows his favourite only after a meal he loved, and his dislike only
+   *  after he has actually turned his head away. Never told, always learned. */
+  favouriteKnown?: boolean;
+  dislikeKnown?: boolean;
 }
 
 export type RegionStatus = 'active' | 'unlockable' | 'locked';
@@ -838,7 +843,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'ui:codex_closed' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number }
   /** A piece of `chain` CARRIED into `region` — the board-hygiene lesson. The
    *  gate is the drop landing inside the named region's tiles, so a wiggle on
@@ -890,12 +895,12 @@ export type TileRef = [number, number] | 'last_hatched' | { chain: string; nth: 
 
 export type TutorialHandConfig =
   | { from: TileRef; to: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string };
 
 export type TutorialArrowConfig =
   | { tile: TileRef }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string }
   /** A world character by id. NEVER point at one with a literal `tile` — where
    *  she stands is authored in the World Builder (`characters.json` anchor +
@@ -917,6 +922,11 @@ export type TutorialEffect =
   | { setEnergy: number }
   | { move: { chain: string; tier: number; to: [number, number] } }
   | { setTimer: { chain: string; tier: number; remainingMs: number } }
+  /** Open the Dragon Codex on the first named dragon's own page — the lesson
+   *  that shows the book writing itself. `reveal: 'favourite'` plays the
+   *  cinematic fade-in of the favourite-meal row (just discovered by the feed
+   *  the previous beat scripted). */
+  | { openCodex: { reveal?: 'favourite' } }
   /** Open the naming prompt on the first board dragon of this chain+tier. The
    *  panel is not dismissible, so this is only ever authored on a step whose
    *  gate is the naming itself. */
@@ -1190,6 +1200,9 @@ export interface EventMap {
   'ui:commission_toggled': { open: boolean };
   /** The Dragon Codex opened/closed. */
   'ui:codex_toggled': { open: boolean };
+  /** Intent: open the Codex on the first named dragon's detail page — the
+   *  tutorial's `openCodex` effect. UIScene owns the panel and answers. */
+  'ui:codex_open_requested': { reveal?: 'favourite' };
   /** Command: brew this recipe. CauldronSystem validates the Bag and owns the
    *  outcome — the panel only asks. */
   'cauldron:brew': { recipeId: string };
@@ -1571,12 +1584,12 @@ export interface EventMap {
 
 export type ResolvedHand =
   | { from: TilePos; to: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string };
 
 export type ResolvedArrow =
   | { tile: TilePos }
-  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
+  | { ui: 'ledger' | 'deliver' | 'marketplace' | 'cookbook' | 'cookbook_close' | 'codex_close' | 'bag' | 'bag_give' | 'status' | 'commission' }
   | { fogRegion: string }
   /** Stays an id through the payload, exactly like `ui`: the UI re-reads her
    *  position every frame, so she can move (World Builder, or a future walk)

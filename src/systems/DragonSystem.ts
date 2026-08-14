@@ -429,6 +429,23 @@ export class DragonSystem {
     return this.findAnywhere(itemId)?.care?.wellFedCycles ?? 0;
   }
 
+  /**
+   * What the player KNOWS about this dragon's tastes — the Codex's two rows.
+   * The chains come from the breed's diet; the `known` flags come from the
+   * care record, written the first time each taste was actually experienced.
+   */
+  tasteKnowledge(itemId: number): {
+    favourite: { chain: string; known: boolean };
+    dislike: { chain: string; known: boolean };
+  } {
+    const item = this.findAnywhere(itemId);
+    const diet = (item && DRAGON_DIET[item.chain]) ?? { favourite: '', refuses: '' };
+    return {
+      favourite: { chain: diet.favourite, known: !!item?.care?.favouriteKnown },
+      dislike: { chain: diet.refuses, known: !!item?.care?.dislikeKnown }
+    };
+  }
+
   /** Every NAMED dragon across all materialised boards, home world first — the
    *  Codex roster. Chapter One holds exactly one, but the shape is a list. */
   namedDragons(): Array<{ itemId: number; name: string; chain: string; tier: number }> {
@@ -492,6 +509,12 @@ export class DragonSystem {
     }
     const diet = DRAGON_DIET[item.chain]!;
     if (chain === diet.refuses) {
+      // The head turns away — and the Codex learns from it. The refusal is
+      // still absolute (nothing consumed), but "he will not eat that" is now
+      // a thing the player KNOWS, so the book writes it down.
+      if (!item.care?.dislikeKnown) {
+        item.care = { ...this.careOf(itemId), dislikeKnown: true };
+      }
       this.bus.emit('dragon:refused', { itemId, chain, reason: 'dislike' });
       return;
     }
@@ -504,6 +527,9 @@ export class DragonSystem {
     const rate = tasteRate(taste);
     if (axisOf(chain, tier) === 'green') care.green++;
     care.meals += (MEAL_VALUE[tier] ?? 0) * rate;
+    // A meal he LOVED tells the player what his favourite is — the Codex's
+    // taste rows fill in by experiment, never by being told.
+    if (taste === 'favourite') care.favouriteKnown = true;
 
     // A FULL gauge inside one cycle is a WELL-FED cycle, credited once — the
     // Codex's lifetime count, and what the evolution condition is priced in.
