@@ -839,8 +839,9 @@ export class BoardScene extends Phaser.Scene {
       // animal for the rest of the session. Locally the sheets usually arrive
       // first and it looked fine; on the deployed build it never did.
       //
-      // A clip-mounted dragon has no RigPlayer, so `player !== null` is exactly
-      // "still wearing the rig" and re-dressing is idempotent.
+      // The rigs are gone now, so the guard is simply "not already live" — but
+      // the re-dress itself still matters: it is what puts a dragon that
+      // spawned ahead of its sheets onto its clips.
       for (const sprite of this.itemSprites.values()) {
         if (
           this.clipCharacterFor(sprite.chain, sprite.tier) !== id ||

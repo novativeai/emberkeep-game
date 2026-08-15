@@ -1953,10 +1953,10 @@ export const CAULDRON_DECOR = 'pink_cauldron';
 export const HIT_FORGIVENESS_PX = 14;
 
 /**
- * Live rigged dragon on the board (hatchling/whelp). Enters in the rig's original
- * (un-mirrored, facing LEFT) orientation celebrating, then alternates idle/celebrate
- * weighted so it is idle ~90% of the time. Durations in ms; scales are RigPlayer
- * display scales.
+ * Live dragon on the board (hatchling/whelp). Enters in the source art's
+ * original (un-mirrored, facing LEFT) orientation celebrating, then alternates
+ * idle/celebrate weighted so it is idle ~90% of the time. Durations in ms;
+ * scales are clip display scales.
  */
 export const DRAGON_ANIM = {
   introCelebrateMs: 2400, // the grand entrance after hatching

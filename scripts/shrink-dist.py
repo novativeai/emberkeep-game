@@ -299,10 +299,26 @@ def main():
     #
     # 108 (2026-08-14, the legendaries): ashdrake + rimewyrm young idle+roar —
     # young-ONLY breeds, so ~5.3 MB each (no adult set, no fly clip), measured
-    # 95.2 → 105.8. 108 keeps the customary ~2 MB of slack. This completes the
-    # clip roster for every breed that exists in chains.json; the next raise
-    # should come with legendary ADULT tiers or a new breed, nothing else.
-    ap.add_argument("--budget", type=float, default=108.0, help="fail over this many MB")
+    # 95.2 → 105.8. 108 keeps the customary ~2 MB of slack.
+    #
+    # 143 (2026-08-15, the pin rigs deleted): the last three breeds without clip
+    # sets got them — the GREEN DRAGON (which had none of its own; only its
+    # moonwhisker skin was ever animated) plus the ashglass and porcelain
+    # Emporium skins. Six sets, ~39 MB, measured 105.6 → 140.1 → 136.8 once the
+    # rigs stopped shipping (2.7 MB) and their head blink/talk banks with them
+    # (4.0 MB across 100 files — a clip has the blink painted into its frames).
+    # That is the whole trade: a rig is 1.2 MB of data-URI layers covering every
+    # pose, a clip set is megabytes per clip.
+    #
+    # This is the biggest single step this gate has taken and it is worth being
+    # honest about WHY it is acceptable: dist size is not download size here.
+    # Clip sheets are fetched per breed the first time one of that breed appears
+    # (BoardScene.ensureDragonClips — the same iOS fix that made the rigs win
+    # the race), so a player pays for the one or two breeds on their board, not
+    # for eleven. If this ever has to come DOWN the levers are unchanged: idle
+    # fps decimation (idles are by far the largest sheets), or dropping a clip
+    # from the skins — never quality shaving at this gate.
+    ap.add_argument("--budget", type=float, default=140.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():

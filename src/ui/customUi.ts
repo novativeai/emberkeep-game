@@ -30,10 +30,10 @@ interface LiveComponent {
 /**
  * Instantiates the UI Builder's tool-authored components (ui-theme.json
  * `custom` section) inside the game. This is what makes the exported JSON
- * "digestible": image/text layers become plain game objects, `rig` layers
- * become LIVE RigPlayers wearing the chosen body preset (idle, low flight,
- * roar…) and face mode (ambient blink / looping talk). Runs in EVERY build —
- * dev, preview, production — not just the editor.
+ * "digestible": image/text layers become plain game objects. (`rig` layers went
+ * with the pin rigs — every character is an Align-Studio clip sequence now, and
+ * no authored component ever used one.) Runs in EVERY build — dev, preview,
+ * production — not just the editor.
  */
 export class CustomUiManager {
   private live = new Map<string, LiveComponent>();

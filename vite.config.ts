@@ -918,6 +918,11 @@ const copyRuntimeArt = (): Plugin => ({
       // …and the same for the sprite folders, EXCEPT the baked board art
       // (`*-baked.webp`), which is what assets.json names for a skin.
       /^sprites\/characters\/dragon\/[^/]+\/sprite[^/]*\/(?!.*-baked\.webp$).+\.(png|jpg|webp)$/,
+      // Head blink / roar-talk frame banks. These were the RIG's face: it swapped
+      // a head texture per pose (faceAnimations + faces.json). A clip sequence
+      // has the blink painted into its own frames, so with the pin rigs deleted
+      // nothing resolves these — 4 MB across 100 files, shipping unread.
+      /^sprites\/characters\/dragon\/[^/]+\/head-animation/,
       /^sprites\/(eleanor|selyna)\/(talk_|blink\/|eyelids\/|expressions\/|visemes\/)/,
       /^sprites\/(eleanor|selyna)\/(rest|portrait|disc-atlas)\.(png|webp)$/,
       /^sprites\/(eleanor|selyna)-merge\/portrait\.(png|webp)$/,
@@ -960,18 +965,12 @@ const copyRuntimeArt = (): Plugin => ({
       // (lossless, 58% smaller) with the PNG master beside it for the baker.
       !/\/disc-atlas\.(png|webp)$/.test(rel);
 
-    // Rigs: keep ONLY the ones a scene can actually ask for. Each rig json
-    // carries its own layer art as data URIs, so an unreferenced one is ~1.2 MB
-    // of art for a dragon nothing can spawn — and the skin rigs are exactly
-    // that: a worn skin swaps the BAKED `skin_<id>_<tier>` texture (BoardScene),
-    // it does not load a second rig. Derived from the two files that name rig
-    // urls, so a newly registered rig ships the moment it is registered.
-    const rigKeep = new Set<string>();
-    for (const file of ['src/render/characterCatalog.ts', 'src/scenes/BoardScene.ts']) {
-      const src = readFileSync(path.resolve(__dirname, file), 'utf8');
-      for (const [, url] of src.matchAll(/'(sprites\/[^']*\.rig\.json)'/g)) rigKeep.add(url);
-    }
-    if (rigKeep.size === 0) throw new Error('[copy-runtime-art] no rig urls found — did the catalog move?');
+    // Rigs: NONE ship. The pin-rig runtime is deleted — every dragon is an
+    // Align-Studio clip sequence — so a `.rig.json` is now pure authoring data.
+    // Each one carries its layer art inside itself as data URIs (~1.2 MB each),
+    // which is why this is worth an explicit rule rather than leaving them to
+    // ride along. They stay in the workspace because `apply-anim-align.mjs`
+    // still needs a rest pose to register a NEW clip against.
     // VFX bank: keep ONLY what the runtime loads — the ramp LUT plus the
     // `_pack`/`_mv` pair for each shipped sheet. The graded colour sheets are
     // the bake INPUT, the other flipbooks are unshipped, and the manifests are
@@ -1018,7 +1017,7 @@ const copyRuntimeArt = (): Plugin => ({
       const stem = rel.replace(/\.[A-Za-z0-9]+$/, '');
       if (SOURCE_ONLY.some((s) => rel === s || stem === s || rel.startsWith(`${s}/`))) return false;
       if (!isDir && SOURCE_ONLY_PATTERNS.some((re) => re.test(rel))) return false;
-      if (!isDir && rel.endsWith('.rig.json') && !rigKeep.has(rel)) return false;
+      if (!isDir && rel.endsWith('.rig.json')) return false;
       if (!isDir && bakedIntoAtlas(rel)) return false;
       // Default-deny the workspace: `raw` itself ships (it has kept children),
       // anything under it must be on — or an ancestor of — RAW_SHIPPED.
