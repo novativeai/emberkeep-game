@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  HUD_BTN_SCALE,
   HUD_COLUMN_X,
   hudColumnY,
   IS_MOBILE,
@@ -8,6 +9,7 @@ import {
   LIVE_GAME_WIDTH,
   num,
   PALETTE,
+  PILL_SCALE,
   UI_SCALE
 } from '../core/Constants';
 import { FONT } from '../art/design';
@@ -44,6 +46,11 @@ export class Hud {
   private keyPill: Pill;
   private regenLabel: Phaser.GameObjects.Text;
   private xpFill: Phaser.GameObjects.Graphics;
+  /** Bar + fill + number. Always shown on desktop; on mobile it is revealed by
+   *  tapping the level disc (see `toggleXpBar`). */
+  private xpBar!: Phaser.GameObjects.Container;
+  private xpBarTween?: Phaser.Tweens.Tween;
+  private xpBarOpen = false;
   private levelText: Phaser.GameObjects.Text;
   private xpLabel: Phaser.GameObjects.Text;
   private bagBadge: Phaser.GameObjects.Container;
@@ -53,7 +60,7 @@ export class Hud {
   private ledgerEnabled = true;
   /** Base scale of the gauge pills (>1 on mobile) — press/refresh tweens are
    *  relative to this so the mobile magnification survives every bump. */
-  private pillScale = UI_SCALE;
+  private pillScale = PILL_SCALE;
   /** Deliverability per visible order — the dot shows while ANY is ready. */
   private deliverableByOrder = new Map<string, boolean>();
   private readonly offBus: Array<() => void> = [];
@@ -76,7 +83,7 @@ export class Hud {
     // is hidden until the story grants one, so most of the game shows one row).
     // Desktop keeps its compact landscape row.
     const L = IS_MOBILE
-      ? { energy: [560, 190], coin: [1660, 190], key: [560, 620], regen: [560, 390] }
+      ? { energy: [390, 165], coin: [1155, 165], key: [390, 520], regen: [390, 330] }
       : { energy: [224, 88], coin: [572, 88], key: [920, 88], regen: [224, 138] };
     this.energyPill = this.pill(L.energy[0], L.energy[1], 'ui_icon_bolt', `${state.energyCurrent}/${this.state.energyMax}`);
     // coin.png is a big detailed coin — shrink the icon ~85% so the Gold gauge
@@ -100,8 +107,8 @@ export class Hud {
     // that suited 1.5x hangs its right half off the screen at 3x. 78·UI_SCALE
     // keeps the disc clear of both edges at any scale.
     this.gearButton = this.roundIconButton(
-      LIVE_GAME_WIDTH - (IS_MOBILE ? 78 * UI_SCALE : 112),
-      IS_MOBILE ? 78 * UI_SCALE : 104,
+      LIVE_GAME_WIDTH - (IS_MOBILE ? 78 * HUD_BTN_SCALE : 112),
+      IS_MOBILE ? 78 * HUD_BTN_SCALE : 104,
       'ui_icon_gear',
       1,
       callbacks.onGear
@@ -202,13 +209,26 @@ export class Hud {
         color: PALETTE.textBrown
       })
       .setOrigin(0.5);
-    // Same paint order the old depth values produced: bar under disc, number on top.
-    levelGroup.add([barBg, this.xpFill, this.xpLabel, lvlTag, disc, this.levelText]);
+    // The bar, its fill and its number travel together so the mobile reveal can
+    // tween ONE thing. Paint order is unchanged: bar under disc, number on top.
+    this.xpBar = scene.add.container(0, 0);
+    this.xpBar.add([barBg, this.xpFill, this.xpLabel]);
+    levelGroup.add([this.xpBar, lvlTag, disc, this.levelText]);
     // Mobile: magnify the whole cluster, anchored to the bottom-left corner. The
     // children carry large absolute Y (~LIVE_GAME_HEIGHT), so scaling around that
     // corner = scale k with the group offset by pivotY·(1−k) (plus a small inset).
     if (IS_MOBILE) {
       levelGroup.setScale(UI_SCALE).setPosition(24, LIVE_GAME_HEIGHT * (1 - UI_SCALE) - 30);
+      // On a phone the bar is a 440-unit rail lying across the bottom-left at
+      // triple size, permanently under the dialogue. The NUMBER is the part
+      // worth keeping on screen — the bar is a detail you ask for. So it starts
+      // hidden and the disc becomes the switch.
+      this.xpBar.setAlpha(0).setVisible(false).setX(-70);
+      disc.setInteractive({ useHandCursor: true });
+      this.levelText.setInteractive({ useHandCursor: true });
+      const toggle = (): void => this.toggleXpBar();
+      disc.on('pointerup', toggle);
+      this.levelText.on('pointerup', toggle);
     }
 
     this.refreshEconomy();
@@ -321,7 +341,7 @@ export class Hud {
    *  of it — the same beat the concept frame shows. Called once per stored item,
    *  as the flight lands. */
   bumpBag(): void {
-    const base = UI_SCALE;
+    const base = HUD_BTN_SCALE;
     this.scene.tweens.add({
       targets: this.bagButton,
       scale: { from: base * 1.22, to: base },
@@ -377,6 +397,30 @@ export class Hud {
     pill.container.add(btn);
   }
 
+  /**
+   * Slide the XP rail out from behind the level disc, or put it back.
+   *
+   * It unrolls rightward — x eases from just under the disc to its authored
+   * place while alpha comes up — so the bar reads as coming OUT of the number
+   * that was tapped rather than fading in beside it. Mobile only; the desktop
+   * bar is always out and never calls this.
+   */
+  private toggleXpBar(): void {
+    this.xpBarOpen = !this.xpBarOpen;
+    this.xpBarTween?.stop();
+    if (this.xpBarOpen) this.xpBar.setVisible(true);
+    this.xpBarTween = this.scene.tweens.add({
+      targets: this.xpBar,
+      alpha: this.xpBarOpen ? 1 : 0,
+      x: this.xpBarOpen ? 0 : -70,
+      duration: this.xpBarOpen ? 260 : 180,
+      ease: this.xpBarOpen ? 'Back.easeOut' : 'Sine.easeIn',
+      onComplete: () => {
+        if (!this.xpBarOpen) this.xpBar.setVisible(false);
+      }
+    });
+  }
+
   private pill(x: number, y: number, icon: string, value: string, iconScale = 0.92): Pill {
     const container = this.scene.add.container(x, y).setScale(this.pillScale);
     const bg = this.scene.add.image(0, 0, 'ui_pill').setScale(0.95, 0.9);
@@ -402,7 +446,9 @@ export class Hud {
   ): Phaser.GameObjects.Container {
     // `base` is the mobile magnification (1 on desktop). The press/hover feedback
     // multiplies it so the button never snaps back to un-magnified size on tap.
-    const base = UI_SCALE;
+    // Buttons take HUD_BTN_SCALE, not UI_SCALE — an icon does not need a word's
+    // magnification, and at UI_SCALE these discs crowded out the dialogue.
+    const base = HUD_BTN_SCALE;
     const container = this.scene.add.container(x, y).setScale(base);
     const bg = this.scene.add.image(0, 0, 'ui_btn_round').setScale(scale);
     // Icons arrive from two places at two resolutions: TextureFactory paints one

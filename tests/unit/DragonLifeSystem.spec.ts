@@ -411,3 +411,99 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(ctx.state.items.get(egg.id)).toMatchObject({ col: 3, row: 3 });
   });
 });
+
+/**
+ * ONE STATE. The board draws the countdown, the pose, the skip offer and the
+ * hire refusal from `dragonLife`, so the property that matters is not what any
+ * one of them says — it is that they cannot say different things.
+ *
+ * The bug these pin: a dragon with a running shift-rest that some OTHER rule
+ * called awake. It stood, wandered and flew under a five-minute countdown,
+ * refused work, and answered a tap with nothing at all — the skip buttons are
+ * sold off `sleepKindOf`, and that is null whenever the mood is not asleep.
+ */
+describe('the sleep is one state — the countdown and the animal never disagree', () => {
+  /** Put `dragon` through a full shift so a real fatigue rest is running. */
+  function workToExhaustion(ctx: Ctx, dragonId: number): void {
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 4, row: 4, kind: 'item' });
+    ctx.bus.emit('dragon:work', { dragonId, houseId: house.id });
+    tick(ctx, DRAGON_WORK_MS + 1000);
+    expect(ctx.systems.jobs.restRemaining(dragonId)).toBeGreaterThan(0);
+  }
+
+  it('a rest that begins inside a keep-awake window still puts the dragon down', () => {
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    atPhase(ctx, 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    // The player shook it awake (or a cinematic wanted it on its feet) — a
+    // window that lasts far longer than the shift it is about to work.
+    ctx.systems.dragonLife.keepAwake(dragon.id, DRAGON_WORK_MS + DRAGON_REST_MS + 60_000);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+
+    workToExhaustion(ctx, dragon.id);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+
+    // The window does NOT outrank the rest: this is the exact state that used
+    // to show a countdown over a wide-awake animal with nothing to tap.
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('rest');
+    expect(ctx.systems.dragonLife.sleepTimer(dragon.id)).not.toBeNull();
+  });
+
+  it('a HUNGRY dragon sleeps off its shift — the rest is a gate, hunger is a mood', () => {
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    atPhase(ctx, 1);
+    workToExhaustion(ctx, dragon.id);
+    // Deliberately unfed: the shift is long enough to bring the appetite back,
+    // and hunger used to win — leaving a roaring, standing dragon under the
+    // rest countdown, unhireable, with no sleep to buy off.
+    tick(ctx, DRAGON_HUNGER_GRACE_MS + 1000);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('rest');
+  });
+
+  it('the tutorial dragon is awake AND wears no countdown — both, or neither', () => {
+    const ctx = createTestContext();
+    // NOT tutorialDone: the `dragon_rest` beat advances the clock straight
+    // through a shift on purpose, and the beat after it needs her awake enough
+    // to take a Hearth Cake.
+    const dragon = ctx.state.addItem({
+      chain: 'ember_dragon',
+      tier: 3,
+      col: 1,
+      row: 1,
+      kind: 'item'
+    });
+    workToExhaustion(ctx, dragon.id);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).not.toBe('asleep');
+    // …so there is nothing to draw and nothing to sell. The badge derives from
+    // THIS, which is what stops the tutorial showing a five-minute sleep timer
+    // over a dragon the rest of the game treats as wide awake.
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBeNull();
+    expect(ctx.systems.dragonLife.sleepTimer(dragon.id)).toBeNull();
+  });
+
+  it('a countdown is showing IF AND ONLY IF the dragon is asleep — every hour of the day', () => {
+    const ctx = createTestContext();
+    const dragon = dragonAt(ctx, 1, 1);
+    const life = ctx.systems.dragonLife;
+    // Daylight and fed, so the shift can start at all — a sleeper is never
+    // hired (DragonJobSystem.startWork), and the clock is seeded from real time.
+    atPhase(ctx, 1);
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    // Walk a whole day, in and out of a shift, fed and unfed, held awake and
+    // not — the pairing must hold at every step or some frame draws a timer
+    // the tap cannot answer.
+    workToExhaustion(ctx, dragon.id);
+    for (let i = 0; i < 80; i++) {
+      tick(ctx, DAY_MS / 40);
+      if (i % 7 === 0) ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+      if (i % 11 === 0) life.keepAwake(dragon.id, DRAGON_SLEEP_MAX_MS * 3);
+      const asleep = life.asleep(dragon.id);
+      expect(life.moodOf(dragon.id) === 'asleep').toBe(asleep);
+      expect(life.sleepTimer(dragon.id) !== null).toBe(asleep);
+    }
+  });
+});

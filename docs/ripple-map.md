@@ -69,7 +69,7 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | generator:skipped | GeneratorSystem | TutorialDirector (gate) |
 | chest:claimed | ChestSystem | BoardScene |
 | dragon:working | DragonJobSystem | TutorialDirector (gate) — BoardScene animates in startDragonWork, not via this event |
-| dragon:rest / dragon:rested | DragonJobSystem | BoardScene |
+| dragon:rest / dragon:rested | DragonJobSystem | DragonLifeSystem (prompt mood announce), BoardScene (`dragon:rested` only — the "Refreshed!" flourish, skipped while another sleep still holds it; the badge and pose are reconciled on the tick, never off these) |
 | dragon:sleep_skipped | DragonLifeSystem | BoardScene (the flourish only — the uncurl arrives as the ordinary `dragon:mood` change) |
 | energy:changed | EnergySystem, BoardSystem | Hud, Save |
 | economy:changed | EconomySystem, BoardSystem | Hud, AudioManager, Save |
@@ -255,14 +255,35 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   means — `not.toBe('hungry')` rather than `toBe('awake')`. A test that demands `awake`
   at an unpinned moment passes or fails depending on the hour it runs at, which is the
   worst kind of flake to trace.
-- **TOUCH the sleep paths → RULE** there are THREE ways to be asleep and they must
-  all look like ONE thing (same curled painting, same breath): sleeping off a
-  `DragonJobSystem` rest, the day clock's `night`, and an ambient nap. Order in
-  `moodOf` is load-bearing: hungry > resting > working(awake) > night > nap. A dragon
-  out WORKING is awake whatever the sky says, and a HUNGRY one does not sleep through
-  it. The nap is stateless — a window inside `DRAGON_NAP_CYCLE_MS` whose offset is
-  hashed off the item id — so it survives a reload, needs no save field, and stays
+- **TOUCH the sleep paths → RULE** there are FOUR ways to be asleep and they must all
+  look like ONE thing (same curled painting, same breath): a tutorial `scripted`
+  sleep, a `DragonJobSystem` shift-rest, the day clock's `night`, and an ambient nap.
+  Order in `moodOf` is load-bearing and now reads: scripted > **rest (post-tutorial)**
+  > hungry > tutorial(awake) > heldAwake(awake) > working(awake) > night > nap. The
+  rest sits that high because it is a GATE, not ambience — it wears a countdown and
+  refuses hiring for five minutes — so ANY rule above it produced a state with no
+  name: a plainly awake dragon standing, wandering and flying under a countdown,
+  unhireable, answering a tap with nothing (the skip is sold off `sleepKindOf`, null
+  whenever the mood is not asleep). Hunger did it; a `keepAwake` window, which
+  outlives the reason it was opened for, did it most often. The tutorial is the one
+  exception and it exempts the dragon from sleeping AT ALL (its `dragon_rest` beat
+  advances the clock through a shift on purpose and the next beat must be able to
+  feed her) — which is safe only because the badge derives from the same answer.
+  The nap is stateless — a window inside `DRAGON_NAP_CYCLE_MS` whose offset is hashed
+  off the item id — so it survives a reload, needs no save field, and stays
   reproducible under `advanceTime`.
+- **TOUCH anything that DRAWS a sleep → RULE** the pose and the countdown are
+  reconciled wholesale off `dragonLife` on BoardScene's 240 ms tick
+  (`syncDragonSleep`); `dragon:mood` is only a fast path and there is no
+  `dragon:rest` listener at all. Never re-hang either on an event alone: `dragon:mood`
+  fires on CHANGE only, so a seat deferred while the animal was airborne had one door
+  back (`dragonIdle`) and any other flight ending stranded it awake-under-asleep for
+  good; `dragon:rest` fires once, so the old badge never returned after a reload or a
+  trip north — and it read `restRemaining`, a number that knows nothing about the
+  tutorial, hunger or a hold. The invariant to keep (pinned in
+  `DragonLifeSystem.spec`): a countdown is showing **iff** `asleep(id)` is true.
+  `wakeDragon` (on `dragon:rested`) must likewise not fly a dragon another sleep
+  still holds down.
 - **TOUCH the sleeping breath → RULE** it is driven from `BoardItem.applyBob` off
   ABSOLUTE time, never a tween. `applyBob` is the one per-frame art hook, so it cannot
   fight the landing squash or the drag lift for the same two properties, and absolute

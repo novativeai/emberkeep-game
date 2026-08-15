@@ -92,6 +92,9 @@ export class DragonLifeSystem {
     private jobs: DragonJobSystem
   ) {
     bus.on('time:advanced', () => this.tick());
+    // A shift-rest begins: say so NOW rather than on the next tick. The animal
+    // lies down as it lands, not half a second later.
+    bus.on('dragon:rest', ({ dragonId }) => this.announceMood(dragonId));
     bus.on('dragon:sleep_skip', ({ itemId, currency }) => this.onSleepSkip(itemId, currency));
     bus.on('tutorial:sleep_dragon', ({ ms }) => this.putScriptedToSleep(ms));
     bus.on('item:removed', ({ itemId }) => this.forget(itemId));
@@ -335,18 +338,38 @@ export class DragonLifeSystem {
     // A SCRIPTED sleep outranks everything, hunger included: a tutorial beat
     // asked for it, and the same beat is teaching the player how to end it.
     if (this.scriptedAsleep(itemId)) return 'asleep';
+    // A SHIFT-REST is the second absolute, and the order here is the whole of
+    // the one-state rule.
+    //
+    // The other two sleeps are ambience — nothing on screen says they are
+    // running, and a rule that overrides them costs the player nothing. A rest
+    // is a GATE: it wears a countdown over the animal's head and refuses work
+    // for its whole five minutes. So every rule that used to sit above it could
+    // put the dragon in a state with no name — plainly awake, standing,
+    // wandering, flying, under a countdown, refusing to be hired, and with
+    // nothing to tap, because the sleep skip is sold off `sleepKindOf` and that
+    // was null the whole time. Hunger did it (a dragon that has eaten nothing
+    // today rests hungry), and a `keepAwake` window did it most often of all —
+    // a window outlives the reason it was opened for, so any shift ending
+    // inside one landed there.
+    //
+    // The tutorial is the ONE exception, and it is an exception to sleeping at
+    // all rather than to this ordering: its beats point the hand at the dragon
+    // and gate on her answering (`feed_dragon` needs her awake enough to eat),
+    // and its `dragon_rest` beat advances the clock straight into a five-minute
+    // fatigue rest on purpose. Below, `sleepKindOf` derives from THIS answer,
+    // so a tutorial dragon wears no countdown either — the badge and the pose
+    // cannot disagree, because there is only one thing to ask.
+    if (this.jobs.restRemaining(itemId) > 0 && this.state.tutorialDone) return 'asleep';
     if (this.isHungry(itemId)) return 'hungry';
     // The TUTORIAL never sleeps. Its beats point the hand at the dragon and
     // gate on her answering — a lesson whose subject curls up under the arrow
     // (scripted advanceTime jumps land in night/nap windows at random) is a
     // lesson that soft-locks. Hunger stays: the feeding beat depends on it.
     if (!this.state.tutorialDone) return 'awake';
-    // Shaken awake, or wanted on its feet by a cinematic — outranks all three
-    // sleeps for the length of the window (see keepAwake).
+    // Shaken awake, or wanted on its feet by a cinematic — outranks the two
+    // AMBIENT sleeps for the length of the window (see keepAwake), never a rest.
     if (this.heldAwake(itemId)) return 'awake';
-    // Fatigue outranks the sky: a dragon that just came off a shift sleeps at
-    // noon, and this is the path the player sees most often.
-    if (this.jobs.restRemaining(itemId) > 0) return 'asleep';
     if (this.jobs.isWorking(itemId)) return 'awake';
     if (phaseAt(this.clock.now()) === 'night') return 'asleep';
     if (this.isNapping(itemId)) return 'asleep';

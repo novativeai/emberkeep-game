@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { CHARACTER_ANIMS, type CharacterClip, clipFor, clipKey, type PortraitView } from '../core/characterAnims';
-import { num, PALETTE, PORTRAIT_CLIP_TALK, SPEAKER_NAMES, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
+import { IS_MOBILE, num, PALETTE, PORTRAIT_CLIP_TALK, SPEAKER_NAMES, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { SpeakerId, TutorialStepEvent } from '../core/types';
 import {
@@ -153,7 +153,11 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.label = scene.add
       .text(0, 0, '', {
         fontFamily: FONT.ui,
-        fontSize: '38px',
+        // The bubble is magnified on a phone but not enough on its own: the
+        // frame can only grow until the portrait ring reaches the screen edge
+        // (BUBBLE_SCALE is capped by that), so the last of the legibility has to
+        // come from the type itself. Landscape keeps the authored 38.
+        fontSize: IS_MOBILE ? '46px' : '38px',
         fontStyle: 'bold',
         color: PALETTE.textBrown,
         wordWrap: { width: TEXT_WIDTH },

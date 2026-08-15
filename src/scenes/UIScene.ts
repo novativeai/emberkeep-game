@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
   ATMOSPHERE,
+  BUBBLE_BOTTOM,
   BUBBLE_SCALE,
   EGG_GIFT,
   ELDER_VOICE,
@@ -296,9 +297,9 @@ export class UIScene extends Phaser.Scene {
     this.bubble.setScale(BUBBLE_SCALE);
     this.bubble.setPosition(
       LIVE_GAME_WIDTH / 2 + (IS_MOBILE ? 0 : 220),
-      // 200 (not 150) on mobile: the magnified bubble is taller than the lift
-      // the landscape inset gives it, and its foot ran past the bottom edge.
-      LIVE_GAME_HEIGHT - (IS_MOBILE ? 200 * BUBBLE_SCALE : 150)
+      // BUBBLE_BOTTOM lifts it clear of the level disc, which keeps the very
+      // bottom band on mobile — see the bottom-stack note in Constants.
+      LIVE_GAME_HEIGHT - BUBBLE_BOTTOM
     );
     this.bubble.setDepth(DEPTH_TUTORIAL);
     this.bubble.registerUi();
