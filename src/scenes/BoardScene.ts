@@ -5596,19 +5596,29 @@ export class BoardScene extends Phaser.Scene {
     // work-magic onto the building, and come STRAIGHT home. The job itself
     // (DragonJobSystem's speed-up + fatigue cycle) runs on its own clock and
     // never depended on the dragon standing there. Depth follows the flight
-    // (see sendDragonFlourish) — never the always-on-top band.
+    // (see sendDragonFlourish) — never the always-on-top band — but with a
+    // FLOOR at the target's own depth: the errand flies him straight AT the
+    // building, so the natural y-sort crossing happens against its silhouette
+    // and reads as the dragon clipping through the roof, in on the approach
+    // and out again on the return. In front of the building he is restoring,
+    // the whole trip; behind unrelated scenery he crosses, as ever.
     //
     // The errand waits for the WINGS: takeoff plays in place, the sprite only
     // travels once the cruise loop is running, it stays ON THE WING over the
     // House while the work-magic lands, and it folds exactly once — at home.
+    const aboveHouse = (): void => {
+      sprite.settleDepth();
+      if (sprite.depth <= house.depth) sprite.setDepth(house.depth + 1);
+    };
     const journey = (): void => {
+      aboveHouse(); // airborne toward the building — in front of it from the first frame
       this.tweens.add({
       targets: sprite,
       x: landX,
       y: house.y + 24,
       duration: DRAGON_ANIM.flyToMs,
       ease: 'Sine.easeInOut',
-      onUpdate: () => sprite.settleDepth(),
+      onUpdate: aboveHouse,
       onComplete: () => {
         this.glowFlash(house.x, house.y - 36, PALETTE.goldAccent, 0.6, 1.2);
         this.sparks.explode(14, house.x, house.y - 34);
@@ -5622,7 +5632,7 @@ export class BoardScene extends Phaser.Scene {
           onStart: () => {
             if (ld) this.dragonHover(ld, DRAGON_ANIM.flyBackMs); // the return leg's own arc
           },
-          onUpdate: () => sprite.settleDepth(),
+          onUpdate: aboveHouse,
           onComplete: () => {
             sprite.settleDepth();
             this.busyDragons.delete(sprite.itemId);
