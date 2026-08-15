@@ -355,6 +355,39 @@ export class GameState {
       if (sections.has(id) || !this.worlds.has(id)) continue;
       this.hydrateBoard(id, { items: [] }, entries);
     }
+    this.healFixtures();
+  }
+
+  /**
+   * FIXTURES go home. The crystal is authored scenery with a timer: it has a
+   * plinth (`startingItems`) and no legitimate reason to stand anywhere else —
+   * but two shipped bugs could move it anyway (the worker-lap mis-filter flew
+   * it mid-board where a touch could re-home it, and the pre-v17 loader could
+   * relocate it during collision recovery), and the next auto-save baked the
+   * damage into the save, where a code fix alone cannot reach it. So the
+   * loader heals: a crystal found off its authored cell snaps back whenever
+   * that cell is free. Runs after EVERY board is hydrated, so the plinth's
+   * occupancy answer is about the settled board, not a half-loaded one. A
+   * plinth that is genuinely taken leaves the crystal where it stands — a
+   * heal must never clobber a piece the player earned.
+   */
+  private healFixtures(): void {
+    for (const world of this.worlds.values()) {
+      const board = this.board(world.id);
+      for (const placement of world.map.startingItems ?? []) {
+        if (placement.chain !== 'crystal') continue;
+        const [col, row] = placement.at;
+        const stray = [...board.items.values()].find(
+          (i) => i.kind === 'item' && i.chain === 'crystal' && (i.col !== col || i.row !== row)
+        );
+        if (!stray) continue;
+        if (!this.canOccupy(world, board, col, row)) continue;
+        board.grid[stray.row]![stray.col] = null;
+        stray.col = col;
+        stray.row = row;
+        board.grid[row]![col] = stray.id;
+      }
+    }
   }
 
   /**

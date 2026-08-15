@@ -3533,12 +3533,20 @@ export class BoardScene extends Phaser.Scene {
     // else the static PNG fallback (iOS / WebGL-less), so decor never silently drops.
     if (!map.decor3d?.length || !this.textures.exists('item_crystal_1')) return;
     // The crystal GENERATOR already stands on the authored 3D-crystal spot (see
-    // build-gamemap), so skip the scenery copy there — exactly ONE crystal renders.
+    // build-gamemap), so skip the scenery copy there — exactly ONE crystal
+    // renders. The suppression covers the authored plinth AND wherever the
+    // LIVE item actually stands: keyed on the authored cell alone, a crystal
+    // that had strayed (pre-heal saves) doubled up with the scenery copy. The
+    // authored cell stays in the set because first create() runs before the
+    // save has loaded, when the board is still empty.
     const genCells = new Set(
       (map.startingItems ?? [])
         .filter((i) => i.chain === 'crystal')
         .map((i) => `${i.at[0]},${i.at[1]}`)
     );
+    for (const i of this.ctx.state.items.values()) {
+      if (i.kind === 'item' && i.chain === 'crystal') genCells.add(`${i.col},${i.row}`);
+    }
     const ratio = TILE_W / (map.tile?.width ?? TILE_W);
     map.decor3d.forEach((d, i) => {
       if (genCells.has(`${d.col},${d.row}`)) return; // generator covers this placement
@@ -4796,6 +4804,12 @@ export class BoardScene extends Phaser.Scene {
 
   private canDrag(sprite: BoardItem): boolean {
     if (sprite.kind !== 'item') return false;
+    // The crystal is a FIXTURE with a timer: it has an authored plinth
+    // (map.json startingItems), every verb it owns is a tap, and its
+    // art-bounds hit zone is big enough that a pan starting on the gem could
+    // read as a move — which is how it ended up saved mid-board. Undraggable,
+    // like decor; GameState.healFixtures walks any already-strayed one home.
+    if (sprite.chain === 'crystal') return false;
     if (this.tutorialDone) return true;
     return this.allow.drag.includes('*') || this.allow.drag.includes(sprite.chain);
   }

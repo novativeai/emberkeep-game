@@ -147,3 +147,79 @@ describe('a reload rebuilds each world onto its own board', () => {
     expect(ctxWith(storage).systems.save.peek()).not.toBeNull();
   });
 });
+
+/**
+ * FIXTURES GO HOME.
+ *
+ * The crystal has an authored plinth (`startingItems`) and no verb that moves
+ * it — but two shipped bugs could move it anyway (the worker-lap mis-filter
+ * flew it mid-board where a touch could re-home it; the pre-v17 loader could
+ * relocate it during collision recovery), and the next auto-save baked the
+ * damage in, out of reach of any code fix. The loader now heals it on every
+ * hydrate — without ever clobbering a piece that legitimately holds the cell.
+ */
+describe('the crystal goes home on load', () => {
+  const plinth = (realMap as unknown as MapData).startingItems!.find(
+    (i) => i.chain === 'crystal'
+  )!.at;
+
+  /** A free, active cell on the isle that is not the plinth. */
+  function freeCellAwayFromPlinth(ctx: GameContext): [number, number] {
+    for (let row = 0; row < ctx.state.rows; row++) {
+      for (let col = 0; col < ctx.state.cols; col++) {
+        if (!ctx.state.isTileActive(col, row)) continue;
+        if (ctx.state.itemIdAt(col, row) !== null) continue;
+        if (col === plinth[0] && row === plinth[1]) continue;
+        return [col, row];
+      }
+    }
+    throw new Error('fixture map has no free cell');
+  }
+
+  it('walks a strayed crystal back to its authored plinth', () => {
+    const storage = new MemoryStorage();
+    const ctx = ctxWith(storage);
+    ctx.beginRun();
+    const stray = freeCellAwayFromPlinth(ctx);
+    ctx.systems.save.save();
+    const save = read(storage);
+    const crystal = save.items.find((i) => i.chain === 'crystal')!;
+    expect(crystal).toBeDefined();
+    expect([crystal.col, crystal.row]).toEqual(plinth);
+    [crystal.col, crystal.row] = stray; // the baked-in damage
+    write(storage, save);
+
+    const fresh = ctxWith(storage);
+    fresh.beginRun();
+    const healed = [...fresh.state.items.values()].find((i) => i.chain === 'crystal')!;
+    expect([healed.col, healed.row]).toEqual(plinth);
+    expect(superposed(fresh)).toEqual([]);
+  });
+
+  it('leaves the crystal standing when something else holds the plinth', () => {
+    const storage = new MemoryStorage();
+    const ctx = ctxWith(storage);
+    ctx.beginRun();
+    const stray = freeCellAwayFromPlinth(ctx);
+    ctx.systems.save.save();
+    const save = read(storage);
+    const crystal = save.items.find((i) => i.chain === 'crystal')!;
+    [crystal.col, crystal.row] = stray;
+    // A fresh save holds only the crystal, so the squatter is forged: an
+    // earned piece standing exactly on the plinth when the save loads.
+    const squatter = { ...crystal, id: save.nextItemId, chain: 'lumber', tier: 1 };
+    [squatter.col, squatter.row] = plinth;
+    save.items.push(squatter);
+    save.nextItemId += 1;
+    write(storage, save);
+
+    const fresh = ctxWith(storage);
+    fresh.beginRun();
+    const items = [...fresh.state.items.values()];
+    const healed = items.find((i) => i.chain === 'crystal')!;
+    const holder = items.find((i) => i.id === squatter.id)!;
+    expect([holder.col, holder.row]).toEqual(plinth); // the squatter keeps the cell
+    expect([healed.col, healed.row]).toEqual(stray); // the heal never clobbers
+    expect(superposed(fresh)).toEqual([]);
+  });
+});
