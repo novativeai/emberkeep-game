@@ -71,6 +71,7 @@ import {
 } from '../core/characterAnims';
 import { gridToWorld, worldToGrid } from '../core/iso';
 import { ensureTextures } from '../core/lazyTextures';
+import { isDragonClipCharacter, planClipEviction, releaseClips } from '../core/clipResidency';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
 import { artScaleAt, setActiveWorld } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
@@ -321,6 +322,11 @@ export class BoardScene extends Phaser.Scene {
   /** Clip characters whose sheets have been requested this scene — see
    *  `ensureDragonClips`. Membership means "asked for", not "resident". */
   private clipsFetched = new Set<string>();
+  /** When each dragon clip character was last wanted, for the LRU in
+   *  `evictDragonClips`. Stamped on every fetch and every re-dress. */
+  private clipLastUsed = new Map<string, number>();
+  /** Debounce for `scheduleClipEviction` — one sweep per settled board. */
+  private clipEvictionTimer?: Phaser.Time.TimerEvent;
   /** Dragon item ids currently flying a cosmetic worker flourish. */
   private busyDragons = new Set<number>();
   /** Per-level camera framing + the active level-up glide. */
@@ -509,6 +515,16 @@ export class BoardScene extends Phaser.Scene {
         ld.clipOverlay?.destroy();
       }
       this.liveDragons.clear();
+      // `clipsFetched` is scene state ("asked for THIS scene"), so a restart —
+      // world travel, Title → Play after a reset — must start it empty or the
+      // guard says a breed is loaded when its textures may have been evicted,
+      // and the dragon mounts bald. The textures themselves are deliberately
+      // left alone: the next board asks for what it needs and the budget
+      // reclaims the rest.
+      this.clipsFetched.clear();
+      this.clipLastUsed.clear();
+      this.clipEvictionTimer?.remove();
+      this.clipEvictionTimer = undefined;
         this.altarElderClip?.destroy();
       this.altarElderClip = undefined;
       this.crystal3d?.dispose();
@@ -814,7 +830,12 @@ export class BoardScene extends Phaser.Scene {
    */
   private ensureDragonClips(chain: string, tier: number): void {
     const id = this.clipCharacterFor(chain, tier);
-    if (!id || this.clipsFetched.has(id)) return;
+    if (!id) return;
+    // Stamp the LRU on every ASK, not just on the fetch — a breed that is being
+    // re-requested is a breed the board is using, and that is exactly what must
+    // outrank an older one when `evictDragonClips` has to choose.
+    this.clipLastUsed.set(id, this.time.now);
+    if (this.clipsFetched.has(id)) return;
     this.clipsFetched.add(id);
     let queued = 0;
     for (const [clipId, clip] of Object.entries(clipsFor(id))) {
@@ -854,10 +875,88 @@ export class BoardScene extends Phaser.Scene {
         if (this.liveDragons.has(sprite.itemId)) continue;
         this.attachDragon(sprite, false);
       }
+      // A breed just landed, so this is the moment the resident total is at its
+      // highest and the moment we know which breeds the board is actually
+      // wearing. Give back whatever is over budget and no longer on screen.
+      this.evictDragonClips();
     });
     // A loader already in flight will pick these up when it drains; starting a
     // second overlapping run is what wedges Phaser's queue (see loadDragonRigs).
     if (!this.load.isLoading()) this.load.start();
+  }
+
+  /**
+   * Clip characters the board is WEARING right now — the pin list for eviction.
+   *
+   * Everything a sprite could be drawn from this frame: every board item's breed
+   * (not just the live ones — an item mid-spawn is about to want its sheets),
+   * every live dragon, the named companions, and the Golden Elder on her altar.
+   * Evicting a texture out from under a live sprite null-crashes the renderer
+   * and takes Phaser's RAF chain with it, so this list errs toward keeping.
+   */
+  private dragonClipsInUse(): Set<string> {
+    const pinned = new Set<string>();
+    const pin = (id: string | null): void => {
+      if (id) pinned.add(id);
+    };
+    for (const sprite of this.itemSprites.values()) pin(this.clipCharacterFor(sprite.chain, sprite.tier));
+    for (const item of this.ctx.state.items.values()) pin(this.clipCharacterFor(item.chain, item.tier));
+    for (const named of this.ctx.systems.dragons.namedDragons())
+      pin(dragonClipCharacter(named.chain, named.tier, this.ctx.state.dragonSkins[named.chain] ?? null));
+    pin(dragonClipCharacter(GOLDEN_CHAIN, GOLDEN_ELDER_TIER, null));
+    return pinned;
+  }
+
+  /**
+   * Hand back the dragon breeds this board is no longer showing.
+   *
+   * The lazy fetch (`ensureDragonClips`) fixed what boot costs; this fixes what a
+   * SESSION costs. Without it `clipsFetched` only ever grew: a board that merged
+   * up through four breeds held all four forever at 40–130 MB each, and the tab
+   * died on the same iOS ceiling the boot fix was written to clear.
+   *
+   * Only BOARD-DRAGON clips are governed here. Character and decor clips belong
+   * to a world and are exchanged at its door by `releaseAwayWorldArt` — a second
+   * owner evicting those on a byte budget would pull a standee's sheets out from
+   * under her mid-conversation.
+   */
+  /**
+   * Sweep once the board has settled, never during the leaving animation.
+   *
+   * `item:removed` deletes the sprite from `itemSprites` immediately but then
+   * fades it out over 150 ms — so for those 150 ms the breed is unpinned and its
+   * texture is still under a live sprite. Evicting there is the exact
+   * null-crash-the-renderer case this whole path is written to avoid. One
+   * debounced call well clear of the fade also collapses a cascade merge into a
+   * single sweep.
+   */
+  private scheduleClipEviction(): void {
+    this.clipEvictionTimer?.remove();
+    this.clipEvictionTimer = this.time.delayedCall(400, () => {
+      this.clipEvictionTimer = undefined;
+      this.evictDragonClips();
+    });
+  }
+
+  private evictDragonClips(): void {
+    const resident = [...this.clipsFetched].filter(
+      (id) => isDragonClipCharacter(id) && this.textures.exists(clipKey(id, 'idle'))
+    );
+    if (resident.length === 0) return;
+    const evict = planClipEviction({
+      resident,
+      pinned: this.dragonClipsInUse(),
+      lastUsedAt: this.clipLastUsed,
+      budgetBytes: graphics.profile.clipBudgetMb * 1e6
+    });
+    for (const id of evict) {
+      releaseClips(this.textures, id);
+      // Forget it entirely: `clipsFetched` is the "already asked for" guard, so a
+      // breed that is evicted and later walks back onto the board must be able to
+      // ask again. Leaving it in the set would leave the dragon permanently bald.
+      this.clipsFetched.delete(id);
+      this.clipLastUsed.delete(id);
+    }
   }
 
   /** True when this breed+skin's clip set carries the whole animal (an idle
@@ -5719,6 +5818,10 @@ export class BoardScene extends Phaser.Scene {
           ease: 'Sine.easeIn',
           onComplete: () => sprite.release()
         });
+        // Merging up is how a breed STOPS being on the board — two babies become
+        // an adult and the baby sheets are dead weight from that moment. The
+        // fetch path only evicts when something new lands, which would miss it.
+        this.scheduleClipEviction();
       }),
       bus.on('item:sold', ({ coins }) => {
         // Drift a "+N" toward the coin pill.

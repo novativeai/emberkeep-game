@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
-import { clipKey, clipsFor, dragonClipCharacter } from '../core/characterAnims';
-import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, PALETTE, SCENES, STANDEE_BANKS } from '../core/Constants';
+import { clipKey, clipsFor } from '../core/characterAnims';
+import { savedDragonClips } from '../core/clipResidency';
+import { SCENES, STANDEE_BANKS, WORLD_ID } from '../core/Constants';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
 import { ANIMATED_SPEAKERS, discTextureFor } from '../entities/PortraitAnimator';
@@ -35,6 +36,15 @@ function referencedBuiltins(doc: UiThemeDoc): BuiltinSequence[] {
 }
 
 /**
+ * Fired on `game.events` once every texture the BOARD needs is resident, and
+ * mirrored into the registry so a listener that arrives late can still tell.
+ * `TitleScene` holds Play against it — see `queueBoardArt`.
+ */
+export const BOARD_ART_READY = 'bootload:ready';
+/** Fired on `game.events` with 0..1 while the board art downloads behind the title. */
+export const BOARD_ART_PROGRESS = 'bootload:progress';
+
+/**
  * Loads real-art files for any assets.json entry flipped to source:"file"
  * (from assets/, the Vite public dir). A failed file falls back to its
  * generated placeholder so the build never blocks on art.
@@ -46,6 +56,38 @@ export class PreloadScene extends Phaser.Scene {
 
   preload(): void {
     this.cameras.main.setOrigin(0).setZoom(renderScale.value); // hi-DPI backing for the loading bar
+    // UI Builder uploads and PNG-sequence animations are self-contained data
+    // URLs — no network, and `applyUiReplacements` in create() needs them before
+    // any scene builds objects. They are the ONLY thing the title is gated on.
+    for (const [name, uri] of Object.entries(uiRegistry.doc.assets)) {
+      if (!this.textures.exists(uploadKey(name))) this.load.image(uploadKey(name), uri);
+    }
+    for (const [name, seq] of Object.entries(uiRegistry.doc.sequences)) {
+      seq.frames.forEach((uri, i) => {
+        const key = sequenceFrameKey(name, i);
+        if (!this.textures.exists(key)) this.load.image(key, uri);
+      });
+    }
+  }
+
+  /**
+   * Everything the BOARD needs — queued after the title is already on screen.
+   *
+   * This used to be the body of `preload()`, which meant Phaser would not call
+   * `create()` (and therefore would not start `TitleScene`) until all ~19.4 MB of
+   * it had landed. The title screen loads NOTHING: its logo and background are
+   * DOM `<img>`s in index.html and its Play button is drawn with `Graphics`. So
+   * the player was staring at a loading bar for a screen that was ready
+   * immediately — and worse, those two `<img>` fetches were competing with the
+   * 19.4 MB queue for connections, so on a slow phone even the title art arrived
+   * late.
+   *
+   * Now the title comes up as soon as the bundle parses and this downloads behind
+   * it, in the time the player spends looking at the logo and reaching for Play.
+   * Play stays tappable throughout; `TitleScene` waits on `BOARD_ART_READY`
+   * before starting the board, so nothing can enter a world whose art is missing.
+   */
+  private queueBoardArt(): void {
     const ctx = this.registry.get('ctx') as GameContext;
     const factory = this.registry.get('textureFactory') as TextureFactory;
 
@@ -78,30 +120,17 @@ export class PreloadScene extends Phaser.Scene {
       // Rare-screen art, fetched by `ensureTextures` when its screen opens.
       isLazyScreenArt(key);
 
-    if (fileEntries.length > 0) {
-      const barBg = this.add
-        .rectangle(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
-        .setStrokeStyle(2, num(PALETTE.gold));
-      const bar = this.add.rectangle(
-        LIVE_GAME_WIDTH / 2 - 176,
-        LIVE_GAME_HEIGHT / 2,
-        4,
-        10,
-        num(PALETTE.gold)
-      );
-      bar.setOrigin(0, 0.5);
-      this.load.on('progress', (value: number) => bar.setSize(4 + 348 * value, 10));
-      this.load.on('complete', () => {
-        barBg.destroy();
-        bar.destroy();
-      });
-      this.load.on('loaderror', (file: Phaser.Loader.File) => {
-        factory.generate(file.key);
-      });
-      for (const entry of fileEntries) {
-        if (skipAtBoot(entry.key)) continue;
-        this.load.image(entry.key, entry.file as string);
-      }
+    // A failed file falls back to its generated placeholder so the build never
+    // blocks on art. This is the ONLY thing the old in-scene loading bar shared
+    // a block with — the bar itself is gone, because there is no longer a moment
+    // where the player sits looking at this scene: the title is already up and
+    // shows the wait on its own Play button.
+    this.load.on('loaderror', (file: Phaser.Loader.File) => {
+      factory.generate(file.key);
+    });
+    for (const entry of fileEntries) {
+      if (skipAtBoot(entry.key)) continue;
+      this.load.image(entry.key, entry.file as string);
     }
     // Animated dialogue portrait: the guide's banks as 270x360 bust cutouts
     // (top 95% of each frame, natural alpha) in ONE 2160x2880 spritesheet
@@ -180,16 +209,14 @@ export class PreloadScene extends Phaser.Scene {
     // So they follow the standee rule above instead: fetch what this board can
     // actually show, and let `BoardScene.ensureDragonClips` pull a breed's set
     // the first time one of its dragons appears (spawn, merge or restore).
-    const onBoard = new Set<string>();
-    for (const item of ctx.state.items.values()) {
-      const id = dragonClipCharacter(
-        item.chain,
-        item.tier,
-        ctx.state.dragonSkins[item.chain] ?? null
-      );
-      if (id) onBoard.add(id);
-    }
-    for (const id of onBoard) {
+    //
+    // Read off the SAVE, not off `ctx.state`. The state's board is empty here —
+    // `beginRun()` hydrates it from `UIScene.create()`, two scenes after this —
+    // so deriving the list from `ctx.state.items` (as this did) produced an
+    // empty set on every single boot and quietly moved the entire cost into
+    // gameplay. `savedDragonClips` reads the persisted board instead, for the
+    // world the save actually resumes in.
+    for (const id of savedDragonClips(ctx.systems.save.peek(), WORLD_ID)) {
       for (const [clipId, clip] of Object.entries(clipsFor(id))) {
         if (this.textures.exists(clipKey(id, clipId))) continue;
         this.load.spritesheet(clipKey(id, clipId), clip.file, {
@@ -210,18 +237,6 @@ export class PreloadScene extends Phaser.Scene {
     // game's existing fx_ember / fx_spark / fx_glow beats. The sheets they need
     // are already in SHIPPED above.
     preloadEmitterAssets(this.load, BANK_BASE, { sheets: false });
-    // UI Builder uploads (ui-theme.json `assets`, self-contained data URLs).
-    for (const [name, uri] of Object.entries(uiRegistry.doc.assets)) {
-      if (!this.textures.exists(uploadKey(name))) this.load.image(uploadKey(name), uri);
-    }
-    // UI Builder PNG-sequence animations — every frame as its own texture, so
-    // `anim` layers in custom components play in dev, preview and production.
-    for (const [name, seq] of Object.entries(uiRegistry.doc.sequences)) {
-      seq.frames.forEach((uri, i) => {
-        const key = sequenceFrameKey(name, i);
-        if (!this.textures.exists(key)) this.load.image(key, uri);
-      });
-    }
     // Built-in (guide/character) sequences are FILE-backed. The editor preloads ALL of
     // them so the Animations rail is instantly draggable; the game loads only
     // the banks a saved component actually references (they're heavy).
@@ -239,8 +254,37 @@ export class PreloadScene extends Phaser.Scene {
     // Saved art replacements repaint generated textures IN PLACE before any
     // scene builds objects — consumers get the new art with zero object churn.
     applyUiReplacements(this);
-    // The UI Builder boots into its own document scene — the game NEVER runs.
     const uiedit = new URLSearchParams(window.location.search).has('uiedit');
-    this.scene.start(uiedit ? SCENES.uiEditor : SCENES.title);
+    if (uiedit) {
+      // The UI Builder boots into its own document scene — the game NEVER runs,
+      // so there is no title to race and no reason to defer anything.
+      this.queueBoardArt();
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.scene.start(SCENES.uiEditor));
+      this.load.start();
+      return;
+    }
+
+    // The title is ready NOW — it draws its own button and its art is in the DOM.
+    // `launch`, not `start`: this scene must stay alive to own the loader that is
+    // still running. It is stopped once the board has what it needs.
+    this.scene.launch(SCENES.title);
+
+    this.queueBoardArt();
+    let announced = false;
+    const done = (): void => {
+      if (announced) return;
+      announced = true;
+      this.game.registry.set(BOARD_ART_READY, true);
+      this.game.events.emit(BOARD_ART_READY);
+      this.scene.stop();
+    };
+    this.load.on('progress', (value: number) => this.game.events.emit(BOARD_ART_PROGRESS, value));
+    this.load.once(Phaser.Loader.Events.COMPLETE, done);
+    this.load.start();
+    // An empty queue completes INSIDE `start()`, before the handler above can be
+    // reached on some paths (every texture already resident — a restart, or a
+    // build with no file-backed art). Belt and braces, made idempotent by
+    // `announced` so the ordinary path cannot fire it twice.
+    if (this.load.totalToLoad === 0) done();
   }
 }

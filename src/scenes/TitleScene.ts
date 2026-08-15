@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, PALETTE, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
+import { BOARD_ART_READY } from './PreloadScene';
 
 
 /**
@@ -99,8 +100,16 @@ export class TitleScene extends Phaser.Scene {
     play.on('pointerup', () => {
       play.disableInteractive();
       this.cameras.main.fadeOut(260, 36, 27, 34);
+      // The board art now downloads BEHIND this screen (PreloadScene.create), so
+      // Play can be tapped before it has all landed. Fade out on the tap either
+      // way — the response is immediate and the button never feels dead — but
+      // hold the scene switch until the textures are resident. Entering a world
+      // whose art has not arrived is what `queueBoardArt` trades away, and this
+      // is the guard that makes the trade safe.
+      //
+      // On a warm cache both are already true and this is one frame.
       this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-        this.scene.start(SCENES.board);
+        this.whenBoardArtReady(() => this.scene.start(SCENES.board));
       });
     });
     // Spring-in: visible the whole time (alpha 1), only the scale pops. Then a
@@ -126,5 +135,35 @@ export class TitleScene extends Phaser.Scene {
     });
 
     this.cameras.main.fadeIn(300, 36, 27, 34);
+  }
+
+  /**
+   * Run `then` once the board's textures are resident — immediately if they
+   * already are.
+   *
+   * Deliberately NOT a gate on the button: Play stays visible and interactive
+   * from the first frame (a GPU stutter must never be able to leave it dead, and
+   * the e2e run taps it at a fixed position), so the wait happens after the tap,
+   * under the fade, where it reads as loading rather than as an unresponsive
+   * screen.
+   */
+  private whenBoardArtReady(then: () => void): void {
+    if (this.game.registry.get(BOARD_ART_READY) === true) {
+      then();
+      return;
+    }
+    // A dot crawl under where the button was, so a slow connection shows
+    // something moving rather than a black screen. It lives on the camera that
+    // is fading out, so it inherits the fade and needs no teardown of its own.
+    const wait = this.add
+      .text(LIVE_GAME_WIDTH / 2, Math.round(LIVE_GAME_HEIGHT * 0.8375) + 180, 'stoking the ember…', {
+        fontFamily: FONT.ui,
+        fontSize: '44px',
+        color: PALETTE.cream
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+    this.tweens.add({ targets: wait, alpha: 0.85, duration: 240 });
+    this.game.events.once(BOARD_ART_READY, then);
   }
 }

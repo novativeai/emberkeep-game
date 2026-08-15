@@ -61,6 +61,14 @@ export interface GraphicsProfile {
   ambient: number;
   /** Frame-rate cap while the player is active. */
   activeFps: number;
+  /**
+   * How much DECODED dragon-clip texture the board may keep resident, in MB.
+   * Breeds past this are released oldest-first once they leave the board
+   * (`src/core/clipResidency.ts`). One breed is 40–130 MB, so this is the
+   * difference between a long session and a killed tab — it is a budget for
+   * what is KEPT, never a cap on what may be shown.
+   */
+  clipBudgetMb: number;
 }
 
 /**
@@ -77,7 +85,8 @@ export const GRAPHICS_PROFILES: Record<GraphicsTier, GraphicsProfile> = {
     weather: true,
     crystal3d: true,
     ambient: 1,
-    activeFps: 62
+    activeFps: 62,
+    clipBudgetMb: 640
   },
   balanced: {
     label: 'Balanced',
@@ -88,7 +97,8 @@ export const GRAPHICS_PROFILES: Record<GraphicsTier, GraphicsProfile> = {
     weather: true,
     crystal3d: true,
     ambient: 0.6,
-    activeFps: 62
+    activeFps: 62,
+    clipBudgetMb: 320
   },
   low: {
     label: 'Low',
@@ -99,7 +109,8 @@ export const GRAPHICS_PROFILES: Record<GraphicsTier, GraphicsProfile> = {
     weather: false,
     crystal3d: false,
     ambient: 0.25,
-    activeFps: 30
+    activeFps: 30,
+    clipBudgetMb: 160
   }
 };
 
