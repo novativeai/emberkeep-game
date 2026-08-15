@@ -39,21 +39,6 @@ const RING_HOLE_RADIUS = RING_SIZE * (200 / 512);
 /** A static speaker's disc (the Golden Elder, Selyna) fits INSIDE the hole like
  *  a medallion photo — the fully-contained treatment. */
 const STATIC_DISC_SIZE = RING_SIZE * 0.98;
-/**
- * Stand-in ring art for a speaker with no `portrait_<id>` texture of its own.
- *
- * Without an entry here the ring kept whatever sheet the LAST speaker mounted,
- * and the mismatch broke the frame rather than merely showing the wrong face:
- * `layout` branches on the mounted texture's key, so Eleanor's `eleanor_disc`
- * took the split (bottom-anchored, bust-scaled, shifted a half-height DOWN)
- * treatment while `setSpeakerArt` had already centre-origined it and dropped
- * the circular mask — so her bust drew at full size, below the hole, with
- * nothing clipping it. That is what the Golden Elder's finale lines showed.
- * He IS the golden dragon, so his own reveal plate is the honest medallion.
- */
-const STATIC_PORTRAIT_ART: Record<string, string> = {
-  golden_elder: 'reveal_golden_adult'
-};
 /** Align-Studio PORTRAIT clips (character-anims.json, stage 'portrait') get
  *  the SAME split treatment the guide's disc has — body copy masked BEHIND the
  *  ring band, head copy (cropped at the neck) drawn ABOVE it — with per-
@@ -413,13 +398,25 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.portrait.setMask(this.portraitMask);
   }
 
-  /** The ring art for a speaker with no disc/clip animation: its own painted
-   *  portrait if one exists, else its authored stand-in, else nothing. */
+  /**
+   * The ring art for a speaker whose animation has not landed: its own painted
+   * bust, or nothing.
+   *
+   * "Or nothing" is deliberate — an EMPTY ring beats the last speaker's sheet
+   * left mounted, which broke the frame rather than merely showing the wrong
+   * face: `layout` branches on the mounted texture's key, so a stale
+   * `eleanor_disc` took the split (bottom-anchored, bust-scaled, shifted a
+   * half-height DOWN) treatment while `setSpeakerArt` had already
+   * centre-origined it and dropped the circular mask.
+   *
+   * The Golden Elder used to be routed here to her full-body REVEAL plate, for
+   * want of a bust of her own — a whole standing dragon, wings out, inside a
+   * 300px medallion hole. She has a bust now (`portrait_golden_elder`), so
+   * every speaker resolves by name and the stand-in table is gone.
+   */
   private staticPortraitKey(speaker: string): string | null {
     const own = `portrait_${speaker}`;
-    if (this.scene.textures.exists(own)) return own;
-    const standIn = STATIC_PORTRAIT_ART[speaker];
-    return standIn && this.scene.textures.exists(standIn) ? standIn : null;
+    return this.scene.textures.exists(own) ? own : null;
   }
 
   /**

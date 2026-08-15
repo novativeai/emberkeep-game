@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import charactersDoc from '../../src/data/characters.json';
+import { SPEAKER_NAMES } from '../../src/core/Constants';
 import { ZONES } from '../../src/core/world';
 import {
   CHARACTER_ANIMS,
@@ -53,6 +54,16 @@ describe('character-anims.json', () => {
       if (c.board) continue; // board dragons (redwhelp, redadult…), not world characters
       if (Object.values(c.clips).every((clip) => clip.stage === 'decor')) {
         expect(props.has(id), `${id} is not placed as map decor by any world`).toBe(true);
+        continue;
+      }
+      // A set that is ONLY portrait clips is never placed anywhere — it is the
+      // dialogue ring's, and CharacterBubble looks it up by SPEAKER id (the
+      // Golden Elder's talking head). Same rule, third roster: a bust filed
+      // under a name nobody can speak as is exactly as unshowable as the
+      // others, and `SPEAKER_NAMES` is the table every surface prints from.
+      if (Object.values(c.clips).every((clip) => clip.stage === 'portrait')) {
+        expect(id in SPEAKER_NAMES, `${id} is a portrait-only set but not a speaker`).toBe(true);
+        expect(c.portrait, `${id}: portrait clips need a portraitView to frame them`).toBeTruthy();
         continue;
       }
       expect(wardrobe.has(id), `${id} is not worn by anyone in characters.json`).toBe(true);

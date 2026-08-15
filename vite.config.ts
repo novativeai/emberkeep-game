@@ -892,6 +892,10 @@ const copyRuntimeArt = (): Plugin => ({
       'sprites/items/emerald-egg',
       'sprites/items/key', //  icon_key_bronze / ui_icon_key use key-icon
       'sprites/items/stone',
+      // The Elder's old 412x412 medallion crop. `portrait_golden_elder` is the
+      // re-framed bust beside it (portrait-bust.webp), which is also what her
+      // ring clips are drawn on; nothing has referenced this one since.
+      'sprites/golden-elder/portrait.webp',
       'sprites/characters/dragon/golden-dragon/golden-egg', // items/golden-egg.webp ships
       'sprites/characters/dragon/golden-dragon/golden-egg-sunset',
       'map', //  World Builder project files — the game reads src/data/map.json

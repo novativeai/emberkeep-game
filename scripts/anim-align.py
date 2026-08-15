@@ -153,6 +153,17 @@ def rig_reference_box(root: Path, ref: dict) -> dict:
     }
 
 
+def box_reference(root: Path, ref: dict) -> dict:
+    """A reference the caller already solved: a literal game-px box.
+
+    Used by PORTRAIT-ONLY characters, whose clips are never placed on the board
+    at all — `CharacterBubble` seats them from `portraitView` and ignores the
+    transform. apply-anim-align.mjs computes the box from that same view, so
+    there is nothing here to measure off an image.
+    """
+    return {k: float(ref[k]) for k in ('left', 'top', 'right', 'bottom')}
+
+
 def align_clip(meta: dict, box: tuple, target: dict, mode: str) -> dict:
     """Solve {scale, dx, dy} so the probe frame's content lands on `target`
     (a game-px box relative to the anchor)."""
@@ -187,6 +198,7 @@ REFERENCE_BOX = {
     'sprite': sprite_reference_box,
     'rig': rig_reference_box,
     'item': item_reference_box,
+    'box': box_reference,
 }
 
 

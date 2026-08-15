@@ -7,7 +7,7 @@ import { savedDragonClips } from '../core/clipResidency';
 import { SCENES, STANDEE_BANKS, WORLD_ID } from '../core/Constants';
 import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
 import { liveCrystalAvailable } from '../core/graphicsState';
-import type { AssetEntry } from '../core/types';
+import type { AssetEntry, SpeakerId } from '../core/types';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
 import { ANIMATED_SPEAKERS, discTextureFor } from '../entities/PortraitAnimator';
@@ -49,6 +49,9 @@ export const BOARD_ART_READY = 'bootload:ready';
 export const BOARD_ART_PROGRESS = 'bootload:progress';
 /** Fired on `game.events` once the streamed `play` wave has finished landing too. */
 export const PLAY_ART_READY = 'bootload:play_ready';
+
+/** The one dialogue speaker who is not a map character — see the fetch below. */
+const ELDER_SPEAKER: SpeakerId = 'golden_elder';
 
 /** Files per streamed batch, and the breather between batches. Small on purpose:
  *  the cost of the play wave is the texture UPLOAD, and spreading those out is
@@ -225,6 +228,26 @@ export class PreloadScene extends Phaser.Scene {
         };
         if (clipId === 'idle') this.load.spritesheet(sheet.key, sheet.file, sheet);
         else playSheets.push(sheet);
+      }
+    }
+    // The Golden Elder's DIALOGUE BUST. She is the one speaker the loop above
+    // cannot reach: `characters.json` lists who stands on a MAP, and she is an
+    // altar fixture whose talking head only ever appears in the bubble's ring.
+    //
+    // Home world only, and deferred. She never speaks anywhere else — both
+    // `UIScene.sayElderAsk` and `onElderQuestCompleted` return early off-world,
+    // and Borealis does not open until her awakening quest is already done —
+    // so a Borealis boot would be paying 3 MB for a ring she cannot fill. The
+    // ring degrades to `portrait_golden_elder`, her still bust, until they land.
+    if (ctx.state.worldId === WORLD_ID) {
+      for (const [clipId, clip] of Object.entries(clipsFor(ELDER_SPEAKER))) {
+        if (this.textures.exists(clipKey(ELDER_SPEAKER, clipId))) continue;
+        playSheets.push({
+          key: clipKey(ELDER_SPEAKER, clipId),
+          file: clip.file,
+          frameWidth: clip.frameWidth,
+          frameHeight: clip.frameHeight
+        });
       }
     }
     // Map-decor clips — Runevault's boiling cauldron. A decor piece's clips live

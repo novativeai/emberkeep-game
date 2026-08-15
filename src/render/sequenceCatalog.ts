@@ -135,7 +135,17 @@ export const BUILTIN_SEQUENCES: BuiltinSequence[] = [
     endIdle: 'sprites/selyna-merge/rest.webp',
     loop: true
   },
-  // The Golden Elder. Unlike Eleanor and Selyna, her talk bank is NOT a
+  // The Golden Elder, for the UI BUILDER's Animations rail only.
+  //
+  // Her DIALOGUE BUBBLE no longer comes through here: the ring plays the
+  // `golden_elder` portrait clips in character-anims.json, which are drawn on a
+  // re-framed bust with the horns the old crop cut off (see
+  // scripts/gen-elder-portrait.py). These four-pose banks stay because a saved
+  // theme may reference them by key and because the rail is a different
+  // surface — but they are the OLD framing, and a component built on them will
+  // not match the ring.
+  //
+  // Unlike Eleanor and Selyna, her talk bank is NOT a
   // phrase-specific viseme track — a dragon muzzle has no lip shapes to read, so
   // it is a generic jaw cycle (small → mid → wide → mid) that loops for as long
   // as a line is on screen, the same approach as the red dragon's roar_talk head

@@ -86,6 +86,34 @@ const ROSTER = {
     // Bust framing, same treatment as Eleanor's; neck-line at her choker.
     portraitView: { height: 380, dy: -172, headCrop: 0.55 }
   },
+  golden_elder: {
+    label: 'Golden Elder (dialogue bust)',
+    rawDir: `${RAW_BASE}/golden_elder_atlasses`,
+    // PORTRAIT-ONLY, and the first of its kind in this roster. `golden_adult`
+    // further down is the same dragon as an ALTAR FIXTURE — a whole animal on
+    // a tile. This entry is her talking head, and the two never share a clip:
+    // she has no board key, no rig and no standee, because a bust is never
+    // placed on the board at all.
+    //
+    // Her banks are pose composites rather than wan footage
+    // (scripts/gen-elder-portrait.py): five `edit` cells off one plate, each
+    // swapped into the rest pose through a feathered ellipse so every frame is
+    // byte-identical outside the eyes or the muzzle. If she is ever re-shot as
+    // video, `ingest golden_elder talking <mp4> --write` replaces the sheets
+    // without touching a line of runtime.
+    portraitOnly: true,
+    modes: { talking: 'top', blinking: 'top' },
+    clipInfo: {
+      blinking: { stage: 'portrait', trigger: 'bubble ring at rest — the loop between her lines', loop: true },
+      talking: { stage: 'portrait', trigger: 'bubble ring while her line shows', loop: true }
+    },
+    // Measured, not guessed: `headCrop` must fall on a row where her silhouette
+    // fits INSIDE the ring's circular mask, or the horn that the head copy
+    // draws in full steps against the body copy the mask has already trimmed.
+    // At height 420 / dy -190 the feasible band is 0.469..0.708; 0.58 sits in
+    // the middle of it, with her chin on the band and both horns clear of it.
+    portraitView: { height: 420, dy: -190, headCrop: 0.58 }
+  },
   redwhelp: {
     label: 'Ember Dragon (red whelp)',
     rawDir: `${RAW_BASE}/dragon_atlasses`,
@@ -434,7 +462,37 @@ function itemReference(root, entry, C) {
   };
 }
 
+/**
+ * The reference for a PORTRAIT-ONLY character: the ring framing itself.
+ *
+ * Every other character registers against something the board draws — a rig's
+ * rest pose, a standee's feet, an item's art. A dialogue bust is drawn by
+ * `CharacterBubble.layout`, which ignores the clip's transform entirely and
+ * places the frame from `portraitView` (whole frame at `height` display px,
+ * crown at ring centre + `dy`). So the transform this produces is never used to
+ * POSITION anything; it exists so `applyAnimAlign` knows how big the clip is
+ * drawn and can decide whether the sheet is oversampled.
+ *
+ * Which makes the honest reference the framing the bust was authored for. The
+ * box is the frame's own footprint at that framing, taken from the atlas — and
+ * because `align_clip` fits CONTENT to the box, the scale it solves comes back
+ * a hair large (content is narrower than the frame by its margin). That is the
+ * safe direction: `max(t.scale, ringScale)` is what staging consumes, so an
+ * over-estimate can only ever ship the sheet at full size.
+ */
+function ringReference(root, entry) {
+  const atlas = readAtlas(root, entry);
+  const clip = Object.entries(atlas?.animations ?? {}).find(
+    ([id]) => entry.clipInfo?.[id]?.stage === 'portrait'
+  )?.[1];
+  if (!clip) throw new Error(`${entry.label}: portraitOnly, but no portrait-stage clip in ${entry.rawDir}`);
+  const { height, dy } = entry.portraitView;
+  const halfWidth = ((clip.frameWidth / clip.frameHeight) * height) / 2;
+  return { kind: 'box', left: -halfWidth, right: halfWidth, top: dy, bottom: dy + height };
+}
+
 function referenceOf(root, id, entry, C) {
+  if (entry.portraitOnly) return ringReference(root, entry);
   if (entry.item) return itemReference(root, entry, C);
   if (entry.standee) {
     const bank = C.STANDEE_BANKS[entry.standee];

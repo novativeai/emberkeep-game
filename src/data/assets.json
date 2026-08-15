@@ -300,6 +300,12 @@
       "file": "sprites/ui/portrait-ring.webp"
     },
     {
+      "key": "portrait_golden_elder",
+      "source": "file",
+      "generator": "portrait",
+      "file": "sprites/golden-elder/portrait-bust.webp"
+    },
+    {
       "key": "ui_tile_highlight",
       "source": "placeholder",
       "generator": "ui",

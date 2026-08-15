@@ -62,6 +62,15 @@ ADULT_FOOTER = (
     'The whole dragon stays fully inside the frame, nothing cut off. '
     'Static locked-off camera, no camera movement. The background stays still.'
 )
+PORTRAIT_FOOTER = (
+    'This is a close bust portrait: only the head, neck and upper chest are in '
+    'shot, and the chest runs off the bottom edge of the frame. The head stays '
+    'exactly where it is in the frame at exactly the same size — it must not '
+    'drift up, down or sideways, and must never touch or cross the top or side '
+    'edges. No shoulders, arms, wings, hands or body appear. '
+    'Static locked-off camera, no camera movement, no zoom. The flat background '
+    'stays completely empty and untouched.'
+)
 
 CLIPS = {
     'baby': {
@@ -113,6 +122,44 @@ CLIPS = {
                 'The background stays still.'
             )
         }
+    },
+    # ---- DIALOGUE BUST (the ring, not the board) -----------------------------
+    # A different problem from every stage above: the subject is a head and a
+    # neck at conversational distance, and the frame it is animated in IS the
+    # frame the ring mounts. Nothing may grow into headroom, because there is no
+    # headroom to grow into — `portraitView` fixes the framing and a bust that
+    # rises mid-clip swims inside the ring window.
+    #
+    # Two clips, matching what CharacterBubble asks every animated speaker for:
+    # `blinking` is the rest loop it settles into, `talking` is what plays while
+    # a line is on screen. A dragon muzzle has no visemes to read, so talking is
+    # a JAW CYCLE — the same reasoning sequenceCatalog.ts records for her old
+    # four-pose bank, now carried by real footage instead of three composites.
+    'portrait': {
+        'blinking': {
+            'duration': 4,
+            'prompt': (
+                'The dragon is at rest, listening. She breathes slowly and '
+                'evenly, her neck and chest rising and falling a little. Her '
+                'head drifts a few degrees and settles. She blinks twice, '
+                'unhurried. Her mouth stays CLOSED the whole time — no teeth, '
+                'no jaw movement. Calm and ancient, not aggressive. '
+                f'{PORTRAIT_FOOTER}'
+            )
+        },
+        'talking': {
+            'duration': 3,
+            'prompt': (
+                'The dragon is speaking. Her lower jaw opens and closes in a '
+                'steady, continuous rhythm as she talks — small, then wide, '
+                'then small again, over and over, never stopping and never '
+                'holding still. Her head tilts and nods slightly with the '
+                'words and she blinks once. Calm and ancient, addressing '
+                'someone in front of her; she is talking, not roaring, so the '
+                'jaw never gapes fully open and the lips never pull back into '
+                f'a snarl. {PORTRAIT_FOOTER}'
+            )
+        }
     }
 }
 
@@ -140,7 +187,12 @@ PLATE_STAGES = {
     'ashglass_baby': 'baby',
     'ashglass_adult': 'adult',
     'porcelain_baby': 'baby',
-    'porcelain_adult': 'adult'
+    'porcelain_adult': 'adult',
+    # The Golden Elder AGAIN, but as a talking head rather than an animal: her
+    # `golden_adult` plate above is the altar fixture, this one is the dialogue
+    # bust (scripts/gen-elder-portrait.py). Same dragon, different stage, and
+    # the two never share a clip — hence a plate of its own.
+    'golden_elder': 'portrait'
 }
 
 
