@@ -146,6 +146,31 @@ describe('a reload rebuilds each world onto its own board', () => {
     expect(read(storage).version).toBe(SAVE_VERSION);
     expect(ctxWith(storage).systems.save.peek()).not.toBeNull();
   });
+  it('puts every piece back on the exact cell it was saved on', () => {
+    // The drift question, asked directly: same build, same geometry, no
+    // damage — a reload must be a NO-OP for positions. Superposition and
+    // id-set checks above cannot see a piece that merely slid one cell.
+    const storage = new MemoryStorage();
+    const ctx = travelledNorth(storage);
+    const cells = new Map<string, string>();
+    for (const worldId of ctx.state.worlds.keys()) {
+      for (const item of ctx.state.itemsIn(worldId)?.values() ?? []) {
+        cells.set(`${worldId}#${item.id}`, `${item.col},${item.row}`);
+      }
+    }
+    expect(cells.size).toBeGreaterThan(0);
+
+    const fresh = ctxWith(storage);
+    fresh.beginRun();
+    for (const worldId of fresh.state.worlds.keys()) {
+      for (const item of fresh.state.itemsIn(worldId)?.values() ?? []) {
+        expect(
+          cells.get(`${worldId}#${item.id}`),
+          `item ${item.chain}:${item.tier} #${item.id} on ${worldId} drifted`
+        ).toBe(`${item.col},${item.row}`);
+      }
+    }
+  });
 });
 
 /**
