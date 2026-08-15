@@ -10,7 +10,7 @@
  * it — and that is exactly the channel `POWER_STATE_EVENT` already uses for the
  * same kind of signal.
  */
-import { IS_IOS, IS_LOW_END } from './Constants';
+import { IS_IOS, IS_LOW_END, IS_MOBILE } from './Constants';
 import {
   GRAPHICS_PROFILES,
   detectTier,
@@ -93,7 +93,21 @@ export { GRAPHICS_PROFILES };
  * the boot path of a device that will never use it.
  */
 export function liveCrystalAvailable(): boolean {
-  // iOS Safari's renderer process crashes under a SECOND live WebGL context plus
-  // its per-frame GPU→CPU readback; the `low` profile declines it on cost.
-  return graphics.profile.crystal3d && !IS_IOS;
+  // NO TOUCH DEVICE runs it, whatever tier it resolved to or the player picked.
+  //
+  // Tier alone was not enough: a strong Android (8 GB, 8 cores) resolves to
+  // `high`, and the quality setting lets anyone choose `high` by hand on a
+  // phone — either route put a second WebGL context, with MSAA and
+  // preserveDrawingBuffer, on hardware that cannot afford one. iOS crashes its
+  // renderer process outright; Android survives it and pays in a pipeline stall
+  // instead, because a GPU→CPU readback every 33 ms is the one thing a tiled
+  // mobile GPU with unified memory is worst at. The baked sheet is the same 90°
+  // loop at the same cadence, so there is nothing to weigh.
+  //
+  // `IS_MOBILE` is the touch heuristic, so a touchscreen LAPTOP is a false
+  // positive here. That is the right way to be wrong: it loses a spin it would
+  // have rendered fine and gains a 105 KB smaller bundle, where guessing the
+  // other way risks the crash on every device that actually is a phone. It is
+  // also the same signal GameConfig already trusts to pick a backing floor.
+  return graphics.profile.crystal3d && !IS_IOS && !IS_MOBILE;
 }

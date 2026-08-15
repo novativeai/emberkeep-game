@@ -163,3 +163,38 @@ describe('cappedTier', () => {
     expect(cappedTier('off', 'high')).toBe('off');
   });
 });
+
+/**
+ * The live three.js gem is a DESKTOP-`high` luxury, and that is a device-class
+ * promise rather than a tuning preference — a second WebGL context with MSAA and
+ * `preserveDrawingBuffer`, readback and all, is what crashed iOS's renderer
+ * process and what stalls a tiled mobile GPU. `liveCrystalAvailable` is the only
+ * gate, so these are the cases it has to keep answering correctly.
+ */
+describe('only a desktop at `high` renders the live crystal', () => {
+  it('`balanced` plays the baked sheet — that is the whole IS_LOW_END band', () => {
+    // detectTier sends <=4 GB / <=4 cores here, and it was running the live gem
+    // at 62 fps until this flipped.
+    expect(GRAPHICS_PROFILES.balanced.crystal3d).toBe(false);
+  });
+
+  it('`high` is the ONLY profile that still asks for it', () => {
+    const asking = (Object.keys(GRAPHICS_PROFILES) as GraphicsTier[]).filter(
+      (t) => GRAPHICS_PROFILES[t].crystal3d
+    );
+    expect(asking).toEqual(['high']);
+  });
+
+  it('a strong phone still resolves to a tier that would ask for it', () => {
+    // The reason the runtime gate cannot be tier alone: an 8 GB / 8-core Android
+    // is `high` by every signal a browser exposes, and a player may pick `high`
+    // by hand on any device. Both routes reach a profile with crystal3d true —
+    // `liveCrystalAvailable`'s IS_MOBILE term is what stops them, and this test
+    // exists so that term is never mistaken for redundant.
+    expect(detectTier({ deviceMemory: 8, hardwareConcurrency: 8 }).valueOf()).toBe('high');
+    expect(GRAPHICS_PROFILES[detectTier({ deviceMemory: 8, hardwareConcurrency: 8 })].crystal3d).toBe(
+      true
+    );
+    expect(profileFor('high', { lowEnd: true }).crystal3d).toBe(true);
+  });
+});
