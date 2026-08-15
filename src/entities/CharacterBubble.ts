@@ -1,11 +1,24 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { CHARACTER_ANIMS, type CharacterClip, clipFor, clipKey, type PortraitView } from '../core/characterAnims';
-import { IS_MOBILE, num, PALETTE, PORTRAIT_CLIP_TALK, SPEAKER_NAMES, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
+import {
+  BUBBLE_BOTTOM,
+  BUBBLE_DODGE_TOP_Y,
+  IS_MOBILE,
+  LIVE_GAME_HEIGHT,
+  num,
+  PALETTE,
+  PORTRAIT_CLIP_TALK,
+  SPEAKER_NAMES,
+  STORY_BEAT_HOLD_MS,
+  TIMINGS
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { SpeakerId, TutorialStepEvent } from '../core/types';
 import {
   ANIMATED_SPEAKER,
+  DISC_FRAME,
+  discFileFor,
   discTextureFor,
   ELEANOR_DISC_TEXTURE,
   type Expression,
@@ -104,6 +117,10 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   private sayTimer: Phaser.Time.TimerEvent | null = null;
   /** Who is currently standing in the ring — drives the crossfade on handoff. */
   private artSpeaker = '';
+  /** Disc atlases already asked for on demand — one fetch per speaker. */
+  private discFetched = new Set<string>();
+  /** MOBILE: docked at the top, clear of a bottom-band tutorial target. */
+  private dockedTop = false;
   /** A post-tutorial chapter run: tap-advanced lines from one speaker. Empty
    *  when no run is playing, which is also how the tap handler tells the two
    *  modes apart. */
@@ -332,6 +349,22 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.portraitMaskG.setScale(this.scaleX, this.scaleY);
   }
 
+  /**
+   * MOBILE: slide clear of a tutorial target in the bottom band — the coach
+   * must never cover the thing she is pointing at (UIScene decides WHEN, from
+   * the live arrow target; this only moves). Slides home when the band clears.
+   */
+  dodge(top: boolean): void {
+    if (!IS_MOBILE || this.dockedTop === top) return;
+    this.dockedTop = top;
+    this.scene.tweens.add({
+      targets: this,
+      y: top ? BUBBLE_DODGE_TOP_Y : LIVE_GAME_HEIGHT - BUBBLE_BOTTOM,
+      duration: 340,
+      ease: 'Sine.easeInOut'
+    });
+  }
+
   /** A speaker's baked disc spritesheet is loaded and sliced into frames. */
   private hasDiscSheet(speaker: string = ANIMATED_SPEAKER): boolean {
     const key = discTextureFor(speaker);
@@ -358,6 +391,15 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     }
     if (this.trySetAtlasPortrait(speaker, text)) return;
     this.stopAtlasPortrait();
+    // Discs are fetched per-world (boot takes the active world's, travel takes
+    // the destination's — see PreloadScene / fetchWorldArt). A cross-world
+    // line that beats both is backfilled here: still portrait for THIS line,
+    // the breathing puppet from the next one on.
+    if (isAnimatedSpeaker(speaker) && !this.hasDiscSheet(speaker) && !this.discFetched.has(speaker)) {
+      this.discFetched.add(speaker);
+      this.scene.load.spritesheet(discTextureFor(speaker), discFileFor(speaker), DISC_FRAME);
+      this.scene.load.start();
+    }
     if (isAnimatedSpeaker(speaker) && this.hasDiscSheet(speaker)) {
       const disc = discTextureFor(speaker);
       if (this.portrait.texture.key !== disc) this.portrait.setTexture(disc, 0);

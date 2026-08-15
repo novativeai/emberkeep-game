@@ -17,6 +17,7 @@
  * Phaser-free on purpose (like worldArt.ts): the rules here are unit-testable
  * in node, and the scenes only spend a couple of lines on the Phaser calls.
  */
+import { IS_LOW_END } from './Constants';
 import characterAnimsJson from '../data/character-anims.json';
 import sleepFramesJson from '../data/sleep-frames.json';
 
@@ -90,7 +91,38 @@ export interface CharacterAnimsData {
   characters: Record<string, CharacterAnimEntry>;
 }
 
-export const CHARACTER_ANIMS: CharacterAnimsData = characterAnimsJson as CharacterAnimsData;
+/**
+ * LOW-END: every clip presents at HALF resolution. The record here and the
+ * texture in the loader (core/lowend.ts shrinks `canim_` sheets as they land)
+ * halve TOGETHER, which keeps every consumer honest by construction: display
+ * size is frameWidth×scale (unchanged), origins divide dx by frameWidth×scale
+ * (unchanged), and texture-space hit rects divide by scale (halved, matching
+ * the halved texture). dx/dy are game-space registrations and do not move.
+ *
+ * This is the piece the field crash demanded: a red whelp's four sheets are
+ * ~109 MB decoded at full res — by the codex tutorial beat they sat on top of
+ * everything else and pushed iOS past its ceiling. Halved, the same set is
+ * ~27 MB and the beat fits the budget (IOS_TEXTURE_BUDGET_MB).
+ */
+function halveForLowEnd(data: CharacterAnimsData): CharacterAnimsData {
+  if (!IS_LOW_END) return data;
+  const characters: CharacterAnimsData['characters'] = {};
+  for (const [id, entry] of Object.entries(data.characters)) {
+    const clips: Record<string, CharacterClip> = {};
+    for (const [cid, c] of Object.entries(entry.clips)) {
+      clips[cid] = {
+        ...c,
+        frameWidth: Math.floor(c.frameWidth / 2),
+        frameHeight: Math.floor(c.frameHeight / 2),
+        scale: c.scale * 2
+      };
+    }
+    characters[id] = { ...entry, clips };
+  }
+  return { ...data, characters };
+}
+
+export const CHARACTER_ANIMS: CharacterAnimsData = halveForLowEnd(characterAnimsJson as CharacterAnimsData);
 
 /** The staged clip for a character, or null — callers degrade, never block. */
 export function clipFor(characterId: string, clipId: string, data: CharacterAnimsData = CHARACTER_ANIMS): CharacterClip | null {

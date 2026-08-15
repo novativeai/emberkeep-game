@@ -71,6 +71,8 @@ import {
   sleepFrameFor
 } from '../core/characterAnims';
 import { gridToWorld, worldToGrid } from '../core/iso';
+import { armLowEndShrink, shrunkArtScale } from '../core/lowend';
+import { DISC_FRAME, discFileFor, discTextureFor, isAnimatedSpeaker } from '../entities/PortraitAnimator';
 import { ensureTextures } from '../core/lazyTextures';
 import { isDragonClipCharacter, planClipEviction, releaseClips } from '../core/clipResidency';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
@@ -407,6 +409,7 @@ export class BoardScene extends Phaser.Scene {
 
   create(): void {
     this.ctx = this.registry.get('ctx') as GameContext;
+    armLowEndShrink(this); // owned-skin fetches ride this scene's loader
     // Point the ambient `gridToWorld`/`worldToGrid` at the world being shown, so
     // every call site below projects through the ZONE that owns each address.
     // GameState already does this on construction and on each switch; the scene
@@ -1748,7 +1751,7 @@ export class BoardScene extends Phaser.Scene {
     const standKey = `item_${ld.host.chain}_${ld.host.tier}`;
     if (this.textures.exists(standKey)) {
       ld.host.setArtTexture(standKey, this.ctx.data.anchors);
-      ld.host.setArtScale(ITEM_SCALE[`${ld.host.chain}_${ld.host.tier}`] ?? 1);
+      ld.host.setArtScale((ITEM_SCALE[`${ld.host.chain}_${ld.host.tier}`] ?? 1) * shrunkArtScale(standKey));
     }
     ld.host.setArtVisible(false);
     ld.shadow.setVisible(true);
@@ -3437,7 +3440,14 @@ export class BoardScene extends Phaser.Scene {
       const key = `item_${c.chain}_${c.adult ? 4 : 3}`;
       if (!this.textures.exists(key)) continue;
       const { x, y } = gridToWorld(c.col, c.row);
-      const sprite = this.add.image(x, y, key).setOrigin(0.5, 0.85).setDepth(DEPTHS.itemBase + y);
+      const sprite = this.add
+        .image(x, y, key)
+        .setOrigin(0.5, 0.85)
+        // Companions size themselves off native texture dimensions, so the
+        // low-end half-res item diet needs its compensation here too. The hit
+        // rectangle below is in LOCAL texture space and needs none.
+        .setScale(shrunkArtScale(key))
+        .setDepth(DEPTHS.itemBase + y);
       const hw = sprite.width;
       const hh = sprite.height;
       // Same trap as the world characters: a tall sprite anchored to one cell
@@ -5035,11 +5045,26 @@ export class BoardScene extends Phaser.Scene {
     for (const [id, sprite] of this.itemSprites) {
       const item = this.ctx.state.items.get(id);
       if (!item || item.chain !== chain || !wants(item)) continue;
-      sprite.setArtTexture(
-        this.textureFor(this.ctx.state.snapshot(item, this.ctx.clock.now())),
-        this.ctx.data.anchors
-      );
+      const snap = this.ctx.state.snapshot(item, this.ctx.clock.now());
+      const tex = this.textureFor(snap);
+      sprite.setArtTexture(tex, this.ctx.data.anchors);
+      // A skin plate is never shrunk but the item art it replaces may be — the
+      // swap must re-derive the scale for the texture ACTUALLY worn, both ways.
+      sprite.setArtScale(this.artScaleFor(snap, tex));
     }
+  }
+
+  /** The display scale a piece's CURRENT texture wants: the authored art scale
+   *  times the low-end shrink compensation for that texture (core/lowend.ts). */
+  private artScaleFor(snap: ItemSnapshot, tex: string): number {
+    const authored =
+      snap.kind === 'decor'
+        ? (DECOR_SCALE[snap.chain] ?? 1)
+        : (ITEM_SCALE[`${snap.chain}_${snap.tier}`] ??
+          ITEM_SCALE[snap.chain] ??
+          this.tierArtScale(snap.chain, snap.tier) ??
+          1);
+    return authored * shrunkArtScale(tex);
   }
 
   private generatorConfigFor(chain: string, tier: number): GeneratorConfig | undefined {
@@ -5235,14 +5260,8 @@ export class BoardScene extends Phaser.Scene {
         this.onItemTapped(sprite!);
       });
     }
-    const artScale =
-      snap.kind === 'decor'
-        ? (DECOR_SCALE[snap.chain] ?? 1)
-        : (ITEM_SCALE[`${snap.chain}_${snap.tier}`] ??
-          ITEM_SCALE[snap.chain] ??
-          this.tierArtScale(snap.chain, snap.tier) ??
-          1);
-    sprite.acquire(snap, this.ctx.data.anchors, this.textureFor(snap), artScale);
+    const tex = this.textureFor(snap);
+    sprite.acquire(snap, this.ctx.data.anchors, tex, this.artScaleFor(snap, tex));
     // The emerald turns wherever the LIVE gem is not. On iOS and the `low`
     // profile `ensureCrystal3D` declines the second WebGL context, and the baked
     // sheet plays the same 90° loop at the same cadence instead — the gem the
@@ -6082,6 +6101,14 @@ export class BoardScene extends Phaser.Scene {
       // The wardrobe key (`art ?? id`) names both the bank and its files —
       // Eleanor-at-home fetches Eleanor's own sheets.
       const art = cfg.art ?? cfg.id;
+      // Her dialogue DISC too: boot only fetches the discs of the world it
+      // opens in (they are 18 MB decoded apiece), so the door fetches the
+      // destination's — the bubble's own backfill (CharacterBubble) is only
+      // the net under this, not the plan.
+      if (isAnimatedSpeaker(art) && !this.textures.exists(discTextureFor(art))) {
+        this.load.spritesheet(discTextureFor(art), discFileFor(art), DISC_FRAME);
+        queued++;
+      }
       // Her Align-Studio atlas clips travel with her banks — same door, same
       // loader run, and worldArtKeys lists them for the matching eviction.
       for (const [clipId, clip] of Object.entries(clipsFor(art))) {

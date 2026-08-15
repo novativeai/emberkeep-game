@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { chromeScale } from '../art/TextureFactory';
 import { FONT, INK } from '../art/design';
 import { IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelFitScale, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
@@ -163,8 +164,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .setInteractive(); // swallow board input behind the panel
     this.dim.on('pointerup', () => this.requestClose());
 
-    const panel = scene.add.image(0, LG.frameY, LG.frameKey);
-    this.baseScale = IS_MOBILE ? panelFitScale(panel.width, panel.height) : panelMobileScale(panel.width);
+    const panel = scene.add.image(0, LG.frameY, LG.frameKey).setScale(chromeScale(LG.frameKey));
+    this.baseScale = IS_MOBILE ? panelFitScale(panel.displayWidth, panel.displayHeight) : panelMobileScale(panel.displayWidth);
 
     // Tab lozenges along the top edge — Orders sits centred (classic Ledger
     // header) until the tutorial ends and the Tasks tab joins it.

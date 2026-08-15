@@ -3,6 +3,7 @@ import type { GameContext } from '../core/Context';
 import {
   ATMOSPHERE,
   BUBBLE_BOTTOM,
+  BUBBLE_DODGE_BAND,
   BUBBLE_X_DESKTOP_NUDGE,
   BUBBLE_X_MOBILE,
   BUBBLE_SCALE,
@@ -32,7 +33,9 @@ import {
   WORLD_ID
 } from '../core/Constants';
 import { FONT } from '../art/design';
+import { clipKey, clipsFor } from '../core/characterAnims';
 import { iapBridge } from '../core/iapBridge';
+import { armLowEndShrink } from '../core/lowend';
 import { gridToWorld } from '../core/iso';
 import type {
   EventMap,
@@ -101,7 +104,9 @@ interface TravelVeil {
 // On-screen heights (2560-space) for the tutorial pointer/arrow. The real art
 // loads at its native pixel size, so each is scaled to these.
 const HAND_MARKER_H = 172;
-const ARROW_MARKER_H = 148;
+// On a phone the FIT scale shrinks the authored size to ~15% of the window —
+// the arrows read as slivers (field report). +50% restores presence.
+const ARROW_MARKER_H = IS_MOBILE ? 222 : 148;
 
 /**
  * Runs in parallel above BoardScene: HUD, tooltip, Eleanor's Ledger, the
@@ -189,6 +194,7 @@ export class UIScene extends Phaser.Scene {
 
   create(): void {
     this.ctx = this.registry.get('ctx') as GameContext;
+    armLowEndShrink(this); // the hatch card / Emporium ensureTextures ride this loader
     this.cameras.main.setOrigin(0).setZoom(renderScale.value); // paint the 2560-space UI into the hi-DPI backing
 
     this.buildVignette(); // warm finishing grade under the HUD, over the board
@@ -481,6 +487,12 @@ export class UIScene extends Phaser.Scene {
       // the frame it appears. (`placeArrow` used to give up on a null and leave
       // the beat with no pointer at all for the rest of its life.)
       this.arrow.setVisible(a !== null);
+      // MOBILE: a target under the coach bubble is untappable — the codex's
+      // EVOLUTION button sat exactly behind her (field-reported). When the
+      // pointer's target lands in the bubble's bottom band, she docks to the
+      // top of the screen for the rest of the beat and slides home the moment
+      // the next target is clear. Re-evaluated each frame, like the arrow.
+      if (IS_MOBILE) this.bubble.dodge(a !== null && a.y > LIVE_GAME_HEIGHT - BUBBLE_DODGE_BAND);
       if (a) {
         // A target near the top of the screen (the ⚡+ Warmth button) would push
         // the down-pointing arrow off-screen above it — so flip it UP and sit it
@@ -1223,6 +1235,21 @@ export class UIScene extends Phaser.Scene {
   private runFinaleUi(): void {
     if (this.finaleActive) return;
     this.finaleActive = true;
+    // Her dialogue busts are NOT in a fresh session's preload — 40 MB decoded
+    // for a speaker who cannot talk before this very ceremony (the iOS budget
+    // note in Constants). The finale is the moment she becomes a speaker, so
+    // they are fetched here, under cover of the camera pan; the ring degrades
+    // to her still bust for any line that outruns the network.
+    let elderQueued = 0;
+    for (const [clipId, clip] of Object.entries(clipsFor('golden_elder'))) {
+      if (this.textures.exists(clipKey('golden_elder', clipId))) continue;
+      this.load.spritesheet(clipKey('golden_elder', clipId), clip.file, {
+        frameWidth: clip.frameWidth,
+        frameHeight: clip.frameHeight
+      });
+      elderQueued++;
+    }
+    if (elderQueued) this.load.start();
     this.clearRecipeHint(); // the finale owns the stage — no competing pointers
     this.ledger.requestClose();
     this.shop.requestClose();

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ITEM_SCALE, PALETTE, RES } from '../core/Constants';
+import { IS_LOW_END, IS_MOBILE, ITEM_SCALE, PALETTE, RES } from '../core/Constants';
 import type { AssetsManifest } from '../core/types';
 import { darken, lighten, seededRandom, withAlpha } from './colors';
 import {
@@ -16,6 +16,42 @@ import {
 } from './design';
 
 const P = PALETTE;
+
+/**
+ * Chrome that exists for exactly ONE device class. The portrait tall family is
+ * referenced only by the panels' mobile layout branches, and the big desktop
+ * plates only by their desktop branches — painting the other class's set is
+ * pure decoded weight (the talls alone are 37 MB EACH at full res), which is
+ * what pushed iOS past its budget. `generateAll` skips the set the device can
+ * never show; a lazy `generate` call still paints on demand.
+ */
+const MOBILE_ONLY_CHROME = new Set([
+  'ui_panel_tall',
+  'ui_shop_panel_tall',
+  'ui_shop_card_tall',
+  'ui_shop_card_tall_hot'
+]);
+const DESKTOP_ONLY_CHROME = new Set(['ui_store_panel', 'ui_shop_panel', 'ui_shop_card', 'ui_shop_card_hot']);
+
+/** The two full-screen portrait plates paint at HALF resolution on low-end
+ *  devices (soft gradient chrome upscales invisibly; 74 MB -> 19 MB). */
+const HALF_RES_ON_LOW_END = new Set(['ui_panel_tall', 'ui_shop_panel_tall']);
+
+/**
+ * The scale that puts a reduced-resolution chrome texture back at its authored
+ * on-screen size. 1 everywhere else, so panels apply it unconditionally to
+ * their frame image and stay correct on every device.
+ */
+export function chromeScale(key: string): number {
+  return IS_LOW_END && HALF_RES_ON_LOW_END.has(key) ? 2 : 1;
+}
+
+/** False for chrome the running device class can never draw. */
+function paintsOnThisDevice(key: string): boolean {
+  if (MOBILE_ONLY_CHROME.has(key)) return IS_MOBILE;
+  if (DESKTOP_ONLY_CHROME.has(key)) return !IS_MOBILE;
+  return true;
+}
 
 /**
  * Tile texture geometry in LOGICAL units (the painter multiplies everything
@@ -84,7 +120,7 @@ export class TextureFactory {
 
   generateAll(manifest: AssetsManifest): void {
     for (const entry of manifest.images) {
-      if (entry.source === 'placeholder') this.generate(entry.key);
+      if (entry.source === 'placeholder' && paintsOnThisDevice(entry.key)) this.generate(entry.key);
     }
   }
 
@@ -263,6 +299,10 @@ export class TextureFactory {
   }
 
   private paint(key: string, w: number, h: number, draw: (g: Ctx2D) => void): void {
+    // Half-resolution chrome: the drawing code is identical — only the backing
+    // canvas (and the context scale) halves. `chromeScale(key)` puts the frame
+    // image back at its authored size wherever it is worn.
+    const res = RES / chromeScale(key);
     if (this.scene.textures.exists(key)) {
       if (!this.forceRepaint) return;
       // Live re-theme: clear and redraw the SAME canvas texture in place.
@@ -272,18 +312,18 @@ export class TextureFactory {
       g.save();
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, tex.width, tex.height);
-      g.scale(RES, RES);
+      g.scale(res, res);
       draw(g);
       g.restore();
       tex.refresh();
       return;
     }
     // Paint in logical units, render at RES x for crisp hi-dpi output.
-    const tex = this.scene.textures.createCanvas(key, w * RES, h * RES);
+    const tex = this.scene.textures.createCanvas(key, w * res, h * res);
     if (!tex) return;
     const g = tex.getContext();
     g.save();
-    g.scale(RES, RES);
+    g.scale(res, res);
     draw(g);
     g.restore();
     tex.refresh();

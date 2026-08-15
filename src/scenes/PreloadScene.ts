@@ -4,13 +4,14 @@ import type { GameContext } from '../core/Context';
 import { clipKey, clipsFor } from '../core/characterAnims';
 import { bootChains, splitWaves } from '../core/assetWaves';
 import { savedDragonClips } from '../core/clipResidency';
-import { IS_LOW_END, SCENES, STANDEE_BANKS, WORLD_ID } from '../core/Constants';
+import { GOLDEN_ALTAR, IS_LOW_END, SCENES, STANDEE_BANKS, WORLD_ID } from '../core/Constants';
 import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
 import { liveCrystalAvailable } from '../core/graphicsState';
+import { armLowEndShrink } from '../core/lowend';
 import type { AssetEntry, SpeakerId } from '../core/types';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
-import { ANIMATED_SPEAKERS, discTextureFor } from '../entities/PortraitAnimator';
+import { ANIMATED_SPEAKERS, DISC_FRAME, discFileFor, discTextureFor } from '../entities/PortraitAnimator';
 import { preloadFlipbooks } from '../render/FlipbookFX';
 import { BUILTIN_SEQUENCES, builtinSequence, builtinSequenceFiles, type BuiltinSequence } from '../render/sequenceCatalog';
 import { preloadEmitterAssets } from '../render/fx/emitterAssets';
@@ -96,6 +97,10 @@ export class PreloadScene extends Phaser.Scene {
 
   preload(): void {
     this.cameras.main.setOrigin(0).setZoom(renderScale.value); // hi-DPI backing for the loading bar
+    // Low-end texture diet: item art is halved the moment it lands, before
+    // anything can wear it — see src/core/lowend.ts and the iOS budget note
+    // in Constants. All item art loads through THIS scene's loader.
+    armLowEndShrink(this);
     // UI Builder uploads and PNG-sequence animations are self-contained data
     // URLs — no network, and `applyUiReplacements` in create() needs them before
     // any scene builds objects. They are the ONLY thing the title is gated on.
@@ -198,10 +203,17 @@ export class PreloadScene extends Phaser.Scene {
     // Phaser derives the frame count from the image size, so a bigger atlas
     // needs no change here (scripts/bake-portrait-disc.py sizes the grid).
     for (const who of ANIMATED_SPEAKERS) {
-      this.load.spritesheet(discTextureFor(who), `sprites/${who}-merge/disc-atlas.webp`, {
-        frameWidth: 270,
-        frameHeight: 360
-      });
+      // Only speakers who LIVE in the active world ride the boot preload — a
+      // disc is 18 MB decoded, and Selyna's was costing every Emberkeep boot
+      // that much for a voice the player cannot hear before Borealis. Travel
+      // fetches the destination's discs at the door (fetchWorldArt), and the
+      // bubble itself backfills on a cross-world line (CharacterBubble),
+      // degrading to the still portrait for that one line.
+      const speaksHere = ctx.data.characters.characters.some(
+        (c) => (c.art ?? c.id) === who && c.world === ctx.state.worldId
+      );
+      if (!speaksHere) continue;
+      this.load.spritesheet(discTextureFor(who), discFileFor(who), DISC_FRAME);
     }
     // World-standee banks for the characters who stand ON the map: an idle loop
     // and a one-shot scepter cast, both 8 frames on ONE shared canvas so the
@@ -261,7 +273,13 @@ export class PreloadScene extends Phaser.Scene {
     // and Borealis does not open until her awakening quest is already done —
     // so a Borealis boot would be paying 3 MB for a ring she cannot fill. The
     // ring degrades to `portrait_golden_elder`, her still bust, until they land.
-    if (ctx.state.worldId === WORLD_ID) {
+    // …and only once she is AWAKE. Her `talking`+`blinking` busts are 40 MB
+    // decoded, and before `keepers_hoard` completes she cannot say a word —
+    // streaming them into every fresh session was a fifth of the iOS budget
+    // spent on a speaker the first hours cannot show. A save with the latch
+    // streams her as before; the session that AWAKENS her fetches the busts
+    // when the finale starts (UIScene), under cover of the ceremony itself.
+    if (ctx.state.worldId === WORLD_ID && ctx.state.stat(`q:done:${GOLDEN_ALTAR.awakenQuestId}`) > 0) {
       for (const [clipId, clip] of Object.entries(clipsFor(ELDER_SPEAKER))) {
         if (this.textures.exists(clipKey(ELDER_SPEAKER, clipId))) continue;
         playSheets.push({

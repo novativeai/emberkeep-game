@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { chromeScale } from '../art/TextureFactory';
 import { FONT, INK, RADIUS, TYPE } from '../art/design';
 import {
   IS_MOBILE,
@@ -162,8 +163,8 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     });
     this.add(dim);
 
-    const frame = scene.add.image(0, CX.frameY, CX.frameKey);
-    this.baseScale = IS_MOBILE ? panelFitScale(frame.width, frame.height) : panelMobileScale(frame.width);
+    const frame = scene.add.image(0, CX.frameY, CX.frameKey).setScale(chromeScale(CX.frameKey));
+    this.baseScale = IS_MOBILE ? panelFitScale(frame.displayWidth, frame.displayHeight) : panelMobileScale(frame.displayWidth);
     this.add(frame);
 
     // Title plaque — the same gold-seated cream banner the Store and Cauldron

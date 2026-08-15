@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { chromeScale } from '../art/TextureFactory';
 import { FONT, INK } from '../art/design';
 import {
   FOIL,
@@ -271,9 +272,9 @@ export class StorePanel extends Phaser.GameObjects.Container {
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
-    const frame = scene.add.image(0, LY.frameY, LY.frameKey);
+    const frame = scene.add.image(0, LY.frameY, LY.frameKey).setScale(chromeScale(LY.frameKey));
     // The tall frame fits BOTH axes; the landscape one keeps the width-only rule.
-    this.baseScale = LY.mobile ? panelFitScale(frame.width, frame.height) : panelMobileScale(frame.width);
+    this.baseScale = LY.mobile ? panelFitScale(frame.displayWidth, frame.displayHeight) : panelMobileScale(frame.displayWidth);
 
     this.titleBg = scene.add.graphics();
     this.titleText = scene.add

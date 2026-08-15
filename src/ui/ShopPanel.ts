@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { chromeScale } from '../art/TextureFactory';
 import { IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelFitScale, panelMobileScale } from '../core/Constants';
 import { FONT, INK } from '../art/design';
 import type { EventBus } from '../core/EventBus';
@@ -165,8 +166,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
-    const frame = scene.add.image(0, 0, SL.frameKey);
-    this.baseScale = IS_MOBILE ? panelFitScale(frame.width, frame.height) : panelMobileScale(frame.width);
+    const frame = scene.add.image(0, 0, SL.frameKey).setScale(chromeScale(SL.frameKey));
+    this.baseScale = IS_MOBILE ? panelFitScale(frame.displayWidth, frame.displayHeight) : panelMobileScale(frame.displayWidth);
 
     // ---- Title bar: name plate left, wallet + close right ----
     const plaque = scene.add.image(SL.plaqueX, SL.plaqueY, 'ui_shop_plaque').setScale(SL.plaqueScale);

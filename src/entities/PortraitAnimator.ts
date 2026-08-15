@@ -16,6 +16,11 @@ export type AnimatedSpeaker = (typeof ANIMATED_SPEAKERS)[number];
 export const ANIMATED_SPEAKER: AnimatedSpeaker = 'eleanor';
 
 export const discTextureFor = (speaker: string): string => `${speaker}_disc`;
+
+/** One source of truth for the disc atlas fetch — boot, travel and the
+ *  bubble's on-demand backfill must all slice the same grid. */
+export const DISC_FRAME = { frameWidth: 270, frameHeight: 360 } as const;
+export const discFileFor = (speaker: string): string => `sprites/${speaker}-merge/disc-atlas.webp`;
 export const isAnimatedSpeaker = (speaker: string): speaker is AnimatedSpeaker =>
   (ANIMATED_SPEAKERS as readonly string[]).includes(speaker);
 

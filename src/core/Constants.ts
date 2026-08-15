@@ -1790,6 +1790,38 @@ export const FIRST_CONTACT_HOLD_MS = 6200;
 export const FIRST_CONTACT_RETRY_MS = 1500;
 
 /**
+ * THE iOS MEMORY BUDGET — the one number the crash reports answer to.
+ *
+ * WebKit kills a tab's renderer process at a per-device ceiling; the worst
+ * device we support (3 GB iPhones — 8/X on iOS 16) dies around ~1000 MB. The
+ * process cost decomposes as:
+ *
+ *   decoded texture bitmaps ×2  (the image/canvas source AND its GL upload)
+ * + JS heap                     (~170 MB measured at boot, survives GC)
+ * + WebKit/canvas baseline      (~150 MB: page, DOM, our hi-dpi canvas)
+ *
+ * Solving for decoded textures: (1000 − 170 − 150) / 2 ≈ 340 MB, and the
+ * budget takes ~18% margin under that. This is the STEADY-STATE ceiling after
+ * the play wave has fully streamed — enforced by tests/e2e/ios-budget.spec.ts
+ * on the iPhone profile, so a texture regression fails `pnpm verify` instead
+ * of shipping a crash. The diet that keeps us under it: src/core/lowend.ts
+ * (half-res item art), device-gated chrome painting (TextureFactory), and the
+ * lazy Elder busts / per-world discs (PreloadScene).
+ */
+export const IOS_TEXTURE_BUDGET_MB = 280;
+
+/**
+ * MOBILE: the coach bubble must never cover the thing it is pointing at. When
+ * a tutorial pointer's target lands within BUBBLE_DODGE_BAND of the bottom
+ * edge (the band the bubble occupies — the codex EVOLUTION button sat exactly
+ * behind it, field-reported), the bubble slides up to centre on
+ * BUBBLE_DODGE_TOP_Y — below the top-left gauges, above the board — and slides
+ * home when the next target is clear.
+ */
+export const BUBBLE_DODGE_BAND = 950;
+export const BUBBLE_DODGE_TOP_Y = 1010;
+
+/**
  * The travel wipe — the screen burns away into iso diamonds when the Keeper
  * crosses worlds, and reassembles on the far side (UIScene's veil; shader in
  * render/fx/travelWipeShader.ts, which documents the technique). The cover

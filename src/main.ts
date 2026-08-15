@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
-import { LIVE_GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
+import { IOS_TEXTURE_BUDGET_MB, LIVE_GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from './core/Constants';
 import { createGameConfig } from './core/GameConfig';
 import { PowerGovernor } from './core/PowerGovernor';
 import { iapBridge } from './core/iapBridge';
@@ -57,6 +57,10 @@ declare global {
         available: string[];
       };
       switchWorld: (id: string) => string;
+      /** The iOS budget and the live decoded-texture meter it is checked
+       *  against — tests/e2e/ios-budget.spec.ts is the enforcement. */
+      iosTexBudgetMB: number;
+      decodedTextureMB: () => number;
     };
     webkitAudioContext?: typeof AudioContext;
   }
@@ -251,6 +255,16 @@ const worldToPage = (world: { x: number; y: number }): { x: number; y: number } 
 window.__emberkeep = {
   saveKey: SAVE_KEY,
   game,
+  // The iOS memory budget (Constants documents the derivation) and the meter
+  // the enforcement spec reads: decoded RGBA held by the texture manager.
+  iosTexBudgetMB: IOS_TEXTURE_BUDGET_MB,
+  decodedTextureMB: () => {
+    let bytes = 0;
+    for (const key of game.textures.getTextureKeys()) {
+      for (const src of game.textures.get(key).source) bytes += (src.width ?? 0) * (src.height ?? 0) * 4;
+    }
+    return Math.round(bytes / 1048576);
+  },
   // Test/diagnostic: award XP so a level-up (and its camera fly) can be driven
   // deterministically without grinding merges.
   grantXp: (xp: number) => ctx.bus.emit('economy:add', { xp, reason: 'debug:grantXp' }),

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { chromeScale } from '../art/TextureFactory';
 import { FONT } from '../art/design';
 import { chainHiddenIn, IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelFitScale, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
@@ -122,8 +123,8 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     dim.on('pointerup', () => this.requestClose());
     this.add(dim);
 
-    const panel = scene.add.image(0, CB.frameY, CB.frameKey);
-    this.baseScale = IS_MOBILE ? panelFitScale(panel.width, panel.height) : panelMobileScale(panel.width);
+    const panel = scene.add.image(0, CB.frameY, CB.frameKey).setScale(chromeScale(CB.frameKey));
+    this.baseScale = IS_MOBILE ? panelFitScale(panel.displayWidth, panel.displayHeight) : panelMobileScale(panel.displayWidth);
     this.add(panel);
 
     // Title lozenge — gold, like the Keeper's Tasks header.

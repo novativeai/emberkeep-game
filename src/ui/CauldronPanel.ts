@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { chromeScale } from '../art/TextureFactory';
 import { FONT, INK } from '../art/design';
 import { IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelFitScale, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
@@ -114,8 +115,8 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
-    const frame = scene.add.image(0, CY.frameY, CY.frameKey);
-    this.baseScale = IS_MOBILE ? panelFitScale(frame.width, frame.height) : panelMobileScale(frame.width);
+    const frame = scene.add.image(0, CY.frameY, CY.frameKey).setScale(chromeScale(CY.frameKey));
+    this.baseScale = IS_MOBILE ? panelFitScale(frame.displayWidth, frame.displayHeight) : panelMobileScale(frame.displayWidth);
 
     this.titleBg = scene.add.graphics();
     this.titleText = scene.add
