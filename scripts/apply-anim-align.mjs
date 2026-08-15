@@ -214,6 +214,90 @@ const ROSTER = {
       }
     }
   },
+  // ---- the last three off the pin rigs -------------------------------------
+  // These three had NO clip set: the Green Dragon was never animated at all
+  // (only its moonwhisker skin was), and ashglass/porcelain shipped as static
+  // baked sprites. The rig was the only thing moving them, so it could not be
+  // deleted until these existed. Aligned against the rigs one last time — the
+  // rest pose is all alignment needs, and the runtime stops reading them after.
+  emerald_baby: {
+    label: 'Green Dragon (baby)',
+    rawDir: `${RAW_BASE}/emerald_baby_atlasses`,
+    rig: 'sprites/characters/dragon/emerald-dragon/rig/dragon-emerald.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE.emerald,
+    board: 'emerald:3',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded (also stands in for flight — no baby fly clip)' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false }
+    }
+  },
+  emerald_adult: {
+    label: 'Adult Emerald Dragon',
+    rawDir: `${RAW_BASE}/emerald_adult_atlasses`,
+    rig: 'sprites/characters/dragon/emerald-dragon/rig-adult/emerald-dragon.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE['emerald:4'],
+    modes: { fly: 'center' },
+    board: 'emerald:4',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false },
+      fly: { trigger: 'flight: unfold → wingbeat cruise → fold' }
+    }
+  },
+  ashglass_baby: {
+    label: 'Ashglass (baby)',
+    rawDir: `${RAW_BASE}/ashglass_baby_atlasses`,
+    // Ashglass is the EMBER chain's Emporium skin, so it aligns at ember's
+    // board scale — the animal underneath is the red whelp's geometry.
+    rig: 'sprites/characters/dragon/red-dragon/rig/dragon-red.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE.ember_dragon,
+    board: 'ember_dragon:3',
+    skin: 'ashglass',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded (also stands in for flight — no baby fly clip)' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false }
+    }
+  },
+  ashglass_adult: {
+    label: 'Ashglass (adult)',
+    rawDir: `${RAW_BASE}/ashglass_adult_atlasses`,
+    rig: 'sprites/characters/dragon/red-dragon/rig-adult/red-dragon.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE['ember_dragon:4'],
+    modes: { fly: 'center' },
+    board: 'ember_dragon:4',
+    skin: 'ashglass',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false },
+      fly: { trigger: 'flight: unfold → wingbeat cruise → fold' }
+    }
+  },
+  porcelain_baby: {
+    label: 'Porcelain (baby)',
+    rawDir: `${RAW_BASE}/porcelain_baby_atlasses`,
+    rig: 'sprites/characters/dragon/emerald-dragon/rig/dragon-emerald.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE.emerald,
+    board: 'emerald:3',
+    skin: 'porcelain',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded (also stands in for flight — no baby fly clip)' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false }
+    }
+  },
+  porcelain_adult: {
+    label: 'Porcelain (adult)',
+    rawDir: `${RAW_BASE}/porcelain_adult_atlasses`,
+    rig: 'sprites/characters/dragon/emerald-dragon/rig-adult/emerald-dragon.rig.json',
+    rigScaleOf: (C) => C.DRAGON_ANIM.whelpScale * C.DRAGON_RIG_SCALE['emerald:4'],
+    modes: { fly: 'center' },
+    board: 'emerald:4',
+    skin: 'porcelain',
+    clipInfo: {
+      idle: { trigger: 'board rest, grounded' },
+      roar: { trigger: 'every bellow: hungry + ambient cadence + intro', loop: false },
+      fly: { trigger: 'flight: unfold → wingbeat cruise → fold' }
+    }
+  },
   golden_adult: {
     label: 'Golden Elder',
     rawDir: `${RAW_BASE}/golden_adult_atlasses`,

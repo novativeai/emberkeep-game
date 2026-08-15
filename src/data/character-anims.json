@@ -688,6 +688,235 @@
         }
       },
       "board": "rimewyrm:2"
+    },
+    "emerald_baby": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/emerald_baby/idle.webp",
+          "frames": 162,
+          "frameWidth": 270,
+          "frameHeight": 235,
+          "fps": 24,
+          "loop": true,
+          "scale": 0.8005900000000001,
+          "dx": 14.98,
+          "dy": -2.24,
+          "srcFrameWidth": 315,
+          "srcFrameHeight": 274
+        },
+        "roar": {
+          "file": "sprites/anims/emerald_baby/roar.webp",
+          "frames": 66,
+          "frameWidth": 238,
+          "frameHeight": 259,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8025359243697479,
+          "dx": 18.15,
+          "dy": -1.88,
+          "srcFrameWidth": 331,
+          "srcFrameHeight": 360
+        }
+      },
+      "board": "emerald:3"
+    },
+    "emerald_adult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/emerald_adult/idle.webp",
+          "frames": 106,
+          "frameWidth": 372,
+          "frameHeight": 254,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.16782,
+          "dx": 40.66,
+          "dy": 44.96,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 254
+        },
+        "roar": {
+          "file": "sprites/anims/emerald_adult/roar.webp",
+          "frames": 66,
+          "frameWidth": 455,
+          "frameHeight": 261,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.52431,
+          "dx": 18.84,
+          "dy": 44.15,
+          "srcFrameWidth": 455,
+          "srcFrameHeight": 261
+        },
+        "fly": {
+          "file": "sprites/anims/emerald_adult/fly.webp",
+          "frames": 234,
+          "frameWidth": 256,
+          "frameHeight": 214,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.38574,
+          "dx": -0.21,
+          "dy": 45.4,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 214
+        }
+      },
+      "board": "emerald:4"
+    },
+    "ashglass_baby": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/ashglass_baby/idle.webp",
+          "frames": 162,
+          "frameWidth": 220,
+          "frameHeight": 207,
+          "fps": 24,
+          "loop": true,
+          "scale": 0.8006154545454546,
+          "dx": 21.92,
+          "dy": -2.21,
+          "srcFrameWidth": 315,
+          "srcFrameHeight": 297
+        },
+        "roar": {
+          "file": "sprites/anims/ashglass_baby/roar.webp",
+          "frames": 66,
+          "frameWidth": 216,
+          "frameHeight": 210,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8018379629629631,
+          "dx": 17.79,
+          "dy": -2.39,
+          "srcFrameWidth": 370,
+          "srcFrameHeight": 360
+        }
+      },
+      "board": "ember_dragon:3",
+      "skin": "ashglass"
+    },
+    "ashglass_adult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/ashglass_adult/idle.webp",
+          "frames": 112,
+          "frameWidth": 372,
+          "frameHeight": 228,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.32247,
+          "dx": 69.88,
+          "dy": 45.27,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 228
+        },
+        "roar": {
+          "file": "sprites/anims/ashglass_adult/roar.webp",
+          "frames": 66,
+          "frameWidth": 455,
+          "frameHeight": 302,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.39241,
+          "dx": 10.93,
+          "dy": 55.16,
+          "srcFrameWidth": 455,
+          "srcFrameHeight": 302
+        },
+        "fly": {
+          "file": "sprites/anims/ashglass_adult/fly.webp",
+          "frames": 240,
+          "frameWidth": 256,
+          "frameHeight": 177,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.84472,
+          "dx": 19.16,
+          "dy": 51.85,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 177
+        }
+      },
+      "board": "ember_dragon:4",
+      "skin": "ashglass"
+    },
+    "porcelain_baby": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/porcelain_baby/idle.webp",
+          "frames": 162,
+          "frameWidth": 315,
+          "frameHeight": 261,
+          "fps": 24,
+          "loop": true,
+          "scale": 0.93052,
+          "dx": 21.03,
+          "dy": -2.68,
+          "srcFrameWidth": 315,
+          "srcFrameHeight": 261
+        },
+        "roar": {
+          "file": "sprites/anims/porcelain_baby/roar.webp",
+          "frames": 66,
+          "frameWidth": 239,
+          "frameHeight": 253,
+          "fps": 24,
+          "loop": false,
+          "scale": 0.8026560669456068,
+          "dx": 15.55,
+          "dy": -2.48,
+          "srcFrameWidth": 340,
+          "srcFrameHeight": 360
+        }
+      },
+      "board": "emerald:3",
+      "skin": "porcelain"
+    },
+    "porcelain_adult": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/porcelain_adult/idle.webp",
+          "frames": 109,
+          "frameWidth": 372,
+          "frameHeight": 277,
+          "fps": 24,
+          "loop": true,
+          "scale": 1.08067,
+          "dx": 25.18,
+          "dy": 44.79,
+          "srcFrameWidth": 372,
+          "srcFrameHeight": 277
+        },
+        "roar": {
+          "file": "sprites/anims/porcelain_adult/roar.webp",
+          "frames": 66,
+          "frameWidth": 455,
+          "frameHeight": 301,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.47015,
+          "dx": -3.16,
+          "dy": 51.45,
+          "srcFrameWidth": 455,
+          "srcFrameHeight": 301
+        },
+        "fly": {
+          "file": "sprites/anims/porcelain_adult/fly.webp",
+          "frames": 234,
+          "frameWidth": 256,
+          "frameHeight": 221,
+          "fps": 24,
+          "loop": false,
+          "scale": 1.35972,
+          "dx": -0.9,
+          "dy": 45.35,
+          "srcFrameWidth": 256,
+          "srcFrameHeight": 221
+        }
+      },
+      "board": "emerald:4",
+      "skin": "porcelain"
     }
   }
 }

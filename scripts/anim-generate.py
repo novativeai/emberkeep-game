@@ -130,7 +130,17 @@ PLATE_STAGES = {
     # The legendaries — young only (neither chain has an adult tier), so two
     # clips each: the grounded idle and the bellow.
     'ashdrake_young': 'baby',
-    'rimewyrm_young': 'baby'
+    'rimewyrm_young': 'baby',
+    # The last three off the pin rigs. The Green Dragon has no clip set at all
+    # (only its moonwhisker skin did), and the two Emporium skins were never
+    # animated — so the rig was the ONLY thing keeping them moving, and it
+    # cannot be deleted until these exist.
+    'emerald_baby': 'baby',
+    'emerald_adult': 'adult',
+    'ashglass_baby': 'baby',
+    'ashglass_adult': 'adult',
+    'porcelain_baby': 'baby',
+    'porcelain_adult': 'adult'
 }
 
 
