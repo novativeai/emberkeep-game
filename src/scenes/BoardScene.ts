@@ -856,6 +856,17 @@ export class BoardScene extends Phaser.Scene {
     if (queued === 0) return;
     this.load.once(Phaser.Loader.Events.COMPLETE, () => {
       if (!this.scene.isActive()) return;
+      // `clipsFetched` latches on the ASK, so on its own a FAILED fetch would
+      // never be retried — the breed's dragons would stand as static sprites for
+      // the rest of the scene (seen once in the wild: a whelp with no LiveDragon
+      // at the gate beat after a dropped request). The idle sheet is the floor
+      // of every set (`clipComplete` keys on it), so if it is not resident after
+      // the loader drains, the fetch failed: un-latch, and the breed's NEXT
+      // appearance asks again.
+      if (!this.textures.exists(clipKey(id, 'idle'))) {
+        this.clipsFetched.delete(id);
+        return;
+      }
       // Re-dress anything already standing that this set completes — INCLUDING
       // a dragon that is already live on its RIG.
       //

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { chainHiddenIn, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelMobileScale, PALETTE } from '../core/Constants';
+import { chainHiddenIn, IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelFitScale, panelMobileScale, PALETTE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import { reachableRecipeKeys, type AuditData } from '../core/availability';
@@ -34,8 +34,32 @@ interface RecipeRow {
 
 // Row geometry (ROW-local; every row lives in its own container so crowded
 // books scale rows down UNIFORMLY instead of letting chips overlap).
-// Two page columns; up to six recipes per page render at full size.
-const COL_X = 310;
+// Desktop: two page columns, an open spread. Mobile: ONE column of magnified
+// rows down a tall page — a spread halves the row width, and at phone width a
+// halved row's caption is unreadable. The row internals stay authored; the
+// row CONTAINER carries the magnification.
+const CB = IS_MOBILE
+  ? {
+      frameKey: 'ui_panel_tall', frameY: 0,
+      lozengeW: 1240, lozengeH: 190, lozengeY: -1900, titleY: -1806, titleFont: 88,
+      subY: -1640, subFont: 56,
+      closeX: 984, closeY: -1800, closeScale: 2.2,
+      cols: 1, colX: 0, rowScale: 3, rowGap: 140 * 3,
+      viewTop: -1440, viewH: 3200,
+      counterY: 1830, counterFont: 60,
+      seam: false
+    }
+  : {
+      frameKey: 'ui_panel', frameY: 16,
+      lozengeW: 660, lozengeH: 104, lozengeY: -436, titleY: -384, titleFont: 48,
+      subY: -302, subFont: 26,
+      closeX: 592, closeY: -392, closeScale: 1,
+      cols: 2, colX: 310, rowScale: 1, rowGap: 140,
+      viewTop: -278, viewH: 612,
+      counterY: 384, counterFont: 28,
+      seam: true
+    };
+const COL_X = CB.colX;
 /**
  * A recipe is drawn at ONE size and the page scrolls.
  *
@@ -44,15 +68,15 @@ const COL_X = 310;
  * at roughly half scale and nothing on it could be read. A book has pages —
  * shrinking the type until it all fits is the one thing a book never does.
  */
-const ROW_GAP = 140;
+const ROW_GAP = CB.rowGap;
 const CHIP = 96;
 const CHIP_FROM_X = -212;
 const CHIP_TO_X = 188;
 const ICON_FIT = 72;
 
 /** The scrolling window, in panel space: under the subtitle, above the count. */
-const VIEW_TOP = -278;
-const VIEW_H = 612;
+const VIEW_TOP = CB.viewTop;
+const VIEW_H = CB.viewH;
 /** Centre of that window — where the viewport container sits. */
 const VIEW_MID = VIEW_TOP + VIEW_H / 2;
 /** First row's centre inside the scrolling content. */
@@ -98,21 +122,21 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     dim.on('pointerup', () => this.requestClose());
     this.add(dim);
 
-    const panel = scene.add.image(0, 16, 'ui_panel');
-    this.baseScale = panelMobileScale(panel.width);
+    const panel = scene.add.image(0, CB.frameY, CB.frameKey);
+    this.baseScale = IS_MOBILE ? panelFitScale(panel.width, panel.height) : panelMobileScale(panel.width);
     this.add(panel);
 
     // Title lozenge — gold, like the Keeper's Tasks header.
     const lozenge = scene.add.graphics();
     lozenge.fillStyle(num(PALETTE.gold), 1);
-    lozenge.fillRoundedRect(-330, -436, 660, 104, 52);
+    lozenge.fillRoundedRect(-CB.lozengeW / 2, CB.lozengeY, CB.lozengeW, CB.lozengeH, CB.lozengeH / 2);
     lozenge.lineStyle(6, num(PALETTE.cream), 0.95);
-    lozenge.strokeRoundedRect(-330, -436, 660, 104, 52);
+    lozenge.strokeRoundedRect(-CB.lozengeW / 2, CB.lozengeY, CB.lozengeW, CB.lozengeH, CB.lozengeH / 2);
     this.add(lozenge);
     const title = scene.add
-      .text(0, -384, 'Emberkeep Cookbook', {
+      .text(0, CB.titleY, 'Emberkeep Cookbook', {
         fontFamily: FONT.ui,
-        fontSize: '48px',
+        fontSize: `${CB.titleFont}px`,
         fontStyle: 'bold',
         color: PALETTE.textBrown
       })
@@ -122,9 +146,9 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
 
     this.add(
       scene.add
-        .text(0, -302, 'Every merge you discover is inscribed here', {
+        .text(0, CB.subY, 'Every merge you discover is inscribed here', {
           fontFamily: FONT.ui,
-          fontSize: '26px',
+          fontSize: `${CB.subFont}px`,
           fontStyle: 'italic',
           color: '#8A6248'
         })
@@ -133,18 +157,21 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     );
 
     // The book's centre seam — the panel reads as an open two-page spread.
-    const seam = scene.add.graphics();
-    seam.lineStyle(3, num(PALETTE.goldShade), 0.25);
-    seam.lineBetween(0, VIEW_TOP, 0, VIEW_TOP + VIEW_H);
-    this.add(seam);
+    if (CB.seam) {
+      const seam = scene.add.graphics();
+      seam.lineStyle(3, num(PALETTE.goldShade), 0.25);
+      seam.lineBetween(0, VIEW_TOP, 0, VIEW_TOP + VIEW_H);
+      this.add(seam);
+    }
 
     // Close button.
-    const closeButton = scene.add.container(592, -392);
+    const closeButton = scene.add.container(CB.closeX, CB.closeY);
     const closeBg = scene.add.circle(0, 0, 42, num(PALETTE.lava)).setStrokeStyle(6, num(PALETTE.cream));
     const closeX = scene.add
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: PALETTE.goldAccent })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
+    closeButton.setScale(CB.closeScale);
     closeButton.setSize(96, 96);
     closeButton.setInteractive({ useHandCursor: true });
     closeButton.on('pointerup', () => this.requestClose());
@@ -183,17 +210,17 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // Filling column one before column two put recipe 1 beside recipe 13, and
     // a scroll moved both by twelve places at once.
     recipes.forEach((recipe, i) => {
-      const x = (i % 2 === 0 ? -1 : 1) * COL_X;
-      const y = ROW_TOP + Math.floor(i / 2) * ROW_GAP;
+      const x = CB.cols === 1 ? 0 : (i % 2 === 0 ? -1 : 1) * COL_X;
+      const y = ROW_TOP + Math.floor(i / CB.cols) * ROW_GAP;
       this.rows.push(this.buildRow(scene, recipe, x, y));
     });
-    const contentH = Math.ceil(recipes.length / 2) * ROW_GAP;
+    const contentH = Math.ceil(recipes.length / CB.cols) * ROW_GAP;
     this.maxScroll = Math.max(0, contentH - VIEW_H);
 
     this.counter = scene.add
-      .text(0, 384, '', {
+      .text(0, CB.counterY, '', {
         fontFamily: FONT.ui,
-        fontSize: '28px',
+        fontSize: `${CB.counterFont}px`,
         fontStyle: 'bold',
         color: PALETTE.goldAccent
       })
@@ -254,7 +281,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   /** One cookbook line: [chip ×N] ──▶ [chip], caption beneath the arrow.
    *  Everything is ROW-LOCAL, so a row can be seated anywhere on the page. */
   private buildRow(scene: Phaser.Scene, recipe: Recipe, x: number, y: number): RecipeRow {
-    const rowC = scene.add.container(x, y);
+    const rowC = scene.add.container(x, y).setScale(CB.rowScale);
     this.rowsGroup.add(rowC);
 
     const fromChip = scene.add.graphics();
@@ -475,6 +502,6 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   getClosePos(): { x: number; y: number } {
     // Offset is panel-LOCAL — scale it by the panel's own scale (>1 on mobile)
     // so the tutorial pointer lands on the ✕ instead of a shrunken/enlarged gap.
-    return { x: this.x + 592 * this.scaleX, y: this.y - 392 * this.scaleY };
+    return { x: this.x + CB.closeX * this.scaleX, y: this.y + CB.closeY * this.scaleY };
   }
 }

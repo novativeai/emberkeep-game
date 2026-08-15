@@ -159,8 +159,12 @@ export class TextureFactory {
       case 'ui_heart_empty': return this.heart(key, false);
       case 'ui_slot': return this.slot(key);
       case 'ui_store_panel': return this.storePanel(key);
+      case 'ui_panel_tall': return this.tallPanel(key);
       case 'ui_quest_panel': return this.questPanel(key);
       case 'ui_shop_panel': return this.shopPanel(key);
+      case 'ui_shop_panel_tall': return this.shopPanelTall(key);
+      case 'ui_shop_card_tall': return this.shopCardTall(key, false);
+      case 'ui_shop_card_tall_hot': return this.shopCardTall(key, true);
       case 'ui_shop_card': return this.shopCard(key, false);
       case 'ui_shop_card_hot': return this.shopCard(key, true);
       case 'ui_shop_price': return this.shopPricePill(key);
@@ -1600,6 +1604,32 @@ export class TextureFactory {
    * still a cream page, so re-pointing the shared key would have dragged the
    * book along with the quests.
    */
+  /**
+   * The PORTRAIT panel frame — the phone counterpart of `ui_store_panel`.
+   *
+   * Mobile plays vertically, and a landscape frame scaled to the portrait width
+   * leaves two thirds of the screen empty while the content inside squeezes into
+   * a band. Every full-screen panel mounts THIS on mobile instead and lays its
+   * content out tall (fewer columns, more rows; each panel owns its reflow).
+   *
+   * 1180×2040 logical: ×RES that is 4080 px on the tall axis, deliberately just
+   * under the 4096 old-device MAX_TEXTURE_SIZE (docs/pipelines: a texture past
+   * it is silently clipped by the driver, not scaled). Same chrome grammar as
+   * the landscape frame so the two read as one family.
+   */
+  private tallPanel(key: string): void {
+    this.paint(key, 1180, 2040, (g) => {
+      withShadow(g, 30, 14, () => {
+        this.roundRectPath(g, 22, 16, 1136, 2000, 42);
+        g.fillStyle = INK.fieldDeep;
+        g.fill();
+      });
+      chromeField(g, 22, 16, 1136, 2000, 42, { x: 590, y: 160, radius: 1500, strength: 0.32 });
+      chromeEdge(g, 22, 16, 1136, 2000, 42, EDGE.bold);
+      chromeClasps(g, 22, 16, 1136, 2000, 42, 18, 6.5);
+    });
+  }
+
   private questPanel(key: string): void {
     this.paint(key, 660, 440, (g) => {
       withShadow(g, 30, 14, () => {
@@ -1675,6 +1705,75 @@ export class TextureFactory {
    * inside and brightens the metal rather than adding furniture, so the two
    * share every measurement.
    */
+  /** The Emporium's PORTRAIT hall — same plum-and-gold material as the
+   *  landscape shopPanel, proportioned for a phone held upright. 2040 logical
+   *  keeps the rendered tall axis at 4080, under the 4096 old-device cap. */
+  private shopPanelTall(key: string): void {
+    this.paint(key, 1180, 2040, (g) => {
+      g.shadowColor = 'rgba(0,0,0,0.6)';
+      g.shadowBlur = 38;
+      g.shadowOffsetY = 16;
+      this.roundRectPath(g, 12, 10, 1156, 2016, 30);
+      g.fillStyle = INK.fieldDeep;
+      g.fill();
+      g.shadowColor = 'transparent';
+      g.shadowBlur = 0;
+      g.shadowOffsetY = 0;
+
+      chromeField(g, 12, 10, 1156, 2016, 30, { x: 590, y: 140, radius: 1500, strength: 0.3 });
+      chromeEdge(g, 12, 10, 1156, 2016, 30, 5);
+      chromeClasps(g, 12, 10, 1156, 2016, 30, 16, 6);
+
+      // Rule under the title bar — same treatment as the landscape hall.
+      const rule = g.createLinearGradient(60, 0, 1120, 0);
+      rule.addColorStop(0, withAlpha(INK.gold, 0));
+      rule.addColorStop(0.5, withAlpha(INK.goldHi, 0.75));
+      rule.addColorStop(1, withAlpha(INK.gold, 0));
+      g.fillStyle = rule;
+      g.fillRect(60, 268, 1060, 2);
+      g.fillStyle = withAlpha('#000000', 0.5);
+      g.fillRect(60, 270, 1060, 2);
+
+      // Content box, tall: the tabs bite into its top edge.
+      chromeField(g, 34, 420, 1112, 1560, 22, { x: 590, y: 480, radius: 1300, strength: 0.16 });
+      chromeEdge(g, 34, 420, 1112, 1560, 22, 4);
+      chromeClasps(g, 34, 420, 1112, 1560, 22, 14, 5);
+    });
+  }
+
+  /** The portrait row card: the landscape shopCard's material at a TALLER cut,
+   *  because on a phone each pack is a two-line card (goods left, price plate
+   *  riding low-right) rather than a thin band. */
+  private shopCardTall(key: string, hot: boolean): void {
+    this.paint(key, 1100, 280, (g) => {
+      if (hot) {
+        const bloom = g.createRadialGradient(550, 140, 60, 550, 140, 620);
+        bloom.addColorStop(0, withAlpha(INK.ember, 0.3));
+        bloom.addColorStop(0.55, withAlpha(INK.ember, 0.1));
+        bloom.addColorStop(1, withAlpha(INK.ember, 0));
+        g.fillStyle = bloom;
+        g.fillRect(0, 0, 1100, 280);
+      }
+      chromeField(g, 8, 6, 1084, 268, 24, {
+        x: 190,
+        y: 140,
+        radius: hot ? 430 : 340,
+        strength: hot ? 0.42 : 0.22,
+        warm: hot
+      });
+      chromeEdge(g, 8, 6, 1084, 268, 24, 4.5, hot ? 0.32 : 0);
+      chromeClasps(g, 8, 6, 1084, 268, 24, 13, hot ? 6 : 5);
+
+      const seat = g.createRadialGradient(190, 232, 6, 190, 232, 150);
+      seat.addColorStop(0, 'rgba(0,0,0,0.4)');
+      seat.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = seat;
+      g.beginPath();
+      g.ellipse(190, 232, 150, 16, 0, 0, Math.PI * 2);
+      g.fill();
+    });
+  }
+
   private shopCard(key: string, hot: boolean): void {
     this.paint(key, 880, 112, (g) => {
       if (hot) {

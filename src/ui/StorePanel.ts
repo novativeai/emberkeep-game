@@ -2,9 +2,11 @@ import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
 import {
   FOIL,
+  IS_MOBILE,
   LIVE_GAME_HEIGHT,
   LIVE_GAME_WIDTH,
   num,
+  panelFitScale,
   panelMobileScale,
   RARITY
 } from '../core/Constants';
@@ -17,42 +19,165 @@ import { addScrim, makeFoilPlate, PLATE_INSET, runSheen } from './foil';
 import { uiRegistry } from './theme';
 
 
-/** Card geometry, in the 2560-space. Four across inside the shop frame. */
-const CARD_W = 452;
-const CARD_H = 460;
 const CARD_R = 34;
-const COLS = 4;
-const COL_GAP = 476;
-/**
- * The grid window, measured off the PAINTED frame rather than off its texture:
- * the plate the storePanel painter fills is 1016×620 logical drawn at y+40, so
- * its inner floor sits at +652 — not +660, which is merely where the texture
- * ends. The shelf owns -300 (under the tabs) down to +640, keeping a 12-unit
- * air gap above the floor. That gap is the whole fix for "the bottom row
- * overflows the panel": the old window ran to +660, eight units PAST the
- * floor, so any layout that filled it exactly (the dragon-skin hero section,
- * Decorations at full scroll) stood its bottom row on the frame's bezel.
- */
-const VIEW_TOP = -300;
-const VIEW_BOTTOM = 640;
-const VIEW_H = VIEW_BOTTOM - VIEW_TOP;
-const GRID_MID = (VIEW_TOP + VIEW_BOTTOM) / 2;
-/** Two rows of 460 + the 20 between them = 940, the window exactly — which is
- *  why CARD_H cannot grow: a taller card pushes row two onto the bezel again.
- *  A section with more than `COLS * 2` items SCROLLS instead of squeezing. */
-const ROW_GAP = 480;
 /** Past this much drag the gesture is a scroll, and the card under the finger
  *  must not also be bought. */
 const DRAG_SLOP = 12;
 
 /**
- * The showcase card. Its height IS the whole grid — both rows and the gap
- * between them — so it can never disagree with the cards beside it. Its width
- * is that height at 0.716, the proportion of a physical trading card, because
- * that is the thing a foiled legendary is pretending to be.
+ * TWO layouts, one shelf. The Store adapts its LAYOUT to the device, not just
+ * its frame: desktop is a landscape counter — four columns, tabs in a row, a
+ * showcase card standing BESIDE the grid. A phone is a portrait sheet on the
+ * tall frame — two columns and more rows, the tabs a 2×2 grid, the showcase a
+ * full-width poster ABOVE the grid, and every font stepped up because the tall
+ * frame's fit scale still leaves a unit smaller on a phone than on a desktop.
+ *
+ * Desktop numbers are the shipped ones, untouched. The window comments there
+ * still apply: it is measured off the PAINTED plate (inner floor +652 on the
+ * landscape frame), holding a 12-unit air gap so a full layout never stands its
+ * bottom row on the bezel. The mobile window is measured the same way off the
+ * tall frame's plate (y −1004..+996 local, minus the chrome edge).
  */
-const HERO_H = ROW_GAP + CARD_H;
-const HERO_W = Math.round(HERO_H * 0.716);
+interface StoreLayout {
+  mobile: boolean;
+  frameKey: string;
+  frameY: number;
+  bannerY: number;
+  titleY: number;
+  titleFont: number;
+  closeX: number;
+  closeY: number;
+  closeScale: number;
+  tabsY: number;
+  /** 'row' = all tabs on one line; 'grid' = two per line, stacked. */
+  tabsMode: 'row' | 'grid';
+  tabW: number;
+  tabH: number;
+  tabFont: number;
+  blurbY: number;
+  blurbFont: number;
+  blurbWrap: number;
+  viewTop: number;
+  viewBottom: number;
+  cardW: number;
+  cardH: number;
+  cols: number;
+  colGap: number;
+  rowGap: number;
+  cardNameFont: number;
+  cardBlurbFont: number;
+  cardArtY: number;
+  cardArtFitW: number;
+  cardArtFitH: number;
+  priceFont: number;
+  priceScale: number;
+  ribbonFont: number;
+  ribbonH: number;
+  heroW: number;
+  heroH: number;
+  heroGap: number;
+  /** Columns beside the hero (desktop); on mobile the hero sits above instead. */
+  heroCols: number;
+  heroNameFont: number;
+  heroBlurbFont: number;
+  heroPriceFont: number;
+  soonFont: number;
+}
+
+// NOTE the mobile numbers live in the frame's RENDERED space: the painter works
+// in logical units ×RES, so `ui_panel_tall` painted 1180×2040 logical RENDERS as
+// a 2360×4080 image — the same convention the desktop numbers always used
+// against ui_store_panel's rendered 2120×1320.
+const LY: StoreLayout = IS_MOBILE
+  ? {
+      mobile: true,
+      frameKey: 'ui_panel_tall',
+      frameY: 0,
+      bannerY: -1904,
+      titleY: -1800,
+      titleFont: 168,
+      closeX: 984,
+      closeY: -1800,
+      closeScale: 2.2,
+      tabsY: -1560,
+      tabsMode: 'grid',
+      tabW: 1000,
+      tabH: 200,
+      tabFont: 88,
+      blurbY: -1188,
+      blurbFont: 64,
+      blurbWrap: 2080,
+      viewTop: -900,
+      viewBottom: 1892,
+      cardW: 1000,
+      cardH: 1140,
+      cols: 2,
+      colGap: 1080,
+      rowGap: 1188,
+      cardNameFont: 84,
+      cardBlurbFont: 60,
+      cardArtY: -292,
+      cardArtFitW: 760,
+      cardArtFitH: 480,
+      priceFont: 92,
+      priceScale: 1.72,
+      ribbonFont: 48,
+      ribbonH: 92,
+      heroW: 2080,
+      heroH: 1860,
+      heroGap: 120,
+      heroCols: 2,
+      heroNameFont: 112,
+      heroBlurbFont: 64,
+      heroPriceFont: 104,
+      soonFont: 176
+    }
+  : {
+      mobile: false,
+      frameKey: 'ui_store_panel',
+      frameY: 40,
+      bannerY: -640,
+      titleY: -586,
+      titleFont: 64,
+      closeX: 956,
+      closeY: -540,
+      closeScale: 1,
+      tabsY: -430,
+      tabsMode: 'row',
+      tabW: 420,
+      tabH: 92,
+      tabFont: 40,
+      blurbY: -344,
+      blurbFont: 30,
+      blurbWrap: 1860,
+      viewTop: -300,
+      viewBottom: 640,
+      cardW: 452,
+      cardH: 460,
+      cols: 4,
+      colGap: 476,
+      rowGap: 480,
+      cardNameFont: 32,
+      cardBlurbFont: 22,
+      cardArtY: -122,
+      cardArtFitW: 300,
+      cardArtFitH: 188,
+      priceFont: 38,
+      priceScale: 0.74,
+      ribbonFont: 22,
+      ribbonH: 44,
+      heroW: Math.round((480 + 460) * 0.716),
+      heroH: 480 + 460,
+      heroGap: 96,
+      heroCols: 2,
+      heroNameFont: 46,
+      heroBlurbFont: 22,
+      heroPriceFont: 46,
+      soonFont: 76
+    };
+
+const VIEW_H = LY.viewBottom - LY.viewTop;
+const GRID_MID = (LY.viewTop + LY.viewBottom) / 2;
 
 /**
  * Bleed a painting across a plate WITHOUT distorting it.
@@ -77,17 +202,16 @@ function bleedArt(
   boxH: number
 ): Phaser.GameObjects.Image {
   const art = scene.add.image(0, 0, key);
-  const scale = boxH / art.height; // fill vertically
-  const fitsW = boxW / scale; // source pixels the plate's width can hold
-  if (fitsW < art.width) {
-    art.setCrop((art.width - fitsW) / 2, 0, fitsW, art.height);
-  }
+  // COVER, not height-fill: the plates come in both proportions now (the mobile
+  // hero is wider than tall, the desktop hero taller than wide), so fill
+  // whichever axis binds and crop the other out of the source. Centred crop —
+  // the animal is in the middle of these paintings, the spare sky at the edges.
+  const scale = Math.max(boxW / art.width, boxH / art.height);
+  const fitsW = boxW / scale;
+  const fitsH = boxH / scale;
+  art.setCrop((art.width - fitsW) / 2, (art.height - fitsH) / 2, fitsW, fitsH);
   return art.setScale(scale);
 }
-const HERO_GAP = 96;
-/** A section with a showcase card fits two ordinary columns beside it. */
-const HERO_COLS = 2;
-
 /**
  * The Keeper's Store — cosmetics, bought with earned Gold.
  *
@@ -147,13 +271,14 @@ export class StorePanel extends Phaser.GameObjects.Container {
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
-    const frame = scene.add.image(0, 40, 'ui_store_panel');
-    this.baseScale = panelMobileScale(frame.width);
+    const frame = scene.add.image(0, LY.frameY, LY.frameKey);
+    // The tall frame fits BOTH axes; the landscape one keeps the width-only rule.
+    this.baseScale = LY.mobile ? panelFitScale(frame.width, frame.height) : panelMobileScale(frame.width);
 
     this.titleBg = scene.add.graphics();
     this.titleText = scene.add
-      .text(0, -586, "KEEPER'S STORE", {
-        fontFamily: FONT.ui, fontSize: '64px', fontStyle: 'bold', color: INK.onField
+      .text(0, LY.titleY, "KEEPER'S STORE", {
+        fontFamily: FONT.ui, fontSize: `${LY.titleFont}px`, fontStyle: 'bold', color: INK.onField
       })
       .setOrigin(0.5)
       .setShadow(0, 5, 'rgba(36,27,34,0.55)', 6);
@@ -162,25 +287,28 @@ export class StorePanel extends Phaser.GameObjects.Container {
     // two-row section starts at -300, and a blurb parked in the shelf container
     // ended up behind the first row of cards.
     this.sectionBlurb = scene.add
-      .text(0, -344, '', {
-        fontFamily: FONT.ui, fontSize: '30px', color: INK.onFieldDim,
-        align: 'center', wordWrap: { width: 1860 }
+      .text(0, LY.blurbY, '', {
+        fontFamily: FONT.ui, fontSize: `${LY.blurbFont}px`, color: INK.onFieldDim,
+        align: 'center', wordWrap: { width: LY.blurbWrap }
       })
-      .setOrigin(0.5);
+      // Mobile pins the blurb's TOP under the tab grid so a four-line pitch
+      // grows down toward the shelf instead of up into the tabs.
+      .setOrigin(0.5, LY.mobile ? 0 : 0.5);
 
-    const close = scene.add.container(956, -540);
+    const close = scene.add.container(LY.closeX, LY.closeY);
     this.closeBtn = close;
     const closeBg = scene.add.image(0, 6, 'ui_btn_round').setScale(0.92).setTint(num(INK.field));
     const closeX = scene.add
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '54px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     close.add([closeBg, closeX]);
+    close.setScale(LY.closeScale);
     close.setSize(120, 120).setInteractive({ useHandCursor: true });
-    close.on('pointerover', () => close.setScale(1.08));
-    close.on('pointerout', () => close.setScale(1));
+    close.on('pointerover', () => close.setScale(LY.closeScale * 1.08));
+    close.on('pointerout', () => close.setScale(LY.closeScale));
     close.on('pointerup', () => this.requestClose());
 
-    this.tabsRow = scene.add.container(0, -430);
+    this.tabsRow = scene.add.container(0, LY.tabsY);
     this.viewport = scene.add.container(0, GRID_MID);
     this.shelf = scene.add.container(0, 0);
     this.viewport.add(this.shelf);
@@ -319,36 +447,44 @@ export class StorePanel extends Phaser.GameObjects.Container {
   }
 
   private drawBanner(width: number): void {
-    const w = Math.max(620, width);
-    const y = -640;
+    const w = Math.max(LY.mobile ? 1240 : 620, width);
+    const y = LY.bannerY;
+    const h = LY.mobile ? 208 : 104;
     const g = this.titleBg;
     g.clear();
     g.fillStyle(num(INK.goldDeep), 1);
-    g.fillRoundedRect(-w / 2, y + 10, w, 104, 34);
+    g.fillRoundedRect(-w / 2, y + 10, w, h, h / 3);
     g.fillStyle(num(INK.field), 1);
-    g.fillRoundedRect(-w / 2, y, w, 104, 34);
+    g.fillRoundedRect(-w / 2, y, w, h, h / 3);
     g.lineStyle(6, num(INK.gold), 1);
-    g.strokeRoundedRect(-w / 2, y, w, 104, 34);
+    g.strokeRoundedRect(-w / 2, y, w, h, h / 3);
     g.fillStyle(num(INK.fieldLift), 0.5);
-    g.fillRoundedRect(-w / 2 + 14, y + 8, w - 28, 34, 18);
+    g.fillRoundedRect(-w / 2 + 14, y + 8, w - 28, h / 3, h / 6);
   }
 
   private buildTabs(): void {
     this.tabsRow.removeAll(true);
-    const gap = 470;
-    const startX = -((this.sections.length - 1) * gap) / 2;
+    const { tabW, tabH, tabFont } = LY;
+    const halfW = tabW / 2;
+    const halfH = tabH / 2;
     this.sections.forEach((section, i) => {
       const active = i === this.activeIndex;
-      const tab = this.scene.add.container(startX + i * gap, 0);
+      // Desktop: one row. Mobile: two per row, stacked — four full-word tabs do
+      // not share 1100 units, and truncating the words costs more than a row.
+      const pos =
+        LY.tabsMode === 'row'
+          ? { x: -((this.sections.length - 1) * 470) / 2 + i * 470, y: 0 }
+          : { x: (i % 2 === 0 ? -1 : 1) * (tabW / 2 + 32), y: Math.floor(i / 2) * (tabH + 40) };
+      const tab = this.scene.add.container(pos.x, pos.y);
       const g = this.scene.add.graphics();
       g.fillStyle(num(active ? INK.fieldLift : INK.fieldDeep), 1);
-      g.fillRoundedRect(-210, -46, 420, 92, 30);
+      g.fillRoundedRect(-halfW, -halfH, tabW, tabH, 30);
       g.lineStyle(5, num(active ? INK.gold : INK.goldDeep), 1);
-      g.strokeRoundedRect(-210, -46, 420, 92, 30);
+      g.strokeRoundedRect(-halfW, -halfH, tabW, tabH, 30);
       const label = this.scene.add
         .text(0, -2, section.title, {
           fontFamily: FONT.ui,
-          fontSize: '40px',
+          fontSize: `${tabFont}px`,
           fontStyle: 'bold',
           color: active ? INK.onField : INK.onFieldDim
         })
@@ -358,15 +494,15 @@ export class StorePanel extends Phaser.GameObjects.Container {
       if (section.kind === 'soon') {
         tab.add(
           this.scene.add
-            .text(0, 34, 'SOON', {
-              fontFamily: FONT.ui, fontSize: '22px', fontStyle: 'bold',
+            .text(0, halfH - LY.tabFont * 0.55, 'SOON', {
+              fontFamily: FONT.ui, fontSize: `${Math.round(LY.tabFont * 0.5)}px`, fontStyle: 'bold',
               color: active ? INK.onFieldGold : INK.onFieldDim
             })
             .setOrigin(0.5)
         );
         label.setY(-12);
       }
-      tab.setSize(420, 92).setInteractive({ useHandCursor: true });
+      tab.setSize(tabW, tabH).setInteractive({ useHandCursor: true });
       tab.on('pointerup', () => {
         if (this.activeIndex === i) return;
         this.activeIndex = i;
@@ -394,7 +530,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
       this.shelf.add(
         this.scene.add
           .text(0, -60, 'AVAILABLE SOON', {
-            fontFamily: FONT.ui, fontSize: '76px', fontStyle: 'bold', color: INK.onFieldGold
+            fontFamily: FONT.ui, fontSize: `${LY.soonFont}px`, fontStyle: 'bold', color: INK.onFieldGold
           })
           .setOrigin(0.5)
           .setAlpha(0.85)
@@ -402,41 +538,68 @@ export class StorePanel extends Phaser.GameObjects.Container {
       return;
     }
 
-    // One showcase card may claim the left of the shelf at full grid height;
-    // everything else falls into the columns left over. Both halves are laid
-    // out from the same measured total, so the block stays centred whether or
-    // not the section has a hero.
     const hero = section.items.find((item) => item.hero) ?? null;
     const rest = hero ? section.items.filter((item) => item !== hero) : section.items;
-    const cols = hero ? HERO_COLS : COLS;
-    const blockW = (cols - 1) * COL_GAP + CARD_W;
-    const total = hero ? HERO_W + HERO_GAP + blockW : blockW;
+
+    if (LY.mobile) {
+      // PORTRAIT flow: the showcase is a full-width poster ABOVE the grid, and
+      // the grid is two columns of as many rows as it takes — the window
+      // scrolls, so depth is free where width is not.
+      const rows = Math.ceil(rest.length / LY.cols);
+      const gridH = rest.length ? (rows - 1) * LY.rowGap + LY.cardH : 0;
+      const heroBand = hero ? LY.heroH + (rest.length ? LY.heroGap : 0) : 0;
+      const contentH = heroBand + gridH;
+      const firstTop = contentH <= VIEW_H ? -contentH / 2 : -VIEW_H / 2;
+      this.maxScroll = Math.max(0, contentH - VIEW_H);
+      if (hero) this.place(this.makeHeroCard(0, firstTop + LY.heroH / 2, hero, section), hero);
+      const colStartX = -((LY.cols - 1) * LY.colGap) / 2;
+      const gridTop = firstTop + heroBand + LY.cardH / 2;
+      rest.forEach((item, i) => {
+        const col = i % LY.cols;
+        const row = Math.floor(i / LY.cols);
+        this.place(
+          this.makeCard(colStartX + col * LY.colGap, gridTop + row * LY.rowGap, item, section),
+          item
+        );
+      });
+      this.setScroll(0);
+      this.seatMask();
+      return;
+    }
+
+    // LANDSCAPE flow — the shipped desktop layout, untouched. One showcase card
+    // may claim the left of the shelf at full grid height; everything else
+    // falls into the columns left over. Both halves are laid out from the same
+    // measured total, so the block stays centred whether or not there is a hero.
+    const cols = hero ? LY.heroCols : LY.cols;
+    const blockW = (cols - 1) * LY.colGap + LY.cardW;
+    const total = hero ? LY.heroW + LY.heroGap + blockW : blockW;
     const left = -total / 2;
 
-    if (hero) this.place(this.makeHeroCard(left + HERO_W / 2, 0, hero, section), hero);
+    if (hero) this.place(this.makeHeroCard(left + LY.heroW / 2, 0, hero, section), hero);
 
-    const blockMidX = hero ? left + HERO_W + HERO_GAP + blockW / 2 : 0;
+    const blockMidX = hero ? left + LY.heroW + LY.heroGap + blockW / 2 : 0;
     const rows = Math.ceil(rest.length / cols);
     // Short sections stay optically centred; a section that overflows starts at
     // the top of the window instead, because a centred overflow hides its first
     // row as well as its last.
-    const contentH = (rows - 1) * ROW_GAP + CARD_H;
+    const contentH = (rows - 1) * LY.rowGap + LY.cardH;
     const startY =
       contentH <= VIEW_H
-        ? -((rows - 1) * ROW_GAP) / 2
-        : -VIEW_H / 2 + CARD_H / 2;
+        ? -((rows - 1) * LY.rowGap) / 2
+        : -VIEW_H / 2 + LY.cardH / 2;
     this.maxScroll = Math.max(0, contentH - VIEW_H);
     // Every row starts at the block's left edge — the BLOCK is centred, the
     // rows inside it are a grid. A short final row therefore leaves its gap on
     // the right rather than re-centring itself, so columns line up top to
     // bottom and a lone last item sits under the first column, not adrift in
     // the middle.
-    const colStartX = blockMidX - ((cols - 1) * COL_GAP) / 2;
+    const colStartX = blockMidX - ((cols - 1) * LY.colGap) / 2;
     rest.forEach((item, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
       this.place(
-        this.makeCard(colStartX + col * COL_GAP, startY + row * ROW_GAP, item, section),
+        this.makeCard(colStartX + col * LY.colGap, startY + row * LY.rowGap, item, section),
         item
       );
     });
@@ -519,13 +682,13 @@ export class StorePanel extends Phaser.GameObjects.Container {
     const ribbon = this.scene.add.container(0, y);
     const label = this.scene.add
       .text(0, 0, look.label, {
-        fontFamily: FONT.ui, fontSize: '22px', fontStyle: 'bold', color: look.ink
+        fontFamily: FONT.ui, fontSize: `${LY.ribbonFont}px`, fontStyle: 'bold', color: look.ink
       })
       .setLetterSpacing(4)
       .setOrigin(0.5)
       .setShadow(0, 2, 'rgba(36,27,34,0.5)', 3);
-    const w = label.width + 58;
-    const h = 44;
+    const w = label.width + LY.ribbonH * 1.3;
+    const h = LY.ribbonH;
     const g = this.scene.add.graphics();
     g.fillStyle(num(INK.scrim), 0.45);
     g.fillRoundedRect(-w / 2, -h / 2 + 5, w, h, h / 2);
@@ -610,12 +773,12 @@ export class StorePanel extends Phaser.GameObjects.Container {
     const card = this.scene.add.container(x, y);
     const owned = this.gameState.ownedCosmetics.includes(item.id);
     const worn = this.isWorn(item, section);
-    const inner = { w: HERO_W - PLATE_INSET * 2, h: HERO_H - PLATE_INSET * 2 };
+    const inner = { w: LY.heroW - PLATE_INSET * 2, h: LY.heroH - PLATE_INSET * 2 };
 
     const plate = makeFoilPlate(
       this.scene,
-      HERO_W,
-      HERO_H,
+      LY.heroW,
+      LY.heroH,
       CARD_R,
       worn ? INK.ember : undefined
     );
@@ -630,11 +793,12 @@ export class StorePanel extends Phaser.GameObjects.Container {
     card.add(plate.rim);
     this.sheens.push(runSheen(this.scene, plate.sheen));
 
-    if (item.rarity) card.add(this.makeRibbon(item.rarity, -HERO_H / 2 + 46));
+    if (item.rarity) card.add(this.makeRibbon(item.rarity, -LY.heroH / 2 + LY.ribbonH));
+    const nameY = LY.heroH / 2 - (LY.mobile ? 500 : 264);
     card.add(
       this.scene.add
-        .text(0, 206, item.name, {
-          fontFamily: FONT.ui, fontSize: '46px', fontStyle: 'bold', color: INK.onField,
+        .text(0, nameY, item.name, {
+          fontFamily: FONT.ui, fontSize: `${LY.heroNameFont}px`, fontStyle: 'bold', color: INK.onField,
           align: 'center', wordWrap: { width: inner.w - 72 }
         })
         .setOrigin(0.5)
@@ -642,14 +806,14 @@ export class StorePanel extends Phaser.GameObjects.Container {
     );
     card.add(
       this.scene.add
-        .text(0, 246, item.blurb, {
-          fontFamily: FONT.ui, fontSize: '22px', color: FOIL.rim,
+        .text(0, nameY + LY.heroNameFont - 6, item.blurb, {
+          fontFamily: FONT.ui, fontSize: `${LY.heroBlurbFont}px`, color: FOIL.rim,
           align: 'center', wordWrap: { width: inner.w - 84 }
         })
         .setOrigin(0.5, 0)
         .setShadow(0, 3, 'rgba(36,27,34,0.7)', 5)
     );
-    card.add(this.makeAction(item, section, owned, worn, HERO_H / 2 - 84, 0.92, 46));
+    card.add(this.makeAction(item, section, owned, worn, LY.heroH / 2 - 84, 0.92, LY.heroPriceFont));
     return card;
   }
 
@@ -677,8 +841,8 @@ export class StorePanel extends Phaser.GameObjects.Container {
     if (foil) {
       const plate = makeFoilPlate(
         this.scene,
-        CARD_W,
-        CARD_H,
+        LY.cardW,
+        LY.cardH,
         CARD_R,
         worn ? INK.ember : undefined
       );
@@ -688,30 +852,30 @@ export class StorePanel extends Phaser.GameObjects.Container {
     } else {
       const g = this.scene.add.graphics();
       g.fillStyle(num(INK.goldDeep), 1);
-      g.fillRoundedRect(-CARD_W / 2, -CARD_H / 2 + 8, CARD_W, CARD_H, CARD_R);
+      g.fillRoundedRect(-LY.cardW / 2, -LY.cardH / 2 + 8, LY.cardW, LY.cardH, CARD_R);
       g.fillStyle(num(INK.field), 1);
-      g.fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
+      g.fillRoundedRect(-LY.cardW / 2, -LY.cardH / 2, LY.cardW, LY.cardH, CARD_R);
       card.add(g);
       // The rim is its own layer so full-bleed art can slide UNDER it — a
       // stroke fused into the plate would be painted over by the art.
       rim = this.scene.add.graphics();
       rim.lineStyle(6, num(worn ? INK.ember : INK.gold), 1);
-      rim.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
+      rim.strokeRoundedRect(-LY.cardW / 2, -LY.cardH / 2, LY.cardW, LY.cardH, CARD_R);
     }
 
     if (this.scene.textures.exists(item.art)) {
       if (bleed) {
-        const inner = { w: CARD_W - PLATE_INSET * 2, h: CARD_H - PLATE_INSET * 2 };
+        const inner = { w: LY.cardW - PLATE_INSET * 2, h: LY.cardH - PLATE_INSET * 2 };
         card.add(bleedArt(this.scene, item.art, inner.w, inner.h));
         // Scrim under everything the player must read — from just above the
         // name down to the plate's foot, same treatment as the hero.
         card.add(addScrim(this.scene, inner.w, inner.h / 2 - 12, -12));
       } else {
         // Contain-fit into the card's stage so a tall Manor and a squat rune
-        // pad both sit inside the same rectangle, capped at 188 tall: the
-        // blurb is the reason anyone reads a card twice, and it needs lines.
-        const art = this.scene.add.image(0, -122, item.art);
-        art.setScale(Math.min(300 / art.width, 188 / art.height));
+        // pad both sit inside the same rectangle, height-capped: the blurb is
+        // the reason anyone reads a card twice, and it needs lines.
+        const art = this.scene.add.image(0, LY.cardArtY, item.art);
+        art.setScale(Math.min(LY.cardArtFitW / art.width, LY.cardArtFitH / art.height));
         card.add(art);
       }
     }
@@ -723,28 +887,31 @@ export class StorePanel extends Phaser.GameObjects.Container {
       this.sheens.push(runSheen(this.scene, sheen, this.sheens.length * 900));
     }
     if (rim) card.add(rim);
-    if (item.rarity) card.add(this.makeRibbon(item.rarity, -CARD_H / 2 + 8));
+    if (item.rarity) card.add(this.makeRibbon(item.rarity, -LY.cardH / 2 + 8));
 
+    // Name sits where the art band ends; the blurb hangs off it so the pair
+    // moves together when the card grows taller on the portrait layout.
+    const nameY = LY.cardArtY + LY.cardArtFitH / 2 + 36;
     const name = this.scene.add
-      .text(0, 8, item.name, {
-        fontFamily: FONT.ui, fontSize: '32px', fontStyle: 'bold',
+      .text(0, nameY, item.name, {
+        fontFamily: FONT.ui, fontSize: `${LY.cardNameFont}px`, fontStyle: 'bold',
         color: INK.onField,
-        align: 'center', wordWrap: { width: CARD_W - 56 }
+        align: 'center', wordWrap: { width: LY.cardW - 56 }
       })
       .setOrigin(0.5);
     if (bleed) name.setShadow(0, 4, 'rgba(36,27,34,0.7)', 6);
     card.add(name);
     const blurb = this.scene.add
-      .text(0, 40, item.blurb, {
-        fontFamily: FONT.ui, fontSize: '22px',
+      .text(0, nameY + LY.cardNameFont, item.blurb, {
+        fontFamily: FONT.ui, fontSize: `${LY.cardBlurbFont}px`,
         color: bleed || foil ? FOIL.rim : INK.onFieldDim,
-        align: 'center', wordWrap: { width: CARD_W - 64 }
+        align: 'center', wordWrap: { width: LY.cardW - 64 }
       })
       .setOrigin(0.5, 0)
       .setAlpha(bleed || foil ? 1 : 0.9);
     if (bleed) blurb.setShadow(0, 3, 'rgba(36,27,34,0.7)', 5);
     card.add(blurb);
-    card.add(this.makeAction(item, section, owned, worn, CARD_H / 2 - 62, 0.74, 38));
+    card.add(this.makeAction(item, section, owned, worn, LY.cardH / 2 - 62, LY.priceScale, LY.priceFont));
     return card;
   }
 }

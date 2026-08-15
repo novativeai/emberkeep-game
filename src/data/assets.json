@@ -365,12 +365,32 @@
       "generator": "ui"
     },
     {
+      "key": "ui_panel_tall",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
       "key": "ui_quest_panel",
       "source": "placeholder",
       "generator": "ui"
     },
     {
       "key": "ui_shop_panel",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_panel_tall",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_card_tall",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
+      "key": "ui_shop_card_tall_hot",
       "source": "placeholder",
       "generator": "ui"
     },

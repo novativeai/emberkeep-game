@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelMobileScale } from '../core/Constants';
+import { IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelFitScale, panelMobileScale } from '../core/Constants';
 import { FONT, INK } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
@@ -54,14 +54,39 @@ const SHOP: Record<Currency, { title: string; tab: string; icon: string; iconSca
  * painter authors in logical units and Phaser draws at logical×RES, so one
  * logical unit is two game units — every number here is already doubled.
  * ------------------------------------------------------------------------ */
-/** Title bar: name plate, wallet chips, close ring. */
-const BAR_Y = -600;
-/** Content box (the tabbed shelf) — the tabs bite into its top edge. */
-const SHELF_TOP = -280;
-/** Tab art is 148 tall and its bottom 28 are a borderless lip, so seating the
- *  centre here drops that lip OVER the shelf's top edge and the active tab
- *  reads as part of the shelf rather than as a button above it. */
-const TAB_Y = SHELF_TOP - 60;
+/**
+ * Device layout. Desktop is the landscape hall; a phone gets the PORTRAIT hall
+ * (`ui_shop_panel_tall`) with every pack as a two-line card — goods left, name
+ * and amount stacked, price plate riding low-right — because the landscape
+ * row's single-line flow has no room at phone width.
+ */
+const SL = IS_MOBILE
+  ? {
+      frameKey: 'ui_shop_panel_tall',
+      cardKey: 'ui_shop_card_tall', cardHotKey: 'ui_shop_card_tall_hot',
+      plaqueX: 0, plaqueY: -1790, plaqueScale: 1.5, plaqueFont: 76,
+      walletY: -1520, walletX: [-430, 430] as const, walletScale: 1.6,
+      closeX: 960, closeY: -1790, closeScale: 1.5,
+      tabY: -1236, tabGap: 1150, tabScale: 1.5, tabFont: 58,
+      shelfTop: -1150, shelfH: 2700, rowH: 560, rowGap: 70,
+      artX: -660, pileUnit: 170, burstScale: 2.6,
+      textX: -360, nameY: -116, nameFont: 66, amountY: -8, amountFont: 54, bonusFont: 50,
+      tagX: -360, tagY: 116, tagScale: 1.5,
+      priceX: 620, priceY: 84, priceScale: 1.5
+    }
+  : {
+      frameKey: 'ui_shop_panel',
+      cardKey: 'ui_shop_card', cardHotKey: 'ui_shop_card_hot',
+      plaqueX: -740, plaqueY: -600, plaqueScale: 1, plaqueFont: 58,
+      walletY: -600, walletX: [380, 760] as const, walletScale: 1,
+      closeX: 1040, closeY: -600, closeScale: 1,
+      tabY: -280 - 60, tabGap: 620, tabScale: 1, tabFont: 44,
+      shelfTop: -280, shelfH: 928, rowH: 224, rowGap: 30,
+      artX: -680, pileUnit: 100, burstScale: 1.9,
+      textX: -500, nameY: -34, nameFont: 46, amountY: 34, amountFont: 34, bonusFont: 32,
+      tagX: 150, tagY: 0, tagScale: 1,
+      priceX: 640, priceY: 0, priceScale: 1
+    };
 
 /* ---------------------------------------------------------------------------
  * The shelf is a LIST OF ROWS, which is the shape a currency shop actually
@@ -73,15 +98,7 @@ const TAB_Y = SHELF_TOP - 60;
  * name, sub-line, tag, price, left to right — so nothing is positioned against
  * an edge and nothing can collide with its neighbour.
  * ------------------------------------------------------------------------ */
-/** Inner height of the content box, from `ui_shop_panel`'s own geometry. */
-const SHELF_H = 928;
-const ROW_H = 224;
-const ROW_GAP = 30;
-/** Row slots, measured from the row's centre. */
-const ROW_ART_X = -680;
-const ROW_TEXT_X = -500;
-const ROW_TAG_X = 150;
-const ROW_PRICE_X = 640;
+
 
 /** Painted glyphs (the ⚡ bolt) are authored at 44 logical units; blowing one up
  *  to fill a shop plate turns it to mush. Art is fitted to the slot but never
@@ -148,37 +165,38 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
-    const frame = scene.add.image(0, 0, 'ui_shop_panel');
-    this.baseScale = panelMobileScale(frame.width);
+    const frame = scene.add.image(0, 0, SL.frameKey);
+    this.baseScale = IS_MOBILE ? panelFitScale(frame.width, frame.height) : panelMobileScale(frame.width);
 
     // ---- Title bar: name plate left, wallet + close right ----
-    const plaque = scene.add.image(-740, BAR_Y, 'ui_shop_plaque');
+    const plaque = scene.add.image(SL.plaqueX, SL.plaqueY, 'ui_shop_plaque').setScale(SL.plaqueScale);
     this.plaqueText = scene.add
-      .text(-740, BAR_Y - 2, 'EMPORIUM', {
+      .text(SL.plaqueX, SL.plaqueY - 2, 'EMPORIUM', {
         fontFamily: FONT.ui,
-        fontSize: '58px',
+        fontSize: `${SL.plaqueFont}px`,
         fontStyle: 'bold',
         color: INK.onPlate
       })
       .setOrigin(0.5);
 
-    const [goldChip, goldText] = this.wallet(380, 'ui_icon_coin');
-    const [warmthChip, warmthText] = this.wallet(760, 'ui_icon_bolt');
+    const [goldChip, goldText] = this.wallet(SL.walletX[0], 'ui_icon_coin');
+    const [warmthChip, warmthText] = this.wallet(SL.walletX[1], 'ui_icon_bolt');
     this.walletGold = goldText;
     this.walletWarmth = warmthText;
 
-    const close = scene.add.container(1040, BAR_Y);
+    const close = scene.add.container(SL.closeX, SL.closeY);
     const closeRing = scene.add.image(0, 0, 'ui_shop_close');
     const closeX = scene.add
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '52px', fontStyle: 'bold', color: INK.goldHi })
       .setOrigin(0.5);
     close.add([closeRing, closeX]);
+    close.setScale(SL.closeScale);
     close.setSize(140, 140).setInteractive({ useHandCursor: true });
-    close.on('pointerover', () => close.setScale(1.08));
-    close.on('pointerout', () => close.setScale(1));
+    close.on('pointerover', () => close.setScale(SL.closeScale * 1.08));
+    close.on('pointerout', () => close.setScale(SL.closeScale));
     close.on('pointerup', () => this.requestClose());
 
-    this.tabs = scene.add.container(0, TAB_Y);
+    this.tabs = scene.add.container(0, SL.tabY);
     this.shelf = scene.add.container(0, 0);
 
     this.add([this.dim, frame, plaque, this.plaqueText, goldChip, warmthChip, close, this.tabs, this.shelf]);
@@ -248,7 +266,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
 
   /** One wallet chip in the title bar: dark lozenge, icon, live count. */
   private wallet(x: number, icon: string): [Phaser.GameObjects.Container, Phaser.GameObjects.Text] {
-    const chip = this.scene.add.container(x, BAR_Y);
+    const chip = this.scene.add.container(x, SL.walletY).setScale(SL.walletScale);
     const bg = this.scene.add.image(0, 0, 'ui_shop_wallet');
     // Icons arrive at wildly different authored sizes (the coin is a big
     // detailed PNG, the bolt a 44-unit painted glyph) — fit both to the chip's
@@ -270,16 +288,16 @@ export class ShopPanel extends Phaser.GameObjects.Container {
   private buildTabs(): void {
     this.tabs.removeAll(true);
     const order: Currency[] = ['energy', 'coins'];
-    const gap = 620;
+    const gap = SL.tabGap;
     order.forEach((cur, i) => {
       const active = cur === this.currency;
-      const tab = this.scene.add.container((i - (order.length - 1) / 2) * gap, 0);
+      const tab = this.scene.add.container((i - (order.length - 1) / 2) * gap, 0).setScale(SL.tabScale);
       tab.add(this.scene.add.image(0, 0, active ? 'ui_shop_tab_on' : 'ui_shop_tab'));
       tab.add(
         this.scene.add
           .text(0, -6, SHOP[cur].tab, {
             fontFamily: FONT.ui,
-            fontSize: '44px',
+            fontSize: `${SL.tabFont}px`,
             fontStyle: 'bold',
             color: active ? INK.onField : INK.onFieldDim
           })
@@ -323,10 +341,10 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     const order = items.map((item, tier) => ({ item, tier }));
     if (freeIndex >= 0) order.unshift(...order.splice(freeIndex, 1));
 
-    const total = order.length * ROW_H + (order.length - 1) * ROW_GAP;
-    const top = SHELF_TOP + (SHELF_H - total) / 2 + ROW_H / 2;
+    const total = order.length * SL.rowH + (order.length - 1) * SL.rowGap;
+    const top = SL.shelfTop + (SL.shelfH - total) / 2 + SL.rowH / 2;
     order.forEach(({ item, tier }, i) => {
-      const y = top + i * (ROW_H + ROW_GAP);
+      const y = top + i * (SL.rowH + SL.rowGap);
       this.shelf.add(this.makeRow(item, cfg, items, tier, y, freeIndex >= 0 && i === 0));
     });
   }
@@ -446,19 +464,19 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     isFree: boolean
   ): Phaser.GameObjects.Container {
     const row = this.scene.add.container(0, y);
-    row.add(this.scene.add.image(0, 0, item.best || isFree ? 'ui_shop_card_hot' : 'ui_shop_card'));
+    row.add(this.scene.add.image(0, 0, item.best || isFree ? SL.cardHotKey : SL.cardKey));
 
     // Goods, heaped in their own pool of light.
     row.add(
-      this.scene.add.image(ROW_ART_X, -4, 'ui_shop_burst').setScale(1.9).setAlpha(isFree || item.best ? 0.95 : 0.6)
+      this.scene.add.image(SL.artX, -4, 'ui_shop_burst').setScale(SL.burstScale).setAlpha(isFree || item.best ? 0.95 : 0.6)
     );
-    row.add(this.pile(ROW_ART_X, -8, cfg.icon, tier, 100));
+    row.add(this.pile(SL.artX, -8, cfg.icon, tier, SL.pileUnit));
 
     row.add(
       this.scene.add
-        .text(ROW_TEXT_X, -34, item.name.toUpperCase(), {
+        .text(SL.textX, SL.nameY, item.name.toUpperCase(), {
           fontFamily: FONT.ui,
-          fontSize: '46px',
+          fontSize: `${SL.nameFont}px`,
           fontStyle: 'bold',
           color: INK.onField
         })
@@ -468,9 +486,9 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     // The sub-line carries the amount and, when there is one, the value bonus —
     // inline, so the shelf never needs a chip pinned to a corner to say it.
     const amount = this.scene.add
-      .text(ROW_TEXT_X + 4, 34, `${cfg.title} ×${item.amount.toLocaleString()}`, {
+      .text(SL.textX + 4, SL.amountY, `${cfg.title} ×${item.amount.toLocaleString()}`, {
         fontFamily: FONT.ui,
-        fontSize: '34px',
+        fontSize: `${SL.amountFont}px`,
         color: INK.onFieldDim
       })
       .setOrigin(0, 0.5);
@@ -479,9 +497,9 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     if (!isFree && bonus >= 5) {
       row.add(
         this.scene.add
-          .text(ROW_TEXT_X + 4 + amount.width + 26, 34, `+${bonus}% MORE`, {
+          .text(SL.textX + 4 + amount.width + 26, SL.amountY, `+${bonus}% MORE`, {
             fontFamily: FONT.ui,
-            fontSize: '32px',
+            fontSize: `${SL.bonusFont}px`,
             fontStyle: 'bold',
             color: INK.goldHi
           })
@@ -490,14 +508,14 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     }
 
     const tag = this.tagFor(items, item, isFree);
-    if (tag) row.add(this.ribbon(ROW_TAG_X, 0, tag));
-    row.add(this.pricePlate(ROW_PRICE_X, 0, item, isFree, 1));
+    if (tag) row.add(this.ribbon(SL.tagX, SL.tagY, tag));
+    row.add(this.pricePlate(SL.priceX, SL.priceY, item, isFree, SL.priceScale));
     return row;
   }
 
   /** The parchment tag, sitting in the row's flow rather than on its edge. */
   private ribbon(x: number, y: number, label: string): Phaser.GameObjects.Container {
-    const tag = this.scene.add.container(x, y);
+    const tag = this.scene.add.container(x, y).setScale(SL.tagScale);
     tag.add(this.scene.add.image(0, 0, 'ui_shop_ribbon').setOrigin(0, 0.5));
     // The parchment body runs x 6..214 in game units; its text rides the same
     // -0.11rad tilt the painter gave the paper.

@@ -9,12 +9,16 @@ architecture — nothing is throwaway.
 - `pnpm dev` — dev server · `pnpm verify` — typecheck → unit → build → e2e (run before calling anything done)
 - `pnpm test` (Vitest, node, `tests/unit/`) · `pnpm e2e` (Playwright, drives the whole tutorial)
 - e2e serves the PRODUCTION build via `vite preview` — `pnpm build` first if invoking `playwright test` directly.
-- **NEVER start Playwright unprompted** — not `pnpm e2e`, not `pnpm verify` (it
-  chains e2e), not `playwright test`, not the Playwright MCP browser tools. Each
-  run launches a GPU-heavy Chromium at 2560×1600 and leaves an MCP browser
-  resident; several agent sessions doing it at once cooks the machine. Default
-  "done" check is `pnpm typecheck && pnpm test && pnpm build`; then ASK before
-  running e2e and say what it would cover. Only run it when the user says so.
+- **Playwright is allowed — ONE browser instance at a time** (policy lifted
+  2026-08-15; it used to be ask-first). The machine limit was never the runs, it
+  was several sessions' GPU-heavy Chromiums at once. So: before launching any
+  Playwright browser (a harness script or `pnpm e2e`), sweep stray browser
+  processes — `pkill -f headless_shell; pkill -f "Chromium.*--headless"` — but
+  ONLY after checking `pgrep -f "@playwright/test.*cli.js"` finds nothing: an
+  ACTIVE test run's browsers ARE the run, and two sessions blind-sweeping killed
+  each other's e2e mid-suite (2026-08-15). Always close the browser you
+  launched. Never kill the shared `playwright-mcp` server or a `test-server`. Visual verification on real viewports is part of "done"
+  for UI work, alongside `pnpm typecheck && pnpm test && pnpm build`.
 - ONE dev server at a time (port 5173 is strict — a second `pnpm dev` fails by
   design). Its watcher is an ALLOW-list of `src/assets/tools/scripts` minus
   `assets/raw|map` (vite.config.ts `watchIgnored`): the repo root also holds
@@ -77,6 +81,14 @@ silently drops `checklist` writes, so everything goes in `notes`.
   design/lore/tuning discussion. `docs/MECHANICS.md` — the full ruleset, `[L1]`
   = shipped vs `[full]` = designed-not-built. `docs/DEMO-PLAN.md` (authoring
   intent, shipped) and `docs/DESIGN-REVIEW.md` (pre-retune audit, historical).
+- `docs/story-map.md` — the story TRACKER: canon on one page, both event
+  successions (shipped ladders and the 12-chapter campaign) visualized, the
+  merge-item lore index, and the wired-vs-canon drift board (§9, the one thing
+  it is authoritative for). Start here for any story/lore/quest work; it points
+  at the corpus doc that wins each argument. Update its drift board whenever
+  story data or campaign docs move. `docs/naming.md` — the kid-clarity (8–13)
+  naming law + the authoritative old→new map for every player-facing name;
+  REQUIRED before naming any new quest, item, or line of dialogue.
 
 ## Architecture laws (non-negotiable)
 - ALL cross-module communication goes through the typed synchronous `EventBus`

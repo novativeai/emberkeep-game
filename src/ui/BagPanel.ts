@@ -2,11 +2,13 @@ import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import {
   BAG_SLOTS,
+  IS_MOBILE,
   goldPurse,
   LIVE_GAME_HEIGHT,
   LIVE_GAME_WIDTH,
   num,
   PALETTE,
+  panelFitScale,
   panelMobileScale,
   TIMINGS
 } from '../core/Constants';
@@ -15,14 +17,21 @@ import type { GameState } from '../core/GameState';
 import type { BagStack, ChainsData } from '../core/types';
 import { uiRegistry } from './theme';
 
-const FRAME_W = 1560;
-const FRAME_H = 900;
-/** 6 x 2 — the layout the concept frame settled on. Twelve slots read better in
- *  one wide band at 16:9 than in a 4x3 block, and the count is what matters. */
-const COLS = 6;
-const ROWS = 2;
-const SLOT = 196;
-const GAP = 30;
+/**
+ * Device grid. Desktop is the concept frame's 6×2 band — twelve slots read
+ * better in one wide row-pair at 16:9. A phone is PORTRAIT: the same twelve
+ * slots as 3×4 on a taller frame, each slot half again bigger, because a
+ * 6-across band at phone width made every slot a 60px target.
+ */
+const BG = IS_MOBILE
+  ? { frameW: 1100, frameH: 1700, cols: 3, rows: 4, slot: 300, gap: 36, gridDy: 60, helperFont: 44 }
+  : { frameW: 1560, frameH: 900, cols: 6, rows: 2, slot: 196, gap: 30, gridDy: 30, helperFont: 40 };
+const FRAME_W = BG.frameW;
+const FRAME_H = BG.frameH;
+const COLS = BG.cols;
+const ROWS = BG.rows;
+const SLOT = BG.slot;
+const GAP = BG.gap;
 /**
  * The Drop/Sell chooser is an anchored POPOVER, not two loose buttons.
  *
@@ -104,7 +113,7 @@ export class BagPanel extends Phaser.GameObjects.Container {
     super(scene, 0, 0);
     scene.add.existing(this);
     this.setVisible(false);
-    this.baseScale = panelMobileScale(FRAME_W);
+    this.baseScale = IS_MOBILE ? panelFitScale(FRAME_W, FRAME_H) : panelMobileScale(FRAME_W);
 
     // The AUTHORED space, never `scene.scale.*`: the canvas backing is
     // LIVE_GAME_WIDTH × renderScale (the Graphics setting picks the factor at boot,
@@ -182,17 +191,19 @@ export class BagPanel extends Phaser.GameObjects.Container {
     const gridH = ROWS * SLOT + (ROWS - 1) * GAP;
     for (let i = 0; i < BAG_SLOTS; i++) {
       const sx = -gridW / 2 + SLOT / 2 + (i % COLS) * (SLOT + GAP);
-      const sy = -gridH / 2 + SLOT / 2 + Math.floor(i / COLS) * (SLOT + GAP) + 30;
+      const sy = -gridH / 2 + SLOT / 2 + Math.floor(i / COLS) * (SLOT + GAP) + BG.gridDy;
       const slot = scene.add.container(sx, sy);
       body.add(slot);
       this.slots.push(slot);
     }
 
     const helper = scene.add
-      .text(0, FRAME_H / 2 - 62, 'Tap an item to Drop it back, Give it to someone, or Sell it for gold.', {
+      .text(0, FRAME_H / 2 - (IS_MOBILE ? 96 : 62), 'Tap an item to Drop it back, Give it to someone, or Sell it for gold.', {
         fontFamily: FONT.display,
-        fontSize: '40px',
-        color: PALETTE.cream
+        fontSize: `${BG.helperFont}px`,
+        color: PALETTE.cream,
+        align: 'center',
+        wordWrap: { width: FRAME_W - 140 }
       })
       .setOrigin(0.5)
       .setAlpha(0.92);

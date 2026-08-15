@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
-import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelMobileScale } from '../core/Constants';
+import { IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelFitScale, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { speakerName } from '../entities/CharacterBubble';
 import { discTextureFor } from '../entities/PortraitAnimator';
@@ -14,12 +14,36 @@ import { uiRegistry } from './theme';
 // Card centres: half the card art (640×0.9 → ±288) + this must stay inside the
 // ui_panel's inner face (~±612) — at 330/0.96 the cards overflowed the frame.
 const CARD_X = 300;
+
+/**
+ * Device layout. Desktop: the landscape quest frame, two order cards SIDE BY
+ * SIDE. Mobile: the portrait tall frame and the same two cards STACKED and
+ * magnified — a phone reads one order at a time, at a size a thumb can hit, and
+ * the checklist page rides the same magnification. Card internals and the task
+ * rows keep their authored desktop geometry; the roots scale and re-seat.
+ */
+const LG = IS_MOBILE
+  ? {
+      frameKey: 'ui_panel_tall', frameY: 0, tabY: -1700, tabScale: 1.6, tabX: 440,
+      closeX: 984, closeY: -1800, closeScale: 2.2,
+      cardScale: 2.1, card0: { x: 0, y: -620 }, card1: { x: 0, y: 790 },
+      blurbY: 1800, blurbFont: 56, blurbWrap: 2000,
+      emptyFont: 72, taskScale: 2.05,
+      taskLabelX: -500, taskLabelWrap: 560, taskCheckX: 500, taskHintX: 330, taskHintWrap: 380
+    }
+  : {
+      frameKey: 'ui_quest_panel', frameY: 16, tabY: -384, tabScale: 1, tabX: 270,
+      closeX: 592, closeY: -392, closeScale: 1,
+      cardScale: 1, card0: { x: -CARD_X, y: 16 }, card1: { x: CARD_X, y: 16 },
+      blurbY: 372, blurbFont: 26, blurbWrap: 1050,
+      emptyFont: 38, taskScale: 1,
+      taskLabelX: -548, taskLabelWrap: 640, taskCheckX: 548, taskHintX: 340, taskHintWrap: 430
+    };
 /** The requirement icon contain-fits this box — the `ui_slot` backdrop is 144
  *  units, so the art sits inside it with a small air gap all round. */
 const SLOT_ICON_FIT = 128;
 const TAB_W = 520;
 const TAB_H = 104;
-const TAB_Y = -384;
 
 // ---- Order-card portrait medallion ----
 // Eleanor sits in the SAME gold ring the dialogue bubble frames her with
@@ -139,8 +163,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .setInteractive(); // swallow board input behind the panel
     this.dim.on('pointerup', () => this.requestClose());
 
-    const panel = scene.add.image(0, 16, 'ui_quest_panel');
-    this.baseScale = panelMobileScale(panel.width);
+    const panel = scene.add.image(0, LG.frameY, LG.frameKey);
+    this.baseScale = IS_MOBILE ? panelFitScale(panel.width, panel.height) : panelMobileScale(panel.width);
 
     // Tab lozenges along the top edge — Orders sits centred (classic Ledger
     // header) until the tutorial ends and the Tasks tab joins it.
@@ -148,36 +172,37 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.tasksTab = this.buildTab(scene, 'Keeper’s Tasks', () => this.switchTab('tasks'));
 
     // Close button.
-    const closeButton = scene.add.container(592, -392);
+    const closeButton = scene.add.container(LG.closeX, LG.closeY);
     const closeBg = scene.add.circle(0, 0, 42, num(INK.field)).setStrokeStyle(6, num(INK.goldMid));
     const closeX = scene.add
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
+    closeButton.setScale(LG.closeScale);
     closeButton.setSize(96, 96);
     closeButton.setInteractive({ useHandCursor: true });
     closeButton.on('pointerup', () => this.requestClose());
 
     // ---- Orders page: two cards side by side + blurb + empty text. ----
     this.ordersPage = scene.add.container(0, 0);
-    this.cards.push(this.buildCard(scene, -CARD_X), this.buildCard(scene, CARD_X));
+    this.cards.push(this.buildCard(scene, LG.card0.x, LG.card0.y), this.buildCard(scene, LG.card1.x, LG.card1.y));
 
     // The active card's flavor line runs along the bottom of the board.
     this.blurb = scene.add
-      .text(0, 372, '', {
+      .text(0, LG.blurbY, '', {
         fontFamily: FONT.ui,
-        fontSize: '26px',
+        fontSize: `${LG.blurbFont}px`,
         fontStyle: 'italic',
         color: INK.onFieldDim,
         align: 'center',
-        wordWrap: { width: 1050 }
+        wordWrap: { width: LG.blurbWrap }
       })
       .setOrigin(0.5);
 
     this.emptyText = scene.add
       .text(0, 20, 'The brazier roars again!\nEleanor will have new work for you soon.', {
         fontFamily: FONT.ui,
-        fontSize: '38px',
+        fontSize: `${LG.emptyFont}px`,
         fontStyle: 'bold',
         color: INK.onField,
         align: 'center',
@@ -188,7 +213,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.ordersPage.add([...this.cards.map((c) => c.root), this.blurb, this.emptyText]);
 
     // ---- Tasks page: the chapter checklist. ----
-    this.tasksPage = scene.add.container(0, 0).setVisible(false);
+    this.tasksPage = scene.add.container(0, IS_MOBILE ? -300 : 0).setScale(LG.taskScale).setVisible(false);
     this.buildTasksPage(scene);
 
     this.add([this.dim, panel, this.ordersTab.root, this.tasksTab.root, closeButton, this.ordersPage, this.tasksPage]);
@@ -217,7 +242,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
 
   /** One header lozenge — restyled active/inactive by layoutTabs(). */
   private buildTab(scene: Phaser.Scene, text: string, onTap: () => void): TabHandle {
-    const root = scene.add.container(0, TAB_Y);
+    const root = scene.add.container(0, LG.tabY);
     const bg = scene.add.graphics();
     const label = scene.add
       .text(0, 0, text, {
@@ -242,12 +267,12 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.taskSystem.tasks.forEach((task, i) => {
       const y = rowTop + i * rowGap;
       const label = scene.add
-        .text(-548, y, task.label, {
+        .text(LG.taskLabelX, y, task.label, {
           fontFamily: FONT.ui,
           fontSize: '31px',
           fontStyle: 'bold',
           color: INK.onField,
-          wordWrap: { width: 640 }
+          wordWrap: { width: LG.taskLabelWrap }
         })
         .setOrigin(0, 0.5);
       const barX = 160;
@@ -264,7 +289,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
         })
         .setOrigin(0.5);
       const check = scene.add
-        .text(548, y, '✓', {
+        .text(LG.taskCheckX, y, '✓', {
           fontFamily: FONT.ui,
           fontSize: '46px',
           fontStyle: 'bold',
@@ -274,13 +299,13 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
         .setVisible(false);
       // Replaces the bar while the task's subject doesn't exist yet.
       const hint = scene.add
-        .text(340, y, task.lockedHint ? `🔒 ${task.lockedHint}` : '', {
+        .text(LG.taskHintX, y, task.lockedHint ? `🔒 ${task.lockedHint}` : '', {
           fontFamily: FONT.ui,
           fontSize: '24px',
           fontStyle: 'italic',
           color: INK.onFieldDim,
           align: 'center',
-          wordWrap: { width: 430 }
+          wordWrap: { width: LG.taskHintWrap }
         })
         .setOrigin(0.5)
         .setVisible(false);
@@ -300,8 +325,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   }
 
   /** One order card: portrait, title, requirement slot, reward line, Deliver. */
-  private buildCard(scene: Phaser.Scene, x: number): OrderCard {
-    const root = scene.add.container(x, 16);
+  private buildCard(scene: Phaser.Scene, x: number, y: number): OrderCard {
+    const root = scene.add.container(x, y).setScale(LG.cardScale);
     const cardBg = scene.add.image(0, 0, 'ui_card').setScale(0.9);
     const { layers: medallion, portrait } = this.buildMedallion(scene, root);
     const title = scene.add
@@ -460,8 +485,14 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private syncPortraitMasks(): void {
     if (!this.visible) return;
     for (const { g, root } of this.portraitMasks) {
-      g.setPosition(this.x + root.x * this.scaleX, this.y + (root.y + MEDALLION_Y) * this.scaleY);
-      g.setScale(this.scaleX, this.scaleY);
+      // The medallion offset lives INSIDE the card root, so it magnifies with
+      // the root's own scale (2.1 on the stacked mobile cards) before the
+      // panel's transform applies.
+      g.setPosition(
+        this.x + root.x * this.scaleX,
+        this.y + (root.y + MEDALLION_Y * root.scaleY) * this.scaleY
+      );
+      g.setScale(this.scaleX * root.scaleX, this.scaleY * root.scaleY);
     }
   }
 
@@ -479,8 +510,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     // Local offsets scaled by the panel's own scale (>1 on mobile) so the pointer
     // tracks the Deliver button through the portrait magnification.
     return {
-      x: this.x + (card.root.x + card.deliverButton.x) * this.scaleX,
-      y: this.y + (card.root.y + card.deliverButton.y) * this.scaleY
+      x: this.x + (card.root.x + card.deliverButton.x * card.root.scaleX) * this.scaleX,
+      y: this.y + (card.root.y + card.deliverButton.y * card.root.scaleY) * this.scaleY
     };
   }
 
@@ -556,8 +587,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
   private layoutTabs(): void {
     const twoTabs = this.gameState.tutorialDone;
     this.tasksTab.root.setVisible(twoTabs);
-    this.ordersTab.root.x = twoTabs ? -270 : 0;
-    this.tasksTab.root.x = 270;
+    this.ordersTab.root.x = twoTabs ? -LG.tabX : 0;
+    this.tasksTab.root.x = LG.tabX;
     this.paintTab(this.ordersTab, this.activeTab === 'orders');
     this.paintTab(this.tasksTab, this.activeTab === 'tasks');
     this.ordersPage.setVisible(this.activeTab === 'orders');
@@ -574,7 +605,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     tab.bg.strokeRoundedRect(-TAB_W / 2, -TAB_H / 2, TAB_W, TAB_H, TAB_H / 2);
     tab.label.setColor(active ? INK.onField : INK.onFieldDim);
     tab.label.setAlpha(active ? 1 : 0.85);
-    tab.root.setScale(active ? 1 : 0.94);
+    tab.root.setScale(LG.tabScale * (active ? 1 : 0.94));
   }
 
   private refresh(): void {

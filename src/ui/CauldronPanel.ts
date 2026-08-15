@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
-import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelMobileScale } from '../core/Constants';
+import { IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, panelFitScale, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameContext } from '../core/Context';
 import type { CauldronRecipeConfig } from '../core/types';
@@ -8,45 +8,60 @@ import { ensureTextures } from '../core/lazyTextures';
 import { uiRegistry } from './theme';
 
 
-/* Recipe list (left column), in the 2560-space.
- *
- * It SCROLLS. The roster is authored rather than player-grown, but authored
- * does not mean small: the north's five farms brought their own parts into the
- * pot and the book went from seven recipes to nineteen, so the fixed column
- * that once "fit the frame" was drawing its last ten rows through the floor
- * and out onto the board. Same viewport-and-mask treatment the Store's shelf
- * and the Cookbook's pages use. */
-const LIST_X = -640;
-const ROW_W = 700;
-const ROW_H = 104;
-const ROW_GAP = 122;
-const ROW_ICON = 80;
-/** The clipped window: under the plaque, down to the panel's inner floor. */
-const LIST_VIEW_TOP = -458;
-const LIST_VIEW_H = 1090;
-/** Centre of that window — where the viewport container sits. */
-const LIST_VIEW_MID = LIST_VIEW_TOP + LIST_VIEW_H / 2;
-/** First row's centre inside the scrolling content. */
-const LIST_TOP = -LIST_VIEW_H / 2 + ROW_GAP / 2;
 /** Past this much drag the gesture is a scroll, not a pick. */
 const DRAG_SLOP = 12;
-/** The scroll rail down the column's right edge — the only cue that the book
- *  runs past its window, so it is drawn whenever there is anywhere to go. */
-const BAR_X = ROW_W / 2 + 26;
 const BAR_W = 10;
 
-/* Detail column (right of the list). */
-const DETAIL_X = 350;
-const DETAIL_W = 1180;
+/**
+ * TWO layouts, one pot. Desktop is the classic alchemy spread — the recipe
+ * ledger a column on the LEFT, the selected formula explained on the right.
+ * A phone is a portrait sheet on the tall frame and the same two panes STACK:
+ * the formula (art, story, ingredient cards, BREW) reads first at the top, and
+ * the ledger scrolls below it — depth is what portrait has to spend.
+ *
+ * The list SCROLLS on both. The roster is authored rather than player-grown,
+ * but authored does not mean small: the book is nineteen recipes now, and the
+ * fixed column that once "fit the frame" was drawing rows through the floor.
+ * Numbers live in the frame's RENDERED space (painter logical ×RES) — the tall
+ * frame renders 2360×4080, the landscape one 2120×1320.
+ */
+const CY = IS_MOBILE
+  ? {
+      frameKey: 'ui_panel_tall', frameY: 0,
+      bannerY: -1904, titleY: -1800, titleFont: 150, closeX: 984, closeY: -1800, closeScale: 2.2,
+      listX: 0, rowW: 2050, rowH: 200, rowGap: 236, rowIcon: 150, rowFont: 68,
+      listViewTop: 340, listViewH: 1480,
+      detailX: 0, detailW: 2080,
+      artY: -1400, artFit: 440,
+      nameY: -1130, nameFont: 100,
+      flavorY: -1030, flavorFont: 58,
+      useY: -850, useFont: 62,
+      ingW: 470, ingH: 580, ingGap: 48, ingIcon: 280, ingY: -400,
+      ingCountFont: 72, ingNameFont: 44, haveFont: 56,
+      brewY: 190, brewScaleX: 2.3, brewScaleY: 2.1, brewFont: 92
+    }
+  : {
+      frameKey: 'ui_store_panel', frameY: 40,
+      bannerY: -640, titleY: -586, titleFont: 64, closeX: 956, closeY: -540, closeScale: 1,
+      listX: -640, rowW: 700, rowH: 104, rowGap: 122, rowIcon: 80, rowFont: 36,
+      listViewTop: -458, listViewH: 1090,
+      detailX: 350, detailW: 1180,
+      artY: -350, artFit: 230,
+      nameY: -212, nameFont: 52,
+      flavorY: -158, flavorFont: 28,
+      useY: -62, useFont: 30,
+      ingW: 236, ingH: 290, ingGap: 26, ingIcon: 140, ingY: 150,
+      ingCountFont: 36, ingNameFont: 22, haveFont: 28,
+      brewY: 520, brewScaleX: 1.15, brewScaleY: 1.05, brewFont: 46
+    };
 
-/* Ingredient cards under the description. */
-const ING_W = 236;
-const ING_H = 290;
-const ING_GAP = 26;
-const ING_ICON = 140;
-const ING_Y = 150;
-
-const BREW_Y = 520;
+/** Centre of the clipped window — where the viewport container sits. */
+const LIST_VIEW_MID = CY.listViewTop + CY.listViewH / 2;
+/** First row's centre inside the scrolling content. */
+const LIST_TOP = -CY.listViewH / 2 + CY.rowGap / 2;
+/** The scroll rail down the column's right edge — the only cue that the book
+ *  runs past its window, so it is drawn whenever there is anywhere to go. */
+const BAR_X = CY.rowW / 2 + 26;
 
 /**
  * Selyna's Cauldron — the brew screen behind the pot in the runevault hub.
@@ -99,30 +114,31 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
-    const frame = scene.add.image(0, 40, 'ui_store_panel');
-    this.baseScale = panelMobileScale(frame.width);
+    const frame = scene.add.image(0, CY.frameY, CY.frameKey);
+    this.baseScale = IS_MOBILE ? panelFitScale(frame.width, frame.height) : panelMobileScale(frame.width);
 
     this.titleBg = scene.add.graphics();
     this.titleText = scene.add
-      .text(0, -586, "SELYNA'S CAULDRON", {
-        fontFamily: FONT.ui, fontSize: '64px', fontStyle: 'bold', color: INK.onField
+      .text(0, CY.titleY, "SELYNA'S CAULDRON", {
+        fontFamily: FONT.ui, fontSize: `${CY.titleFont}px`, fontStyle: 'bold', color: INK.onField
       })
       .setOrigin(0.5)
       .setShadow(0, 5, 'rgba(36,27,34,0.55)', 6);
 
-    const close = scene.add.container(956, -540);
+    const close = scene.add.container(CY.closeX, CY.closeY);
     this.closeBtn = close;
     const closeBg = scene.add.image(0, 6, 'ui_btn_round').setScale(0.92).setTint(num(INK.field));
     const closeX = scene.add
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '54px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     close.add([closeBg, closeX]);
+    close.setScale(CY.closeScale);
     close.setSize(120, 120).setInteractive({ useHandCursor: true });
-    close.on('pointerover', () => close.setScale(1.08));
-    close.on('pointerout', () => close.setScale(1));
+    close.on('pointerover', () => close.setScale(CY.closeScale * 1.08));
+    close.on('pointerout', () => close.setScale(CY.closeScale));
     close.on('pointerup', () => this.requestClose());
 
-    this.listViewport = scene.add.container(LIST_X, LIST_VIEW_MID);
+    this.listViewport = scene.add.container(CY.listX, LIST_VIEW_MID);
     this.listGroup = scene.add.container(0, 0);
     this.listBar = scene.add.graphics();
     this.listViewport.add([this.listGroup, this.listBar]);
@@ -130,7 +146,7 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     // container's own world transform whenever the panel moves or scales.
     this.listMask = scene.make.graphics();
     this.listGroup.setMask(this.listMask.createGeometryMask());
-    this.detailGroup = scene.add.container(DETAIL_X, 0);
+    this.detailGroup = scene.add.container(CY.detailX, 0);
 
     this.add([this.dim, frame, this.titleBg, this.titleText, close, this.listViewport, this.detailGroup]);
     scene.add.existing(this);
@@ -240,18 +256,19 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
   }
 
   private drawBanner(width: number): void {
-    const w = Math.max(620, width);
-    const y = -640;
+    const w = Math.max(IS_MOBILE ? 1240 : 620, width);
+    const y = CY.bannerY;
+    const bh = IS_MOBILE ? 208 : 104;
     const g = this.titleBg;
     g.clear();
     g.fillStyle(num(INK.goldDeep), 1);
-    g.fillRoundedRect(-w / 2, y + 10, w, 104, 34);
+    g.fillRoundedRect(-w / 2, y + 10, w, bh, bh / 3);
     g.fillStyle(num(INK.field), 1);
-    g.fillRoundedRect(-w / 2, y, w, 104, 34);
+    g.fillRoundedRect(-w / 2, y, w, bh, bh / 3);
     g.lineStyle(6, num(INK.gold), 1);
-    g.strokeRoundedRect(-w / 2, y, w, 104, 34);
+    g.strokeRoundedRect(-w / 2, y, w, bh, bh / 3);
     g.fillStyle(num(INK.fieldLift), 0.5);
-    g.fillRoundedRect(-w / 2 + 14, y + 8, w - 28, 34, 18);
+    g.fillRoundedRect(-w / 2 + 14, y + 8, w - 28, bh / 3, bh / 6);
   }
 
   private refresh(): void {
@@ -266,27 +283,28 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     this.recipes.forEach((recipe, i) => {
       const selected = recipe.id === this.selectedId;
       const brewable = this.ctx.systems.cauldron.canBrew(recipe.id);
-      const row = this.scene.add.container(0, LIST_TOP + i * ROW_GAP);
+      const row = this.scene.add.container(0, LIST_TOP + i * CY.rowGap);
       const g = this.scene.add.graphics();
+      const rr = Math.min(26, CY.rowH / 2 - 2) * (IS_MOBILE ? 2 : 1);
       g.fillStyle(num(INK.goldDeep), 1);
-      g.fillRoundedRect(-ROW_W / 2, -ROW_H / 2 + 6, ROW_W, ROW_H, 26);
+      g.fillRoundedRect(-CY.rowW / 2, -CY.rowH / 2 + 6, CY.rowW, CY.rowH, rr);
       g.fillStyle(num(selected ? INK.fieldLift : INK.fieldDeep), 1);
-      g.fillRoundedRect(-ROW_W / 2, -ROW_H / 2, ROW_W, ROW_H, 26);
+      g.fillRoundedRect(-CY.rowW / 2, -CY.rowH / 2, CY.rowW, CY.rowH, rr);
       g.lineStyle(selected ? 6 : 4, num(selected ? INK.gold : INK.goldDeep), 1);
-      g.strokeRoundedRect(-ROW_W / 2, -ROW_H / 2, ROW_W, ROW_H, 26);
+      g.strokeRoundedRect(-CY.rowW / 2, -CY.rowH / 2, CY.rowW, CY.rowH, rr);
       row.add(g);
 
       const key = this.itemKey(recipe.output.chain, recipe.output.tier);
       if (this.scene.textures.exists(key)) {
-        const icon = this.scene.add.image(-ROW_W / 2 + 66, 0, key);
-        icon.setScale(Math.min(ROW_ICON / icon.width, ROW_ICON / icon.height));
+        const icon = this.scene.add.image(-CY.rowW / 2 + CY.rowIcon * 0.85, 0, key);
+        icon.setScale(Math.min(CY.rowIcon / icon.width, CY.rowIcon / icon.height));
         if (!brewable) icon.setAlpha(0.55);
         row.add(icon);
       }
       row.add(
         this.scene.add
-          .text(-ROW_W / 2 + 126, 0, this.nameOf(recipe.output.chain, recipe.output.tier), {
-            fontFamily: FONT.ui, fontSize: '36px', fontStyle: 'bold',
+          .text(-CY.rowW / 2 + CY.rowIcon * 1.6, 0, this.nameOf(recipe.output.chain, recipe.output.tier), {
+            fontFamily: FONT.ui, fontSize: `${CY.rowFont}px`, fontStyle: 'bold',
             color: selected ? INK.onField : brewable ? INK.onFieldGold : INK.onFieldDim
           })
           .setOrigin(0, 0.5)
@@ -296,11 +314,11 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       if (brewable) {
         const dot = this.scene.add.graphics();
         dot.fillStyle(num(INK.gain), 1);
-        dot.fillCircle(ROW_W / 2 - 48, 0, 10);
+        dot.fillCircle(CY.rowW / 2 - 48, 0, IS_MOBILE ? 18 : 10);
         row.add(dot);
       }
 
-      row.setSize(ROW_W, ROW_H).setInteractive({ useHandCursor: true });
+      row.setSize(CY.rowW, CY.rowH).setInteractive({ useHandCursor: true });
       row.on('pointerup', () => {
         if (this.dragged) return; // the player was scrolling the book, not picking
         if (this.selectedId === recipe.id) return;
@@ -309,8 +327,8 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       });
       this.listGroup.add(row);
     });
-    const contentH = this.recipes.length * ROW_GAP;
-    this.maxScroll = Math.max(0, contentH - LIST_VIEW_H);
+    const contentH = this.recipes.length * CY.rowGap;
+    this.maxScroll = Math.max(0, contentH - CY.listViewH);
     this.setScroll(this.scrollY); // re-clamp: the roster may have shrunk
     this.seatListMask();
   }
@@ -329,12 +347,12 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     const g = this.listBar;
     g.clear();
     if (this.maxScroll <= 0) return;
-    const top = -LIST_VIEW_H / 2;
-    const contentH = LIST_VIEW_H + this.maxScroll;
-    const thumbH = Math.max(90, LIST_VIEW_H * (LIST_VIEW_H / contentH));
-    const thumbY = top + (LIST_VIEW_H - thumbH) * (this.scrollY / this.maxScroll);
+    const top = -CY.listViewH / 2;
+    const contentH = CY.listViewH + this.maxScroll;
+    const thumbH = Math.max(90, CY.listViewH * (CY.listViewH / contentH));
+    const thumbY = top + (CY.listViewH - thumbH) * (this.scrollY / this.maxScroll);
     g.fillStyle(num(INK.fieldDeep), 0.85);
-    g.fillRoundedRect(BAR_X - BAR_W / 2, top, BAR_W, LIST_VIEW_H, BAR_W / 2);
+    g.fillRoundedRect(BAR_X - BAR_W / 2, top, BAR_W, CY.listViewH, BAR_W / 2);
     g.fillStyle(num(INK.gold), 0.9);
     g.fillRoundedRect(BAR_X - BAR_W / 2, thumbY, BAR_W, thumbH, BAR_W / 2);
   }
@@ -344,8 +362,8 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
    *  open/close tween, and a mask left in local units clips the wrong band. */
   private seatListMask(): void {
     const m = this.listViewport.getWorldTransformMatrix();
-    const w = (ROW_W + 60) * m.scaleX;
-    const h = LIST_VIEW_H * m.scaleY;
+    const w = (CY.rowW + 60) * m.scaleX;
+    const h = CY.listViewH * m.scaleY;
     this.listMask.clear();
     this.listMask.fillStyle(0xffffff, 1);
     this.listMask.fillRect(m.tx - w / 2, m.ty - h / 2, w, h);
@@ -356,8 +374,8 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
   private overList(p: Phaser.Input.Pointer): boolean {
     const m = this.listViewport.getWorldTransformMatrix();
     // Wide enough to take in the rail, so a wheel over the scrollbar scrolls.
-    const w = (ROW_W + 80) * m.scaleX;
-    const h = LIST_VIEW_H * m.scaleY;
+    const w = (CY.rowW + 80) * m.scaleX;
+    const h = CY.listViewH * m.scaleY;
     return (
       p.x >= m.tx - w / 2 && p.x <= m.tx + w / 2 && p.y >= m.ty - h / 2 && p.y <= m.ty + h / 2
     );
@@ -401,72 +419,73 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     // The output, held up like the thing it is: art first, name under it.
     const outKey = this.itemKey(recipe.output.chain, recipe.output.tier);
     if (this.scene.textures.exists(outKey)) {
-      const art = this.scene.add.image(0, -350, outKey);
-      art.setScale(Math.min(230 / art.width, 230 / art.height));
+      const art = this.scene.add.image(0, CY.artY, outKey);
+      art.setScale(Math.min(CY.artFit / art.width, CY.artFit / art.height));
       this.detailGroup.add(art);
     }
     this.detailGroup.add(
       this.scene.add
-        .text(0, -212, this.nameOf(recipe.output.chain, recipe.output.tier), {
-          fontFamily: FONT.ui, fontSize: '52px', fontStyle: 'bold', color: INK.onFieldGold
+        .text(0, CY.nameY, this.nameOf(recipe.output.chain, recipe.output.tier), {
+          fontFamily: FONT.ui, fontSize: `${CY.nameFont}px`, fontStyle: 'bold', color: INK.onFieldGold
         })
         .setOrigin(0.5)
         .setShadow(0, 4, 'rgba(36,27,34,0.55)', 5)
     );
     this.detailGroup.add(
       this.scene.add
-        .text(0, -158, recipe.flavor, {
-          fontFamily: FONT.ui, fontSize: '28px', fontStyle: 'italic', color: INK.onFieldDim,
-          align: 'center', wordWrap: { width: DETAIL_W - 120 }
+        .text(0, CY.flavorY, recipe.flavor, {
+          fontFamily: FONT.ui, fontSize: `${CY.flavorFont}px`, fontStyle: 'italic', color: INK.onFieldDim,
+          align: 'center', wordWrap: { width: CY.detailW - 120 }
         })
         .setOrigin(0.5, 0)
     );
     this.detailGroup.add(
       this.scene.add
-        .text(0, -62, recipe.use, {
-          fontFamily: FONT.ui, fontSize: '30px', color: INK.onField,
-          align: 'center', wordWrap: { width: DETAIL_W - 120 }
+        .text(0, CY.useY, recipe.use, {
+          fontFamily: FONT.ui, fontSize: `${CY.useFont}px`, color: INK.onField,
+          align: 'center', wordWrap: { width: CY.detailW - 120 }
         })
         .setOrigin(0.5, 0)
     );
 
     // Ingredient cards — the required item, the count it wants, and beneath the
     // card how many the Bag holds, in red when it is not enough.
-    const total = recipe.inputs.length * ING_W + (recipe.inputs.length - 1) * ING_GAP;
+    const total = recipe.inputs.length * CY.ingW + (recipe.inputs.length - 1) * CY.ingGap;
     recipe.inputs.forEach((input, i) => {
-      const x = -total / 2 + ING_W / 2 + i * (ING_W + ING_GAP);
+      const x = -total / 2 + CY.ingW / 2 + i * (CY.ingW + CY.ingGap);
       const have = cauldron.haveOf(input.chain, input.tier);
       const enough = have >= input.count;
-      const card = this.scene.add.container(x, ING_Y);
+      const card = this.scene.add.container(x, CY.ingY);
 
       const g = this.scene.add.graphics();
+      const ir = IS_MOBILE ? 44 : 24;
       g.fillStyle(num(INK.goldDeep), 1);
-      g.fillRoundedRect(-ING_W / 2, -ING_H / 2 + 6, ING_W, ING_H, 24);
+      g.fillRoundedRect(-CY.ingW / 2, -CY.ingH / 2 + 6, CY.ingW, CY.ingH, ir);
       g.fillStyle(num(INK.fieldDeep), 1);
-      g.fillRoundedRect(-ING_W / 2, -ING_H / 2, ING_W, ING_H, 24);
+      g.fillRoundedRect(-CY.ingW / 2, -CY.ingH / 2, CY.ingW, CY.ingH, ir);
       g.lineStyle(4, num(enough ? INK.gold : INK.spendDeep), 1);
-      g.strokeRoundedRect(-ING_W / 2, -ING_H / 2, ING_W, ING_H, 24);
+      g.strokeRoundedRect(-CY.ingW / 2, -CY.ingH / 2, CY.ingW, CY.ingH, ir);
       card.add(g);
 
       const key = this.itemKey(input.chain, input.tier);
       if (this.scene.textures.exists(key)) {
-        const icon = this.scene.add.image(0, -46, key);
-        icon.setScale(Math.min(ING_ICON / icon.width, ING_ICON / icon.height));
+        const icon = this.scene.add.image(0, -CY.ingH * 0.16, key);
+        icon.setScale(Math.min(CY.ingIcon / icon.width, CY.ingIcon / icon.height));
         if (!enough) icon.setAlpha(0.6);
         card.add(icon);
       }
       card.add(
         this.scene.add
-          .text(0, 56, this.nameOf(input.chain, input.tier), {
-            fontFamily: FONT.ui, fontSize: '22px', color: INK.onFieldDim,
-            align: 'center', wordWrap: { width: ING_W - 28 }
+          .text(0, CY.ingH * 0.19, this.nameOf(input.chain, input.tier), {
+            fontFamily: FONT.ui, fontSize: `${CY.ingNameFont}px`, color: INK.onFieldDim,
+            align: 'center', wordWrap: { width: CY.ingW - 28 }
           })
           .setOrigin(0.5, 0)
       );
       card.add(
         this.scene.add
-          .text(0, ING_H / 2 - 34, `×${input.count}`, {
-            fontFamily: FONT.ui, fontSize: '36px', fontStyle: 'bold', color: INK.onFieldGold
+          .text(0, CY.ingH / 2 - CY.ingCountFont, `×${input.count}`, {
+            fontFamily: FONT.ui, fontSize: `${CY.ingCountFont}px`, fontStyle: 'bold', color: INK.onFieldGold
           })
           .setOrigin(0.5)
       );
@@ -474,8 +493,8 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       // speaks, and it speaks in red.
       card.add(
         this.scene.add
-          .text(0, ING_H / 2 + 42, `in bag: ${have}`, {
-            fontFamily: FONT.ui, fontSize: '28px', fontStyle: 'bold',
+          .text(0, CY.ingH / 2 + CY.haveFont * 1.05, `in bag: ${have}`, {
+            fontFamily: FONT.ui, fontSize: `${CY.haveFont}px`, fontStyle: 'bold',
             color: enough ? INK.onFieldDim : INK.spendDeep
           })
           .setOrigin(0.5)
@@ -487,11 +506,11 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
   }
 
   private buildBrewButton(canBrew: boolean): void {
-    this.brewBtn = this.scene.add.container(0, BREW_Y);
-    this.brewBg = this.scene.add.image(0, 0, 'ui_btn_green').setScale(1.15, 1.05);
+    this.brewBtn = this.scene.add.container(0, CY.brewY);
+    this.brewBg = this.scene.add.image(0, 0, 'ui_btn_green').setScale(CY.brewScaleX, CY.brewScaleY);
     this.brewLabel = this.scene.add
       .text(0, -4, 'BREW', {
-        fontFamily: FONT.ui, fontSize: '46px', fontStyle: 'bold', color: '#fff6e0',
+        fontFamily: FONT.ui, fontSize: `${CY.brewFont}px`, fontStyle: 'bold', color: '#fff6e0',
         stroke: '#1f3a14', strokeThickness: 6
       })
       .setOrigin(0.5)
@@ -520,7 +539,7 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
    *  `bag:changed` already repainted) speak for the rest. */
   private celebrate(output: { chain: string; tier: number; count: number }): void {
     const float = this.scene.add
-      .text(this.x + DETAIL_X * this.scaleX, this.y + (BREW_Y - 90) * this.scaleY,
+      .text(this.x + CY.detailX * this.scaleX, this.y + (CY.brewY - 90) * this.scaleY,
         `+${output.count} ${this.nameOf(output.chain, output.tier)}`, {
           fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: INK.onFieldGold,
           stroke: 'rgba(36,27,34,0.8)', strokeThickness: 6
