@@ -1,0 +1,18 @@
+{
+  "_note": "GENERATED calibration — the fully-blinked (eyes-closed) frame of each clip character's IDLE sheet, used as the seated-sleep pose for breeds with no tosleep clip and no sleep painting (BoardScene.seatDragonSleep; the sleep breath animates this frozen frame). Recalibrate with scripts/find-sleep-frames.py after any idle sheet changes — it renders labeled eye filmstrips for visual picking. redwhelp (tosleep clip) and redadult (sleep painting) never reach this fallback and are deliberately absent.",
+  "ashdrake_young": 56,
+  "ashglass_adult": 36,
+  "ashglass_baby": 52,
+  "emerald_adult": 56,
+  "emerald_baby": 40,
+  "frost_adult": 28,
+  "frost_baby": 54,
+  "golden_adult": 78,
+  "moonwhisker_adult": 36,
+  "moonwhisker_baby": 30,
+  "porcelain_adult": 36,
+  "porcelain_baby": 90,
+  "rimewyrm_young": 40,
+  "storm_adult": 84,
+  "storm_baby": 10
+}

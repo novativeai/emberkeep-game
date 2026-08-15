@@ -65,7 +65,8 @@ import {
   clipTextureRect,
   dragonChainsOf,
   dragonClipCharacter,
-  originFor
+  originFor,
+  sleepFrameFor
 } from '../core/characterAnims';
 import { gridToWorld, worldToGrid } from '../core/iso';
 import { ensureTextures } from '../core/lazyTextures';
@@ -1601,11 +1602,19 @@ export class BoardScene extends Phaser.Scene {
       if (!sleepKey || !this.textures.exists(sleepKey)) {
         const idle = this.dragonClip(ld, 'idle');
         if (idle) {
+          // The FULLY-BLINKED idle frame is the sleep pose: eyes closed is
+          // what separates "asleep" from "stuck". Calibrated per breed
+          // (sleep-frames.json); syncDragon's seated branch breathes the
+          // frozen frame exactly as it breathes the red whelp's tosleep
+          // freeze. Only a breed with no calibrated frame falls back to the
+          // old dimmed frame 0 — eyes open, so the dim does the talking.
+          const id = this.clipCharacterFor(ld.host.chain, ld.host.tier);
+          const closed = id ? sleepFrameFor(id) : null;
           const overlay = this.dressOverlay(ld, idle);
           overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
           overlay.stop();
-          overlay.setFrame(0);
-          overlay.setVisible(true).setAlpha(0.65);
+          overlay.setFrame(closed ?? 0);
+          overlay.setVisible(true).setAlpha(closed !== null ? 1 : 0.65);
         } else {
         }
         return;

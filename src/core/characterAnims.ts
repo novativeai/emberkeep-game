@@ -18,6 +18,7 @@
  * in node, and the scenes only spend a couple of lines on the Phaser calls.
  */
 import characterAnimsJson from '../data/character-anims.json';
+import sleepFramesJson from '../data/sleep-frames.json';
 
 export interface CharacterClip {
   /** path under assets/, e.g. 'sprites/anims/eleanor/idle.webp' */
@@ -104,6 +105,20 @@ export function clipsFor(characterId: string, data: CharacterAnimsData = CHARACT
 /** Texture AND animation key for a staged clip — one namespace, one owner. */
 export function clipKey(characterId: string, clipId: string): string {
   return `canim_${characterId}_${clipId}`;
+}
+
+/**
+ * The fully-blinked (eyes-closed) frame of this character's IDLE clip, or null.
+ *
+ * Calibrated per breed (src/data/sleep-frames.json, GENERATED — see
+ * scripts/find-sleep-frames.py): the frame a seated sleep freezes on when the
+ * breed has no tosleep clip and no sleep painting. Eyes closed is what makes a
+ * frozen idle frame read as SLEEP rather than as a stuck animation.
+ */
+export function sleepFrameFor(characterId: string): number | null {
+  const frames = sleepFramesJson as Record<string, number | string>;
+  const v = frames[characterId];
+  return typeof v === 'number' ? v : null;
 }
 
 /**
