@@ -90,8 +90,26 @@ export class WorldSystem {
           }
         }
       }
+      // Past the ring, the NEAREST cell it can stand on — never "the first one
+      // in the set", which is what this used to fall through to. A gateway is
+      // painted off the playable ground and can sit further than three cells
+      // from any of it, and when it did the arriving dragon was seated at
+      // whatever cell the registry happened to list first: the bottom of the
+      // world, under the clouds, nowhere near the door it came through.
+      let best: TilePos | null = null;
+      let bestD = Infinity;
+      for (const key of world.playable) {
+        const [col, row] = key.split(',').map(Number);
+        if (!free(col!, row!)) continue;
+        const d = (col! - at.col) ** 2 + (row! - at.row) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = { col: col!, row: row! };
+        }
+      }
+      if (best) return best;
     }
-    // No door back, or the whole neighbourhood is full: anywhere it can stand.
+    // No door back at all: anywhere it can stand.
     for (const key of world.playable) {
       const [col, row] = key.split(',').map(Number);
       if (free(col!, row!)) return { col: col!, row: row! };

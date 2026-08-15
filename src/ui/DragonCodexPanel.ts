@@ -7,7 +7,9 @@ import {
   panelMobileScale,
   WELL_FED_EVOLUTION
 } from '../core/Constants';
+import type { GameContext } from '../core/Context';
 import type { EventBus } from '../core/EventBus';
+import { ensureTextures } from '../core/lazyTextures';
 import type { ChainsData, DragondexData, DragondexEntry } from '../core/types';
 import type { DragonSystem } from '../systems/DragonSystem';
 import { GaugeBar } from './GaugeBar';
@@ -120,7 +122,8 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     private bus: EventBus,
     private dragons: DragonSystem,
     private dex: DragondexData,
-    private chains: ChainsData
+    private chains: ChainsData,
+    private ctx: GameContext
   ) {
     super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
@@ -205,6 +208,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     this.isOpen = true;
     this.revealPending = false;
     this.revealArmed = false;
+    this.fetchEvolutionArt();
     this.showPage('roster');
     this.setVisible(true);
     this.setAlpha(0);
@@ -279,6 +283,31 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
 
   private entryFor(chain: string): DragondexEntry | undefined {
     return this.dex.dragons[chain];
+  }
+
+  /**
+   * Pull in the evolution plates the moment the book opens.
+   *
+   * They are the same 1200x1400 reveal art the ceremony card uses, and holding
+   * all sixteen resident cost 99 MB of a phone's GPU memory for a page most
+   * sessions never turn to (`isLazyScreenArt`). The book opens on the ROSTER,
+   * which needs none of them, so the fetch has the width of that page to
+   * finish in — and `renderEvolution` already draws the shadow only when its
+   * plate exists, so an unfinished fetch degrades to the page without the art
+   * rather than to a broken one.
+   *
+   * Re-renders if the player got to the evolution page first: without that,
+   * the plate would land into a page already drawn without it and the tutorial
+   * beat that says "that shadow is what she grows into" would point at nothing.
+   */
+  private fetchEvolutionArt(): void {
+    const keys = Object.values(this.dex.dragons)
+      .map((e) => e?.evolution?.reveal)
+      .filter((k): k is string => !!k && !this.scene.textures.exists(k));
+    if (keys.length === 0) return;
+    ensureTextures(this.scene, this.ctx, keys, () => {
+      if (this.isOpen && this.page === 'evolution') this.renderEvolution();
+    });
   }
 
   /** Set the plaque's line and re-cut the banner to it. */

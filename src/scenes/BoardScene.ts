@@ -28,7 +28,6 @@ import {
   GOLDEN_ELDER_TIER,
   GOLDEN_TINT,
   GOLDEN_TREMBLE_PROGRESS,
-  IS_IOS,
   ITEM_SCALE,
   LEVEL_XP,
   LIVE_GAME_HEIGHT,
@@ -44,6 +43,7 @@ import {
   STANDEE_SCALE_TRIM,
   DRAGON_OUTLINE,
   DRAGON_ROAR_EVERY_MS,
+  DRAGON_REST_MS,
   DRAGON_ROAR_MS,
   DRAGON_SLEEP_SCALE,
   DRAGON_WAKE_MS,
@@ -77,19 +77,22 @@ import {
 import { type ClipRef, clipLoadTiers, planClipEviction } from '../core/dragonClips';
 import { type MergeHint, nextMergeHint } from '../core/mergeHints';
 import { LoadQueue } from '../core/LoadQueue';
+import { ensureTextures } from '../core/lazyTextures';
+import { plateScale } from '../core/artScale';
 import { gridToWorld } from '../core/iso';
 import { guard, recordError } from '../core/crash';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
 import { artScaleAt, cellAtWorldPoint, setActiveWorld, worldPointOf } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
 import { cappedTier } from '../core/graphics';
-import { GRAPHICS_EVENT, graphics } from '../core/graphicsState';
+import { GRAPHICS_EVENT, graphics, liveCrystalAvailable } from '../core/graphicsState';
+import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
 import { renderScale } from '../core/render-scale';
 import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAllow } from '../core/types';
 import facesJson from '../data/faces.json';
 import { BoardItem } from '../entities/BoardItem';
 import { PortalFX } from '../entities/PortalFX';
-import { type Crystal3D, sharedCrystal3D } from '../render/Crystal3D';
+import type { Crystal3D } from '../render/Crystal3D';
 import type { FacesData } from '../render/faceAnimations';
 import { FlipbookFX, RAMP_TEXTURE } from '../render/FlipbookFX';
 import { EMITTER_PRESETS } from '../render/fx/emitterAssets';
@@ -151,6 +154,15 @@ interface LiveDragon {
    *  dragon is airborne — falling asleep mid-flight is how it once slept in
    *  the air (and how a cleared transition once left it fully invisible). */
   sleepState: 'none' | 'transition' | 'seated';
+  /** Whether the HOST is currently wearing the curled sleep painting.
+   *
+   *  Deliberately separate from `sleepState`, which is about the ANIMATION and
+   *  gets cleared out from under the art: `dragonHover` resets it to 'none' on
+   *  any flight ordered over a sleeper, so the later wake read "nothing to
+   *  undo" and left the host in curled clothes — a dragon standing up on screen
+   *  whose hit target was still a 160-unit ball. What is DRAWN needs its own
+   *  record, and this is it. */
+  wearingSleepArt: boolean;
   /** True from the moment a sleep starts unfolding until the wake clip has
    *  finished. A dragon is not a working generator during it — the tap that
    *  woke it is the whole gesture, and harvesting through the uncurl would
@@ -379,6 +391,9 @@ export class BoardScene extends Phaser.Scene {
    *  Theme-Crystal generator's look) + any authored 3D-decor placement. */
   private crystal3d?: Crystal3D;
   private crystalTex?: Phaser.Textures.CanvasTexture;
+  /** Authored 3D-decor sprites wearing the crystal texture. Held so a LATE live
+   *  gem (the import is dynamic now) can re-point them off the destroyed frame. */
+  private crystalDecor: Phaser.GameObjects.Image[] = [];
   /** Battery governor (registry; set in main.ts — absent in bare-scene tests). */
   private power?: PowerGovernor;
   private crystalLastRender = 0;
@@ -1083,6 +1098,7 @@ export class BoardScene extends Phaser.Scene {
       roarInMs: DRAGON_ROAR_EVERY_MS,
       flightPhase: null,
       sleepState: 'none',
+      wearingSleepArt: false,
       waking: false
     };
     this.liveDragons.set(host.itemId, ld);
@@ -1747,7 +1763,13 @@ export class BoardScene extends Phaser.Scene {
     // ordered over a sleeper (work drop, wander race) used to strand
     // `sleepState` at seated/transition, and every later seatDragonSleep
     // no-opped on the stale guard — the frozen-dragon bug.
+    //
+    // Clearing that state is only half of it: the curled PAINTING is still on
+    // the host, and dropping the flag is what once hid it from the wake path
+    // that would have taken it off. Undress here too, so the animal that takes
+    // wing is wearing what it will land in.
     ld.sleepState = 'none';
+    this.restoreStandingArt(ld);
     const f = this.flySegments(ld);
     if (!f) {
       // No phased clip: the whole-loop overlay, else the rig's hover preset
@@ -1960,7 +1982,8 @@ export class BoardScene extends Phaser.Scene {
       // second one the item would otherwise light beneath itself.
       ld.player?.container.setVisible(false);
       ld.host.setArtTexture(sleepKey, this.ctx.data.anchors);
-      ld.host.setArtScale(ITEM_SCALE[sleepKey] ?? DRAGON_SLEEP_SCALE);
+      ld.host.setArtScale(plateScale(sleepKey, ITEM_SCALE[sleepKey] ?? DRAGON_SLEEP_SCALE));
+      ld.wearingSleepArt = true;
       ld.host.setArtVisible(true);
       ld.host.setGroundShadowVisible(false);
       // A still frame reads as a dead sprite, so the painting BREATHES.
@@ -2018,6 +2041,41 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Put the STANDING art back on the host, whatever route the sleep ended by.
+   *
+   * The host is invisible while a rig or clip stands in for it, so this is not
+   * about what the player sees — it is about what they can HIT. The clickable
+   * rect is cut from the art's bounds and the pixel test reads the art's own
+   * alpha, so a host left in its curled painting is a dragon that is standing
+   * on screen and answers taps only over a ball a fraction of its size. It also
+   * matters to the pool: a released item still wearing `sleep_*` would come
+   * back as some other tile's sleeping dragon.
+   *
+   * Idempotent, and keyed on `wearingSleepArt` rather than on any animation
+   * state, so every path out of a sleep — the tap, the timer, a flight ordered
+   * over the sleeper — can call it without knowing what the others did.
+   */
+  private restoreStandingArt(ld: LiveDragon): void {
+    if (!ld.wearingSleepArt) return;
+    ld.wearingSleepArt = false;
+    ld.host.setSleepBreath(false);
+    const item = this.ctx.state.items.get(ld.host.itemId);
+    // Through `textureFor`, not a hand-built `item_<chain>_<tier>`: a dragon
+    // wearing a bought skin used to wake up in the base breed's clothes and
+    // stay that way until something else re-skinned the board.
+    const standKey = item
+      ? this.textureFor(this.ctx.state.snapshot(item, this.ctx.clock.now()))
+      : `item_${ld.host.chain}_${ld.host.tier}`;
+    if (this.textures.exists(standKey)) {
+      ld.host.setArtTexture(standKey, this.ctx.data.anchors);
+      ld.host.setArtScale(
+        plateScale(standKey, ITEM_SCALE[`${ld.host.chain}_${ld.host.tier}`] ?? 1)
+      );
+    }
+    ld.host.setArtVisible(false);
+  }
+
   private applyDragonMood(itemId: number, mood: 'awake' | 'hungry' | 'asleep'): void {
     const ld = this.liveDragons.get(itemId);
     if (!ld) return;
@@ -2051,7 +2109,17 @@ export class BoardScene extends Phaser.Scene {
     const seated = ld.sleepState === 'seated';
     const midTransition = ld.sleepState === 'transition';
     ld.sleepState = 'none';
-    if (!seated && !midTransition) return; // never seated — it is still flying or standing
+    if (!seated && !midTransition) {
+      // Never seated, SO FAR AS THE ANIMATION KNOWS — which is not the same as
+      // "nothing to undo". `dragonHover` clears sleepState on any flight
+      // ordered over a sleeper and leaves the curled painting on the host, and
+      // this early return used to walk straight past it: the rig stood up, the
+      // hit target stayed a 160-unit ball, and the dragon was awake and
+      // untappable until something else happened to re-dress it. The art has
+      // its own record now, and it is the one asked here.
+      this.restoreStandingArt(ld);
+      return;
+    }
     // It is not a working generator until it is back on its feet — the tap
     // that woke it does not also harvest, and neither does one thrown at the
     // uncurl (see onItemTapped).
@@ -2061,17 +2129,7 @@ export class BoardScene extends Phaser.Scene {
     // waking has to give that alpha back, or it stays a ghost for the rest of
     // the session. Harmless on every other path — the overlay is opaque there.
     ld.clipOverlay?.setAlpha(1);
-    ld.host.setSleepBreath(false);
-    // Restore the STANDING art under the rig. The host is invisible while the
-    // rig stands in, but a pooled item that is released still carrying the
-    // curled texture would come back as a sleeping dragon in another tile's
-    // clothes (the pool's own rule: acquire must fully reset).
-    const standKey = `item_${ld.host.chain}_${ld.host.tier}`;
-    if (this.textures.exists(standKey)) {
-      ld.host.setArtTexture(standKey, this.ctx.data.anchors);
-      ld.host.setArtScale(ITEM_SCALE[`${ld.host.chain}_${ld.host.tier}`] ?? 1);
-    }
-    ld.host.setArtVisible(false);
+    this.restoreStandingArt(ld);
     ld.shadow.setVisible(true);
     // The TOSLEEP clip played in REVERSE is the definitive wake when pushed —
     // the whelp uncurls, then the rig stands. Without it, the rig returns at
@@ -2399,10 +2457,16 @@ export class BoardScene extends Phaser.Scene {
     if (!this.altarEgg && !this.altarElder && !this.altarElderClip && !this.altarElderFallback) {
       const p0 = this.altarPoint();
       const cal = GOLDEN_ALTAR.calibration;
+      // Through `plateScale`, like every other draw of a board plate: this
+      // scale is CALIBRATED against the art as it was drawn, and the plate is
+      // stored smaller than that. Without it the altar egg shrank by the
+      // downscale factor — the one draw in this file that reads a plate at a
+      // hand-tuned scale instead of ITEM_SCALE, and so the one the compensation
+      // was missing.
       this.altarEgg = this.add
         .image(p0.x, p0.y, `item_${GOLDEN_CHAIN}_1`)
         .setOrigin(cal.anchor.x, cal.anchor.y)
-        .setScale(p0.scale)
+        .setScale(plateScale(`item_${GOLDEN_CHAIN}_1`, p0.scale))
         .setDepth(DEPTHS.itemBase + p0.y);
       // Soft radial ground shadow at the egg's base — the egg is anchored at its
       // TOP (cal.anchor.y ≈ 0), so its foot sits one display-height below p0.y.
@@ -2508,7 +2572,9 @@ export class BoardScene extends Phaser.Scene {
       this.altarElderFallback = this.add
         .image(p.x, eggBottom, `item_${GOLDEN_CHAIN}_${GOLDEN_ELDER_TIER}`)
         .setOrigin(0.5, 0.88)
-        .setScale(0.21)
+        // A no-op today (this plate shares its file with two other keys, so the
+        // downscale skips it) and correct the day it stops sharing.
+        .setScale(plateScale(`item_${GOLDEN_CHAIN}_${GOLDEN_ELDER_TIER}`, 0.21))
         .setTint(GOLDEN_TINT)
         .setVisible(false)
         .setDepth(DEPTHS.itemBase + p.y + 1);
@@ -3496,6 +3562,7 @@ export class BoardScene extends Phaser.Scene {
       return;
     }
     this.armed = { kind: 'character', id: characterId };
+    this.ctx.bus.emit('ui:character_armed', { characterId, armed: true });
     sprite.setTint(0xffd84d);
     this.armedTween?.remove();
     // Relative to her OWN scale — a standee is rendered well under 1 and a
@@ -3523,6 +3590,11 @@ export class BoardScene extends Phaser.Scene {
     if (sprite) {
       sprite.clearTint();
       sprite.setScale(baseScaleOf(sprite));
+    }
+    // Say so, so a two-part tutorial step can put its first arrow back: the
+    // player who armed her and changed their mind is back at "tap her".
+    if (a?.kind === 'character') {
+      this.ctx.bus.emit('ui:character_armed', { characterId: a.id, armed: false });
     }
     this.armed = null;
   }
@@ -3826,28 +3898,65 @@ export class BoardScene extends Phaser.Scene {
     this.restoreCrystalArt();
     // The painted grotto is the crystal (see CRYSTAL_3D).
     if (!CRYSTAL_3D) return;
-    // A live three.js render every few frames for one board item. The painted
-    // fallback texture is already there, so skipping this costs a highlight.
-    if (!graphics.profile.crystal3d) return;
-    // iOS Safari's renderer process crashes ("A problem repeatedly occurred") under
-    // the memory of a SECOND live WebGL context plus its per-frame GPU→CPU readback
-    // (drawImage of a WebGL canvas). Skip it there — the static `item_crystal_1` PNG
-    // (loaded in preload) stays as the crystal texture, so the gem still renders 2D.
-    if (IS_IOS) return;
+    // `high` only, and never on a touch device — see `liveCrystalAvailable`.
+    // Everywhere else the baked spin sheet plays the same 90° loop for the price
+    // of a texture, with no second WebGL context and no per-frame readback (see
+    // `spinsBakedCrystal`).
+    if (!liveCrystalAvailable()) return;
     const map = this.ctx.state.map;
     const spec = map.decor3d?.find((d) => d.model3d)?.model3d ?? undefined;
-    try {
-      // ONE renderer per page (`sharedCrystal3D`), not one per scene. The
-      // texture manager is the GAME's, not the scene's, so both the gem and the
-      // key it wears simply outlive every rebuild.
-      const crystal = sharedCrystal3D(spec ?? {});
-      this.textures.remove(CRYSTAL_KEY); // the painted art is safe under CRYSTAL_PNG
-      this.crystalTex = this.textures.addCanvas(CRYSTAL_KEY, crystal.canvas) ?? undefined;
-      if (!this.crystalTex) return;
-      this.crystal3d = crystal;
-    } catch (err) {
-      console.warn('[Crystal3D] WebGL unavailable — keeping the 2D crystal art.', err);
-    }
+    // DYNAMIC, and this is the only import of three.js in the codebase: at 72 KB
+    // brotli it was riding the one boot-blocking bundle onto every device,
+    // including every iOS, phone and non-`high` machine guaranteed never to
+    // execute a line of it. Now the tier that renders the gem downloads the
+    // renderer, and the tiers that play the sheet download the sheet — one gem
+    // each, never both.
+    void import('../render/Crystal3D')
+      .then(({ sharedCrystal3D }) => {
+        // The board may have been left (travel, a quality change) while this was
+        // in flight; installing a texture into a dead scene would throw.
+        if (!this.scene.isActive()) return;
+        // ONE renderer per page (`sharedCrystal3D`), not one per scene. The
+        // texture manager is the GAME's, not the scene's, so both the gem and the
+        // key it wears simply outlive every rebuild.
+        const crystal = sharedCrystal3D(spec ?? {});
+        this.textures.remove(CRYSTAL_KEY); // the painted art is safe under CRYSTAL_PNG
+        this.crystalTex = this.textures.addCanvas(CRYSTAL_KEY, crystal.canvas) ?? undefined;
+        if (!this.crystalTex) return;
+        this.crystal3d = crystal;
+        // The import means items and decor can now be BUILT before the gem
+        // arrives, and the swap above destroyed the texture they were holding a
+        // frame of — which ends the RAF chain, not just the picture. Re-point
+        // them at the new one; same key, so the anchor still resolves.
+        for (const sprite of this.itemSprites.values()) {
+          if (sprite.chain === 'crystal' && sprite.kind !== 'decor') {
+            sprite.setArtTexture(CRYSTAL_KEY, this.ctx.data.anchors);
+          }
+        }
+        for (const decor of this.crystalDecor) decor.setTexture(CRYSTAL_KEY);
+      })
+      .catch((err) => {
+        console.warn('[Crystal3D] unavailable — keeping the 2D crystal art.', err);
+      });
+  }
+
+  /**
+   * True when this piece is the emerald AND it should play the BAKED spin rather
+   * than wear the live three.js gem.
+   *
+   * The texture check is not belt-and-braces: the sheet is only FETCHED where the
+   * live gem is declined, so on a machine that has the real thing it is
+   * legitimately absent. `crystal3d` being unset is no longer proof on its own —
+   * the renderer arrives asynchronously now — which is exactly why the sheet's
+   * presence is the term that decides.
+   */
+  private spinsBakedCrystal(snap: ItemSnapshot): boolean {
+    return (
+      snap.chain === 'crystal' &&
+      snap.kind !== 'decor' &&
+      !this.crystal3d &&
+      this.textures.exists(CRYSTAL_SPIN_KEY)
+    );
   }
 
   /**
@@ -3858,6 +3967,7 @@ export class BoardScene extends Phaser.Scene {
    * up (WebGL-less); the gem only shows where the world placed it.
    */
   private buildMapDecor3d(): void {
+    this.crystalDecor = [];
     const map = this.ctx.state.map;
     // Render wherever the crystal texture exists — the live 3D gem when present,
     // else the static PNG fallback (iOS / WebGL-less), so decor never silently drops.
@@ -3885,6 +3995,7 @@ export class BoardScene extends Phaser.Scene {
         .setOrigin(cal.anchor?.x ?? 0.5, cal.anchor?.y ?? 0.72)
         .setScale((cal.scale ?? 1) * ratio)
         .setDepth(DEPTHS.itemBase + y);
+      this.crystalDecor.push(sprite);
       // Under the gem, not under its cell — same rule as `buildMapDecor` above.
       // The authored emerald carries dx -64 / dy -28, so its shadow used to sit
       // a third of a tile down-right of the crystal casting it.
@@ -4198,6 +4309,46 @@ export class BoardScene extends Phaser.Scene {
    * through actually finds him waiting there. A flourish that flew back out
    * would be prettier by one beat and a lie by the whole point.
    */
+  /**
+   * The door under a drop point — but only one the player has actually earned.
+   *
+   * A portal rectangle exists from the first frame whether or not its
+   * destination is open, and an unlit arch that swallowed a dragon would send
+   * it somewhere the Keeper cannot follow. `available()` is the same set
+   * `syncPortalFx` lights the doors from, so what accepts a dragon is exactly
+   * what is glowing on screen.
+   */
+  private openDoorUnder(
+    pointer: Phaser.Input.Pointer,
+    dragged?: BoardItem
+  ): { fx: PortalFX; zone: Phaser.GameObjects.Zone; to: string } | null {
+    const open = new Set(this.ctx.systems.worlds.available().map((w) => w.id));
+    // The POINTER is not where the player thinks they dropped: a piece is
+    // carried by wherever it was grabbed, so a dragon laid squarely on the arch
+    // can have the finger a tile below and to the left of it. The same trap the
+    // drop-cell resolution warns about, and matching the pointer alone is why a
+    // dragon dragged onto a door simply settled back on the board while a tap
+    // on the same arch carried the Keeper through without it. So the ART's
+    // bounds count too — what the player aimed is what the player sees.
+    const art = dragged?.artHitRect();
+    const box =
+      art && dragged
+        ? new Phaser.Geom.Rectangle(
+            dragged.x + art.x - dragged.displayOriginX,
+            dragged.y + art.y - dragged.displayOriginY,
+            art.width,
+            art.height
+          )
+        : null;
+    for (const door of this.portalDoors.values()) {
+      if (!open.has(door.to)) continue;
+      const rect = door.zone.getBounds();
+      if (rect.contains(pointer.worldX, pointer.worldY)) return door;
+      if (box && Phaser.Geom.Intersects.RectangleToRectangle(rect, box)) return door;
+    }
+    return null;
+  }
+
   private flyThroughGate(
     door: { fx: PortalFX; zone: Phaser.GameObjects.Zone; to: string },
     itemId: number
@@ -4629,6 +4780,51 @@ export class BoardScene extends Phaser.Scene {
           }
         }
 
+        // Dragon dragged onto an OPEN DOOR → it goes through, and stays through.
+        //
+        // The crossing itself has existed since the gate flight: `flyThroughGate`
+        // arcs it into the light and `dragon:cross_gate` seats it on the far
+        // board. What was missing was any way for the PLAYER to ask for one — it
+        // fired once, on the door's own ignition, and a dragon that had gone
+        // ahead could never be called back. So the far side read as a cage.
+        //
+        // Same "put this on that" verb as feeding and hiring, so it needs no
+        // teaching, and the same art-bounds match: the door is a rectangle over
+        // a painted archway, and asking the player to hit its cell would be
+        // asking them to aim at something they cannot see.
+        if (this.wearsRigTier(obj.chain, obj.tier) && this.tutorialDone) {
+          const door = this.openDoorUnder(pointer, obj);
+          if (door) {
+            const home = gridToWorld(this.dragFrom.col, this.dragFrom.row);
+            this.dragFrom = null;
+            this.time.delayedCall(60, () => obj.setData('dragged', false));
+            obj.settleFromDrag();
+            // A sleeper is not sent on a journey — the same refusal the House
+            // gives, for the same reason: the drop must not quietly MOVE her to
+            // whatever cell is behind the arch.
+            const resting = this.ctx.systems.jobs.restRemaining(obj.itemId) > 0;
+            if (resting || this.ctx.systems.dragonLife.moodOf(obj.itemId) === 'asleep') {
+              this.floatText(
+                obj.x,
+                obj.y - 190,
+                resting ? 'Resting…' : 'Fast asleep…',
+                PALETTE.cream
+              );
+              this.tweens.add({
+                targets: obj,
+                x: home.x,
+                y: home.y,
+                duration: TIMINGS.dragReturn,
+                ease: 'Back.easeOut',
+                onComplete: () => obj.settleDepth()
+              });
+              return;
+            }
+            this.flyThroughGate(door, obj.itemId);
+            return;
+          }
+        }
+
         this.ctx.bus.emit('drag:dropped', {
           itemId: obj.itemId,
           from: this.dragFrom,
@@ -5044,6 +5240,10 @@ export class BoardScene extends Phaser.Scene {
 
   private textureFor(snap: ItemSnapshot): string {
     if (snap.kind === 'decor') return `decor_${snap.chain}`;
+    // The baked spin sheet is its OWN texture, not a re-dress of item_crystal_1:
+    // it is trimmed and half-scale, so it carries a different origin and scale
+    // (setSpin applies them) and must never be seated with the still's numbers.
+    if (this.spinsBakedCrystal(snap)) return CRYSTAL_SPIN_KEY;
     // A bought Manor skin replaces the top-tier Timber art and nothing else —
     // same chain, same tier, same generator, same payout. Every skin ships on
     // the Manor's own 430x450 canvas so ITEM_SCALE.lumber_4 applies unchanged.
@@ -5087,14 +5287,45 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private reskinChain(chain: string, wants: (item: BoardItemState) => boolean): void {
-    for (const [id, sprite] of this.itemSprites) {
+    const targets = [...this.itemSprites].filter(([id]) => {
       const item = this.ctx.state.items.get(id);
-      if (!item || item.chain !== chain || !wants(item)) continue;
-      sprite.setArtTexture(
-        this.textureFor(this.ctx.state.snapshot(item, this.ctx.clock.now())),
-        this.ctx.data.anchors
-      );
+      return !!item && item.chain === chain && wants(item);
+    });
+    const paint = (): void => {
+      for (const [id, sprite] of targets) {
+        const item = this.ctx.state.items.get(id);
+        if (!item) continue;
+        sprite.setArtTexture(
+          this.textureFor(this.ctx.state.snapshot(item, this.ctx.clock.now())),
+          this.ctx.data.anchors
+        );
+      }
+    };
+    // Skin plates are LAZY (`isLazyScreenArt` — fourteen of them were 37 MB of
+    // GPU memory for the at-most-two a save wears). `textureFor` answers with
+    // the BASE art when a plate is missing, which is the right fallback and
+    // exactly the wrong thing to paint here: the player just put the skin on.
+    // So fetch first and paint after. The keys are built rather than asked for,
+    // because asking `textureFor` would get the fallback back.
+    const skin = chain === 'lumber' ? this.ctx.state.manorSkin : this.ctx.state.dragonSkins[chain];
+    if (!skin) {
+      paint(); // taking one OFF: the base art is already resident
+      return;
     }
+    const wanted = new Set<string>();
+    for (const [id] of targets) {
+      const item = this.ctx.state.items.get(id);
+      if (!item) continue;
+      const key = chain === 'lumber' ? `skin_${skin}` : `skin_${skin}_${item.tier}`;
+      if (!this.textures.exists(key)) wanted.add(key);
+    }
+    if (wanted.size === 0) {
+      paint();
+      return;
+    }
+    // Anything with no plate of its own is simply not queued (`ensureTextures`
+    // skips unknown keys), so a whelp-only skin still leaves the adult alone.
+    ensureTextures(this, this.ctx, [...wanted], paint);
   }
 
   private generatorConfigFor(chain: string, tier: number): GeneratorConfig | undefined {
@@ -5290,14 +5521,29 @@ export class BoardScene extends Phaser.Scene {
         this.onItemTapped(sprite!);
       });
     }
+    const textureKey = this.textureFor(snap);
     const artScale =
       snap.kind === 'decor'
         ? (DECOR_SCALE[snap.chain] ?? 1)
-        : (ITEM_SCALE[`${snap.chain}_${snap.tier}`] ??
-          ITEM_SCALE[snap.chain] ??
-          this.tierArtScale(snap.chain, snap.tier) ??
-          1);
-    sprite.acquire(snap, this.ctx.data.anchors, this.textureFor(snap), artScale);
+        : // `plateScale` gives back a resized plate's authored size: the ratio
+          // below is against the art as DRAWN, and 98 board plates are stored
+          // smaller than that. Keyed on the texture actually chosen, so a skin
+          // is corrected by its own factor and not the base plate's.
+          plateScale(
+            textureKey,
+            ITEM_SCALE[`${snap.chain}_${snap.tier}`] ??
+              ITEM_SCALE[snap.chain] ??
+              this.tierArtScale(snap.chain, snap.tier) ??
+              1
+          );
+    sprite.acquire(snap, this.ctx.data.anchors, textureKey, artScale);
+    // The emerald turns wherever the LIVE gem is not. On a phone and on the
+    // `low` profile `ensureCrystal3D` declines the second WebGL context, and the
+    // baked sheet plays the same 90° loop at the same cadence instead — the gem
+    // the player sees is the gem everyone else sees, minus a WebGL context and
+    // its 33 ms readback. The sheet brings its own origin and scale (setSpin),
+    // which is why it overrides the `artScale` computed just above.
+    sprite.setSpin(this.spinsBakedCrystal(snap) ? CRYSTAL_SPIN : null);
     // Phaser 3.90: calling setInteractive() on an already-interactive object
     // silently returns without updating hitArea. Mutate sprite.input.hitArea
     // directly instead. This also handles pool-reuse resets.
@@ -5454,18 +5700,14 @@ export class BoardScene extends Phaser.Scene {
     // it does not also harvest, because the wake is the whole gesture and its
     // animation has to finish before the animal is a working generator again.
     //
-    // Which sleep it is decides whether the tap does anything at all. A NAP is
-    // the player's to interrupt; a shift-rest is not — that sleep was bought
-    // with the work, and shaking it off would hand the cost back.
+    // Every sleep is now the nap, and the nap is the player's to interrupt. The
+    // shift-rest used to refuse this tap ("that sleep was bought with the
+    // work") — it no longer puts the dragon down at all, so there is nothing
+    // here to refuse; a tired dragon takes the tap like any other awake one and
+    // is simply not hireable until its fatigue runs out.
     if (this.ctx.systems.dragons.isBoardDragon(item)) {
-      const kind = this.ctx.systems.dragonLife.sleepKindOf(item.id);
-      if (kind === 'nap') {
+      if (this.ctx.systems.dragonLife.sleepKindOf(item.id) === 'nap') {
         this.wakeDragonByTap(sprite, item.id);
-        return;
-      }
-      if (kind === 'rest') {
-        scalePulse(this, sprite, 1.04, 120); // it stirs, and goes back to sleep
-        this.floatText(sprite.x, sprite.y - 150, 'Worn out — let it rest', PALETTE.cream);
         return;
       }
       // Awake, but still folding out of a sleep: the wake clip owns these
@@ -5699,7 +5941,7 @@ export class BoardScene extends Phaser.Scene {
     // token); the label carries only the price and sits right of the icon.
     this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
     this.skipGoldLabel.setX(-150 + 22);
-    btn.add(this.add.image(-150 - 34, -2, 'item_coin_1').setScale(0.1));
+    btn.add(this.add.image(-150 - 34, -2, 'item_coin_1').setScale(plateScale('item_coin_1', 0.1)));
     this.skipWarmthLabel = make(150, 0xa9d6ff, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
     btn.add(caption); // on top of the buttons
     // Tutorial: bounce an arrow over the WARMTH (⚡) skip so the player learns to
@@ -5892,6 +6134,10 @@ export class BoardScene extends Phaser.Scene {
    *  fx_timepill visual the cooldown countdowns use, with the sleep emoji in
    *  place of the gold dot. */
   private showRestBadge(dragonId: number): void {
+    // Nothing to count down to: with DRAGON_REST_MS at 0 the dragon flies home
+    // ready, and a pill that appeared for one housekeeping tick and vanished
+    // would read as a flicker, not as information.
+    if (DRAGON_REST_MS <= 0) return;
     this.restBadges.get(dragonId)?.destroy();
     const sprite = this.itemSprites.get(dragonId);
     if (!sprite) return;
@@ -6390,7 +6636,9 @@ export class BoardScene extends Phaser.Scene {
     const ghost = this.add
       .image(x, y, eggKey)
       .setOrigin(ax, ay)
-      .setScale(ITEM_SCALE[`${snap.chain}_${snap.tier - 1}`] ?? ITEM_SCALE[snap.chain] ?? 1)
+      .setScale(
+        plateScale(eggKey, ITEM_SCALE[`${snap.chain}_${snap.tier - 1}`] ?? ITEM_SCALE[snap.chain] ?? 1)
+      )
       .setDepth(DEPTHS.itemBase + y);
     this.tweens.add({
       targets: ghost,

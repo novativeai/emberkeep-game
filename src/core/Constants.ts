@@ -466,8 +466,11 @@ export const ITEM_SCALE: Record<string, number> = {
   // grass the dragons rested in and ate; it burned, and what stands here is the
   // last of it, in a vessel somebody thought was worth the silver.
   //
-  // 205 units on its LONGEST axis, which is now its height rather than its
-  // width — same on-board presence, turned upright. Its anchor (anchors.json)
+  // 102 units on its LONGEST axis, which is now its height rather than its
+  // width — halved (from main, b4ff20e) from the 205 the upright vase first
+  // shipped at, so the farm reads as a vessel standing on its tile rather than
+  // a landmark filling it. The anchor is unchanged, so its foot stays on the
+  // same ground contact and only the size moves. Its anchor (anchors.json)
   // moved 0.66 → 0.94 with the shape: 0.66 was eyeballed for a low wide stump
   // whose mass sat well above its alpha bottom, and a vase contacts the ground
   // at its own foot. Re-derived the same way and for the same reason — an
@@ -476,7 +479,7 @@ export const ITEM_SCALE: Record<string, number> = {
   // centred on the tile diamond. When a landmark floats, composite
   // art-over-shadow and EYEBALL it; deriving this from the bbox has failed
   // three times now.
-  emberbark_1: 0.32,
+  emberbark_1: 0.16,
   emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
   emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red
@@ -1369,11 +1372,16 @@ export const SLEEP_BREATH = {
 /**
  * A dragon naps of its own accord: a SHORT window, on a period of its own.
  *
- * Thirty seconds, once every ten to fifteen minutes. Both halves are the tuning
+ * Fifteen seconds, once every ten to fifteen minutes. Both halves are the tuning
  * and both matter: a sleep long enough to be in the player's way is a sleep the
  * player has to work around, and a sleep on a fixed period is a schedule rather
  * than an animal. The nap is meant to be caught out of the corner of an eye —
  * you look over, it is curled up, you look again and it is not.
+ *
+ * 30 s → 15 s (2026-08-15), by the owner's call after playing it: half a minute
+ * is long enough to walk up to a dragon, want something from it, and wait. The
+ * curl-up and the uncurl are ~1.4 s each at either length, so the nap still
+ * reads as a full gesture rather than a flicker — it simply stops being a wait.
  *
  * The PERIOD is drawn per dragon from its id (`napCycleOf`), so no two share a
  * rhythm; the OFFSET inside it is drawn the same way, so no two doze in
@@ -1382,7 +1390,7 @@ export const SLEEP_BREATH = {
  * puts the animal exactly where it was.
  *
  * This is now the ONLY sleep a dragon chooses. The night used to put the whole
- * roster down for its eight-minute phase, which is not "thirty seconds" by any
+ * roster down for its eight-minute phase, which is not "a short window" by any
  * reading — the sky still turns, the Dew Basin still only runs after dark, but
  * it no longer decides whether an animal is on its feet. What remains beside
  * the nap is the shift-rest, and that one the player asked for by working it.
@@ -1408,7 +1416,7 @@ export const GATE_FLIGHT = {
   fadeMs: 420
 } as const;
 
-export const DRAGON_NAP_LENGTH_MS = 30_000;
+export const DRAGON_NAP_LENGTH_MS = 15_000;
 export const DRAGON_NAP_CYCLE_MIN_MS = 600_000;
 export const DRAGON_NAP_CYCLE_MAX_MS = 900_000;
 
@@ -2105,7 +2113,21 @@ export const DRAGON_OUTLINE = {
  * returns home and rests REST_MS before it can work again.
  */
 export const DRAGON_WORK_MS = 180_000; // 3 minutes of work
-export const DRAGON_REST_MS = 300_000; // then 5 minutes of rest (fatigue)
+/**
+ * NO FATIGUE (0, 2026-08-15 — owner's call, and the second half of the sleep
+ * decision above).
+ *
+ * A shift used to be followed by five minutes in which the dragon could not be
+ * hired again. Making it stop being a SLEEP fixed the picture; it did not fix
+ * the rule, because the animal was still unusable for five minutes out of
+ * every eight. One sentence now describes a dragon's whole day: it sleeps
+ * fifteen seconds every ten to fifteen minutes, and it is available the rest of
+ * the time.
+ *
+ * The shift itself is untouched — DRAGON_WORK_MS still ends it and the dragon
+ * still flies home on `dragon:rest`. It simply lands ready.
+ */
+export const DRAGON_REST_MS = 0;
 
 /** Seconds a single working dragon advances timers per real second. Total rate =
  *  PER × workers; the base 1× already comes from the clock, so the job system

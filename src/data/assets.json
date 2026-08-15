@@ -196,7 +196,7 @@
       "key": "item_crystal_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/crystal.webp"
+      "file": "sprites/items/crystal-still.webp"
     },
     {
       "key": "item_emberbark_1",
@@ -900,7 +900,7 @@
     {
       "key": "item_frost_2",
       "source": "file",
-      "file": "sprites/items/skins/dragons/frost_3.webp"
+      "file": "sprites/items/skins/dragons/frost_3--item_frost_2.webp"
     },
     {
       "key": "item_frost_3",
@@ -915,7 +915,7 @@
     {
       "key": "item_storm_2",
       "source": "file",
-      "file": "sprites/items/skins/dragons/storm_3.webp"
+      "file": "sprites/items/skins/dragons/storm_3--item_storm_2.webp"
     },
     {
       "key": "item_storm_3",
@@ -1445,7 +1445,7 @@
       "key": "item_cinder_vein_3",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/crystal.webp"
+      "file": "sprites/items/crystal-still.webp"
     },
     {
       "key": "item_lumber_4",

@@ -90,6 +90,13 @@ export class MapEditor {
     ctx.bus.on('world:ready', () => {
       if (!this.prepared) void this.hydrate();
     });
+    // The editor is CONSTRUCTED LAZILY now — main.ts imports this module on the
+    // first `editor:open`, to keep three.js and an 8.9 MB project fetch off every
+    // player's boot. By then `world:ready` has long since fired for this world and
+    // will not fire again, so the subscription above would wait forever. Ask the
+    // same question directly when the board is already standing. Still exactly
+    // one restore: `prepared` is the latch, whichever door reaches it first.
+    if (!this.prepared && this.boardScene()?.scene.isActive()) void this.hydrate();
   }
 
   /** The single boot restore of the EDITOR's own state: wait for the on-disk

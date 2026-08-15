@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { DEPTHS, DRAG, HIT_FORGIVENESS_PX, SLEEP_BREATH, TIMINGS, num, PALETTE } from '../core/Constants';
 import { gridToWorld } from '../core/iso';
-import type { AnchorsData, ItemSnapshot } from '../core/types';
+import type { AnchorsData, ItemSnapshot, SpinSheet } from '../core/types';
 
 const COOLING_TINT = 0x9d97a2;
 
@@ -36,6 +36,9 @@ export class BoardItem extends Phaser.GameObjects.Container {
   private sleepBreath = false;
   private breathPhase = 0;
   private sleepGroundY = 0;
+  /** The baked spin sheet this item's art is playing, if any (the crystal on
+   *  devices that decline the live three.js gem). */
+  private spin: SpinSheet | null = null;
   /** The art's own scale, so the breath can modulate it without drifting. */
   private artBaseX = 1;
   private artBaseY = 1;
@@ -119,6 +122,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     }
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
     this.groundShadow.setDisplaySize(w, w * 0.42);
+    this.refitHitArea();
   }
 
   /**
@@ -136,6 +140,25 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.artBaseY = artScale;
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
     this.groundShadow.setDisplaySize(w, w * 0.42);
+    this.refitHitArea();
+  }
+
+  /**
+   * Re-cut the clickable rect to the art that is on screen NOW.
+   *
+   * The rect is the ART's bounds, so every swap that changes those bounds
+   * invalidates it — and it was only ever written once, at acquire. A dragon
+   * that curled up into its sleep painting (a different pose at 0.134 of the
+   * standing scale) kept the standing rect, and a piece that came back from a
+   * swap the other way kept a rect too small for what the player can see. Both
+   * end as the same complaint: the thing is right there and taps go through it.
+   *
+   * Called from the two swaps that can change the size, rather than left to
+   * their callers, because "remember to refit" is exactly the kind of promise
+   * that gets forgotten at the third call site.
+   */
+  private refitHitArea(): void {
+    if (this.input) this.input.hitArea = this.artHitRect();
   }
 
   acquire(
@@ -162,6 +185,9 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.artBaseY = artScale;
     this.sleepBreath = false;
     this.sleepGroundY = 0;
+    // A pooled item may have been the spinning crystal; `acquire` must hand back
+    // a still one or the next piece in this slot inherits the sheet's frames.
+    this.spin = null;
     this.sprite.setVisible(true); // a pooled item may have been a hidden rig host
     // Soft shadow scaled to the art's footprint (proportional to its size).
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
@@ -414,10 +440,48 @@ export class BoardItem extends Phaser.GameObjects.Container {
     });
   }
 
+  /**
+   * Play a baked spin sheet on this item's art, or stop one.
+   *
+   * One caller: the crystal generator on every device that declines the live
+   * three.js gem, where `crystal-spin.webp` stands in for it. The sheet is its
+   * own trimmed canvas, so it brings its OWN origin and scale — the
+   * `anchors.json` entry and `ITEM_SCALE` that fit the untrimmed 803x902 texture
+   * would seat it wrong — and both are generated alongside the pixels by
+   * `pack-crystal.py` rather than restated here.
+   *
+   * Frames are stepped from the clock in `applyBob`, not by a Phaser animation:
+   * the art child is an `Image`, and a per-frame `setFrame` in a loop that is
+   * already walking every item is cheaper than promoting it to a `Sprite` and
+   * giving the animation system another member to tick.
+   */
+  setSpin(spin: SpinSheet | null): void {
+    this.spin = spin;
+    if (!spin) return;
+    this.sprite.setOrigin(spin.anchor[0], spin.anchor[1]);
+    this.sprite.setScale(spin.itemScale);
+    this.artBaseX = spin.itemScale;
+    this.artBaseY = spin.itemScale;
+    const w = Math.max(64, this.sprite.displayWidth * 0.92);
+    this.groundShadow.setDisplaySize(w, w * 0.42);
+  }
+
   /** Items no longer float — they sit flat on the ground (a one-time landing
    *  squash on spawn sells the "placed" feel). Kept as a no-op so the per-frame
-   *  caller and the drag pause/resume logic stay intact. */
+   *  caller and the drag pause/resume logic stay intact — and as the hook the
+   *  sleep breath and the crystal's spin both hang off. */
   applyBob(timeMs: number): void {
+    if (this.spin) {
+      // BEFORE the drag pause, unlike everything else here: a gem that froze
+      // the moment it was picked up would read as the board hanging. The spin
+      // is what the object IS, not an idle flourish it can be interrupted out
+      // of. `setFrame` on a spritesheet is a UV swap, so a no-change frame is
+      // near-free and not worth guarding.
+      const t = ((timeMs % this.spin.periodMs) + this.spin.periodMs) % this.spin.periodMs;
+      this.sprite.setFrame(
+        Math.min(this.spin.frames - 1, Math.floor((t / this.spin.periodMs) * this.spin.frames))
+      );
+    }
     if (this.bobPaused) return;
     if (this.sleepBreath) {
       // A sleeping animal's ribcage: it rises and the body widens a little less

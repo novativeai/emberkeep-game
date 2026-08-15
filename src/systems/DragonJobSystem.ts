@@ -49,7 +49,7 @@ export class DragonJobSystem {
     if (!dragonCfg || dragonCfg.tappable === false) return;
     const houseCfg = this.generatorConfig(house.chain, house.tier);
     if (!houseCfg || houseCfg.tappable !== false) return;
-    if (this.jobs.get(dragonId)?.state === 'resting') return; // still tired
+    if (this.restRemaining(dragonId) > 0) return; // still tired (no-op while REST_MS is 0)
     this.jobs.set(dragonId, { houseId, state: 'working', sinceMs: this.clock.now() });
     this.bus.emit('dragon:working', { dragonId, houseId });
   }
@@ -94,15 +94,23 @@ export class DragonJobSystem {
         if (item.passiveAt !== undefined) item.passiveAt -= bonusMs;
       }
     }
-    // Per-dragon fatigue: work DRAGON_WORK_MS → rest DRAGON_REST_MS.
+    // End of shift: work DRAGON_WORK_MS → fly home → available again after
+    // DRAGON_REST_MS, which is now 0. Both beats still fire, and in order: the
+    // trip home is the flourish that says the shift ended, and `dragon:rested`
+    // is what hands the animal back. With no fatigue they land in the same
+    // tick, which is exactly the intent — it flies home ready.
     for (const [dragonId, job] of this.jobs) {
       if (job.state === 'working') {
         if (now - job.sinceMs >= DRAGON_WORK_MS) {
           job.state = 'resting';
           job.sinceMs = now;
           this.bus.emit('dragon:rest', { dragonId }); // tired → fly home
+          if (DRAGON_REST_MS > 0) continue;
+        } else {
+          continue;
         }
-      } else if (now - job.sinceMs >= DRAGON_REST_MS) {
+      }
+      if (now - job.sinceMs >= DRAGON_REST_MS) {
         this.jobs.delete(dragonId);
         this.bus.emit('dragon:rested', { dragonId });
       }

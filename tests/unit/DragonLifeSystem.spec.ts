@@ -4,7 +4,6 @@ import {
   DRAGON_HUNGER_GRACE_MS,
   DRAGON_NAP_CYCLE_MAX_MS,
   DRAGON_NAP_LENGTH_MS,
-  DRAGON_REST_MS,
   DRAGON_WORK_MS,
   DRAGON_WANDER_EVERY_MS,
   DRAGON_WANDER_MIN_DIST,
@@ -110,10 +109,10 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
   });
 
-  it('tells the two sleeps apart: a shift-rest is earned, a nap is the player\u2019s', () => {
-    // The distinction is the whole point — one is a cost the player chose to
-    // pay by working the dragon, the other is the animal being an animal. Only
-    // the second may be shaken off.
+  it('has ONE sleep — the nap — and a finished shift is not one', () => {
+    // There used to be two, and telling them apart was the point. There is one
+    // now: the animal being an animal, for fifteen seconds, and the player may
+    // always shake it off.
     const ctx = createTestContext();
     const dragon = dragonAt(ctx, 1, 1);
     ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
@@ -122,12 +121,18 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     tick(ctx, 0);
     expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('nap');
 
-    // Worked a full shift → the rest outranks everything and is NOT a nap.
+    // Worked a full shift → it flies home, and NOTHING about that is a sleep.
+    // There used to be a second sleep here, five minutes of shift-rest under a
+    // countdown; two sleeps of wildly different lengths read as one broken
+    // rule. One sentence describes the animal's day now — fifteen seconds every
+    // ten to fifteen minutes — and this is what holds the rest of the code to it.
     const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 3, row: 3, kind: 'item' });
     ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
     tick(ctx, DRAGON_WORK_MS + 1);
     ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
-    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('rest');
+    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBe(0);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBeNull();
   });
 
   it('keepAwake ends a sleep at once and announces it — the tap is answered now', () => {
@@ -251,28 +256,15 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     // On the job it is awake, whatever else is true.
     expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
 
-    // Work it to exhaustion; it flies home and sleeps it off. The shift spans
-    // feed CYCLES (hunger returns every DRAGON_CYCLE_MS now), so it is fed on
-    // clocking off — hunger outranks sleep, and this test is about fatigue.
+    // Work a full shift; it flies home and is available again at once. The
+    // shift spans feed CYCLES (hunger returns every DRAGON_CYCLE_MS now), so it
+    // is fed on clocking off: hunger outranks everything, and this test is
+    // about what a finished shift costs — which is nothing.
     tick(ctx, DRAGON_WORK_MS + 1000);
     ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
-    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBeGreaterThan(0);
-    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
-
-    // …and it is up again once it is rested. Asserted as "wakes within a nap
-    // cycle" rather than "is awake on the tick the rest ends": a dragon coming
-    // off a shift can legitimately walk straight into an ambient nap, and a
-    // test that forbade that would be testing the clock, not the behaviour.
-    tick(ctx, DRAGON_REST_MS + 1000);
     expect(ctx.systems.jobs.restRemaining(dragon.id)).toBe(0);
-    let woke = false;
-    for (let i = 0; i < 60 && !woke; i++) {
-      tick(ctx, DRAGON_NAP_CYCLE_MAX_MS / 60);
-      // Keep it fed — hunger outranks sleep, and this test is about fatigue.
-      ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
-      if (ctx.systems.dragonLife.moodOf(dragon.id) === 'awake') woke = true;
-    }
-    expect(woke).toBe(true);
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('awake');
+    expect(ctx.systems.jobs.isWorking(dragon.id)).toBe(false);
   });
 
   it('naps of its own accord, and two dragons never doze in lockstep', () => {

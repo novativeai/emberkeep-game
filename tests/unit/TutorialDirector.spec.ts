@@ -85,6 +85,27 @@ describe('the tutorial script (no unwinnable step)', () => {
     const over = steps.filter((s) => s.text.length > 180).map((s) => `${s.id} (${s.text.length})`);
     expect(over).toEqual([]);
   });
+
+  /**
+   * A TWO-PART STEP HAS TO HAVE BOTH PARTS.
+   *
+   * `arrowThen` is the marker for the second half of "tap me, then tap the
+   * House": it is placed when the character is armed and the first arrow comes
+   * back if she is put away again. Both halves are therefore load-bearing — a
+   * step that names the second without the first has nothing to point at until
+   * the player guesses the gesture, which is the failure this pins.
+   *
+   * `allow.character` too: the second half cannot be reached without arming
+   * her, and a step that forbids the tap that arms her is unwinnable.
+   */
+  it('gives every arrowThen step its first arrow and the tap that arms her', () => {
+    const twoPart = steps.filter((s) => s.arrowThen);
+    expect(twoPart.map((s) => s.id)).toContain('eleanor_helps');
+    for (const step of twoPart) {
+      expect(step.arrow, `${step.id} has arrowThen but no arrow`).toBeDefined();
+      expect(step.allow?.character, `${step.id} cannot arm her`).toBe(true);
+    }
+  });
 });
 
 describe('TutorialDirector (the new gates advance)', () => {

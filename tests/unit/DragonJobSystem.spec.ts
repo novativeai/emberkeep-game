@@ -20,11 +20,14 @@ describe('DragonJobSystem (dragon jobs)', () => {
     ctx.bus.emit('time:advanced', { ms: 10_000 });
     expect(house.passiveAt!).toBe(before - 10_000);
 
-    // After the 3-minute work shift it tires and starts resting.
+    // After the 3-minute shift it clocks off and flies home — and lands READY.
+    // The five-minute fatigue is gone (DRAGON_REST_MS = 0): a dragon that could
+    // not be used for five minutes out of every eight was the rule the owner
+    // was actually objecting to. The shift still ends; nothing is owed after it.
     ctx.clock.advance(180_001);
     ctx.bus.emit('time:advanced', { ms: 180_001 });
     expect(ctx.systems.jobs.isWorking(dragon.id)).toBe(false);
-    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBeGreaterThan(0);
+    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBe(0);
   });
 
   it('the speed-up is GLOBAL — it advances every timed object, not just the assigned one', () => {
@@ -44,22 +47,22 @@ describe('DragonJobSystem (dragon jobs)', () => {
     expect(tree.passiveAt!).toBe(treeBefore - 10_000); // AND the tree it never touched
   });
 
-  it('a tired (resting) dragon cannot be put back to work until it has rested', () => {
+  it('a dragon that has clocked off can be hired again straight away', () => {
+    // This test used to assert the opposite — a five-minute fatigue lock. It is
+    // kept, inverted, rather than deleted: the hiring gate still EXISTS
+    // (`restRemaining` is still what startWork consults), and this is what
+    // proves the window is genuinely zero rather than merely untested.
     const ctx = createTestContext();
     const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
     const dragon = ctx.state.addItem({ chain: 'emerald', tier: 3, col: 4, row: 4, kind: 'item' });
     ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
     ctx.clock.advance(180_001);
-    ctx.bus.emit('time:advanced', { ms: 180_001 }); // 3 min work → resting
-    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBeGreaterThan(0);
-
-    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id }); // ignored while tired
+    ctx.bus.emit('time:advanced', { ms: 180_001 }); // 3 min work → home, ready
     expect(ctx.systems.jobs.isWorking(dragon.id)).toBe(false);
-
-    // Once the 5-minute rest elapses it becomes available again.
-    ctx.clock.advance(300_001);
-    ctx.bus.emit('time:advanced', { ms: 300_001 });
     expect(ctx.systems.jobs.restRemaining(dragon.id)).toBe(0);
+
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+    expect(ctx.systems.jobs.isWorking(dragon.id)).toBe(true);
   });
 
   it('only actual DRAGON tiers work — the chain merge pieces (Ruby, Eggs) cannot be hired', () => {

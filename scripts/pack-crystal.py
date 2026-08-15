@@ -44,10 +44,25 @@ def alpha_bbox(im: Image.Image):
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
+    # allow_abbrev=False, and it is load-bearing. bake-crystal.mjs forwards its
+    # OWN argv to us, so `--frames 54` arrives alongside `--frames-dir DIR` — and
+    # with abbreviation on, argparse reads `--frames` as a prefix of the only
+    # option starting that way and binds it to --frames-dir. The packer then went
+    # looking for PNGs in a directory literally named "54" and exited with
+    # "no frames found", which is why this pipeline had never produced a sheet.
+    ap = argparse.ArgumentParser(allow_abbrev=False)
     ap.add_argument("--frames-dir", required=True)
     ap.add_argument("--measure", action="store_true", help="report the silhouette, write nothing")
     ap.add_argument("--scale", type=float, default=1.0)
+    # Cells are packed edge to edge, and the engine filters LINEAR
+    # (`antialias: true`), so a sprite drawn at non-integer scale samples across a
+    # frame boundary and picks up the NEIGHBOURING frame's pixels. The union ink
+    # box touches all four edges by construction, so without this every cell
+    # bleeds a sliver of another angle at the gem's tips. Taken from the source
+    # margin rather than added synthetically: these are real transparent pixels
+    # the trim would otherwise have thrown away, so nothing is invented and the
+    # symmetry the anchor depends on is preserved.
+    ap.add_argument("--pad", type=int, default=4, help="source px of transparent margin per cell")
     ap.add_argument("--max-dim", type=int, default=4096)
     ap.add_argument("--quality", type=int, default=92)
     args, _ = ap.parse_known_args()
@@ -63,9 +78,11 @@ def main() -> int:
     top = min(b[1] for b in boxes)
     right = max(b[2] for b in boxes)
     bottom = max(b[3] for b in boxes)
-    # Symmetric about the centre so the spin axis stays at x = 0.5.
-    m = min(left, src_w - right)
-    cut = (m, top, src_w - m, bottom)
+    # Symmetric about the centre so the spin axis stays at x = 0.5. The pad is
+    # applied to BOTH sides horizontally (keeping that symmetry) and clamped to
+    # the canvas vertically, so it can only ever give back margin that exists.
+    m = max(0, min(left, src_w - right) - args.pad)
+    cut = (m, max(0, top - args.pad), src_w - m, min(src_h, bottom + args.pad))
     cw, ch = cut[2] - cut[0], cut[3] - cut[1]
 
     print(f"[pack-crystal] {len(frames)} frames of {src_w}x{src_h}")

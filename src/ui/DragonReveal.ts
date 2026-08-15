@@ -2,6 +2,10 @@ import Phaser from 'phaser';
 import { FONT, INK, TYPE } from '../art/design';
 import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, REVEAL } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import type { GameContext } from '../core/Context';
+// Aliased: this file already has a local `ensureTextures` for its own generated
+// ray/glow textures, which is a different job entirely.
+import { ensureTextures as ensureLazyArt } from '../core/lazyTextures';
 
 /**
  * The full-screen card a player is shown the first time a dragon form is theirs.
@@ -87,10 +91,14 @@ export class DragonReveal {
   private tweens: Phaser.Tweens.Tween[] = [];
   /** ms the open card has been up — the tap-to-skip gate reads it. */
   private elapsed = 0;
+  /** Plates whose fetch is in flight, so a second `dragon:revealed` for the
+   *  same card cannot queue the load twice. */
+  private fetching = new Set<string>();
 
   constructor(
     private scene: Phaser.Scene,
-    private bus: EventBus
+    private bus: EventBus,
+    private ctx: GameContext
   ) {
     ensureTextures(scene);
   }
@@ -113,8 +121,26 @@ export class DragonReveal {
    * the board is where she lands afterwards.
    */
   play(card: RevealCard): void {
+    // The plate is LAZY (99 MB of reveal art off the boot, `isLazyScreenArt`),
+    // so fetch it and come back rather than dropping the ceremony on the floor
+    // — `exists` is false here on the first card of a session, and the old
+    // early return would have made that a silent no-card.
+    if (this.scene.textures.exists(card.art)) {
+      this.draw(card);
+      return;
+    }
+    if (this.fetching.has(card.art)) return; // already on its way; one card, one fetch
+    this.fetching.add(card.art);
+    ensureLazyArt(this.scene, this.ctx, [card.art], () => {
+      this.fetching.delete(card.art);
+      // Still missing means the file itself failed. No plate, no card — the
+      // original rule, just moved to where it is actually true.
+      if (this.scene.textures.exists(card.art)) this.draw(card);
+    });
+  }
+
+  private draw(card: RevealCard): void {
     if (this.layer) this.close(true);
-    if (!this.scene.textures.exists(card.art)) return; // no plate, no card
 
     this.elapsed = 0;
     const cx = LIVE_GAME_WIDTH / 2;

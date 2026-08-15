@@ -8,7 +8,6 @@ import { LIVE_GAME_WIDTH, IS_MOBILE, LIVE_GAME_HEIGHT, SAVE_KEY, SCENES } from '
 import { createGameConfig } from './core/GameConfig';
 import { PowerGovernor } from './core/PowerGovernor';
 import { iapBridge } from './core/iapBridge';
-import { MapEditor } from './editor/mapEditor';
 import { gridToWorld } from './core/iso';
 
 interface BoardCellText {
@@ -106,12 +105,44 @@ game.registry.set('power', power);
 // game is embedded; standalone builds stay on the Emporium's mock showcase.
 iapBridge.attach(ctx.bus);
 
-// Map Editor — the authoring tool for the zone registry the engine runs
-// (src/editor/, opened from Settings). Constructed at boot because it owns the
-// disk-backed design document, and it subscribes to `editor:open`; nothing in the
-// game calls into it. The UI Builder document has no board to edit, so it is the
-// one boot that skips it.
-if (!uiEditMode) new MapEditor(game, ctx);
+/**
+ * Map Editor — the authoring tool for the zone registry the engine runs
+ * (src/editor/, opened from Settings). LAZY, and this is the codebase's second
+ * dynamic import for exactly the reason of the first.
+ *
+ * It used to be constructed at boot, which made every player pay for a tool
+ * almost none of them open, twice over:
+ *
+ *   • It is the ONLY thing in the codebase that pulls three.js into a bundle
+ *     besides `Crystal3D` — so deferring the gem alone (see `ensureCrystal3D`)
+ *     would have moved nothing, the library would simply have ridden in on this
+ *     import instead. 250 KB of editor source went with it.
+ *   • Its constructor fetches `asset3d/editor-map.json` — 8.9 MB of embedded
+ *     project art — and JSON-parses it. On a phone over LAN that is most of the
+ *     wait before the title appears.
+ *
+ * Nothing in the game calls into it (its own comment: it no longer restores
+ * anything INTO the game), so the only thing boot construction bought was the
+ * `editor:open` subscription — which this bootstrap holds instead, handing the
+ * first open to the real editor once its chunk lands. Later opens are its own
+ * listener's. The UI Builder document has no board to edit, so it is the one
+ * boot that skips the editor entirely.
+ */
+if (!uiEditMode) {
+  let editorAsked = false;
+  ctx.bus.on('editor:open', () => {
+    if (editorAsked) return; // constructed already — its own listener has this one
+    editorAsked = true;
+    // In a `.then`, so the editor's own `editor:open` subscription is added after
+    // this dispatch has finished rather than during it.
+    void import('./editor/mapEditor')
+      .then(({ MapEditor }) => new MapEditor(game, ctx).open())
+      .catch((err) => {
+        editorAsked = false; // a failed fetch must not lock the tool out for good
+        console.warn('[MapEditor] could not be loaded.', err);
+      });
+  });
+}
 
 // Host-page bridge: the EmberGames hub reports when the game's iframe is
 // scrolled out of view — sleep the whole loop (tab-hidden is Phaser built-in).

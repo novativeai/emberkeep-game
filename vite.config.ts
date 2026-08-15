@@ -785,6 +785,11 @@ const copyRuntimeArt = (): Plugin => ({
       // Superseded / never-referenced art, each verified against the reference
       // graph (`node scripts/audit-art.mjs`) rather than by eye:
       'sprites/background/emberkeep.jpg', //  background_emberkeep points at emberkeep-nb2.webp
+      // The hand-drawn emerald. `item_crystal_1` now points at crystal-still.webp
+      // — one frame of the SAME three.js gem the board renders live, so the still
+      // and the spin sheet and the live render are finally all the same object.
+      // Kept in the workspace as the original art; nothing loads it.
+      'sprites/items/crystal.webp',
       // The two hub backdrops swapped places on 2026-08-12: the editor replaced
       // its Hatchery map with Runevault and drew a grid on it, so Runevault is
       // the world Borealis's Rune Way now opens onto and ships like any other
@@ -1328,6 +1333,18 @@ export default defineConfig({
     // strict: a second `pnpm dev` must FAIL, not silently start on 5174 with a
     // second recursive watcher over the same multi-GB tree.
     strictPort: true,
+    /**
+     * Bind every interface, so `pnpm dev` prints a Network URL beside the Local
+     * one and a phone on the same wifi can open the build being worked on. The
+     * game is authored at 2560x1600 and FIT-scales, so a handset is a real test
+     * of the fit — one that no desktop window reproduces.
+     *
+     * This DOES put the dev server on the local network, and the dev server is
+     * not a read-only thing: the map editor and the worldbuilder endpoints
+     * above write to the repo. That is fine on a home network and is not fine
+     * on a shared one — on café wifi, run `pnpm dev --host false`.
+     */
+    host: true,
     watch: { ignored: watchIgnored }
   },
   preview: {

@@ -11,6 +11,8 @@ import {
   SCENES,
   STANDEE_BANKS
 } from '../core/Constants';
+import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
+import { liveCrystalAvailable } from '../core/graphicsState';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
 import { ANIMATED_SPEAKERS, discTextureFor } from '../entities/PortraitAnimator';
@@ -43,6 +45,15 @@ function referencedBuiltins(doc: UiThemeDoc): BuiltinSequence[] {
 }
 
 /**
+ * Fired on `game.events` once every texture the BOARD needs is resident, and
+ * mirrored into the registry so a listener that arrives late can still tell.
+ * `TitleScene` holds the scene switch against it — see `queueBoardArt`.
+ */
+export const BOARD_ART_READY = 'bootload:ready';
+/** Fired on `game.events` with 0..1 while the board art downloads behind the title. */
+export const BOARD_ART_PROGRESS = 'bootload:progress';
+
+/**
  * Loads real-art files for any assets.json entry flipped to source:"file"
  * (from assets/, the Vite public dir). A failed file falls back to its
  * generated placeholder so the build never blocks on art.
@@ -54,6 +65,41 @@ export class PreloadScene extends Phaser.Scene {
 
   preload(): void {
     this.cameras.main.setOrigin(0).setZoom(renderScale.value); // hi-DPI backing for the loading bar
+    // The ONLY thing the title is gated on. These are self-contained data URLs
+    // — no network — and `applyUiReplacements` in create() needs them before any
+    // scene builds objects. Everything else moved to `queueBoardArt`.
+    for (const [name, uri] of Object.entries(uiRegistry.doc.assets)) {
+      if (!this.textures.exists(uploadKey(name))) this.load.image(uploadKey(name), uri);
+    }
+    for (const [name, seq] of Object.entries(uiRegistry.doc.sequences)) {
+      seq.frames.forEach((uri, i) => {
+        const key = sequenceFrameKey(name, i);
+        if (!this.textures.exists(key)) this.load.image(key, uri);
+      });
+    }
+  }
+
+  /**
+   * Everything the BOARD needs — queued AFTER the title is already on screen.
+   *
+   * This used to be the body of `preload()`, and that one fact is the whole bug:
+   * Phaser does not call `create()` until the preload queue has landed, and
+   * `create()` is what starts `TitleScene`. So the title — which loads nothing,
+   * its logo and background being DOM `<img>`s and its Play button drawn with
+   * Graphics — was held behind every megabyte of board art. On a phone that is a
+   * minute of black screen with no Play button on it, and if the tab dies during
+   * the upload the button never arrives at all.
+   *
+   * Worse, those two `<img>` fetches were competing with the queue for
+   * connections, so even the title art came late.
+   *
+   * Now the title comes up as soon as the bundle parses and this downloads
+   * behind it, in the time the player spends looking at the logo and reaching
+   * for Play. Play stays tappable throughout; `TitleScene` waits on
+   * `BOARD_ART_READY` before starting the board, so nothing enters a world whose
+   * art has not arrived. (Ported from main, 782bac6.)
+   */
+  private queueBoardArt(): void {
     const ctx = this.registry.get('ctx') as GameContext;
     const factory = this.registry.get('textureFactory') as TextureFactory;
 
@@ -77,6 +123,20 @@ export class PreloadScene extends Phaser.Scene {
     for (const d of map.decor3d ?? []) neededArt.add(`decor_${d.name}`);
     for (const d of map.startingDecor ?? []) neededArt.add(`decor_${d.decor}`);
     for (const r of map.regions ?? []) for (const d of r.decor ?? []) neededArt.add(`decor_${d.decor}`);
+    // The skins actually BEING WORN. `isLazyScreenArt` holds the whole `skin_`
+    // bank back — fourteen plates for the at-most-two a save can be showing —
+    // and these are the exceptions that come back, so a player who bought a
+    // skin still sees it on the first frame instead of watching the base art
+    // get replaced a moment later. Derived from the save, like `neededArt`
+    // above, so nothing has to be kept in sync by hand.
+    const wornSkins = new Set<string>();
+    if (ctx.state.manorSkin) wornSkins.add(`skin_${ctx.state.manorSkin}`);
+    for (const [, skin] of Object.entries(ctx.state.dragonSkins ?? {})) {
+      if (!skin) continue;
+      // Which tiers a skin covers is decided by which plates exist (BoardScene
+      // `textureFor`), so ask for every tier and let the filter drop the rest.
+      for (let tier = 1; tier <= 5; tier++) wornSkins.add(`skin_${skin}_${tier}`);
+    }
     const skipAtBoot = (key: string): boolean =>
       (/^(tile_|decor_)/.test(key) && !neededArt.has(key)) ||
       (/^background_/.test(key) && !liveBackdrops.has(key)) ||
@@ -84,9 +144,14 @@ export class PreloadScene extends Phaser.Scene {
       // <img class="title-logo"> in index.html.
       key === 'title_logo' ||
       // Rare-screen art, fetched by `ensureTextures` when its screen opens.
-      isLazyScreenArt(key);
+      (isLazyScreenArt(key) && !wornSkins.has(key));
 
-    if (fileEntries.length > 0) {
+    // The bar belongs to the UI-Builder route only. On the game route this wave
+    // runs BEHIND the title, and PreloadScene's canvas sits under TitleScene's —
+    // so a bar drawn here would stripe the middle of the logo. The title shows
+    // the wait itself, and only if the player taps Play before it lands.
+    const showBar = new URLSearchParams(window.location.search).has('uiedit');
+    if (showBar && fileEntries.length > 0) {
       const barBg = this.add
         .rectangle(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2, 360, 18, num(PALETTE.plumShade), 0.9)
         .setStrokeStyle(2, num(PALETTE.gold));
@@ -103,6 +168,11 @@ export class PreloadScene extends Phaser.Scene {
         barBg.destroy();
         bar.destroy();
       });
+    }
+    // OUTSIDE the bar block, deliberately: the fallback and the queue itself are
+    // the load, not its decoration, and nesting them under a progress widget is
+    // how gating that widget would have silently stopped loading the board.
+    if (fileEntries.length > 0) {
       this.load.on('loaderror', (file: Phaser.Loader.File) => {
         factory.generate(file.key);
       });
@@ -189,6 +259,17 @@ export class PreloadScene extends Phaser.Scene {
     // already returns null when a sheet is not resident, and the dragon animates
     // with its rig — which is how it moved before these clips existed at all.
     // The clips take over the moment they land.
+    // The crystal's baked spin sheet — ONLY where the live three.js gem is
+    // declined (every touch device, the `low` profile). 0.46 MB on the wire and
+    // 18 MB decoded, so a machine that renders the real gem must never pay for a
+    // picture of it; `liveCrystalAvailable` is the single predicate BoardScene
+    // asks too, so the two cannot drift into fetching both or neither.
+    if (!liveCrystalAvailable()) {
+      this.load.spritesheet(CRYSTAL_SPIN_KEY, 'sprites/items/crystal-spin.webp', {
+        frameWidth: CRYSTAL_SPIN.frameWidth,
+        frameHeight: CRYSTAL_SPIN.frameHeight
+      });
+    }
     // VFX bank flipbooks for the payoff beats (hatch / finale / merge / chest).
     // Only the sheets in `SHIPPED` — see src/render/vfxBank.ts for the VRAM
     // reasoning. Each is a channel-packed frame sheet plus its motion vectors;
@@ -201,18 +282,9 @@ export class PreloadScene extends Phaser.Scene {
     // game's existing fx_ember / fx_spark / fx_glow beats. The sheets they need
     // are already in SHIPPED above.
     preloadEmitterAssets(this.load, BANK_BASE, { sheets: false });
-    // UI Builder uploads (ui-theme.json `assets`, self-contained data URLs).
-    for (const [name, uri] of Object.entries(uiRegistry.doc.assets)) {
-      if (!this.textures.exists(uploadKey(name))) this.load.image(uploadKey(name), uri);
-    }
-    // UI Builder PNG-sequence animations — every frame as its own texture, so
-    // `anim` layers in custom components play in dev, preview and production.
-    for (const [name, seq] of Object.entries(uiRegistry.doc.sequences)) {
-      seq.frames.forEach((uri, i) => {
-        const key = sequenceFrameKey(name, i);
-        if (!this.textures.exists(key)) this.load.image(key, uri);
-      });
-    }
+    // (The UI Builder's own uploads and PNG sequences are data URLs and load in
+    // `preload` — the title needs them; the board wave does not.)
+    //
     // Built-in (guide/character) sequences are FILE-backed. The editor preloads ALL of
     // them so the Animations rail is instantly draggable; the game loads only
     // the banks a saved component actually references (they're heavy).
@@ -230,8 +302,40 @@ export class PreloadScene extends Phaser.Scene {
     // Saved art replacements repaint generated textures IN PLACE before any
     // scene builds objects — consumers get the new art with zero object churn.
     applyUiReplacements(this);
-    // The UI Builder boots into its own document scene — the game NEVER runs.
     const uiedit = new URLSearchParams(window.location.search).has('uiedit');
-    this.scene.start(uiedit ? SCENES.uiEditor : SCENES.title);
+    if (uiedit) {
+      // The UI Builder boots into its own document scene — the game NEVER runs,
+      // so there is no title to race: take the whole wave and start when it has
+      // landed, exactly as this scene always behaved.
+      this.queueBoardArt();
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.scene.start(SCENES.uiEditor));
+      this.load.start();
+      return;
+    }
+
+    // The title is ready NOW — it draws its own button and its art is in the
+    // DOM. `launch`, not `start`: this scene must stay alive to own the loader
+    // that is still running, and a stopped scene's loader dies with it.
+    this.scene.launch(SCENES.title);
+
+    this.queueBoardArt();
+    let announced = false;
+    const done = (): void => {
+      if (announced) return;
+      announced = true;
+      this.game.registry.set(BOARD_ART_READY, true);
+      this.game.events.emit(BOARD_ART_READY);
+      // Stop RENDERING but stay alive: this scene owns the loader, and it draws
+      // nothing now, so hiding it costs the renderer one less pass.
+      this.scene.setVisible(false);
+    };
+    this.load.on('progress', (value: number) => this.game.events.emit(BOARD_ART_PROGRESS, value));
+    this.load.once(Phaser.Loader.Events.COMPLETE, done);
+    this.load.start();
+    // An empty queue completes INSIDE `start()`, before the handler above can be
+    // reached on some paths (every texture already resident — a restart, or a
+    // build with no file-backed art). Belt and braces, made idempotent by
+    // `announced` so the ordinary path cannot fire it twice.
+    if (this.load.totalToLoad === 0) done();
   }
 }

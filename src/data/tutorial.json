@@ -1184,7 +1184,7 @@
     {
       "id": "dragon_rest",
       "speaker": "eleanor",
-      "text": "Hard work tires even dragons! After 3 minutes they need rest — watch, your dragon just nodded off and flew home to recover.",
+      "text": "Hard work tires even dragons! After 3 minutes your dragon flies home — and needs a few minutes on its feet before it will take another shift.",
       "gate": {
         "type": "tap"
       },
@@ -1198,7 +1198,7 @@
     {
       "id": "resin_find",
       "speaker": "eleanor",
-      "text": "Let her sleep. While she does — look low on your Fir's trunk. Resin. It weeps out where the heat got into the bark and sets hard as amber. Three beads of it.",
+      "text": "Let her catch her breath. While she does — look low on your Fir's trunk. Resin. It weeps out where the heat got into the bark and sets hard as amber. Three beads of it.",
       "gate": {
         "type": "tap"
       },

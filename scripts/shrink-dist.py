@@ -80,7 +80,14 @@ DIST = ROOT / os.environ.get("EMBERKEEP_DIST", "dist")
 QUALITY = 92
 METHOD = 4
 REQUANT_QUALITY = 88
-REQUANT_MIN_KB = 60
+# Only files at least this big were re-encoded, and at 60 KB that skipped most of
+# the art the player waits on: most of the item / skin / reveal / card / terrain
+# textures are UNDER 60 KB, and together those small files are most of the boot.
+# There is nothing special about a small file that makes its bytes cheaper, so
+# the floor is now low enough to catch them. It is not zero: under a few KB the
+# WebP container overhead means there is nothing to win and MIN_GAIN would
+# reject it anyway, so the work would be pure build time. (From main, 60d4ce8.)
+REQUANT_MIN_KB = 6
 # Below this saving, a rewrite is not worth a generation of loss.
 MIN_GAIN = 0.08
 

@@ -54,6 +54,23 @@ export function isLazyScreenArt(key: string): boolean {
   return (
     /^trailer_/.test(key) || // finale "Beyond the demo" worlds + legends
     /^ui_teaser_/.test(key) || // finale Chapter-Two teasers
-    key === 'ui_levelup_emblem' // level-up banner emblem
+    key === 'ui_levelup_emblem' || // level-up banner emblem
+    // THE REVEAL PLATES — 16 full-bleed cards, ~6.7 MB of GPU memory EACH once
+    // decoded (99 MB of the boot's 375). Two screens draw them and both are
+    // rare: the reveal card a breed earns once per save, and the Codex's
+    // evolution page. Neither is on the path to the board, and a phone was
+    // holding all sixteen from the first frame to show at most one.
+    /^reveal_/.test(key) ||
+    // EMPORIUM CARDS — the shop's own illustrations, ~2 MB of GPU memory each
+    // and drawn nowhere but inside the Emporium. StorePanel already fetches
+    // every `item.art` in its catalogue when it opens (`artKeys`), so this side
+    // of the contract was the only one missing.
+    /^card_/.test(key) ||
+    // BOARD SKIN ART. One Manor skin and one skin per dragon chain can be worn
+    // at a time, and only if bought — but all fourteen were resident. The WORN
+    // ones are pulled back into the boot preload by key (PreloadScene), so a
+    // save that wears one still draws it on the first frame; the rest arrive
+    // when the Emporium opens or when one is put on.
+    /^skin_/.test(key)
   );
 }

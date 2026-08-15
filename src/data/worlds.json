@@ -2,7 +2,7 @@
   "format": "emberkeep-worlds",
   "version": 1,
   "source": "assets/map/nionja-worlds.json",
-  "generatedBy": "Emberkeep Map Editor",
+  "generatedBy": "scripts/export-editor-worlds.mjs (from the editor project on disk)",
   "primary": "nb2",
   "teleport": {
     "trigger": "hatch",

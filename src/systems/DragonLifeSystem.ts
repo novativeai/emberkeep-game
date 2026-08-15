@@ -84,22 +84,22 @@ export class DragonLifeSystem {
   }
 
   /**
-   * WHY this dragon is asleep — the two sleeps are not the same promise.
+   * WHY this dragon is asleep — and there is now only one answer.
    *
-   *   • `rest`  — it worked a shift and is sleeping it off (DragonJobSystem).
-   *               Earned, timed, and NOT the player's to cancel: shaking it
-   *               awake would hand back the cost of working it.
-   *   • `nap`   — it simply felt like it. This one IS the player's: a tap
-   *               wakes it, because a nap the player cannot interrupt is an
-   *               animal that ignores them. The sky is no longer one of these:
-   *               the night stopped putting dragons down (see `moodOf`).
+   * `nap` — it simply felt like it, for fifteen seconds somewhere in its own
+   * ten-to-fifteen-minute cycle. It is the PLAYER'S: a tap wakes it, because a
+   * nap the player cannot interrupt is an animal that ignores them.
+   *
+   * The other two are gone. The sky stopped putting dragons down first (an
+   * eight-minute phase is not a nap), and the shift-rest followed (five
+   * minutes under a countdown is not one either) — see `moodOf`. A dragon in
+   * its fatigue window is awake on its feet and simply cannot be hired again,
+   * which is `restRemaining`'s job and never was this one's.
    *
    * Null when awake (or hungry — a hungry dragon does not sleep through it).
    */
-  sleepKindOf(itemId: number): 'rest' | 'nap' | null {
-    if (this.moodOf(itemId) !== 'asleep') return null;
-    if (this.jobs.restRemaining(itemId) > 0) return 'rest';
-    return 'nap';
+  sleepKindOf(itemId: number): 'nap' | null {
+    return this.moodOf(itemId) === 'asleep' ? 'nap' : null;
   }
 
   /**
@@ -172,9 +172,18 @@ export class DragonLifeSystem {
     // Shaken awake, or wanted on its feet by a cinematic — outranks all three
     // sleeps for the length of the window (see keepAwake).
     if (this.heldAwake(itemId)) return 'awake';
-    // Fatigue outranks the sky: a dragon that just came off a shift sleeps at
-    // noon, and this is the path the player sees most often.
-    if (this.jobs.restRemaining(itemId) > 0) return 'asleep';
+    // THE SHIFT-REST NO LONGER PUTS IT DOWN EITHER (2026-08-15, owner's call).
+    //
+    // A dragon coming off a shift used to lie down for DRAGON_REST_MS — five
+    // minutes — under a floating countdown. Two sleeps of wildly different
+    // lengths read as one broken rule: the animal is meant to nap for fifteen
+    // seconds every ten to fifteen minutes, and what the player actually saw
+    // was a five-minute sleep with a timer over it. So there is ONE sleep now,
+    // and it is the nap.
+    //
+    // The fatigue itself is untouched — `restRemaining` still refuses to hire
+    // the dragon again and the badge still counts down to when it can work.
+    // What changed is that it waits on its feet.
     if (this.jobs.isWorking(itemId)) return 'awake';
     // THE NIGHT NO LONGER PUTS IT DOWN. It used to sleep the whole eight-minute
     // phase, which is a quarter of every day spent as a curled painting the

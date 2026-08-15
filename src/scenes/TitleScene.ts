@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, SCENES } from '../core/Constants';
 import { renderScale } from '../core/render-scale';
+import { BOARD_ART_PROGRESS, BOARD_ART_READY } from './PreloadScene';
 
 
 /**
@@ -98,9 +99,22 @@ export class TitleScene extends Phaser.Scene {
     play.on('pointerdown', () => play.setScale(0.96));
     play.on('pointerup', () => {
       play.disableInteractive();
-      this.cameras.main.fadeOut(260, 36, 27, 34);
-      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-        this.scene.start(SCENES.board);
+      // The board art now downloads BEHIND this screen (PreloadScene.create), so
+      // Play can be tapped before it has all landed — and entering a world whose
+      // art has not arrived is what `queueBoardArt` trades away. So WAIT FIRST,
+      // then fade.
+      //
+      // The order matters and the other one is a bug: fading on the tap and
+      // waiting afterwards leaves the player looking at a fully faded-out
+      // camera, which is a black screen for however long the download has left.
+      // Waiting here keeps the logo up with a line under the button, which is
+      // what "loading" is supposed to look like. On a warm cache the art is
+      // already resident and this is one frame, indistinguishable from before.
+      this.whenBoardArtReady(() => {
+        this.cameras.main.fadeOut(260, 36, 27, 34);
+        this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+          this.scene.start(SCENES.board);
+        });
       });
     });
     // Spring-in: visible the whole time (alpha 1), only the scale pops. Then a
@@ -126,5 +140,44 @@ export class TitleScene extends Phaser.Scene {
     });
 
     this.cameras.main.fadeIn(300, 36, 27, 34);
+  }
+
+  /**
+   * Run `then` once the board's textures are resident — immediately if they
+   * already are.
+   *
+   * Deliberately NOT a gate on the BUTTON: Play stays visible and interactive
+   * from the first frame (a GPU stutter must never be able to leave it dead, and
+   * the e2e run taps it at a fixed position). The wait happens after the tap,
+   * with the title still on screen \u2014 never behind a fade, which would make a
+   * slow download indistinguishable from a crash.
+   */
+  private whenBoardArtReady(then: () => void): void {
+    if (this.game.registry.get(BOARD_ART_READY) === true) {
+      then();
+      return;
+    }
+    // A line under the button, and a real percentage against it: on a phone the
+    // board wave is the longest part of the boot, and "is it working?" is the
+    // only question the player has. A number moving answers it; a black screen
+    // does not.
+    const wait = this.add
+      .text(LIVE_GAME_WIDTH / 2, Math.round(LIVE_GAME_HEIGHT * 0.8375) + 180, 'stoking the ember\u2026', {
+        fontFamily: FONT.ui,
+        fontSize: '44px',
+        color: PALETTE.cream
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+    this.tweens.add({ targets: wait, alpha: 0.85, duration: 240 });
+    const onProgress = (value: number): void => {
+      wait.setText(`stoking the ember\u2026 ${Math.round(value * 100)}%`);
+    };
+    this.game.events.on(BOARD_ART_PROGRESS, onProgress);
+    this.game.events.once(BOARD_ART_READY, () => {
+      this.game.events.off(BOARD_ART_PROGRESS, onProgress);
+      wait.destroy();
+      then();
+    });
   }
 }

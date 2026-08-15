@@ -8,14 +8,30 @@ import { ensureTextures } from '../core/lazyTextures';
 import { uiRegistry } from './theme';
 
 
-/* Recipe list (left column), in the 2560-space. Seven rows fit the frame
- * without scrolling — the roster is authored, not player-grown. */
+/* Recipe list (left column), in the 2560-space.
+ *
+ * It used to say "seven rows fit the frame without scrolling — the roster is
+ * authored, not player-grown". The roster grew: nineteen recipes at a 122-unit
+ * pitch is 2196 units of list inside a 1320-tall frame, so the last two thirds
+ * of it hung off the panel and down the board. An authored count is exactly the
+ * kind of assumption that stops being true quietly.
+ *
+ * So the list SCROLLS, on the same geometry-mask + drag/wheel shape the
+ * Cookbook already uses for the same reason. Nothing about a row changed. */
 const LIST_X = -640;
-const LIST_TOP = -400;
 const ROW_W = 700;
 const ROW_H = 104;
 const ROW_GAP = 122;
 const ROW_ICON = 80;
+/** The scrolling window, in panel space: under the banner, inside the frame. */
+const VIEW_TOP = -470;
+const VIEW_H = 1030;
+/** Centre of that window — where the viewport container sits. */
+const VIEW_MID = VIEW_TOP + VIEW_H / 2;
+/** First row's centre inside the scrolling content. */
+const LIST_TOP = -VIEW_H / 2 + ROW_GAP / 2;
+/** Past this much drag the gesture is a scroll, not a tap. */
+const DRAG_SLOP = 12;
 
 /* Detail column (right of the list). */
 const DETAIL_X = 350;
@@ -47,6 +63,14 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
   private titleText: Phaser.GameObjects.Text;
   private titleBg: Phaser.GameObjects.Graphics;
   private listGroup: Phaser.GameObjects.Container;
+  private listViewport: Phaser.GameObjects.Container;
+  private listMask: Phaser.GameObjects.Graphics;
+  private scrollY = 0;
+  private maxScroll = 0;
+  /** Pointer y where a drag began, and the scroll offset it began from — null
+   *  when no drag is in flight. */
+  private dragFrom: number | null = null;
+  private dragScrollFrom = 0;
   private detailGroup: Phaser.GameObjects.Container;
   private brewBtn!: Phaser.GameObjects.Container;
   private brewBg!: Phaser.GameObjects.Image;
@@ -92,10 +116,24 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     close.on('pointerout', () => close.setScale(1));
     close.on('pointerup', () => this.requestClose());
 
-    this.listGroup = scene.add.container(LIST_X, 0);
+    // The list lives inside a VIEWPORT so it can scroll: the viewport is fixed
+    // in the frame, `listGroup` slides inside it, and a geometry mask cuts it to
+    // the window. Same three-part shape as the Cookbook's page.
+    this.listViewport = scene.add.container(LIST_X, VIEW_MID);
+    this.listGroup = scene.add.container(0, 0);
+    this.listViewport.add(this.listGroup);
+    // A geometry mask is drawn in WORLD space, so it is re-seated from the
+    // viewport's own world transform whenever the panel opens or scales.
+    this.listMask = scene.make.graphics();
+    this.listGroup.setMask(this.listMask.createGeometryMask());
     this.detailGroup = scene.add.container(DETAIL_X, 0);
 
-    this.add([this.dim, frame, this.titleBg, this.titleText, close, this.listGroup, this.detailGroup]);
+    this.add([this.dim, frame, this.titleBg, this.titleText, close, this.listViewport, this.detailGroup]);
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, this.onWheel);
+    scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown);
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove);
+    scene.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp);
+    scene.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp);
     scene.add.existing(this);
     this.setVisible(false);
     this.drawBanner(this.titleText.width + 200);
@@ -109,6 +147,14 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       for (const off of this.offBus) off();
       this.offBus = [];
+      // Scene-level input listeners outlive the panel unless they are taken
+      // off by hand — the bus subscriptions above are not the only thing here
+      // holding a reference to a dead container.
+      scene.input.off(Phaser.Input.Events.POINTER_WHEEL, this.onWheel);
+      scene.input.off(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown);
+      scene.input.off(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove);
+      scene.input.off(Phaser.Input.Events.POINTER_UP, this.onPointerUp);
+      scene.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp);
     });
 
     uiRegistry.register(scene, 'panel.cauldron', "Selyna's Cauldron panel", 'Panels', this, {
@@ -145,8 +191,14 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       alpha: 1,
       scale: this.baseScale,
       duration: 200,
-      ease: 'Back.easeOut'
+      ease: 'Back.easeOut',
+      // The mask follows the open tween: it is cut in WORLD space, so a rect
+      // seated at the 0.92 start scale would clip the wrong band for the whole
+      // animation and leave a visibly short list once it settled.
+      onUpdate: () => this.seatMask(),
+      onComplete: () => this.seatMask()
     });
+    this.seatMask();
     this.bus.emit('ui:cauldron_toggled', { open: true });
   }
 
@@ -255,7 +307,54 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       });
       this.listGroup.add(row);
     });
+    // Content taller than the window is what there is to scroll through; a
+    // roster that fits leaves this at 0 and the handlers all no-op.
+    const contentH = this.recipes.length * ROW_GAP;
+    this.maxScroll = Math.max(0, contentH - VIEW_H);
+    this.setScroll(this.scrollY); // re-clamp: the roster can shrink under us
   }
+
+  /* ------------------------------- scrolling ------------------------------ */
+
+  private setScroll(y: number): void {
+    this.scrollY = Phaser.Math.Clamp(y, 0, this.maxScroll);
+    this.listGroup.setY(-this.scrollY);
+  }
+
+  /** Re-seat the clip rect from the viewport's live WORLD transform — the panel
+   *  is centred, scaled by `panelMobileScale` and scaled again by its own open
+   *  tween, and a mask in local units clips the wrong band through all three. */
+  private seatMask(): void {
+    const m = this.listViewport.getWorldTransformMatrix();
+    const h = VIEW_H * m.scaleY;
+    const w = (ROW_W + 80) * m.scaleX;
+    this.listMask.clear();
+    this.listMask.fillStyle(0xffffff, 1);
+    this.listMask.fillRect(m.tx - w / 2, m.ty - h / 2, w, h);
+  }
+
+  private onWheel = (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number): void => {
+    if (!this.isOpen || this.maxScroll <= 0) return;
+    this.setScroll(this.scrollY + dy);
+  };
+
+  private onPointerDown = (p: Phaser.Input.Pointer): void => {
+    if (!this.isOpen) return;
+    this.dragFrom = p.y;
+    this.dragScrollFrom = this.scrollY;
+  };
+
+  private onPointerMove = (p: Phaser.Input.Pointer): void => {
+    if (this.dragFrom === null || this.maxScroll <= 0) return;
+    const dy = p.y - this.dragFrom;
+    if (Math.abs(dy) <= DRAG_SLOP) return;
+    const scale = this.listViewport.getWorldTransformMatrix().scaleY || 1;
+    this.setScroll(this.dragScrollFrom - dy / scale);
+  };
+
+  private onPointerUp = (): void => {
+    this.dragFrom = null;
+  };
 
   /* ----------------------------- detail column ---------------------------- */
 

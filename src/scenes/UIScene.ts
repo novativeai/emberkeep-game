@@ -237,7 +237,8 @@ export class UIScene extends Phaser.Scene {
       this.ctx.bus,
       this.ctx.systems.dragons,
       this.ctx.data.dragondex,
-      this.ctx.data.chains
+      this.ctx.data.chains,
+      this.ctx
     );
     this.codex.setDepth(DEPTH_PANEL + 4);
     this.codexButton = this.buildCodexButton();
@@ -284,7 +285,7 @@ export class UIScene extends Phaser.Scene {
 
     // The reveal card. It plays wherever it is earned, tutorial or not — the
     // one thing it must never do is arrive long after the moment it is about.
-    this.reveal = new DragonReveal(this, this.ctx.bus);
+    this.reveal = new DragonReveal(this, this.ctx.bus, this.ctx);
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
@@ -432,6 +433,18 @@ export class UIScene extends Phaser.Scene {
     const bus = this.ctx.bus;
     this.offBus.push(
       bus.on('tutorial:step', (step) => this.onTutorialStep(step)),
+      // THE SECOND HALF OF A TWO-PART STEP. `eleanor_helps` says "tap me, then
+      // tap the House" and carries an `arrowThen` naming that House — resolved
+      // with the step since 0ce3efd and, until now, never drawn by anybody. The
+      // player who did as they were told arrived at the second half with the
+      // arrow still on her and nothing pointing at what to do next.
+      bus.on('ui:character_armed', ({ armed }) => {
+        const step = this.lastStep;
+        if (!step || step.done || !step.arrowThen) return;
+        this.clearMarkers();
+        const next = armed ? step.arrowThen : step.arrow;
+        if (next) this.placeArrow(next);
+      }),
       bus.on('dragon:revealed', (card) => this.reveal.play(card)),
       bus.on('story:chapter', ({ chapter }) => this.playChapterBeats(chapter)),
       bus.on('story:arrival', ({ worldId }) => this.playArrivalBeats(worldId)),
@@ -594,23 +607,9 @@ export class UIScene extends Phaser.Scene {
         // script, and a button appearing under the guided hand would compete
         // with it. It debuts with the rest of the HUD when the script ends.
         this.codexButton.setVisible(step.done && this.ctx.systems.dragons.namedDragons().length > 0);
-        // The Codex lesson holds its own book open — every beat of it is gated
-        // on turning a page, and a tap on Eleanor's bubble also reaches the
-        // panel's scrim. The beat that teaches CLOSING drops the hold, which is
-        // what puts the ✕ back on the page for its arrow to point at.
-        this.codex.setHeld(!step.done && step.allow.codexHold === true);
-        // ...and the same safety net the satchel and the Ledger carry: a beat
-        // that is not the lesson finds the book SHUT. The one exception is the
-        // beat that teaches closing it — there the ✕ is the gate, and shutting
-        // the panel for the player would answer their own lesson for them.
-        if (
-          !step.done &&
-          !step.allow.codexHold &&
-          !(step.arrow && 'ui' in step.arrow && step.arrow.ui === 'codex_close') &&
-          this.codex.isOpen
-        ) {
-          this.codex.requestClose();
-        }
+        // (The Codex hold and its safety net moved into `onTutorialStep` —
+        // `applyCodexHold` — because they have to run BEFORE the step's markers
+        // are placed. This listener is registered after that one.)
         this.hud.storeButton.setVisible(step.done && this.shopUnlocked());
         // Safety net only — the cookbook_close step has the player close the
         // book themselves; any later step that disallows it just shuts it.
@@ -1335,6 +1334,16 @@ export class UIScene extends Phaser.Scene {
     // A step that no longer involves the Ledger closes it, so its dim never
     // sits over the board and swallows the next tap (e.g. the post-deliver fog).
     if (!step.done && !step.allow.ledger && this.ledger.isOpen) this.ledger.requestClose();
+    // THE CODEX HOLD, AND IT HAS TO BE HERE — before `applyMarkers` below.
+    //
+    // The lesson holds the book open and the ✕ goes with the hold, so
+    // `getClosePos` answers null while it is held. The beat that teaches
+    // CLOSING drops the hold, and its arrow points at the ✕ — which means the
+    // hold must be dropped BEFORE the arrow is resolved. It used to be dropped
+    // in a second `tutorial:step` listener registered after this one, so on
+    // `codex_shut` the arrow was resolved against a still-held book, came back
+    // null, and the lesson ended with nothing pointing at the way out.
+    this.applyCodexHold(step);
     if (step.done) {
       this.bubble.hide();
       this.clearMarkers();
@@ -1688,6 +1697,32 @@ export class UIScene extends Phaser.Scene {
         tweens: cfg.tweens.map((t) => ({ ...t, targets: cfg.targets }))
       })
     );
+  }
+
+  /**
+   * The Codex lesson holds its own book open — every beat of it is gated on
+   * turning a page, and a tap on Eleanor's bubble also reaches the panel's
+   * scrim. The beat that teaches CLOSING drops the hold, which is what puts the
+   * ✕ back on the page for its arrow to point at.
+   *
+   * Called from `onTutorialStep` BEFORE `applyMarkers`, and the order is the
+   * whole point: `getClosePos` answers null while the book is held, so an arrow
+   * resolved first would resolve to nothing.
+   */
+  private applyCodexHold(step: TutorialStepEvent): void {
+    this.codex.setHeld(!step.done && step.allow.codexHold === true);
+    // The same safety net the satchel and the Ledger carry: a beat that is not
+    // the lesson finds the book SHUT. The one exception is the beat that
+    // teaches closing it — there the ✕ is the gate, and shutting the panel for
+    // the player would answer their own lesson for them.
+    if (
+      !step.done &&
+      !step.allow.codexHold &&
+      !(step.arrow && 'ui' in step.arrow && step.arrow.ui === 'codex_close') &&
+      this.codex.isOpen
+    ) {
+      this.codex.requestClose();
+    }
   }
 
   private applyMarkers(step: TutorialStepEvent): void {

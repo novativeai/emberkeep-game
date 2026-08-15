@@ -26,7 +26,11 @@
  *   aurora and snow all run cheaper. Live.
  * - `weather` — skips the procedural sky and snowfall entirely. Live (the board
  *   rebuilds).
- * - `crystal3d` — the offscreen three.js render. Live.
+ * - `crystal3d` — the offscreen three.js render. Live. `high` ONLY: it is the
+ *   one tier where the gem can draw big enough (295 device px at backing 1.5,
+ *   412 at max zoom) for a 250 px baked cell to look soft. Everywhere else the
+ *   sheet is the same motion for less, and turning this off is also what keeps
+ *   three.js out of that device's bundle — see `liveCrystalAvailable`.
  * - `ambient` — multiplier on ambient emitter emission. Live.
  * - `activeFps` — halving the frame rate roughly halves GPU work and is the
  *   bluntest, most reliable win on a weak device. Live.
@@ -86,7 +90,14 @@ export const GRAPHICS_PROFILES: Record<GraphicsTier, GraphicsProfile> = {
     backingCeiling: 1,
     fxCeiling: 'medium',
     weather: true,
-    crystal3d: true,
+    // The baked spin sheet instead of the live gem. `detectTier` sends the whole
+    // IS_LOW_END band here — <=4 GB RAM or <=4 cores — which was running a SECOND
+    // WebGL context with MSAA and preserveDrawingBuffer at 62 fps, doing a
+    // GPU->CPU readback every 33 ms. On a tiled mobile GPU with unified memory
+    // that readback is a pipeline stall, and the sheet is the same 90° loop at
+    // the same cadence. The gem draws ~196 device px here against a 250 px cell,
+    // so it is also sharper than it needs to be.
+    crystal3d: false,
     ambient: 0.6,
     activeFps: 62
   },
