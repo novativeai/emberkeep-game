@@ -52,6 +52,12 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** Art hidden behind a live rig — cooldown/ready visuals are suppressed
    *  (they'd render UNDER the rig); BoardScene floats a badge instead. */
   private artHidden = false;
+  /** A scene-owned pose sprite (the dragon clip overlay) standing in for the
+   *  art. While it is VISIBLE, hit-testing follows IT: the player taps the
+   *  pose they see, and during a seated sleep the visible curl and the hidden
+   *  upright art disagree by half a tile — taps on the curl's edges sampled
+   *  the upright frame's transparent margin and fell through. */
+  private poseProxy: Phaser.GameObjects.Sprite | null = null;
 
   constructor(scene: Phaser.Scene) {
     super(scene, 0, 0);
@@ -117,6 +123,9 @@ export class BoardItem extends Phaser.GameObjects.Container {
     }
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
     this.groundShadow.setDisplaySize(w, w * 0.42);
+    // A different painting is a different clickable zone (the sleep curl is
+    // wider and lower than the standing pose) — the input rect must follow.
+    this.refreshHitArea();
   }
 
   /**
@@ -134,6 +143,27 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.artBaseY = artScale;
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
     this.groundShadow.setDisplaySize(w, w * 0.42);
+    this.refreshHitArea();
+  }
+
+  /**
+   * Point hit-testing at a scene-owned pose sprite (or back at the art with
+   * null). Set by BoardScene whenever a clip overlay is dressed; the `visible`
+   * check in `artHitRect`/`artOpaqueAt` makes a hidden overlay fall back to
+   * the art automatically, so clearing is only needed on pool reuse.
+   */
+  setPoseProxy(sprite: Phaser.GameObjects.Sprite | null): void {
+    this.poseProxy = sprite;
+    this.refreshHitArea();
+  }
+
+  /** Re-fit the container's input rect to the CURRENT pose (art or proxy).
+   *  Mutated in place: `setInteractive()` on an already-interactive object
+   *  silently no-ops (see acquireSprite), and the callback closes over the
+   *  stored rect. */
+  refreshHitArea(): void {
+    const area = this.input?.hitArea as Phaser.Geom.Rectangle | undefined;
+    if (area) Phaser.Geom.Rectangle.CopyFrom(this.artHitRect(), area);
   }
 
   acquire(
@@ -150,6 +180,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.bobPaused = false;
     this.cooling = false;
     this.artHidden = false;
+    this.poseProxy = null; // pooled reuse must never inherit another dragon's overlay
     this.sprite.setTexture(textureKey);
     const [ax, ay] = anchors.byKey[textureKey] ?? anchors.default;
     this.sprite.setOrigin(ax, ay);
@@ -189,6 +220,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.setVisible(false);
     this.setActive(false);
     this.itemId = 0;
+    this.poseProxy = null;
   }
 
   placeAt(col: number, row: number): void {
@@ -207,6 +239,22 @@ export class BoardItem extends Phaser.GameObjects.Container {
    *  displayOrigin — see acquireSprite): the clickable zone wraps the sprite
    *  the player sees, never the tile footprint. */
   artHitRect(): Phaser.Geom.Rectangle {
+    const o = this.poseProxy;
+    if (o?.visible && this.scaleX !== 0 && this.scaleY !== 0) {
+      // The proxy lives in WORLD space (it is not a child) — map its display
+      // bounds through this container's transform into hit-area space. The
+      // container may be flipped (setFacing scaleX = -1), so normalise.
+      const x1 = (o.x - o.displayOriginX * o.scaleX - this.x) / this.scaleX + this.displayOriginX;
+      const y1 = (o.y - o.displayOriginY * o.scaleY - this.y) / this.scaleY + this.displayOriginY;
+      const x2 = x1 + o.displayWidth / this.scaleX;
+      const y2 = y1 + o.displayHeight / this.scaleY;
+      return new Phaser.Geom.Rectangle(
+        Math.min(x1, x2),
+        Math.min(y1, y2),
+        Math.abs(x2 - x1),
+        Math.abs(y2 - y1)
+      );
+    }
     const w = this.sprite.displayWidth;
     const h = this.sprite.displayHeight;
     return new Phaser.Geom.Rectangle(
@@ -262,6 +310,8 @@ export class BoardItem extends Phaser.GameObjects.Container {
   }
 
   private artOpaqueAt(hx: number, hy: number): boolean {
+    const o = this.poseProxy;
+    if (o?.visible) return this.proxyOpaqueAt(o, hx, hy);
     const s = this.sprite;
     if (s.scaleX === 0 || s.scaleY === 0) return false;
     if (!this.scene.textures.exists(s.texture.key)) return true; // no pixels to ask
@@ -272,6 +322,26 @@ export class BoardItem extends Phaser.GameObjects.Container {
       Math.floor(py),
       s.texture.key,
       s.frame.name
+    );
+    return alpha !== null && alpha > 0;
+  }
+
+  /** Opaque-pixel test against the pose proxy: hit-area point → world →
+   *  the proxy's current FRAME, honouring its flipX (the overlay mirrors via
+   *  setFlipX, unlike the container's scaleX facing flip). */
+  private proxyOpaqueAt(o: Phaser.GameObjects.Sprite, hx: number, hy: number): boolean {
+    if (o.scaleX === 0 || o.scaleY === 0 || this.scaleX === 0 || this.scaleY === 0) return false;
+    if (!this.scene.textures.exists(o.texture.key)) return true; // no pixels to ask
+    const wx = this.x + (hx - this.displayOriginX) * this.scaleX;
+    const wy = this.y + (hy - this.displayOriginY) * this.scaleY;
+    let px = (wx - (o.x - o.displayOriginX * o.scaleX)) / o.scaleX;
+    const py = (wy - (o.y - o.displayOriginY * o.scaleY)) / o.scaleY;
+    if (o.flipX) px = o.width - px;
+    const alpha = this.scene.textures.getPixelAlpha(
+      Math.floor(px),
+      Math.floor(py),
+      o.texture.key,
+      o.frame.name
     );
     return alpha !== null && alpha > 0;
   }

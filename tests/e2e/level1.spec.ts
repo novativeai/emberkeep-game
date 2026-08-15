@@ -1063,20 +1063,44 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     const coinsBeforeWake = (await gameText(page)).coins;
     const whelpCells = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 3);
     expect(whelpCells.length).toBeGreaterThanOrEqual(1);
-    const whelpPage = await gridToPage(page, whelpCells[0]![0], whelpCells[0]![1]);
+    // Aim at the ART, not the cell: a dragon that wandered before the scripted
+    // sleep is seated where it STOOD, up to half a tile off its tile point —
+    // itemToPage resolves the visible pose's own opaque centre.
+    const whelpPage = await page.evaluate(
+      ([c, r]) => window.__emberkeep.itemToPage(c as number, r as number),
+      whelpCells[0]!
+    );
     await page.mouse.click(whelpPage.x, whelpPage.y);
     await page.waitForTimeout(400);
     await page.screenshot({ path: shot('15e-gate-wake') });
-    // The GOLD plate sits at game offset (−150, +100) from the sprite; CSS = ÷2.
-    const wokeBySkip = await page.evaluate(() => {
+    const skipState = await page.evaluate(() => {
       const scene = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
         skipForId: number;
         skipKind: string;
       };
-      return scene.skipForId !== 0 && scene.skipKind === 'sleep';
+      return { skipForId: scene.skipForId, skipKind: scene.skipKind };
     });
+    const wokeBySkip = skipState.skipForId !== 0 && skipState.skipKind === 'sleep';
     expect(wokeBySkip, 'tapping the sleeper offers the sleep skip').toBe(true);
-    await page.mouse.click(whelpPage.x - 75, whelpPage.y + 50);
+    // The GOLD plate rides the skip container at world dx −150 — read its real
+    // position rather than assuming the sprite stands on its tile point.
+    const goldPlatePage = await page.evaluate(() => {
+      const scene = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
+        skipButton?: { x: number; y: number };
+        cameras: { main: { worldView: { x: number; y: number; width: number; height: number } } };
+      };
+      const btn = scene.skipButton;
+      if (!btn) return null;
+      const view = scene.cameras.main.worldView;
+      const rect = window.__emberkeep.game.canvas.getBoundingClientRect();
+      const sx = rect.width / view.width;
+      return {
+        x: rect.left + (btn.x - 150 - view.x) * sx,
+        y: rect.top + ((btn.y - view.y) / view.height) * rect.height
+      };
+    });
+    expect(goldPlatePage).not.toBeNull();
+    await page.mouse.click(goldPlatePage!.x, goldPlatePage!.y);
     await page.waitForTimeout(500);
 
     // ---------- Golden tease: the camera glides west to the sleeping egg ----------
@@ -1110,12 +1134,59 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       await page.waitForTimeout(260);
     }
 
-    // The handover also blooms the Ember Gate, whose reveal flies the named
-    // hatchling through the door and back (BoardScene.playGateFlight — bloom
-    // +2.1s, out 1.8s, through 2.6s, home 1.5s ≈ 8s from the done step). His
-    // SPRITE is away from his cell for that whole flight, so the drag
-    // assertions below would grab empty air — let him land first.
-    await page.waitForTimeout(6_000);
+    // The handover also blooms the Ember Gate, and the reveal carries its
+    // passenger: the named hatchling lifts off, arcs into the door and FADES
+    // through it (bloom +2.1s, flight 1.8s). He is in Roothold now —
+    // `gate:scout_out` latches at the fade-out and his sprite stays hidden
+    // (and untappable: alpha 0 clears the render flag) until the door gives
+    // him back. This disappearance is the ceremony's one non-negotiable.
+    const scoutState = () =>
+      page.evaluate(() => {
+        const board = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
+          ctx: {
+            state: {
+              stat: (k: string) => number;
+              items: Map<number, { id: number; chain: string; tier: number }>;
+            };
+          };
+          itemSprites: Map<number, { alpha: number; active: boolean }>;
+        };
+        const dragon = [...board.ctx.state.items.values()].find(
+          (i) => i.chain === 'ember_dragon' && i.tier === 3
+        );
+        const sprite = dragon ? board.itemSprites.get(dragon.id) : undefined;
+        return {
+          alpha: sprite?.active ? sprite.alpha : null,
+          out: board.ctx.state.stat('gate:scout_out'),
+          home: board.ctx.state.stat('gate:scout_home')
+        };
+      });
+    await expect
+      .poll(async () => {
+        const s = await scoutState();
+        return s.out === 1 && s.home === 0 && s.alpha === 0;
+      }, {
+        timeout: 15_000,
+        message: 'the dragon fades through the Ember Gate (scout_out latched, sprite hidden)'
+      })
+      .toBe(true);
+    await page.screenshot({ path: shot('17b-gate-flight-out') });
+
+    // And he comes home the way he left: GATE_FLIGHT.awayMs after the portal
+    // takes him, the door flares and he arcs back MID-FLIGHT onto his own
+    // tile (the net for a Keeper who never follows him across —
+    // `flyHomeFromGate`). The drag assertions below need a visible, tappable
+    // dragon, so the suite waits the crossing out and asserts the resolution.
+    await expect
+      .poll(async () => {
+        const s = await scoutState();
+        return s.home === 1 && s.alpha === 1;
+      }, {
+        timeout: 60_000,
+        message: 'the door gives the scout back (scout_home latched, sprite landed)'
+      })
+      .toBe(true);
+    await page.screenshot({ path: shot('17c-gate-flight-home') });
 
     // ---------- Regression: scripted synchronous moves vs the sprite's cell ----------
     // A scripted step can slide the dragon synchronously inside an emit —
