@@ -881,6 +881,11 @@ export class BoardScene extends Phaser.Scene {
         if (this.liveDragons.has(sprite.itemId)) continue;
         this.attachDragon(sprite, false);
       }
+      // …and the ALTAR, which is not a board item and so is not in the loop
+      // above. Her stand-in is waiting for exactly this: `showAltarElder` bails
+      // to it whenever `elderClip('idle')` finds no resident sheet, and this is
+      // what swaps the animal in behind it.
+      if (this.altarElderFallback && !this.altarElderClip) this.showAltarElder();
       // A breed just landed, so this is the moment the resident total is at its
       // highest and the moment we know which breeds the board is actually
       // wearing. Give back whatever is over budget and no longer on screen.
@@ -2114,6 +2119,14 @@ export class BoardScene extends Phaser.Scene {
     this.eggAura?.destroy();
     this.eggAura = undefined;
     this.stopGoldenTremble();
+    // ASK FOR HER SHEETS. Nobody else does: the preload fetches the breeds on
+    // the SAVED BOARD and `ensureDragonClips` runs for board items, and the
+    // Elder is neither — she is a fixture of the altar. So `golden_adult` was
+    // requested by no one, `elderClip` never found a resident sheet, and the
+    // stand-in below was not a brief window before the animal arrived, it was
+    // the whole finale. (Idempotent, and `clipsFetched` makes it free after the
+    // first ask; the loader's COMPLETE swaps her in.)
+    this.ensureDragonClips(GOLDEN_CHAIN, GOLDEN_ELDER_TIER);
     // Clip set first (golden_egg:2 → golden_adult): the Elder is then
     // clip-complete and mounts as a plain sprite — aligned in character-anims
     // against HER altar scale (GOLDEN_ALTAR.elderScale, not the board formula),
