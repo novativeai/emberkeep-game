@@ -267,6 +267,41 @@ describe('the gate_wake beat — a dragon paid awake for the crossing', () => {
     expect(ctx.state.tutorialIndex).toBe(stepAt('golden_tease'));
   });
 
+  it('holds the sleep until it is PAID — it must not lapse under the beat', () => {
+    // A scripted sleep that expired on its own was a soft-lock: the gate wants
+    // the WAKE bought, so once she woke by herself the tap had nothing to sell
+    // and the beat could never be satisfied — a bubble asking the player to
+    // rouse an animal already on its feet.
+    const ctx = createTestContext();
+    const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.bus.emit('ui:dragon_named', { itemId: dragon.id, name: 'Ember' });
+    ctx.state.tutorialIndex = stepAt('gate_wake');
+    ctx.systems.tutorial.begin();
+
+    for (let i = 0; i < 20; i++) {
+      ctx.clock.advance(60_000);
+      ctx.bus.emit('time:advanced', { ms: 60_000 });
+    }
+    expect(ctx.systems.dragonLife.asleep(dragon.id)).toBe(true);
+    expect(ctx.systems.dragonLife.sleepTimer(dragon.id)?.remaining).toBeGreaterThan(0);
+  });
+
+  it('takes either currency — a Warmth payment must not strand the beat', () => {
+    // The skip offer shows BOTH buttons. When the gate named `gold`, paying
+    // with Warmth woke her and advanced nothing: the sleep was gone, so the
+    // one event the step waits for could never fire again.
+    const ctx = createTestContext();
+    const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.bus.emit('ui:dragon_named', { itemId: dragon.id, name: 'Ember' });
+    ctx.state.tutorialIndex = stepAt('gate_wake');
+    ctx.systems.tutorial.begin();
+    ctx.bus.emit('energy:set', { value: 99, reason: 'test' });
+
+    ctx.bus.emit('dragon:sleep_skip', { itemId: dragon.id, currency: 'warmth' });
+    expect(ctx.systems.dragonLife.asleep(dragon.id)).toBe(false);
+    expect(ctx.state.tutorialIndex).toBe(stepAt('golden_tease'));
+  });
+
   it('re-scripts the sleep on resume — a reload must not leave her standing', () => {
     // Nothing in DragonLifeSystem is persisted, so a save reloaded on this beat
     // comes back to a dragon who is awake and a gate that can never fire.

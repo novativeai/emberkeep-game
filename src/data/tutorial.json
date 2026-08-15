@@ -1743,11 +1743,10 @@
     {
       "id": "gate_wake",
       "speaker": "eleanor",
-      "text": "The gate is open — and {dragon} is fast asleep. Nothing crosses curled up. Tap her and pay the gold to rouse her; time is the only other way, and the gate will not wait.",
+      "text": "The gate is open — and {dragon} is fast asleep. Nothing crosses curled up. Tap her, and pay to rouse her: gold rouses a dragon as well as it rushes a kiln.",
       "gate": {
         "type": "event",
-        "event": "dragon:sleep_skipped",
-        "currency": "gold"
+        "event": "dragon:sleep_skipped"
       },
       "effects": [
         {

@@ -68,10 +68,21 @@ export class DragonLifeSystem {
   /** Clock time the CURRENT sleep bout began, per dragon — cleared the moment
    *  it is awake again. The ceiling (DRAGON_SLEEP_MAX_MS) is measured off it. */
   private asleepSince = new Map<number, number>();
-  /** A sleep a tutorial beat ASKED for: `until` is when it lapses, `total` the
-   *  window it was given (what the skip price is scaled against). Transient
-   *  like every other schedule here — the beat replays it on resume. */
-  private scripted = new Map<number, { until: number; total: number }>();
+  /**
+   * A sleep a tutorial beat ASKED for. `total` is the wait it stands for — what
+   * the skip price is scaled against — and it is NOT a countdown: a scripted
+   * sleep holds until it is paid off.
+   *
+   * It used to lapse after its window, and that was a soft-lock. The beat is
+   * gated on the WAKE being bought; once the sleep expired on its own the
+   * dragon was awake, the tap offered nothing to buy, and the gate could never
+   * fire again — the player was stuck on a bubble asking them to rouse an
+   * animal that was already up. A scripted sleep ends exactly one way, which is
+   * the way its own beat teaches.
+   *
+   * Transient like every other schedule here; the beat replays it on resume.
+   */
+  private scripted = new Map<number, { total: number }>();
 
   constructor(
     private state: GameState,
@@ -115,17 +126,13 @@ export class DragonLifeSystem {
     const named = this.dragons.firstNamed();
     if (!named) return;
     this.awakeUntil.delete(named.itemId);
-    this.scripted.set(named.itemId, { until: this.clock.now() + ms, total: ms });
+    this.scripted.set(named.itemId, { total: ms });
     this.announceMood(named.itemId);
   }
 
-  /** Is this dragon inside a scripted sleep window? */
+  /** Is this dragon under a scripted sleep? Held until paid — see `scripted`. */
   private scriptedAsleep(itemId: number): boolean {
-    const s = this.scripted.get(itemId);
-    if (!s) return false;
-    if (this.clock.now() < s.until) return true;
-    this.scripted.delete(itemId);
-    return false;
+    return this.scripted.has(itemId);
   }
 
   /**
@@ -169,8 +176,10 @@ export class DragonLifeSystem {
     if (!kind) return null;
     const now = this.clock.now();
     if (kind === 'scripted') {
+      // Full price, always: a scripted sleep does not drain, so there is no
+      // cheaper hour to wait for. The beat is asking for the payment itself.
       const s = this.scripted.get(itemId)!;
-      return { remaining: Math.max(0, s.until - now), total: s.total };
+      return { remaining: s.total, total: s.total };
     }
     if (kind === 'rest') {
       return { remaining: this.jobs.restRemaining(itemId), total: DRAGON_REST_MS };

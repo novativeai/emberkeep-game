@@ -1044,7 +1044,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     });
     if (deliverPos) await page.mouse.click(deliverPos.x / 2, deliverPos.y / 2);
     await page.waitForTimeout(600);
-    if ((await gameText(page)).tutorial.step !== 'golden_tease') {
+    if ((await gameText(page)).tutorial.step === 'ledger_deliver') {
       await page.evaluate(() => {
         const ctx = window.__emberkeep.game.registry.get('ctx') as {
           bus: { emit: (event: string, payload: unknown) => void };
@@ -1053,11 +1053,41 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       });
     }
 
+    // ---------- The crossing: pay to wake her before she can fly the gate ----------
+    // The delivery opens the Ember Gate, and the beat between it and the tease
+    // curls {dragon} up beside it: nothing crosses asleep. Tapping a sleeping
+    // dragon offers the SAME two skip buttons any wait does, and buying the
+    // wake is what advances the step (and what releases the gate flight).
+    await waitStep(page, 'gate_wake');
+    await page.waitForTimeout(400);
+    const coinsBeforeWake = (await gameText(page)).coins;
+    const whelpCells = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 3);
+    expect(whelpCells.length).toBeGreaterThanOrEqual(1);
+    const whelpPage = await gridToPage(page, whelpCells[0]![0], whelpCells[0]![1]);
+    await page.mouse.click(whelpPage.x, whelpPage.y);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: shot('15e-gate-wake') });
+    // The GOLD plate sits at game offset (−150, +100) from the sprite; CSS = ÷2.
+    const wokeBySkip = await page.evaluate(() => {
+      const scene = window.__emberkeep.game.scene.getScene('BoardScene') as unknown as {
+        skipForId: number;
+        skipKind: string;
+      };
+      return scene.skipForId !== 0 && scene.skipKind === 'sleep';
+    });
+    expect(wokeBySkip, 'tapping the sleeper offers the sleep skip').toBe(true);
+    await page.mouse.click(whelpPage.x - 75, whelpPage.y + 50);
+    await page.waitForTimeout(500);
+
     // ---------- Golden tease: the camera glides west to the sleeping egg ----------
     await waitStep(page, 'golden_tease');
+    expect((await gameText(page)).coins).toBeLessThan(coinsBeforeWake); // the wake was bought
     state = await gameText(page);
     expect(count(state, 'flame_gem', 1)).toBeLessThan(gemsBeforeDeliver); // 6 went to the brazier
-    expect(state.coins).toBeGreaterThan(coinsBeforeDeliver); // the order paid
+    // The order paid 25 and the wake cost 20 of it, so the net is +5 — thin, but
+    // the direction is the point: the delivery must leave the player richer even
+    // after the crossing they have to buy.
+    expect(state.coins).toBeGreaterThan(coinsBeforeDeliver);
     await page.waitForTimeout(2000); // glide (1.1s) + the egg's waking wobble/aura
     await page.screenshot({ path: shot('15b-golden-tease') });
     await tapBubble(page);
