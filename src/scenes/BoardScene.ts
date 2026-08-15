@@ -62,6 +62,8 @@ import {
   TAP_MAX_MS,
   TILE_H,
   TILE_W,
+  TUTORIAL_FOLLOW_INSET,
+  TUTORIAL_FOLLOW_MS,
   TIMINGS,
   WORLD_ID
 } from '../core/Constants';
@@ -95,7 +97,16 @@ import { cappedTier } from '../core/graphics';
 import { GRAPHICS_EVENT, graphics, liveCrystalAvailable } from '../core/graphicsState';
 import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
 import { renderScale } from '../core/render-scale';
-import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAllow } from '../core/types';
+import type {
+  BoardItemState,
+  GeneratorConfig,
+  ItemSnapshot,
+  ResolvedArrow,
+  ResolvedHand,
+  TilePos,
+  TutorialAllow,
+  TutorialStepEvent
+} from '../core/types';
 import facesJson from '../data/faces.json';
 import { BoardItem } from '../entities/BoardItem';
 import { PortalFX } from '../entities/PortalFX';
@@ -374,6 +385,10 @@ export class BoardScene extends Phaser.Scene {
   /** Companion standees, by companion id. Named dragons are never BoardItems. */
   private companionSprites = new Map<string, Phaser.GameObjects.Image>();
   private tutorialStepId = ''; // current tutorial step id (drives in-board hints)
+  /** The live step, kept whole so the pointer can be re-followed mid-step — a
+   *  beat that hands its arrow on (`arrowThen`) moves the target without ever
+   *  emitting a new step. */
+  private tutorialStep: TutorialStepEvent | null = null;
   private dragFrom: TilePos | null = null;
   /** Live drag: the lifted sprite eases toward this pointer-tracked target. */
   private dragSprite: BoardItem | null = null;
@@ -4409,6 +4424,59 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /** The hub tours' bouncing pointer over a board landmark. */
+  /**
+   * THE CAMERA FOLLOWS THE POINTER — wherever the tutorial points, the player
+   * can see.
+   *
+   * The board camera frames one level and is otherwise held still during the
+   * tutorial, which was fine while every scripted target sat in the opening
+   * frame. It stopped being fine as the script grew: a step could point at a
+   * cell the camera had never included, and the lesson became "find the arrow".
+   * Three beats had already been patched one at a time (the crystal, the fog
+   * gate, the golden tease) — this is the rule those three were special cases
+   * of, so a new step needs no camera code at all.
+   *
+   * WHAT IT WILL NOT DO is move for the sake of moving. A pointer already
+   * comfortably in frame is left alone: nudging the world on every step reads
+   * as drift, and the inset keeps a target from being technically visible while
+   * it hugs an edge under the HUD.
+   */
+  private followTutorialPointer(step: TutorialStepEvent): void {
+    if (step.done) return; // the hand-over step: the board is the player's again
+    const at = this.pointerWorldPoint(step.hand ?? step.arrow);
+    if (!at) return;
+    const view = this.cameras.main.worldView;
+    const insetX = view.width * TUTORIAL_FOLLOW_INSET;
+    const insetY = view.height * TUTORIAL_FOLLOW_INSET;
+    const comfortable =
+      at.x >= view.x + insetX &&
+      at.x <= view.right - insetX &&
+      at.y >= view.y + insetY &&
+      at.y <= view.bottom - insetY;
+    if (comfortable) return;
+    this.glideToWorld(at.x, at.y, TUTORIAL_FOLLOW_MS);
+  }
+
+  /**
+   * Where a pointer target stands in the WORLD, or null when it stands nowhere
+   * the camera can go.
+   *
+   * `ui` is on the HUD, which travels with the viewport — there is nothing to
+   * pan toward. `fogRegion` is a whole strip rather than a point and has its
+   * own framing (`panToRegion`), which runs beside this. A gauntlet hand is
+   * followed to the piece it wants MOVED, not to the destination: that is where
+   * the player's finger has to start.
+   */
+  private pointerWorldPoint(
+    target: ResolvedArrow | ResolvedHand | null
+  ): { x: number; y: number } | null {
+    if (!target) return null;
+    if ('from' in target) return worldPointOf(this.ctx.state.world, target.from.col, target.from.row);
+    if ('tile' in target) return worldPointOf(this.ctx.state.world, target.tile.col, target.tile.row);
+    if ('character' in target) return this.characterAimWorldPoint(target.character);
+    return null;
+  }
+
   private onTourPoint(target: string): void {
     this.clearTourArrow();
     const at = this.tourTargets.get(target);
@@ -6707,14 +6775,7 @@ export class BoardScene extends Phaser.Scene {
         // Key badges: earned into view (held keys ≥ region cost) — quiet here,
         // because the tutorial's own script stages the key_unlock beat.
         this.syncKeyBadges(false);
-        // Glide the camera to show the crystal when the player must tap it.
-        if (step.id === 'crystal_tap') {
-          const crystal = [...this.ctx.state.items.values()].find((i) => i.chain === 'crystal');
-          if (crystal) {
-            const w = gridToWorld(crystal.col, crystal.row);
-            this.glideToWorld(w.x, w.y, 900);
-          }
-        }
+        this.tutorialStep = step;
         // The closer camera can leave a fog-gate lesson off-screen — glide to it.
         const fog =
           (step.arrow && 'fogRegion' in step.arrow && step.arrow.fogRegion) ||
@@ -6753,6 +6814,19 @@ export class BoardScene extends Phaser.Scene {
           });
           this.glideToWorld(home.x, home.y, 1000);
         }
+        // LAST, and only when nothing above already owns the camera: the tease
+        // pulls the zoom out to the altar and the fog gate frames a whole strip
+        // — both would be fought by a pan to the same step's arrow.
+        else if (!fog) this.followTutorialPointer(step);
+      }),
+      // The pointer can move WITHIN a step: a beat that says "tap her, then tap
+      // the House" hands its arrow on when she is armed, with no new step to
+      // ride. Follow that too, or the second half of the lesson is the half
+      // played off-screen.
+      bus.on('ui:character_armed', ({ armed }) => {
+        const step = this.tutorialStep;
+        if (!step || step.done || !step.arrowThen) return;
+        this.followTutorialPointer({ ...step, hand: null, arrow: armed ? step.arrowThen : step.arrow });
       }),
       bus.on('state:loaded', () => this.fullResync())
     );

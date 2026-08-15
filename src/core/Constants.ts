@@ -1952,6 +1952,23 @@ export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000 } as const;
  */
 export const MERGE_SNAP_RADIUS = 2;
 
+/**
+ * THE TUTORIAL CAMERA FOLLOWING ITS OWN POINTER.
+ *
+ * `INSET` is the margin, as a fraction of the view, inside which a target
+ * counts as already comfortably in frame — the camera holds still for anything
+ * within it. It is not zero because "technically on screen" is not the same as
+ * "seen": a cell hugging the bottom edge sits under the HUD, and one at the far
+ * right is where the eye looks last. A sixth of the view in from each side puts
+ * the pointer in the middle two-thirds, which is where a lesson belongs.
+ *
+ * `MS` is the glide. Long enough to read as the world turning rather than
+ * cutting — a jump loses the player's place, which is the whole thing the
+ * follow exists to protect.
+ */
+export const TUTORIAL_FOLLOW_INSET = 1 / 6;
+export const TUTORIAL_FOLLOW_MS = 700;
+
 /** The save latch for the gate lesson — the hand that teaches world travel by
  *  drawing "carry the dragon to the arch" once, after Eleanor's Emporium visit.
  *  A `stats` counter like the tours', so it is taught once ever and a player who
