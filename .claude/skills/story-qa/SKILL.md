@@ -76,7 +76,7 @@ The test is whether a first-time player could **know** rather than **suspect**.
 ### 4. Voice
 | Character | Must always | Must never |
 |---|---|---|
-| Eleanor | be plain about rules; let true sentences be misheard | state a falsehood — except ch 4's *"it isn't a knack and it isn't luck"*, which is flagged canon; grovel |
+| Eleanor | be plain about rules; let true sentences be misheard | state a falsehood — except ch 4's *"it isn't a trick and it isn't luck"*, which is flagged canon; grovel |
 | Selyna | be clipped, precise, unsentimental | gloat; be written as a villain; threaten; **appear in Emberkeep** — she is in the north throughout world 1 and exists there only as letters |
 | Golden Elder | testify; capitals and grandeur are hers alone | accuse; explain a system; appear before she wakes |
 | Dragons | behave as animals with preferences | understand the plot |

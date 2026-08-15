@@ -122,7 +122,7 @@ because she cannot.
 
 ### Beat 3 — the ash
 
-> **Mind your footing. That grey isn't soil. Fires die slowly, from the edges in — this one went out all at once, everywhere, in a single night.**
+> **Watch your step. That grey isn't soil. Fires die slowly, from the edges in — this one went out all at once, everywhere, in a single night.**
 
 The scale of the disaster arrives without the words "Great Flame", and the clue
 is **deducible rather than stated**: fires do not do that. The player reaches
@@ -132,7 +132,7 @@ they will remember. Directs the eye at the actual board art.
 
 ### Beat 4 — the near-slip *(two bubbles, and the tap between them is the point)*
 
-> **You'll want to know what did that. So did I, once. I read every account there is. I crossed half the world for the rest. I was—**
+> **You'll want to know what did that. So did I, once. I read every story there is. I crossed half the world for the rest. I was—**
 
 > **…Later. You'll hear it better when you're not standing in it.**
 
@@ -211,10 +211,10 @@ matches the existing tap-gated steps exactly; no new gate, effect or allow types
   "text": "This is Emberkeep. I aimed for the hall — the spell was clean, I've cast it a hundred times. Something set you down here instead." },
 
 { "id": "arrival_ash",   "speaker": "eleanor", "gate": { "type": "tap" }, "allow": {},
-  "text": "Mind your footing. That grey isn't soil. Fires die slowly, from the edges in — this one went out all at once, everywhere, in a single night." },
+  "text": "Watch your step. That grey isn't soil. Fires die slowly, from the edges in — this one went out all at once, everywhere, in a single night." },
 
 { "id": "arrival_slip",  "speaker": "eleanor", "gate": { "type": "tap" }, "allow": {},
-  "text": "You'll want to know what did that. So did I, once. I read every account there is. I crossed half the world for the rest. I was—" },
+  "text": "You'll want to know what did that. So did I, once. I read every story there is. I crossed half the world for the rest. I was—" },
 
 { "id": "arrival_hold",  "speaker": "eleanor", "gate": { "type": "tap" }, "allow": {},
   "text": "…Later. You'll hear it better when you're not standing in it." },

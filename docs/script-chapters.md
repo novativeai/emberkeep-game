@@ -1,13 +1,20 @@
 # The script — twelve chapters and the recurring banks
 
-> **Status: SCRIPT COMPLETE, NOT WIRED.** Every line the campaign needs, written.
-> Canon and the reveal ladder: [story-bible.md](story-bible.md). The quest
-> behind each gate, and the state each beat is allowed to presuppose, is
-> [quests.md](quests.md). Chapter 1 is [opening-scene.md](opening-scene.md) and
-> is not repeated here.
+> **Status: SCRIPT COMPLETE, register-passed for the 8–13 target
+> ([naming.md](naming.md) §7 rules), NOT fully wired.** Every line the campaign
+> needs, written. Canon and the reveal ladder: [story-bible.md](story-bible.md).
+> The quest behind each gate, and the state each beat is allowed to presuppose,
+> is [quests.md](quests.md). Chapter 1 is [opening-scene.md](opening-scene.md)
+> and is not repeated here.
 >
-> **Bubble budget ≤180 characters** (940 px wrap, 38 px bold, ~4 lines). Every
-> line below is under it; each `>` block is one bubble and one tap.
+> **Bubble budget ≤180 characters** (940 px wrap, 38 px bold, ~4 lines); the
+> register pass targets ≤150. Every line below is under budget; each `>` block
+> is one bubble and one tap.
+>
+> **The campaign currently ends after chapter 12 into free play.** The
+> resolution chapter — Eleanor says the words, the Flame comes home — is
+> deferred to a later version and is NOT written here. Nothing in chapter 12
+> promises it on a clock.
 
 ---
 
@@ -19,13 +26,13 @@ Gates are stated per chapter and must not be reachable early.
 ## Chapter 2 — What her craft is
 **Gate:** first Ledger order delivered. **Rung:** catch, hold, return.
 
-> That's the first thing anyone has given back to this place in sixty years. I would like to be composed about it. I'm not going to manage it.
+> That's the first thing anyone has given back to this place in sixty years. I told myself I wouldn't cry about it. Well. Too late.
 
-> You should know what you're working for. My craft isn't a large one. I can catch a thing, hold it, and give it back. That's the whole of it.
+> You should know what my magic does. I can catch a thing, hold it, and give it back. That's all of it.
 
-> The moon does the same trick every night. Takes light it was never given, hands it back cooler. Nobody calls that a miracle. They call it evening.
+> The moon does the same trick every night. It borrows light and gives it back, softer. Nobody calls that magic. But it is.
 
-> So when I ask you for moonwater, understand that I'm not making anything. Everything I do, somebody else lit first.
+> So when I ask you for moonwater, remember — I never make anything new. Everything I do, someone else lit first.
 
 *The murder weapon, introduced as modesty, in chapter 2. Every later reveal is
 already sitting in that last line — a player who re-reads it in chapter 7 finds
@@ -36,35 +43,36 @@ she told them in the second week.*
 
 > Wait — you're naming it?
 
-> …Yes. Do. Out loud, where it can hear you. I'll explain why that matters when I've stopped being surprised at you.
+> …Yes. Do. Say it out loud, where it can hear you. I'll explain why that matters when I've stopped being surprised at you.
 
-> They didn't die, you know. Everyone says the dragons died. They went cold, and they went to sleep, and sleeping things can be woken. That isn't hope, it's the correct word.
+> They didn't die, you know. Everyone says the dragons died. They went cold, and they fell asleep. And sleeping things can be woken.
 
 > Names are the one thing nobody thought to take.
 
-*Last line is a slip, not a statement — "nobody thought to take" concedes that
-things* were *taken, a chapter before the player has any frame for it.*
+*The last line is a slip, not a statement — "nobody thought to take" concedes
+that things* were *taken, a chapter before the player has any frame for it.*
 
 ## Chapter 4 — What she can't do
 **Gate:** second region restored. **Rung:** she cannot wake anything. The player can.
 
-> Stop a moment. I want to show you something, and I'd rather you saw it than took my word for it.
+> Stop a moment. I want to show you something. I'd rather you saw it than took my word for it.
 
-> That ember there, the dead one. Watch.
+> That ember there — the dead one. Watch.
 
-> Sixty years of craft in these hands, and I cannot raise a spark from a thing that has gone out. Not once. Not ever.
+> Sixty years of magic in these hands, and I can't raise one spark from a thing that has gone out. Not once. Not ever.
 
 > Now you. Go on — put your hand on it.
 
-> …There. That is the whole of the difference between us, and it is not a small one.
+> …There. That's the whole difference between us. And it isn't small.
 
-> Don't ask me why yet. It isn't a knack and it isn't luck, and I'll tell you when I can stand to.
+> You're wondering why it's you. Don't ask me yet. It isn't a trick and it isn't luck — and I'll tell you when I can bear to.
 
-*The limitation is **demonstrated before it is confessed**, and the player is the
-one who demonstrates it — she fails in front of them, then they succeed with
-their own hands. A limitation you were told about is a fact; one you performed is
-a memory. The deflection at the end is her only outright lie in the campaign, and
-it is about herself.*
+*The limitation is **demonstrated before it is confessed**, and the player is
+the one who demonstrates it — she fails in front of them, then they succeed
+with their own hands. The last bubble has her **voice the player's question
+before deflecting it** (the Keeper is silent; she must be seen asking for
+them), which is what chapter 8's opener calls back to. The deflection is her
+only outright lie in the campaign, and it is about herself.*
 
 ## Chapter 5 — A letter from the north
 **Gate:** Trust 2 with any dragon. **Rung:** there is a sister, and she is hostile.
@@ -73,20 +81,20 @@ Delivered as a folded page on the board — the player taps to read. See §Lette
 
 > **Selyna:** Eleanor. Something on that rock is waking, and it isn't you doing it. Whatever you've told them, it isn't enough. Don't make them into you. — S.
 
-> That's my sister. Selyna. She's younger, she writes when she wants something, and she has never once said what.
+> That's my sister. Selyna. She's younger. She writes when she wants something — and she has never once said what.
 
-> No — don't. That's the whole of it, and I'd rather get back to work.
+> No — don't. That's all I want to say about it. Let's get back to work.
 
 ## Chapter 6 — The librarian
 **Gate:** 5 Dragon Book entries discovered. **Rung:** her father.
 
-> Half of what's in that book isn't mine. It's copied out of my father's accounts. He kept the library at the Hold.
+> Half of what's in that book isn't mine. It's copied from my father's notes. He kept the library at the Hold.
 
-> No magic in him at all. Not a spark, not once, and he'd been married into an order of it for thirty years. So he read instead.
+> He had no magic at all. Not a spark, not once — and he'd been married into a whole house of magic for thirty years. So he read instead.
 
-> He read every account of a loss that house owned, looking for one — just one — where somebody got the thing back.
+> He read every story of a lost thing that house owned. He was looking for just one — one — where somebody got the thing back.
 
-> He never found it. I want you to understand that's a sad story about a librarian and nothing else. I'd like it to stay that way.
+> He never found it. It's a sad story about a librarian and nothing else. I'd like it to stay that way.
 
 *The last line is her asking the player to stop looking. Players will do the
 opposite, which is the point: the next rung is now something they went and got.*
@@ -94,37 +102,39 @@ opposite, which is the point: the next rung is now something they went and got.*
 ## Chapter 7 — The Keeping
 **Gate:** second dragon named. **Rung:** the rite, and the player's title.
 
-> Two of them awake, with names. You've done in a month what the order didn't manage in sixty years. So I'm going to say something, because you've earned it and because I'm tired.
+> Two of them awake, with names. You did in a month what the order couldn't do in sixty years. So I'm going to tell you something. You've earned it, and I'm tired.
 
-> There was a rite. The last one of my formation — the one they give you when they've decided you're finished. I was nineteen.
+> There was a rite. The last test of my training — the one they give you when they've decided you're finished. I was nineteen.
 
 > It was called the Keeping.
 
-> That is not a coincidence, what I've been calling you. I chose it in the first minute and I have been trying to explain it every day since.
+> That's not a coincidence, what I've been calling you. I chose that word on the first day. I've been trying to explain it ever since.
 
-> Not tonight. But I want it on the record that I stopped lying about the word.
+> Not tonight. But I want you to know I've stopped lying about the word.
 
 *The scene the whole campaign is built to reach. It retro-poisons the opening's
-final line — "You can, Keeper" — for anyone paying attention, and it
-costs one word planted eight chapters earlier.*
+final line — "You can, Keeper" — for anyone paying attention, and it costs one
+word planted eight chapters earlier.*
 
 ## Chapter 8 — She went looking
 **Gate:** third region restored, or Trust 4. **Rung:** it was never luck, and she
 knew before she brought you.
 
-> You asked me why it's you. I gave you a mage's answer. Here's the real one.
+> You've been wondering why it's you. I let you wonder. Here's the real answer.
 
-> It isn't luck. It was never luck. I knew what you were before I ever brought you here, and I brought you anyway.
+> It isn't luck. It was never luck. I knew what you were before I ever brought you here. And I brought you anyway.
 
-> The Flame answers a Keeper's hands. There were people who tended it — a line of them — and it never stopped knowing them. Not even after.
+> The Flame answers a Keeper's hands. There were people who tended it — a whole family line of them — and it never stopped knowing them. Not even after.
 
-> I spent sixty years looking for one. Not for a helper. For the only thing in the world that could undo what I did.
+> I spent sixty years looking for one. Not for a helper. For the only person in the world who could undo what I did.
 
 > So — yes. I found someone with a power they didn't know they had, and I used it, and I didn't explain myself. Ask me who else did that.
 
 *The last line is the campaign's hinge. She does not confess her father here —
-she invites the player to notice she has become him, which is worse, and it is
-the first thing she has ever volunteered.*
+she invites the player to notice she has become him. The answer is then given
+**in plain words** twice, on schedule: the Elder says it in chapter 9, and she
+says it herself in chapter 10 — a first-time ten-year-old gets the fact, an
+adult gets the dread one chapter early.*
 
 ## Chapter 9 — The witness
 **Gate:** the Golden Elder wakes (finale). **Rung:** testimony.
@@ -134,53 +144,64 @@ does not accuse — she testifies, then hands the verdict to the player.
 
 > **Elder:** …Keeper. I slept an AGE, and I woke to your hands. Not hers. Hers I would have known.
 
-> **Elder:** I was AWAKE. That is the whole of my burden. Every other living thing on this isle went down into the dark, and I stayed, and I saw it done.
+> **Elder:** I was AWAKE. That is my whole burden. Every living thing on this isle went down into the dark — and I stayed, and I saw it done.
 
-> **Elder:** There was a man with no light in him at all. And a girl who had far more of it than she understood.
+> **Elder:** There was a man with no light in him at all. And a girl who had more of it than she understood.
 
-> **Elder:** She was NINETEEN. She was crying. She did it anyway, and she did it beautifully, which is the part none of the accounts will tell you.
+> **Elder:** He needed her hands for what his own could not do. So he used them, and he told her nothing. Look at your own hands, child, and understand her.
 
-> **Elder:** She believed it was a keeping. She has believed it every day since, and that is its own long punishment, and it is not mine to end.
+> **Elder:** She was NINETEEN. She was crying. She did it anyway — and she did it beautifully. No account will tell you that part.
 
-> **Elder:** So I give it to YOU. She stands over there not looking at me. Whether she rides south with us at dawn is not my judgement to make. Your hands are clean.
+> **Elder:** She believed it was a keeping. She has believed it every day since. That is its own punishment, and it is not mine to end.
+
+> **Elder:** So I give it to YOU. She stands over there, not looking at me. Whether she rides south with us at dawn is not my judgement to make. Your hands are clean.
 
 *Consistent with the shipped finale line — "the Great Flame did not die. It was
-TAKEN" — which stays exactly as it is and now has a witness behind it.*
+TAKEN" — which stays exactly as it is and now has a witness behind it. The
+fourth bubble is the campaign's parallel said plainly — as testimony and an
+instruction to the player, never as an accusation of her.*
 
 ## Chapter 10 — Unasked
-**Gate:** arrival at the Hold, after *Provisions for the Road*. **Rung:** she
-breaks the pattern.
+**Gate:** arrival at the Hold, after *Pack for the Trip*. **Rung:** she breaks
+the pattern.
 
-> You didn't ask me a single question the whole way south. I'd have preferred it if you had.
+> You didn't ask me one question the whole way south. I'd have liked it if you had.
 
-> So here's the rest of it. Unasked, and before I want anything from you — which is the one courtesy nobody ever paid me.
+> So here's the rest of it. Before I ask you for anything — which is the one kindness nobody ever paid me.
 
 > My father held the vessel. I filled it. I believed we were giving it back at dawn.
 
-> I've never been able to decide whether that makes it better, or whether it's just the last excuse I've got left.
+> He didn't give it back. He walked out of the Hold with the Lantern — and the world's oldest fire inside it.
 
-> He didn't give it back. He walked out of the Hold with the Lantern and the whole of the world's oldest fire inside it.
+> And I let him. Because he had finally looked at me. I was nineteen, and I had never been good at anything before.
 
-> And I let him. Because he had looked at me, and I was nineteen, and I had never been good at anything before.
+> He found a girl with a power he needed, and he didn't tell her everything. That's what I did to you. I've known it every single day.
 
-> Now. I'm going to ask you for one more thing, and you may say no. If you do, I'll take you home and that's the end of it.
+> One more thing you should know. You can wake them one at a time — but waking isn't warming. Without the Flame, the isle stays cold around everything you wake.
 
-> That isn't a gesture. It's the entire difference between him and me, and it's the only thing I have left that's mine.
+> Now. I'm going to ask you for one more thing, and you may say no. If you say no, I'll take you home, and that's the end of it.
+
+> That's the whole difference between him and me. It's the only thing I have left that's mine.
+
+*Bubble six pays chapter 8's hinge in words a kid can retell. Bubble seven is
+the Lantern's stakes, stated once and plainly — it is why waking dragons one
+at a time can never replace the return, and it pays the marginalia fragment
+"Awake is not the same as warm." Both were owed; see quests.md §6.*
 
 ## Chapter 11 — North
 **Gate:** Borealis opens. **Rung:** Selyna has the Lantern.
 
-> North. My sister has it. She's had it a very long time, and I've known for most of that.
+> North. My sister has it. She's had it a very long time — and I've known for most of that time.
 
-> Don't. I know. Add it to the list and come north with me anyway.
+> Don't. I know. Add it to my list, and come north with me anyway.
 
 Then, on arrival:
 
 > **Selyna:** So you're the one with the hands.
 
-> **Selyna:** Sixty years of us trying everything we knew, and it lights for someone who didn't know they could. Yes. I've had time to find that funny.
+> **Selyna:** Sixty years of us trying everything we knew. And it lights for someone who didn't even know they could. Yes — I've had time to find that funny.
 
-> **Selyna:** She's told you, then. I can tell, because you're being careful with me. Nobody's careful with me who hasn't been told.
+> **Selyna:** She's told you, then. I can tell, because you're being careful with me. Nobody is careful with me unless they've been told.
 
 > **Selyna:** I'm not the villain of her story, Keeper. I'm the one who carried the thing while she read about it.
 
@@ -189,94 +210,101 @@ Then, on arrival:
 ## Chapter 12 — Her terms
 **Gate:** Selyna's trust threshold in Borealis. **Rung:** the price of return.
 
-> **Selyna:** You want it back. Naturally. You've spent a season warming a graveyard.
+> **Selyna:** You want it back. Of course you do. You've spent a whole season warming a graveyard.
 
 > **Selyna:** You can have it. I'm not a dragon in a story — I don't want a riddle. I want one thing.
 
-> **Selyna:** She says it out loud. Here. In front of you, and in front of them, and with the real words. Not "what happened." Not "the rite." What she did.
+> **Selyna:** She says it out loud. Here. In front of you, and in front of them, with the real words. Not "what happened." Not "the rite." What she did.
 
-> **Selyna:** It isn't a punishment, and I'd like you to stop looking at me as though it were. A thing handed back by someone who won't name the taking isn't handed back. It's just moved.
+> **Selyna:** It isn't a punishment. Stop looking at me like it is. If she won't say what she did, then giving it back doesn't count. It's only moving it.
 
-> **Selyna:** She's had sixty years to find that sentence. Let's see whether a stranger was what she was missing.
+> **Selyna:** She's had sixty years to find that sentence. Let's see if a stranger was what she was missing.
+
+*The campaign rests here for now: after this beat the game hands back free
+play, with the banks below still live. The saying, the return, and Emberkeep's
+waking are the deferred resolution chapter — written in a later version, gated
+on nothing that exists today.*
 
 ---
 
 # Part II — the recurring banks
 
-This is where weeks of words actually come from. Every bank below rides a system
-that **already fires**; the story advances by swapping which bank is live.
+This is where weeks of words actually come from. Every bank below rides a
+system that **already fires**; the story advances by swapping which bank is
+live.
 
 ## Ledger banter — `order:completed`
 Six stages. Replaces the shipped `dialogue.json → orderComplete` array; the
-system needs no change beyond selecting a bank by chapter.
+system needs no change beyond selecting a bank by chapter. These are the
+[naming.md](naming.md) §7 versions — the two files must never drift.
 
 **Stage I (ch 1–2) — brisk, guarded, warmer than she intends**
-> Delivered, and early. I'd ask how, but I've decided not to look a gift Keeper in the mouth.
+> Done already? I won't ask how. I'm just glad you're here.
 
-> Warmer. Not warm. But warmer, and I'll take the comparative.
+> Warmer. Not warm yet. But warmer counts.
 
-> That's the ledger square for today. Rest — it doesn't run off if you stop.
+> That's today's work. Rest — the list will still be here tomorrow.
 
-> Good. Do that again tomorrow and I'll start believing it.
+> Good. Do that again tomorrow and I'll start to believe it's real.
 
 **Stage II (ch 3–4) — the isle starts answering**
-> Something upslope lifted its head just then. I don't know which one. It felt that.
+> Something up the hill just lifted its head. It felt what you did.
 
-> Another one down. The isle is keeping count even if you aren't.
+> Another one done. The island is keeping count, even if you aren't.
 
 > You work like someone who's done this before. You haven't — I checked.
 
 **Stage III (ch 5–6) — letters have started arriving**
-> Thank you. Genuinely. I'm short of things to say today that aren't hedged.
+> Thank you. I mean it. I don't have many easy words today, so take that one.
 
-> Take the gold and buy something pointless with it. That's an instruction.
+> Take the gold and buy something silly with it. That's an order.
 
-> It's going faster than it should. Not a complaint — it's true, and it frightens me slightly.
+> It's going faster than it should. I'm not complaining. It just scares me a little.
 
 **Stage IV (ch 7–8) — after the word**
-> Delivered. And you're still here, which I notice every single time.
+> Done. And you're still here. I notice that every single time.
 
-> I keep expecting to look up and find you gone. Ignore that. Next one's on the shelf.
+> I keep thinking I'll look up and you'll be gone. Ignore me. The next job is on the shelf.
 
-> You have a better hand for this than I ever did. That isn't modesty, it's arithmetic. I've watched you do it.
+> You're better at this than I ever was. That's not me being kind. I've counted.
 
 **Stage V (ch 9–10) — after the Elder**
 > She watches you work, you know. She doesn't watch me.
 
-> Whatever you decided about me, you're still filling my ledger. I've stopped trying to work out what that means.
+> Whatever you think of me now — you're still here, still helping. I've stopped trying to work out why.
 
 > Thank you, Keeper. I've started being able to say the word.
 
 **Stage VI (ch 11–12) — Borealis**
-> My sister will call this inefficient. My sister says that about weather.
+> My sister will say we're doing this the slow way. She says that about everything.
 
-> Cold work. Different craft up here — hold it, don't hand it back. I'm out of my depth and enjoying it, which is new.
+> Cold work up here. Her magic holds things; mine gives them back. I'm learning, and I like it. That's new.
 
 ## Day-phase ambience — the four-phase clock
-Fired sparingly on phase change (merge-chains §3). Cheapest presence in the game:
-she is *there* without a scene.
+Fired sparingly on phase change (merge-chains §3). Cheapest presence in the
+game: she is *there* without a scene.
 
 | Phase | Early (ch 1–4) | Mid (ch 5–8) | Late (ch 9–12) |
 | --- | --- | --- | --- |
-| **morning** | The ash is loudest in the morning. You'll get used to it. | You're up early. So am I. Neither of us should read anything into that. | Morning, Keeper. Still a strange thing to say out loud and mean kindly. |
-| **day** | Good light. Do the fiddly work now. | Take the middle of the day for the board — they won't want you until it cools. | Half the terrace is green. I've been avoiding looking straight at it, the way you do with good news. |
-| **dusk** | This is when it used to be worth seeing. Sorry. Go on. | That colour on the ridge isn't the sunset. That's the moss taking. You did that. | She used to come out at dusk. My sister. She said the light was honest then. |
-| **night** | The basin runs tonight. Everything my craft needs happens after dark — make of that what you like. | I don't sleep much. Never have. It isn't tragic, it's just a fact you'll notice eventually. | Sixty years of nights, and this is the first one where the isle is warmer at midnight than it was at noon. |
+| **morning** | The ash is loudest in the morning. You'll get used to it. | You're up early. So am I. We don't have to explain ourselves. | Morning, Keeper. It still feels new, saying that and meaning it. |
+| **day** | Good light. Do the tricky work now. | Take the middle of the day for the board — they won't want you until it cools. | Half the terrace is green now. I can hardly look straight at it. Good news is like that. |
+| **dusk** | This is when it used to be worth seeing. Sorry. Go on. | That colour on the ridge isn't the sunset. That's the moss taking hold. You did that. | She used to come out at dusk. My sister. She said the light was honest then. |
+| **night** | The dew basin fills tonight. Everything my magic needs happens after dark. Make of that what you like. | I don't sleep much. Never have. It isn't sad — it's just a fact you'll notice. | Sixty years of nights, and this is the first one where the isle is warmer at midnight than it was at noon. |
 
 ## The naming ceremony — per dragon
-The single most emotional moment the game has. Keep it short and do not score it
-with a fanfare.
+The single most emotional moment the game has. Keep it short and do not score
+it with a fanfare.
 
 > It's awake. Don't crowd it — let it come to you.
 
 > **[ naming prompt ]**
 
-> Say it out loud. Names don't take unless something hears them.
+> Say it out loud. Names don't stick unless something hears them.
 
 > …*&lt;name&gt;*. Right. That's a real one, then.
 
 **Second dragon onward, replacing the last line:**
-> That's two names on this isle that weren't here a season ago. I'm keeping a list. It's the only list I've ever enjoyed keeping.
+> That's two names on this isle that weren't here a season ago. I'm keeping a list. It's the only list I've ever liked keeping.
 
 ## Trust milestones — per dragon, narrated as conduct
 Trust is never shown as a bar (merge-chains §4.1). She narrates what the player
@@ -284,28 +312,28 @@ would otherwise miss.
 
 > **1** — It stopped backing away from you. That's not nothing. It's the first thing any of them do.
 
-> **2** — It brought you a stone. Dug that up itself. Don't make a fuss, just take it.
+> **2** — It brought you a stone. It dug that up itself. Don't make a fuss — just take it.
 
-> **3** — It took food out of your hand. Sixty years asleep, and it decided you were safe inside a month.
+> **3** — It took food from your hand. Sixty years asleep, and it decided you were safe within a month.
 
-> **4** — It's foraging for you now. Whatever it likes best, it'll fetch you one. That's a gift, not a system.
+> **4** — It's foraging for you now. Whatever it likes best, it'll fetch you one. That's a gift, not a chore.
 
-> **5** — It followed you across a zone line. They don't do that for handlers. They do that for people.
+> **5** — It followed you across the zone line. They don't follow just anyone. They follow their people.
 
 ## Dragon Book marginalia — Eleanor's hand
-**The most valuable channel in the game, and the least obvious.** A pokédex the
-player opens voluntarily, hundreds of times, is the only place a sentence can
-mean nothing on first read and everything on the fourth. One annotation per
-entry, in her handwriting, undated. The guilt goes here in fragments — the
+**The most valuable channel in the game, and the least obvious.** A pokédex
+the player opens voluntarily, hundreds of times, is the only place a sentence
+can mean nothing on first read and everything on the fourth. One annotation
+per entry, in her handwriting, undated. The guilt goes here in fragments — the
 player should assemble it *before* any chapter beat confirms it.
 
 > Sleeps hot even in ash. Note: they all did, before.
 
-> Refuses dew after a fuel day. So did the ones in the old accounts. Nothing has changed in them at all — only in what they had.
+> Refuses dew after a fuel day. So did the ones in the old books. Nothing about them has changed — only what they had.
 
 > Third to wake with no fire in it. Do not write "lost." They are not lost. It was taken from them, and that is a different word.
 
-> Father's hand, this page. I have left it.
+> My father's handwriting, this page. I have left it in.
 
 > It hummed this morning. I have not heard that in sixty years and I had to sit down.
 
@@ -315,16 +343,19 @@ player should assemble it *before* any chapter beat confirms it.
 
 > Query: does it know? Answer: no. Stop asking it.
 
-> S. would say I am sentimentalising the husbandry. S. would be right, and would still be wrong.
+> Awake is not the same as warm. I keep having to write that down.
 
-> The Keeper named it without being told they were allowed to. I did not know that was permitted either.
+> S. would say I'm going soft over feeding notes. S. would be right — and still wrong.
+
+> The Keeper named it without asking if that was allowed. I didn't know it was allowed either.
 
 > Entry left blank. I know what goes here.
 
-> Warmer at midnight than at noon. Recording it so that somebody other than me has seen it.
+> Warmer at midnight than at noon. Writing it down so somebody besides me has seen it.
 
-*The sixth line is a correction to her own note. It is a confession filed as an
-errata, and it is the best sentence in the campaign.*
+*The sixth line is a correction to her own note — a confession filed as an
+errata, and the best sentence in the campaign. The ninth is new: it seeds the
+Lantern's stakes long before chapter 10 says them plainly.*
 
 ## Selyna's letters — world 1
 Arrive as a folded page on the board; the player taps to read. They track the
@@ -336,7 +367,7 @@ player's actual progress, so it reads as being watched.
 
 > **L3** (ch 7, 2nd name) — It has two names on that rock now. Two. Ask yourself when you last gave a thing a name instead of an entry number. — S.
 
-> **L4** (ch 8, 3rd region) — The old one is stirring. I can feel it from here, which ought to frighten you. She was awake, Eleanor. She has always been the problem with your version.
+> **L4** (ch 8, 3rd region) — The old one is stirring. I can feel it from here — that should frighten you. She was awake, Eleanor. She has always been the problem with your version.
 
 > **L5** (ch 9, post-finale) — Come north. Bring the stranger. Do not bring an explanation — I already have all of yours. — S.
 
@@ -344,9 +375,9 @@ player's actual progress, so it reads as being watched.
 Rare and heavy. Fired on communing taps, not on a timer. Her scarcity is the
 point — four lines across the rest of the game.
 
-> I do not sleep now. I have had enough of it, and there is nothing left on this rock that I want to miss.
+> I do not sleep now. I have had enough of sleep. There is nothing left on this rock that I want to miss.
 
-> You keep looking over at her when she cannot see you doing it. So do I, child. So do I.
+> You keep looking over at her when she cannot see you. So do I, child. So do I.
 
 > They are coming back one at a time. That is the correct speed. Nothing that goes out all at once should return all at once.
 
@@ -372,6 +403,7 @@ specified; what changes is that each one **selects a bank by chapter**.
 
 **One chapter pointer in `GameState`** (`story.chapter`, 1–12) selects every
 bank above and persists in the save. That single integer is the whole system.
+(`StorySystem` ships with the pointer and the chapter-2 gate live.)
 
 Gates should read existing state rather than new counters — regions restored,
 dragons named, Book entries, Trust, `order:completed` count are all either
@@ -380,4 +412,3 @@ shipped or specified in [merge-chains.md](merge-chains.md).
 **Chapter 1 is written** ([opening-scene.md](opening-scene.md)) and its beat 7
 is the model for all later reactions: she responds to what the player did, she
 never announces a chapter.
-</content>

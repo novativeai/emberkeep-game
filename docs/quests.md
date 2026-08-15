@@ -133,7 +133,7 @@ Five kinds, so the ladder has texture rather than twelve delivery orders:
 | Ch | Quest | Kind | Requirement | Reward | Real time |
 | --- | --- | --- | --- | --- | --- |
 | 1 | First Warmth | tutorial | the tutorial | — | 5 min |
-| 2 | The Cold Brazier | order | 2× Emberberry Preserve | 40 G · Regard 1 | ~20 min |
+| 2 | The Cold Fire Bowl | order | 2× Berry Jam | 40 G · Regard 1 | ~20 min |
 | 3 | The Cold Nest | nest | 9 pts, ≤3/day | **a dragon + a name** · Nest-shard | 3 days |
 | 4 | The Second Terrace | restore | Gold Key + **give** Eleanor the First Bloom | Regard 2 · region 2 | 1–2 days |
 | 5 | What It Likes | care | find the favourite, feed it 3× → Trust 2 | Trust 2 · first quartz · **letter** | 2 days |
@@ -141,23 +141,28 @@ Five kinds, so the ladder has texture rather than twelve delivery orders:
 | 7 | The Second Nest | nest | 9 pts in region 3 | **2nd dragon + name** · Regard 4 | 3 days |
 | 8 | The Third Gate | restore | 1× Crystal Ball → she forges the key | Regard 5 · region 3 | 2–3 days |
 | 9 | The Golden Altar | care+order | **1 adult dragon** + the golden order | **the Elder wakes** · south opens | 5+ days |
-| 10 | Provisions for the Road | order | every dragon fed, ledger closed | the journey south | 1 day |
-| 11 | The Long Record | order | search the Hold's records | north opens | 1–2 days |
+| 10 | Pack for the Trip | order | every dragon fed, ledger closed | the journey south | 1 day |
+| 11 | Find the Last Page | order | search the Hold's records | north opens | 1–2 days |
 | 12 | Her Dragons | care | Selyna Regard 3, caring for **her** dragons | the terms | 4–5 days |
 
 Floor: **~25 days**, and that is a player who never idles. The two Cold Nests
 and the five well-fed days for the adult are hard multi-session gates that no
 amount of stockpiling compresses (merge-chains §4).
 
+**The campaign currently ends after ch 12 into free play.** The resolution —
+Eleanor says the words, the Flame returns, Emberkeep wakes — is a deferred
+chapter for a later version. Chapter 12's closing beat promises nothing on a
+clock, so the deferral costs no broken promise.
+
 ## 4. Per chapter — the quest, and its coherence contract
 
 Each **contract** is the list of things that must be true the instant the
 conversation fires. These are the assertions the QA skill checks.
 
-### Ch 2 — The Cold Brazier
-> *"Two Preserves and that brazier lights. It has been cold since the last keeper left it, and I would very much like to stand next to it while it burns."*
+### Ch 2 — The Cold Fire Bowl
+> *"Two jars of Berry Jam and that fire bowl lights. It has been cold since the last keeper left, and I would very much like to stand next to it while it burns."*
 
-**Requires** 2× Emberberry Preserve, delivered **to the brazier on the terrace,
+**Requires** 2× Berry Jam, delivered **to the fire bowl on the terrace,
 not to Eleanor.** **Rewards** 40 G, 30 XP, Regard(Eleanor) 1.
 
 **Contract** — the delivery target was *the isle*, not her. Her opening line is
@@ -192,7 +197,10 @@ GIVE on a human rather than a dragon.
 hiding. Her scene needs a cold thing on screen that she can fail to light and the
 player can light, so the quest must place one and leave it unlit. She fails
 *first*, in front of them; the player succeeds second, with their own hands.
-Order matters — reversed, it is a party trick instead of a revelation.
+Order matters — reversed, it is a party trick instead of a revelation. Her
+closing bubble **voices the player's question before deflecting it** (*"You're
+wondering why it's you"*) — the Keeper is silent, so she must be seen asking on
+their behalf, and ch 8's opener calls this exact phrasing back.
 
 ### Ch 5 — What It Likes
 > *"It won't tell you what it likes. Nothing will. Try things, and write down the ones that stop it sulking."*
@@ -248,10 +256,10 @@ chapters 3 and 7.
 in her father's hand, a chapter before the player knows he exists as anything
 but a librarian.
 
-**Contract** — ch 4 has happened (she references it: *"you asked me why it's
-you"*), and the player has *just* lit something she stood next to and could
-not. The confession is triggered by a fresh, witnessed failure — hers — not by a
-timer.
+**Contract** — ch 4 has happened (she references it: *"You've been wondering
+why it's you"* — the question she voiced for the player there), and the player
+has *just* lit something she stood next to and could not. The confession is
+triggered by a fresh, witnessed failure — hers — not by a timer.
 
 ### Ch 9 — The Golden Altar
 > *"The altar wants a grown dragon's fire. Not a hatchling's. You will have to have raised one, and there is no way to hurry that, and I am sorry."*
@@ -269,7 +277,7 @@ quest the Growth axis exists for: the finale is gated on weeks of daily care,
 which is the strongest possible argument that the new direction's thesis works.
 The Elder then testifies and hands the verdict on Eleanor to the player.
 
-### Ch 10 — Provisions for the Road
+### Ch 10 — Pack for the Trip
 > *"Everything fed, everything closed. I am not leaving this isle half-warm to go and be uncomfortable in the south."*
 
 **Requires** every dragon fed today, the ledger cleared, keepsakes packed.
@@ -283,7 +291,7 @@ Her ch 1 promise, *"you'll hear it better when you're not standing in it,"* pays
 here **literally**: she tells the player everything the moment they are off the
 ash.
 
-### Ch 11 — The Long Record
+### Ch 11 — Find the Last Page
 > *"My family kept records. All of them. Somewhere in this house is the last page anybody wrote about my father, and I have not read it in fifty years."*
 
 **Requires** search the Hold's records (an order-style quest given by the Hold,
@@ -318,7 +326,7 @@ bug; a payoff with no setup is worse.**
 | Ch 1 | *"the ash under your hands went warm"* | Ch 8 — the Flame answers a Keeper's hands |
 | Ch 2 | *"When I ask you for moonwater…"* | Ch 6 — her first material order |
 | Ch 3 | *"I'll explain why that matters."* | Ch 7 |
-| Ch 4 | *"It isn't a knack and it isn't luck."* | Ch 8 — she names what it is |
+| Ch 4 | *"It isn't a trick and it isn't luck."* | Ch 8 — she names what it is |
 | Ch 5 | *"She never says what she wants."* | **Ch 12** — Selyna says it in one sentence |
 | Ch 6 | *"A sad story about a librarian and nothing else."* | Ch 9 / Ch 10 |
 | Ch 7 | *"Not tonight."* | Ch 10 |
@@ -327,6 +335,7 @@ bug; a payoff with no setup is worse.**
 | Ch 10 | *"You may say no."* | Ch 11–12 |
 | Ch 11 | Selyna: *"I never once put it down."* | Ch 12 — her terms |
 | Marginalia | *"Entry left blank. I know what goes here."* | Ch 10 — the blank is the Keeping |
+| Marginalia | *"Awake is not the same as warm."* | Ch 10 — the Lantern's stakes, said plainly |
 
 ## 6. One line changed for coherence
 
@@ -342,6 +351,32 @@ makes the next line's *"unasked"* literal rather than figurative:
 Applied to `script-chapters.md`. It is a better line than the one it replaced,
 which is the usual result of auditing dialogue against what the player actually
 just did.
+
+**2026-08-15 — the kid-clarity register pass, and three coherence fixes.**
+The whole script was re-registered for the 8–13 target under
+[naming.md](naming.md) §7 (shorter sentences, no idioms, no stumble words;
+reveals, promises and gates untouched). Three line-level fixes rode along:
+
+1. **Ch 4 now voices the player's question** — *"You're wondering why it's
+   you. Don't ask me yet."* — so ch 8's opener (*"You've been wondering why
+   it's you"*) calls back to a question that was actually seen being asked.
+   The silent Keeper never asks; Eleanor must ask for them. (The line's
+   wording also moved from "knack" to "trick" — the flagged-canon lie is the
+   same lie.)
+2. **The ch 8 hinge is now paid in plain words, on schedule.** *"Ask me who
+   else did that"* was subtext-only — an adult gasps, a ten-year-old blinks.
+   The Elder's testimony gained one bubble (*"He needed her hands for what his
+   own could not do… Look at your own hands, child, and understand her"*) and
+   ch 10 gained the plain statement (*"That's what I did to you"*). Reveal
+   order is unchanged: suspicion in 8, testimony in 9, confession in 10.
+3. **The Lantern's stakes are stated once, plainly** — ch 10: *"waking isn't
+   warming"* — answering the question every player will ask ("why not just
+   wake them all ourselves?"), seeded early by the new marginalia fragment
+   *"Awake is not the same as warm."* Both rows are in §5.
+
+Ch 10 also lost its hardest adult-introspection line (*"whether that makes it
+better, or whether it's just the last excuse I've got left"*) — the content
+survives in the surrounding bubbles; the register does not.
 
 ## 7. Coherence rules for authoring more
 

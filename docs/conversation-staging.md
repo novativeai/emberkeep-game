@@ -98,20 +98,20 @@ Camera moves only where the text presupposes a sight. Blank = no move.
 ### Chapters 2–8 — Eleanor
 | Ch | Beat | Face | Camera |
 | --- | --- | --- | --- |
-| 2 | *"the first thing anyone has given back…"* | `happy` | the lit brazier |
+| 2 | *"the first thing anyone has given back…"* | `happy` | the lit fire bowl |
 | 2 | *"my craft isn't a large one"* | `neutral` | |
 | 2 | *"the moon does the same trick"* | `neutral` | |
 | 2 | *"somebody else lit first"* | `worried` | |
 | 3 | *"Wait — you're naming it?"* | `surprised` | the nest |
-| 3 | *"…Yes. Do. Out loud"* | `happy` | |
+| 3 | *"…Yes. Do. Say it out loud"* | `happy` | |
 | 3 | *"they didn't die, you know"* | `determined` | |
 | 3 | *"names are the one thing nobody thought to take"* | `worried` | |
 | 4 | *"I'd rather you saw it than took my word"* | `neutral` | to the dead ember |
 | 4 | *"That ember there, the dead one. Watch."* | `determined` | hold, close |
-| 4 | *"I cannot raise a spark. Not once. Not ever."* | `sad` | hold — **she fails on screen** |
+| 4 | *"I can't raise one spark. Not once. Not ever."* | `sad` | hold — **she fails on screen** |
 | 4 | *"Now you. Go on."* | `neutral` | |
-| 4 | *"…There. That is the whole of the difference"* | `surprised` | **the ember lights** |
-| 4 | *"it isn't a knack and it isn't luck"* | `worried` | back to the board |
+| 4 | *"…There. That's the whole difference between us."* | `surprised` | **the ember lights** |
+| 4 | *"it isn't a trick and it isn't luck"* | `worried` | back to the board |
 | 5 | *"That's my sister. Selyna."* | `neutral` | |
 | 5 | *"she has never once said what"* | **`angry`** ①  | |
 | 5 | *"No — don't. That's the whole of it"* | `worried` | |
@@ -124,7 +124,7 @@ Camera moves only where the text presupposes a sight. Blank = no move.
 | 7 | *"It was called the Keeping."* | `sad` | **push in, slow** |
 | 7 | *"that is not a coincidence, what I've been calling you"* | `worried` | |
 | 7 | *"I stopped lying about the word"* | `determined` | |
-| 8 | *"I gave you a mage's answer"* | `neutral` | |
+| 8 | *"You've been wondering why it's you. I let you wonder."* | `neutral` | |
 | 8 | *"It was never luck. I knew what you were."* | `determined` | |
 | 8 | *"The Flame answers a Keeper's hands"* | `neutral` | the Long Hearth, now burning |
 | 8 | *"I spent sixty years looking for one"* | `sad` | |
@@ -144,17 +144,18 @@ stillness is the characterisation. Direction instead:
 ### Chapters 10–12
 | Ch | Beat | Speaker | Face | Camera |
 | --- | --- | --- | --- | --- |
-| 10 | *"you didn't ask me a single question"* | eleanor | `sad` | the Hold, arriving |
-| 10 | *"unasked, and before I want anything"* | eleanor | `determined` | |
+| 10 | *"you didn't ask me one question the whole way south"* | eleanor | `sad` | the Hold, arriving |
+| 10 | *"before I ask you for anything"* | eleanor | `determined` | |
 | 10 | *"my father held the vessel. I filled it."* | eleanor | `neutral` | |
-| 10 | *"whether that makes it better"* | eleanor | `sad` | |
 | 10 | *"he walked out with the Lantern"* | eleanor | `neutral` | |
 | 10 | *"and I let him… I was nineteen"* | eleanor | `sad` | |
+| 10 | *"That's what I did to you. I've known it every single day."* | eleanor | `sad` | hold on her |
+| 10 | *"waking isn't warming"* | eleanor | `neutral` | — a rules line, delivered flat |
 | 10 | *"you may say no"* | eleanor | `determined` | |
 | 10 | *"the only thing I have left that's mine"* | eleanor | `worried` | |
 | 11 | *"North. My sister has it."* | eleanor | `worried` | |
 | 11 | *"add it to the list and come north anyway"* | eleanor | `sad` | |
-| 11 | *"So you're the one it let in."* | **selyna** | `neutral` | **her first appearance — see §6** |
+| 11 | *"So you're the one with the hands."* | **selyna** | `neutral` | **her first appearance — see §6** |
 | 11 | *"I've had time to find that funny"* | selyna | `neutral` | |
 | 11 | *"nobody's careful with me who hasn't been told"* | selyna | `determined` | |
 | 11 | *"I'm the one who carried it while she read"* | selyna | `angry` | |
@@ -162,7 +163,7 @@ stillness is the characterisation. Direction instead:
 | 12 | *"you've spent a season warming a graveyard"* | selyna | `neutral` | |
 | 12 | *"I don't want a riddle. I want one thing."* | selyna | `determined` | |
 | 12 | *"she says it out loud"* | selyna | `determined` | |
-| 12 | *"stop looking at me as though it were"* | selyna | `sad` | |
+| 12 | *"Stop looking at me like it is."* | selyna | `sad` | |
 | 12 | *"let's see whether a stranger was what she was missing"* | selyna | `worried` | |
 
 ## 5. Bank staging
@@ -170,16 +171,16 @@ stillness is the characterisation. Direction instead:
 | Bank | Face | Note |
 | --- | --- | --- |
 | Ledger I–II | `neutral`, one `happy` per stage | brisk |
-| Ledger III | `neutral`, *"frightens me slightly"* → `worried` | |
+| Ledger III | `neutral`, *"it just scares me a little"* → `worried` | |
 | Ledger IV | `neutral`, *"you're still here"* → `worried` | |
 | Ledger V | `neutral`, *"I've started being able to say the word"* → `sad` | |
-| Ledger VI | *"my sister says that about weather"* → **`laughing`** — the campaign's only one | the first lightness after the confession |
+| Ledger VI | *"she says that about everything"* → **`laughing`** — the campaign's only one | the first lightness after the confession |
 | Day-phase early/mid | `neutral` throughout | ambience must not emote |
 | Day-phase late | dusk *"she said the light was honest then"* → `sad`; night *"warmer at midnight"* → `happy` | |
 | Naming, 1st dragon | `surprised` → `happy` → `happy` | |
 | Naming, 2nd+ | closing line → `happy`; the single relief face is spent elsewhere | ch 7's weight follows immediately |
 | Trust 1–3 | `happy` | |
-| Trust 4–5 | `determined` | *"they do that for people"* |
+| Trust 4–5 | `determined` | *"they follow their people"* |
 | Elder, post-wake | `rest` only | she does not emote |
 
 **Reserved-face check:** `laughing` fires exactly once (Ledger VI). `angry` fires
