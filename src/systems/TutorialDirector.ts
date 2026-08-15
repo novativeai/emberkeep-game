@@ -108,6 +108,12 @@ export class TutorialDirector {
     bus.on('generator:skipped', ({ chain, currency }) =>
       this.onGateEvent('generator:skipped', chain, currency)
     );
+    // The same lesson as the House's skip, aimed at the one wait that is an
+    // animal: paying a sleeping dragon awake. No chain — there is only ever one
+    // named dragon being asked to cross.
+    bus.on('dragon:sleep_skipped', ({ currency }) =>
+      this.onGateEvent('dragon:sleep_skipped', undefined, currency)
+    );
     bus.on('marketplace:purchased', () => this.onGateEvent('marketplace:purchased'));
     bus.on('order:completed', () => this.onGateEvent('order:completed'));
     bus.on('region:unlocked', () => this.onGateEvent('region:unlocked'));
@@ -168,19 +174,28 @@ export class TutorialDirector {
    *
    * Most effects are grants — a spawn, some XP, a key — and their results are in
    * the save, which is why `advance()` runs them once and `begin()` does not.
-   * Three are not grants. `nameDragon` opens a prompt, `wantGift` stages a want
-   * that is deliberately never persisted, and `openCodex` opens a panel; none
-   * leaves anything behind for a reload to find. A step gated on answering a
-   * prompt — or on turning a page of a book that is not on screen — is a dead
-   * save, so those three are re-applied on resume.
+   * Four are not grants. `nameDragon` opens a prompt, `wantGift` stages a want
+   * that is deliberately never persisted, `openCodex` opens a panel, and
+   * `sleepDragon` opens a sleep window that (like every schedule in
+   * DragonLifeSystem) survives nothing; none leaves anything behind for a
+   * reload to find. A step gated on answering a prompt — or on turning a page
+   * of a book that is not on screen, or on waking a dragon that came back
+   * standing — is a dead save, so those four are re-applied on resume.
    *
-   * All three are idempotent by construction: `nameDragon` looks for a dragon
-   * with no name yet, `wantGift` overwrites the single scripted want, and
-   * `openCodex` re-opens a panel that is either already open or shut.
+   * All four are idempotent by construction: `nameDragon` looks for a dragon
+   * with no name yet, `wantGift` overwrites the single scripted want,
+   * `openCodex` re-opens a panel that is either already open or shut, and
+   * `sleepDragon` overwrites the one scripted window.
    */
   private replayPrompts(step: TutorialStepConfig | undefined): void {
     for (const effect of step?.effects ?? []) {
-      if (!('nameDragon' in effect) && !('wantGift' in effect) && !('openCodex' in effect)) continue;
+      if (
+        !('nameDragon' in effect) &&
+        !('wantGift' in effect) &&
+        !('openCodex' in effect) &&
+        !('sleepDragon' in effect)
+      )
+        continue;
       try {
         this.applyEffect(effect);
       } catch (err) {
@@ -272,6 +287,8 @@ export class TutorialDirector {
         this.bus.emit('generator:set_timer', effect.setTimer);
       } else if ('wantGift' in effect) {
         this.bus.emit('tutorial:want_gift', effect.wantGift);
+      } else if ('sleepDragon' in effect) {
+        this.bus.emit('tutorial:sleep_dragon', effect.sleepDragon);
       } else if ('openCodex' in effect) {
         // The book opens ITSELF for the lesson — UIScene owns the panel and
         // plays the favourite-meal reveal the previous beat's feed earned.

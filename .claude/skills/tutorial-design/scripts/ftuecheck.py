@@ -29,6 +29,9 @@ GATE_REQUIRES: dict[str, list[str]] = {
     "item:harvested": ["tapGenerators"],
     "chest:open": ["tapGenerators"],
     "generator:skipped": ["tapGenerators"],
+    # Paying a sleeping dragon awake goes through the same tap that offers any
+    # other skip, so it needs the same verb.
+    "dragon:sleep_skipped": ["tapGenerators"],
     "dragon:working": ["dragonWork", "drag"],
     "region:unlocked": ["fog"],
     "marketplace:purchased": ["marketplace"],

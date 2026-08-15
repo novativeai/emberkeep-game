@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { TextureFactory, UI_TEXTURE_PARAMS } from '../art/TextureFactory';
 import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, PALETTE } from '../core/Constants';
-import { bodyMotions, CHARACTER_RIGS, faceMotions } from '../render/characterCatalog';
 import { BUILTIN_SEQUENCES } from '../render/sequenceCatalog';
 import type { CustomUiManager } from './customUi';
 import { applyUiReplacements, ensureSequenceTextures, repaintTextureWith, sequenceFrameKey, uiRegistry, uploadKey, type UiElementInfo, type UiElementPatch } from './theme';
@@ -758,13 +757,9 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
         }))
       ],
       history: { undo: undoStack.length, redo: redoStack.length },
-      characters: Object.entries(CHARACTER_RIGS).map(([id, c]) => ({
-        id,
-        label: c.label,
-        thumb: thumb(c.thumbTexture),
-        bodies: bodyMotions(),
-        faces: faceMotions(id)
-      })),
+      // The character rail is empty: it listed pin-rigged dragons, and the
+      // rigs are gone. Kept as a field so the tool's client needs no change.
+      characters: [],
       doc: uiRegistry.exportDoc()
     });
   };
@@ -781,13 +776,6 @@ export function initUiEdit(scene: Phaser.Scene, customUi: CustomUiManager): void
    *  by the drop handler). Mirrors the double-click "+ …" defaults. */
   const layerFromPayload = (payload: { kind: string; id?: string; name?: string; key?: string; loop?: boolean }): CustomLayer | null => {
     switch (payload.kind) {
-      case 'character':
-        return {
-          kind: 'rig', name: '', x: 0, y: 0, scale: 0.35,
-          character: payload.id ?? 'dragon-red', body: 'idle',
-          face: faceMotions(payload.id ?? 'dragon-red').includes('blink') ? 'blink' : 'none',
-          facing: 'left'
-        };
       case 'sequence':
         // Built-in banks end on an idle; default loop:false so they play
         // through once and rest there. The payload carries the sequence default.

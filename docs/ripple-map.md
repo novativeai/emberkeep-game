@@ -22,6 +22,7 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | drag:dropped | BoardScene | MergeSystem |
 | item:tapped | BoardScene | GeneratorSystem, UIScene (tooltip) |
 | generator:skip | BoardScene | GeneratorSystem |
+| dragon:sleep_skip | BoardScene (the SAME two skip buttons, `showSkipButton(kind:'sleep')`) | DragonLifeSystem (charges, clears a shift-rest via `jobs.clearRest`, opens the keepAwake window) |
 | dragon:work | BoardScene | DragonJobSystem |
 | fog:tapped | BoardScene | UnlockSystem |
 | chest:open | BoardScene | ChestSystem, TutorialDirector (gate) |
@@ -69,6 +70,7 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | chest:claimed | ChestSystem | BoardScene |
 | dragon:working | DragonJobSystem | TutorialDirector (gate) — BoardScene animates in startDragonWork, not via this event |
 | dragon:rest / dragon:rested | DragonJobSystem | BoardScene |
+| dragon:sleep_skipped | DragonLifeSystem | BoardScene (the flourish only — the uncurl arrives as the ordinary `dragon:mood` change) |
 | energy:changed | EnergySystem, BoardSystem | Hud, Save |
 | economy:changed | EconomySystem, BoardSystem | Hud, AudioManager, Save |
 | keeper:leveled | EconomySystem | UnlockSystem (level regions lift), RewardSystem (Gold + refill + **chest from level 3**), BoardScene (camera fly to the opened region — skipped for perk-only levels and for the altar's level pre-awakening), UIScene (banner), AudioManager |
@@ -81,7 +83,7 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | region:unlock_failed | UnlockSystem | BoardScene |
 | marketplace:purchased | ShopPanel | TutorialDirector (gate) |
 | tutorial:step | TutorialDirector | BoardScene (allow-list, highlights, camera nudges), UIScene (bubble, hand, arrow), Save |
-| state:loaded | SaveSystem | BoardScene (fullResync), EnergySystem (offline regen), OrderSystem, GeneratorSystem (banks ≤3 offline passive cycles → `lastOfflineGifts`), UIScene (welcome-back card reads offlineMs/energyRecovered + lastOfflineGifts) |
+| state:loaded | SaveSystem | BoardScene (fullResync — or a full REBUILD when the save restored a different `activeWorld` than the scene was cut for), EnergySystem (offline regen), OrderSystem, GeneratorSystem (banks ≤3 offline passive cycles → `lastOfflineGifts`), UIScene (welcome-back card reads offlineMs/energyRecovered + lastOfflineGifts) |
 | game:reset | GameContext | UIScene, DragonJobSystem |
 | **ORPHANS** (emitted, zero subscribers — safe to consume, don't assume anyone hears them): | | `state:saved`, `order:all_done` |
 
@@ -361,6 +363,10 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   HAPPENS IN THE AIR: `dragon:mood` asleep while busy/airborne only records the
   mood, and `dragonIdle` — the one door onto the tile — seats the curl-up
   (`seatDragonSleep`, `sleepState`); the wake path only undoes a SEATED sleep.
+  A dragon is built wearing the mood the SYSTEM already holds (`attachDragon`
+  ends by asking `moodOf`, seating an ongoing sleep with `instant`): `dragon:mood`
+  fires on CHANGE only and DragonLifeSystem's memory outlives a `scene.restart()`,
+  so a scene that waited for the push came back showing a sleeper standing up.
   The dragon's grounded REST is the video-ingested `idle` clip (`dragonIdle`
   plays it on attach, wake, post-roar and every touchdown — the rig idle only
   without it) and EVERY bellow is the `roar` clip (`playRoarClip`: the hungry
@@ -608,6 +614,20 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   TutorialDirector. Removing items programmatically mid-tutorial can strand a gate.
 - `state:loaded` → BoardScene.fullResync destroys/rebuilds ALL sprites + rigs. Anything
   holding a BoardItem reference across it is stale.
+- **`state:loaded` CAN CHANGE THE WORLD.** BoardScene builds itself for
+  `state.worldId` and only `create()` cuts tiles/backdrop/fog/portals; but the
+  load runs LATER (UIScene.create → `beginRun`) and `hydrate` restores
+  `activeWorld` through `switchWorld`, a state call that emits nothing —
+  `world:switched` belongs to WorldSystem's travel flow. So the handler compares
+  `state.worldId` against `builtWorld` and REBUILDS (fetchWorldArt → restart)
+  rather than resyncing. Without that, a save written in Borealis came back as
+  the isle's ground wearing the north's pieces. Any new "reload state under a
+  live scene" path owes the same check.
+- **Loading never superposes.** `hydrateBoards` files each saved piece under
+  `place.world` (not the save section it sits in) and `placeAtSavedCell` refuses
+  an occupied or unindexable cell, nudging through the re-grid recovery and
+  banking as the last resort. ONE PIECE PER CELL is assumed by merging,
+  dragging, the grid reverse lookup and every hit test.
 
 ## 4. Cold-start read order (new session, zero context)
 

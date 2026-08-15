@@ -1741,6 +1741,40 @@
       }
     },
     {
+      "id": "gate_wake",
+      "speaker": "eleanor",
+      "text": "The gate is open — and {dragon} is fast asleep. Nothing crosses curled up. Tap her and pay the gold to rouse her; time is the only other way, and the gate will not wait.",
+      "gate": {
+        "type": "event",
+        "event": "dragon:sleep_skipped",
+        "currency": "gold"
+      },
+      "effects": [
+        {
+          "setTimer": {
+            "chain": "ember_dragon",
+            "tier": 3,
+            "remainingMs": 0
+          }
+        },
+        {
+          "sleepDragon": {
+            "ms": 90000
+          }
+        }
+      ],
+      "arrow": {
+        "tile": {
+          "chain": "ember_dragon",
+          "nth": 0,
+          "tier": 3
+        }
+      },
+      "allow": {
+        "tapGenerators": true
+      }
+    },
+    {
       "id": "golden_tease",
       "speaker": "eleanor",
       "text": "This is what I kept. Look west — a GOLDEN egg on the old altar, asleep since the Great Flame went out. See how it stirs at your coming. I know its story. Not yet.",

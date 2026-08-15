@@ -853,7 +853,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'ui:codex_closed' | 'ui:codex_dragon_opened' | 'ui:codex_evolution_opened' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'ui:codex_closed' | 'ui:codex_dragon_opened' | 'ui:codex_evolution_opened' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'dragon:sleep_skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number }
   /** A piece of `chain` CARRIED into `region` — the board-hygiene lesson. The
    *  gate is the drop landing inside the named region's tiles, so a wiggle on
@@ -989,6 +989,20 @@ export type TutorialEffect =
    * The effect is idempotent — an already-open Codex ignores it.
    */
   | { openCodex: { reveal?: 'favourite'; page?: 'roster' | 'detail' | 'evolution' } }
+  /**
+   * Curl the first NAMED board dragon up for `ms` — a sleep the script asked
+   * for, rather than one the sky or a shift produced.
+   *
+   * The tutorial otherwise suppresses sleep entirely (`moodOf`), and for good
+   * reason: its scripted `advanceClock` jumps land in night and nap windows at
+   * random, and a lesson whose subject curls up under the arrow soft-locks. A
+   * SCRIPTED sleep is the opposite of that — it happens exactly where a beat
+   * puts it, and the beat that puts it there is the one teaching the player how
+   * to end it. Nothing persists it, so it is replayed on resume with the other
+   * prompt effects; a beat gated on waking a dragon that a reload left standing
+   * would be a dead save.
+   */
+  | { sleepDragon: { ms: number } }
   /** Open the naming prompt on the first board dragon of this chain+tier. The
    *  panel is not dismissible, so this is only ever authored on a step whose
    *  gate is the naming itself. */
@@ -1250,6 +1264,24 @@ export interface EventMap {
   'dragon:working': { dragonId: number; houseId: number };
   'dragon:rest': { dragonId: number };
   'dragon:rested': { dragonId: number };
+  /**
+   * Intent: PAY to end the sleep this dragon is in — the same two buttons, the
+   * same scaling price, as skipping any generator's wait.
+   *
+   * Its own command rather than `generator:skip` because the two timers are
+   * owned by different systems and can be running at once (a dragon asleep
+   * mid-cooldown): one event routed by "what happens to be ticking" would sell
+   * the player whichever the handler looked at first. DragonLifeSystem owns
+   * sleep, so it owns this.
+   */
+  'dragon:sleep_skip': { itemId: number; currency: 'gold' | 'warmth' };
+  /** Intent (TutorialDirector → DragonLifeSystem): put the first named board
+   *  dragon down for `ms`, whatever the tutorial's blanket suppression says.
+   *  See the `sleepDragon` effect for why the script is allowed to override it. */
+  'tutorial:sleep_dragon': { ms: number };
+  /** Fact: the sleep was bought off. The wake itself still arrives as the
+   *  ordinary `dragon:mood` change — this is only the flourish's cue. */
+  'dragon:sleep_skipped': { itemId: number; currency: 'gold' | 'warmth' };
   'ui:ledger_toggled': { open: boolean };
   /** The Keeper's Store opened/closed. */
   'ui:store_toggled': { open: boolean };
@@ -1468,7 +1500,7 @@ export interface EventMap {
   };
   /** It turned its head away — the chain is this breed's refusal, or it is not
    *  food at all. Nothing was consumed. */
-  'dragon:refused': { itemId: number; chain: string; reason: 'dislike' | 'not_food' };
+  'dragon:refused': { itemId: number; chain: string; reason: 'dislike' | 'not_food' | 'asleep' };
   /** This cycle's gauge reached FULL — a well-fed cycle, credited once per
    *  cycle into the lifetime count the Codex shows. `needed` is the breed's
    *  evolution bar (WELL_FED_EVOLUTION), 0 when the breed has none. */

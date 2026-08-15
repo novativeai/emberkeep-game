@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import tutorial from '../../src/data/tutorial.json';
+import { skipEnergyCost } from '../../src/core/Constants';
 import type { TutorialAllow, TutorialStepConfig } from '../../src/core/types';
 import { capture, createTestContext } from './helpers';
 
@@ -18,6 +19,9 @@ const GATE_REQUIRES: Record<string, Array<keyof TutorialAllow>> = {
   'item:harvested': ['tapGenerators'],
   'chest:open': ['tapGenerators'],
   'generator:skipped': ['tapGenerators'],
+  // Paying a sleeping dragon awake goes through the tap that offers any other
+  // skip, so it needs the same verb.
+  'dragon:sleep_skipped': ['tapGenerators'],
   'dragon:working': ['dragonWork', 'drag'],
   'region:unlocked': ['fog'],
   'marketplace:purchased': ['marketplace'],
@@ -205,5 +209,72 @@ describe('the Codex lesson walks the book', () => {
     ctx.state.tutorialIndex = stepAt('codex_cycles');
     ctx.systems.tutorial.begin();
     expect(asked).toEqual([{ page: 'evolution' }]);
+  });
+});
+
+/**
+ * THE CROSSING — the one sleep the tutorial allows.
+ *
+ * The gate to the hub blooms on the Brazier delivery and the named hatchling
+ * flies through it. She cannot cross curled up, so the beat between the two
+ * scripts her asleep and teaches the verb that ends any wait in this game:
+ * pay for it. Everything about it is deliberate — the sleep is scripted (a
+ * clock jump would land it wherever it liked), the beat is affordable out of
+ * the delivery it follows, and the flight waits for the wake rather than
+ * forcing it.
+ */
+describe('the gate_wake beat — a dragon paid awake for the crossing', () => {
+  const step = () => steps[stepAt('gate_wake')]!;
+
+  it('stands between the delivery that opens the gate and the tease that follows', () => {
+    expect(stepAt('gate_wake')).toBe(stepAt('ledger_deliver') + 1);
+    expect(stepAt('golden_tease')).toBe(stepAt('gate_wake') + 1);
+  });
+
+  it('scripts the sleep it asks the player to end', () => {
+    // Without this the beat waits on a dragon the tutorial keeps awake by rule
+    // (`moodOf` suppresses sleep for the whole script) — an unwinnable step.
+    const effects = step().effects ?? [];
+    const sleep = effects.find((e) => 'sleepDragon' in e) as { sleepDragon: { ms: number } };
+    expect(sleep?.sleepDragon.ms).toBeGreaterThan(0);
+    // …and clears her cooldown, or the tap would sell the GENERATOR's timer
+    // (checked first) and the beat's own gate would never hear about it.
+    expect(effects.some((e) => 'setTimer' in e && e.setTimer.chain === 'ember_dragon')).toBe(true);
+  });
+
+  it('puts her down, and the gold she was just paid covers waking her', () => {
+    const ctx = createTestContext();
+    const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.bus.emit('ui:dragon_named', { itemId: dragon.id, name: 'Ember' });
+    ctx.state.tutorialIndex = stepAt('gate_wake') - 1;
+    ctx.state.coins = 0;
+
+    // The delivery that opens the gate pays 25 Gold; the skip is capped at 20.
+    ctx.bus.emit('economy:add', { coins: 25, reason: 'test' });
+    ctx.bus.emit('order:completed', {
+      orderId: 'eleanor_brazier',
+      rewards: { coins: 0, keys: 0 }
+    });
+    expect(ctx.state.tutorialIndex).toBe(stepAt('gate_wake'));
+    expect(ctx.systems.dragonLife.asleep(dragon.id)).toBe(true);
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('scripted');
+
+    const timer = ctx.systems.dragonLife.sleepTimer(dragon.id)!;
+    expect(skipEnergyCost(timer.remaining, timer.total)).toBeLessThanOrEqual(ctx.state.coins);
+
+    ctx.bus.emit('dragon:sleep_skip', { itemId: dragon.id, currency: 'gold' });
+    expect(ctx.systems.dragonLife.asleep(dragon.id)).toBe(false);
+    expect(ctx.state.tutorialIndex).toBe(stepAt('golden_tease'));
+  });
+
+  it('re-scripts the sleep on resume — a reload must not leave her standing', () => {
+    // Nothing in DragonLifeSystem is persisted, so a save reloaded on this beat
+    // comes back to a dragon who is awake and a gate that can never fire.
+    const ctx = createTestContext();
+    const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 1, row: 1, kind: 'item' });
+    ctx.bus.emit('ui:dragon_named', { itemId: dragon.id, name: 'Ember' });
+    ctx.state.tutorialIndex = stepAt('gate_wake');
+    ctx.systems.tutorial.begin();
+    expect(ctx.systems.dragonLife.asleep(dragon.id)).toBe(true);
   });
 });

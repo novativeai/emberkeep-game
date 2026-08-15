@@ -113,7 +113,7 @@ Orders are the **primary XP/Gold faucet**; the sandbox is where supply is made.
 | **Harvest** | tap a ready dragon | its produce onto a free tile within 3 tiles (costs Warmth, starts a nap) | she digs you a pebble | **[L1]** |
 | **Passive gift** | wait — no tap, no Warmth | produce drops on its own every `passiveMs` | she works while you're away | **[L1]** |
 | **Skip** | tap a waiting timer → pay Gold (or 1.5× in Warmth) | the wait ends; price ∝ time remaining | impatience has a price | **[L1]** |
-| **Dragon job** | send a dragon to a House | every timer runs 2× per worker for 3 min, then she rests 5 min | a day's work | **[L1]** |
+| **Dragon job** | send a dragon to a House | every timer runs 2× per worker for 3 min, then she rests 5 min — **curled up the whole time**: no feeding, no hiring, no tap-harvest, and the tap offers the ordinary Gold/Warmth skip instead (`dragon:sleep_skip`, which also clears the rest) | a day's work | **[L1]** |
 | **Rekindle** | lift fog / merge onto an ash tile | ash → moss, warm-light bloom | warmth returns | **[L1]** fog; **[full]** per-tile |
 | **Cascade** | a merge output lands beside matching items | chain-reaction merge + bonus spark per step | the flame spreads | **[full]** |
 | **Shrine merge** | merge the chain's top tier | a passive **Flame Shrine** (idle producer) | a relic relit | **[full]** |
@@ -567,7 +567,7 @@ The live contract is **58 events** in `types.ts`; the adjacency table
 regenerate it after structural refactors rather than duplicating it here.
 
 **Intents (UI/scenes emit) [L1]:** `drag:dropped`, `item:tapped`, `fog:tapped`,
-`generator:skip`, `dragon:work`, `dragon:rest`, `elder:tapped`,
+`generator:skip`, `dragon:sleep_skip`, `dragon:work`, `dragon:rest`, `elder:tapped`,
 `chest:open`, `ui:ledger_toggled`, `ui:deliver_requested`, `ui:sell_requested`,
 `ui:shop_requested`, `ui:cookbook_opened`, `ui:cookbook_closed`,
 `tutorial:advance_requested`, `game:reset_requested`, `time:advanced`,

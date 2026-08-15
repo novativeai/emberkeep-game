@@ -44,6 +44,7 @@ Eleanor herself are all rows: they are live from the first frame.
 | Skip a timer with Gold | the skip popup, post-tutorial | `goldSkip` | popup offers both; Gold is the cheaper one |
 | Dragons work a generator | after `plank_merge` | `dragon_work` | ×2 per working dragon |
 | Dragons tire and go home | after `dragon_work` | `dragon_rest` | |
+| A sleeping dragon does nothing — and can be paid awake | the crossing, right after the Brazier delivery | `gate_wake` | the ONE sleep the tutorial allows (`sleepDragon`, 90 s), scripted so it lands where the lesson wants it rather than wherever a clock jump put it. Tapping a sleeper offers the same two buttons any wait does; the beat asks for the Gold one, which costs at most 20 against the 25 the delivery just paid. The Ember Gate flight WAITS for it (`playGateFlight`), so the wake is visibly what lets her cross |
 | Harvest from a dragon (job menu) | the Red Dragon | `gem_harvest` | tap → menu → Harvest. Moved off the Green Dragon when the Emerald ladder left the opening — the Red produces the same Gem Shards, and the beat now calls her by name |
 
 ## The economy

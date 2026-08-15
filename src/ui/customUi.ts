@@ -1,19 +1,12 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { UI_NINESLICE } from '../art/TextureFactory';
-import { CHARACTER_FACES, faceTextureKeyFor, loadCharacterRig } from '../render/characterCatalog';
-import { RigPlayer } from '../render/RigPlayer';
 import { PartAnimator, resolveSequence, stepSequence } from './partAnimator';
 import { uiRegistry } from './theme';
 import type { CustomLayer } from './themeCore';
 import { hexToNum } from './themeCore';
 
 const DEFAULT_DEPTH = 40; // above the HUD (10), below modal panels (60)
-
-interface LiveRigLayer {
-  layer: CustomLayer;
-  player: RigPlayer;
-}
 
 /** A playing PNG-sequence layer: an Image whose texture is swapped frame by
  *  frame on the scene clock, honouring each frame's own duration. */
@@ -30,7 +23,6 @@ interface LiveAnimLayer {
 interface LiveComponent {
   id: string;
   root: Phaser.GameObjects.Container;
-  rigs: LiveRigLayer[];
   anims: LiveAnimLayer[];
   objByName: Map<string, Phaser.GameObjects.GameObject>;
 }
@@ -55,7 +47,6 @@ export class CustomUiManager {
     // Elements registered BEFORE this manager existed re-apply so their saved
     // sequence patches attach (scenes construct components first).
     this.partAnimator.resyncAll();
-    // Rigs animate on the scene clock; talk loops re-arm if they ever run out.
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.tick, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       scene.events.off(Phaser.Scenes.Events.UPDATE, this.tick, this);
@@ -67,10 +58,6 @@ export class CustomUiManager {
 
   private tick(_t: number, delta: number): void {
     for (const comp of this.live.values()) {
-      for (const rig of comp.rigs) {
-        rig.player.update(delta);
-        if (rig.layer.face === 'talk') rig.player.playFaceIfIdle();
-      }
       for (const anim of comp.anims) {
         if (stepSequence(anim, delta) !== null) {
           const key = anim.frameKeys[anim.idx]!;
@@ -100,7 +87,7 @@ export class CustomUiManager {
     const root = this.scene.add.container(def.x, def.y).setDepth(def.depth ?? DEFAULT_DEPTH);
     root.setScale(def.scale ?? 1);
     if (def.visible === false) root.setVisible(false);
-    const comp: LiveComponent = { id, root, rigs: [], anims: [], objByName: new Map() };
+    const comp: LiveComponent = { id, root, anims: [], objByName: new Map() };
     this.live.set(id, comp);
     for (const layer of def.layers) this.buildLayer(comp, layer);
     this.syncZOrder(comp);
@@ -200,35 +187,15 @@ export class CustomUiManager {
       comp.anims.push({ layer, img, frameKeys, durations, idx: 0, elapsed: 0, loop: layer.loop !== false });
       return;
     }
-    // rig — a live animated character; loads async, degrades to nothing.
-    const character = layer.character ?? 'dragon-red';
-    void loadCharacterRig(this.scene, character).then((rig) => {
-      if (!rig || !comp.root.scene || this.live.get(comp.id) !== comp) return;
-      const player = new RigPlayer(this.scene, rig, (l) => `rig:${rig.character}:${l}`, {
-        scale: layer.scale ?? 0.3
-      });
-      const face = CHARACTER_FACES[rig.character];
-      if (face && layer.face && layer.face !== 'none') {
-        player.attachFace(this.scene, face, faceTextureKeyFor(rig.character));
-        if (layer.face === 'talk') player.playFace(Number.POSITIVE_INFINITY);
-      }
-      player.setFacing(layer.facing ?? 'left');
-      player.play(layer.body ?? 'idle');
-      player.container.setPosition(layer.x, layer.y);
-      player.container.setAlpha(layer.alpha ?? 1);
-      player.container.setAngle(layer.angle ?? 0);
-      if (layer.visible === false) player.container.setVisible(false);
-      comp.root.add(player.container);
-      comp.rigs.push({ layer, player });
-      comp.objByName.set(layer.name, player.container);
-      this.syncZOrder(comp); // async arrival — restore the authored stacking
-    });
+    // `rig` layers are gone with the pin rigs — every character is an
+    // Align-Studio clip sequence now, and no authored component used one
+    // (ui-theme.json carries no rig layer). An old doc that names one simply
+    // draws nothing rather than throwing.
   }
 
   destroyComponent(id: string): void {
     const comp = this.live.get(id);
     if (!comp) return;
-    for (const rig of comp.rigs) rig.player.destroy();
     comp.root.destroy();
     this.live.delete(id);
     uiRegistry.elements.delete(`custom.${id}`);

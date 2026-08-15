@@ -189,6 +189,12 @@ export class GameContext {
       save,
       tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial)
     };
+    // One sleep, asked for rather than re-derived. Both systems above are built
+    // BEFORE DragonLifeSystem (it reads them), so the rule they need — "is this
+    // dragon asleep?" — can only reach them as a back-reference wired here.
+    const sleeping = (itemId: number): boolean => this.systems.dragonLife.asleep(itemId);
+    dragons.asleep = sleeping;
+    jobs.asleep = sleeping;
     this.bus.on('game:reset_requested', () => this.resetGame());
   }
 

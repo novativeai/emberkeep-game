@@ -136,6 +136,23 @@ export function boardClipCharacters(data: CharacterAnimsData = CHARACTER_ANIMS):
 }
 
 /**
+ * Chains that have a live animal on the board — the question `DRAGON_RIGS` used
+ * to answer before the pin rigs were deleted.
+ *
+ * BoardScene asks it in three places that have nothing to do with animation:
+ * whether a generator can be worked by a dragon, whether a tap is a dragon tap,
+ * and whether a spawn gets the non-dragon flourish. Those all mean "is this
+ * chain an animal", and the clip roster is now the only place that knows.
+ */
+export function dragonChainsOf(data: CharacterAnimsData = CHARACTER_ANIMS): Set<string> {
+  const out = new Set<string>();
+  for (const c of Object.values(data.characters)) {
+    if (c.board) out.add(c.board.split(':')[0]!);
+  }
+  return out;
+}
+
+/**
  * The Phaser origin that puts the clip's bottom-centre at anchor + (dx, dy).
  * `flip` mirrors the registration for a right-facing play (source art faces
  * left, same single-flip convention the rigs use) — dx changes sign, so the

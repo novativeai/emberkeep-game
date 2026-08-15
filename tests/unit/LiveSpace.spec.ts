@@ -16,7 +16,7 @@ describe('liveSpaceFor', () => {
       [2560, 1600],
       [1920, 1200]
     ]) {
-      expect(liveSpaceFor(w, h, false)).toEqual({ w: GAME_WIDTH, h: GAME_HEIGHT });
+      expect(liveSpaceFor(w, h)).toEqual({ w: GAME_WIDTH, h: GAME_HEIGHT });
     }
   });
 
@@ -28,7 +28,7 @@ describe('liveSpaceFor', () => {
       [1440, 960], // 3:2
       [900, 1200] // tall desktop window
     ]) {
-      expect(aspectOf(liveSpaceFor(w, h, false))).toBeCloseTo(w / h, 2);
+      expect(aspectOf(liveSpaceFor(w, h))).toBeCloseTo(w / h, 2);
     }
   });
 
@@ -39,7 +39,7 @@ describe('liveSpaceFor', () => {
       [900, 1200],
       [1440, 960]
     ]) {
-      const s = liveSpaceFor(w, h, false);
+      const s = liveSpaceFor(w, h);
       expect(s.w).toBeGreaterThanOrEqual(GAME_WIDTH);
       expect(s.h).toBeGreaterThanOrEqual(GAME_HEIGHT);
       // Exactly one axis grows: the short one stays pinned.
@@ -48,26 +48,43 @@ describe('liveSpaceFor', () => {
   });
 
   it('a wider window is never a SHORTER space (16:9 keeps the full 1600)', () => {
-    expect(liveSpaceFor(1920, 1080, false)).toEqual({ w: 2844, h: GAME_HEIGHT });
-    expect(liveSpaceFor(1440, 960, false)).toEqual({ w: GAME_WIDTH, h: 1707 });
+    expect(liveSpaceFor(1920, 1080)).toEqual({ w: 2844, h: GAME_HEIGHT });
+    expect(liveSpaceFor(1440, 960)).toEqual({ w: GAME_WIDTH, h: 1707 });
   });
 
   it('clamps an absurd aspect rather than inflating the backing', () => {
-    const ultra = liveSpaceFor(5120, 1080, false); // 4.74:1
+    const ultra = liveSpaceFor(5120, 1080); // 4.74:1
     expect(aspectOf(ultra)).toBeCloseTo(2.4, 2);
-    const sliver = liveSpaceFor(400, 2000, false); // 1:5
+    const sliver = liveSpaceFor(400, 2000); // 1:5
     expect(aspectOf(sliver)).toBeCloseTo(1 / 2.4, 2);
   });
 
-  it('mobile is PORTRAIT whichever way the phone is held', () => {
-    const upright = liveSpaceFor(390, 844, true);
-    const onItsSide = liveSpaceFor(844, 390, true);
-    expect(upright).toEqual(onItsSide);
-    expect(upright.w).toBe(GAME_WIDTH);
-    expect(upright.h).toBeGreaterThan(GAME_HEIGHT);
+  // Phones. The rule used to special-case them into an always-portrait space,
+  // which is what forced the "rotate to portrait" overlay; these pin that the
+  // upright result did not change when that exception went away, and that a
+  // sideways phone now gets a space of its own instead of a nag.
+  it('an upright phone still gets the portrait space the old rule built', () => {
+    for (const [w, h] of [
+      [390, 844], // iPhone 14/15
+      [393, 852], // iPhone 15 Pro
+      [430, 932], // iPhone 15 Pro Max
+      [375, 667] // iPhone SE
+    ]) {
+      const s = liveSpaceFor(w, h);
+      expect(s.w).toBe(GAME_WIDTH); // width is pinned — the phone's short side
+      expect(s.h).toBe(Math.round(GAME_WIDTH * Math.min(2.4, h / w)));
+      expect(s.h).toBeGreaterThan(GAME_HEIGHT);
+    }
+  });
+
+  it('a phone held sideways gets a LANDSCAPE space, not a squeezed portrait one', () => {
+    const onItsSide = liveSpaceFor(844, 390);
+    expect(aspectOf(onItsSide)).toBeCloseTo(844 / 390, 2);
+    expect(onItsSide.h).toBe(GAME_HEIGHT); // height pinned now — it is the short side
+    expect(onItsSide.w).toBeGreaterThan(GAME_WIDTH);
   });
 
   it('caps the portrait space at 2.4x so a long phone cannot run the backing away', () => {
-    expect(liveSpaceFor(400, 4000, true).h).toBe(Math.round(GAME_WIDTH * 2.4));
+    expect(liveSpaceFor(400, 4000).h).toBe(Math.round(GAME_WIDTH * 2.4));
   });
 });

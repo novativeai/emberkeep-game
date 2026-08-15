@@ -69,10 +69,14 @@ export class Hud {
       onStore: () => void;
     }
   ) {
-    // Portrait phones magnify the HUD (pillScale) and spread the gauge row wider
-    // so the enlarged pills don't collide; desktop keeps its compact landscape row.
+    // Portrait phones magnify the HUD (pillScale) and lay the gauges out for the
+    // magnified size. At UI_SCALE a pill is ~1000 units wide, so THREE of them
+    // will not share a row across 2560 — Warmth and Gold take the top row and
+    // Keys drops to a second, which portrait has the height to spare for (Keys
+    // is hidden until the story grants one, so most of the game shows one row).
+    // Desktop keeps its compact landscape row.
     const L = IS_MOBILE
-      ? { energy: [330, 150], coin: [930, 150], key: [1530, 150], regen: [330, 280] }
+      ? { energy: [560, 190], coin: [1660, 190], key: [560, 620], regen: [560, 390] }
       : { energy: [224, 88], coin: [572, 88], key: [920, 88], regen: [224, 138] };
     this.energyPill = this.pill(L.energy[0], L.energy[1], 'ui_icon_bolt', `${state.energyCurrent}/${this.state.energyMax}`);
     // coin.png is a big detailed coin — shrink the icon ~85% so the Gold gauge
@@ -91,10 +95,13 @@ export class Hud {
       .setScale(this.pillScale)
       .setAlpha(0.9);
 
-    // Settings gear — top-right corner (nudged in on mobile for the fat pixels).
+    // Settings gear — top-right corner. The mobile inset is DERIVED from the
+    // magnification: the button scales about its own centre, so a fixed inset
+    // that suited 1.5x hangs its right half off the screen at 3x. 78·UI_SCALE
+    // keeps the disc clear of both edges at any scale.
     this.gearButton = this.roundIconButton(
-      LIVE_GAME_WIDTH - (IS_MOBILE ? 150 : 112),
-      IS_MOBILE ? 150 : 104,
+      LIVE_GAME_WIDTH - (IS_MOBILE ? 78 * UI_SCALE : 112),
+      IS_MOBILE ? 78 * UI_SCALE : 104,
       'ui_icon_gear',
       1,
       callbacks.onGear

@@ -53,6 +53,37 @@ const DRAG_SLOP = 12;
  */
 const HERO_H = ROW_GAP + CARD_H;
 const HERO_W = Math.round(HERO_H * 0.716);
+
+/**
+ * Bleed a painting across a plate WITHOUT distorting it.
+ *
+ * The card art is not one shape: the showcase portraits are ~0.71 (a physical
+ * trading card) while the shelf paintings are 16:9 scenes. `setDisplaySize` on
+ * both meant the 16:9 ones were squeezed nearly twice as narrow as painted, so
+ * every dragon but the one whose portrait happened to match its slot came out
+ * tall and thin.
+ *
+ * So: scale to FILL the plate's height, let the width fall where the aspect puts
+ * it, and crop the overhang out of the SOURCE rather than letting it spill past
+ * the plate. Cropping (not masking) because a mask lives in world space and this
+ * shelf scrolls and scales — the crop rides the image itself. The crop is
+ * centred, which is what these paintings want: the animal is in the middle and
+ * the spare sky is at the edges.
+ */
+function bleedArt(
+  scene: Phaser.Scene,
+  key: string,
+  boxW: number,
+  boxH: number
+): Phaser.GameObjects.Image {
+  const art = scene.add.image(0, 0, key);
+  const scale = boxH / art.height; // fill vertically
+  const fitsW = boxW / scale; // source pixels the plate's width can hold
+  if (fitsW < art.width) {
+    art.setCrop((art.width - fitsW) / 2, 0, fitsW, art.height);
+  }
+  return art.setScale(scale);
+}
 const HERO_GAP = 96;
 /** A section with a showcase card fits two ordinary columns beside it. */
 const HERO_COLS = 2;
@@ -224,16 +255,11 @@ export class StorePanel extends Phaser.GameObjects.Container {
     this.bus.emit('ui:store_toggled', { open: true });
   }
 
-  /** Tour accessors — page-space anchors for the walkthrough's pointer.
-   *  Null while the panel is closed, exactly like BagPanel's verb accessors. */
-  getTabPos(i: number): { x: number; y: number } | null {
-    if (!this.visible) return null;
-    const tab = this.tabsRow.list[i] as Phaser.GameObjects.Container | undefined;
-    if (!tab) return null;
-    const m = tab.getWorldTransformMatrix();
-    return { x: m.tx, y: m.ty };
-  }
-
+  /** Tour accessor — the page-space anchor for the walkthrough's ONE pointer.
+   *  Null while the panel is closed, exactly like BagPanel's verb accessors.
+   *  (There was a `getTabPos` beside it, for an arrow over each section tab in
+   *  turn; the tour names the shelves rather than asking for them, so the tabs
+   *  no longer point and it had no callers left.) */
   getClosePos(): { x: number; y: number } | null {
     if (!this.visible) return null;
     const m = this.closeBtn.getWorldTransformMatrix();
@@ -595,7 +621,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
     );
     card.add(plate.under);
     if (this.scene.textures.exists(item.art)) {
-      card.add(this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h));
+      card.add(bleedArt(this.scene, item.art, inner.w, inner.h));
     }
     card.add(addScrim(this.scene, inner.w, inner.h / 2 - 30, 30));
     // The sheen crosses the ART as well as the plate — a foil card whose gloss
@@ -676,7 +702,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
     if (this.scene.textures.exists(item.art)) {
       if (bleed) {
         const inner = { w: CARD_W - PLATE_INSET * 2, h: CARD_H - PLATE_INSET * 2 };
-        card.add(this.scene.add.image(0, 0, item.art).setDisplaySize(inner.w, inner.h));
+        card.add(bleedArt(this.scene, item.art, inner.w, inner.h));
         // Scrim under everything the player must read — from just above the
         // name down to the plate's foot, same treatment as the hero.
         card.add(addScrim(this.scene, inner.w, inner.h / 2 - 12, -12));

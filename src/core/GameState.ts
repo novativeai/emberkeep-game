@@ -24,6 +24,7 @@ import type {
   NestState,
   RegionStatus,
   SaveDataV1,
+  SavedBoardItem,
   SavedWorldBoard,
   TilePos
 } from './types';
@@ -250,17 +251,17 @@ export class GameState {
     // The default world's board is stored at the top level of the save, exactly
     // where it has always been — a save written before worlds existed is a save
     // of this world and loads with nothing to migrate.
-    this.hydrateBoard(WORLD_ID, {
-      mapSignature: save.mapSignature,
-      items: save.items,
-      nests: save.nests,
-      nestPlaces: save.nestPlaces
-    });
-    for (const [id, board] of Object.entries(save.boards ?? {})) {
-      if (id === WORLD_ID || !this.worlds.has(id)) continue;
-      this.hydrateBoard(id, board);
+    this.hydrateBoards(save);
+    // NEVER behind the board. A counter that has fallen below an id already on
+    // the board hands the next spawn a number something else is using, and the
+    // item map is keyed by id: the newcomer REPLACES a piece the player owns
+    // while the grid still points at it. That is one of the ways a board comes
+    // back looking scrambled, and it costs one max() to make impossible.
+    let maxId = 0;
+    for (const board of this.boards.values()) {
+      for (const id of board.items.keys()) maxId = Math.max(maxId, id);
     }
-    this.nextItemId = save.nextItemId;
+    this.nextItemId = Math.max(save.nextItemId, maxId + 1);
     // Only 'active' is the PLAYER'S state — the one runtime transition is
     // unlockable→active, so any other saved value is just an echo of the
     // authored status at save time. Letting it through would pin a region to a
@@ -299,24 +300,81 @@ export class GameState {
   }
 
   /**
+   * Load every world's board — each piece filed under the world it was SAVED
+   * ON, not under the section of the save it happened to be found in.
+   *
+   * The save's shape is historical: the authored world's board sits at the top
+   * level (where it was before travel existed) and every other world's under
+   * `boards`. That shape is fine, but it is not proof — `place.world` is what
+   * the piece itself says, written beside its art position for exactly this
+   * kind of question, and it is the only claim that cannot be broken by a
+   * section being written or read wrongly. A piece that names another world is
+   * routed there and resolved by its ART POSITION (its raw `(col,row)` indexed
+   * a grid that is not the one it is going to), so a mis-filed board sorts
+   * itself out on the next load instead of two worlds landing on one map.
+   */
+  private hydrateBoards(save: SaveDataV1): void {
+    const sections = new Map<string, SavedWorldBoard>();
+    // The home board always exists, even when it holds nothing: the game starts
+    // standing on it.
+    sections.set(WORLD_ID, {
+      mapSignature: save.mapSignature,
+      items: save.items,
+      nests: save.nests,
+      nestPlaces: save.nestPlaces
+    });
+    for (const [id, board] of Object.entries(save.boards ?? {})) {
+      if (id === WORLD_ID) continue; // a duplicate section would double the home board
+      sections.set(id, board);
+    }
+
+    const filed = new Map<string, { item: SavedBoardItem; regridded: boolean }[]>();
+    for (const [sectionId, section] of sections) {
+      for (const item of section.items ?? []) {
+        const claimed = item.place?.world;
+        const owner = claimed && this.worlds.has(claimed) ? claimed : sectionId;
+        const world = this.worlds.get(owner);
+        if (!world) continue; // a world this build no longer has: nothing to load it into
+        // A piece filed under the wrong section is BY DEFINITION on a stale
+        // grid, and this comparison says so without a special case: the
+        // signature it was written against belongs to a different world.
+        const regridded =
+          section.mapSignature !== undefined && section.mapSignature !== world.signature;
+        const list = filed.get(owner) ?? [];
+        list.push({ item, regridded });
+        filed.set(owner, list);
+      }
+    }
+
+    for (const [id, section] of sections) {
+      if (this.worlds.has(id)) this.hydrateBoard(id, section, filed.get(id) ?? []);
+    }
+    // A world nothing was saved UNDER but pieces were saved FOR still gets its
+    // board — the routing above is what put them there.
+    for (const [id, entries] of filed) {
+      if (sections.has(id) || !this.worlds.has(id)) continue;
+      this.hydrateBoard(id, { items: [] }, entries);
+    }
+  }
+
+  /**
    * Load one world's board. Positions come straight out of the save whenever
    * that world's geometry is the geometry they were written against; when it is
    * not, they are recovered from map space (see `placeByMapPoint`).
    */
-  private hydrateBoard(worldId: string, saved: SavedWorldBoard): void {
+  private hydrateBoard(
+    worldId: string,
+    saved: SavedWorldBoard,
+    entries: { item: SavedBoardItem; regridded: boolean }[]
+  ): void {
     const world = this.worlds.get(worldId);
     if (!world) return;
     const board = this.board(worldId);
-    // Does this save's grid still exist? Equal signature = the `(col,row)` in it
-    // still index the world being loaded, which is every load today. Different =
-    // the world was re-gridded under a save (new zones on the isle itself, a new
-    // tile size, a moved backdrop) and the cells are stale.
-    const regridded = saved.mapSignature !== undefined && saved.mapSignature !== world.signature;
-    for (const item of saved.items ?? []) {
+    for (const { item, regridded } of entries) {
       const { place, ...state } = item;
       const at = regridded
         ? this.placeByMapPoint(world, board, place, state)
-        : { col: state.col, row: state.row };
+        : this.placeAtSavedCell(world, board, place, state);
       if (!at) {
         // Its art position is on ground this world no longer has. Bank it rather
         // than delete it — a piece the player earned must never be the cost of
@@ -332,11 +390,42 @@ export class GameState {
     // Nests are keyed by cell, so on a re-grid the KEY has to move with the
     // cell — a nest left on a stale key is warming progress the player can no
     // longer reach. Its map point is stored beside it for exactly this.
+    const regridded = saved.mapSignature !== undefined && saved.mapSignature !== world.signature;
     board.nests = {};
     for (const [k, value] of Object.entries(saved.nests ?? {})) {
       const moved = regridded ? this.relocateKey(world, k, saved.nestPlaces?.[k]) : k;
       if (moved) board.nests[moved] = { ...value };
     }
+  }
+
+  /**
+   * The saved cell, when this world's grid is still the one that cell indexed —
+   * but NEVER on top of something already standing there.
+   *
+   * ONE PIECE PER CELL is the invariant the whole board rests on: merging,
+   * dragging, the grid's own reverse lookup and every hit test assume it, and
+   * the loader used to be the one place that did not enforce it. It wrote each
+   * saved piece straight into `items` and its id into `grid`, so two pieces
+   * claiming one cell BOTH survived while the grid remembered only the last —
+   * an invisible-to-the-rules piece drawn over a visible one, which is what a
+   * "messy superposed board" is made of. A save can carry that pair for
+   * reasons the loader cannot audit and should not have to; refusing to
+   * reproduce it costs one check.
+   *
+   * The displaced piece is nudged to the nearest free cell of its own zone
+   * through the same recovery a re-grid uses — its art position is right there
+   * in the save — and banked in the satchel only if that finds nothing.
+   */
+  private placeAtSavedCell(
+    world: WorldRuntime,
+    board: WorldBoard,
+    place: PersistedPlace | undefined,
+    state: BoardItemState
+  ): TilePos | null {
+    if (this.canOccupy(world, board, state.col, state.row)) {
+      return { col: state.col, row: state.row };
+    }
+    return this.placeByMapPoint(world, board, place, state);
   }
 
   /** One world's board, in the shape the save carries it. */
@@ -546,6 +635,12 @@ export class GameState {
    *  whole path exists to prevent. */
   private canOccupy(world: WorldRuntime, board: WorldBoard, col: number, row: number): boolean {
     if (!hasCell(world, col, row)) return false;
+    // The grid row must actually EXIST. `hasCell` answers for the world's cell
+    // registry, which a zone can extend past the row array (the Golden Altar is
+    // authored at (-2,2)); writing an id into a row that is not there throws,
+    // and a load that throws is a save the player cannot open at all. Banking
+    // the piece is the honest answer to ground this board cannot index.
+    if (!board.grid[row]) return false;
     return (board.grid[row]?.[col] ?? null) === null;
   }
 

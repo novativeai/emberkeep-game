@@ -2,6 +2,7 @@ import {
   DRAGON_HUNGER_GRACE_MS,
   DRAGON_NAP_CYCLE_MS,
   DRAGON_NAP_LENGTH_MS,
+  DRAGON_REST_MS,
   DRAGON_WANDER_ENABLED,
   DRAGON_SLEEP_GAP_MS,
   DRAGON_SLEEP_MAX_MS,
@@ -10,7 +11,10 @@ import {
   DRAGON_WANDER_MIN_DIST,
   DRAGON_WANDER_SPREAD_MS,
   HUNGRY_UNFED_EPS,
-  phaseAt
+  PHASE_MS,
+  phaseAt,
+  skipEnergyCost,
+  skipWarmthCost
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
@@ -64,6 +68,10 @@ export class DragonLifeSystem {
   /** Clock time the CURRENT sleep bout began, per dragon — cleared the moment
    *  it is awake again. The ceiling (DRAGON_SLEEP_MAX_MS) is measured off it. */
   private asleepSince = new Map<number, number>();
+  /** A sleep a tutorial beat ASKED for: `until` is when it lapses, `total` the
+   *  window it was given (what the skip price is scaled against). Transient
+   *  like every other schedule here — the beat replays it on resume. */
+  private scripted = new Map<number, { until: number; total: number }>();
 
   constructor(
     private state: GameState,
@@ -73,6 +81,8 @@ export class DragonLifeSystem {
     private jobs: DragonJobSystem
   ) {
     bus.on('time:advanced', () => this.tick());
+    bus.on('dragon:sleep_skip', ({ itemId, currency }) => this.onSleepSkip(itemId, currency));
+    bus.on('tutorial:sleep_dragon', ({ ms }) => this.putScriptedToSleep(ms));
     bus.on('item:removed', ({ itemId }) => this.forget(itemId));
     bus.on('game:reset', () => {
       this.nextWanderAt.clear();
@@ -80,6 +90,7 @@ export class DragonLifeSystem {
       this.lastMood.clear();
       this.awakeUntil.clear();
       this.asleepSince.clear();
+      this.scripted.clear();
     });
   }
 
@@ -89,6 +100,32 @@ export class DragonLifeSystem {
     this.lastMood.delete(itemId);
     this.awakeUntil.delete(itemId);
     this.asleepSince.delete(itemId);
+    this.scripted.delete(itemId);
+  }
+
+  /**
+   * A tutorial beat asks the first named dragon to lie down.
+   *
+   * It outranks the tutorial's own blanket suppression — see the `sleepDragon`
+   * effect — and it outranks a `keepAwake` window, because the beat that asks
+   * for it is the beat teaching the player to end it: a leftover cinematic hold
+   * would leave the lesson with a subject that will not sleep.
+   */
+  private putScriptedToSleep(ms: number): void {
+    const named = this.dragons.firstNamed();
+    if (!named) return;
+    this.awakeUntil.delete(named.itemId);
+    this.scripted.set(named.itemId, { until: this.clock.now() + ms, total: ms });
+    this.announceMood(named.itemId);
+  }
+
+  /** Is this dragon inside a scripted sleep window? */
+  private scriptedAsleep(itemId: number): boolean {
+    const s = this.scripted.get(itemId);
+    if (!s) return false;
+    if (this.clock.now() < s.until) return true;
+    this.scripted.delete(itemId);
+    return false;
   }
 
   /**
@@ -104,11 +141,88 @@ export class DragonLifeSystem {
    *
    * Null when awake (or hungry — a hungry dragon does not sleep through it).
    */
-  sleepKindOf(itemId: number): 'rest' | 'night' | 'nap' | null {
+  sleepKindOf(itemId: number): 'rest' | 'night' | 'nap' | 'scripted' | null {
     if (this.moodOf(itemId) !== 'asleep') return null;
+    if (this.scripted.has(itemId)) return 'scripted';
     if (this.jobs.restRemaining(itemId) > 0) return 'rest';
     if (phaseAt(this.clock.now()) === 'night') return 'night';
     return 'nap';
+  }
+
+  /** The one question every other system asks about sleep. Systems that own an
+   *  action a sleeper must not perform (feeding, hiring) hold a reference to
+   *  THIS rather than a rule of their own — there is one sleep in the game. */
+  asleep(itemId: number): boolean {
+    return this.sleepKindOf(itemId) !== null;
+  }
+
+  /**
+   * The wait this sleep still has to run, in the shape every skip offer takes.
+   *
+   * A sleep is a wait like a cooldown is a wait, so it is priced like one:
+   * `remaining/total` is the fraction the skip cost scales on. The totals are
+   * each sleep's own natural span — a shift's rest, a phase of sky, one doze —
+   * so the price reads honestly against what the player is actually buying off.
+   */
+  sleepTimer(itemId: number): { remaining: number; total: number } | null {
+    const kind = this.sleepKindOf(itemId);
+    if (!kind) return null;
+    const now = this.clock.now();
+    if (kind === 'scripted') {
+      const s = this.scripted.get(itemId)!;
+      return { remaining: Math.max(0, s.until - now), total: s.total };
+    }
+    if (kind === 'rest') {
+      return { remaining: this.jobs.restRemaining(itemId), total: DRAGON_REST_MS };
+    }
+    if (kind === 'night') {
+      const into = (((now % PHASE_MS) + PHASE_MS) % PHASE_MS);
+      return { remaining: PHASE_MS - into, total: PHASE_MS };
+    }
+    return { remaining: DRAGON_NAP_LENGTH_MS - this.napInto(itemId), total: DRAGON_NAP_LENGTH_MS };
+  }
+
+  /**
+   * Buy this sleep off — the same two currencies, the same scaling price, as
+   * any other wait on the board.
+   *
+   * A sleeping dragon is the one timed thing that used to have no way out: the
+   * rest was minutes long, its countdown sat over the animal's head, and the
+   * tap answered "let it rest". A wait the player cannot pay to end is the only
+   * kind this game does not have, and it read as the dragon being broken.
+   *
+   * The wake itself is NOT performed here. Every sleep is derived from a
+   * standing cause, so the only honest way to end one is to hold the animal
+   * awake past it — `keepAwake` — and let the ordinary mood path do the rest.
+   * A rest is additionally CLEARED, because its cause is a job record and a
+   * paid skip that left the dragon un-hireable would have sold nothing.
+   */
+  private onSleepSkip(itemId: number, currency: 'gold' | 'warmth'): void {
+    const kind = this.sleepKindOf(itemId);
+    const timer = this.sleepTimer(itemId);
+    if (!kind || !timer) return; // already awake — nothing to sell
+    if (currency === 'warmth') {
+      const cost = skipWarmthCost(timer.remaining, timer.total);
+      if (this.state.energyCurrent < cost) {
+        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
+        return;
+      }
+      this.bus.emit('energy:spend', { amount: cost, reason: 'skip_sleep' });
+    } else {
+      const cost = skipEnergyCost(timer.remaining, timer.total);
+      if (this.state.coins < cost) {
+        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
+        return;
+      }
+      this.bus.emit('economy:add', { coins: -cost, reason: 'skip_sleep' });
+    }
+    if (kind === 'rest') this.jobs.clearRest(itemId);
+    if (kind === 'scripted') this.scripted.delete(itemId);
+    // Long enough to outlast what was showing, and never shorter than the gap a
+    // capped bout earns on its own — a paid wake must not be the worse deal.
+    this.keepAwake(itemId, Math.max(timer.remaining, DRAGON_SLEEP_GAP_MS));
+    this.asleepSince.delete(itemId);
+    this.bus.emit('dragon:sleep_skipped', { itemId, currency });
   }
 
   /**
@@ -151,12 +265,25 @@ export class DragonLifeSystem {
    * ended the only way a derived state can be: by opening a `keepAwake` window
    * over it, which also buys the gap that stops the same standing cause
    * re-seating the animal on the very next tick.
+   *
+   * A SHIFT-REST is exempt, and that exemption is the whole point of the
+   * ceiling being here rather than in `moodOf`. The other two sleeps are
+   * ambience: nothing on screen says they are running, so capping them costs
+   * the player nothing and spares them a motionless board. A rest is a GATE —
+   * it wears a 💤 countdown over the animal's head and blocks hiring for its
+   * whole five minutes — and capping THAT produced the exact bug this comment
+   * exists to prevent: a dragon idling and flying about, plainly awake, under a
+   * sleep countdown, accepting food and work it should have refused. A rest now
+   * holds the sleeping pose for as long as it holds the dragon, and the player
+   * who will not wait buys it off (`onSleepSkip`).
    */
   private capSleepBout(itemId: number): void {
     if (this.moodOf(itemId) !== 'asleep') {
       this.asleepSince.delete(itemId);
       return;
     }
+    if (this.jobs.restRemaining(itemId) > 0) return;
+    if (this.scripted.has(itemId)) return; // the beat owns this one, start to end
     const since = this.asleepSince.get(itemId);
     if (since === undefined) {
       this.asleepSince.set(itemId, this.clock.now());
@@ -196,6 +323,9 @@ export class DragonLifeSystem {
   moodOf(itemId: number): DragonMood {
     const item = this.state.items.get(itemId);
     if (!item || !this.dragons.isBoardDragon(item)) return 'awake';
+    // A SCRIPTED sleep outranks everything, hunger included: a tutorial beat
+    // asked for it, and the same beat is teaching the player how to end it.
+    if (this.scriptedAsleep(itemId)) return 'asleep';
     if (this.isHungry(itemId)) return 'hungry';
     // The TUTORIAL never sleeps. Its beats point the hand at the dragon and
     // gate on her answering — a lesson whose subject curls up under the arrow
@@ -222,10 +352,16 @@ export class DragonLifeSystem {
    * reload, needs no save field, and stays reproducible under `advanceTime`.
    */
   private isNapping(itemId: number): boolean {
+    return this.napInto(itemId) < DRAGON_NAP_LENGTH_MS;
+  }
+
+  /** How far into its own nap cycle this dragon is, in ms. */
+  private napInto(itemId: number): number {
     const offset = Math.abs((itemId * 2654435761) >>> 0) % DRAGON_NAP_CYCLE_MS;
-    const into = (((this.clock.now() - offset) % DRAGON_NAP_CYCLE_MS) + DRAGON_NAP_CYCLE_MS) %
-      DRAGON_NAP_CYCLE_MS;
-    return into < DRAGON_NAP_LENGTH_MS;
+    return (
+      (((this.clock.now() - offset) % DRAGON_NAP_CYCLE_MS) + DRAGON_NAP_CYCLE_MS) %
+      DRAGON_NAP_CYCLE_MS
+    );
   }
 
   /**

@@ -63,8 +63,11 @@ declare global {
 }
 
 if (IS_MOBILE && 'orientation' in screen) {
-  // The game is portrait on mobile; best-effort lock (iOS ignores it — the
-  // #rotate-hint overlay in index.html covers the landscape-held case).
+  // Portrait is the intended way to hold the game, so ask for it — but only as
+  // a SILENT, best-effort lock. Where it is honoured the phone simply stays
+  // upright; where it is not (iOS ignores it), the player is not nagged and
+  // nothing is blocked, because the live space follows the window and a
+  // sideways phone gets a real landscape space of its own.
   (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> })
     .lock?.('portrait')
     ?.catch(() => {});

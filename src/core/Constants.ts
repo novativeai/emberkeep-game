@@ -79,13 +79,32 @@ export const IS_LOW_END: boolean =
       (typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 4)));
 
 /**
- * HUD / popup magnification on mobile portrait. The UI is authored in the fixed
- * 2560-wide space; on a phone that space FIT-scales to ~15%, so gauges/buttons
- * render at half the size a thumb needs. Clusters multiply by this (anchored to
- * their screen corner) and popups fill the portrait width. `1` on desktop — the
- * landscape layout is untouched. See `panelMobileScale`.
+ * HUD magnification on mobile portrait. The UI is authored in the fixed
+ * 2560-wide space, and on a phone that space FIT-scales to about 15% — one game
+ * unit lands on 0.15 CSS pixels against 0.5 on a desktop window, so everything
+ * renders a THIRD of the size it was drawn at. Measured on an iPhone 15 at the
+ * old 1.5: the XP readout was 6 px tall and a quest's reward line 4.7 px, under
+ * half the ~11pt floor a phone UI needs.
+ *
+ * 3 is that 0.5/0.15 shortfall, near enough — it restores desktop legibility
+ * rather than merely improving it. Clusters multiply by this ANCHORED TO THEIR
+ * SCREEN CORNER, so the growth runs inward into the portrait space's spare
+ * height and never off an edge. `1` on desktop — the landscape layout is
+ * untouched. Panels do not use this (they already fill the width; see
+ * `panelMobileScale`), and the dialogue bubble has its own — `BUBBLE_SCALE`.
  */
-export const UI_SCALE: number = IS_MOBILE ? 1.5 : 1;
+export const UI_SCALE: number = IS_MOBILE ? 3 : 1;
+
+/**
+ * The dialogue bubble's own magnification. It is authored 1200 units wide — just
+ * under half the 2560 space — which on a phone is ~184 CSS px of bubble holding
+ * 6 px text. It cannot take UI_SCALE's 3 (3600 units would be wider than the
+ * space), so it takes the most that still fits the portrait width with a margin,
+ * and is re-centred there: the authored `+220` offset exists to clear a board
+ * decoration in landscape, and off-centring a bubble this wide would push it off
+ * the right edge.
+ */
+export const BUBBLE_SCALE: number = IS_MOBILE ? 1.6 : 1;
 
 /** Uniform scale so a centred popup FRAME of `frameWidth` fills ~94% of the
  *  portrait width. `1` on desktop. Capped so a small frame never balloons. */
@@ -110,25 +129,22 @@ export function panelMobileScale(frameWidth: number): number {
  * past the authored backdrop (`minZoom` is the backdrop-fit), so a wider
  * viewport simply holds a slightly closer frame.
  *
- * Mobile is unchanged. There the game is PORTRAIT: GAME_WIDTH spans the phone's
- * SHORT side whichever way it is held, the space grows taller to match, and 2.4
- * caps a near-square tablet (or an extreme aspect) from a runaway backing.
+ * ONE rule, every device. Mobile used to be special-cased: the space was always
+ * PORTRAIT-shaped, built from the phone's short and long sides rather than from
+ * the window, whichever way the phone was actually held — which is why a
+ * landscape-held phone had to be nagged back upright by an overlay. It never
+ * needed the exception. Feed the same rule a portrait window and it returns the
+ * identical space the special case did (390×844 → 2560×5541, where the old
+ * branch gave 5540), because on a portrait window the short axis IS the width.
+ * Held sideways it now returns a real landscape space instead of a tall canvas
+ * squeezed into a wide window, so no one has to be told how to hold the phone.
  *
- * Both axes are read at BOOT. A desktop window resized afterwards re-FITs (and
- * re-letterboxes) until reload — the scenes lay out once.
+ * Both axes are read at BOOT. A window resized or a phone rotated afterwards
+ * re-FITs (and re-letterboxes) until reload — the scenes lay out once.
  */
 /** The pure half of the rule above — exported so the invariants (short axis
  *  pinned, 16:10 identity, clamp) are unit-testable without a DOM. */
-export function liveSpaceFor(
-  winW: number,
-  winH: number,
-  isMobile: boolean
-): { w: number; h: number } {
-  if (isMobile) {
-    const shortSide = Math.min(winW, winH); // portrait width
-    const longSide = Math.max(winW, winH); // portrait height
-    return { w: GAME_WIDTH, h: Math.round(GAME_WIDTH * Math.min(2.4, longSide / shortSide)) };
-  }
+export function liveSpaceFor(winW: number, winH: number): { w: number; h: number } {
   // Clamped the same 2.4 either way, so one absurd axis cannot inflate the
   // backing; past the clamp the leftover simply letterboxes as it always did.
   const aspect = Math.min(2.4, Math.max(1 / 2.4, winW / winH));
@@ -141,7 +157,7 @@ export function liveSpaceFor(
 const LIVE_SPACE: { w: number; h: number } =
   typeof window === 'undefined'
     ? { w: GAME_WIDTH, h: GAME_HEIGHT }
-    : liveSpaceFor(window.innerWidth, window.innerHeight, IS_MOBILE);
+    : liveSpaceFor(window.innerWidth, window.innerHeight);
 
 /** Viewport WIDTH in game-space units. Anchor every screen-space x to this —
  *  `GAME_WIDTH` is the authoring constant and is only correct at 16:10. */
@@ -167,10 +183,14 @@ export const LIVE_GAME_HEIGHT: number = LIVE_SPACE.h;
  * anything closer than that overlaps its neighbour. UI_SCALE magnifies each
  * button about its own centre, so the pitch scales with it.
  */
-export const HUD_COLUMN_X: number = LIVE_GAME_WIDTH - (IS_MOBILE ? 190 : 156);
+/** The column's insets are DERIVED from the magnification on mobile: a button
+ *  scales about its own centre, so an inset tuned for one UI_SCALE hangs half
+ *  the disc off the screen at a larger one. 112·UI_SCALE clears the scaled disc
+ *  (~306 units of half-width at 3) with a margin, at any scale. */
+export const HUD_COLUMN_X: number = LIVE_GAME_WIDTH - (IS_MOBILE ? 112 * UI_SCALE : 156);
 export const HUD_COLUMN_PITCH: number = 200 * UI_SCALE;
 export const hudColumnY = (slot: number): number =>
-  LIVE_GAME_HEIGHT - (IS_MOBILE ? 260 : 168) - slot * HUD_COLUMN_PITCH;
+  LIVE_GAME_HEIGHT - (IS_MOBILE ? 112 * UI_SCALE : 168) - slot * HUD_COLUMN_PITCH;
 
 /** Isometric 2:1 projection. */
 export const TILE_W = 256;
@@ -2195,7 +2215,10 @@ export const SAVE_KEY = 'emberkeep_save';
 // 16: the Codex lesson grew from one beat to six (the roster card, the taste
 // row, then Evolution, cycles and the payoff before the book shuts), so every
 // persisted `tutorialIndex` after it points at a different beat than it left.
-export const SAVE_VERSION = 16;
+// 17: `gate_wake` inserted between the Brazier delivery and the golden tease —
+// the beat that teaches paying a sleeping dragon awake for the crossing. Same
+// reason as 16: every `tutorialIndex` past it now names a different beat.
+export const SAVE_VERSION = 17;
 
 /** The opening's held silence: the board is visible and quiet before Eleanor's
  *  first line, so the player sees the ash before anyone frames it

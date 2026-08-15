@@ -297,24 +297,92 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     expect(longest).toBeLessThanOrEqual(DRAGON_SLEEP_MAX_MS + 500);
   });
 
-  it('a shift-rest still costs the shift — the cap shortens the NAP, not the timer', () => {
-    // The rest timer is what the player paid for working the dragon; only the
-    // curled-up look is capped. Blur the two and working becomes free.
+  it('a shift-rest is NOT capped — the pose lasts as long as the countdown does', () => {
+    // The ceiling is for the sleeps NOTHING on screen announces. A rest wears a
+    // 💤 countdown over the animal's head and blocks hiring for its whole five
+    // minutes, and capping THAT produced the bug this test exists to hold shut:
+    // a dragon idling and flying about, plainly awake, under a sleep countdown.
     const ctx = createTestContext();
+    atPhase(ctx, 1); // DAY — a dragon does not take a shift at night any more
     const dragon = dragonAt(ctx, 1, 1);
     const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 3, row: 3, kind: 'item' });
     ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
     tick(ctx, DRAGON_WORK_MS + 1);
     expect(ctx.systems.jobs.restRemaining(dragon.id)).toBeGreaterThan(0);
 
-    // Past the sleep ceiling it is on its feet again...
+    // Well past the ceiling, and still curled up — the state the board draws
+    // and the state the rules read are the same one.
     for (let i = 0; i < 40; i++) {
       tick(ctx, 500);
       ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
     }
-    expect(ctx.systems.dragonLife.moodOf(dragon.id)).not.toBe('asleep');
-    // ...and still owes the rest.
+    expect(DRAGON_SLEEP_MAX_MS).toBeLessThan(20_000); // the ceiling really was crossed
+    expect(ctx.systems.dragonLife.moodOf(dragon.id)).toBe('asleep');
+    expect(ctx.systems.dragonLife.sleepKindOf(dragon.id)).toBe('rest');
     expect(ctx.systems.jobs.restRemaining(dragon.id)).toBeGreaterThan(0);
+  });
+
+  it('refuses food and work while it sleeps, from every direction', () => {
+    // The board's own gestures say so where the player made them, but the rule
+    // lives in the systems that own the actions: a panel that learns to feed
+    // tomorrow must not be able to feed a sleeper by forgetting to ask.
+    const ctx = createTestContext();
+    atPhase(ctx, 1); // DAY — a dragon does not take a shift at night any more
+    const dragon = dragonAt(ctx, 1, 1);
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 3, row: 3, kind: 'item' });
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+    tick(ctx, DRAGON_WORK_MS + 1);
+    tick(ctx, 1000);
+    expect(ctx.systems.dragonLife.asleep(dragon.id)).toBe(true);
+
+    const refused = capture(ctx.bus, 'dragon:refused');
+    const fed = capture(ctx.bus, 'dragon:fed');
+    const working = capture(ctx.bus, 'dragon:working');
+    const before = ctx.systems.dragons.careOf(dragon.id).meals;
+
+    ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+
+    expect(refused.at(-1)).toMatchObject({ reason: 'asleep' });
+    expect(fed).toHaveLength(0);
+    expect(ctx.systems.dragons.careOf(dragon.id).meals).toBe(before);
+    expect(working).toHaveLength(0);
+  });
+
+  it('sells the sleep off — the same two currencies every other wait takes', () => {
+    // A wait the player cannot pay to end is the one kind this game does not
+    // have. The rest is CLEARED by the purchase (a paid skip that left the
+    // dragon un-hireable would have sold nothing) and the animal is held awake
+    // past what it was shown, so paying is never the worse deal.
+    const ctx = createTestContext();
+    atPhase(ctx, 1); // DAY — a dragon does not take a shift at night any more
+    const dragon = dragonAt(ctx, 1, 1);
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 3, row: 3, kind: 'item' });
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+    tick(ctx, DRAGON_WORK_MS + 1);
+    tick(ctx, 1000);
+
+    const timer = ctx.systems.dragonLife.sleepTimer(dragon.id)!;
+    expect(timer.total).toBe(DRAGON_REST_MS);
+    expect(timer.remaining).toBeGreaterThan(0);
+
+    // Broke: nothing is taken and nothing wakes.
+    ctx.state.coins = 0;
+    const skipped = capture(ctx.bus, 'dragon:sleep_skipped');
+    ctx.bus.emit('dragon:sleep_skip', { itemId: dragon.id, currency: 'gold' });
+    expect(skipped).toHaveLength(0);
+    expect(ctx.systems.dragonLife.asleep(dragon.id)).toBe(true);
+
+    ctx.bus.emit('economy:add', { coins: 500, reason: 'test' });
+    const purse = ctx.state.coins;
+    ctx.bus.emit('dragon:sleep_skip', { itemId: dragon.id, currency: 'gold' });
+
+    expect(skipped).toHaveLength(1);
+    expect(ctx.state.coins).toBeLessThan(purse); // it cost something
+    expect(ctx.systems.dragonLife.asleep(dragon.id)).toBe(false);
+    expect(ctx.systems.jobs.restRemaining(dragon.id)).toBe(0); // hireable again
+    ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
+    expect(ctx.systems.jobs.isWorking(dragon.id)).toBe(true);
   });
 
   it('announces a mood once per change, not once per tick', () => {

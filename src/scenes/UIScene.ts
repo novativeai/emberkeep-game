@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameContext } from '../core/Context';
 import {
   ATMOSPHERE,
+  BUBBLE_SCALE,
   EGG_GIFT,
   ELDER_VOICE,
   ENERGY_REGEN_MS,
@@ -12,6 +13,7 @@ import {
   GOLDEN_ALTAR,
   GOLDEN_TREMBLE_PROGRESS,
   HUD_COLUMN_X,
+  IS_MOBILE,
   hudColumnY,
   LIVE_GAME_HEIGHT,
   LIVE_GAME_WIDTH,
@@ -286,8 +288,18 @@ export class UIScene extends Phaser.Scene {
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
-    // cover, over the empty bottom-right margin during tutorial steps.
-    this.bubble.setPosition(LIVE_GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
+    // cover, over the empty bottom-right margin during tutorial steps. On a
+    // phone it is magnified instead and re-centred: at BUBBLE_SCALE the bubble
+    // is nearly the full portrait width, so the landscape nudge would hang it
+    // off the right edge, and it is lifted by the same factor to keep its foot
+    // off the bottom.
+    this.bubble.setScale(BUBBLE_SCALE);
+    this.bubble.setPosition(
+      LIVE_GAME_WIDTH / 2 + (IS_MOBILE ? 0 : 220),
+      // 200 (not 150) on mobile: the magnified bubble is taller than the lift
+      // the landscape inset gives it, and its foot ran past the bottom edge.
+      LIVE_GAME_HEIGHT - (IS_MOBILE ? 200 * BUBBLE_SCALE : 150)
+    );
     this.bubble.setDepth(DEPTH_TUTORIAL);
     this.bubble.registerUi();
     // GIVE is a two-part act: the bag arms it, the board delivers it. The panel
@@ -423,8 +435,16 @@ export class UIScene extends Phaser.Scene {
         if (p) this.hand.setPosition(p.x, p.y + this.handBob.v);
       }
     }
-    if (this.arrow.visible && this.arrowAnchor) {
+    if (this.arrowAnchor) {
       const a = this.arrowAnchor();
+      // A UI anchor can resolve to nothing YET — the Codex spread the pointer
+      // belongs to has not been turned to, the panel is still fading in, the
+      // cinematic has not finished. Those are the pointers most worth showing,
+      // so the arrow follows its target's availability instead of being decided
+      // once at the start of the beat: hidden while the target is absent, shown
+      // the frame it appears. (`placeArrow` used to give up on a null and leave
+      // the beat with no pointer at all for the rest of its life.)
+      this.arrow.setVisible(a !== null);
       if (a) {
         // A target near the top of the screen (the ⚡+ Warmth button) would push
         // the down-pointing arrow off-screen above it — so flip it UP and sit it
@@ -1572,14 +1592,21 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  /** The 3 sections with the pointer moving between them, then the ✕. The
-   *  arrow rides the LINE (sequence onLine), and the panel shows the section
-   *  she is naming, so eye, pointer and shelf agree. */
+  /**
+   * The 3 sections, then the ✕ — and only the ✕ wears a pointer.
+   *
+   * She is SHOWING the shelves, not asking for anything: the panel turns to the
+   * section she is naming and the player taps on. An arrow over a tab the
+   * player is not being asked to press reads as an instruction, and three of
+   * them in a row read as three instructions that do nothing. The one moment
+   * the tour does want an action — closing the Emporium, which is what ends it
+   * — is the one that points.
+   */
   private runShopWalkthrough(t: { sections: string[]; close: string; outro: string }): void {
     this.bubble.sequence('eleanor', [...t.sections, t.close], undefined, (i) => {
       if (i < t.sections.length) {
         this.store.showSection(i);
-        this.pointUi(this.store.getTabPos(i));
+        this.clearUiPointer();
       } else {
         this.pointUi(this.store.getClosePos());
       }
@@ -1981,13 +2008,13 @@ export class UIScene extends Phaser.Scene {
       this.arrowLift = 'character' in arrow ? 84 : 'ui' in arrow ? 116 : 192;
     }
     const target = this.arrowAnchor();
-    if (!target) {
-      this.arrowAnchor = null;
-      return;
-    }
-    this.arrow.setVisible(true);
+    // No target YET is not the same as no target: the anchor stays live and
+    // `update()` shows the arrow the moment it resolves. Only a marker with
+    // nothing to bob is started hidden — the bob chain below is what makes it
+    // read as a pointer, and it must be running when the target arrives.
+    this.arrow.setVisible(target !== null);
     this.arrow.setAlpha(1);
-    this.arrow.setPosition(target.x, target.y - this.arrowLift);
+    if (target) this.arrow.setPosition(target.x, target.y - this.arrowLift);
     // Bob via a proxy so update() can re-anchor the arrow to its cell each frame
     // while it bobs (a tween writing arrow.y directly would fight re-projection).
     // Puppet-style cycle: rise, then DROP toward the target with a tiny impact

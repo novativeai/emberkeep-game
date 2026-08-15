@@ -125,6 +125,14 @@ const cellKey = (col: number, row: number): string => `${col},${row}`;
  * day, and five of those make it an adult.
  */
 export class DragonSystem {
+  /**
+   * Is this board dragon asleep? Wired to `DragonLifeSystem` in Context (it is
+   * built after this one, and derives sleep partly FROM this one's care record,
+   * so the reference can only go this way). Defaults to "never" so a fixture
+   * that builds this system alone feeds exactly as it always did.
+   */
+  asleep: (itemId: number) => boolean = () => false;
+
   constructor(
     private state: GameState,
     private bus: EventBus,
@@ -503,6 +511,14 @@ export class DragonSystem {
   private feedBoardDragon(itemId: number, chain: string, tier: number): void {
     const item = this.state.items.get(itemId);
     if (!item || !this.isBoardDragon(item)) return;
+    // ASLEEP: a curled animal does not eat, from any direction. The board's own
+    // gestures already say so where the player made them (the drag home, the
+    // give handed back), but the rule lives here so a panel that learns to feed
+    // tomorrow cannot feed a sleeper by forgetting to ask.
+    if (this.asleep(itemId)) {
+      this.bus.emit('dragon:refused', { itemId, chain, reason: 'asleep' });
+      return;
+    }
     if (!isDragonFood(chain, tier)) {
       this.bus.emit('dragon:refused', { itemId, chain, reason: 'not_food' });
       return;

@@ -28,10 +28,11 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
   // anyone who picks High by hand — boots byte-identically to before.
   const gfx = graphics.profile;
   const dpr = Math.min(rawDpr, IS_LOW_END ? 2 : 3, gfx.dprCap);
-  // On mobile the game is PORTRAIT: width = the phone's SHORT side, height = long,
-  // regardless of how the device is currently held.
-  const dispW = IS_MOBILE ? Math.min(window.innerWidth, window.innerHeight) : window.innerWidth;
-  const dispH = IS_MOBILE ? Math.max(window.innerWidth, window.innerHeight) : window.innerHeight;
+  // The live space follows the window on every device now (see LIVE_SPACE), so
+  // the backing is measured against the window as it actually is — no
+  // short-side/long-side swap for a phone held sideways.
+  const dispW = window.innerWidth;
+  const dispH = window.innerHeight;
   // Backing needed to match the device pixels the FIT canvas spans, in game-units.
   const need = Math.min(
     (dispW * dpr) / LIVE_GAME_WIDTH,
