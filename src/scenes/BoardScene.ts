@@ -984,6 +984,10 @@ export class BoardScene extends Phaser.Scene {
     if (!from || !to) return;
     this.hintShown = hint;
     this.bounceHintPiece(from.id);
+    // Through the WORLD's projection, never the ambient `gridToWorld`: a zoned
+    // world places its cells per zone, so the authored lattice would aim the
+    // camera at open sky anywhere but the opening isle.
+    this.bringIntoView(worldPointOf(this.ctx.state.world, from.col, from.row));
     this.ctx.bus.emit('hint:merge', {
       from: { col: from.col, row: from.row },
       to: { col: to.col, row: to.row }
@@ -2195,7 +2199,13 @@ export class BoardScene extends Phaser.Scene {
     if (this.textures.exists(standKey)) {
       ld.host.setArtTexture(standKey, this.ctx.data.anchors);
       ld.host.setArtScale(
-        plateScale(standKey, ITEM_SCALE[`${ld.host.chain}_${ld.host.tier}`] ?? 1)
+        plateScale(
+          standKey,
+          // Same precedence as the acquire path — per-tier, then chain, then 1.
+          // Dropping the chain-level fallback here would wake a breed whose
+          // scale is declared only for the chain at full authoring size.
+          ITEM_SCALE[`${ld.host.chain}_${ld.host.tier}`] ?? ITEM_SCALE[ld.host.chain] ?? 1
+        )
       );
     }
     ld.host.setArtVisible(false);
@@ -4444,7 +4454,23 @@ export class BoardScene extends Phaser.Scene {
   private followTutorialPointer(step: TutorialStepEvent): void {
     if (step.done) return; // the hand-over step: the board is the player's again
     const at = this.pointerWorldPoint(step.hand ?? step.arrow);
-    if (!at) return;
+    if (at) this.bringIntoView(at);
+  }
+
+  /**
+   * Put a world point somewhere the player can comfortably see it.
+   *
+   * EVERY pointer, not just the tutorial's. The camera-follow shipped tied to
+   * scripted steps, so the moment the script handed over — and in every world
+   * that has no script at all — a hand could point at a cell the camera had
+   * never included, and the help became "find the hint". A pointer the player
+   * cannot see is not help, whichever system raised it.
+   *
+   * Only when it is NOT already comfortably in frame: a camera that re-centres
+   * on something already on screen reads as drift, and it would fight a player
+   * who has just panned somewhere deliberately.
+   */
+  private bringIntoView(at: { x: number; y: number }): void {
     const view = this.cameras.main.worldView;
     const insetX = view.width * TUTORIAL_FOLLOW_INSET;
     const insetY = view.height * TUTORIAL_FOLLOW_INSET;
@@ -6643,7 +6669,15 @@ export class BoardScene extends Phaser.Scene {
       // The backdrop is fetched first: the new world's art is deliberately not
       // in the boot preload, and rebuilding onto a missing texture would paint
       // the isle over open sky.
-      bus.on('world:switched', () => this.fetchWorldArt(() => this.scene.restart())),
+      bus.on('world:switched', () => {
+        // Retract every pointer FIRST. This scene restarts on a world change and
+        // forgets what it had offered; UIScene, which actually draws the hand,
+        // does NOT — so an un-retracted hint survived the journey and went on
+        // pointing at cells belonging to a board that is no longer on screen.
+        this.takeBackHint();
+        this.ctx.bus.emit('hint:carry', null);
+        this.fetchWorldArt(() => this.scene.restart());
+      }),
       bus.on('store:skin_changed', () => this.applyManorSkin()),
       bus.on('store:dragon_skin_changed', ({ dragon }) => this.applyDragonSkin(dragon)),
       bus.on('item:spawned', ({ item }) => {

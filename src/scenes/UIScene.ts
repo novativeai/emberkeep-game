@@ -664,6 +664,19 @@ export class UIScene extends Phaser.Scene {
       // `world:ready`, not `world:switched`: the board has to exist under the
       // bubble, or she talks over the travelling curtain.
       bus.on('world:ready', () => this.flushAwayBeats()),
+      // EVERY pointer drops at the door. BoardScene retracts its own on the way
+      // out, but this scene is the one holding the hand and it does NOT restart
+      // with the board — so this is the guarantee rather than the courtesy: a
+      // hand left up after a journey points at cells that are not on screen any
+      // more, and the arithmetic behind it (three rubies, over there) was true
+      // of a board the player has left.
+      bus.on('world:switched', () => {
+        if (this.hintHand || this.carryHand) {
+          this.hintHand = false;
+          this.carryHand = false;
+          this.clearMarkers();
+        }
+      }),
       // The idle merge hint. UIScene owns the hand, so it — not the board —
       // is what decides the hand is free: the tutorial's own gestures always
       // win, and two hands pointing at different things is worse than none.

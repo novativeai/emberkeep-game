@@ -580,7 +580,10 @@ export class BagPanel extends Phaser.GameObjects.Container {
     step: (by: number) => void,
     max: () => void
   ): Phaser.GameObjects.Container {
-    const row = this.scene.add.container(0, y);
+    // The keys span -234..154 once laid out below, so the row itself is nudged
+    // right by half that offset — otherwise a set that now fits the plate still
+    // sits visibly left of its middle.
+    const row = this.scene.add.container(40, y);
     const label = this.scene.add
       .text(0, 0, '×1', {
         fontFamily: FONT.display,
@@ -590,12 +593,18 @@ export class BagPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     this.qtyLabel = label;
+    // Laid out to sit INSIDE the plate with the same 26px margin its buttons
+    // use: `Max` at x=246 with a 108 width put its right edge at 300 against a
+    // 298 half-plate, so it hung over the rim. The row is pulled left and the
+    // whole set tightened, keeping the number in the middle of the three keys
+    // that change it rather than in the middle of the plate.
     row.add([
-      this.stepperKey('−', -132, () => step(-1)),
+      this.stepperKey('−', -196, () => step(-1)),
       label,
-      this.stepperKey('+', 132, () => step(1)),
-      this.stepperKey('Max', 246, max, 108)
+      this.stepperKey('+', -68, () => step(1)),
+      this.stepperKey('Max', 96, max, 116)
     ]);
+    label.setX(-132);
     return row;
   }
 

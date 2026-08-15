@@ -228,12 +228,27 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** The art's display bounds in HIT-AREA space (container local point +
    *  displayOrigin — see acquireSprite): the clickable zone wraps the sprite
    *  the player sees, never the tile footprint. */
+  /**
+   * The tappable box — the ART's bounds, INCLUDING wherever the art currently
+   * sits inside the container.
+   *
+   * The rect and the per-pixel test (`artOpaqueAt`) have to describe the same
+   * shape, and only one of them used to move: the pixel test reads `sprite.x/y`
+   * — it must, or it samples the wrong texel — while this rect was pinned to the
+   * container origin. Any moment the art is offset from that origin the two
+   * disagree, and a tap inside the picture is rejected for being outside a box
+   * drawn where the picture is not.
+   *
+   * The art is offset more often than it looks: a sleeping dragon breathes on a
+   * ground offset, a held piece floats on the drag lift. Those are exactly the
+   * moments a player is trying to tap the thing.
+   */
   artHitRect(): Phaser.Geom.Rectangle {
     const w = this.sprite.displayWidth;
     const h = this.sprite.displayHeight;
     return new Phaser.Geom.Rectangle(
-      this.displayOriginX - this.sprite.originX * w,
-      this.displayOriginY - this.sprite.originY * h,
+      this.displayOriginX + this.sprite.x - this.sprite.originX * w,
+      this.displayOriginY + this.sprite.y - this.sprite.originY * h,
       w,
       h
     );
