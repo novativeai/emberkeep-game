@@ -23,7 +23,6 @@ import {
   GOLDEN_ELDER_TIER,
   GOLDEN_TINT,
   GOLDEN_TREMBLE_PROGRESS,
-  IS_IOS,
   ITEM_SCALE,
   LIVE_GAME_HEIGHT,
   LIVE_GAME_WIDTH,
@@ -77,12 +76,12 @@ import { artScaleAt, setActiveWorld } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
 import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
 import { cappedTier } from '../core/graphics';
-import { GRAPHICS_EVENT, graphics } from '../core/graphicsState';
+import { GRAPHICS_EVENT, graphics, liveCrystalAvailable } from '../core/graphicsState';
 import { renderScale } from '../core/render-scale';
 import type { BoardItemState, GeneratorConfig, ItemSnapshot, TilePos, TutorialAllow } from '../core/types';
 import { BoardItem } from '../entities/BoardItem';
 import { PortalFX } from '../entities/PortalFX';
-import { Crystal3D } from '../render/Crystal3D';
+import type { Crystal3D } from '../render/Crystal3D';
 import { FlipbookFX, RAMP_TEXTURE } from '../render/FlipbookFX';
 import { EMITTER_PRESETS } from '../render/fx/emitterAssets';
 import { resolvePlacement } from '../render/fx/emitterPlacements';
@@ -328,6 +327,9 @@ export class BoardScene extends Phaser.Scene {
   private clipLastUsed = new Map<string, number>();
   /** Debounce for `scheduleClipEviction` — one sweep per settled board. */
   private clipEvictionTimer?: Phaser.Time.TimerEvent;
+  /** Authored 3D-decor sprites wearing the crystal texture. Held so a LATE live
+   *  gem (the import is dynamic now) can re-point them off the destroyed frame. */
+  private crystalDecor: Phaser.GameObjects.Image[] = [];
   /** Dragon item ids currently flying a cosmetic worker flourish. */
   private busyDragons = new Set<number>();
   /** Per-level camera framing + the active level-up glide. */
@@ -3432,28 +3434,44 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private ensureCrystal3D(): void {
-    // A live three.js render every few frames for one board item. The painted
-    // fallback texture is already there, so skipping this costs a highlight.
-    if (!graphics.profile.crystal3d) return;
-    // iOS Safari's renderer process crashes ("A problem repeatedly occurred") under
-    // the memory of a SECOND live WebGL context plus its per-frame GPU→CPU readback
-    // (drawImage of a WebGL canvas). Skip it there — the static `item_crystal_1` PNG
-    // (loaded in preload) stays as the crystal texture, so the gem still renders 2D.
-    if (IS_IOS) return;
+    // `high` only, and never on iOS — whose renderer process crashes under a
+    // SECOND live WebGL context plus its per-frame GPU→CPU readback. Everywhere
+    // else the baked spin sheet plays the same loop (see `spinsBakedCrystal`).
+    if (!liveCrystalAvailable()) return;
     const map = this.ctx.state.map;
     const spec = map.decor3d?.find((d) => d.model3d)?.model3d ?? undefined;
-    try {
-      const crystal = new Crystal3D(spec ?? {});
-      if (this.textures.exists('item_crystal_1')) this.textures.remove('item_crystal_1');
-      this.crystalTex = this.textures.addCanvas('item_crystal_1', crystal.canvas) ?? undefined;
-      if (!this.crystalTex) {
-        crystal.dispose();
-        return;
-      }
-      this.crystal3d = crystal;
-    } catch (err) {
-      console.warn('[Crystal3D] WebGL unavailable — keeping the 2D crystal art.', err);
-    }
+    // DYNAMIC, and this is the only import of three.js in the codebase: at 72 KB
+    // brotli it was riding the one boot-blocking bundle onto every device,
+    // including the iOS and non-`high` machines that are guaranteed never to
+    // execute a line of it. Now the tier that renders the gem downloads the
+    // renderer, and the tiers that play the sheet download the sheet — one gem
+    // each, never both.
+    void import('../render/Crystal3D')
+      .then(({ Crystal3D }) => {
+        // The board may have been left (travel, a quality change) while this was
+        // in flight; installing a texture into a dead scene would throw.
+        if (!this.scene.isActive()) return;
+        const crystal = new Crystal3D(spec ?? {});
+        if (this.textures.exists('item_crystal_1')) this.textures.remove('item_crystal_1');
+        this.crystalTex = this.textures.addCanvas('item_crystal_1', crystal.canvas) ?? undefined;
+        if (!this.crystalTex) {
+          crystal.dispose();
+          return;
+        }
+        this.crystal3d = crystal;
+        // The import means items can now be BUILT before the gem arrives, and
+        // the swap above destroyed the texture they were holding a frame of.
+        // Re-point them at the new one — same key, so the anchor still resolves.
+        for (const sprite of this.itemSprites.values()) {
+          if (sprite.chain === 'crystal' && sprite.kind !== 'decor') {
+            sprite.setArtTexture('item_crystal_1', this.ctx.data.anchors);
+          }
+        }
+        for (const decor of this.crystalDecor) decor.setTexture('item_crystal_1');
+      })
+      .catch((err) => {
+        console.warn('[Crystal3D] unavailable — keeping the 2D crystal art.', err);
+      });
   }
 
   /**
@@ -3464,6 +3482,7 @@ export class BoardScene extends Phaser.Scene {
    * up (WebGL-less); the gem only shows where the world placed it.
    */
   private buildMapDecor3d(): void {
+    this.crystalDecor = [];
     const map = this.ctx.state.map;
     // Render wherever the crystal texture exists — the live 3D gem when present,
     // else the static PNG fallback (iOS / WebGL-less), so decor never silently drops.
@@ -3491,6 +3510,7 @@ export class BoardScene extends Phaser.Scene {
         .setOrigin(cal.anchor?.x ?? 0.5, cal.anchor?.y ?? 0.72)
         .setScale((cal.scale ?? 1) * ratio)
         .setDepth(DEPTHS.itemBase + y);
+      this.crystalDecor.push(sprite);
       this.addGroundShadow(x, y, sprite.displayWidth, DEPTHS.itemBase + y - 1);
       this.settleSprite(sprite, (i % 8) * 35); // one-time landing settle
     });
