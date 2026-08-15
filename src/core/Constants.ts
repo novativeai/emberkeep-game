@@ -1822,8 +1822,10 @@ export const GATE_FLIGHT = {
    * him through — travel rebuilds the board from state and he is on his tile
    * again, having come home with them. This is only the net for a player who
    * never goes: a hidden sprite is an untappable one, and the board may not be
-   * left a generator short for ever. Long enough that the ceremony, Eleanor's
-   * lines and the travel prompt all land first.
+   * left a generator short for ever. When it fires he flies back OUT of the
+   * door (`flyHomeFromGate`) — a scout returning, not a dragon that was on his
+   * tile all along. Long enough that the ceremony, Eleanor's lines and the
+   * travel prompt all land first.
    */
   awayMs: 45_000
 } as const;

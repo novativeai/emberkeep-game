@@ -4019,32 +4019,89 @@ export class BoardScene extends Phaser.Scene {
         sprite.setAlpha(t > 0.66 ? Math.max(0, 1 - (t - 0.66) / 0.3) : 1);
       },
       onComplete: () => {
-        // THROUGH. He does not come back out — he has gone to Roothold, and
-        // that is where the player meets him again (buildHubDragon stands him
-        // by Eleanor's door). The old return leg flew him straight back out of
-        // the glare, which read as the portal spitting him out and made the
-        // whole ceremony pointless.
+        // THROUGH. He is in Roothold now, and that is where the player meets
+        // him again (buildHubDragon stands him by Eleanor's door). Parked at
+        // home but invisible: the ordinary ending is the player following him
+        // across, and travelling rebuilds this scene from state.
         sprite.setAlpha(0);
-        sprite.setPosition(home.x, home.y); // parked at home, just not visible
+        sprite.setPosition(home.x, home.y);
         if ('setFacing' in sprite) {
           (sprite as { setFacing(dir: 'left' | 'right'): unknown }).setFacing('left');
         }
-        // Travelling rebuilds this scene from state, so in the ordinary flow he
-        // is simply standing on his tile again when the Keeper comes home. This
-        // is the net for the player who never goes: a hidden sprite is also an
+        // The net for the Keeper who never goes. A hidden sprite is also an
         // UNTAPPABLE one (Phaser skips hit-tests on a cleared render flag), so
-        // the board must never be left one generator short. No flight — he is
-        // just back, the way he would be if you had not been watching.
+        // the board may not be left one generator short for ever — but he may
+        // not simply BE on his tile again either, which reads as the crossing
+        // never having happened. He comes home the way he left: out of the
+        // door, on the wing, with the light letting him go.
         this.time.delayedCall(GATE_FLIGHT.awayMs, () => {
           if (!sprite.active || sprite.alpha > 0) return;
-          const ld = this.liveDragons.get(itemId);
-          if (ld) ld.busy = false;
-          this.tweens.add({ targets: sprite, alpha: 1, duration: 500, ease: 'Sine.easeOut' });
+          this.flyHomeFromGate(door, itemId, home);
         });
       }
     });
     // The light intensifies to receive him, timed to his arrival at the door.
     this.time.delayedCall(1100, () => door.fx.flare(1400));
+  }
+
+  /**
+   * The scouting run's return leg — only ever flown by a Keeper who stayed.
+   *
+   * He was hidden at his tile the whole time; this puts him back at the door
+   * and flies him home along the same arc, fading IN out of the glare as the
+   * light releases him. The old net dropped him onto his tile at full alpha,
+   * which is what made the crossing read as nothing having happened at all.
+   */
+  private flyHomeFromGate(
+    door: { fx: PortalFX; zone: Phaser.GameObjects.Zone },
+    itemId: number,
+    home: { x: number; y: number }
+  ): void {
+    const sprite = this.itemSprites.get(itemId);
+    if (!sprite?.active) return;
+    const live = this.liveDragons.get(itemId);
+    if (live) {
+      live.busy = true; // still the cinematic's animal until he is down
+      this.dragonHover(live);
+    }
+    const start = { x: door.zone.x, y: door.zone.y - 30 };
+    const peak = {
+      x: (home.x + start.x) / 2,
+      y: Math.min(home.y, start.y) - 320
+    };
+    if ('setFacing' in sprite) {
+      (sprite as { setFacing(dir: 'left' | 'right'): unknown }).setFacing(home.x > start.x ? 'right' : 'left');
+    }
+    sprite.setPosition(start.x, start.y);
+    // The door gives him back before he is visible, so the glare reads as the
+    // thing he steps out of rather than a flare that happens to coincide.
+    door.fx.flare(1400);
+    const flight = { t: 0 };
+    this.tweens.add({
+      targets: flight,
+      t: 1,
+      duration: 1800,
+      ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        const t = flight.t;
+        const u = 1 - t;
+        sprite.x = u * u * start.x + 2 * u * t * peak.x + t * t * home.x;
+        sprite.y = u * u * start.y + 2 * u * t * peak.y + t * t * home.y;
+        sprite.setAlpha(t < 0.34 ? Math.min(1, t / 0.3) : 1);
+      },
+      onComplete: () => {
+        sprite.setAlpha(1);
+        sprite.setPosition(home.x, home.y);
+        if ('setFacing' in sprite) {
+          (sprite as { setFacing(dir: 'left' | 'right'): unknown }).setFacing('left');
+        }
+        const ld = this.liveDragons.get(itemId);
+        if (ld) {
+          ld.busy = false;
+          this.dragonLand(ld); // wings away; the ordinary mood path resumes
+        }
+      }
+    });
   }
 
   private ignitePortal(id: string): void {
