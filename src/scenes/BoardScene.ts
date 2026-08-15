@@ -75,6 +75,7 @@ import { isDragonClipCharacter, planClipEviction, releaseClips } from '../core/c
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
 import { artScaleAt, setActiveWorld } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
+import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
 import { cappedTier } from '../core/graphics';
 import { GRAPHICS_EVENT, graphics } from '../core/graphicsState';
 import { renderScale } from '../core/render-scale';
@@ -731,20 +732,7 @@ export class BoardScene extends Phaser.Scene {
     if (this.coolAccum >= 240) {
       this.coolAccum = 0;
       this.syncProduceBadges();
-      for (const [id, badge] of this.restBadges) {
-        const sp = this.itemSprites.get(id);
-        const rest = this.ctx.systems.jobs.restRemaining(id);
-        if (!sp || rest <= 0) {
-          badge.destroy();
-          this.restBadges.delete(id);
-          continue;
-        }
-        const s = Math.ceil(rest / 1000);
-        badge.setPosition(sp.x, sp.y - 160);
-        (badge.getData('label') as Phaser.GameObjects.Text).setText(
-          `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-        );
-      }
+      this.syncDragonSleep();
       for (const [id, badge] of this.coolBadges) {
         if (!this.itemSprites.has(id)) {
           badge.destroy();
@@ -3424,6 +3412,25 @@ export class BoardScene extends Phaser.Scene {
    * spec comes from the world's `decor3d` (the world-builder's `model3d`), or a
    * default emerald. WebGL-less contexts keep the PNG (the try/catch falls back).
    */
+  /**
+   * True when this piece is the emerald AND it should play the BAKED spin rather
+   * than wear the live three.js gem.
+   *
+   * `crystal3d` is built in `create()` before any item spawns, so this is settled
+   * by the time the first crystal is dressed and stays settled for the life of
+   * the scene — a quality change rebuilds the board, which re-asks. The texture
+   * check is not belt-and-braces: the sheet is only FETCHED where the live gem is
+   * declined, so on a machine that has the real thing it is legitimately absent.
+   */
+  private spinsBakedCrystal(snap: ItemSnapshot): boolean {
+    return (
+      snap.chain === 'crystal' &&
+      snap.kind !== 'decor' &&
+      !this.crystal3d &&
+      this.textures.exists(CRYSTAL_SPIN_KEY)
+    );
+  }
+
   private ensureCrystal3D(): void {
     // A live three.js render every few frames for one board item. The painted
     // fallback texture is already there, so skipping this costs a highlight.
@@ -4681,6 +4688,10 @@ export class BoardScene extends Phaser.Scene {
 
   private textureFor(snap: ItemSnapshot): string {
     if (snap.kind === 'decor') return `decor_${snap.chain}`;
+    // The baked spin sheet is its OWN texture, not a re-dress of item_crystal_1:
+    // it is trimmed and half-scale, so it carries a different origin and scale
+    // (setSpin applies them) and must never be seated with the still's numbers.
+    if (this.spinsBakedCrystal(snap)) return CRYSTAL_SPIN_KEY;
     // A bought Manor skin replaces the top-tier Timber art and nothing else —
     // same chain, same tier, same generator, same payout. Every skin ships on
     // the Manor's own 430x450 canvas so ITEM_SCALE.lumber_4 applies unchanged.
@@ -4934,6 +4945,12 @@ export class BoardScene extends Phaser.Scene {
           this.tierArtScale(snap.chain, snap.tier) ??
           1);
     sprite.acquire(snap, this.ctx.data.anchors, this.textureFor(snap), artScale);
+    // The emerald turns wherever the LIVE gem is not. On iOS and the `low`
+    // profile `ensureCrystal3D` declines the second WebGL context, and the baked
+    // sheet plays the same 90° loop at the same cadence instead — the gem the
+    // player sees is the gem everyone else sees, minus a WebGL context and 87
+    // MB/s of readback. The sheet brings its own origin and scale (see setSpin).
+    sprite.setSpin(this.spinsBakedCrystal(snap) ? CRYSTAL_SPIN : null);
     // Phaser 3.90: calling setInteractive() on an already-interactive object
     // silently returns without updating hitArea. Mutate sprite.input.hitArea
     // directly instead. This also handles pool-reuse resets.
@@ -5538,10 +5555,80 @@ export class BoardScene extends Phaser.Scene {
   /** "💤 m:ss" fatigue pill floating above a resting dragon — the SAME
    *  fx_timepill visual the cooldown countdowns use, with the sleep emoji in
    *  place of the gold dot. */
-  private showRestBadge(dragonId: number): void {
+  /**
+   * Reconcile every dragon's SLEEP against the system — the pose AND the
+   * countdown that goes with it — wholesale, on the shared 240 ms tick.
+   *
+   * This is the one-state rule, enforced where it can drift. The pose used to
+   * move on `dragon:mood` alone and the badge on `dragon:rest` alone: two event
+   * streams for one state, and each could be missed.
+   *
+   *   • `dragon:mood` fires on CHANGE only, so a seat DEFERRED while the animal
+   *     was airborne had exactly one door back (`dragonIdle`) — a flight that
+   *     ended any other way left a standing dragon that every rule read as
+   *     asleep, for good.
+   *   • `dragon:rest` fires once, and the badge it built read `restRemaining` —
+   *     a number that knows nothing about the tutorial, hunger, or a keep-awake
+   *     window. Whenever one of those made `moodOf` answer 'awake', the animal
+   *     stood there under a five-minute countdown with nothing to tap: the skip
+   *     buttons are sold off `sleepKindOf`, which was null the whole time. That
+   *     is the bug this method exists to make unrepresentable.
+   *
+   * So the tick is the authority and the events are only the fast path. There
+   * is ONE question — `dragonLife` — and the pose, the badge, the tap and the
+   * hire all answer from it, which is what makes them agree.
+   */
+  private syncDragonSleep(): void {
+    const life = this.ctx.systems.dragonLife;
+    for (const [id, ld] of this.liveDragons) {
+      const mood = life.moodOf(id);
+      // The same one door the event uses, and a no-op when nothing changed.
+      if (mood !== ld.mood) {
+        this.applyDragonMood(id, mood);
+      } else if (
+        mood === 'asleep' &&
+        ld.sleepState === 'none' &&
+        !ld.busy &&
+        ld.flightPhase === null &&
+        !ld.host.getData('dragged')
+      ) {
+        // A seat deferred while airborne: take it the moment the animal is
+        // actually standing, however the flight ended.
+        this.seatDragonSleep(ld);
+      }
+    }
+
+    // The countdown belongs to the one sleep that is a GATE rather than
+    // ambience: a shift rest, which blocks hiring for its whole five minutes.
+    // Naps and nights are capped at seconds — a pill for those would be noise.
+    for (const [id, badge] of this.restBadges) {
+      if (!this.itemSprites.has(id)) {
+        badge.destroy();
+        this.restBadges.delete(id);
+      }
+    }
+    for (const [id, sprite] of this.itemSprites) {
+      const timer = life.sleepKindOf(id) === 'rest' ? life.sleepTimer(id) : null;
+      const badge = this.restBadges.get(id);
+      if (!timer) {
+        badge?.destroy();
+        this.restBadges.delete(id);
+        continue;
+      }
+      const shown = badge ?? this.showRestBadge(id);
+      if (!shown) continue;
+      const s = Math.ceil(timer.remaining / 1000);
+      shown.setPosition(sprite.x, sprite.y - 160);
+      (shown.getData('label') as Phaser.GameObjects.Text).setText(
+        `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+      );
+    }
+  }
+
+  private showRestBadge(dragonId: number): Phaser.GameObjects.Container | null {
     this.restBadges.get(dragonId)?.destroy();
     const sprite = this.itemSprites.get(dragonId);
-    if (!sprite) return;
+    if (!sprite) return null;
 
     const badge = this.add.container(sprite.x, sprite.y - 160).setDepth(DEPTHS.flash);
     const pill = this.add.image(0, 0, 'fx_timepill');
@@ -5568,6 +5655,7 @@ export class BoardScene extends Phaser.Scene {
     this.tweens.add({ targets: badge, scale: 1, duration: 170, ease: 'Back.easeOut' });
 
     this.restBadges.set(dragonId, badge);
+    return badge;
   }
 
   /**
@@ -5622,6 +5710,13 @@ export class BoardScene extends Phaser.Scene {
     this.restBadges.delete(dragonId);
     const sprite = this.itemSprites.get(dragonId);
     if (!sprite) return;
+    // The FATIGUE lifted — which is not the same as being awake. Night, a nap
+    // or a scripted sleep can still hold the animal down, and the celebration
+    // below FLIES it: a dragon that took off out of its own sleeping pose was
+    // this celebration firing on the job record instead of on the one state.
+    // It stays asleep and simply loses the badge; the pose lifts when the
+    // sleep does.
+    if (this.ctx.systems.dragonLife.asleep(dragonId)) return;
     this.sparks.explode(14, sprite.x, sprite.y - 60);
     this.glowFlash(sprite.x, sprite.y - 50, PALETTE.goldAccent, 0.5, 1.0);
     this.floatText(sprite.x, sprite.y - 150, 'Refreshed!', PALETTE.goldAccent);
@@ -5798,7 +5893,11 @@ export class BoardScene extends Phaser.Scene {
       bus.on('dragon:mood', ({ itemId, mood }) => this.applyDragonMood(itemId, mood)),
       bus.on('dragon:sleep_skipped', ({ itemId }) => this.onSleepSkipped(itemId)),
       bus.on('dragon:wandered', ({ itemId, to }) => this.flyWander(itemId, to)),
-      bus.on('dragon:rest', ({ dragonId }) => this.showRestBadge(dragonId)), // already home — the work trip is a brief flourish
+      // No `dragon:rest` listener: the badge and the pose are BOTH reconciled
+      // off the system on the tick (syncDragonSleep), so a rest that begins
+      // mid-tutorial — or inside a keep-awake window, or on a board restored
+      // from a save — can never wear a countdown the rest of the game
+      // disagrees with.
       bus.on('dragon:rested', ({ dragonId }) => this.wakeDragon(dragonId)),
       bus.on('item:harvest_failed', ({ generatorId, reason }) => {
         const sprite = this.itemSprites.get(generatorId);

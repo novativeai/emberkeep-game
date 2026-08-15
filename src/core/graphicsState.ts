@@ -10,7 +10,7 @@
  * it — and that is exactly the channel `POWER_STATE_EVENT` already uses for the
  * same kind of signal.
  */
-import { IS_LOW_END } from './Constants';
+import { IS_IOS, IS_LOW_END } from './Constants';
 import {
   GRAPHICS_PROFILES,
   detectTier,
@@ -78,3 +78,22 @@ export const graphics = {
 };
 
 export { GRAPHICS_PROFILES };
+
+/**
+ * Whether the LIVE three.js emerald may run on this device — and therefore
+ * whether the baked spin sheet is needed instead.
+ *
+ * One predicate, asked in two places that must never disagree: `BoardScene`
+ * decides whether to build the renderer, and `PreloadScene` decides whether to
+ * download the 0.46 MB sheet at all. If they drifted apart a device would either
+ * pay for both or show a still gem with no sheet behind it.
+ *
+ * It lives here rather than beside `Crystal3D` because that module imports
+ * three.js — asking this question must not be what pulls 600 KB of renderer into
+ * the boot path of a device that will never use it.
+ */
+export function liveCrystalAvailable(): boolean {
+  // iOS Safari's renderer process crashes under a SECOND live WebGL context plus
+  // its per-frame GPU→CPU readback; the `low` profile declines it on cost.
+  return graphics.profile.crystal3d && !IS_IOS;
+}

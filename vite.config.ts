@@ -869,6 +869,11 @@ const copyRuntimeArt = (): Plugin => ({
       // Superseded / never-referenced art, each verified against the reference
       // graph (`node scripts/audit-art.mjs`) rather than by eye:
       'sprites/background/emberkeep.jpg', //  background_emberkeep points at emberkeep-nb2.webp
+      // The hand-drawn emerald. `item_crystal_1` now points at crystal-still.webp
+      // — one frame of the SAME three.js gem the board renders live, so the still
+      // and the spin sheet and the live render are finally all the same object.
+      // Kept in the workspace as the original art; nothing loads it.
+      'sprites/items/crystal.webp',
       // (runevault.webp used to sit here as "worlds.json-only, not a zone" while
       //  hatchery.webp was the hub. Runevault IS the hub now — Borealis's, with
       //  its ground measured out of this very file by fit-deck-grid.py — so it

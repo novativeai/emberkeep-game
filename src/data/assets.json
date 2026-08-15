@@ -196,7 +196,7 @@
       "key": "item_crystal_1",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/crystal.webp"
+      "file": "sprites/items/crystal-still.webp"
     },
     {
       "key": "item_emberbark_1",
@@ -1445,7 +1445,7 @@
       "key": "item_cinder_vein_3",
       "source": "file",
       "generator": "item",
-      "file": "sprites/items/crystal.webp"
+      "file": "sprites/items/crystal-still.webp"
     },
     {
       "key": "item_lumber_4",

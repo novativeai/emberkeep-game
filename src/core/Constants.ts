@@ -104,7 +104,40 @@ export const UI_SCALE: number = IS_MOBILE ? 3 : 1;
  * decoration in landscape, and off-centring a bubble this wide would push it off
  * the right edge.
  */
-export const BUBBLE_SCALE: number = IS_MOBILE ? 1.6 : 1;
+export const BUBBLE_SCALE: number = IS_MOBILE ? 1.65 : 1;
+
+/**
+ * The round buttons (settings gear, and the Ledger/Bag/Codex/Store column) take
+ * a SMALLER magnification than the text does.
+ *
+ * UI_SCALE is sized to make WORDS legible, and a word needs about three times
+ * the size on a phone. An icon does not: at 3 the satchel and the scroll were
+ * ~93 CSS px discs stacked nearly 100 px apart, eating the bottom-right corner
+ * and leaving the dialogue no width to open into. 2 puts them near 62 px —
+ * comfortably past the ~44 px touch minimum, and small enough to get out of the
+ * way. Their pitch and their insets both derive from THIS, not from UI_SCALE.
+ */
+export const HUD_BTN_SCALE: number = IS_MOBILE ? 2 : 1;
+
+/**
+ * The top-left gauges, likewise below UI_SCALE. At 3 the Warmth and Gold pills
+ * were ~1000 units each and their "+" buttons ran under the settings gear.
+ */
+export const PILL_SCALE: number = IS_MOBILE ? 2.1 : 1;
+
+/**
+ * The mobile bottom stack, measured UP from the bottom edge. Portrait has the
+ * height to give each of these its own band instead of overlapping them:
+ *
+ *   level disc + XP  ..... lowest, bottom-left
+ *   dialogue bubble  ..... above it, and now nearly the full width
+ *   button column    ..... above that, right side
+ *
+ * Landscape keeps its old insets — there the bubble is narrow and sits beside
+ * the column rather than under it.
+ */
+export const BUBBLE_BOTTOM: number = IS_MOBILE ? 830 : 150;
+export const HUD_COLUMN_BOTTOM: number = IS_MOBILE ? 1460 : 168;
 
 /** Uniform scale so a centred popup FRAME of `frameWidth` fills ~94% of the
  *  portrait width. `1` on desktop. Capped so a small frame never balloons. */
@@ -187,10 +220,10 @@ export const LIVE_GAME_HEIGHT: number = LIVE_SPACE.h;
  *  scales about its own centre, so an inset tuned for one UI_SCALE hangs half
  *  the disc off the screen at a larger one. 112·UI_SCALE clears the scaled disc
  *  (~306 units of half-width at 3) with a margin, at any scale. */
-export const HUD_COLUMN_X: number = LIVE_GAME_WIDTH - (IS_MOBILE ? 112 * UI_SCALE : 156);
-export const HUD_COLUMN_PITCH: number = 200 * UI_SCALE;
+export const HUD_COLUMN_X: number = LIVE_GAME_WIDTH - (IS_MOBILE ? 112 * HUD_BTN_SCALE : 156);
+export const HUD_COLUMN_PITCH: number = 200 * HUD_BTN_SCALE;
 export const hudColumnY = (slot: number): number =>
-  LIVE_GAME_HEIGHT - (IS_MOBILE ? 112 * UI_SCALE : 168) - slot * HUD_COLUMN_PITCH;
+  LIVE_GAME_HEIGHT - HUD_COLUMN_BOTTOM - slot * HUD_COLUMN_PITCH;
 
 /** Isometric 2:1 projection. */
 export const TILE_W = 256;

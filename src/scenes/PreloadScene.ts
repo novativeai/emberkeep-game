@@ -5,6 +5,8 @@ import { clipKey, clipsFor } from '../core/characterAnims';
 import { bootChains, splitWaves } from '../core/assetWaves';
 import { savedDragonClips } from '../core/clipResidency';
 import { SCENES, STANDEE_BANKS, WORLD_ID } from '../core/Constants';
+import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
+import { liveCrystalAvailable } from '../core/graphicsState';
 import type { AssetEntry } from '../core/types';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
@@ -267,6 +269,17 @@ export class PreloadScene extends Phaser.Scene {
           frameHeight: clip.frameHeight
         });
       }
+    }
+    // The crystal's baked spin sheet — ONLY where the live three.js gem is
+    // declined (iOS, the `low` profile). 0.46 MB on the wire and 19 MB decoded,
+    // so a machine that renders the real gem must never pay for a picture of it;
+    // `liveCrystalAvailable` is the single predicate BoardScene asks too, so the
+    // two cannot drift into fetching both or neither.
+    if (!liveCrystalAvailable()) {
+      this.load.spritesheet(CRYSTAL_SPIN_KEY, 'sprites/items/crystal-spin.webp', {
+        frameWidth: CRYSTAL_SPIN.frameWidth,
+        frameHeight: CRYSTAL_SPIN.frameHeight
+      });
     }
     // VFX bank flipbooks for the payoff beats (hatch / finale / merge / chest).
     // Only the sheets in `SHIPPED` — see src/render/vfxBank.ts for the VRAM
