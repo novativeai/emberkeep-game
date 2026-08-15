@@ -1232,7 +1232,11 @@ export interface EventMap {
    *  beat reads it, and the HUD dims behind it. */
   'ui:commission_toggled': { open: boolean };
   /** Intent: DROP one of this stack back out onto the board. */
-  'ui:bag_retrieve_requested': { chain: string; tier: number };
+  /** `count` is how many the player asked for in one go (the Bag's stepper).
+   *  Optional and defaulting to 1, so every older caller still means "one". A
+   *  retrieval takes as many as the board has room for and stops — a partial
+   *  answer is the honest one when the isle fills up mid-request. */
+  'ui:bag_retrieve_requested': { chain: string; tier: number; count?: number };
 
   /* -- the House's commission (GeneratorSystem owns what a generator makes) -- */
   /**
@@ -1263,7 +1267,8 @@ export interface EventMap {
    *  never sold, so the board keeps exactly one destructive verb and the player
    *  has to have chosen to put something aside before they can lose it.
    *  EconomySystem owns it (it owns coins) and commands `bag:consume`. */
-  'ui:bag_sell_requested': { chain: string; tier: number };
+  /** `count` as above: sell this many at once rather than one tap per piece. */
+  'ui:bag_sell_requested': { chain: string; tier: number; count?: number };
   /** Command: take `count` of this stack out of the Bag. BagSystem owns the bag,
    *  exactly as BoardSystem owns the grid behind `board:consume_items`. */
   'bag:consume': { chain: string; tier: number; count: number };

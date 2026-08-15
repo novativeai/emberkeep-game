@@ -22,7 +22,6 @@ export class BoardItem extends Phaser.GameObjects.Container {
 
   private sprite: Phaser.GameObjects.Image;
   private readyStar: Phaser.GameObjects.Image;
-  private shadow: Phaser.GameObjects.Ellipse;
   private groundShadow: Phaser.GameObjects.Image; // persistent soft shadow, sized to the art
   private cooldownLabel: Phaser.GameObjects.Text;
   private timePill: Phaser.GameObjects.Image;
@@ -55,19 +54,15 @@ export class BoardItem extends Phaser.GameObjects.Container {
 
   constructor(scene: Phaser.Scene) {
     super(scene, 0, 0);
-    // Ground shadow sits FIRST so it renders beneath the art; only shown while
-    // the item is lifted for a drag (Fairyland-style weighted pick-up).
     // Persistent soft (radial-gradient) ground shadow, sized to the art in
     // acquire() so EVERY object casts one. Sits first (under the art); the idle
-    // bob lifts the sprite off it. Falls back to a flat tint if the texture
+    // bob lifts the sprite off it, and a drag SWELLS it (liftForDrag) — it is
+    // the ONLY shadow an item has. Falls back to a flat tint if the texture
     // (built by BoardScene.ensureShadowTexture) isn't ready.
     this.groundShadow = scene.add
       .image(0, 8, scene.textures.exists('fx_shadow') ? 'fx_shadow' : '__WHITE')
       .setVisible(false);
     if (!scene.textures.exists('fx_shadow')) this.groundShadow.setTint(num(PALETTE.night)).setAlpha(0.24);
-    this.shadow = scene.add
-      .ellipse(0, DRAG.shadowY, DRAG.shadowRX * 2, DRAG.shadowRY * 2, DRAG.shadowColor)
-      .setAlpha(0);
     this.sprite = scene.add.image(0, 0, '__DEFAULT');
     this.readyStar = scene.add.image(40, -104, 'fx_spark').setScale(0.7).setVisible(false);
     // Countdown shown over a waiting generator: warm plum pill (Emberkeep
@@ -93,7 +88,6 @@ export class BoardItem extends Phaser.GameObjects.Container {
       .setVisible(false);
     this.add([
       this.groundShadow,
-      this.shadow,
       this.sprite,
       this.readyStar,
       this.timePill,
@@ -201,7 +195,6 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.cooldownLabel.setVisible(false);
     this.timePill.setVisible(false);
     this.timeIcon.setVisible(false);
-    this.shadow.setAlpha(0);
     this.setScale(1);
     this.setAlpha(1);
     this.setVisible(true);
@@ -212,8 +205,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
   release(): void {
     this.scene.tweens.killTweensOf(this);
     this.scene.tweens.killTweensOf(this.sprite);
-    this.scene.tweens.killTweensOf(this.shadow);
-    this.shadow.setAlpha(0);
+    this.scene.tweens.killTweensOf(this.groundShadow);
     // Keep the input component: invisible objects are skipped by hit tests,
     // and disableInteractive() would leave reused pool sprites input-dead.
     this.setVisible(false);
@@ -362,9 +354,10 @@ export class BoardItem extends Phaser.GameObjects.Container {
   setOverGround(on: boolean): void {
     if (on === this.overGround) return;
     this.overGround = on;
+    // `groundShadowBeforeLift` is what keeps this from LIGHTING a shadow: a rig
+    // host (or a sleeping dragon) hid its own on purpose, and coming back over
+    // the isle must not undo that.
     this.groundShadow.setVisible(on && this.groundShadowBeforeLift);
-    this.scene.tweens.killTweensOf(this.shadow);
-    this.shadow.setAlpha(on ? DRAG.shadowAlpha : 0);
   }
 
   /**
@@ -388,7 +381,6 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // hidden, and coming back over ground must not light one up for it.
     this.groundShadowBeforeLift = this.groundShadow.visible;
     this.overGround = true;
-    this.scene.tweens.killTweensOf(this.shadow);
     this.scene.tweens.add({
       targets: this,
       scale: DRAG.liftScale,
@@ -401,12 +393,27 @@ export class BoardItem extends Phaser.GameObjects.Container {
       duration: DRAG.liftMs,
       ease: 'Sine.easeOut'
     });
-    this.scene.tweens.add({
-      targets: this.shadow,
-      alpha: DRAG.shadowAlpha,
-      duration: DRAG.liftMs,
-      ease: 'Sine.easeOut'
-    });
+    // The pick-up response lives on the item's OWN soft shadow: it swells
+    // under the lifted piece on the same snappy curve the lift uses, instead of
+    // a second sharp ellipse fading in on top of it. (A rig host's art — and
+    // its shadow — are hidden; the rig carries its own.)
+    if (!this.artHidden) {
+      this.scene.tweens.killTweensOf(this.groundShadow);
+      const w = this.shadowFitWidth() * DRAG.shadowGrow;
+      this.scene.tweens.add({
+        targets: this.groundShadow,
+        scaleX: w / Math.max(1, this.groundShadow.width),
+        scaleY: (w * 0.42) / Math.max(1, this.groundShadow.height),
+        duration: DRAG.liftMs,
+        ease: 'Back.easeOut'
+      });
+    }
+  }
+
+  /** The soft shadow's resting display width for the current art — the same fit
+   *  every setDisplaySize site uses, from the UNTWEENED art scale. */
+  private shadowFitWidth(): number {
+    return Math.max(64, this.sprite.width * this.artBaseX * 0.92);
   }
 
   settleFromDrag(): void {
@@ -431,13 +438,19 @@ export class BoardItem extends Phaser.GameObjects.Container {
         this.landSquash();
       }
     });
-    this.scene.tweens.killTweensOf(this.shadow);
-    this.scene.tweens.add({
-      targets: this.shadow,
-      alpha: 0,
-      duration: DRAG.shadowFadeMs,
-      ease: 'Sine.easeIn'
-    });
+    // …and the swell relaxes back to its resting fit. Sized, not alpha'd: the
+    // shadow never goes away, it only stops being the shadow of a held thing.
+    if (!this.artHidden) {
+      this.scene.tweens.killTweensOf(this.groundShadow);
+      const w = this.shadowFitWidth();
+      this.scene.tweens.add({
+        targets: this.groundShadow,
+        scaleX: w / Math.max(1, this.groundShadow.width),
+        scaleY: (w * 0.42) / Math.max(1, this.groundShadow.height),
+        duration: DRAG.shadowFadeMs,
+        ease: 'Sine.easeOut'
+      });
+    }
   }
 
   /**

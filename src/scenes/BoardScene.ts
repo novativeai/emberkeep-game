@@ -4821,21 +4821,40 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
-  /** The iso-diamond that lights up the cell a dragged item is hovering over. */
+  /**
+   * The reticle that marks the cell a dragged item is hovering over.
+   *
+   * Four corner brackets on the tile diamond over a breath of fill — the frame
+   * an action game puts round a target, rather than the filled slab this used to
+   * be (see `DRAG.cellHighlight*` for why). Drawn once at the authored tile's
+   * size and re-scaled per zone by `updateDrag`, so it costs nothing per frame.
+   */
   private buildDragCell(): void {
     const g = this.add.graphics().setDepth(DEPTHS.tileHighlight).setVisible(false);
-    g.fillStyle(DRAG.cellHighlightColor, DRAG.cellHighlightAlpha);
-    g.lineStyle(3, DRAG.cellHighlightColor, Math.min(1, DRAG.cellHighlightAlpha + 0.3));
-    const pts = [0, -TILE_H / 2, TILE_W / 2, 0, 0, TILE_H / 2, -TILE_W / 2, 0];
-    g.fillPoints(this.diamond(pts), true);
-    g.strokePoints(this.diamond(pts), true);
+    // The diamond's vertices, clockwise from the top.
+    const v = [
+      { x: 0, y: -TILE_H / 2 },
+      { x: TILE_W / 2, y: 0 },
+      { x: 0, y: TILE_H / 2 },
+      { x: -TILE_W / 2, y: 0 }
+    ];
+    g.fillStyle(DRAG.cellHighlightColor, DRAG.cellFillAlpha);
+    g.fillPoints(v.map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
+    // Each corner is TWO arms: one reaching along the edge to the previous
+    // vertex, one to the next. Drawn as separate strokes rather than one path so
+    // the round join sits at the vertex and the arms end square.
+    g.lineStyle(DRAG.cellBracketWidth, DRAG.cellHighlightColor, DRAG.cellHighlightAlpha);
+    const t = DRAG.cellBracketSpan;
+    for (let i = 0; i < v.length; i++) {
+      const c = v[i]!;
+      for (const n of [v[(i + 1) % v.length]!, v[(i + 3) % v.length]!]) {
+        g.beginPath();
+        g.moveTo(c.x, c.y);
+        g.lineTo(c.x + (n.x - c.x) * t, c.y + (n.y - c.y) * t);
+        g.strokePath();
+      }
+    }
     this.dragCell = g;
-  }
-
-  private diamond(flat: number[]): Phaser.Geom.Point[] {
-    const pts: Phaser.Geom.Point[] = [];
-    for (let i = 0; i < flat.length; i += 2) pts.push(new Phaser.Geom.Point(flat[i], flat[i + 1]));
-    return pts;
   }
 
   /* ----------------------------- input ------------------------------ */

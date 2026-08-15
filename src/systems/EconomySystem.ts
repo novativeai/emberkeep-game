@@ -35,7 +35,7 @@ export class EconomySystem {
     bus.on('marketplace:purchased', ({ free }) => {
       if (free && this.state.stat('freeSparkUsed') === 0) this.state.addStat('freeSparkUsed', 1);
     });
-    bus.on('ui:bag_sell_requested', ({ chain, tier }) => this.sellFromBag(chain, tier));
+    bus.on('ui:bag_sell_requested', ({ chain, tier, count }) => this.sellFromBag(chain, tier, count ?? 1));
     /**
      * A LOADED save is a wallet that changed, and nothing was saying so.
      *
@@ -66,13 +66,24 @@ export class EconomySystem {
    * debit goes out as the `bag:consume` command rather than a direct write —
    * the same split as `board:consume_items` on the board side.
    */
-  private sellFromBag(chain: string, tier: number): void {
-    if ((this.state.bag.find((s) => s.chain === chain && s.tier === tier)?.count ?? 0) <= 0) return;
+  /**
+   * Sell `count` of a banked stack in ONE transaction.
+   *
+   * Clamped to what is actually held, so a stale panel — a stepper left at ten
+   * while a merge ate four — pays for what exists and no more. One `item:sold`
+   * carrying the whole take rather than one per piece: the event drives a
+   * celebration and a quest counter, and ten of them for one gesture would
+   * spam the first and is not what the second means by "a sale".
+   */
+  private sellFromBag(chain: string, tier: number, count = 1): void {
+    const held = this.state.bag.find((s) => s.chain === chain && s.tier === tier)?.count ?? 0;
+    const n = Math.min(Math.max(1, count), held);
+    if (n <= 0) return;
     // Story items (the Golden Egg/Elder) are promises, not merchandise.
     const tierConfig = this.chains.chains.find((c) => c.id === chain)?.tiers.find((t) => t.tier === tier);
     if (!tierConfig || tierConfig.sellable === false) return;
-    const value = this.sellValue(chain, tier);
-    this.bus.emit('bag:consume', { chain, tier, count: 1 });
+    const value = this.sellValue(chain, tier) * n;
+    this.bus.emit('bag:consume', { chain, tier, count: n });
     this.state.coins += value;
     this.bus.emit('item:sold', { chain, tier, coins: value });
     this.announce();

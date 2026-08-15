@@ -1,4 +1,4 @@
-import { REWARD_SPAWN_RADIUS } from '../core/Constants';
+import { MERGE_SNAP_RADIUS, REWARD_SPAWN_RADIUS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -88,32 +88,42 @@ export class MergeSystem {
   }
 
   /**
-   * If the exact drop tile didn't form a group, scan the 8 tiles around it for a
-   * FREE active tile that sits beside enough matching pieces to merge; snap the
-   * dropped piece there and fuse. This makes dropping a piece NEAR a mergeable
-   * pair merge directly, the way a forgiving merge game should feel.
+   * THE MAGNET — dropping a piece NEAR a mergeable cluster fuses it anyway.
+   *
+   * If the exact drop tile didn't form a group, the tiles around it are scanned
+   * for a FREE active one that sits beside enough matching pieces to merge; the
+   * piece snaps there and fuses. Landing on the precise completing tile is a
+   * precision the player should never be asked for.
+   *
+   * SEARCHED IN RINGS, nearest first, because "near" is the whole promise: a
+   * piece must not fly across three tiles to a bigger cluster when a merge was
+   * sitting one tile away. Within a ring the biggest group wins, so a drop
+   * equally close to two clusters joins the one further along.
+   *
+   * What the radius may NOT do is loosen the test. The group size is the exact
+   * orthogonally-connected flood `collectGroup` runs — a looser count (an
+   * 8-neighbourhood, say) can promise a merge that then fails, leaving the
+   * piece moved in state while the scene still draws it on the drop tile: a
+   * permanent desync. Reaching further is safe; guessing is not.
    */
   private trySnapMerge(item: BoardItemState, to: TilePos): boolean {
     const config = this.chainConfig(item.chain);
     if (!config || !config.tiers.some((t) => t.tier === item.tier + 1)) return false; // max tier
     const minGroup = this.mergeOverrideFor(config, item.tier)?.group ?? this.chains.mergeRule.minGroup;
     let best: { col: number; row: number; size: number } | null = null;
-    for (let dc = -1; dc <= 1; dc++) {
-      for (let dr = -1; dr <= 1; dr++) {
-        if (dc === 0 && dr === 0) continue; // the drop tile itself was already tried
-        const col = to.col + dc;
-        const row = to.row + dr;
-        if (!this.state.isTileActive(col, row)) continue;
-        const occ = this.state.itemIdAt(col, row);
-        if (occ && occ !== item.id) continue; // candidate must be free
-        // Size the ACTUAL orthogonally-connected group the piece would join if
-        // it stood on this candidate — the same flood-fill collectGroup runs.
-        // (A looser count — e.g. 8-neighbourhood — can promise a merge that
-        // then fails, leaving the piece silently moved in state while the
-        // scene renders it on the drop tile: a permanent drag-bounce desync.)
-        const size = this.groupSizeAt(col, row, item);
-        if (size >= minGroup && (!best || size > best.size)) {
-          best = { col, row, size };
+    for (let r = 1; r <= MERGE_SNAP_RADIUS && !best; r++) {
+      for (let dc = -r; dc <= r; dc++) {
+        for (let dr = -r; dr <= r; dr++) {
+          if (Math.max(Math.abs(dc), Math.abs(dr)) !== r) continue; // this ring only
+          const col = to.col + dc;
+          const row = to.row + dr;
+          if (!this.state.isTileActive(col, row)) continue;
+          const occ = this.state.itemIdAt(col, row);
+          if (occ && occ !== item.id) continue; // candidate must be free
+          const size = this.groupSizeAt(col, row, item);
+          if (size >= minGroup && (!best || size > best.size)) {
+            best = { col, row, size };
+          }
         }
       }
     }

@@ -13,6 +13,7 @@ import {
   HUD_COLUMN_X,
   hudColumnY,
   LIVE_GAME_HEIGHT,
+  MAP_EDITOR_IN_SETTINGS,
   num,
   PALETTE,
   OPENING_HOLD_MS,
@@ -2219,11 +2220,20 @@ export class UIScene extends Phaser.Scene {
     // Map Editor — the tool that authors the zone registry the engine runs
     // (`src/editor/`). Parked on the title row so it never crowds the reset copy.
     // It only emits the intent; the editor lives outside the scene tree entirely.
-    const editorButton = makeButton(292, 'Map Editor', 'ui_btn_green', 0.68, () => {
-      this.closeResetDialog();
-      this.ctx.bus.emit('editor:open', {});
-    });
-    editorButton.setY(-320);
+    //
+    // HIDDEN by default (`MAP_EDITOR_IN_SETTINGS`), because a button that opens
+    // the world-authoring tool does not belong one tap away on a player's
+    // settings panel. `?mapedit` on the URL brings it back for whoever is
+    // actually authoring, the same way `?uiedit` opens the UI Builder — so the
+    // tool is out of the player's way without being out of reach.
+    const showEditor =
+      MAP_EDITOR_IN_SETTINGS || new URLSearchParams(window.location.search).has('mapedit');
+    const editorButton = showEditor
+      ? makeButton(292, 'Map Editor', 'ui_btn_green', 0.68, () => {
+          this.closeResetDialog();
+          this.ctx.bus.emit('editor:open', {});
+        }).setY(-320)
+      : null;
 
     const resetButton = makeButton(-210, 'Reset', 'ui_btn_play', 0.72, () => {
       this.closeResetDialog();
@@ -2233,7 +2243,8 @@ export class UIScene extends Phaser.Scene {
       this.closeResetDialog()
     );
 
-    container.add([dim, panel, title, editorButton, musicBtn, gfxBtn, gfxNote, divider, resetTitle, body, resetButton, keepButton]);
+    container.add([dim, panel, title, musicBtn, gfxBtn, gfxNote, divider, resetTitle, body, resetButton, keepButton]);
+    if (editorButton) container.add(editorButton); // last: it sits alone on the title row, nothing to sort against
     container.setAlpha(0);
     container.setScale(0.94);
     this.tweens.add({ targets: container, alpha: 1, scale: 1, duration: 170, ease: 'Back.easeOut' });

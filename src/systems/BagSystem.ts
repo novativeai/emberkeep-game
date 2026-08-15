@@ -29,7 +29,7 @@ export class BagSystem {
     private bus: EventBus
   ) {
     bus.on('ui:store_requested', ({ itemId }) => this.store(itemId));
-    bus.on('ui:bag_retrieve_requested', ({ chain, tier }) => this.retrieve(chain, tier));
+    bus.on('ui:bag_retrieve_requested', ({ chain, tier, count }) => this.retrieve(chain, tier, count ?? 1));
     // EconomySystem owns selling and coins; the bag owns the stack. It sends
     // this command the way selling a board piece used to send
     // `board:consume_items`, so exactly one system ever writes `state.bag`.
@@ -123,9 +123,29 @@ export class BagSystem {
    * reopens the bag that tile is usually occupied, and a retrieval that
    * silently fails is worse than one that lands somewhere sensible.
    */
-  private retrieve(chain: string, tier: number): void {
+  /**
+   * Take `count` back out of the Bag, one at a time.
+   *
+   * A loop rather than a bulk spawn, because the answer to "is there room?" is
+   * only true one piece at a time: each retrieval fills a cell, so the fifth
+   * can fail where the fourth succeeded. Whatever fitted stays out and the rest
+   * stays banked — a request that cannot be met in full is met in part, never
+   * refused outright and never silently over-debited.
+   */
+  private retrieve(chain: string, tier: number, count = 1): void {
+    let taken = 0;
+    for (let n = 0; n < Math.max(1, count); n++) {
+      if (!this.retrieveOne(chain, tier, taken === 0)) break;
+      taken++;
+    }
+  }
+
+  /** One piece out. Returns false when the board had nowhere to put it — the
+   *  caller stops there. `announce` only for the first, so a run of ten does
+   *  not fire ten "the isle is full" nudges. */
+  private retrieveOne(chain: string, tier: number, announceFailure: boolean): boolean {
     const idx = this.state.bag.findIndex((s) => s.chain === chain && s.tier === tier);
-    if (idx < 0) return;
+    if (idx < 0) return false;
     const stack = this.state.bag[idx]!;
 
     const before = this.state.items.size;
@@ -133,8 +153,8 @@ export class BagSystem {
     // BoardSystem is synchronous: if nothing appeared the board had no free
     // active tile, so the stack must NOT be debited.
     if (this.state.items.size === before) {
-      this.bus.emit('bag:store_failed', { reason: 'no_room' });
-      return;
+      if (announceFailure) this.bus.emit('bag:store_failed', { reason: 'no_room' });
+      return false;
     }
 
     stack.count -= 1;
@@ -143,6 +163,7 @@ export class BagSystem {
     const spawned = [...this.state.items.values()].at(-1)!;
     this.bus.emit('bag:retrieved', { chain, tier, at: { col: spawned.col, row: spawned.row } });
     this.emitChanged();
+    return true;
   }
 
   /** Take pieces out of the bag without putting them anywhere — the debit half

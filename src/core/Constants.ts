@@ -87,6 +87,22 @@ export const IS_LOW_END: boolean =
  */
 export const UI_SCALE: number = IS_MOBILE ? 1.5 : 1;
 
+/**
+ * Does Settings offer the Map Editor?
+ *
+ * OFF — hidden, not removed. The tool is the whole authoring pipeline for the
+ * zone registry and it goes on being built; what it should not be is a green
+ * button on a player's settings panel, one tap from a screen that can repaint
+ * the world. Nothing else changes: the scene still builds the button and the
+ * `editor:open` intent still exists, so turning this back on is one word.
+ *
+ * The way in while it is off is `?mapedit` on the URL — the same convention the
+ * UI Builder already uses for `?uiedit` (see PreloadScene). Read at the settings
+ * panel rather than here, because this module is imported by systems that run in
+ * node unit tests, where there is no `window`.
+ */
+export const MAP_EDITOR_IN_SETTINGS = false;
+
 /** Uniform scale so a centred popup FRAME of `frameWidth` fills ~94% of the
  *  portrait width. `1` on desktop. Capped so a small frame never balloons. */
 export function panelMobileScale(frameWidth: number): number {
@@ -1866,16 +1882,42 @@ export const DRAG = {
    */
   dropBiasOfHeight: 0.28,
   dropBiasMaxPx: 24,
-  /** Ground shadow under a lifted item. */
-  shadowRX: 58,
-  shadowRY: 22,
-  shadowY: 30,
-  shadowAlpha: 0.28,
-  shadowColor: 0x1a0f14,
+  /**
+   * How much the item's own SOFT ground shadow swells while it is held.
+   *
+   * There is deliberately NO second drag-only shadow shape. A lifted piece used
+   * to light a sharp dark ellipse (shadowRX/RY/Y/Alpha/Color) on top of the soft
+   * one every item already casts — two shadows for one object, which reads as a
+   * rendering bug rather than as weight. One shadow, and lifting makes it grow.
+   */
+  shadowGrow: 1.32,
   shadowFadeMs: 130,
-  /** Highlight diamond on the cell under the dragged item. */
-  cellHighlightAlpha: 0.5,
-  cellHighlightColor: 0xffd27a
+  /**
+   * The drop-target reticle on the cell under the dragged item.
+   *
+   * A RETICLE, not a slab. It used to be the whole diamond filled at half alpha
+   * with a line round it, which is the honest first version of "show the cell"
+   * and reads as a coloured tile: it competes with the art it is under, and at
+   * the pitch of the smaller zones two neighbouring highlights look like ground
+   * rather than like a choice.
+   *
+   * Corner brackets say the same thing in a quarter of the ink — the four
+   * vertices are marked, the edges between them are left open, and the eye
+   * closes the shape by itself. It is the targeting frame every action game
+   * uses for exactly this, and it stays legible over dark rock and pale
+   * flagstone alike because it is line rather than wash.
+   *
+   * `bracketSpan` is the fraction of ONE EDGE each arm covers, so the geometry
+   * follows the zone's own diamond rather than a fixed pixel length — Runevault's
+   * 133px tile gets the same proportion as the authored isle's 256px one.
+   */
+  cellHighlightColor: 0xffd27a,
+  /** The brackets themselves: near-opaque, so the frame is the thing you see. */
+  cellHighlightAlpha: 0.9,
+  cellBracketWidth: 5,
+  cellBracketSpan: 0.32,
+  /** A breath of wash inside, only enough to say WHICH side of the line is the cell. */
+  cellFillAlpha: 0.12
 } as const;
 
 /** The authored decor piece (zones.json `decor` name) that opens Selyna's
@@ -1892,6 +1934,23 @@ export const DRAG = {
  * and they are free to diverge if either turns out wrong in play.
  */
 export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000 } as const;
+
+/**
+ * HOW FAR THE MERGE MAGNET REACHES — in tiles, from where the piece was let go.
+ *
+ * A drop that lands beside a mergeable cluster fuses anyway (MergeSystem
+ * `trySnapMerge`): the player aims at a group, not at the one exact tile that
+ * completes it, and asking for that precision is asking them to do the board's
+ * arithmetic. Two rings rather than one because a finger covers most of a tile
+ * and an isometric grid reads a row off at a glance — one ring caught the near
+ * miss, not the honest "I dropped it right there".
+ *
+ * It buys forgiveness, not guessing: the candidate tile still has to be free,
+ * still has to be real ground, and the group is still counted by the exact
+ * flood-fill the merge itself uses. Raising this makes pieces travel further to
+ * a merge the player did mean; it can never conjure one they did not.
+ */
+export const MERGE_SNAP_RADIUS = 2;
 
 /** The save latch for the gate lesson — the hand that teaches world travel by
  *  drawing "carry the dragon to the arch" once, after Eleanor's Emporium visit.

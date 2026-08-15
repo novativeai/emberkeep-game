@@ -337,8 +337,11 @@ describe('MergeSystem', () => {
     // 8-neighbourhood count saw a completable pair there, snapped the piece in
     // state, then collectGroup (orthogonal) found nobody — the merge failed and
     // the emitted item:moved pointed at a tile the item no longer occupied.
+    // Far enough apart that NO free tile is orthogonally beside both, at any
+    // ring the magnet searches — the point is a snap that is considered and
+    // rejected, so the pair must stay unfuseable however far the reach grows.
     ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 2, row: 2, kind: 'item' });
-    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 4, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 6, row: 2, kind: 'item' });
     const dragged = ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 4, kind: 'item' });
     const merges = capture(ctx.bus, 'item:merged');
     const moves = capture(ctx.bus, 'item:moved');
@@ -351,6 +354,43 @@ describe('MergeSystem', () => {
     const item = ctx.state.items.get(dragged.id)!;
     expect({ col: item.col, row: item.row }).toEqual(moves[0]!.to);
     expect(ctx.state.itemIdAt(moves[0]!.to.col, moves[0]!.to.row)).toBe(dragged.id);
+  });
+
+  it('reaches TWO tiles for a merge the player clearly meant', () => {
+    const ctx = createTestContext();
+    // A pair sitting together, and a drop two tiles short of the tile that
+    // completes them. One ring used to leave this as a plain move: the player
+    // aimed at the group and was told to aim better.
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 4, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 5, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 1, row: 5, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    drag(ctx, [1, 5], [4, 4]); // (4,3) completes it — two rows up from the drop
+
+    expect(merges).toHaveLength(1);
+  });
+
+  it('takes the nearer merge, not the bigger one further off', () => {
+    const ctx = createTestContext();
+    // A completable pair one ring away, and a fatter cluster two rings away.
+    // "Near" is the promise — a piece must not fly past the merge under the
+    // finger to join a better one across the board.
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 2, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 2, row: 2, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 6, row: 4, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 6, row: 5, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 6, row: 6, kind: 'item' });
+    ctx.state.addItem({ chain: 'sparkweed', tier: 1, col: 0, row: 7, kind: 'item' });
+    const merges = capture(ctx.bus, 'item:merged');
+
+    drag(ctx, [0, 7], [3, 3]); // (2,3) is one ring away; the trio sits two away
+
+    expect(merges).toHaveLength(1);
+    // The NEAR pair is the one that fused — the far trio is still standing.
+    expect(ctx.state.itemAt(6, 4)?.tier).toBe(1);
+    expect(ctx.state.itemAt(6, 5)?.tier).toBe(1);
+    expect(ctx.state.itemAt(6, 6)?.tier).toBe(1);
   });
 
   it('writes a Cookbook page on the FIRST merge of a recipe — and only once', () => {

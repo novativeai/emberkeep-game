@@ -39,7 +39,7 @@ const GAP = 30;
 /** Widened for the THIRD verb. Three buttons at the old 194 would have brought
  *  the overlap the popover was built to fix straight back. */
 const POP_W = 596;
-const POP_H = 214;
+const POP_H = 292; // title · quantity stepper · the three fates
 const POP_R = 26;
 /** Tail height, and half its width where it meets the plate. */
 const POP_TAIL = 20;
@@ -84,6 +84,22 @@ export class BagPanel extends Phaser.GameObjects.Container {
   /** The Drop/Sell chooser, parented to the slot it belongs to (null = none
    *  open). Only one is ever live: opening another closes this one. */
   private chooser: Phaser.GameObjects.Container | null = null;
+  /**
+   * HOW MANY — the stepper's live answer, and why it exists.
+   *
+   * Drop and Sell used to move exactly one piece per visit: open the slot, tap,
+   * the popover closes, open it again. Emptying a stack of twelve was twelve
+   * round trips through a menu that had already been told what the player
+   * wanted. The count travels with the request instead.
+   *
+   * A stepper rather than a typed field: this is a touch surface and the
+   * numbers are small — `Max` covers the one case where typing would win, and
+   * nothing here is worth raising a keyboard over. Reset to 1 on every open, so
+   * a big number chosen for one stack is never inherited by the next.
+   */
+  private qty = 1;
+  private qtyMax = 1;
+  private qtyLabel: Phaser.GameObjects.Text | null = null;
   /** The Sell button inside the live chooser — the tutorial arrow's target. */
   private sellButton: Phaser.GameObjects.Container | null = null;
   /** The Give button, likewise. */
@@ -418,7 +434,11 @@ export class BagPanel extends Phaser.GameObjects.Container {
     // it. Drop is reversible so it is the quiet one; Sell is final and wears the
     // coin it pays, which is also the only place the value is ever shown.
     const drop = this.chooserButton('Drop', dropX, by, PALETTE.plumHighlight, PALETTE.plumShade, () => {
-      this.bus.emit('ui:bag_retrieve_requested', { chain: stack.chain, tier: stack.tier });
+      this.bus.emit('ui:bag_retrieve_requested', {
+        chain: stack.chain,
+        tier: stack.tier,
+        count: this.qty
+      });
       this.closeChooser();
     });
     const give = this.chooserButton('Give', giveX, by, PALETTE.lava, PALETTE.lavaShade, () => {
@@ -439,12 +459,53 @@ export class BagPanel extends Phaser.GameObjects.Container {
           this.bus.emit('tutorial:nudge', {});
           return;
         }
-        this.bus.emit('ui:bag_sell_requested', { chain: stack.chain, tier: stack.tier });
+        this.bus.emit('ui:bag_sell_requested', {
+          chain: stack.chain,
+          tier: stack.tier,
+          count: this.qty
+        });
         this.closeChooser();
       }, true);
       sell.setAlpha(this.sellAllowed ? 1 : 0.5);
     }
     chooser.add(sell ? [drop, give, sell] : [drop, give]);
+
+    // The stepper, between the name and the fates — it qualifies the two verbs
+    // that take a number, and sits where the eye already is on the way down.
+    //
+    // GIVE is deliberately not qualified by it: giving ARMS a second gesture on
+    // the board, and "give six" would have to ask six times or invent a rule
+    // for what happens after the first refusal. One is the only honest answer
+    // there, so the stepper leaves it alone rather than lying about its reach.
+    this.qty = 1;
+    this.qtyMax = stack.count;
+    const priceOf = (n: number): string => `+${value * n}`;
+    const paint = (): void => {
+      this.qtyLabel?.setText(`×${this.qty}`);
+      (drop.getData('text') as Phaser.GameObjects.Text | undefined)?.setText(
+        this.qty > 1 ? `Drop ×${this.qty}` : 'Drop'
+      );
+      if (sell) {
+        const label = sell.getData('text') as Phaser.GameObjects.Text | undefined;
+        label?.setText(priceOf(this.qty));
+        // The coin rides beside the price, so a wider number has to re-centre
+        // the pair or the plate reads lopsided at ×10.
+        const coin = sell.list.find((o) => o instanceof Phaser.GameObjects.Image) as
+          | Phaser.GameObjects.Image
+          | undefined;
+        if (coin && label) {
+          const total = coin.displayWidth + 10 + label.width;
+          coin.setX(-total / 2 + coin.displayWidth / 2);
+          label.setX(total / 2 - label.width / 2);
+        }
+      }
+    };
+    const step = (by2: number): void => {
+      this.qty = Phaser.Math.Clamp(this.qty + by2, 1, Math.max(1, this.qtyMax));
+      paint();
+    };
+    if (stack.count > 1) chooser.add(this.quantityRow(-4, step, () => { this.qty = this.qtyMax; paint(); }));
+    paint();
 
     slot.add(chooser);
     // Above every other slot: the plate is wider than its own slot and would
@@ -506,6 +567,78 @@ export class BagPanel extends Phaser.GameObjects.Container {
    *  width to sit side by side without touching, and the shared button art can
    *  only get there by being squashed non-uniformly — which is how the old pair
    *  ended up overlapping. */
+  /**
+   * `−  ×N  +  Max` — the row that turns "one per visit" into "however many".
+   *
+   * Built only when the stack HOLDS more than one: a stepper over a single
+   * piece is three controls that can do nothing, which is worse than no
+   * stepper. `Max` is the one shortcut worth having — emptying a stack is the
+   * commonest reason to want a number at all.
+   */
+  private quantityRow(
+    y: number,
+    step: (by: number) => void,
+    max: () => void
+  ): Phaser.GameObjects.Container {
+    const row = this.scene.add.container(0, y);
+    const label = this.scene.add
+      .text(0, 0, '×1', {
+        fontFamily: FONT.display,
+        fontSize: '40px',
+        fontStyle: 'bold',
+        color: PALETTE.cream
+      })
+      .setOrigin(0.5);
+    this.qtyLabel = label;
+    row.add([
+      this.stepperKey('−', -132, () => step(-1)),
+      label,
+      this.stepperKey('+', 132, () => step(1)),
+      this.stepperKey('Max', 246, max, 108)
+    ]);
+    return row;
+  }
+
+  /** One round key of the stepper. Its own helper rather than `chooserButton`:
+   *  those are the three FATES and wear the weight to match — a key that only
+   *  changes a number must not look like one that spends the piece. */
+  private stepperKey(
+    label: string,
+    x: number,
+    onTap: () => void,
+    width = 76
+  ): Phaser.GameObjects.Container {
+    const c = this.scene.add.container(x, 0);
+    const h = 68;
+    const g = this.scene.add.graphics();
+    g.fillStyle(num(PALETTE.plumShade), 1);
+    g.fillRoundedRect(-width / 2, -h / 2 + 4, width, h, 18);
+    g.fillStyle(num(PALETTE.plum), 1);
+    g.fillRoundedRect(-width / 2, -h / 2, width, h, 18);
+    g.lineStyle(3, num(PALETTE.plumShade), 1);
+    g.strokeRoundedRect(-width / 2, -h / 2, width, h, 18);
+    c.add(g);
+    c.add(
+      this.scene.add
+        .text(0, -2, label, {
+          fontFamily: FONT.display,
+          fontSize: label.length > 1 ? '28px' : '40px',
+          fontStyle: 'bold',
+          color: PALETTE.cream
+        })
+        .setOrigin(0.5)
+    );
+    c.setSize(width, h);
+    c.setInteractive({ useHandCursor: true });
+    c.on('pointerover', () => c.setScale(1.06));
+    c.on('pointerout', () => c.setScale(1));
+    c.on('pointerup', () => {
+      c.setScale(1);
+      onTap();
+    });
+    return c;
+  }
+
   private chooserButton(
     label: string,
     x: number,
@@ -534,6 +667,7 @@ export class BagPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5)
       .setShadow(0, 3, 'rgba(36,27,34,0.5)', 4);
     container.add(text);
+    container.setData('text', text); // so a stepper can rewrite the price
     if (withCoin) {
       const coin = this.scene.add.image(0, -2, 'ui_icon_coin');
       coin.setScale(40 / Math.max(coin.width, coin.height));
@@ -567,6 +701,10 @@ export class BagPanel extends Phaser.GameObjects.Container {
     this.chooser = null;
     this.sellButton = null;
     this.giveButton = null;
+    // The label belonged to the destroyed plate; holding the reference would
+    // leave `paint()` writing into a corpse the next time a slot opens.
+    this.qtyLabel = null;
+    this.qty = 1;
     this.dimOthers(null);
   }
 
