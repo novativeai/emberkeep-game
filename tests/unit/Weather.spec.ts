@@ -29,8 +29,11 @@ describe('weather.json', () => {
     for (const id of Object.keys(DOC.worlds)) expect(WORLD_IDS, id).toContain(id);
   });
 
-  it('gives Borealis both its aurora and its snow', () => {
-    expect(DOC.worlds.borealis).toEqual({ aurora: 'borealis', auroraBand: 0.5, snow: 'snowfall' });
+  it('gives Borealis its snow, and no aurora', () => {
+    // The northern lights were taken back out: the aurora band competed with
+    // the snow for the same sky and read as two effects rather than weather.
+    // Pinned as an exact match so re-adding one is a deliberate edit here too.
+    expect(DOC.worlds.borealis).toEqual({ snow: 'snowfall' });
   });
 
   it('leaves the authored world alone', () => {

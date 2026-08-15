@@ -97,6 +97,10 @@ export class SnowFX {
   /** Integrated wind displacement in band-widths — a POSITION, not a speed. */
   private windOffset = 0;
   private frames = 0;
+  /** Last viewport `coverCamera` fitted to, so a still camera costs nothing. */
+  private coverZoom = -1;
+  private coverW = -1;
+  private coverH = -1;
 
   constructor(scene: Phaser.Scene, preset: SnowPreset, opts: SnowOptions) {
     this.preset = preset;
@@ -182,6 +186,35 @@ export class SnowFX {
     this.view.setPosition(x, y).setDisplaySize(width, height);
     this.data.aspect = width / Math.max(1, height);
     this.data.resY = height;
+    return this;
+  }
+
+  /**
+   * Grow the quad to cover the whole viewport at the camera's CURRENT zoom.
+   *
+   * `setScrollFactor(0)` stops the band SLIDING when the board pans, but it
+   * does not stop it SCALING: Phaser still applies the camera's zoom about the
+   * viewport centre, so a band sized to the canvas shrinks with everything else
+   * and leaves the screen bare around it the moment the player zooms out.
+   *
+   * Only the quad's transform moves. `aspect` and `resY` — the two uniforms the
+   * flake field is built from — are deliberately NOT touched, so a flake stays
+   * the same size on screen whatever the camera does: zooming out reveals MORE
+   * snow rather than smaller snow, which is what weather does.
+   */
+  coverCamera(camera: Phaser.Cameras.Scene2D.Camera): this {
+    const zoom = Math.max(1e-4, camera.zoom);
+    if (zoom === this.coverZoom && camera.width === this.coverW && camera.height === this.coverH) {
+      return this;
+    }
+    this.coverZoom = zoom;
+    this.coverW = camera.width;
+    this.coverH = camera.height;
+    // A scrollFactor-0 point maps to `centre + (p - centre) * zoom`, so the quad
+    // has to be 1/zoom oversized and re-centred to land back on the viewport.
+    const w = camera.width / zoom;
+    const h = camera.height / zoom;
+    this.view.setPosition((camera.width - w) / 2, (camera.height - h) / 2).setDisplaySize(w, h);
     return this;
   }
 

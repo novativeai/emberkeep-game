@@ -746,14 +746,26 @@ Placement is data, so giving a world weather is a JSON edit and nothing else:
 
 ```json
 { "version": 1, "worlds": {
-    "borealis": { "aurora": "borealis", "auroraBand": 0.5, "snow": "snowfall" } } }
+    "borealis": { "snow": "snowfall" } } }
 ```
 
 `BoardScene.buildWeather()` reads it during `create()`, keyed on
 `ctx.state.worldId`. A world with no entry builds no weather objects and pays
-nothing — which is every world but Borealis today. Both effects are single
-full-screen shader quads at `scrollFactor 0`, so placing them costs nothing and
-keeping them with the camera costs nothing.
+nothing — which is every world but Borealis today. Omitting a key omits the
+effect: **Borealis ships snow only.** The aurora was mounted there and then
+taken back out — it competed with the snow for the same sky and read as two
+effects stacked rather than as weather. Everything in §8 still stands; the
+preset, the shader and `tools/auroralab` are intact and one JSON key remounts it.
+
+Both effects are single full-screen shader quads at `scrollFactor 0`, so placing
+them costs nothing and keeping them with the camera costs nothing. `scrollFactor
+0` is not the whole story, though: it stops the quad SLIDING when the board pans
+but not SCALING, because Phaser still applies the camera's zoom about the
+viewport centre. A band sized to the canvas therefore shrank out of the corners
+as soon as the player zoomed out. `SnowFX.coverCamera()` re-fits the quad to
+`viewport / zoom` each time the zoom moves, and deliberately leaves `aspect` and
+`resY` alone so a flake keeps its on-screen size — zooming out reveals more
+snow, not smaller snow.
 
 `onPowerState` hands the governor's state to both, and **they disagree on
 purpose**: the aurora freezes on its last frame, the snow fades out. A still

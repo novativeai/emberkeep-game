@@ -9,7 +9,6 @@ import {
   DEPTHS,
   DRAG,
   DRAGON_ANIM,
-  DRAGON_NAP_LENGTH_MS,
   DRAGON_RIG_SCALE,
   EGG_GIFT,
   EMBER_MOTES,
@@ -265,12 +264,19 @@ export class BoardScene extends Phaser.Scene {
   private pool: BoardItem[] = [];
   private tiles = new Map<string, Phaser.GameObjects.Image>();
   private fog = new Map<string, Phaser.GameObjects.Image>();
+  /** The world `create()` actually laid this board out for. Compared against
+   *  `state.worldId` whenever something reloads state under a live scene. */
+  private builtWorld = WORLD_ID;
   /** Floating "skip cooldown" button + the generator it belongs to. */
   private skipButton?: Phaser.GameObjects.Container;
   private skipGoldLabel?: Phaser.GameObjects.Text;
   private skipWarmthLabel?: Phaser.GameObjects.Text;
   private skipForId = 0;
   private skipMaxGold?: number; // per-generator gold cap for the live skip price
+  /** WHICH wait the open offer is selling off — a generator's cooldown or a
+   *  dragon's sleep. They are separate timers on the same item, so the buttons
+   *  must not be retired (or re-priced) by the other one's clock. */
+  private skipKind: 'generator' | 'sleep' = 'generator';
   /** Dragon job menu (Work / Harvest) + the dragon it belongs to. */
   /** Countdown pill floating above a rig-hosted dragon: the BoardItem's own
    *  pill renders UNDER the rig (glued at host.depth + 0.5), so the timer
@@ -445,6 +451,12 @@ export class BoardScene extends Phaser.Scene {
     this.giveTweens = [];
     this.allow = { ...NO_ALLOW };
     this.tutorialDone = this.ctx.state.tutorialDone;
+    // WHICH WORLD THIS BUILD IS OF. Everything below — tiles, backdrop, fog,
+    // portals, decor, the camera frames — is cut for this one world, and only
+    // `create()` cuts them. Anything that later changes `state.worldId` without
+    // rebuilding the scene leaves the board drawing one world's ground under
+    // another world's pieces (see the `state:loaded` handler).
+    this.builtWorld = this.ctx.state.worldId;
     this.liveDragons.clear();
     this.busyDragons.clear();
     // A restart reuses this scene INSTANCE (Title → Play after game:reset): the
@@ -724,7 +736,11 @@ export class BoardScene extends Phaser.Scene {
     // returns after comparing two numbers (it re-renders 20×/s, not 60); the
     // snow writes four uniforms and does no per-flake work at all.
     this.aurora?.update();
-    this.snow?.update();
+    // Re-fit BEFORE stepping: the band is screen-space, but a scrollFactor-0
+    // quad is still scaled by the camera's zoom, so the pinch/wheel range would
+    // otherwise shrink the snow off the edges of the screen. Early-outs unless
+    // the zoom actually moved.
+    this.snow?.coverCamera(this.cameras.main).update();
     this.updateDrag(delta);
     this.updateLiveDragons(delta);
     if (this.altarElder || this.altarElderClip) {
@@ -777,6 +793,13 @@ export class BoardScene extends Phaser.Scene {
           // Rig-hosted dragon: its in-container pill would hide behind the rig —
           // the countdown floats above its head instead.
           this.updateDragonCoolBadge(sprite, timer);
+          // A sleep offer drains on its OWN clock — and disappears the moment
+          // the sleep does, however it ended (paid off, capped, or morning).
+          if (this.skipForId === sprite.itemId && this.skipKind === 'sleep') {
+            const sleep = this.ctx.systems.dragonLife.sleepTimer(sprite.itemId);
+            if (sleep) this.updateSkipCost(sleep.remaining, sleep.total);
+            else this.hideSkipButton();
+          }
           continue;
         }
         sprite.setCooling(timer !== null);
@@ -923,15 +946,33 @@ export class BoardScene extends Phaser.Scene {
     if (queued === 0) return;
     this.load.once(Phaser.Loader.Events.COMPLETE, () => {
       if (!this.scene.isActive()) return;
-      // Re-dress anything already standing that this set completes.
+      // Re-dress anything already standing that this set completes — INCLUDING
+      // a dragon that is already live on its RIG.
+      //
+      // This used to skip every live dragon, and that quietly undid the whole
+      // clip system on any connection slower than a warm dev server. Clips are
+      // fetched lazily now (the iOS gigabyte fix), so a dragon that spawns
+      // before its sheets land takes `attachDragon`'s rig branch — and being
+      // live, it was then never reconsidered. The rig won the race and kept the
+      // animal for the rest of the session. Locally the sheets usually arrive
+      // first and it looked fine; on the deployed build it never did.
+      //
+      // A clip-mounted dragon has no RigPlayer, so `player !== null` is exactly
+      // "still wearing the rig" and re-dressing is idempotent.
       for (const sprite of this.itemSprites.values()) {
         if (
-          this.clipCharacterFor(sprite.chain, sprite.tier) === id &&
-          this.wearsRigTier(sprite.chain, sprite.tier) &&
-          !this.liveDragons.has(sprite.itemId)
+          this.clipCharacterFor(sprite.chain, sprite.tier) !== id ||
+          !this.wearsRigTier(sprite.chain, sprite.tier)
         ) {
-          this.attachDragon(sprite, false);
+          continue;
         }
+        const live = this.liveDragons.get(sprite.itemId);
+        if (live && live.player === null) continue; // already on clips
+        // Re-attaching rebuilds the animal, so carry the mood across or a
+        // sleeping dragon wakes up just because its textures arrived.
+        const mood = live?.mood;
+        this.attachDragon(sprite, false);
+        if (mood && mood !== 'awake') this.applyDragonMood(sprite.itemId, mood);
       }
     });
     // A loader already in flight will pick these up when it drains; starting a
@@ -1004,6 +1045,25 @@ export class BoardScene extends Phaser.Scene {
     // The atlas idle (video-ingested) is the definitive rest from the first
     // frame — never a stint of rig idle before the first ambient roll swaps.
     if (!intro) this.dragonIdle(ld);
+    // ...then ADOPT the mood the system is already holding.
+    //
+    // `dragon:mood` fires on CHANGE only, and DragonLifeSystem's memory of the
+    // last mood outlives this scene: it is cleared on a reset, never on a
+    // restart. So a dragon that was asleep when the player travelled came back
+    // standing and idling — the mood event that would have curled it up had
+    // fired in the previous scene — while every rule still read it as asleep.
+    // The fix is to PULL rather than wait for a push: the animal is built
+    // wearing whatever it is actually doing, and a sleep restored this way is
+    // seated instantly (it has been asleep all along; a two-second curl-up on
+    // arrival would be a lie about when it lay down).
+    if (!intro) {
+      const mood = this.ctx.systems.dragonLife.moodOf(host.itemId);
+      if (mood !== 'awake') {
+        ld.mood = mood;
+        if (mood === 'asleep') this.seatDragonSleep(ld, true);
+        else ld.roarInMs = DRAGON_ROAR_EVERY_MS;
+      }
+    }
     if (intro) {
       // The newborn roars its arrival: the ingested roar clip when pushed
       // (same bellow as the hungry cadence), the rig hover + ~2.1s of mouth
@@ -1557,8 +1617,13 @@ export class BoardScene extends Phaser.Scene {
    * painting + breath + 💤. Only ever called with the dragon grounded —
    * applyDragonMood defers to dragonIdle while it flies. Idempotent via
    * `sleepState`, so a landing chain cannot double-seat.
+   *
+   * `instant` skips the curl-up transition and lands on the sleeping pose
+   * directly — for a sleep that was already running before this scene existed
+   * (a restore, a travel, a re-skin), where the animation would claim the
+   * dragon is lying down NOW.
    */
-  private seatDragonSleep(ld: LiveDragon): void {
+  private seatDragonSleep(ld: LiveDragon, instant = false): void {
     if (ld.sleepState !== 'none') return;
     const seatSleep = (): void => {
       ld.sleepState = 'seated';
@@ -1612,7 +1677,19 @@ export class BoardScene extends Phaser.Scene {
     // separately-authored painting popped. Without the clip, the painting
     // lands at once, exactly as before.
     const t = this.dragonClip(ld, 'tosleep');
-    if (t) {
+    if (t && instant) {
+      // Already down: dress the clip's LAST frame — the pose the transition
+      // would have ended on — and let syncDragon breathe it.
+      ld.flightPhase = null;
+      const overlay = this.dressOverlay(ld, t);
+      overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+      overlay.stop();
+      overlay.setFrame(t.clip.frames - 1);
+      overlay.setVisible(true);
+      ld.player?.container.setVisible(false);
+      ld.host.setArtVisible(false);
+      ld.sleepState = 'seated';
+    } else if (t) {
       ld.sleepState = 'transition';
       ld.flightPhase = null;
       this.playDragonTransition(ld, t, false, () => {
@@ -1723,16 +1800,16 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /**
-   * The player shook it awake.
+   * The sleep was paid off — the flourish, and only the flourish.
    *
-   * `keepAwake` is what actually ends the sleep: both the nap and the night are
-   * derived windows, so clearing a flag would let the very next tick put the
-   * animal straight back down. The mood flip that follows drives the uncurl
-   * through the ordinary `dragon:mood` path — this never animates anything
-   * itself, so there is one wake in the codebase and not two.
+   * DragonLifeSystem has already taken the price and opened the window that
+   * ends the sleep; the uncurl itself arrives as an ordinary `dragon:mood`
+   * change. So there is one wake animation in the codebase and this is not a
+   * second one.
    */
-  private wakeDragonByTap(sprite: BoardItem, itemId: number): void {
-    this.ctx.systems.dragonLife.keepAwake(itemId, DRAGON_NAP_LENGTH_MS);
+  private onSleepSkipped(itemId: number): void {
+    const sprite = this.itemSprites.get(itemId);
+    if (!sprite) return;
     scalePulse(this, sprite, 1.06, 130);
     this.sparks.explode(6, sprite.x, sprite.y - 40);
   }
@@ -3902,7 +3979,22 @@ export class BoardScene extends Phaser.Scene {
   private playGateFlight(door: { fx: PortalFX; zone: Phaser.GameObjects.Zone }): void {
     const named = this.ctx.systems.dragons.firstNamed();
     if (!named) return;
-    const asleep = this.ctx.systems.dragonLife.sleepKindOf(named.itemId) !== null;
+    const asleep = this.ctx.systems.dragonLife.asleep(named.itemId);
+    // The TUTORIAL's own wake beat (`gate_wake`) fires on this same delivery:
+    // the door blooms, she is scripted asleep beside it, and the lesson is the
+    // player paying to rouse her for the crossing. Waking her here would answer
+    // the lesson's one question for them — so the flight WAITS for the wake
+    // they buy, and leaves as its consequence.
+    if (asleep && !this.ctx.state.tutorialDone) {
+      const off = this.ctx.bus.on('dragon:sleep_skipped', ({ itemId }) => {
+        if (itemId !== named.itemId) return;
+        off();
+        if (!this.scene.isActive()) return;
+        this.time.delayedCall(GATE_FLIGHT.wakeLeadMs, () => this.flyThroughGate(door, named.itemId));
+      });
+      this.offBus.push(off);
+      return;
+    }
     this.ctx.systems.dragonLife.keepAwake(named.itemId, GATE_FLIGHT.keepAwakeMs);
     if (asleep) {
       // Woken, not yet flying: the uncurl gets the stage to itself.
@@ -5096,22 +5188,19 @@ export class BoardScene extends Phaser.Scene {
       this.showSkipButton(sprite, timer.remaining, timer.total, cfg?.skipMaxGold);
       return;
     }
-    // Nothing to skip. Now the sleep decides what this tap means.
+    // Nothing to skip on the generator. Now the SLEEP is the wait, and it is
+    // offered exactly like any other: the same two buttons, the same price
+    // scaling on how much of it is left.
     //
-    // A SLEEPING dragon is not a button: the tap wakes it and only wakes it,
-    // because the wake is the whole gesture and its animation has to finish
-    // before the animal is a working generator again. Which sleep it is decides
-    // whether the tap does anything at all — a NAP is the player's to
-    // interrupt; a shift-rest is not, that sleep was bought with the work.
+    // Every sleep, not just the ones that felt optional. A dragon lying under a
+    // five-minute countdown that answered "let it rest" was the only timer in
+    // the game the player could not pay to end, which reads as the animal being
+    // stuck rather than tired — and the free tap-wake it replaced taught the
+    // opposite rule on the very same gesture.
     if (this.ctx.systems.dragons.isBoardDragon(item)) {
-      const kind = this.ctx.systems.dragonLife.sleepKindOf(item.id);
-      if (kind === 'nap' || kind === 'night') {
-        this.wakeDragonByTap(sprite, item.id);
-        return;
-      }
-      if (kind === 'rest') {
-        scalePulse(this, sprite, 1.04, 120); // it stirs, and goes back to sleep
-        this.floatText(sprite.x, sprite.y - 150, 'Worn out — let it rest', PALETTE.cream);
+      const sleep = this.ctx.systems.dragonLife.sleepTimer(item.id);
+      if (sleep) {
+        this.showSkipButton(sprite, sleep.remaining, sleep.total, undefined, 'sleep');
         return;
       }
       // Awake, but still folding out of a sleep: the wake clip owns these
@@ -5268,11 +5357,13 @@ export class BoardScene extends Phaser.Scene {
     sprite: BoardItem,
     remaining: number,
     total: number,
-    maxGold?: number
+    maxGold?: number,
+    kind: 'generator' | 'sleep' = 'generator'
   ): void {
     this.hideSkipButton();
     this.ctx.bus.emit('ui:skip_offered', { itemId: sprite.itemId });
     this.skipMaxGold = maxGold; // per-generator gold cap (Crystal emeralds are dear)
+    this.skipKind = kind;
     const btn = this.add.container(sprite.x, sprite.y + 100).setDepth(DEPTHS.dragged - 1);
     // Caption shown on hover, telling the player which payment a button uses.
     const caption = this.add
@@ -5311,7 +5402,14 @@ export class BoardScene extends Phaser.Scene {
       bg.on('pointerout', () => caption.setVisible(false));
       bg.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
         ev.stopPropagation();
-        this.ctx.bus.emit('generator:skip', { itemId: sprite.itemId, currency });
+        // Two timers can be running over one dragon (a cooldown and a sleep),
+        // so the button says WHICH it is paying off rather than leaving a
+        // handler to guess from whatever happens to be ticking.
+        if (kind === 'sleep') {
+          this.ctx.bus.emit('dragon:sleep_skip', { itemId: sprite.itemId, currency });
+        } else {
+          this.ctx.bus.emit('generator:skip', { itemId: sprite.itemId, currency });
+        }
         this.hideSkipButton();
       });
       btn.add([bg, label]);
@@ -5356,6 +5454,7 @@ export class BoardScene extends Phaser.Scene {
     this.skipGoldLabel = undefined;
     this.skipWarmthLabel = undefined;
     this.skipForId = 0;
+    this.skipKind = 'generator';
   }
 
   /** Send a dragon to WORK a House: it flies over and stands by it, speeding its
@@ -5468,7 +5567,10 @@ export class BoardScene extends Phaser.Scene {
         // Ready again — the sparkle the tinted ready-star would have given.
         this.sparks.explode(6, sprite.x, sprite.y - 110);
       }
-      if (this.skipForId === sprite.itemId) this.hideSkipButton();
+      // A SLEEP offer outlives the cooldown's clock: this dragon has no
+      // cooldown to become ready, which is precisely why the sleep is what the
+      // buttons are selling. Retire only an offer this timer owns.
+      if (this.skipForId === sprite.itemId && this.skipKind === 'generator') this.hideSkipButton();
       return;
     }
     let badge = existing;
@@ -5772,6 +5874,7 @@ export class BoardScene extends Phaser.Scene {
       bus.on('chest:claimed', ({ chestId, label, coins }) => this.onChestClaimed(chestId, label, coins)),
       // ---- ambient life: the dragons living on the isle by themselves ----
       bus.on('dragon:mood', ({ itemId, mood }) => this.applyDragonMood(itemId, mood)),
+      bus.on('dragon:sleep_skipped', ({ itemId }) => this.onSleepSkipped(itemId)),
       bus.on('dragon:wandered', ({ itemId, to }) => this.flyWander(itemId, to)),
       bus.on('dragon:rest', ({ dragonId }) => this.showRestBadge(dragonId)), // already home — the work trip is a brief flourish
       bus.on('dragon:rested', ({ dragonId }) => this.wakeDragon(dragonId)),
@@ -5889,7 +5992,35 @@ export class BoardScene extends Phaser.Scene {
           this.glideToWorld(home.x, home.y, 1000);
         }
       }),
-      bus.on('state:loaded', () => this.fullResync())
+      /**
+       * A SAVE LANDED UNDER A LIVE SCENE — and it may be a save of a different
+       * world than the one this board is cut for.
+       *
+       * This is the boot order, and it is not going to change: BoardScene
+       * builds itself for `state.worldId` (emberkeep, always, before a save
+       * exists), launches UIScene, and UIScene's `create()` ends with
+       * `beginRun()` — the load. `GameState.hydrate` then restores
+       * `activeWorld` through `switchWorld`, which is a STATE call and emits
+       * nothing: `world:switched` belongs to WorldSystem's travel flow, and
+       * travel is what normally rebuilds this scene.
+       *
+       * So a player who closed the tab in Borealis came back to Emberkeep's
+       * ground — its tiles, its fog, its doors — with Borealis's pieces spawned
+       * onto it at Borealis addresses projected through the northern zones'
+       * geometry: a board of two worlds superposed, which is exactly what it
+       * looked like. `fullResync` could never have fixed that; it re-spawns the
+       * items and touches nothing the world decided.
+       *
+       * The rebuild is the same one travel uses (fetch the destination's art,
+       * then restart), so there is one way to change worlds on screen, not two.
+       */
+      bus.on('state:loaded', () => {
+        if (this.ctx.state.worldId !== this.builtWorld) {
+          this.fetchWorldArt(() => this.scene.restart());
+          return;
+        }
+        this.fullResync();
+      })
     );
   }
 
