@@ -294,7 +294,16 @@ def main():
     # slack, which is not slack, it is the next asset failing the build for
     # nobody's benefit. 110 restores the customary ~2 MB. Same rule as every
     # line above it: raised deliberately, with the measurement written down.
-    ap.add_argument("--budget", type=float, default=110.0, help="fail over this many MB")
+    #
+    # 142 (2026-08-16, production): rigs are OFF and every breed is sequence
+    # animated, so the six clip sets main produced after the fork join the
+    # deploy — bare emerald 3/4 (12.3 MB: with no rig left to puppet it, the
+    # clips ARE the green dragon), ashglass 3/4 (13.3 MB) and porcelain 3/4
+    # (17.1 MB), the last two Emporium skins that used to animate as the wrong
+    # breed. Measured 139.6; 142 keeps the customary ~2 MB. The rig table
+    # emptying returns only ~0.5 MB (the catalog's three rig jsons stay — the
+    # UI Builder's loadCharacterRig can still ask for them at runtime).
+    ap.add_argument("--budget", type=float, default=142.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():
