@@ -290,7 +290,7 @@ export class UIScene extends Phaser.Scene {
 
     // The reveal card. It plays wherever it is earned, tutorial or not — the
     // one thing it must never do is arrive long after the moment it is about.
-    this.reveal = new DragonReveal(this, this.ctx.bus);
+    this.reveal = new DragonReveal(this, this.ctx.bus, this.ctx);
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to

@@ -54,7 +54,16 @@ export function isLazyScreenArt(key: string): boolean {
   return (
     /^trailer_/.test(key) || // finale "Beyond the demo" worlds + legends
     /^ui_teaser_/.test(key) || // finale Chapter-Two teasers
-    key === 'ui_levelup_emblem' // level-up banner emblem
+    key === 'ui_levelup_emblem' || // level-up banner emblem
+    // The three below were in the `play` wave, and that shipped a crash. They
+    // are 120 MB DECODED between them — art for one modal card, one panel, and
+    // cosmetics most players never buy — and streaming it into a live board is
+    // what pushed iOS past its renderer-process cap about two seconds in. None
+    // of it can appear without a specific screen opening or a specific purchase,
+    // so none of it belongs anywhere but here.
+    /^reveal_/.test(key) || //  72.6 MB — the hatch card (DragonReveal.play)
+    /^card_/.test(key) || //   9.8 MB — Emporium cards (StorePanel.artKeys)
+    /^skin_/.test(key) //     37.5 MB — only the skins a player OWNS (ensureOwnedSkinArt)
   );
 }
 

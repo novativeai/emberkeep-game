@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { FONT, INK, TYPE } from '../art/design';
 import { LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, REVEAL } from '../core/Constants';
+import type { GameContext } from '../core/Context';
 import type { EventBus } from '../core/EventBus';
+import { ensureTextures as ensureFileTextures } from '../core/lazyTextures';
 
 /**
  * The full-screen card a player is shown the first time a dragon form is theirs.
@@ -90,7 +92,8 @@ export class DragonReveal {
 
   constructor(
     private scene: Phaser.Scene,
-    private bus: EventBus
+    private bus: EventBus,
+    private ctx: GameContext
   ) {
     ensureTextures(scene);
   }
@@ -114,7 +117,19 @@ export class DragonReveal {
    */
   play(card: RevealCard): void {
     if (this.layer) this.close(true);
-    if (!this.scene.textures.exists(card.art)) return; // no plate, no card
+    // The plate is fetched HERE, not at boot. The sixteen reveal plates are
+    // 72.6 MB decoded between them and exactly one is ever shown per hatch, so
+    // preloading the set cost iOS its renderer process for art it would never
+    // draw. `ensureTextures` calls back synchronously when the plate is already
+    // resident, so a warm card still opens on the same frame as before.
+    if (!this.scene.textures.exists(card.art)) {
+      ensureFileTextures(this.scene, this.ctx, [card.art], () => {
+        // Only if nothing else opened in the meantime — a hatch during a hatch
+        // would otherwise reopen the first card over the second.
+        if (!this.layer && this.scene.textures.exists(card.art)) this.play(card);
+      });
+      return;
+    }
 
     this.elapsed = 0;
     const cx = LIVE_GAME_WIDTH / 2;

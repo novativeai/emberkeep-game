@@ -479,6 +479,7 @@ export class BoardScene extends Phaser.Scene {
     this.buildPortals(); // the doors out — after buildFog, so a cloud covers one
     this.spawnExistingItems(); // before the camera frames — travel arrives on a populated board
     this.scheduleScoutReturn(); // still across the Ember Gate? hidden now, home through the door soon
+    this.ensureOwnedSkinArt(); // cosmetics the save owns — after items, before the camera
     this.syncGoldenAltar();
     this.buildEmitters();
     this.buildDragCell();
@@ -4874,6 +4875,41 @@ export class BoardScene extends Phaser.Scene {
     this.reskinChain('lumber', (item) => item.tier === 4);
   }
 
+  /**
+   * Fetch the skin plates this save actually OWNS, and re-dress once they land.
+   *
+   * The fourteen `skin_` textures are 37.5 MB decoded and they are cosmetics —
+   * most saves own none, and no save owns more than a couple. Preloading the set
+   * put 37.5 MB on every device for art almost nobody would see, which on iOS is
+   * a share of the renderer budget that mattered. So they follow the same rule
+   * as everything else heavy here: pay when the thing is yours.
+   *
+   * Called on board build and again whenever a skin changes, because buying one
+   * is exactly the moment its plate stops being hypothetical. `textureFor`
+   * already falls back to the base art while a plate is absent, so a slow fetch
+   * costs the player the skin for a second, never a missing sprite.
+   */
+  private ensureOwnedSkinArt(): void {
+    const wanted = new Set<string>();
+    const manor = this.ctx.state.manorSkin;
+    if (manor) wanted.add(`skin_${manor}`);
+    for (const skin of Object.values(this.ctx.state.dragonSkins)) {
+      if (!skin) continue;
+      // Which tiers a skin re-dresses is decided by which plates EXIST, so ask
+      // for every tier the chain has and let the manifest drop the rest.
+      for (let tier = 1; tier <= 4; tier++) wanted.add(`skin_${skin}_${tier}`);
+      wanted.add(`skin_${skin}`);
+    }
+    const known = new Set(this.ctx.data.assets.images.map((e) => e.key));
+    const fetchable = [...wanted].filter((k) => known.has(k) && !this.textures.exists(k));
+    if (fetchable.length === 0) return;
+    ensureTextures(this, this.ctx, fetchable, () => {
+      if (!this.scene.isActive()) return;
+      this.applyManorSkin();
+      for (const chain of Object.keys(this.ctx.state.dragonSkins)) this.applyDragonSkin(chain);
+    });
+  }
+
   /** Re-texture every dragon of one chain when its worn skin changes. Every
    *  tier is offered to `textureFor`, which swaps only the ones that have skin
    *  art — a whelp-only skin leaves the adult alone by itself. LIVE dragons
@@ -5993,8 +6029,14 @@ export class BoardScene extends Phaser.Scene {
       // in the boot preload, and rebuilding onto a missing texture would paint
       // the isle over open sky.
       bus.on('world:switched', () => this.fetchWorldArt(() => this.scene.restart())),
-      bus.on('store:skin_changed', () => this.applyManorSkin()),
-      bus.on('store:dragon_skin_changed', ({ dragon }) => this.applyDragonSkin(dragon)),
+      bus.on('store:skin_changed', () => {
+        this.ensureOwnedSkinArt(); // just bought — its plate is no longer hypothetical
+        this.applyManorSkin();
+      }),
+      bus.on('store:dragon_skin_changed', ({ dragon }) => {
+        this.ensureOwnedSkinArt();
+        this.applyDragonSkin(dragon);
+      }),
       bus.on('item:spawned', ({ item, cause }) => {
         const sprite = this.acquireSprite(item, false);
         // Before the rig test: a clip-only breed does not read as a dragon at

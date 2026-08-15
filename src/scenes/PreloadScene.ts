@@ -4,7 +4,7 @@ import type { GameContext } from '../core/Context';
 import { clipKey, clipsFor } from '../core/characterAnims';
 import { bootChains, splitWaves } from '../core/assetWaves';
 import { savedDragonClips } from '../core/clipResidency';
-import { SCENES, STANDEE_BANKS, WORLD_ID } from '../core/Constants';
+import { IS_LOW_END, SCENES, STANDEE_BANKS, WORLD_ID } from '../core/Constants';
 import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
 import { liveCrystalAvailable } from '../core/graphicsState';
 import type { AssetEntry, SpeakerId } from '../core/types';
@@ -53,11 +53,28 @@ export const PLAY_ART_READY = 'bootload:play_ready';
 /** The one dialogue speaker who is not a map character — see the fetch below. */
 const ELDER_SPEAKER: SpeakerId = 'golden_elder';
 
-/** Files per streamed batch, and the breather between batches. Small on purpose:
- *  the cost of the play wave is the texture UPLOAD, and spreading those out is
- *  what keeps it invisible to a running board. */
-const STREAM_BATCH = 6;
-const STREAM_GAP_MS = 220;
+/**
+ * Files per streamed batch, and the breather between batches.
+ *
+ * The cost of the play wave is the texture UPLOAD, and spreading those out is
+ * what keeps it invisible to a running board. The constrained pair is not a
+ * tuning preference: at 6-per-220 ms this wave was uploading ~140 MB of decoded
+ * texture into a live board in the first two seconds, on top of the board's own
+ * footprint and the dragon clips arriving beside it, and iOS answered by killing
+ * the renderer process. Slower here means the peak never stacks.
+ */
+const STREAM_BATCH = IS_LOW_END ? 2 : 6;
+const STREAM_GAP_MS = IS_LOW_END ? 600 : 220;
+/**
+ * How long after the board says it is ready before streaming resumes.
+ *
+ * `world:ready` fires at the END of BoardScene.create, but the frames right
+ * after it are the most expensive in the session — the camera settles, the
+ * spawn tweens run, the FX rigs light up. Landing texture uploads in exactly
+ * that window is what turned a memory problem into a crash, so the stream keeps
+ * its hands off until the board has had a moment to itself.
+ */
+const STREAM_BOARD_GRACE_MS = 1500;
 
 /** A spritesheet held back from the boot gate, queued again during play. */
 interface DeferredSheet {
@@ -140,6 +157,11 @@ export class PreloadScene extends Phaser.Scene {
       // Uploaded but never drawn in Phaser — the visible title logo is the DOM
       // <img class="title-logo"> in index.html.
       key === 'title_logo' ||
+      // The untrimmed crystal still, on the devices that play the baked SPIN
+      // instead. `textureFor` returns the sheet there, so the still is 2.9 MB of
+      // texture that nothing can ever draw — and it was being uploaded on
+      // exactly the devices with the least room for it.
+      (key === 'item_crystal_1' && !liveCrystalAvailable()) ||
       // Rare-screen art, fetched by `ensureTextures` when its screen opens.
       isLazyScreenArt(key);
 
@@ -355,9 +377,38 @@ export class PreloadScene extends Phaser.Scene {
       this.scene.stop();
       return;
     }
+    // Hold while the board is building. The stream starts on the TITLE, where it
+    // has the device to itself and is free — but the moment the player taps Play
+    // it would otherwise be uploading into BoardScene.create. `world:ready` is
+    // the board telling us it is done; until it arrives (or if the player never
+    // leaves the title) streaming continues as normal.
+    const ctx = this.registry.get('ctx') as GameContext;
+    let held = false;
+    let resume: (() => void) | null = null;
+    // The BOARD SCENE's own start, not a bus event: `world:switch` only fires on
+    // travel, and the window that actually crashed iOS is the FIRST board build
+    // — the one reached straight from the title, which no travel event
+    // announces. START fires for both, and again for every restart.
+    this.scene.manager.getScene(SCENES.board)?.events.on(Phaser.Scenes.Events.START, () => {
+      held = true;
+    });
+    ctx.bus.on('world:ready', () => {
+      // Not immediately: give the new board its opening frames unmolested.
+      this.time.delayedCall(STREAM_BOARD_GRACE_MS, () => {
+        held = false;
+        const go = resume;
+        resume = null;
+        go?.();
+      });
+    });
+
     let at = 0;
     const pump = (): void => {
       if (!this.scene.isActive()) return;
+      if (held) {
+        resume = pump; // parked until the board settles
+        return;
+      }
       if (at >= queue.length) {
         this.game.registry.set(PLAY_ART_READY, true);
         this.game.events.emit(PLAY_ART_READY);
