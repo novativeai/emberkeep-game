@@ -393,8 +393,11 @@ export const ITEM_SCALE: Record<string, number> = {
   // grass the dragons rested in and ate; it burned, and what stands here is the
   // last of it, in a vessel somebody thought was worth the silver.
   //
-  // 205 units on its LONGEST axis, which is now its height rather than its
-  // width — same on-board presence, turned upright. Its anchor (anchors.json)
+  // 102 units on its LONGEST axis, which is now its height rather than its
+  // width — halved on request from the 205 the upright vase first shipped at,
+  // so the farm reads as a vessel standing on its tile rather than a landmark
+  // filling it. The anchor is unchanged, so its foot stays on the same ground
+  // contact and only the size moves. Its anchor (anchors.json)
   // moved 0.66 → 0.94 with the shape: 0.66 was eyeballed for a low wide stump
   // whose mass sat well above its alpha bottom, and a vase contacts the ground
   // at its own foot. Re-derived the same way and for the same reason — an
@@ -403,7 +406,7 @@ export const ITEM_SCALE: Record<string, number> = {
   // centred on the tile diamond. When a landmark floats, composite
   // art-over-shadow and EYEBALL it; deriving this from the bbox has failed
   // three times now.
-  emberbark_1: 0.32,
+  emberbark_1: 0.16,
   emerald_1: 0.144, // Emerald gem (emerald.png 467×392) — reduced 20% again on request (0.18 → 0.144)
   emerald_2: 0.064, // Green Egg (green-egg.png 1147×1438) — −20% again on request (0.08 → 0.064)
   emerald_3: 0.21, // Green Dragon: baked rig art (1054px), same treatment as the red

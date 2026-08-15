@@ -671,10 +671,13 @@ const DECOR = {
       // px below the true centre, so the pot was drawn that much too HIGH and
       // stood off the back of the rune. x was already right.
       anchor: { x: 0.5439, y: 0.8239 },
-      // A MONUMENT, not a pot. 822 art px × 1.148 / 2 = 472 backdrop px, which
-      // puts the widest span at 72% of the rune's 630px outer ring — the
-      // proportion the art was re-cut to at Runevault's own ~40° camera.
-      scale: 1.148
+      // 822 art px × 0.8036 / 2 = 330 backdrop px, so the widest span sits at
+      // 52% of the rune's 630px outer ring: the pot stands INSIDE the circle
+      // with the glyph band reading around it, rather than covering it. This is
+      // the monument scale (1.148, span 72%) taken down 30% by eye — the anchor
+      // is unchanged, so the contact point stays on the rune's centre and only
+      // the size moves.
+      scale: 0.8036
     }
   ]
 };
