@@ -3,6 +3,8 @@ import type { GameContext } from '../core/Context';
 import {
   ATMOSPHERE,
   BUBBLE_BOTTOM,
+  BUBBLE_X_DESKTOP_NUDGE,
+  BUBBLE_X_MOBILE,
   BUBBLE_SCALE,
   EGG_GIFT,
   ELDER_VOICE,
@@ -24,7 +26,7 @@ import {
   SCENES,
   TILE_W,
   TIMINGS,
-  UI_SCALE,
+  HUD_BTN_SCALE,
   WELCOME_BACK_MIN_MS,
   WORLD_ID
 } from '../core/Constants';
@@ -184,7 +186,10 @@ export class UIScene extends Phaser.Scene {
           return;
         }
         return this.store.isOpen ? this.store.requestClose() : this.store.open();
-      }
+      },
+      // The XP rail and the dialogue share the bottom line on a phone, so the
+      // rail refuses to open while anyone is speaking.
+      bubbleActive: () => this.bubble.visible
     });
     this.hud.ledgerButton.setDepth(DEPTH_HUD);
     this.hud.bagButton.setDepth(DEPTH_HUD);
@@ -296,9 +301,11 @@ export class UIScene extends Phaser.Scene {
     // off the bottom.
     this.bubble.setScale(BUBBLE_SCALE);
     this.bubble.setPosition(
-      LIVE_GAME_WIDTH / 2 + (IS_MOBILE ? 0 : 220),
-      // BUBBLE_BOTTOM lifts it clear of the level disc, which keeps the very
-      // bottom band on mobile — see the bottom-stack note in Constants.
+      // On mobile it starts hard against the level disc's right edge and runs to
+      // the right margin; on desktop it keeps its authored nudge right.
+      IS_MOBILE ? BUBBLE_X_MOBILE : LIVE_GAME_WIDTH / 2 + BUBBLE_X_DESKTOP_NUDGE,
+      // BUBBLE_BOTTOM is the shared bottom line on mobile — the level disc's
+      // centre sits on the same y, so the two read as one row.
       LIVE_GAME_HEIGHT - BUBBLE_BOTTOM
     );
     this.bubble.setDepth(DEPTH_TUTORIAL);
@@ -794,7 +801,7 @@ export class UIScene extends Phaser.Scene {
     // 36 units from the Bag's, so the satchel covered this button entirely.
     const button = this.add
       .container(HUD_COLUMN_X, hudColumnY(2))
-      .setScale(UI_SCALE)
+      .setScale(HUD_BTN_SCALE)
       .setDepth(DEPTH_HUD);
     // Plate, icon and dot all at the column's shared 1.5 — this button used to be
     // built at 1.05 and read as a runt beside the Bag and the Ledger.
@@ -809,8 +816,8 @@ export class UIScene extends Phaser.Scene {
     button.add([bg, icon, this.cookbookDot]);
     button.setSize(192, 192);
     button.setInteractive({ useHandCursor: true });
-    button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
-    button.on('pointerout', () => button.setScale(UI_SCALE));
+    button.on('pointerover', () => button.setScale(HUD_BTN_SCALE * 1.06));
+    button.on('pointerout', () => button.setScale(HUD_BTN_SCALE));
     button.on('pointerup', () => {
       if (!(this.lastStep?.done ?? this.ctx.state.tutorialDone) && !(this.lastStep?.allow.cookbook ?? false)) return;
       if (this.cookbook.isOpen) {
@@ -834,7 +841,7 @@ export class UIScene extends Phaser.Scene {
   private buildCodexButton(): Phaser.GameObjects.Container {
     const button = this.add
       .container(HUD_COLUMN_X, hudColumnY(3))
-      .setScale(UI_SCALE)
+      .setScale(HUD_BTN_SCALE)
       .setDepth(DEPTH_HUD);
     const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.5);
     const icon = this.textures.exists('ui_icon_dragondex')
@@ -843,8 +850,8 @@ export class UIScene extends Phaser.Scene {
     button.add([bg, icon]);
     button.setSize(192, 192);
     button.setInteractive({ useHandCursor: true });
-    button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
-    button.on('pointerout', () => button.setScale(UI_SCALE));
+    button.on('pointerover', () => button.setScale(HUD_BTN_SCALE * 1.06));
+    button.on('pointerout', () => button.setScale(HUD_BTN_SCALE));
     button.on('pointerup', () => {
       // Mid-tutorial the script owns the stage — same contract as the
       // Cookbook button beside it.
@@ -860,10 +867,10 @@ export class UIScene extends Phaser.Scene {
   private revealCodexButton(): void {
     if (this.codexButton.visible) return;
     this.codexButton.setVisible(true);
-    this.codexButton.setScale(UI_SCALE * 0.3);
+    this.codexButton.setScale(HUD_BTN_SCALE * 0.3);
     this.tweens.add({
       targets: this.codexButton,
-      scale: UI_SCALE,
+      scale: HUD_BTN_SCALE,
       duration: 420,
       ease: 'Back.easeOut'
     });

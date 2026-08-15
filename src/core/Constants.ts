@@ -104,7 +104,7 @@ export const UI_SCALE: number = IS_MOBILE ? 3 : 1;
  * decoration in landscape, and off-centring a bubble this wide would push it off
  * the right edge.
  */
-export const BUBBLE_SCALE: number = IS_MOBILE ? 1.65 : 1;
+export const BUBBLE_SCALE: number = IS_MOBILE ? 1.46 : 1;
 
 /**
  * The round buttons (settings gear, and the Ledger/Bag/Codex/Store column) take
@@ -136,8 +136,31 @@ export const PILL_SCALE: number = IS_MOBILE ? 2.1 : 1;
  * Landscape keeps its old insets — there the bubble is narrow and sits beside
  * the column rather than under it.
  */
-export const BUBBLE_BOTTOM: number = IS_MOBILE ? 830 : 150;
-export const HUD_COLUMN_BOTTOM: number = IS_MOBILE ? 1460 : 168;
+export const HUD_COLUMN_BOTTOM: number = IS_MOBILE ? 900 : 168;
+
+/**
+ * The mobile BOTTOM LINE — the level disc and the dialogue sit on it together,
+ * centres aligned, measured up from the bottom edge.
+ *
+ * They used to be stacked, the bubble floating in a band of its own above the
+ * disc, which spent two rows of a phone screen on one row of content.
+ */
+export const BOTTOM_LINE: number = 360;
+
+/**
+ * The level cluster's magnification. A disc with a number in it is an ICON, not
+ * body copy, so it takes the button scale rather than UI_SCALE's 3 — at 3 it was
+ * a 314-unit-wide disc eating the width the dialogue now needs to share the line.
+ */
+export const LEVEL_SCALE: number = IS_MOBILE ? 1.5 : 1;
+
+/** Where the dialogue sits on that line: hard against the level disc's right
+ *  edge, and running to the screen's right margin. `BUBBLE_SCALE` is the widest
+ *  that fits between the two, so the frame is as big as the line allows. */
+export const BUBBLE_X_MOBILE = 1418;
+/** Desktop keeps its authored nudge right, applied where the width is known. */
+export const BUBBLE_X_DESKTOP_NUDGE = 220;
+export const BUBBLE_BOTTOM: number = IS_MOBILE ? BOTTOM_LINE : 150;
 
 /** Uniform scale so a centred popup FRAME of `frameWidth` fills ~94% of the
  *  portrait width. `1` on desktop. Capped so a small frame never balloons. */

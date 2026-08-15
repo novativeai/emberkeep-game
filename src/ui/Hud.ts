@@ -4,13 +4,14 @@ import {
   HUD_COLUMN_X,
   hudColumnY,
   IS_MOBILE,
+  BOTTOM_LINE,
+  LEVEL_SCALE,
   LEVEL_XP,
   LIVE_GAME_HEIGHT,
   LIVE_GAME_WIDTH,
   num,
   PALETTE,
-  PILL_SCALE,
-  UI_SCALE
+  PILL_SCALE
 } from '../core/Constants';
 import { FONT } from '../art/design';
 import type { EventBus } from '../core/EventBus';
@@ -51,6 +52,7 @@ export class Hud {
   private xpBar!: Phaser.GameObjects.Container;
   private xpBarTween?: Phaser.Tweens.Tween;
   private xpBarOpen = false;
+  private bubbleActive: () => boolean = () => false;
   private levelText: Phaser.GameObjects.Text;
   private xpLabel: Phaser.GameObjects.Text;
   private bagBadge: Phaser.GameObjects.Container;
@@ -74,8 +76,12 @@ export class Hud {
       onGear: () => void;
       onBag: () => void;
       onStore: () => void;
+      /** True while a character is speaking. The XP rail shares the bottom line
+       *  with the dialogue now, so it must not open underneath one. */
+      bubbleActive?: () => boolean;
     }
   ) {
+    this.bubbleActive = callbacks.bubbleActive ?? (() => false);
     // Portrait phones magnify the HUD (pillScale) and lay the gauges out for the
     // magnified size. At UI_SCALE a pill is ~1000 units wide, so THREE of them
     // will not share a row across 2560 — Warmth and Gold take the top row and
@@ -218,7 +224,13 @@ export class Hud {
     // children carry large absolute Y (~LIVE_GAME_HEIGHT), so scaling around that
     // corner = scale k with the group offset by pivotY·(1−k) (plus a small inset).
     if (IS_MOBILE) {
-      levelGroup.setScale(UI_SCALE).setPosition(24, LIVE_GAME_HEIGHT * (1 - UI_SCALE) - 30);
+      // Seat the disc's CENTRE on the shared bottom line so the dialogue can be
+      // centred on the same y. Children carry absolute y ≈ LIVE_GAME_HEIGHT - 92,
+      // so scaling by k about (0,0) puts that at k·(H−92); the offset below is
+      // what drags it back onto the line.
+      levelGroup
+        .setScale(LEVEL_SCALE)
+        .setPosition(24, LIVE_GAME_HEIGHT * (1 - LEVEL_SCALE) + 92 * LEVEL_SCALE - BOTTOM_LINE);
       // On a phone the bar is a 440-unit rail lying across the bottom-left at
       // triple size, permanently under the dialogue. The NUMBER is the part
       // worth keeping on screen — the bar is a detail you ask for. So it starts
@@ -406,6 +418,9 @@ export class Hud {
    * bar is always out and never calls this.
    */
   private toggleXpBar(): void {
+    // The rail and the dialogue share the bottom line, so one cannot open under
+    // the other. Closing is always allowed — only opening is refused.
+    if (!this.xpBarOpen && this.bubbleActive()) return;
     this.xpBarOpen = !this.xpBarOpen;
     this.xpBarTween?.stop();
     if (this.xpBarOpen) this.xpBar.setVisible(true);

@@ -142,7 +142,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
         // frame can only grow until the portrait ring reaches the screen edge
         // (BUBBLE_SCALE is capped by that), so the last of the legibility has to
         // come from the type itself. Landscape keeps the authored 38.
-        fontSize: IS_MOBILE ? '46px' : '38px',
+        fontSize: IS_MOBILE ? '58px' : '38px',
         fontStyle: 'bold',
         color: PALETTE.textBrown,
         wordWrap: { width: TEXT_WIDTH },
