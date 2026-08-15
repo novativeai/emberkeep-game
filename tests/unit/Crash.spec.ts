@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearRecordedErrors, guard, hasRecordedErrors, recordedErrors, recordError } from '../../src/core/crash';
+import {
+  clearRecordedErrors,
+  guard,
+  hasRecordedErrors,
+  onErrorRecorded,
+  recordedErrors,
+  recordError
+} from '../../src/core/crash';
 
 /**
  * The black box behind "nothing throws through the game loop".
@@ -50,6 +57,34 @@ describe('the crash recorder', () => {
     recordError('odd', 'just a string');
     recordError('odd', { code: 7 });
     expect(recordedErrors().map((r) => r.message)).toEqual(['just a string', '{"code":7}']);
+  });
+
+  describe('the new-failure watch', () => {
+    it('fires on the first occurrence and stays quiet on the repeats', () => {
+      // Same rule as the log: a per-frame throw must not paint sixty banners a
+      // second over the board it is describing.
+      const seen: string[] = [];
+      const off = onErrorRecorded((rec) => seen.push(`${rec.where}:${rec.message}`));
+      recordError('board.finale.elder', new Error('boom'));
+      recordError('board.finale.elder', new Error('boom'));
+      recordError('ui.finale.elder.speaks', new Error('boom'));
+      off();
+      recordError('board.finale.burst', new Error('after unsubscribe'));
+      expect(seen).toEqual(['board.finale.elder:boom', 'ui.finale.elder.speaks:boom']);
+    });
+
+    it('is not itself a way to throw through the game loop', () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const off = onErrorRecorded(() => {
+        throw new Error('the watcher is broken');
+      });
+      // The recorder must survive its own audience — this call site is the last
+      // line between a bad frame and a dead session.
+      expect(() => recordError('board.finale.awaken', new Error('real failure'))).not.toThrow();
+      expect(recordedErrors()[0]).toMatchObject({ message: 'real failure' });
+      off();
+      spy.mockRestore();
+    });
   });
 
   describe('guard', () => {

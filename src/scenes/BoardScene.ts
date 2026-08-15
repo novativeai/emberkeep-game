@@ -2285,12 +2285,32 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.bus.on('tour:point', ({ target }) => this.onTourPoint(target)),
       this.ctx.bus.on('tour:unpoint', () => this.clearTourArrow()),
       this.ctx.bus.on('quest:completed', ({ questId }) => {
-        if (questId === GOLDEN_ALTAR.awakenQuestId) this.runFinale();
+        if (questId === GOLDEN_ALTAR.awakenQuestId) this.beat('trigger', () => this.runFinale());
       })
     );
   }
 
   /* ------------------------- the Level-3 finale ------------------------- */
+
+  /**
+   * ONE BEAT OF THE FINALE, FENCED.
+   *
+   * Every beat of the awakening is a `delayedCall`, a tween callback or an
+   * input handler, and Phaser runs all three INSIDE the frame step but OUTSIDE
+   * `update` — so the single `guard` on `stepBoard` never covered any of them.
+   * That is the difference between the ceremony failing and the SESSION
+   * failing: the next frame is requested only after the step returns
+   * (`core/crash.ts`), so a throw here does not lose the Elder, it stops the
+   * game dead with the board still on screen, and only a reload brings it back.
+   *
+   * The chapter's one irreversible story beat is the last place in the game
+   * that should be able to do that. Each step now carries on degraded instead —
+   * a missing flourish beats a locked save — and the failure is named in
+   * `window.__emberkeep.errors()` rather than being a freeze with no message.
+   */
+  private beat(where: string, fn: () => void): void {
+    guard(`board.finale.${where}`, fn, undefined);
+  }
 
   /**
    * The grand surprise, made real: the camera glides west to the Golden Altar,
@@ -2310,33 +2330,42 @@ export class BoardScene extends Phaser.Scene {
 
     // 1 — the camera glides WEST to the Golden Altar, where the whole golden
     // lore lives (authored spot, golden-egg.json)…
-    this.time.delayedCall(FINALE.hatchAtMs, () => {
-      if (!this.altarEgg) return;
-      const p = this.altarPoint();
-      this.glideToWorld(p.x, p.y + 60, 900);
-    });
+    this.time.delayedCall(FINALE.hatchAtMs, () =>
+      this.beat('glide', () => {
+        if (!this.altarEgg) return;
+        const p = this.altarPoint();
+        this.glideToWorld(p.x, p.y + 60, 900);
+      })
+    );
     // …and the Golden Egg cracks: the legendary Elder AWAKENS on her ledge.
     // ONLY if Eleanor's golden order was delivered — the egg is authored decor
     // now, so its mere existence no longer implies the promise was earned; the
     // prophecy finale variant leaves her sleeping (deliver later → the late
     // awakening plays instead).
-    this.time.delayedCall(FINALE.awakenAtMs, () => {
-      if (this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId)) {
-        this.awakenAltarElder();
-      } else if (this.altarEgg) {
-        // Prophecy variant: she stirs but does NOT wake — the un-filled order
-        // stays the hook.
-        const p = this.altarPoint();
-        this.wobbleGoldenEgg();
-        this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.7, 1.4);
-      }
-    });
+    this.time.delayedCall(FINALE.awakenAtMs, () =>
+      this.beat('awaken', () => {
+        if (this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId)) {
+          this.awakenAltarElder();
+        } else if (this.altarEgg) {
+          // Prophecy variant: she stirs but does NOT wake — the un-filled order
+          // stays the hook.
+          const p = this.altarPoint();
+          this.wobbleGoldenEgg();
+          this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.7, 1.4);
+        }
+      })
+    );
 
-    // 3 — home again: the board is handed straight back to the player.
-    this.time.delayedCall(FINALE.returnAtMs, () => {
-      const frame = this.frameForLevel(this.ctx.state.level);
-      this.glideToWorld(frame.x, frame.y, 1100);
-    });
+    // 3 — home again: the board is handed straight back to the player. Fenced
+    // like the rest, and the reason it matters most here: this is the beat that
+    // gives the player their camera back, so losing it strands them at the
+    // altar for the rest of the session.
+    this.time.delayedCall(FINALE.returnAtMs, () =>
+      this.beat('return', () => {
+        const frame = this.frameForLevel(this.ctx.state.level);
+        this.glideToWorld(frame.x, frame.y, 1100);
+      })
+    );
   }
 
   /** Ambient anticipation: the altar egg trembles once the Keeper is close
@@ -2483,12 +2512,16 @@ export class BoardScene extends Phaser.Scene {
     const p = this.altarPoint();
     const home = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
     this.glideToWorld(p.x, p.y + 60, 900);
-    this.time.delayedCall(1000, () => {
-      this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.85, 1.6);
-      this.sparks.explode(22, p.x, p.y + 40);
-      this.floatText(p.x, p.y - 40, '???', PALETTE.goldAccent);
-    });
-    this.time.delayedCall(2600, () => this.glideToWorld(home.x, home.y, 900));
+    this.time.delayedCall(1000, () =>
+      this.beat('ceremony.flare', () => {
+        this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.85, 1.6);
+        this.sparks.explode(22, p.x, p.y + 40);
+        this.floatText(p.x, p.y - 40, '???', PALETTE.goldAccent);
+      })
+    );
+    this.time.delayedCall(2600, () =>
+      this.beat('ceremony.return', () => this.glideToWorld(home.x, home.y, 900))
+    );
   }
 
   /** The Elder stands on the altar — live rig when available, gold-tinted
@@ -2611,7 +2644,11 @@ export class BoardScene extends Phaser.Scene {
     this.loads.run(
       () => {},
       () => {
-        if (this.scene.isActive()) this.showAltarElder();
+        // Fenced: this fires from the LOADER, later than the ceremony and with
+        // nobody left to catch it — the upgrade from rig to clips is exactly
+        // the kind of late beat whose failure used to freeze a board the player
+        // had already been handed back.
+        if (this.scene.isActive()) this.beat('clips', () => this.showAltarElder());
       }
     );
   }
@@ -2725,19 +2762,28 @@ export class BoardScene extends Phaser.Scene {
       yoyo: true,
       repeat: Math.floor(TIMINGS.hatchShake / 120),
       ease: 'Sine.easeInOut',
+      // TWO fences, not one: the flourish and the animal fail independently.
+      // A burst that throws must still leave the Elder standing, and an Elder
+      // who cannot be mounted must still let the egg visibly crack — the egg is
+      // destroyed either way, so a single fence around both could leave the
+      // altar empty.
       onComplete: () => {
-        this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 1, 2.6);
-        this.playBeatFX('elder', p.x, p.y + 40);   // the Elder rises out of gold
-        this.shells.explode(12, p.x, p.y + 40);
-        this.sparks.explode(40, p.x, p.y + 44);
-        this.burst.explode(20, p.x, p.y + 48);
-        this.showAltarElder();
-        if (this.altarElder || this.altarElderClip) {
-          this.altarElder?.play('hover');
-          this.altarElder?.playFace(2); // the Elder announces herself — a ROAR
-          this.playElder('announce'); // …and the clip Elder actually bellows it
-          this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.introCelebrateMs };
-        }
+        this.beat('burst', () => {
+          this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 1, 2.6);
+          this.playBeatFX('elder', p.x, p.y + 40); // the Elder rises out of gold
+          this.shells.explode(12, p.x, p.y + 40);
+          this.sparks.explode(40, p.x, p.y + 44);
+          this.burst.explode(20, p.x, p.y + 48);
+        });
+        this.beat('elder', () => {
+          this.showAltarElder();
+          if (this.altarElder || this.altarElderClip) {
+            this.altarElder?.play('hover');
+            this.altarElder?.playFace(2); // the Elder announces herself — a ROAR
+            this.playElder('announce'); // …and the clip Elder actually bellows it
+            this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.introCelebrateMs };
+          }
+        });
       }
     });
   }
@@ -2750,13 +2796,17 @@ export class BoardScene extends Phaser.Scene {
     const home = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
     this.showAltarEgg(false); // no competing camera script — this one drives
     this.glideToWorld(p.x, p.y + 60, 900);
-    this.time.delayedCall(1000, () => {
-      this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.85, 1.6);
-      this.sparks.explode(22, p.x, p.y + 40);
-      this.floatText(p.x, p.y - 40, '???', PALETTE.goldAccent);
-    });
-    this.time.delayedCall(2400, () => this.awakenAltarElder());
-    this.time.delayedCall(5600, () => this.glideToWorld(home.x, home.y, 900));
+    this.time.delayedCall(1000, () =>
+      this.beat('late.flare', () => {
+        this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.85, 1.6);
+        this.sparks.explode(22, p.x, p.y + 40);
+        this.floatText(p.x, p.y - 40, '???', PALETTE.goldAccent);
+      })
+    );
+    this.time.delayedCall(2400, () => this.beat('late.awaken', () => this.awakenAltarElder()));
+    this.time.delayedCall(5600, () =>
+      this.beat('late.return', () => this.glideToWorld(home.x, home.y, 900))
+    );
   }
 
   /** One tap zone covers the altar for both states (egg wobble / commune). */
@@ -2768,8 +2818,13 @@ export class BoardScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     this.altarZone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       if (!this.isTap(pointer)) return;
-      if (this.altarElder || this.altarElderClip || this.altarElderFallback) this.communeWithElder();
-      else if (this.altarEgg) this.wobbleGoldenEgg();
+      // An input handler runs inside the step too, so a tap on the altar could
+      // end the session as surely as the ceremony could.
+      this.beat('altar.tap', () => {
+        if (this.altarElder || this.altarElderClip || this.altarElderFallback) {
+          this.communeWithElder();
+        } else if (this.altarEgg) this.wobbleGoldenEgg();
+      });
     });
   }
 

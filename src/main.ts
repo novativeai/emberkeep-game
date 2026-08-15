@@ -1,6 +1,6 @@
 // The Map Editor's chrome is drawn with FontAwesome glyphs (src/editor/EditorDom.ts).
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import { recordedErrors, type RecordedError } from './core/crash';
+import { onErrorRecorded, recordedErrors, type RecordedError } from './core/crash';
 import Phaser from 'phaser';
 import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
@@ -409,3 +409,29 @@ window.__emberkeep = {
     renderedFps: Math.round(power.renderedFps())
   })
 };
+
+/**
+ * DEV ONLY — put the black box on the screen.
+ *
+ * `guard` keeps a failure from ending the session, but a caught failure is
+ * SILENT: the ceremony is missing a piece and nothing says why. The console
+ * holds the stack, and on the device where these are hardest to reproduce —
+ * a phone on the LAN — there is no console to read it in.
+ *
+ * So the first occurrence of each distinct failure paints itself, tap to
+ * dismiss. Gated on `import.meta.env.DEV`, so it is a development instrument
+ * and never a thing a player can see: the whole point of degrading gracefully
+ * is that the player is not shown the machinery.
+ */
+if (import.meta.env.DEV) {
+  onErrorRecorded((rec) => {
+    const el = document.createElement('div');
+    el.textContent = `⚠ ${rec.where} — ${rec.message}`;
+    el.style.cssText =
+      'position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;padding:10px 14px;' +
+      'background:#7a1420;color:#ffd9d9;font:13px/1.4 monospace;border-radius:8px;' +
+      'white-space:pre-wrap;word-break:break-word;box-shadow:0 4px 18px #0008';
+    el.addEventListener('pointerdown', () => el.remove());
+    document.body.appendChild(el);
+  });
+}

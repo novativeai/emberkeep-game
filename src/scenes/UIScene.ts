@@ -24,6 +24,7 @@ import {
   WELCOME_BACK_MIN_MS
 } from '../core/Constants';
 import { FONT } from '../art/design';
+import { guard } from '../core/crash';
 import { iapBridge } from '../core/iapBridge';
 import { gridToWorld } from '../core/iso';
 import type {
@@ -574,7 +575,9 @@ export class UIScene extends Phaser.Scene {
       bus.on('quest:completed', ({ questId }) => {
         // The Golden Elder's awakening — UIScene runs her voice, BoardScene the
         // camera and the egg, both off this one beat.
-        if (questId === GOLDEN_ALTAR.awakenQuestId) this.time.delayedCall(0, () => this.runFinaleUi());
+        if (questId === GOLDEN_ALTAR.awakenQuestId) {
+          this.time.delayedCall(0, () => this.beat('trigger', () => this.runFinaleUi()));
+        }
       }),
       bus.on('tasks:all_complete', () => this.celebrateTasksComplete()),
       bus.on('energy:changed', ({ current }) => {
@@ -1009,6 +1012,18 @@ export class UIScene extends Phaser.Scene {
    * would like to keep playing is the wrong last thing a chapter says. Her line
    * lands, the camera comes home, and play continues uninterrupted.
    */
+  /**
+   * ONE BEAT OF THE FINALE, FENCED — BoardScene's twin, and needed for the same
+   * reason: this scene runs the Elder's VOICE off the same timeline, out of
+   * `delayedCall`s that Phaser steps outside any `update`. A throw while she
+   * speaks ends the RAF chain (`core/crash.ts`), which is not "her line is
+   * missing" but "the session is over, reload to get the board back" — and the
+   * board it freezes belongs to BoardScene, which did nothing wrong.
+   */
+  private beat(where: string, fn: () => void): void {
+    guard(`ui.finale.${where}`, fn, undefined);
+  }
+
   private runFinaleUi(): void {
     if (this.finaleActive) return;
     this.finaleActive = true;
@@ -1016,36 +1031,45 @@ export class UIScene extends Phaser.Scene {
     this.ledger.requestClose();
     this.shop.requestClose();
     this.cookbook.requestClose();
-    this.time.delayedCall(FINALE.elderAtMs, () => {
-      // No egg earned (Order 1 skipped)? Her line reads as PROPHECY — selling
-      // the promise the player hasn't collected yet, never claiming an
-      // awakening that didn't happen.
-      const eggEarned = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
-      this.bubble.say(
-        'golden_elder',
-        eggEarned ? this.ctx.data.dialogue.finaleElder : this.ctx.data.dialogue.finaleElderProphecy,
-        FINALE.elderHoldMs
-      );
-    });
+    this.time.delayedCall(FINALE.elderAtMs, () =>
+      this.beat('elder.speaks', () => {
+        // No egg earned (Order 1 skipped)? Her line reads as PROPHECY — selling
+        // the promise the player hasn't collected yet, never claiming an
+        // awakening that didn't happen.
+        const eggEarned = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
+        this.bubble.say(
+          'golden_elder',
+          eggEarned ? this.ctx.data.dialogue.finaleElder : this.ctx.data.dialogue.finaleElderProphecy,
+          FINALE.elderHoldMs
+        );
+      })
+    );
     // The stage is released when her line does, not when a panel is dismissed.
-    this.time.delayedCall(FINALE_ENDS_MS, () => {
-      this.finaleActive = false;
-      // The Gate ceremony rides the finale's tail: Eleanor speaks the arch
-      // open (tap-advanced, STORY_BEAT_HOLD_MS backstop — it cannot strand),
-      // and the last line blooming into `gate:opened` is what turns the
-      // portal FX on and the door live. A reload after the finale skips the
-      // ceremony: BoardScene derives the open Gate from the q:done latch.
-      const beats = this.ctx.data.dialogue.gateOpens;
-      if (beats?.lines.length) {
-        this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
-          this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () =>
-            this.ctx.bus.emit('gate:opened', {})
+    // `finaleActive` is cleared FIRST and inside the fence, so the stage is
+    // released even if the Gate ceremony behind it fails — a stuck flag would
+    // silence every later celebration for the rest of the session.
+    this.time.delayedCall(FINALE_ENDS_MS, () =>
+      this.beat('release', () => {
+        this.finaleActive = false;
+        // The Gate ceremony rides the finale's tail: Eleanor speaks the arch
+        // open (tap-advanced, STORY_BEAT_HOLD_MS backstop — it cannot strand),
+        // and the last line blooming into `gate:opened` is what turns the
+        // portal FX on and the door live. A reload after the finale skips the
+        // ceremony: BoardScene derives the open Gate from the q:done latch.
+        const beats = this.ctx.data.dialogue.gateOpens;
+        if (beats?.lines.length) {
+          this.time.delayedCall(TIMINGS.chapterBeatDelay, () =>
+            this.beat('gate', () =>
+              this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () =>
+                this.ctx.bus.emit('gate:opened', {})
+              )
+            )
           );
-        });
-      } else {
-        this.ctx.bus.emit('gate:opened', {});
-      }
-    });
+        } else {
+          this.ctx.bus.emit('gate:opened', {});
+        }
+      })
+    );
   }
 
   /** Order completion — the demo's primary reward beat — now celebrates at
@@ -1073,9 +1097,11 @@ export class UIScene extends Phaser.Scene {
     if (golden && this.ctx.state.level >= 3) {
       // BoardScene's lateGoldenAwakening cracks the egg at ~2.4s — her line
       // lands right as the Elder rises.
-      this.time.delayedCall(3200, () => {
-        this.bubble.say('golden_elder', this.ctx.data.dialogue.lateAwakening, 4600);
-      });
+      this.time.delayedCall(3200, () =>
+        this.beat('late.elder', () =>
+          this.bubble.say('golden_elder', this.ctx.data.dialogue.lateAwakening, 4600)
+        )
+      );
     }
   }
 
