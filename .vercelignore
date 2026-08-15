@@ -1,0 +1,46 @@
+# What NOT to upload to Vercel.
+#
+# Only read by the CLI (`vercel deploy`), which tars the working directory and
+# sends it to the build machine — a git-connected deploy sends the commit
+# instead and ignores this file. Everything below is either build OUTPUT, a
+# local authoring workspace, or a second project that happens to live here; none
+# of it is an input to `pnpm build`, and together they are most of the folder.
+#
+# The build itself decides what SHIPS (vite.config.ts `copyRuntimeArt` filters
+# `assets/` on the way into dist) — this only decides what gets sent.
+
+node_modules
+.git
+
+# Build output — Vercel builds its own.
+dist
+dist-*
+test-results
+test-results-*
+playwright-report
+.playwright-mcp
+
+# The map editor's project store: 30 MB of embedded map art, reachable only
+# through the dev server's `/__asset3d` middleware, which does not exist in a
+# deploy. The game runs from src/data/zones.json, which is generated from it.
+asset3d
+
+# Authoring workspaces and neighbouring projects that carry their own git.
+#
+# NOT `assets/raw` — it looks like a workspace and mostly is, but the build
+# SHIPS `raw/screamingbrain` from it (vite.config.ts `RAW_SHIPPED`) and
+# assets.json references `raw/ai`. What is tracked here is 8 MB; the 3.9 GB of
+# masters the .gitignore talks about lives in another checkout.
+embergames
+path-of-embers
+rigger
+world
+tools/mapmask/out
+agent-to-agent
+.claude/worktrees
+
+# Loose working files at the repo root.
+*.zip
+green_loop
+*.log
+bug-log.md

@@ -274,7 +274,20 @@ def main():
     # sheets (Eleanor, Selyna, the red whelp) are ~13 MB of source art and land
     # around 7 MB shipped. The ceiling is a REGRESSION guard, not a target — it
     # is raised deliberately, with the reason written down, or not at all.
-    ap.add_argument("--budget", type=float, default=56.0, help="fail over this many MB")
+    # 108 (2026-08-14, the legendaries): ashdrake + rimewyrm young idle+roar —
+    # young-ONLY breeds, so ~5.3 MB each (no adult set, no fly clip), measured
+    # 95.2 → 105.8. 108 keeps the customary ~2 MB of slack. This completes the
+    # clip roster for every breed that exists in chains.json; the next raise
+    # should come with legendary ADULT tiers or a new breed, nothing else.
+    #
+    # 110 (2026-08-15, this branch): the number above is main's, measured on
+    # main's dist. Ours is 107.7 — the same clip roster plus what only this
+    # branch ships: Runevault's boiling cauldron (3.1 MB of atlas, the first
+    # animated map decor) and the redrawn Emberbark vase. 108 left 0.3 MB of
+    # slack, which is not slack, it is the next asset failing the build for
+    # nobody's benefit. 110 restores the customary ~2 MB. Same rule as every
+    # line above it: raised deliberately, with the measurement written down.
+    ap.add_argument("--budget", type=float, default=110.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():
