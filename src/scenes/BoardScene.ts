@@ -795,10 +795,27 @@ export class BoardScene extends Phaser.Scene {
    *  (the ember/emerald generator tiers). The Golden Elder is not a board
    *  item — she lives on the Golden Altar fixture (see syncGoldenAltar). */
   private wearsRigTier(chain: string, tier: number): boolean {
-    // A tier is a LIVE dragon when its clip set carries the whole animal.
-    // This used to also accept "a rig is registered for it"; there are no rigs
-    // any more, so clip completeness is the whole test.
-    if (!this.clipComplete(chain, tier)) return false;
+    /**
+     * IS THIS TIER AN ANIMAL THE PLAYER CAN HIRE? A question about the game,
+     * and it has to stay one.
+     *
+     * `DRAGON_RIGS` used to answer it from a static roster, so it was true
+     * whatever the texture cache happened to hold. When the rigs came out it
+     * was pointed at `clipComplete`, which additionally asks whether the
+     * breed's spritesheet is RESIDENT — and that turned a fact about the world
+     * into a fact about the loader. The drop that hires a dragon is gated on
+     * this: with the sheet absent it stopped being a work-drop at all and fell
+     * through to an ordinary move, so the dragon slid onto the House instead of
+     * flying to it, `dragon:work` was never emitted, and the tutorial's
+     * `dragon_work` beat waited for a `dragon:working` that could not come.
+     * Silent, and total — the hatched whelp's clips were never even requested
+     * (see hatchSequence), so the sheet was never going to arrive.
+     *
+     * The clip ROSTER is what knows which chains are animals. Residency is
+     * `attachDragon`'s business and nobody else's.
+     */
+    const id = this.clipCharacterFor(chain, tier);
+    if (!id || clipFor(id, 'idle') === null) return false;
     return this.generatorConfigFor(chain, tier) !== undefined;
   }
 
@@ -6083,9 +6100,21 @@ export class BoardScene extends Phaser.Scene {
           this.ctx.bus.emit('ui:name_dragon_requested', { itemId: snap.id })
         );
       }
-      const sprite = this.acquireSprite(snap, false);      // A live rigged dragon bursts in facing LEFT (un-mirrored), mid-celebration; the host
-      // sprite becomes its invisible interactive anchor. Falls back to the
-      // pooled sprite pop-in if the rig hasn't loaded.
+      const sprite = this.acquireSprite(snap, false);
+      // ASK FOR THIS BREED'S CLIPS — a hatch is the one arrival that never did.
+      // The sheets stopped riding the boot preload (they decode to ~1 GB for
+      // eleven breeds), so every path that puts a dragon on the board fetches
+      // its own set: `item:spawned` does, the merge outputs do, the restore
+      // does. A HATCH emits `item:merged` + `item:hatched` and never
+      // `item:spawned`, and `onMerged` returns early on `isHatch` precisely to
+      // leave the arrival to this ceremony — so the whelp the tutorial hatches
+      // was the one dragon in the game whose clips nobody ever requested. It
+      // came out as a static sprite and stayed one.
+      this.ensureDragonClips(snap.chain, snap.tier);
+      // A live dragon bursts in facing LEFT (un-mirrored), mid-celebration; the
+      // host sprite becomes its invisible interactive anchor. Falls back to the
+      // pooled sprite pop-in if the sheets have not landed yet — the loader's
+      // COMPLETE handler re-dresses it.
       if (this.attachDragon(sprite, true)) return;
       sprite.setScale(0.05);
       sprite.setAlpha(0);
