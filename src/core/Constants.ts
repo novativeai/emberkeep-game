@@ -2190,6 +2190,23 @@ export const DRAGON_WORK_PER_DRAGON = 2;
 export const TAP_MAX_DISTANCE_PX = 16;
 export const TAP_MAX_MS = 350;
 
+/**
+ * THE TUTORIAL CAMERA FOLLOWING ITS OWN POINTER.
+ *
+ * `INSET` is the margin, as a fraction of the view, inside which a target
+ * counts as already comfortably in frame — the camera holds still for anything
+ * within it. It is not zero because "technically on screen" is not the same as
+ * "seen": a cell hugging the bottom edge sits under the HUD, and one at the far
+ * right is where the eye looks last. A sixth of the view in from each side puts
+ * the pointer in the middle two-thirds, which is where a lesson belongs.
+ *
+ * `MS` is the glide. Long enough to read as the world turning rather than
+ * cutting — a jump loses the player's place, which is the whole thing the
+ * follow exists to protect.
+ */
+export const TUTORIAL_FOLLOW_INSET = 1 / 6;
+export const TUTORIAL_FOLLOW_MS = 700;
+
 /** Ambient juice. */
 export const EMBER_MOTES = {
   count: 14,
@@ -2328,7 +2345,10 @@ export const SAVE_KEY = 'emberkeep_save';
 // 17: `gate_wake` inserted between the Brazier delivery and the golden tease —
 // the beat that teaches paying a sleeping dragon awake for the crossing. Same
 // reason as 16: every `tutorialIndex` past it now names a different beat.
-export const SAVE_VERSION = 17;
+// 18: `board_room` removed — the camera now follows every tutorial pointer, so
+// the stump spawns out on the open field ([7,2]) instead of being walked there
+// by a dedicated move beat. Every `tutorialIndex` past the key lesson shifts.
+export const SAVE_VERSION = 18;
 
 /** The opening's held silence: the board is visible and quiet before Eleanor's
  *  first line, so the player sees the ash before anyone frames it

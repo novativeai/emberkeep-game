@@ -466,40 +466,6 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       await tapTile(page, cell[0], cell[1]);
       await page.waitForTimeout(360);
     }
-    // ---------- Board hygiene: carry the Emberbark Stump onto the new field ----------
-    // The first `move`-gated beat: the gate is the DROP landing inside
-    // `level_2`, driven by the real drag first (stump → the hand's own [6,2],
-    // the nearest free tile on Eleanor's left).
-    await waitStep(page, 'board_room');
-    {
-      const stump = await findCells(page, (c) => c.chain === 'emberbark');
-      expect(stump.length).toBe(1);
-      await page.evaluate(() => window.__emberkeep.centerCell(6, 4));
-      await page.waitForTimeout(350);
-      await dragTile(page, [stump[0]![0], stump[0]![1]], [6, 2]);
-      await page.waitForTimeout(500);
-      if ((await gameText(page)).tutorial.step === 'board_room') {
-        // Reliability fallback (software rendering): perform the move directly
-        // and let the director hear the same fact the drop would emit.
-        await page.evaluate(() => {
-          const ctx = window.__emberkeep.game.registry.get('ctx') as {
-            state: {
-              items: Map<number, { id: number; chain: string; col: number; row: number }>;
-              moveItem: (id: number, to: { col: number; row: number }) => void;
-              itemIdAt: (col: number, row: number) => number | null;
-            };
-            bus: { emit: (event: string, payload: unknown) => void };
-          };
-          const stumpItem = [...ctx.state.items.values()].find((i) => i.chain === 'emberbark');
-          if (!stumpItem) return;
-          const from = { col: stumpItem.col, row: stumpItem.row };
-          const to = ctx.state.itemIdAt(6, 2) === null ? { col: 6, row: 2 } : { col: 6, row: 4 };
-          ctx.state.moveItem(stumpItem.id, to);
-          ctx.bus.emit('item:moved', { itemId: stumpItem.id, from, to });
-        });
-      }
-    }
-
     // ---------- Emberberry patch: free harvest in the opened land ----------
     await waitStep(page, 'emberberry_tap');
     state = await gameText(page);
