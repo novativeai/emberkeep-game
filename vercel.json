@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "pnpm install && python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow || python3 -m pip install --quiet --disable-pip-version-check pillow",
+  "installCommand": "pnpm install && ( python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow || python3 -m pip install --quiet --disable-pip-version-check pillow || pip3 install --quiet pillow )",
   "buildCommand": "pnpm build",
   "outputDirectory": "dist"
 }
