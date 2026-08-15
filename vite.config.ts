@@ -1357,7 +1357,7 @@ export default defineConfig({
   build: {
     outDir: process.env.EMBERKEEP_DIST ?? 'dist',
     assetsInlineLimit: 0,
-    chunkSizeWarningLimit: 1600,
+    chunkSizeWarningLimit: 3000,
     // `copyRuntimeArt` does the publicDir copy through a ship/skip filter.
     copyPublicDir: false
   }

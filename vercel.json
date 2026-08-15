@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "corepack enable pnpm && pnpm install && ( python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow || python3 -m pip install --quiet --disable-pip-version-check pillow || pip3 install --quiet pillow )",
+  "installCommand": "corepack enable pnpm && pnpm install && ( python3 -m pip install --quiet --disable-pip-version-check --root-user-action=ignore --break-system-packages pillow || python3 -m pip install --quiet --disable-pip-version-check --root-user-action=ignore pillow || pip3 install --quiet --root-user-action=ignore pillow )",
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "headers": [
