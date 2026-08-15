@@ -808,7 +808,7 @@
       "key": "item_golden_egg_2",
       "source": "file",
       "generator": "item",
-      "file": "sprites/characters/dragon/red-dragon/sprite/red-dragon-baked.webp"
+      "file": "sprites/characters/dragon/golden-dragon/sprite-adult/golden-dragon-adult-baked.webp"
     },
     {
       "key": "ui_teaser_terrace",

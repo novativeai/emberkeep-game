@@ -21,7 +21,6 @@ import {
   GOLDEN_ALTAR,
   GOLDEN_CHAIN,
   GOLDEN_ELDER_TIER,
-  GOLDEN_TINT,
   GOLDEN_TREMBLE_PROGRESS,
   ITEM_SCALE,
   LIVE_GAME_HEIGHT,
@@ -2140,15 +2139,26 @@ export class BoardScene extends Phaser.Scene {
       return;
     }
     // Her clips have not landed yet. The rig used to stand in here; there is no
-    // rig any more, so the tinted egg art holds the altar until they do — and
+    // rig any more, so her own standing art holds the altar until they do — and
     // `syncGoldenAltar` runs again on the loader's COMPLETE, which is what
     // swaps her in.
+    //
+    // It is HER art now. This key was pointed at the red dragon's baked body
+    // (assets.json), which the rig had always covered; the moment the rig came
+    // out and this stand-in took its place, the isle's one golden legend woke up
+    // as a red dragon under a gold tint. The tint went with it — gilding art
+    // that is already gold only muddies it.
+    //
+    // Scale and origin are derived from the alpha bboxes so she stands exactly
+    // where the old stand-in did: 819 body px at 0.21 read as 172 units, and
+    // 172 units is 677 body px at 0.254. Her feet sit at 98.15% down her canvas
+    // (the red art's were at 83%), so the origin follows them rather than
+    // leaving her hovering over the altar.
     if (!this.altarElderFallback) {
       this.altarElderFallback = this.add
         .image(p.x, eggBottom, `item_${GOLDEN_CHAIN}_${GOLDEN_ELDER_TIER}`)
-        .setOrigin(0.5, 0.88)
-        .setScale(0.21)
-        .setTint(GOLDEN_TINT)
+        .setOrigin(0.5, 0.9815)
+        .setScale(0.254)
         .setDepth(DEPTHS.itemBase + p.y + 1);
     }
     this.addGroundShadow(p.x, eggBottom, 170, DEPTHS.itemBase + p.y);
