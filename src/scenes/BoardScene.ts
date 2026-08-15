@@ -21,6 +21,7 @@ import {
   GATE_FX_HEIGHT,
   ROOTHOLD_HOUSE,
   FINALE_ENDS_MS,
+  GATE_LESSON_STAT,
   FINALE_REGION,
   LIVE_GAME_WIDTH,
   GOLDEN_ALTAR,
@@ -79,6 +80,12 @@ import { type MergeHint, nextMergeHint } from '../core/mergeHints';
 import { LoadQueue } from '../core/LoadQueue';
 import { ensureTextures } from '../core/lazyTextures';
 import { plateScale } from '../core/artScale';
+// The ONE thing the running game asks the editor: does it currently own the
+// pointer (see `wireCameraNav`). Deliberately nothing else — the board's map
+// data comes from the generated `zones.json`, never from the live store. Safe to
+// pull into the main bundle: `editorStore` imports only `./lattice`, has no
+// constructor and does no work at module load.
+import { editorStore } from '../editor/editorStore';
 import { gridToWorld } from '../core/iso';
 import { guard, recordError } from '../core/crash';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
@@ -944,18 +951,121 @@ export class BoardScene extends Phaser.Scene {
 
     const hint = nextMergeHint(this.ctx.state.items.values(), this.ctx.data.chains);
     if (!hint) return;
-    const from = this.ctx.state.items.get(hint.ids[0]!);
-    const to = this.ctx.state.items.get(hint.ids[1]!);
+    // FROM the piece that has to travel, TO the one of its set standing nearest
+    // it. The hand used to run between the two OLDEST ids in the set, which on a
+    // spread board drew a line between two pieces that were not the move — and
+    // pointed away from the pair sitting side by side.
+    const from = this.ctx.state.items.get(hint.moveId);
+    const to = hint.ids
+      .filter((id) => id !== hint.moveId)
+      .map((id) => this.ctx.state.items.get(id))
+      .filter((i): i is NonNullable<typeof i> => !!i)
+      .sort(
+        (a, b) =>
+          (a.col - (from?.col ?? 0)) ** 2 +
+          (a.row - (from?.row ?? 0)) ** 2 -
+          ((b.col - (from?.col ?? 0)) ** 2 + (b.row - (from?.row ?? 0)) ** 2)
+      )[0];
     if (!from || !to) return;
     this.hintShown = hint;
+    this.bounceHintPiece(from.id);
     this.ctx.bus.emit('hint:merge', {
       from: { col: from.col, row: from.row },
       to: { col: to.col, row: to.row }
     });
   }
 
+  /**
+   * A small hop under the piece the hand is asking for.
+   *
+   * The hand is drawn by UIScene on its own fixed camera, so on a board scrolled
+   * away from the pair it is the only thing the player sees — and it says
+   * "drag", not "drag THIS ONE". The hop is what makes the far piece findable
+   * without lighting up half the isle: the destination sits still, and the thing
+   * that has to move is the thing that moves.
+   */
+  private bounceHintPiece(itemId: number): void {
+    const sprite = this.itemSprites.get(itemId);
+    if (!sprite) return;
+    this.stopHintBounce();
+    this.hintBounce = this.tweens.add({
+      targets: sprite,
+      y: sprite.y - 18,
+      duration: 320,
+      yoyo: true,
+      repeat: -1,
+      repeatDelay: 900,
+      ease: 'Sine.easeOut'
+    });
+  }
+
+  private stopHintBounce(): void {
+    if (!this.hintBounce) return;
+    // Restore the seat rather than trusting the tween to land: a hop stopped
+    // mid-flight would leave the piece hovering a few pixels off its tile for
+    // the rest of the session, which is the same class of bug as the drag
+    // furniture left behind above.
+    const target = this.hintBounce.targets?.[0] as BoardItem | undefined;
+    const home = target ? gridToWorld(target.col, target.row) : null;
+    this.hintBounce.stop();
+    this.hintBounce = undefined;
+    if (target && home) target.y = home.y;
+  }
+
+  private hintBounce?: Phaser.Tweens.Tween;
+
+  /**
+   * "CARRY HIM TO THE ARCH" — the one gesture world travel is taught with.
+   *
+   * A dragon crosses by being PICKED UP and dropped on the gate; nothing on
+   * screen says so, and the arch reads as scenery until something connects the
+   * two. So the moment Eleanor's Emporium visit ends — the first quiet beat
+   * after arriving in Roothold — the hand draws the move once.
+   *
+   * Latched in `stats` like the tours themselves, so it is taught once ever and
+   * survives a reload, and taken back the moment a dragon actually crosses:
+   * a lesson that stays up after it has been learnt is nagging.
+   */
+  private offerGateLesson(): void {
+    if (this.ctx.state.stat(GATE_LESSON_STAT) > 0) return;
+    const world = this.ctx.state.world;
+    const door = world.portals[0];
+    if (!door) return;
+    // The nearest dragon to the arch: on a board with several, the one already
+    // closest is the one the gesture is cheapest to try with.
+    const at = cellAtWorldPoint(world, door.x + door.width / 2, door.y + door.height / 2);
+    let best: BoardItem | undefined;
+    let bestD = Infinity;
+    for (const s of this.itemSprites.values()) {
+      if (!this.wearsRigTier(s.chain, s.tier)) continue;
+      const d = (s.col - at.col) ** 2 + (s.row - at.row) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = s;
+      }
+    }
+    if (!best) return;
+    this.gateLessonUp = true;
+    this.ctx.bus.emit('hint:carry', {
+      from: { col: best.col, row: best.row },
+      to: { col: at.col, row: at.row }
+    });
+  }
+
+  /** The lesson is over when the move has been made — not when the player
+   *  touches something else. */
+  private clearGateLesson(learnt: boolean): void {
+    if (!this.gateLessonUp) return;
+    this.gateLessonUp = false;
+    if (learnt) this.ctx.state.addStat(GATE_LESSON_STAT, 1);
+    this.ctx.bus.emit('hint:carry', null);
+  }
+
+  private gateLessonUp = false;
+
   /** Take the hand back — after a merge, on a drag, or when the board goes. */
   private takeBackHint(): void {
+    this.stopHintBounce();
     if (!this.hintShown) return;
     this.hintShown = null;
     this.ctx.bus.emit('hint:merge', null);
@@ -2283,6 +2393,15 @@ export class BoardScene extends Phaser.Scene {
         this.syncPortalFx(true);
       }),
       this.ctx.bus.on('tour:point', ({ target }) => this.onTourPoint(target)),
+      // Eleanor's Emporium visit ends → the gate lesson begins. Hung off the
+      // tour rather than off arrival so the two never share the screen: she is
+      // mid-sentence about her shelves for the whole of it.
+      this.ctx.bus.on('tour:completed', ({ id }) => {
+        if (id === 'roothold') this.offerGateLesson();
+      }),
+      // Learnt. The stat is written HERE and only here, so a lesson the player
+      // ignored is still waiting next session, and one they followed is done.
+      this.ctx.bus.on('dragon:crossed', () => this.clearGateLesson(true)),
       this.ctx.bus.on('tour:unpoint', () => this.clearTourArrow()),
       this.ctx.bus.on('quest:completed', ({ questId }) => {
         if (questId === GOLDEN_ALTAR.awakenQuestId) this.beat('trigger', () => this.runFinale());
@@ -3121,6 +3240,13 @@ export class BoardScene extends Phaser.Scene {
    * board is not rebuilt, and closing the editor puts the authored art back.
    */
   applyWorldBackdrop(textureKey: string | null): void {
+    // THE FIELD OUTLIVES THE OBJECT. Nothing here destroys the backdrop, but the
+    // scene's display list is torn down and rebuilt around it — a world switch,
+    // a restart — and this reference is not cleared with it. Phaser drops
+    // `scene` on destroy, so that is the cheapest true test for a corpse;
+    // calling `setTexture` on one reads `this.scene.sys` and throws, which is
+    // precisely what the editor's backdrop preview was doing on every open.
+    if (this.worldBackdrop && !this.worldBackdrop.scene) this.worldBackdrop = undefined;
     if (!textureKey || !this.textures.exists(textureKey)) {
       this.worldBackdrop?.setVisible(false);
       for (const img of this.bgImages) img.setVisible(true);
@@ -4755,9 +4881,25 @@ export class BoardScene extends Phaser.Scene {
     this.input.on(
       Phaser.Input.Events.DRAG_END,
       (pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
-        if (!(obj instanceof BoardItem) || !this.dragFrom) return;
+        if (!(obj instanceof BoardItem)) return;
+        // THE GESTURE IS OVER — put the drag furniture away BEFORE asking
+        // whether there is a drop to resolve.
+        //
+        // These two lines used to sit behind `!this.dragFrom`, so any path that
+        // cleared the origin mid-gesture left them undone: `dragSprite` stayed
+        // armed, and `update()` re-showed the highlight diamond every frame at
+        // the last cell it saw. The result was a warm 0xffd27a diamond parked
+        // under the piece for the rest of the session — read on the board as a
+        // second shadow beneath every dragon, because a dragon is the piece
+        // most often dragged (to a House, through a gate) and the paths that
+        // handle those are exactly the ones that clear `dragFrom` early.
+        //
+        // Nothing below needs the furniture, and there is no drop for which
+        // leaving it up is correct — so it is unconditional, not another
+        // branch to keep in step.
         this.dragSprite = null;
         this.dragCell.setVisible(false);
+        if (!this.dragFrom) return;
         // WYSIWYG: drop into the cell the highlight diamond showed (the dragged
         // item's tracked position), NOT the raw pointer — the two differ by the
         // grab offset, so pointer-based drops could land one tile off and
@@ -5128,7 +5270,30 @@ export class BoardScene extends Phaser.Scene {
    */
   private wireCameraNav(): void {
     const cam = this.cameras.main;
+    this.input.mouse?.disableContextMenu(); // so RIGHT-drag can pan (esp. in the editor) without the menu popping
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
+      /**
+       * THE MAP EDITOR OWNS THE LEFT BUTTON.
+       *
+       * The editor's grids and zones are Graphics, which are not interactive, so
+       * the `onObject` guard below cannot see them and every left-drag meant to
+       * move a grid ALSO started a camera pan. The two then ran on the same
+       * pointer: the grid moved by the drag delta while the board scrolled by the
+       * same delta underneath it, so the grid was placed somewhere other than
+       * where it was dropped — and `BoardEditor.worldOf`, a pointer→world affine
+       * sampled while the camera was still, went stale the moment it moved, after
+       * which clicks no longer selected the thing under them.
+       *
+       * MIDDLE and RIGHT still pan, so a zoomed-in board stays navigable while
+       * editing (`BoardEditor.onDown` bails on any button but 0, so they never
+       * edit). The wheel below is deliberately unguarded — zooming the map in the
+       * editor is wanted.
+       *
+       * This guard existed, was verified, and was lost in the `caced8f` lineage
+       * merge along with the `editorStore` import it reads. If BoardScene ever
+       * stops importing `editorStore` again, this is what goes with it.
+       */
+      if (editorStore.open && pointer.button === 0) return;
       const hits = this.input.hitTestPointer(pointer);
       // Dismiss the skip button / dragon menu on any tap not on the popup itself.
       if (this.skipButton && !hits.some((o) => o === this.skipButton || o.parentContainer === this.skipButton)) {

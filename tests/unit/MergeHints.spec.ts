@@ -33,7 +33,7 @@ describe('mergeHints', () => {
     expect(hint!.completedBy).toBe(3);
   });
 
-  it('ignores where the pieces are — the drag is the move being suggested', () => {
+  it('still offers a set whose pieces are far apart — the drag IS the move', () => {
     nextId = 1;
     const far = [
       item('moonwater', 1, { col: 0, row: 0 }),
@@ -41,6 +41,60 @@ describe('mergeHints', () => {
       item('moonwater', 1, { col: 12, row: 3 })
     ];
     expect(nextMergeHint(far, CHAINS)).not.toBeNull();
+  });
+
+  describe('which pieces, once there are more than enough', () => {
+    it('points at the ones actually TOGETHER, not the oldest three', () => {
+      nextId = 1;
+      // Two ancient pieces stranded on opposite corners, three sitting in a
+      // huddle. By id the answer is 1,2,3 — a line drawn between two corners of
+      // the isle, which reads as the hint being wrong rather than being far.
+      const board = [
+        item('moonwater', 1, { col: 0, row: 0 }),
+        item('moonwater', 1, { col: 40, row: 9 }),
+        item('moonwater', 1, { col: 20, row: 4 }),
+        item('moonwater', 1, { col: 21, row: 4 }),
+        item('moonwater', 1, { col: 20, row: 5 })
+      ];
+      expect(nextMergeHint(board, CHAINS)!.ids).toEqual([3, 4, 5]);
+    });
+
+    it('names the piece that has to travel', () => {
+      nextId = 1;
+      const board = [
+        item('moonwater', 1, { col: 2, row: 2 }),
+        item('moonwater', 1, { col: 3, row: 2 }),
+        item('moonwater', 1, { col: 9, row: 8 }) // the outlier
+      ];
+      const hint = nextMergeHint(board, CHAINS)!;
+      expect(hint.moveId).toBe(3);
+      expect(hint.ids).toContain(hint.moveId);
+    });
+
+    it('names one piece and always the same one, even with nothing to choose', () => {
+      nextId = 1;
+      // All on one cell: no outlier exists, but the hand still has to point
+      // somewhere, and it must not point somewhere new every ten seconds.
+      const stacked = [item('moonwater', 1), item('moonwater', 1), item('moonwater', 1)];
+      const a = nextMergeHint(stacked, CHAINS)!;
+      const b = nextMergeHint([...stacked].reverse(), CHAINS)!;
+      expect(a.moveId).toBe(b.moveId);
+    });
+
+    it('breaks a tie in tightness toward the set that has waited longest', () => {
+      nextId = 1;
+      // Two equally tight huddles; the older one is the one the player is more
+      // likely to have forgotten, which is the queue's whole ordering rule.
+      const board = [
+        item('moonwater', 1, { col: 0, row: 0 }),
+        item('moonwater', 1, { col: 1, row: 0 }),
+        item('moonwater', 1, { col: 0, row: 1 }),
+        item('moonwater', 1, { col: 30, row: 0 }),
+        item('moonwater', 1, { col: 31, row: 0 }),
+        item('moonwater', 1, { col: 30, row: 1 })
+      ];
+      expect(nextMergeHint(board, CHAINS)!.ids).toEqual([1, 2, 3]);
+    });
   });
 
   it('never points at the top of a chain, which has nowhere to merge to', () => {

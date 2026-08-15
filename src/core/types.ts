@@ -327,12 +327,24 @@ export interface DialogueData {
   arrivals?: Record<string, StoryChapterConfig>;
   /** Golden Egg tap flavor, keyed by XP progress toward the Level-3 finale. */
   goldenEgg: { early: string[]; mid: string[]; near: string[] };
-  /** The Golden Elder's first spoken line in the whole game — the finale beat.
-   *  She is silent until she wakes, which is what makes it land. */
-  finaleElder: string;
+  /**
+   * The Golden Elder's first words in the whole game — the finale beat. She is
+   * silent until she wakes, which is what makes it land.
+   *
+   * LINES, not a line. It was typed `string` here while dialogue.json had long
+   * since grown to two, and nothing caught the difference because the JSON is
+   * cast into these interfaces rather than validated against them — so the
+   * declared type was a claim no one was checking. The bubble then called
+   * `text.replace` on an array, threw out of a `delayedCall`, and took the RAF
+   * chain with it: the chapter's one irreversible beat froze the session.
+   *
+   * Typed as what it IS, so the compiler holds the call site to `sequence()`
+   * (tap-advanced, the rule for every chapter beat) instead of `say()`.
+   */
+  finaleElder: string[];
   /** Finale variant when the Golden Egg was never earned (Order 1 skipped) —
    *  reads as PROPHECY, pointing the player back to the un-filled promise. */
-  finaleElderProphecy: string;
+  finaleElderProphecy: string[];
   /** Eleanor's banner quote the moment the egg materialises on the altar. */
   goldenArrival: string;
   /** Eleanor speaks the North Crossing open, right after the finale hands the
@@ -1374,6 +1386,16 @@ export interface EventMap {
    *  BoardScene decides WHICH (src/core/mergeHints.ts) and WHEN; UIScene owns
    *  the hand and refuses while the tutorial is still using it. */
   'hint:merge': { from: TilePos; to: TilePos } | null;
+  /**
+   * CARRY THIS THERE — the same hand, a different lesson.
+   *
+   * Its own event rather than a second caller of `hint:merge`, because the two
+   * are taken back on different facts: a merge hint dies when the merge is made
+   * or the player picks anything up, a carry lesson stands until the thing has
+   * actually been carried. Sharing the event would mean sharing the take-back,
+   * and the first drag of an unrelated piece would erase the lesson.
+   */
+  'hint:carry': { from: TilePos; to: TilePos } | null;
   'item:spawned': { item: ItemSnapshot; cause: SpawnCause };
   'item:moved': { itemId: number; from: TilePos; to: TilePos };
   'item:move_bounced': { itemId: number; at: TilePos };

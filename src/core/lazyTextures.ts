@@ -60,6 +60,11 @@ export function isLazyScreenArt(key: string): boolean {
     // rare: the reveal card a breed earns once per save, and the Codex's
     // evolution page. Neither is on the path to the board, and a phone was
     // holding all sixteen from the first frame to show at most one.
+    //
+    // (Briefly taken off this list as a bisect against the finale freeze, on the
+    // theory that decoding `reveal_golden` beside the Elder's 113 MB of clip
+    // sheets was the stall. Cleared — the freeze was a thrown TypeError in her
+    // dialogue, and the lazy fetch is innocent. Kept, with the ~99 MB it saves.)
     /^reveal_/.test(key) ||
     // EMPORIUM CARDS — the shop's own illustrations, ~2 MB of GPU memory each
     // and drawn nowhere but inside the Emporium. StorePanel already fetches

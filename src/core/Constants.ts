@@ -1893,6 +1893,12 @@ export const DRAG = {
  */
 export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000 } as const;
 
+/** The save latch for the gate lesson — the hand that teaches world travel by
+ *  drawing "carry the dragon to the arch" once, after Eleanor's Emporium visit.
+ *  A `stats` counter like the tours', so it is taught once ever and a player who
+ *  ignored it still finds it waiting next session. */
+export const GATE_LESSON_STAT = 'lesson:gate_carry';
+
 export const CAULDRON_DECOR = 'pink_cauldron';
 
 /**
@@ -2126,6 +2132,10 @@ export const DRAGON_WORK_MS = 180_000; // 3 minutes of work
  *
  * The shift itself is untouched — DRAGON_WORK_MS still ends it and the dragon
  * still flies home on `dragon:rest`. It simply lands ready.
+ *
+ * (Briefly reverted to 300_000 as a bisect against the finale freeze. Cleared:
+ * the freeze was `dialogue.finaleElder` being an array where the bubble wanted
+ * a string. The zero was never involved.)
  */
 export const DRAGON_REST_MS = 0;
 

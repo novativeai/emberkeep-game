@@ -4,11 +4,11 @@ import {
   ATMOSPHERE,
   ENERGY_REGEN_MS,
   FINALE,
-  FINALE_ENDS_MS,
   FIRST_CONTACT,
   FIRST_CONTACT_RETRY_MS,
   LIVE_GAME_WIDTH,
   GOLDEN_ALTAR,
+  STORY_BEAT_HOLD_MS,
   GOLDEN_TREMBLE_PROGRESS,
   HUD_COLUMN_X,
   hudColumnY,
@@ -137,6 +137,10 @@ export class UIScene extends Phaser.Scene {
   /** True while the HAND is showing an idle merge hint rather than a tutorial
    *  beat — so the hint only ever takes back what the hint put there. */
   private hintHand = false;
+  /** The carry lesson holds the hand until the thing has been carried — see
+   *  `hint:carry`. Kept apart from `hintHand` so the idle merge suggestion
+   *  cannot take the hand out from under a lesson in progress. */
+  private carryHand = false;
   private handProg = { t: 0 }; // 0..1 along from→to, driven by a looping tween
   private handPoint: (() => { x: number; y: number } | null) | null = null;
   /** `height` = how far the target extends below the anchor point (0 for a
@@ -671,8 +675,26 @@ export class UIScene extends Phaser.Scene {
         }
         if (this.hand.visible && !this.hintHand) return; // the tutorial is using it
         if (!this.ctx.state.tutorialDone) return;
+        if (this.carryHand) return; // a lesson outranks an idle suggestion
         this.hintHand = true;
         this.placeHand({ from: hint.from, to: hint.to });
+      }),
+      // The carry lesson — "pick it up and take it THERE". Outranks the idle
+      // merge hint while it is up: the hint is a suggestion the player may
+      // ignore, this is the one gesture a new mechanic is taught with.
+      bus.on('hint:carry', (lesson) => {
+        if (!lesson) {
+          if (!this.carryHand) return;
+          this.carryHand = false;
+          this.hintHand = false;
+          this.clearMarkers();
+          return;
+        }
+        if (!this.ctx.state.tutorialDone) return;
+        if (this.hand.visible && !this.hintHand && !this.carryHand) return; // the tutorial owns it
+        this.carryHand = true;
+        this.hintHand = false;
+        this.placeHand({ from: lesson.from, to: lesson.to });
       })
     );
   }
@@ -1027,49 +1049,79 @@ export class UIScene extends Phaser.Scene {
   private runFinaleUi(): void {
     if (this.finaleActive) return;
     this.finaleActive = true;
+    this.finaleReleased = false;
     this.clearRecipeHint(); // the finale owns the stage — no competing pointers
     this.ledger.requestClose();
     this.shop.requestClose();
     this.cookbook.requestClose();
     this.time.delayedCall(FINALE.elderAtMs, () =>
       this.beat('elder.speaks', () => {
-        // No egg earned (Order 1 skipped)? Her line reads as PROPHECY — selling
+        // No egg earned (Order 1 skipped)? Her words read as PROPHECY — selling
         // the promise the player hasn't collected yet, never claiming an
-        // awakening that didn't happen.
+        // awakening that didn't happen. Read HERE, not hoisted: the variant is a
+        // fact about the moment she opens her mouth.
         const eggEarned = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
-        this.bubble.say(
-          'golden_elder',
-          eggEarned ? this.ctx.data.dialogue.finaleElder : this.ctx.data.dialogue.finaleElderProphecy,
-          FINALE.elderHoldMs
-        );
+        const lines = eggEarned
+          ? this.ctx.data.dialogue.finaleElder
+          : this.ctx.data.dialogue.finaleElderProphecy;
+        // TAP-ADVANCED, like every chapter beat: these are her first words in
+        // the whole game and must not scroll past unread. `say()` was wrong on
+        // both counts — it takes ONE string, and it times out.
+        this.bubble.sequence('golden_elder', lines, () => this.releaseFinaleStage());
       })
     );
-    // The stage is released when her line does, not when a panel is dismissed.
-    // `finaleActive` is cleared FIRST and inside the fence, so the stage is
-    // released even if the Gate ceremony behind it fails — a stuck flag would
-    // silence every later celebration for the rest of the session.
-    this.time.delayedCall(FINALE_ENDS_MS, () =>
-      this.beat('release', () => {
-        this.finaleActive = false;
-        // The Gate ceremony rides the finale's tail: Eleanor speaks the arch
-        // open (tap-advanced, STORY_BEAT_HOLD_MS backstop — it cannot strand),
-        // and the last line blooming into `gate:opened` is what turns the
-        // portal FX on and the door live. A reload after the finale skips the
-        // ceremony: BoardScene derives the open Gate from the q:done latch.
-        const beats = this.ctx.data.dialogue.gateOpens;
-        if (beats?.lines.length) {
-          this.time.delayedCall(TIMINGS.chapterBeatDelay, () =>
-            this.beat('gate', () =>
-              this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () =>
-                this.ctx.bus.emit('gate:opened', {})
-              )
+    // THE BACKSTOP, not the release. The stage is now handed back when SHE
+    // finishes speaking (her sequence's `onDone`), because a tap-advanced beat
+    // has no fixed length — a fixed `FINALE_ENDS_MS` timer would cut her off
+    // mid-sentence the moment the player read slowly. This only covers the case
+    // where she never speaks at all, so it is sized past her own per-line
+    // safety net: she cannot still be talking after it.
+    this.time.delayedCall(
+      FINALE.elderAtMs +
+        Math.max(
+          this.ctx.data.dialogue.finaleElder.length,
+          this.ctx.data.dialogue.finaleElderProphecy.length,
+          1
+        ) *
+          STORY_BEAT_HOLD_MS +
+        1000,
+      () => this.beat('release.backstop', () => this.releaseFinaleStage())
+    );
+  }
+
+  /** Set for the run, so the stage is handed back exactly once however the
+   *  finale ends — her last line, or the backstop behind it. */
+  private finaleReleased = false;
+
+  /**
+   * The finale lets go: the board is the player's again and the Gate ceremony
+   * rides the tail. `finaleActive` is cleared FIRST, so a failure in the
+   * ceremony behind it cannot leave the stage held — a stuck flag would silence
+   * every later celebration for the rest of the session.
+   */
+  private releaseFinaleStage(): void {
+    this.beat('release', () => {
+      if (this.finaleReleased) return;
+      this.finaleReleased = true;
+      this.finaleActive = false;
+      // The Gate ceremony rides the finale's tail: Eleanor speaks the arch
+      // open (tap-advanced, STORY_BEAT_HOLD_MS backstop — it cannot strand),
+      // and the last line blooming into `gate:opened` is what turns the portal
+      // FX on and the door live. A reload after the finale skips the ceremony:
+      // BoardScene derives the open Gate from the q:done latch.
+      const beats = this.ctx.data.dialogue.gateOpens;
+      if (beats?.lines.length) {
+        this.time.delayedCall(TIMINGS.chapterBeatDelay, () =>
+          this.beat('gate', () =>
+            this.bubble.sequence(beats.speaker as SpeakerId, beats.lines, () =>
+              this.ctx.bus.emit('gate:opened', {})
             )
-          );
-        } else {
-          this.ctx.bus.emit('gate:opened', {});
-        }
-      })
-    );
+          )
+        );
+      } else {
+        this.ctx.bus.emit('gate:opened', {});
+      }
+    });
   }
 
   /** Order completion — the demo's primary reward beat — now celebrates at
@@ -1505,17 +1557,24 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  /** The 3 sections with the pointer moving between them, then the ✕. The
-   *  arrow rides the LINE (sequence onLine), and the panel shows the section
-   *  she is naming, so eye, pointer and shelf agree. */
+  /**
+   * The 3 sections, then the ✕ — and ONE arrow in the whole walkthrough.
+   *
+   * The panel still follows her words (`showSection`), so eye and shelf agree
+   * while she talks. What is gone is the little pointer that hopped tab to tab
+   * with each line: an arrow means "do this", and there was nothing to do —
+   * she is showing the shelves herself, the player only taps to read on. Three
+   * arrows demanding nothing taught the player to ignore the fourth, which is
+   * the one that matters.
+   *
+   * So the arrow appears exactly once, on the last line, over the button that
+   * ends the visit — the only moment the walkthrough actually asks for a tap
+   * on something.
+   */
   private runShopWalkthrough(t: { sections: string[]; close: string; outro: string }): void {
     this.bubble.sequence('eleanor', [...t.sections, t.close], undefined, (i) => {
-      if (i < t.sections.length) {
-        this.store.showSection(i);
-        this.pointUi(this.store.getTabPos(i));
-      } else {
-        this.pointUi(this.store.getClosePos());
-      }
+      if (i < t.sections.length) this.store.showSection(i);
+      else this.pointUi(this.store.getClosePos());
     });
     const offClose = this.ctx.bus.on('ui:store_toggled', ({ open }) => {
       if (open) return;
