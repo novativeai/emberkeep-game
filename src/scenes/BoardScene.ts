@@ -5369,7 +5369,14 @@ export class BoardScene extends Phaser.Scene {
     const dragon = [...this.itemSprites.values()]
       .filter(
         (s) =>
-          DRAGON_CHAINS.has(s.chain) !== undefined && // any rigged dragon, not just the red
+          // Any dragon breed, not just the red — and ONLY a dragon. This read
+          // `.has(...) !== undefined` for a while, which is always true (has()
+          // returns a boolean), so the "nearest dragon" was really the nearest
+          // GENERATOR: with no dragon hatched yet, the tutorial's spinning
+          // crystal flew the worker lap to the harvested ashmoss. The harvest
+          // itself never depended on this — it pays out before the flourish —
+          // so with no dragon on the board the item simply appears, unescorted.
+          DRAGON_CHAINS.has(s.chain) &&
           s.isGenerator &&
           s.itemId !== plant.itemId &&
           !this.busyDragons.has(s.itemId) &&
