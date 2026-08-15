@@ -87,7 +87,15 @@ DIST = ROOT / "dist"
 QUALITY = 92
 METHOD = 4
 REQUANT_QUALITY = 88
-REQUANT_MIN_KB = 60
+# Only files at least this big were re-encoded, and at 60 KB that skipped most of
+# the art the player waits on: 100 of the 169 item / skin / reveal / card / terrain
+# textures are UNDER 60 KB, and together those small files are most of the boot
+# and play waves. There is nothing special about a small file that makes its
+# bytes cheaper — 116 item textures at ~61 KB average is 7 MB either way — so the
+# floor is now low enough to catch them. It is not zero: under a few KB the WebP
+# container overhead means there is nothing to win and MIN_GAIN would reject it
+# anyway, so the work would be pure build time.
+REQUANT_MIN_KB = 6
 # Below this saving, a rewrite is not worth a generation of loss.
 MIN_GAIN = 0.08
 

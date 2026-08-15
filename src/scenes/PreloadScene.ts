@@ -2,8 +2,10 @@ import Phaser from 'phaser';
 import type { TextureFactory } from '../art/TextureFactory';
 import type { GameContext } from '../core/Context';
 import { clipKey, clipsFor } from '../core/characterAnims';
+import { bootChains, splitWaves } from '../core/assetWaves';
 import { savedDragonClips } from '../core/clipResidency';
 import { SCENES, STANDEE_BANKS, WORLD_ID } from '../core/Constants';
+import type { AssetEntry } from '../core/types';
 import { isLazyScreenArt } from '../core/lazyTextures';
 import { renderScale } from '../core/render-scale';
 import { ANIMATED_SPEAKERS, discTextureFor } from '../entities/PortraitAnimator';
@@ -43,6 +45,22 @@ function referencedBuiltins(doc: UiThemeDoc): BuiltinSequence[] {
 export const BOARD_ART_READY = 'bootload:ready';
 /** Fired on `game.events` with 0..1 while the board art downloads behind the title. */
 export const BOARD_ART_PROGRESS = 'bootload:progress';
+/** Fired on `game.events` once the streamed `play` wave has finished landing too. */
+export const PLAY_ART_READY = 'bootload:play_ready';
+
+/** Files per streamed batch, and the breather between batches. Small on purpose:
+ *  the cost of the play wave is the texture UPLOAD, and spreading those out is
+ *  what keeps it invisible to a running board. */
+const STREAM_BATCH = 6;
+const STREAM_GAP_MS = 220;
+
+/** A spritesheet held back from the boot gate, queued again during play. */
+interface DeferredSheet {
+  key: string;
+  file: string;
+  frameWidth: number;
+  frameHeight: number;
+}
 
 /**
  * Loads real-art files for any assets.json entry flipped to source:"file"
@@ -87,7 +105,7 @@ export class PreloadScene extends Phaser.Scene {
    * Play stays tappable throughout; `TitleScene` waits on `BOARD_ART_READY`
    * before starting the board, so nothing can enter a world whose art is missing.
    */
-  private queueBoardArt(): void {
+  private queueBoardArt(): { images: AssetEntry[]; sheets: DeferredSheet[] } {
     const ctx = this.registry.get('ctx') as GameContext;
     const factory = this.registry.get('textureFactory') as TextureFactory;
 
@@ -128,10 +146,23 @@ export class PreloadScene extends Phaser.Scene {
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
       factory.generate(file.key);
     });
-    for (const entry of fileEntries) {
-      if (skipAtBoot(entry.key)) continue;
-      this.load.image(entry.key, entry.file as string);
-    }
+
+    // The split. `boot` is queued here and gates Play; `play` is handed back to
+    // stream behind the running board. See src/core/assetWaves.ts for why the
+    // line falls where it does — in short, a new save has ONE item on the board
+    // and 112 of the 116 item textures cannot be reached in the opening minute.
+    /** Spritesheets held back to stream during play — see the character clips below. */
+    const playSheets: DeferredSheet[] = [];
+
+    const placed = new Set([...neededArt, ...liveBackdrops]);
+    const waves = splitWaves(
+      fileEntries.filter((e) => !skipAtBoot(e.key)),
+      {
+        placed,
+        bootChains: bootChains(ctx.systems.save.peek(), map, ctx.data.tutorial, WORLD_ID)
+      }
+    );
+    for (const entry of waves.boot) this.load.image(entry.key, entry.file as string);
     // Animated dialogue portrait: the guide's banks as 270x360 bust cutouts
     // (top 95% of each frame, natural alpha) in ONE 2160x2880 spritesheet
     // (scripts/bake-portrait-disc.py) — rest pair first, then talk, then blink.
@@ -171,15 +202,27 @@ export class PreloadScene extends Phaser.Scene {
     // bust clips for the dialogue ring. Same fetch discipline as the standee
     // banks above — a character the board cannot show costs nothing, and
     // travel fetches the destination's at the door (fetchWorldArt).
+    //
+    // Split by clip, not by character: her IDLE is what the board draws the
+    // moment it opens, and it is the only one of the six that cannot arrive
+    // late. `talking` and `blinking` are the two biggest sheets she owns (72 and
+    // 36 frames) and neither is wanted until a dialogue ring opens; `cast`,
+    // `laugh` and `happy` answer events further out still. All of them degrade
+    // to the static `char_<id>` texture until they land, so streaming them costs
+    // nothing but an early beat played on the still.
     for (const c of ctx.data.characters.characters) {
       if (c.world !== ctx.state.worldId) continue;
       const art = c.art ?? c.id;
       for (const [clipId, clip] of Object.entries(clipsFor(art))) {
         if (this.textures.exists(clipKey(art, clipId))) continue;
-        this.load.spritesheet(clipKey(art, clipId), clip.file, {
+        const sheet = {
+          key: clipKey(art, clipId),
+          file: clip.file,
           frameWidth: clip.frameWidth,
           frameHeight: clip.frameHeight
-        });
+        };
+        if (clipId === 'idle') this.load.spritesheet(sheet.key, sheet.file, sheet);
+        else playSheets.push(sheet);
       }
     }
     // Map-decor clips — Runevault's boiling cauldron. A decor piece's clips live
@@ -248,6 +291,50 @@ export class PreloadScene extends Phaser.Scene {
         if (!this.textures.exists(key)) this.load.image(key, file);
       });
     }
+    return { images: waves.play, sheets: playSheets };
+  }
+
+  /**
+   * Stream the `play` wave behind the running board, in small batches.
+   *
+   * The download itself is off-thread; what costs a frame is the texture UPLOAD
+   * on completion, so the batching is the whole point — a few files at a time
+   * with a gap between them spreads those uploads out instead of landing ~190 of
+   * them in one hitch the moment the board opens. The gap is idle time for the
+   * GPU, not a throttle on bandwidth: the next batch is queued the moment the
+   * last one is resident.
+   *
+   * Nothing here is load-bearing. Everything in this wave has a fallback while it
+   * is absent (generated placeholder art, the static `char_<id>` standee), so a
+   * player on a dead connection gets a playable board rather than a stalled one —
+   * which is the property that makes it safe to leave the boot gate as small as
+   * it is.
+   */
+  private streamPlayWave(wave: { images: AssetEntry[]; sheets: DeferredSheet[] }): void {
+    const queue: (() => void)[] = [
+      ...wave.images.map((e) => () => this.load.image(e.key, e.file as string)),
+      ...wave.sheets.map((s) => () => this.load.spritesheet(s.key, s.file, s))
+    ];
+    if (queue.length === 0) {
+      this.scene.stop();
+      return;
+    }
+    let at = 0;
+    const pump = (): void => {
+      if (!this.scene.isActive()) return;
+      if (at >= queue.length) {
+        this.game.registry.set(PLAY_ART_READY, true);
+        this.game.events.emit(PLAY_ART_READY);
+        this.scene.stop(); // the loader has nothing left to own
+        return;
+      }
+      for (let n = 0; n < STREAM_BATCH && at < queue.length; n++, at++) queue[at]!();
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        this.time.delayedCall(STREAM_GAP_MS, pump);
+      });
+      this.load.start();
+    };
+    pump();
   }
 
   create(): void {
@@ -257,8 +344,11 @@ export class PreloadScene extends Phaser.Scene {
     const uiedit = new URLSearchParams(window.location.search).has('uiedit');
     if (uiedit) {
       // The UI Builder boots into its own document scene — the game NEVER runs,
-      // so there is no title to race and no reason to defer anything.
-      this.queueBoardArt();
+      // so there is no title to race and nothing to stream: take both waves at
+      // once and start when the lot has landed.
+      const rest = this.queueBoardArt();
+      for (const e of rest.images) this.load.image(e.key, e.file as string);
+      for (const s of rest.sheets) this.load.spritesheet(s.key, s.file, s);
       this.load.once(Phaser.Loader.Events.COMPLETE, () => this.scene.start(SCENES.uiEditor));
       this.load.start();
       return;
@@ -266,17 +356,21 @@ export class PreloadScene extends Phaser.Scene {
 
     // The title is ready NOW — it draws its own button and its art is in the DOM.
     // `launch`, not `start`: this scene must stay alive to own the loader that is
-    // still running. It is stopped once the board has what it needs.
+    // still running. It is stopped once the play wave has finished streaming.
     this.scene.launch(SCENES.title);
 
-    this.queueBoardArt();
+    const playWave = this.queueBoardArt();
     let announced = false;
     const done = (): void => {
       if (announced) return;
       announced = true;
       this.game.registry.set(BOARD_ART_READY, true);
       this.game.events.emit(BOARD_ART_READY);
-      this.scene.stop();
+      // Stop RENDERING but keep updating: this scene still owns the loader that
+      // streams the play wave, and a stopped scene's loader dies with it. It
+      // draws nothing now, so hiding it costs the renderer one less pass.
+      this.scene.setVisible(false);
+      this.streamPlayWave(playWave);
     };
     this.load.on('progress', (value: number) => this.game.events.emit(BOARD_ART_PROGRESS, value));
     this.load.once(Phaser.Loader.Events.COMPLETE, done);

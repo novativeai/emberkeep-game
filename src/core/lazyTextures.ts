@@ -44,16 +44,9 @@ export function ensureTextures(
 }
 
 /**
- * True for rare-screen art deliberately kept OFF the boot preload.
- *
- * Anything listed here MUST be fetched through `ensureTextures` before the screen
- * that draws it opens, or it will render as a missing texture. Keep the two in
- * step — that is the whole contract of this file.
+ * The `ondemand` wave's membership test — now defined in `assetWaves.ts` beside
+ * the other two waves, and re-exported here so this file still reads as the whole
+ * contract: what is skipped at boot, and the `ensureTextures` above that is
+ * obliged to fetch it.
  */
-export function isLazyScreenArt(key: string): boolean {
-  return (
-    /^trailer_/.test(key) || // finale "Beyond the demo" worlds + legends
-    /^ui_teaser_/.test(key) || // finale Chapter-Two teasers
-    key === 'ui_levelup_emblem' // level-up banner emblem
-  );
-}
+export { isLazyScreenArt } from './assetWaves';

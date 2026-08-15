@@ -11015,8 +11015,8 @@
             "col": 6,
             "row": 12,
             "z": 0,
-            "dx": 69.04,
-            "dy": -14.45
+            "dx": 79.04,
+            "dy": -20.45
           }
         ],
         "decorCalibration": {
@@ -11025,8 +11025,8 @@
             "offsetY": 0,
             "scale": 1.148,
             "anchor": {
-              "x": 0.543,
-              "y": 0.889
+              "x": 0.5439,
+              "y": 0.8239
             }
           }
         },
@@ -12147,14 +12147,14 @@
       ],
       "portals": [
         {
-          "id": "runevault_circle",
+          "id": "runevault_stair",
           "to": "borealis",
-          "label": "The Rune Circle",
+          "label": "The Stair Down",
           "rect": [
-            496.15,
-            475.09,
-            768,
-            463.24
+            1194.67,
+            1513.71,
+            262.1,
+            237.71
           ]
         }
       ]

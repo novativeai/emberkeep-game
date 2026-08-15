@@ -276,6 +276,44 @@ Grouped by payoff per unit of risk. Board: EMB-187 … EMB-191.
 
 ---
 
+## The asset waves
+
+`src/core/assetWaves.ts`. The loader used to be one list, gated behind Play. It
+is now three waves, derived from the map, the save and the tutorial script — not
+hand-listed, so a re-exported world or a re-authored tutorial moves the boundary
+automatically.
+
+| wave | what | when |
+|---|---|---|
+| **boot** | terrain, live backdrop, UI chrome, `fx_`, and item art for chains the opening can reach | gates Play |
+| **play** | everything else with a texture | streams behind the running board, 6 files per 220 ms |
+| **ondemand** | `trailer_`, `ui_teaser_`, `ui_levelup_emblem` | `ensureTextures`, when the screen opens |
+
+The boot set is small because a merge game's need curve is: `map.json`
+`startingItems` is a **single** `crystal:1`, and 112 of the 116 item textures
+cannot be on the board when it opens. Boot item art is the union of the saved
+board's chains, the map's seed, and — only while the tutorial is still running —
+the 14 of 43 chains its 65 steps name.
+
+```
+boot images   14.19 MB  →   3.38 MB   (73 files)
+play images        —        10.81 MB  (115 files, streamed)
+```
+
+Plus spritesheets: Eleanor's `idle` boots, her `talking`/`blinking`/`cast`/
+`laugh`/`happy` stream (they degrade to the static `char_<id>` until they land).
+
+Two properties make the small gate safe. Nothing in the `play` wave is
+load-bearing — absent art falls back to its generated placeholder and is
+re-dressed on arrival — and the wave is **batched**, because the cost is the
+texture *upload*, not the download; six at a time spreads those over the board's
+first seconds instead of landing 190 in one hitch.
+
+`waveFor` defaults unknown keys to `play`, never `ondemand`: a new art category
+should degrade to "streams late", not to "silently missing". Only
+`isLazyScreenArt` promotes to `ondemand`, because that class carries an
+obligation — a matching `ensureTextures` call — that cannot be inferred.
+
 ## What Tier 1 changed
 
 `docs/PERF-AUDIT.md` is the audit; this is the delta, so the numbers above stay
@@ -289,5 +327,27 @@ readable as the BEFORE picture.
 - **The saved board's breeds arrive before the board does**, instead of as a
   40–130 MB upload during the restore pass.
 
-Unchanged: `dist` is still 136.8 MB and a single breed still costs 40–130 MB
+Unchanged: `dist` is still 135.5 MB and a single breed still costs 40–130 MB
 decoded. That is EMB-188's job, and it is where the remaining 8× lives.
+
+## Why item art is not resized
+
+`item_*` is 7.09 MB and would be **0.47 MB stored at drawn size** — 112 of the
+116 textures are drawn at under half their stored width, and `ITEM_SCALE`
+`ember_dragon_2: 0.064` on a 1236×1511 source is a ~15× linear oversample. It is
+the biggest single win left in the build, and it is **not** safe to take blind.
+
+`shrink-dist.py` already refuses to resize because three runtime mechanisms read
+a texture's natural size. Item art has a fourth, worse one: roughly fifteen draw
+sites scale item textures with a **hand-tuned literal** rather than through
+`ITEM_SCALE` — `LedgerPanel.ts:318` `.setScale(0.72)`, `BoardScene.ts:5328`
+`.setScale(0.1)`, `UIScene.ts:878`, `DragonCodexPanel`, `BagPanel`,
+`CommissionPanel`, `QuestTracker`. A build-time resize with an exact
+compensation factor fixes every `ITEM_SCALE` path and silently breaks all of
+those, across 119 items, in ways only a person looking at the screen can catch.
+
+The fix is to make render size independent of texture size (`setDisplaySize`, or
+the `lod` field EMB-188 needs anyway) *before* resizing anything. Until then the
+dimension-safe lever is re-encoding, which is what the `REQUANT_MIN_KB` 60 → 6
+change takes: 100 of the 169 early-wave textures were under the old floor and
+were never touched at all.

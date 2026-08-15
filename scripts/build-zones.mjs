@@ -620,7 +620,18 @@ const PORTALS = {
     // which is exactly right and costs nothing: a portal is the lowest
     // interactive band on the board, so the cauldron standing on the same rune
     // takes the tap inside its own art and only bare stone travels.
-    { id: 'runevault_circle', to: 'borealis', label: 'The Rune Circle', art: [412, 423, 630, 380] }
+    {
+      id: 'runevault_stair',
+      to: 'borealis',
+      label: 'The Stair Down',
+      // THE BASE OF THE STAIRS, not the rune. The circle is where the cauldron
+      // stands and where the hatching happens — putting the door there too made
+      // one piece of art mean two things, and the pot sat on top of the hit
+      // area. The flight down the south rim to the lantern-lit jetty is the way
+      // OFF this island and reads as one: measured off the backdrop, the steps
+      // meet the deck at (960, 1210) and land at about (1100, 1400).
+      art: [985, 1275, 215, 195]
+    }
   ]
 };
 
@@ -645,9 +656,21 @@ const DECOR = {
       // innermost bullseye spans x 680–775, y 589–637. (The session that
       // re-cut the art measured 700, 614 on its own copy — same point, two
       // gold-mask thresholds.)
-      at: [727, 613],
-      // Toe tips, not belly span: the lid drags a belly measurement ~0.12 right.
-      anchor: { x: 0.543, y: 0.889 },
+      // The rune's true centre, taken from the innermost bullseye: that ring is
+      // closed, so the interior it encloses is a hole whose centroid IS the
+      // centre — robust where a colour threshold is not, because the outer band
+      // runs through the deck's shadow and drops out of any mask.
+      at: [732, 610],
+      // The CONTACT ELLIPSE's centre, fitted through all three toe tips at the
+      // ground plane's own aspect (0.569, measured off the rune bullseye).
+      //
+      // Not the mean of the left and right toes, which is what the previous
+      // 0.889 was: that shortcut only lands on the centre when those two feet
+      // sit at the ellipse's horizontal extremes, and this pot's do not — its
+      // left toe is 45 px higher than its right. The mean put the anchor 65 art
+      // px below the true centre, so the pot was drawn that much too HIGH and
+      // stood off the back of the rune. x was already right.
+      anchor: { x: 0.5439, y: 0.8239 },
       // A MONUMENT, not a pot. 822 art px × 1.148 / 2 = 472 backdrop px, which
       // puts the widest span at 72% of the rune's 630px outer ring — the
       // proportion the art was re-cut to at Runevault's own ~40° camera.
