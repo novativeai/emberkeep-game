@@ -478,6 +478,7 @@ export class BoardScene extends Phaser.Scene {
     this.buildKeyBadges();
     this.buildPortals(); // the doors out — after buildFog, so a cloud covers one
     this.spawnExistingItems(); // before the camera frames — travel arrives on a populated board
+    this.scheduleScoutReturn(); // still across the Ember Gate? hidden now, home through the door soon
     this.syncGoldenAltar();
     this.buildEmitters();
     this.buildDragCell();
@@ -1399,8 +1400,10 @@ export class BoardScene extends Phaser.Scene {
    * never a landing played in the air, never a touchdown still mid-cruise. A
    * leg too short for the full ramp skips the takeoff and cruises at once.
    * No duration = hold the loop until `dragonLand` (drag release, burst end).
+   * `fromAir` = the dragon enters the shot already flying (the gate return
+   * emerging from the portal) — skip the takeoff ramp and cruise at once.
    */
-  private dragonHover(ld: LiveDragon, durationMs?: number, onAirborne?: () => void): void {
+  private dragonHover(ld: LiveDragon, durationMs?: number, onAirborne?: () => void, fromAir = false): void {
     // A dragon taking wing is by definition not curled on a tile. A flight
     // ordered over a sleeper (work drop, wander race) used to strand
     // `sleepState` at seated/transition, and every later seatDragonSleep
@@ -1430,7 +1433,9 @@ export class BoardScene extends Phaser.Scene {
     overlay.setVisible(true);
     const airborne = ld.flightPhase === 'takeoff' || ld.flightPhase === 'loop';
     if (!airborne) {
-      const rampFits = durationMs === undefined || durationMs > this.segMs(f.clip, 'takeoff') + DRAGON_ANIM.landingLeadMs;
+      const rampFits =
+        !fromAir &&
+        (durationMs === undefined || durationMs > this.segMs(f.clip, 'takeoff') + DRAGON_ANIM.landingLeadMs);
       if (rampFits) {
         ld.flightPhase = 'takeoff';
         overlay.play(this.segKey(f.key, 'takeoff'));
@@ -4021,8 +4026,11 @@ export class BoardScene extends Phaser.Scene {
       onComplete: () => {
         // THROUGH. He is in Roothold now, and that is where the player meets
         // him again (buildHubDragon stands him by Eleanor's door). Parked at
-        // home but invisible: the ordinary ending is the player following him
-        // across, and travelling rebuilds this scene from state.
+        // home but invisible, and the crossing is LATCHED: out > home in the
+        // stat pair means he is still across, and whichever board next needs
+        // him resolves it — the Keeper who follows him through and comes back
+        // gets `scheduleScoutReturn`, the Keeper who stays gets the net below.
+        this.ctx.state.addStat('gate:scout_out', 1);
         sprite.setAlpha(0);
         sprite.setPosition(home.x, home.y);
         if ('setFacing' in sprite) {
@@ -4062,7 +4070,9 @@ export class BoardScene extends Phaser.Scene {
     const live = this.liveDragons.get(itemId);
     if (live) {
       live.busy = true; // still the cinematic's animal until he is down
-      this.dragonHover(live);
+      // Already on the wing: he has been flying since Roothold, so the door
+      // gives back a dragon mid-cruise — never one politely taking off inside.
+      this.dragonHover(live, undefined, undefined, true);
     }
     const start = { x: door.zone.x, y: door.zone.y - 30 };
     const peak = {
@@ -4100,8 +4110,39 @@ export class BoardScene extends Phaser.Scene {
           ld.busy = false;
           this.dragonLand(ld); // wings away; the ordinary mood path resumes
         }
+        this.ctx.state.addStat('gate:scout_home', 1); // the crossing is resolved
       }
     });
+  }
+
+  /**
+   * The scout is still ACROSS when this board builds — the Keeper followed him
+   * to Roothold and has just come home ahead of him (or reloaded mid-crossing).
+   * He must NOT simply be standing on his tile as if he never left: he stays
+   * hidden for GATE_FLIGHT.returnDelayMs, then the door gives him back —
+   * already on the wing, down onto his own free tile (his cell never moved in
+   * `state`, so it is his by right and empty by construction). The away/home
+   * latch is a stat PAIR, monotonic like the `q:done:` latches, so a reload
+   * finds the crossing exactly as resolved as it was.
+   */
+  private scheduleScoutReturn(): void {
+    if (this.ctx.state.worldId !== WORLD_ID) return; // the Ember Gate is Emberkeep's
+    if (this.ctx.state.stat('gate:scout_out') <= this.ctx.state.stat('gate:scout_home')) return;
+    const named = this.ctx.systems.dragons.firstNamed();
+    const door = this.portalDoors.get('emberkeep_gate');
+    const sprite = named ? this.itemSprites.get(named.itemId) : undefined;
+    if (!named || !sprite?.active || !door?.fx.isLive) {
+      // No door to come out of, or no dragon left to come home (merged away
+      // while hidden): resolve the latch rather than strand it — a stuck
+      // "away" would hide him on every build for ever.
+      this.ctx.state.addStat('gate:scout_home', 1);
+      return;
+    }
+    const ld = this.liveDragons.get(named.itemId);
+    if (ld) ld.busy = true; // the crossing owns him until he lands
+    sprite.setAlpha(0); // away — hidden AND untappable until the door gives him back
+    const home = { x: sprite.x, y: sprite.y };
+    this.time.delayedCall(GATE_FLIGHT.returnDelayMs, () => this.flyHomeFromGate(door, named.itemId, home));
   }
 
   private ignitePortal(id: string): void {

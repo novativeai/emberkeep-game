@@ -170,6 +170,18 @@ export function panelMobileScale(frameWidth: number): number {
 }
 
 /**
+ * Scale for a panel that adapts on BOTH axes — the portrait `ui_panel_tall`
+ * frame and anything mounted on it. Fills 94% of the width OR 92% of the
+ * height, whichever binds: a phone gets a near-full-screen sheet, a squarer
+ * tablet gets the same sheet held to its shorter height instead of spilling.
+ * `1` on desktop, where the landscape frames keep their authored size.
+ */
+export function panelFitScale(frameW: number, frameH: number): number {
+  if (!IS_MOBILE) return 1;
+  return Math.min(2.2, (LIVE_GAME_WIDTH * 0.94) / frameW, (LIVE_GAME_HEIGHT * 0.92) / frameH);
+}
+
+/**
  * The LIVE coordinate space, in game-space units.
  *
  * The space is AUTHORED at 2560×1600, but a window is rarely 16:10 and FIT just
@@ -1827,7 +1839,14 @@ export const GATE_FLIGHT = {
    * tile all along. Long enough that the ceremony, Eleanor's lines and the
    * travel prompt all land first.
    */
-  awayMs: 45_000
+  awayMs: 45_000,
+  /**
+   * The Keeper came home AHEAD of him. Travelling back finds him still across
+   * (`gate:scout_out` > `gate:scout_home` in stats), so the rebuilt board
+   * hides him and this long after arrival the door gives him back — already
+   * on the wing, down onto his own free tile (`scheduleScoutReturn`).
+   */
+  returnDelayMs: 10_000
 } as const;
 
 /**
