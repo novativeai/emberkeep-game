@@ -167,9 +167,17 @@ describe("the Keeper's Store shelves (src/data/store.json)", () => {
     }
   });
 
-  it('every dragon skin names a wardrobe slot and ships board art for it', () => {
+  it('every dragon card is a wardrobe skin or a chain grant, with art to back it', () => {
     expect(dragons.items.length).toBeGreaterThan(0);
     for (const item of dragons.items) {
+      // A CHAIN-GRANT card (frost/storm): the breed is its own merge line, so
+      // the purchase must have board art for every tier the clutch can reach.
+      if (item.chain) {
+        expect(item.dragon, `${item.id} is both grant and skin`).toBeUndefined();
+        const tiers = [1, 2, 3].filter((tier) => keys.has(`item_${item.chain}_${tier}`));
+        expect(tiers, `${item.id} grants a chain with missing art`).toEqual([1, 2, 3]);
+        continue;
+      }
       expect(item.dragon, `${item.id} has no chain`).toBeTruthy();
       // Tiers 3 and 4 are the whelp and the adult — the only dragon tiers with
       // rig art to wear. A skin covering neither would be an empty purchase.

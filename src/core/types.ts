@@ -517,6 +517,10 @@ export interface StoreItem {
   /** `dragon_skin` only: the merge chain this skin re-dresses ('ember_dragon',
    *  'emerald'). It is the wardrobe slot — one worn skin per dragon. */
   dragon?: string;
+  /** A CHAIN-GRANT card (frost/storm): buying it spawns a clutch of three
+   *  tier-1 eggs of this chain — the breed is its own merge line, not a skin.
+   *  Mutually exclusive with `dragon`. */
+  chain?: string;
   /** Absent = the plain cream card the Manor skins and decorations use. */
   rarity?: StoreRarity;
   /** The one showcase card in a section: full grid height, art full-bleed, and

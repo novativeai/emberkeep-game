@@ -620,7 +620,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
       this.priceLabels.set(item.id, label);
       return btn;
     }
-    const skinAction = (section.kind === 'skin' || section.kind === 'dragon_skin') && owned && !worn;
+    // `!item.chain`: a CHAIN-GRANT card (frost/storm) sells a breed, not a
+    // wardrobe — once owned there is nothing to WEAR, the animal is on the
+    // board (or in the bag) already.
+    const skinAction = (section.kind === 'skin' || section.kind === 'dragon_skin') && owned && !worn && !item.chain;
     const isPrice = !worn && !owned;
     const text = worn ? 'WORN' : owned ? (skinAction ? 'WEAR' : 'OWNED') : `${item.gold}`;
     const btnImg = this.scene.add.image(0, 0, owned && !skinAction ? 'ui_btn_free' : 'ui_btn_price');

@@ -347,8 +347,7 @@
           "srcFrameHeight": 188
         }
       },
-      "board": "ember_dragon:4",
-      "skin": "frost"
+      "board": "frost:3"
     },
     "frost_baby": {
       "clips": {
@@ -379,8 +378,7 @@
           "srcFrameHeight": 400
         }
       },
-      "board": "ember_dragon:3",
-      "skin": "frost"
+      "board": "frost:2"
     },
     "golden_adult": {
       "clips": {
@@ -887,8 +885,7 @@
           "srcFrameHeight": 189
         }
       },
-      "board": "ember_dragon:4",
-      "skin": "storm"
+      "board": "storm:3"
     },
     "storm_baby": {
       "clips": {
@@ -919,8 +916,7 @@
           "srcFrameHeight": 400
         }
       },
-      "board": "ember_dragon:3",
-      "skin": "storm"
+      "board": "storm:2"
     }
   }
 }

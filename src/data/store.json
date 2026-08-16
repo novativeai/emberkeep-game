@@ -164,7 +164,7 @@
           "blurb": "Nested on the Borealis floes, scaled in clear ice, with the aurora burning through its wings.",
           "art": "card_frost",
           "gold": 2400,
-          "dragon": "ember_dragon",
+          "chain": "frost",
           "rarity": "legendary",
           "hero": true,
           "world": "borealis"
@@ -175,7 +175,7 @@
           "blurb": "It does not shelter from the thunderheads. It climbs the spire and answers them.",
           "art": "card_storm",
           "gold": 1600,
-          "dragon": "ember_dragon",
+          "chain": "storm",
           "rarity": "legendary",
           "world": "emberkeep"
         },
