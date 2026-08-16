@@ -312,7 +312,15 @@ def main():
     # user with the softness shown and accepted; the revert is one re-run of
     # the cap script at a higher density off the git masters, not a redesign.
     # Measured 67.0; 70 keeps the customary slack.
-    ap.add_argument("--budget", type=float, default=70.0, help="fail over this many MB")
+    #
+    # 142 again (2026-08-16, production): the 0.30 cap shipped, was seen on a
+    # real phone, and came back the same day — at board size the dragons read
+    # as mush, and no deploy number buys that. The full-resolution masters
+    # return untouched (they never left git); cap-clip-density.py stays in
+    # scripts/ for a future tiered attempt (babies sharp, moments soft), but
+    # the 70 MB target is DROPPED rather than paid for in quality. This pair
+    # of entries is the ledger doing its job: both directions, written down.
+    ap.add_argument("--budget", type=float, default=142.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():
