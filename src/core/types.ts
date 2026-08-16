@@ -577,6 +577,15 @@ export interface CauldronRecipeConfig {
   flavor: string;
   /** What the output is FOR — the panel's answer to "why brew this". */
   use: string;
+  /**
+   * The quest whose completion writes this page into the grimoire. Absent =
+   * known from the first visit (the ledger opens with four such). Availability
+   * is the `q:done:<quest>` latch — save-derivable, like everything the altar
+   * and tracker read — and a unit test proves every quest that DEMANDS a brew
+   * sits strictly after the quest that unlocks its recipe, so the ladder can
+   * never ask for a formula Selyna has not taught.
+   */
+  unlock?: { quest: string };
 }
 
 export interface CauldronData {
@@ -1305,7 +1314,7 @@ export interface EventMap {
   /** Fact: inputs left the Bag, the output was banked into it. */
   'cauldron:brewed': { recipeId: string; output: { chain: string; tier: number; count: number } };
   /** Fact: the brew was refused, and why — never silently. */
-  'cauldron:brew_failed': { recipeId: string; reason: 'ingredients' | 'bag_full' };
+  'cauldron:brew_failed': { recipeId: string; reason: 'ingredients' | 'bag_full' | 'locked' };
   'ui:deliver_requested': { orderId: string };
   'ui:gift_deliver_requested': { characterId: string; chain: string; tier: number };
   /** A gauge "+" button opened the currency shop for that currency. */

@@ -36,6 +36,38 @@ export class CauldronSystem {
     return this.data.recipes.find((r) => r.id === id);
   }
 
+  /**
+   * The pages the Keeper has EARNED. No `unlock` = in the grimoire from the
+   * first visit; the rest are written in as their quests complete — the
+   * `q:done:` latch, so a reload finds the ledger exactly as taught as it was.
+   * The panel renders THIS list, never `recipes`: a formula the player has not
+   * earned is not greyed out, it is not there at all.
+   */
+  available(): readonly CauldronRecipeConfig[] {
+    return this.data.recipes.filter((r) => this.unlocked(r));
+  }
+
+  private unlocked(r: CauldronRecipeConfig): boolean {
+    return !r.unlock || this.state.stat(`q:done:${r.unlock.quest}`) > 0;
+  }
+
+  /** Earned but never yet laid eyes on — the rows that fade in wearing the
+   *  star sticker. Cleared (markAllSeen) when the panel CLOSES, so one visit
+   *  is one reveal: reopening shows a settled ledger. */
+  isNew(recipeId: string): boolean {
+    const r = this.recipe(recipeId);
+    if (!r || !this.unlocked(r)) return false;
+    return this.state.stat(`recipe:seen:${recipeId}`) === 0;
+  }
+
+  /** The close-of-panel latch: everything currently on the ledger counts as
+   *  seen. Stats are monotonic, so this writes each id at most once ever. */
+  markAllSeen(): void {
+    for (const r of this.available()) {
+      if (this.state.stat(`recipe:seen:${r.id}`) === 0) this.state.addStat(`recipe:seen:${r.id}`, 1);
+    }
+  }
+
   /** How many of this piece the Bag holds right now. */
   haveOf(chain: string, tier: number): number {
     return this.state.bag.find((s) => s.chain === chain && s.tier === tier)?.count ?? 0;
@@ -51,6 +83,13 @@ export class CauldronSystem {
   private brew(recipeId: string): void {
     const recipe = this.recipe(recipeId);
     if (!recipe) return;
+    // The panel never lists a locked page, but the gate holds HERE too: a
+    // recipe is data, and the one thing a brew must never depend on is the UI
+    // having drawn the ledger right (the store's world-gate rule, same reason).
+    if (!this.unlocked(recipe)) {
+      this.bus.emit('cauldron:brew_failed', { recipeId, reason: 'locked' });
+      return;
+    }
     if (!this.canBrew(recipeId)) {
       this.bus.emit('cauldron:brew_failed', { recipeId, reason: 'ingredients' });
       return;
