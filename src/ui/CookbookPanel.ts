@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { FONT } from '../art/design';
-import { chainHiddenIn, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
+import { FONT, INK, RADIUS } from '../art/design';
+import { chainHiddenIn, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import { reachableRecipeKeys, type AuditData } from '../core/availability';
@@ -62,9 +62,10 @@ const DRAG_SLOP = 12;
 
 /**
  * The Emberkeep Cookbook — a discovery log of every merge recipe performed at
- * least once. Reads as an open two-page spread inside the standard cream
- * ui_panel: each line is [input chip + ×N badge] ──▶ [result chip], with the
- * item names beneath. Recipes not yet performed show as darkened "???" pages,
+ * least once. Reads as an open two-page spread inside the dark hall's
+ * ui_quest_panel (the Ledger's frame — same 660×440 plate, so the geometry is
+ * untouched): each line is [input chip + ×N badge] ──▶ [result chip], with the
+ * item names beneath. Recipes not yet performed show as sunk "???" pages,
  * so the book doubles as a collection drive. MergeSystem owns discovery
  * (`state.discoveredRecipes` + `cookbook:discovered`); this panel only renders.
  */
@@ -93,31 +94,36 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     const chains = data.chains;
 
     const dim = scene.add
-      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
+      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.55)
       .setInteractive();
     dim.on('pointerup', () => this.requestClose());
     this.add(dim);
 
-    const panel = scene.add.image(0, 16, 'ui_panel');
+    const panel = scene.add.image(0, 16, 'ui_quest_panel');
     this.baseScale = panelMobileScale(panel.width);
     this.add(panel);
 
-    // Title lozenge — gold, like the Keeper's Tasks header.
+    // Title plaque — the gold-seated banner the dark suite wears (Codex,
+    // Store, Cauldron, Ledger), so the halls read as one set of furniture.
     const lozenge = scene.add.graphics();
-    lozenge.fillStyle(num(PALETTE.gold), 1);
-    lozenge.fillRoundedRect(-330, -436, 660, 104, 52);
-    lozenge.lineStyle(6, num(PALETTE.cream), 0.95);
-    lozenge.strokeRoundedRect(-330, -436, 660, 104, 52);
+    lozenge.fillStyle(num(INK.goldDeep), 1);
+    lozenge.fillRoundedRect(-330, -426, 660, 104, RADIUS.md);
+    lozenge.fillStyle(num(INK.field), 1);
+    lozenge.fillRoundedRect(-330, -436, 660, 104, RADIUS.md);
+    lozenge.lineStyle(6, num(INK.gold), 1);
+    lozenge.strokeRoundedRect(-330, -436, 660, 104, RADIUS.md);
+    lozenge.fillStyle(num(INK.fieldLift), 0.5);
+    lozenge.fillRoundedRect(-316, -428, 632, 34, RADIUS.sm);
     this.add(lozenge);
     const title = scene.add
       .text(0, -384, 'Emberkeep Cookbook', {
-        fontFamily: FONT.ui,
+        fontFamily: FONT.display,
         fontSize: '48px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown
+        color: INK.onField
       })
       .setOrigin(0.5)
-      .setShadow(0, 3, 'rgba(255,255,255,0.5)', 3);
+      .setShadow(0, 5, 'rgba(11,7,10,0.6)', 6);
     this.add(title);
 
     this.add(
@@ -126,7 +132,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
           fontFamily: FONT.ui,
           fontSize: '26px',
           fontStyle: 'italic',
-          color: '#8A6248'
+          color: INK.onFieldDim
         })
         .setOrigin(0.5)
         .setAlpha(0.9)
@@ -134,15 +140,15 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
 
     // The book's centre seam — the panel reads as an open two-page spread.
     const seam = scene.add.graphics();
-    seam.lineStyle(3, num(PALETTE.goldShade), 0.25);
+    seam.lineStyle(3, num(INK.goldMid), 0.35);
     seam.lineBetween(0, VIEW_TOP, 0, VIEW_TOP + VIEW_H);
     this.add(seam);
 
-    // Close button.
+    // Close button — the Ledger's, verbatim: the two books share a frame.
     const closeButton = scene.add.container(592, -392);
-    const closeBg = scene.add.circle(0, 0, 42, num(PALETTE.lava)).setStrokeStyle(6, num(PALETTE.cream));
+    const closeBg = scene.add.circle(0, 0, 42, num(INK.field)).setStrokeStyle(6, num(INK.goldMid));
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: PALETTE.goldAccent })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
     closeButton.setSize(96, 96);
@@ -195,7 +201,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
         fontFamily: FONT.ui,
         fontSize: '28px',
         fontStyle: 'bold',
-        color: PALETTE.goldAccent
+        color: INK.onFieldGold
       })
       .setOrigin(0.5);
     this.add(this.counter);
@@ -282,7 +288,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
           fontFamily: FONT.ui,
           fontSize: '54px',
           fontStyle: 'bold',
-          color: PALETTE.goldAccent
+          color: INK.onFieldGold
         })
         .setOrigin(0.5)
         .setVisible(false);
@@ -299,7 +305,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
         fontFamily: FONT.ui,
         fontSize: '24px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown
+        color: INK.onField
       })
       .setOrigin(0.5, 0);
     rowC.add(caption);
@@ -307,16 +313,16 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // ×N badge riding the input chip's bottom edge.
     const badge = scene.add.container(CHIP_FROM_X + 34, 34);
     const badgeBg = scene.add.graphics();
-    badgeBg.fillStyle(num(PALETTE.gold), 1);
+    badgeBg.fillStyle(num(INK.gold), 1);
     badgeBg.fillRoundedRect(-33, -19, 66, 38, 19);
-    badgeBg.lineStyle(3, num(PALETTE.cream), 0.9);
+    badgeBg.lineStyle(3, num(INK.goldHi), 0.9);
     badgeBg.strokeRoundedRect(-33, -19, 66, 38, 19);
     const badgeText = scene.add
       .text(0, -1, `×${recipe.count}`, {
         fontFamily: FONT.ui,
         fontSize: '28px',
         fontStyle: 'bold',
-        color: PALETTE.textBrown
+        color: INK.goldDeep
       })
       .setOrigin(0.5);
     badge.add([badgeBg, badgeText]);
@@ -331,15 +337,17 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
       const half = size / 2;
       g.clear();
       if (discovered) {
-        g.fillStyle(num(PALETTE.cream), 1);
+        // A lit cream plate — goods sit on plates in the dark hall.
+        g.fillStyle(num(INK.cream), 1);
         g.fillRoundedRect(cx - half, -8 - half, size, size, 20);
-        g.fillStyle(0xefe0c8, 1);
+        g.fillStyle(num(INK.creamWarm), 1);
         g.fillRoundedRect(cx - half + 4, -8 - half + 4, size - 8, size - 8, 16);
-        g.lineStyle(4, num(PALETTE.goldShade), 0.55);
+        g.lineStyle(4, num(INK.goldMid), 0.9);
       } else {
-        g.fillStyle(num(PALETTE.plumShade), 0.88);
+        // A trough sunk into the field — same silhouette, drained of light.
+        g.fillStyle(num(INK.fieldDeep), 0.9);
         g.fillRoundedRect(cx - half, -8 - half, size, size, 20);
-        g.lineStyle(4, num(PALETTE.plumShade), 1);
+        g.lineStyle(4, num(INK.idleDeep), 1);
       }
       g.strokeRoundedRect(cx - half, -8 - half, size, size, 20);
     };
@@ -353,11 +361,11 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     const x2 = CHIP_TO_X - (CHIP + 8) / 2 - 14;
     const ay = -22;
     a.clear();
-    a.setAlpha(discovered ? 1 : 0.3);
-    a.fillStyle(num(PALETTE.plumShade), 1);
+    a.setAlpha(discovered ? 1 : 0.45);
+    a.fillStyle(num(INK.goldDeep), 1);
     a.fillRoundedRect(x1 - 2, ay - 7, x2 - x1 - 16, 14, 7);
     a.fillTriangle(x2 - 26, ay - 16, x2 - 26, ay + 16, x2 + 2, ay);
-    a.fillStyle(num(discovered ? PALETTE.gold : PALETTE.plum), 1);
+    a.fillStyle(num(discovered ? INK.gold : INK.goldMid), 1);
     a.fillRoundedRect(x1, ay - 4, x2 - x1 - 20, 8, 4);
     a.fillTriangle(x2 - 24, ay - 11, x2 - 24, ay + 11, x2 - 3, ay);
 
