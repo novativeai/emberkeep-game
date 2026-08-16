@@ -1065,6 +1065,11 @@ export class BoardScene extends Phaser.Scene {
     }
     if (!best) return;
     this.gateLessonUp = true;
+    // The lesson's own camera. This is the pointer that most needs it: the arch
+    // is painted at the edge of the ground, so the dragon and the door it has to
+    // reach are rarely both in a frame the player is already looking at — and a
+    // lesson you cannot see is the one case where the hand teaches nothing.
+    this.bringIntoView(worldPointOf(this.ctx.state.world, best.col, best.row));
     this.ctx.bus.emit('hint:carry', {
       from: { col: best.col, row: best.row },
       to: { col: at.col, row: at.row }
@@ -1836,6 +1841,10 @@ export class BoardScene extends Phaser.Scene {
       .setFlipX(flip)
       .setOrigin(origin.x, origin.y)
       .setScale(c.clip.scale);
+    // The overlay IS the visible pose now, so it is also the clickable one:
+    // taps must land on the curl/wingspan the player SEES, not on the hidden
+    // art's silhouette underneath.
+    ld.host.setPoseProxy(overlay);
     return overlay;
   }
 
@@ -1845,6 +1854,7 @@ export class BoardScene extends Phaser.Scene {
     ld.clipOverlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
     ld.clipOverlay.stop();
     ld.clipOverlay.setVisible(false);
+    ld.host.refreshHitArea(); // hidden proxy → the input rect goes back to the art's
   }
 
   /** Segment anim key for a phased clip (takeoff / loop / landing). */

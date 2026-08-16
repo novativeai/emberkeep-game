@@ -1953,6 +1953,36 @@ export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000 } as const;
 export const MERGE_SNAP_RADIUS = 2;
 
 /**
+ * The travel wipe — the screen burns away into iso diamonds when the Keeper
+ * crosses worlds, and reassembles on the far side (UIScene's veil; shader in
+ * render/fx/travelWipeShader.ts, which documents the technique). The cover
+ * hides the old board before the scene restart tears it down; the reveal waits
+ * out `world:ready` PLUS the new board camera's own 320ms fade-in, so lifting
+ * the curtain never shows a world still arriving out of black.
+ */
+export const TRAVEL_WIPE = {
+  coverMs: 620,
+  /** Fully-covered floor even on an instant (resident-art) hop — a
+   *  same-session return journey loads in one frame, and a veil that blinked
+   *  would read as a glitch, not a crossing. */
+  holdMinMs: 480,
+  /** After `world:ready`, before the reveal starts — spans the board camera's
+   *  fade-in closely enough that nothing arrives out of black. */
+  revealDelayMs: 240,
+  revealMs: 760,
+  /** Diamonds across the SHORT screen axis — cell size follows the device, so
+   *  a portrait phone gets the same chunky tiles as a desktop. */
+  cellsShort: 7,
+  /** Fraction of the wipe timeline one diamond takes to grow to full size. */
+  growFrac: 0.3,
+  /** Per-diamond ignition jitter (timeline fraction) — fire catching, not an
+   *  iris closing. */
+  jitterFrac: 0.14,
+  /** Ember rim thickness in cell units (goldAccent -> lava, cools at hold). */
+  edge: 0.16
+} as const;
+
+/**
  * THE TUTORIAL CAMERA FOLLOWING ITS OWN POINTER.
  *
  * `INSET` is the margin, as a fraction of the view, inside which a target

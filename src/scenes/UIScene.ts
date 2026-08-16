@@ -8,7 +8,9 @@ import {
   FIRST_CONTACT_RETRY_MS,
   LIVE_GAME_WIDTH,
   GOLDEN_ALTAR,
+  IS_MOBILE,
   STORY_BEAT_HOLD_MS,
+  TRAVEL_WIPE,
   GOLDEN_TREMBLE_PROGRESS,
   HUD_COLUMN_X,
   hudColumnY,
@@ -26,6 +28,12 @@ import {
 } from '../core/Constants';
 import { FONT } from '../art/design';
 import { guard } from '../core/crash';
+import {
+  ensureTravelWipePipeline,
+  TRAVEL_WIPE_PIPELINE,
+  wipeRgb,
+  type TravelWipePipelineData
+} from '../render/fx/travelWipeShader';
 import { iapBridge } from '../core/iapBridge';
 import { gridToWorld } from '../core/iso';
 import type {
@@ -75,6 +83,25 @@ const ARROW_MARKER_H = 148;
  * tutorial presentation layer (dialogue bubble, guiding hand, bouncing
  * arrow) and the reset-confirm dialog. Pure subscriber + intent emitter.
  */
+/** Banners and toasts must land UNDER the burn, not over it. */
+const DEPTH_TRAVEL_VEIL = 80000;
+
+/** The travelling curtain's live state, spanning cover → hold → reveal. */
+interface TravelVeil {
+  root: Phaser.GameObjects.Container;
+  /** Destination name, ornament and the breathing embers — faded as one. */
+  chrome: Phaser.GameObjects.Container;
+  /** The wipe shader's uniforms; absent on the Canvas fallback. */
+  wipe?: TravelWipePipelineData;
+  /** Every tween target that may still be animating when the veil dies — the
+   *  ember dots repeat forever, so destroy must kill, not just drop. */
+  pulse: Array<object>;
+  covered: boolean;
+  coveredAt: number;
+  revealAsked: boolean;
+  revealing: boolean;
+}
+
 export class UIScene extends Phaser.Scene {
   private ctx!: GameContext;
   private regenAccum = 0;
@@ -117,7 +144,7 @@ export class UIScene extends Phaser.Scene {
   /** Real-money purchase dialog (confirm, then the waiting card). */
   private iapDialog: Phaser.GameObjects.Container | null = null;
   /** The travelling curtain, while a destination world's art loads. */
-  private travelVeil?: Phaser.GameObjects.Container;
+  private travelVeil?: TravelVeil;
   /** Lifts the veil if `world:ready` never arrives — see `showTravelVeil`. */
   private travelWatchdog?: Phaser.Time.TimerEvent;
   private lastStep: TutorialStepEvent | null = null;
@@ -714,7 +741,10 @@ export class UIScene extends Phaser.Scene {
   }
 
   /**
-   * The travelling curtain: a scrim over the board while the destination loads.
+   * The travelling curtain: the old world burns away into iso diamonds, the
+   * destination's name holds the dark while its art loads, and the same fire
+   * reopens on the far side (technique notes in render/fx/travelWipeShader.ts;
+   * every timing in Constants' TRAVEL_WIPE).
    *
    * It lives in UIScene rather than on the board because the board is exactly
    * what is being torn down and rebuilt — a veil parented to it would be
@@ -723,24 +753,116 @@ export class UIScene extends Phaser.Scene {
    * the whole journey.
    */
   private showTravelVeil(worldId: string): void {
-    this.hideTravelVeil();
+    // A veil can only still exist here if a previous journey's reveal is
+    // mid-flight; the new cover replaces it outright.
+    if (this.travelVeil) this.destroyTravelVeil(this.travelVeil);
+
     const name = this.ctx.state.worlds.get(worldId)?.name ?? worldId;
-    const c = this.add.container(0, 0).setDepth(DEPTH_DIALOG + 50);
-    // Interactive so a tap during the load cannot reach the board underneath —
-    // the board it would reach is the one being replaced.
-    const scrim = this.add
-      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.97)
+    const root = this.add.container(0, 0).setDepth(DEPTH_TRAVEL_VEIL);
+    // Input blocker from the very first frame — a Zone renders nothing but
+    // swallows every tap, and the board a tap would reach is the one being
+    // replaced. It spans the whole journey, reveal included.
+    const block = this.add
+      .zone(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT)
       .setOrigin(0)
       .setInteractive();
+    root.add(block);
+
+    const chrome = this.add.container(0, 0).setAlpha(0);
+    const veil: TravelVeil = {
+      root,
+      chrome,
+      pulse: [chrome],
+      covered: false,
+      coveredAt: 0,
+      revealAsked: false,
+      revealing: false
+    };
+
+    if (ensureTravelWipePipeline(this.game)) {
+      // The burn: one fullscreen quad, one tweened uniform. The quad is a 1×1
+      // white frame — every pixel comes from the shader.
+      const wipe: TravelWipePipelineData = {
+        progress: 0,
+        invert: 0,
+        time: this.time.now / 1000,
+        aspect: LIVE_GAME_WIDTH / LIVE_GAME_HEIGHT,
+        cellW: Math.min(LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT) / TRAVEL_WIPE.cellsShort / LIVE_GAME_HEIGHT,
+        grow: TRAVEL_WIPE.growFrac,
+        jitter: TRAVEL_WIPE.jitterFrac,
+        edge: TRAVEL_WIPE.edge,
+        alpha: 1,
+        night: wipeRgb(PALETTE.night),
+        deep: wipeRgb(PALETTE.plumShade),
+        lava: wipeRgb(PALETTE.lava),
+        accent: wipeRgb(PALETTE.goldAccent)
+      };
+      const quad = this.add
+        .image(0, 0, '__WHITE')
+        .setOrigin(0)
+        .setDisplaySize(LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT);
+      quad.pipelineData = wipe;
+      quad.setPipeline(TRAVEL_WIPE_PIPELINE);
+      root.add(quad);
+      veil.wipe = wipe;
+      veil.pulse.push(wipe);
+      this.tweens.add({
+        targets: wipe,
+        progress: 1,
+        duration: TRAVEL_WIPE.coverMs,
+        ease: 'Sine.easeInOut',
+        onUpdate: () => {
+          wipe.time = this.time.now / 1000;
+        },
+        onComplete: () => this.travelVeilCovered(veil)
+      });
+    } else {
+      // Canvas fallback: no pipelines, so the curtain is the plain fade it
+      // always was.
+      const scrim = this.add
+        .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.97)
+        .setOrigin(0)
+        .setAlpha(0);
+      root.add(scrim);
+      veil.pulse.push(scrim);
+      this.tweens.add({
+        targets: scrim,
+        alpha: 1,
+        duration: 220,
+        ease: 'Sine.easeOut',
+        onComplete: () => this.travelVeilCovered(veil)
+      });
+    }
+
+    // Destination name over an iso-diamond ornament — the ceremony of the
+    // crossing. Sized against the live space so a portrait phone reads it.
+    const s = IS_MOBILE ? 2.2 : 1;
+    const cx = LIVE_GAME_WIDTH / 2;
+    const cy = LIVE_GAME_HEIGHT / 2;
     const label = this.add
-      .text(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2 - 30, name, {
-        fontFamily: FONT.ui,
-        fontSize: '64px',
+      .text(cx, cy - 46 * s, name.toUpperCase(), {
+        fontFamily: FONT.display,
+        fontSize: `${64 * s}px`,
         fontStyle: 'bold',
         color: PALETTE.cream
       })
       .setOrigin(0.5);
-    c.add([scrim, label]);
+    const orn = this.add.graphics();
+    const oy = cy + 26 * s;
+    orn.lineStyle(3 * s, num(PALETTE.gold), 0.8);
+    orn.lineBetween(cx - 170 * s, oy, cx - 34 * s, oy);
+    orn.lineBetween(cx + 34 * s, oy, cx + 170 * s, oy);
+    orn.fillStyle(num(PALETTE.goldAccent), 1);
+    orn.fillPoints(
+      [
+        new Phaser.Geom.Point(cx - 18 * s, oy),
+        new Phaser.Geom.Point(cx, oy - 10 * s),
+        new Phaser.Geom.Point(cx + 18 * s, oy),
+        new Phaser.Geom.Point(cx, oy + 10 * s)
+      ],
+      true
+    );
+    chrome.add([label, orn]);
     // Three breathing embers rather than a progress bar: the loader reports
     // bytes, not the scene rebuild that follows it, so a bar would fill and then
     // sit at full while the board was still being built — worse than no bar.
@@ -748,9 +870,7 @@ export class UIScene extends Phaser.Scene {
     // sun haze uses it at scale 7) and three of them this close smear into one
     // blob rather than reading as a count.
     for (let i = 0; i < 3; i++) {
-      const dot = this.add
-        .circle(LIVE_GAME_WIDTH / 2 + (i - 1) * 74, LIVE_GAME_HEIGHT / 2 + 74, 13, num(PALETTE.goldAccent))
-        .setAlpha(0.22);
+      const dot = this.add.circle(cx + (i - 1) * 74 * s, cy + 108 * s, 13 * s, num(PALETTE.goldAccent)).setAlpha(0.22);
       this.tweens.add({
         targets: dot,
         alpha: 1,
@@ -761,18 +881,30 @@ export class UIScene extends Phaser.Scene {
         repeat: -1,
         ease: 'Sine.easeInOut'
       });
-      c.add(dot);
+      chrome.add(dot);
+      veil.pulse.push(dot);
     }
-    c.setAlpha(0);
-    this.tweens.add({ targets: c, alpha: 1, duration: 180, ease: 'Sine.easeOut' });
-    this.travelVeil = c;
-    // A DEAD MAN'S SWITCH. The veil is interactive by design, so while it is up
-    // the player cannot touch anything — which makes it the one overlay that
-    // must never be able to outlive its cause. If `world:ready` has not come by
-    // now the board is either broken or unreachably slow, and a visible board
-    // the player can poke at beats a black screen they cannot leave. It says so
-    // in the console rather than failing silently, because a veil that lifts on
-    // its own would otherwise hide exactly the bug it is papering over.
+    // The name arrives once the burn owns most of the screen, rising a step —
+    // it belongs to the curtain, not to the world still visible behind it.
+    chrome.setY(26 * s);
+    this.tweens.add({
+      targets: chrome,
+      alpha: 1,
+      y: 0,
+      delay: TRAVEL_WIPE.coverMs * 0.55,
+      duration: 340,
+      ease: 'Sine.easeOut'
+    });
+    root.add(chrome);
+    this.travelVeil = veil;
+    // A DEAD MAN'S SWITCH — kept from our own veil, which main's does not carry.
+    // The curtain is interactive by design, so while it is up the player cannot
+    // touch anything: it is the one overlay that must never outlive its cause.
+    // If `world:ready` has not come by now the board is either broken or
+    // unreachably slow, and a visible board the player can poke at beats a
+    // burn they cannot leave. It says so in the console rather than failing
+    // silently, because a veil that lifts on its own would otherwise hide
+    // exactly the bug it is papering over.
     this.travelWatchdog?.remove();
     this.travelWatchdog = this.time.delayedCall(TRAVEL_VEIL_TIMEOUT_MS, () => {
       if (!this.travelVeil) return;
@@ -783,23 +915,74 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
+  /** The cover finished; if the destination is already built, reveal it. */
+  private travelVeilCovered(veil: TravelVeil): void {
+    veil.covered = true;
+    veil.coveredAt = this.time.now;
+    if (veil.revealAsked) this.beginTravelReveal(veil);
+  }
+
   private hideTravelVeil(): void {
-    this.travelWatchdog?.remove();
-    this.travelWatchdog = undefined;
     const veil = this.travelVeil;
     if (!veil) return;
-    this.travelVeil = undefined;
-    // Held a beat past `world:ready`: the board camera runs its own 320ms fade-in
-    // on create, and lifting the curtain first would show the new world arriving
-    // out of black instead of simply being there.
+    veil.revealAsked = true;
+    // `world:ready` can outrun the cover on a resident-art hop — the reveal
+    // then waits for the cover to complete rather than fighting its tween.
+    if (veil.covered) this.beginTravelReveal(veil);
+  }
+
+  private beginTravelReveal(veil: TravelVeil): void {
+    if (veil.revealing) return;
+    veil.revealing = true;
+    // One delay serves two waits: the board camera's own 320ms fade-in (so the
+    // curtain never lifts on a world still arriving out of black), and the
+    // fully-covered floor that keeps an instant hop from reading as a flicker.
+    const held = this.time.now - veil.coveredAt;
+    const delay = Math.max(TRAVEL_WIPE.revealDelayMs, TRAVEL_WIPE.holdMinMs - held);
     this.tweens.add({
-      targets: veil,
+      targets: veil.chrome,
       alpha: 0,
-      delay: 200,
-      duration: 260,
-      ease: 'Sine.easeIn',
-      onComplete: () => veil.destroy()
+      delay: Math.max(0, delay - 120),
+      duration: 240,
+      ease: 'Sine.easeIn'
     });
+    if (veil.wipe) {
+      const wipe = veil.wipe;
+      // Flipped while fully covered — both ignition orders agree at progress 1,
+      // so the swap cannot pop a pixel. Driven back to 0, the curtain now opens
+      // at the centre first: the player arrives looking at the world's heart.
+      wipe.invert = 1;
+      this.tweens.add({
+        targets: wipe,
+        progress: 0,
+        delay,
+        duration: TRAVEL_WIPE.revealMs,
+        ease: 'Sine.easeInOut',
+        onUpdate: () => {
+          wipe.time = this.time.now / 1000;
+        },
+        onComplete: () => this.destroyTravelVeil(veil)
+      });
+    } else {
+      this.tweens.add({
+        targets: veil.root,
+        alpha: 0,
+        delay,
+        duration: 300,
+        ease: 'Sine.easeIn',
+        onComplete: () => this.destroyTravelVeil(veil)
+      });
+    }
+  }
+
+  private destroyTravelVeil(veil: TravelVeil): void {
+    if (this.travelVeil === veil) this.travelVeil = undefined;
+    this.travelWatchdog?.remove();
+    this.travelWatchdog = undefined;
+    // The ember dots pulse on repeat -1 — destroy must kill their tweens, not
+    // orphan them onto dead objects.
+    this.tweens.killTweensOf(veil.pulse);
+    veil.root.destroy();
   }
 
   /** Emberkeep Cookbook button — bottom-right column, above the Bag; hidden

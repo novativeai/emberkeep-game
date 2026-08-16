@@ -22,6 +22,12 @@ export class BoardItem extends Phaser.GameObjects.Container {
 
   private sprite: Phaser.GameObjects.Image;
   private readyStar: Phaser.GameObjects.Image;
+  /** A scene-owned pose sprite (the dragon clip overlay) standing in for the
+   *  art. While it is VISIBLE, hit-testing follows IT: the player taps the pose
+   *  they SEE. During a seated sleep the visible curl and the hidden upright
+   *  art disagree by half a tile, so taps on the curl's edges sampled the
+   *  upright frame's transparent margin and fell straight through. */
+  private poseProxy: Phaser.GameObjects.Sprite | null = null;
   private groundShadow: Phaser.GameObjects.Image; // persistent soft shadow, sized to the art
   private cooldownLabel: Phaser.GameObjects.Text;
   private timePill: Phaser.GameObjects.Image;
@@ -116,7 +122,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     }
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
     this.groundShadow.setDisplaySize(w, w * 0.42);
-    this.refitHitArea();
+    this.refreshHitArea();
   }
 
   /**
@@ -134,7 +140,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.artBaseY = artScale;
     const w = Math.max(64, this.sprite.displayWidth * 0.92);
     this.groundShadow.setDisplaySize(w, w * 0.42);
-    this.refitHitArea();
+    this.refreshHitArea();
   }
 
   /**
@@ -151,8 +157,13 @@ export class BoardItem extends Phaser.GameObjects.Container {
    * their callers, because "remember to refit" is exactly the kind of promise
    * that gets forgotten at the third call site.
    */
-  private refitHitArea(): void {
-    if (this.input) this.input.hitArea = this.artHitRect();
+  refreshHitArea(): void {
+    // Mutated IN PLACE. Phaser's `InputPlugin.enable` only calls `setHitArea`
+    // when the object has no `input` yet, so handing an already-interactive
+    // container a fresh rect is silently ignored and the stale one stays live —
+    // and the hit callback closes over the stored object either way.
+    const area = this.input?.hitArea as Phaser.Geom.Rectangle | undefined;
+    if (area) Phaser.Geom.Rectangle.CopyFrom(this.artHitRect(), area);
   }
 
   acquire(
@@ -189,6 +200,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.groundShadow.setVisible(true);
     // A pooled item may have been released mid-flight over the void.
     this.overGround = true;
+    this.poseProxy = null; // pooled reuse must never inherit another dragon's overlay
     this.groundShadowBeforeLift = true;
     this.sprite.clearTint();
     this.readyStar.setVisible(false);
@@ -244,6 +256,29 @@ export class BoardItem extends Phaser.GameObjects.Container {
    * moments a player is trying to tap the thing.
    */
   artHitRect(): Phaser.Geom.Rectangle {
+    const o = this.poseProxy;
+    if (o?.visible && this.scaleX !== 0 && this.scaleY !== 0) {
+      // The proxy lives in WORLD space (it is not a child) — map its display
+      // bounds through this container's transform into hit-area space. The
+      // container may be flipped (setFacing scaleX = -1), so normalise.
+      const x1 = (o.x - o.displayOriginX * o.scaleX - this.x) / this.scaleX + this.displayOriginX;
+      const y1 = (o.y - o.displayOriginY * o.scaleY - this.y) / this.scaleY + this.displayOriginY;
+      const x2 = x1 + o.displayWidth / this.scaleX;
+      const y2 = y1 + o.displayHeight / this.scaleY;
+      return new Phaser.Geom.Rectangle(
+        Math.min(x1, x2),
+        Math.min(y1, y2),
+        Math.abs(x2 - x1),
+        Math.abs(y2 - y1)
+      );
+    }
+    // No proxy: the art's own bounds, INCLUDING where the art sits inside the
+    // container. The pixel test below reads `sprite.x/y` — it must, or it
+    // samples the wrong texel — so this rect has to, or the two describe
+    // different shapes and a tap inside the picture is rejected for being
+    // outside a box drawn where the picture is not. The art is offset exactly
+    // when a player is aiming at it: a sleeper breathes on a ground offset, a
+    // held piece floats on the drag lift.
     const w = this.sprite.displayWidth;
     const h = this.sprite.displayHeight;
     return new Phaser.Geom.Rectangle(
@@ -252,6 +287,37 @@ export class BoardItem extends Phaser.GameObjects.Container {
       w,
       h
     );
+  }
+
+  /**
+   * Point hit-testing at a scene-owned pose sprite (or back at the art with
+   * null). Set by BoardScene whenever a clip overlay is dressed; the `visible`
+   * check above and in `artOpaqueAt` makes a hidden overlay fall back to the
+   * art automatically, so clearing is only needed on pool reuse.
+   */
+  setPoseProxy(sprite: Phaser.GameObjects.Sprite | null): void {
+    this.poseProxy = sprite;
+    this.refreshHitArea();
+  }
+
+  /** Opaque-pixel test against the pose proxy: hit-area point → world → the
+   *  proxy's current FRAME, honouring its flipX (the overlay mirrors via
+   *  setFlipX, unlike the container's scaleX facing flip). */
+  private proxyOpaqueAt(o: Phaser.GameObjects.Sprite, hx: number, hy: number): boolean {
+    if (o.scaleX === 0 || o.scaleY === 0 || this.scaleX === 0 || this.scaleY === 0) return false;
+    if (!this.scene.textures.exists(o.texture.key)) return true; // no pixels to ask
+    const wx = this.x + (hx - this.displayOriginX) * this.scaleX;
+    const wy = this.y + (hy - this.displayOriginY) * this.scaleY;
+    let px = (wx - (o.x - o.displayOriginX * o.scaleX)) / o.scaleX;
+    const py = (wy - (o.y - o.displayOriginY * o.scaleY)) / o.scaleY;
+    if (o.flipX) px = o.width - px;
+    const alpha = this.scene.textures.getPixelAlpha(
+      Math.floor(px),
+      Math.floor(py),
+      o.texture.key,
+      o.frame.name
+    );
+    return alpha !== null && alpha > 0;
   }
 
   /** True when hit-area point (hx,hy) lands on (or within HIT_FORGIVENESS_PX
@@ -299,6 +365,8 @@ export class BoardItem extends Phaser.GameObjects.Container {
   }
 
   private artOpaqueAt(hx: number, hy: number): boolean {
+    const o = this.poseProxy;
+    if (o?.visible) return this.proxyOpaqueAt(o, hx, hy);
     const s = this.sprite;
     if (s.scaleX === 0 || s.scaleY === 0) return false;
     if (!this.scene.textures.exists(s.texture.key)) return true; // no pixels to ask
