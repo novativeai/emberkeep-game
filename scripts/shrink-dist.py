@@ -303,7 +303,16 @@ def main():
     # breed. Measured 139.6; 142 keeps the customary ~2 MB. The rig table
     # emptying returns only ~0.5 MB (the catalog's three rig jsons stay — the
     # UI Builder's loadCharacterRig can still ask for them at runtime).
-    ap.add_argument("--budget", type=float, default=142.0, help="fail over this many MB")
+    #
+    # 70 (2026-08-16, production): LOWERED, not raised — the one deliberate
+    # quality trade in this ledger. Every board clip sheet is capped at a
+    # uniform 0.30 atlas-px-per-game-px density (scripts/cap-clip-density.py:
+    # ~3.3x upscale at draw, a step softer than the fly clips' authored 0.33),
+    # taking the sheets 103 -> 35 MB staged. Chosen over frame-thinning by the
+    # user with the softness shown and accepted; the revert is one re-run of
+    # the cap script at a higher density off the git masters, not a redesign.
+    # Measured 67.0; 70 keeps the customary slack.
+    ap.add_argument("--budget", type=float, default=70.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():

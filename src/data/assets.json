@@ -1508,30 +1508,6 @@
       "file": "sprites/items/skins/manor_igloo.webp"
     },
     {
-      "key": "skin_frost_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/skins/dragons/frost_3.webp"
-    },
-    {
-      "key": "skin_frost_4",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/skins/dragons/frost_4.webp"
-    },
-    {
-      "key": "skin_storm_3",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/skins/dragons/storm_3.webp"
-    },
-    {
-      "key": "skin_storm_4",
-      "source": "file",
-      "generator": "item",
-      "file": "sprites/items/skins/dragons/storm_4.webp"
-    },
-    {
       "key": "skin_moonwhisker_3",
       "source": "file",
       "generator": "item",
