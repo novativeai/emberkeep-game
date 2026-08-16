@@ -6686,6 +6686,11 @@ export class BoardScene extends Phaser.Scene {
         // pointing at cells belonging to a board that is no longer on screen.
         this.takeBackHint();
         this.ctx.bus.emit('hint:carry', null);
+        // And the new world starts its idle clock from zero. Arriving somewhere
+        // is the one moment a player is reading the board rather than stuck on
+        // it, so a suggestion waiting on the doormat is noise — and it would be
+        // the first thing seen after a crossing.
+        this.hintIdleMs = 0;
         this.fetchWorldArt(() => this.scene.restart());
       }),
       bus.on('store:skin_changed', () => this.applyManorSkin()),

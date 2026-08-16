@@ -698,11 +698,15 @@ export class UIScene extends Phaser.Scene {
       // more, and the arithmetic behind it (three rubies, over there) was true
       // of a board the player has left.
       bus.on('world:switched', () => {
-        if (this.hintHand || this.carryHand) {
-          this.hintHand = false;
-          this.carryHand = false;
-          this.clearMarkers();
-        }
+        // UNCONDITIONAL. This used to be gated on the two flags this scene sets
+        // itself, which only clears a hand THIS scene knows it raised — and the
+        // symptom was a hand still pointing after the journey, so something was
+        // getting past the gate. There is no pointer that should survive a
+        // crossing: whatever raised it, it was aimed at cells on a board that is
+        // being torn down. Clearing markers with nothing to clear is free.
+        this.hintHand = false;
+        this.carryHand = false;
+        this.clearMarkers();
       }),
       // The idle merge hint. UIScene owns the hand, so it — not the board —
       // is what decides the hand is free: the tutorial's own gestures always
