@@ -243,8 +243,7 @@ export class UIScene extends Phaser.Scene {
       this.ctx.bus,
       this.ctx.systems.dragons,
       this.ctx.data.dragondex,
-      this.ctx.data.chains,
-      this.ctx
+      this.ctx.data.chains
     );
     this.codex.setDepth(DEPTH_PANEL + 4);
     this.codexButton = this.buildCodexButton();

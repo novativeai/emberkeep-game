@@ -1,15 +1,15 @@
 import Phaser from 'phaser';
 import { FONT, INK, RADIUS, TYPE } from '../art/design';
 import {
+  IS_MOBILE,
   LIVE_GAME_HEIGHT,
   LIVE_GAME_WIDTH,
   num,
+  panelFitScale,
   panelMobileScale,
   WELL_FED_EVOLUTION
 } from '../core/Constants';
-import type { GameContext } from '../core/Context';
 import type { EventBus } from '../core/EventBus';
-import { ensureTextures } from '../core/lazyTextures';
 import type { ChainsData, DragondexData, DragondexEntry } from '../core/types';
 import type { DragonSystem } from '../systems/DragonSystem';
 import { GaugeBar } from './GaugeBar';
@@ -28,32 +28,59 @@ type Page = 'roster' | 'detail' | 'evolution';
  * a 520-wide text column down a 1230-wide page and then ran three lore
  * paragraphs off the bottom of the book.
  * -------------------------------------------------------------------- */
-const EDGE_X = 1000;
-const HEAD_Y = -586;
-const BODY_TOP = -466;
-const BODY_FLOOR = 636;
-
-/** Detail page — a SPECIMEN column (art + vitals) beside a DOSSIER column. */
-const SPEC_X = -636;
-const SPEC_W = 700;
-const SPEC_PLATE_TOP = BODY_TOP;
-const SPEC_PLATE_H = 700;
-const DOSSIER_X = -240;
-/** Wrap width for dossier prose. The whole reason the lore now fits: at 1180
- *  a 190-character story is three lines, where the old 520 made it seven. */
-const DOSSIER_W = 1180;
-
-/** Roster cards. */
-const CARD_W = 300;
-const CARD_H = 380;
-const CARD_GAP_X = 336;
-const CARD_GAP_Y = 420;
-const ROSTER_COLS = 4;
-
-/** Taste cards, side by side under the dossier prose. */
+/**
+ * Device layout. Desktop keeps the landscape book: specimen column BESIDE the
+ * dossier, four roster columns, taste cards side by side. A phone gets the
+ * portrait tall frame and everything STACKS — two roster columns, specimen
+ * plate above the dossier, taste cards one under the other — and the type
+ * steps up through `F()` because the tall frame's fit scale still leaves a
+ * unit at a third of its desktop size.
+ */
+const CX = IS_MOBILE
+  ? {
+      frameKey: 'ui_panel_tall', frameY: 0,
+      edgeX: 990, headY: -1790, bodyTop: -1400, bodyFloor: 1740,
+      bannerH: 208, closeScale: 2.2, backScale: 2,
+      specX: 0, specW: 1500, specH: 1000,
+      dossierX: -1040, dossierW: 2080, dossierTop: -120,
+      cardW: 300, cardH: 380, cardScale: 2.1, gapX: 960, gapY: 880, rosterCols: 2, cardArtFit: 226,
+      tasteScale: 2.05, tasteStack: true,
+      stageW: 2080, stageH: 1440, evoArtW: 1880, evoArtH: 1050, gaugeW: 1400, gaugeH: 66,
+      completionFont: 64
+    }
+  : {
+      frameKey: 'ui_store_panel', frameY: 40,
+      edgeX: 1000, headY: -586, bodyTop: -466, bodyFloor: 636,
+      bannerH: 104, closeScale: 1, backScale: 1,
+      specX: -636, specW: 700, specH: 700,
+      dossierX: -240, dossierW: 1180, dossierTop: -466,
+      cardW: 300, cardH: 380, cardScale: 1, gapX: 336, gapY: 420, rosterCols: 4, cardArtFit: 226,
+      tasteScale: 1, tasteStack: false,
+      stageW: 1320, stageH: 680, evoArtW: 1160, evoArtH: 580, gaugeW: 760, gaugeH: 38,
+      completionFont: TYPE.label
+    };
+const EDGE_X = CX.edgeX;
+const HEAD_Y = CX.headY;
+const BODY_TOP = CX.bodyTop;
+const BODY_FLOOR = CX.bodyFloor;
+const SPEC_X = CX.specX;
+const SPEC_W = CX.specW;
+const SPEC_PLATE_TOP = CX.bodyTop;
+const SPEC_PLATE_H = CX.specH;
+const DOSSIER_X = CX.dossierX;
+const DOSSIER_W = CX.dossierW;
+const CARD_W = CX.cardW;
+const CARD_H = CX.cardH;
+const CARD_GAP_X = CX.gapX;
+const CARD_GAP_Y = CX.gapY;
+const ROSTER_COLS = CX.rosterCols;
 const TASTE_W = 566;
 const TASTE_H = 148;
 const TASTE_GAP = 48;
+
+/** Font step: desktop sizes pass through; mobile steps every size up 2.6× so a
+ *  unit that renders a third the size still lands the same on-screen type. */
+const F = (n: number): number => (IS_MOBILE ? Math.round(n * 2.6) : n);
 
 /**
  * The Dragon Codex — the keepsake record of the dragons the Keeper has NAMED.
@@ -122,8 +149,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     private bus: EventBus,
     private dragons: DragonSystem,
     private dex: DragondexData,
-    private chains: ChainsData,
-    private ctx: GameContext
+    private chains: ChainsData
   ) {
     super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
@@ -136,8 +162,8 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     });
     this.add(dim);
 
-    const frame = scene.add.image(0, 40, 'ui_store_panel');
-    this.baseScale = panelMobileScale(frame.width);
+    const frame = scene.add.image(0, CX.frameY, CX.frameKey);
+    this.baseScale = IS_MOBILE ? panelFitScale(frame.width, frame.height) : panelMobileScale(frame.width);
     this.add(frame);
 
     // Title plaque — the same gold-seated cream banner the Store and Cauldron
@@ -150,7 +176,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     this.title = scene.add
       .text(0, HEAD_Y, 'DRAGON CODEX', {
         fontFamily: FONT.display,
-        fontSize: `${TYPE.title}px`,
+        fontSize: `${F(TYPE.title)}px`,
         fontStyle: 'bold',
         color: INK.onField
       })
@@ -169,16 +195,17 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     const closeGlyph = scene.add
       .text(0, -2, '✕', {
         fontFamily: FONT.ui,
-        fontSize: `${TYPE.title}px`,
+        fontSize: `${F(TYPE.title)}px`,
         fontStyle: 'bold',
         color: INK.onFieldGold
       })
       .setOrigin(0.5);
     this.closeBtn.add([closeBg, closeGlyph]);
+    this.closeBtn.setScale(CX.closeScale);
     this.closeBtn.setSize(120, 120);
     this.closeBtn.setInteractive({ useHandCursor: true });
-    this.closeBtn.on('pointerover', () => this.closeBtn.setScale(1.08));
-    this.closeBtn.on('pointerout', () => this.closeBtn.setScale(1));
+    this.closeBtn.on('pointerover', () => this.closeBtn.setScale(CX.closeScale * 1.08));
+    this.closeBtn.on('pointerout', () => this.closeBtn.setScale(CX.closeScale));
     this.closeBtn.on('pointerup', () => {
       if (this.held) return;
       this.requestClose();
@@ -208,7 +235,6 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     this.isOpen = true;
     this.revealPending = false;
     this.revealArmed = false;
-    this.fetchEvolutionArt();
     this.showPage('roster');
     this.setVisible(true);
     this.setAlpha(0);
@@ -285,46 +311,22 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     return this.dex.dragons[chain];
   }
 
-  /**
-   * Pull in the evolution plates the moment the book opens.
-   *
-   * They are the same 1200x1400 reveal art the ceremony card uses, and holding
-   * all sixteen resident cost 99 MB of a phone's GPU memory for a page most
-   * sessions never turn to (`isLazyScreenArt`). The book opens on the ROSTER,
-   * which needs none of them, so the fetch has the width of that page to
-   * finish in — and `renderEvolution` already draws the shadow only when its
-   * plate exists, so an unfinished fetch degrades to the page without the art
-   * rather than to a broken one.
-   *
-   * Re-renders if the player got to the evolution page first: without that,
-   * the plate would land into a page already drawn without it and the tutorial
-   * beat that says "that shadow is what she grows into" would point at nothing.
-   */
-  private fetchEvolutionArt(): void {
-    const keys = Object.values(this.dex.dragons)
-      .map((e) => e?.evolution?.reveal)
-      .filter((k): k is string => !!k && !this.scene.textures.exists(k));
-    if (keys.length === 0) return;
-    ensureTextures(this.scene, this.ctx, keys, () => {
-      if (this.isOpen && this.page === 'evolution') this.renderEvolution();
-    });
-  }
-
   /** Set the plaque's line and re-cut the banner to it. */
   private setHeading(title: string): void {
     this.title.setText(title);
-    const w = Math.max(620, this.title.width + 220);
-    const y = HEAD_Y - 52;
+    const w = Math.max(IS_MOBILE ? 1240 : 620, this.title.width + 220);
+    const h = CX.bannerH;
+    const y = HEAD_Y - h / 2;
     const g = this.titleBg;
     g.clear();
     g.fillStyle(num(INK.goldDeep), 1);
-    g.fillRoundedRect(-w / 2, y + 10, w, 104, RADIUS.md);
+    g.fillRoundedRect(-w / 2, y + 10, w, h, RADIUS.md);
     g.fillStyle(num(INK.field), 1);
-    g.fillRoundedRect(-w / 2, y, w, 104, RADIUS.md);
+    g.fillRoundedRect(-w / 2, y, w, h, RADIUS.md);
     g.lineStyle(6, num(INK.gold), 1);
-    g.strokeRoundedRect(-w / 2, y, w, 104, RADIUS.md);
+    g.strokeRoundedRect(-w / 2, y, w, h, RADIUS.md);
     g.fillStyle(num(INK.fieldLift), 0.5);
-    g.fillRoundedRect(-w / 2 + 14, y + 8, w - 28, 34, RADIUS.sm);
+    g.fillRoundedRect(-w / 2 + 14, y + 8, w - 28, h / 3, RADIUS.sm);
   }
 
   /* ------------------------------- roster -------------------------------- */
@@ -348,14 +350,14 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
 
     const cols = Math.min(breeds.length, ROSTER_COLS);
     const rows = Math.ceil(breeds.length / cols);
-    const gridH = (rows - 1) * CARD_GAP_Y + CARD_H;
+    const gridH = (rows - 1) * CARD_GAP_Y + CARD_H * CX.cardScale;
     // Rows start at the block's left edge so the columns line up top to bottom
     // and a short last row leaves its gap on the right — the same rule the
     // Store's shelf follows.
     const startX = -((cols - 1) * CARD_GAP_X) / 2;
     // The grid plus its completion line, centred as ONE block in the body band.
     const blockTop = (BODY_TOP + BODY_FLOOR) / 2 - (gridH + 90) / 2;
-    const startY = blockTop + CARD_H / 2;
+    const startY = blockTop + (CARD_H * CX.cardScale) / 2;
 
     breeds.forEach((chain, i) => {
       const col = i % cols;
@@ -366,6 +368,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
         chain,
         named.get(chain) ?? null
       );
+      card.setScale(CX.cardScale);
       this.cards.set(chain, card);
       this.pageRoster.add(card);
     });
@@ -375,7 +378,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       this.scene.add
         .text(0, blockTop + gridH + 62, `${named.size} OF ${breeds.length} NAMED`, {
           fontFamily: FONT.ui,
-          fontSize: `${TYPE.label}px`,
+          fontSize: `${CX.completionFont}px`,
           fontStyle: 'bold',
           color: INK.onFieldGold
         })
@@ -457,8 +460,8 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     if (!dragon) return card; // a locked slot has nothing to open
     card.setSize(CARD_W, CARD_H);
     card.setInteractive({ useHandCursor: true });
-    card.on('pointerover', () => card.setScale(1.05));
-    card.on('pointerout', () => card.setScale(1));
+    card.on('pointerover', () => card.setScale(CX.cardScale * 1.05));
+    card.on('pointerout', () => card.setScale(CX.cardScale));
     card.on('pointerup', () => {
       this.selected = dragon;
       this.showPage('detail');
@@ -496,9 +499,15 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // dialogue bubble comes in.
     this.evolutionBtn = null;
     if (entry?.evolution) {
-      this.evolutionBtn = this.emberButton(SPEC_X, BODY_FLOOR - 96, 'EVOLUTION  ›', () =>
-        this.showPage('evolution')
+      // Mobile: centred under the taste stack (the specimen no longer owns a
+      // column to close); the button itself doubles for a thumb.
+      this.evolutionBtn = this.emberButton(
+        IS_MOBILE ? 0 : SPEC_X,
+        IS_MOBILE ? BODY_FLOOR + 60 : BODY_FLOOR - 96,
+        'EVOLUTION  ›',
+        () => this.showPage('evolution')
       );
+      if (IS_MOBILE) this.evolutionBtn.setScale(1.9);
       this.pageDetail.add(this.evolutionBtn);
     }
   }
@@ -516,7 +525,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     plate.fillStyle(num(INK.fieldDeep), 1);
     plate.fillRoundedRect(SPEC_X - SPEC_W / 2, top, SPEC_W, h, RADIUS.lg);
     this.pageDetail.add(plate);
-    this.pageDetail.add(this.glowPool(SPEC_X, midY, 300, INK.gold, 0.17));
+    this.pageDetail.add(this.glowPool(SPEC_X, midY, IS_MOBILE ? 520 : 300, INK.gold, 0.17));
 
     const artKey = `item_${dragon.chain}_${dragon.tier}`;
     if (this.scene.textures.exists(artKey)) {
@@ -547,7 +556,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       const label = this.scene.add
         .text(SPEC_X, top + h, entry.title.toUpperCase(), {
           fontFamily: FONT.ui,
-          fontSize: `${TYPE.micro}px`,
+          fontSize: `${F(TYPE.micro)}px`,
           fontStyle: 'bold',
           color: INK.onFieldGold
         })
@@ -565,12 +574,12 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // ---- vitals: the cycle record, as a gauge rather than a sentence ----
     const needed = WELL_FED_EVOLUTION[dragon.chain] ?? entry?.evolution?.wellFedCycles ?? 6;
     const cycles = this.dragons.wellFedCyclesOf(dragon.itemId);
-    const vitalsY = top + h + 104;
+    const vitalsY = top + h + (IS_MOBILE ? 130 : 104);
     this.pageDetail.add(
       this.scene.add
         .text(SPEC_X - SPEC_W / 2 + 10, vitalsY, 'WELL FED', {
           fontFamily: FONT.ui,
-          fontSize: `${TYPE.micro}px`,
+          fontSize: `${F(TYPE.micro)}px`,
           fontStyle: 'bold',
           color: INK.onFieldDim
         })
@@ -580,7 +589,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       this.scene.add
         .text(SPEC_X + SPEC_W / 2 - 10, vitalsY, `${Math.min(cycles, needed)} / ${needed}`, {
           fontFamily: FONT.ui,
-          fontSize: `${TYPE.label}px`,
+          fontSize: `${F(TYPE.label)}px`,
           fontStyle: 'bold',
           color: cycles >= needed ? INK.gain : INK.onFieldGold
         })
@@ -588,7 +597,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     );
     // The same segmented gauge the dragon's hunger uses — one meter language
     // for "how far along is this animal", wherever it is read.
-    const gauge = new GaugeBar(this.scene, SPEC_X - SPEC_W / 2, vitalsY + 70, SPEC_W, 34);
+    const gauge = new GaugeBar(this.scene, SPEC_X - SPEC_W / 2, vitalsY + (IS_MOBILE ? 100 : 70), SPEC_W, IS_MOBILE ? 60 : 34);
     gauge.set(Math.min(cycles / needed, 1), needed, cycles >= needed);
     this.pageDetail.add(gauge);
   }
@@ -602,8 +611,11 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // The taste cards are anchored to the FOOT of the column and the prose
     // flows from the top, so the spare room lands between them instead of
     // pooling under a top-heavy block.
-    const tasteY = BODY_FLOOR - TASTE_H - 26;
-    const group = this.scene.add.container(DOSSIER_X, BODY_TOP);
+    // Mobile: the dossier is BELOW the specimen block, and the taste cards are
+    // scaled containers stacked one under the other above the page floor.
+    const tasteHh = TASTE_H * CX.tasteScale;
+    const tasteY = CX.tasteStack ? BODY_FLOOR - tasteHh * 2 - 60 : BODY_FLOOR - TASTE_H - 26;
+    const group = this.scene.add.container(DOSSIER_X, CX.dossierTop);
     this.pageDetail.add(group);
     let y = 0;
 
@@ -612,7 +624,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     if (entry?.story) {
       const body = this.scene.add.text(28, 0, entry.story, {
         fontFamily: FONT.ui,
-        fontSize: `${TYPE.body}px`,
+        fontSize: `${F(TYPE.body)}px`,
         fontStyle: 'italic',
         color: INK.onField,
         wordWrap: { width: DOSSIER_W - 28 },
@@ -630,7 +642,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       const head = this.scene.add
         .text(0, y, label, {
           fontFamily: FONT.ui,
-          fontSize: `${TYPE.micro}px`,
+          fontSize: `${F(TYPE.micro)}px`,
           fontStyle: 'bold',
           color: INK.onFieldGold
         })
@@ -639,7 +651,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       y += 46;
       const body = this.scene.add.text(0, y, text, {
         fontFamily: FONT.ui,
-        fontSize: `${TYPE.body}px`,
+        fontSize: `${F(TYPE.body)}px`,
         color: INK.onField,
         wordWrap: { width: DOSSIER_W },
         lineSpacing: 10
@@ -654,27 +666,42 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // prose is measured against the gap above the taste cards, and if it ever
     // outgrows it the block scales as ONE unit from its top-left, so the
     // columns stay aligned rather than the paragraphs colliding.
-    const available = tasteY - 96 - BODY_TOP;
+    const available = tasteY - 96 - CX.dossierTop;
     if (y > available) group.setScale(available / y);
 
     // ---- taste cards: written by EXPERIMENT, '???' until tested ----------
     this.pageDetail.add(
       this.scene.add
-        .text(DOSSIER_X, tasteY - 48, 'AT THE TABLE', {
+        .text(DOSSIER_X, tasteY - (IS_MOBILE ? 90 : 48), 'AT THE TABLE', {
           fontFamily: FONT.ui,
-          fontSize: `${TYPE.micro}px`,
+          fontSize: `${F(TYPE.micro)}px`,
           fontStyle: 'bold',
           color: INK.onFieldGold
         })
         .setLetterSpacing(6)
     );
     const taste = this.dragons.tasteKnowledge(dragon.itemId);
-    this.favouriteRow = this.tasteCard(DOSSIER_X, tasteY, 'FAVOURITE MEAL', taste.favourite, INK.gain);
-    this.pageDetail.add(this.favouriteRow);
-    if (this.revealPending) this.favouriteRow.setAlpha(0); // the cinematic owns its entrance
-    this.pageDetail.add(
-      this.tasteCard(DOSSIER_X + TASTE_W + TASTE_GAP, tasteY, 'WON’T TOUCH', taste.dislike, INK.spend)
-    );
+    if (CX.tasteStack) {
+      // Stacked and magnified: each card is built at its authored size around
+      // its own centre, then scaled — the reveal cinematic's centre-pop and the
+      // glow inside the container ride the scale untouched.
+      const mk = (label: string, t: { chain: string; known: boolean }, accent: string, cy: number) => {
+        const card = this.tasteCard(-TASTE_W / 2, -TASTE_H / 2, label, t, accent);
+        card.setScale(CX.tasteScale).setPosition(0, cy);
+        return card;
+      };
+      this.favouriteRow = mk('FAVOURITE MEAL', taste.favourite, INK.gain, tasteY + tasteHh / 2);
+      this.pageDetail.add(this.favouriteRow);
+      if (this.revealPending) this.favouriteRow.setAlpha(0);
+      this.pageDetail.add(mk('WON’T TOUCH', taste.dislike, INK.spend, tasteY + tasteHh * 1.5 + 40));
+    } else {
+      this.favouriteRow = this.tasteCard(DOSSIER_X, tasteY, 'FAVOURITE MEAL', taste.favourite, INK.gain);
+      this.pageDetail.add(this.favouriteRow);
+      if (this.revealPending) this.favouriteRow.setAlpha(0); // the cinematic owns its entrance
+      this.pageDetail.add(
+        this.tasteCard(DOSSIER_X + TASTE_W + TASTE_GAP, tasteY, 'WON’T TOUCH', taste.dislike, INK.spend)
+      );
+    }
   }
 
   /**
@@ -777,23 +804,23 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     const cycles = this.dragons.wellFedCyclesOf(dragon.itemId);
     const met = cycles >= needed;
 
-    const stageY = BODY_TOP + 340;
+    const stageY = BODY_TOP + CX.stageH / 2;
     const stage = this.scene.add.graphics();
     stage.fillStyle(num(INK.fieldDeep), 1);
-    stage.fillRoundedRect(-660, BODY_TOP, 1320, 680, RADIUS.lg);
+    stage.fillRoundedRect(-CX.stageW / 2, BODY_TOP, CX.stageW, CX.stageH, RADIUS.lg);
     stage.lineStyle(5, num(met ? INK.gold : INK.goldDeep), 1);
-    stage.strokeRoundedRect(-660, BODY_TOP, 1320, 680, RADIUS.lg);
+    stage.strokeRoundedRect(-CX.stageW / 2, BODY_TOP, CX.stageW, CX.stageH, RADIUS.lg);
     this.pageEvolution.add(stage);
     // A locked silhouette is painted near-black — on the plum hall that would
     // be a hole in the page, so the glow goes BEHIND it and the shape reads as
     // a shadow cast on light. Earned, the same pool becomes the ember halo.
     this.pageEvolution.add(
-      this.glowPool(0, stageY, 360, met ? INK.ember : INK.gold, met ? 0.3 : 0.2)
+      this.glowPool(0, stageY, IS_MOBILE ? 640 : 360, met ? INK.ember : INK.gold, met ? 0.3 : 0.2)
     );
 
     if (this.scene.textures.exists(entry.evolution.reveal)) {
       const art = this.scene.add.image(0, stageY, entry.evolution.reveal);
-      art.setScale(Math.min(1160 / art.width, 580 / art.height));
+      art.setScale(Math.min(CX.evoArtW / art.width, CX.evoArtH / art.height));
       if (met) {
         art.setAlpha(0);
         this.pageTweens.push(
@@ -806,12 +833,12 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       this.pageEvolution.add(art);
     }
 
-    const nameY = BODY_TOP + 762;
+    const nameY = BODY_TOP + CX.stageH + (IS_MOBILE ? 150 : 82);
     this.pageEvolution.add(
       this.scene.add
         .text(0, nameY, met ? entry.evolution.into : '? ? ? ? ?', {
           fontFamily: FONT.display,
-          fontSize: `${TYPE.heading}px`,
+          fontSize: `${F(TYPE.heading)}px`,
           fontStyle: 'bold',
           color: met ? INK.onFieldGold : INK.idle
         })
@@ -820,9 +847,9 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     );
     this.pageEvolution.add(
       this.scene.add
-        .text(0, nameY + 58, entry.evolution.condition, {
+        .text(0, nameY + (IS_MOBILE ? 110 : 58), entry.evolution.condition, {
           fontFamily: FONT.ui,
-          fontSize: `${TYPE.tiny}px`,
+          fontSize: `${F(TYPE.tiny)}px`,
           fontStyle: 'italic',
           color: INK.onFieldDim
         })
@@ -831,15 +858,15 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
 
     // The same gauge as the detail page's vitals — the player sees the very
     // meter they are filling, on the page that explains what filling it buys.
-    const gaugeW = 760;
-    const gauge = new GaugeBar(this.scene, -gaugeW / 2, nameY + 138, gaugeW, 38);
+    const gaugeW = CX.gaugeW;
+    const gauge = new GaugeBar(this.scene, -gaugeW / 2, nameY + (IS_MOBILE ? 240 : 138), gaugeW, CX.gaugeH);
     gauge.set(Math.min(cycles / needed, 1), needed, met);
     this.pageEvolution.add(gauge);
     this.pageEvolution.add(
       this.scene.add
-        .text(0, nameY + 198, met ? 'READY' : `${Math.min(cycles, needed)} / ${needed} cycles`, {
+        .text(0, nameY + (IS_MOBILE ? 360 : 198), met ? 'READY' : `${Math.min(cycles, needed)} / ${needed} cycles`, {
           fontFamily: FONT.ui,
-          fontSize: `${TYPE.label}px`,
+          fontSize: `${F(TYPE.label)}px`,
           fontStyle: 'bold',
           color: met ? INK.gain : INK.onField
         })
@@ -872,7 +899,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     const label = this.scene.add
       .text(0, 0, text, {
         fontFamily: FONT.ui,
-        fontSize: `${TYPE.sub}px`,
+        fontSize: `${F(TYPE.sub)}px`,
         fontStyle: 'bold',
         color: INK.onPlate
       })
@@ -896,15 +923,16 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     btn.add([g, label]);
     btn.setSize(w, h);
     btn.setInteractive({ useHandCursor: true });
-    btn.on('pointerover', () => btn.setScale(1.05));
-    btn.on('pointerout', () => btn.setScale(1));
+    const rest = IS_MOBILE ? 1.9 : 1;
+    btn.on('pointerover', () => btn.setScale(rest * 1.05));
+    btn.on('pointerout', () => btn.setScale(rest));
     btn.on('pointerup', onTap);
     return btn;
   }
 
   /** The ‹ Back pill every inner page carries, mirroring the ✕. */
   private backButton(onTap: () => void): Phaser.GameObjects.Container {
-    const btn = this.scene.add.container(-EDGE_X + 110, HEAD_Y + 46);
+    const btn = this.scene.add.container(-EDGE_X + (IS_MOBILE ? 240 : 110), HEAD_Y + (IS_MOBILE ? 230 : 46)).setScale(CX.backScale);
     const w = 200;
     const h = 84;
     const r = h / 2; // spelled out — see emberButton on why not RADIUS.pill
@@ -918,7 +946,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     const label = this.scene.add
       .text(0, 0, '‹  BACK', {
         fontFamily: FONT.ui,
-        fontSize: `${TYPE.label}px`,
+        fontSize: `${F(TYPE.label)}px`,
         fontStyle: 'bold',
         color: INK.onFieldGold
       })
@@ -927,8 +955,8 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     btn.add([g, label]);
     btn.setSize(w, h);
     btn.setInteractive({ useHandCursor: true });
-    btn.on('pointerover', () => btn.setScale(1.06));
-    btn.on('pointerout', () => btn.setScale(1));
+    btn.on('pointerover', () => btn.setScale(CX.backScale * 1.06));
+    btn.on('pointerout', () => btn.setScale(CX.backScale));
     btn.on('pointerup', onTap);
     return btn;
   }
