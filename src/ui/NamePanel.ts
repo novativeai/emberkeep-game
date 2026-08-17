@@ -154,7 +154,8 @@ export class NamePanel extends Phaser.GameObjects.Container {
       .setInteractive({ useHandCursor: true });
     reroll.on('pointerup', () => this.offer());
 
-    this.confirmBtn = scene.add.image(0, 288, 'ui_btn_green').setScale(1.5);
+    // Smaller than it was: this plate is one line of a card, not the card.
+    this.confirmBtn = scene.add.image(0, 288, 'ui_btn_green').setScale(1.18);
     this.confirmLabel = scene.add
       .text(0, 284, 'Choose a name', {
         // `ui_btn_green` is painted with the CREAM plate tone, so its ink is the
@@ -258,6 +259,13 @@ export class NamePanel extends Phaser.GameObjects.Container {
       el.type = 'text';
       el.maxLength = NAME_MAX;
       el.autocomplete = 'off';
+      // A soft keyboard's PREDICTION is what put a space on the end of every
+      // name: accepting a suggested word appends one, and the field is fed
+      // straight from this element. Turning the three off is the fix at the
+      // source; `onTyped` still normalises, because a paste can carry anything.
+      el.autocapitalize = 'words';
+      el.setAttribute('autocorrect', 'off');
+      el.spellcheck = false;
       el.setAttribute('aria-label', 'Dragon name');
       // Off-screen but focusable — NOT `display:none` or `visibility:hidden`,
       // which make an element unfocusable and kill the mobile keyboard. The
@@ -296,7 +304,18 @@ export class NamePanel extends Phaser.GameObjects.Container {
     // Only what a name may contain: letters, spaces and the apostrophe/hyphen a
     // real name uses. Anything else is dropped as it is typed rather than
     // rejected at the end, so the field never shows something it will not take.
-    const cleaned = (this.nameInput?.value ?? '').replace(/[^\p{L}\p{M}' -]/gu, '').slice(0, NAME_MAX);
+    // Two passes. The first drops anything a name may not contain; the second
+    // collapses runs of spaces and refuses a LEADING one, so the field can
+    // never hold "  Bl  aze". A TRAILING space survives this on purpose —
+    // stripping it as you type makes it impossible to type a two-word name,
+    // because the space between the words is trailing until the next letter
+    // lands. It is trimmed at the point it stops being an edit and becomes a
+    // name (`chosen`, below), which is the only place it matters.
+    const cleaned = (this.nameInput?.value ?? '')
+      .replace(/[^\p{L}\p{M}' -]/gu, '')
+      .replace(/ {2,}/g, ' ')
+      .replace(/^ +/, '')
+      .slice(0, NAME_MAX);
     if (this.nameInput && this.nameInput.value !== cleaned) this.nameInput.value = cleaned;
     this.chosen = cleaned.trim();
     this.paintField();

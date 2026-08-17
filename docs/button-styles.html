@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emberkeep — Button Foundry</title>
+<style>
+/* ============================================================================
+   EMBERKEEP — BUTTON FOUNDRY v2
+   The Emblem family (logo-language buttons wearing the Emberkeep crest),
+   21 core styles, a round variant of each, a LIGHT/DARK theme for the whole
+   sheet, and a detail view per style: click any card to open its full range —
+   every palette colorway, sizes, shapes, states, and both themes side by side.
+
+   Every colour is lifted from src/core/Constants.ts PALETTE — nothing is
+   invented, so a style picked off this sheet already belongs to the game.
+
+   THE RECIPE, once. Every button is the same five layers, and a style is a
+   handful of custom properties feeding them:
+
+     --face     the plate's own colour
+     --face-hi  its lit top edge
+     --edge     the SEAT: the darker slab the plate sits on
+     --ink      the label
+     --rim      (optional) a border drawn in a different metal than the seat
+     --seatc    (optional) the seat's own colour when it isn't the edge
+
+   The seat is what makes these read as objects rather than rectangles: a solid
+   box-shadow with NO blur, so the plate has a visible thickness that
+   compresses when pressed. Because every style is only variables over one
+   plate, the detail view can re-cast ANY style in ANY palette colour by
+   overriding the variables — that is the whole engine behind the colorways.
+   ========================================================================== */
+
+:root, [data-theme="dark"] {
+  /* --- PALETTE, verbatim from Constants.ts --- */
+  --lava:#E8503C;   --lava-shade:#C73A2E;  --lava-hi:#FF8A66;
+  --gold:#F7A437;   --gold-shade:#D9821F;  --gold-accent:#FFD84D;
+  --plum:#4A3845;   --plum-shade:#3A2B38;  --plum-hi:#6A5468;
+  --teal:#3FA8D9;   --teal-deep:#2E7FA6;
+  --ash:#8E8A93;    --ash-shade:#6E6A75;
+  --moss:#7ECB4F;   --moss-shade:#5FA63D;
+  --cream:#FFF6E8;  --text-brown:#B5602F;  --night:#241B22;
+
+  --font-ui: 'Trebuchet MS', Verdana, sans-serif;
+  --font-display: Georgia, 'Times New Roman', serif;
+
+  /* Deliberately SMALL — the in-game Deliver plate is the exception, not the
+     template. These are the everyday controls. */
+  --h: 46px;
+  --seat: 5px;
+  --radius: 16px;
+
+  /* --- THEME SURFACES (dark = the game's night) --- */
+  --page-bg: radial-gradient(120% 90% at 50% -10%, #3a2b38 0%, #241b22 55%, #1a1319 100%);
+  --surface: rgba(255,246,232,.035);
+  --surface-brd: rgba(255,246,232,.09);
+  --ink-hi: #FFF6E8;
+  --ink-mid: rgba(255,246,232,.62);
+  --ink-dim: rgba(255,246,232,.4);
+  --accent: #FFD84D;
+  --accent-soft: rgba(255,216,77,.16);
+  --side-bg: linear-gradient(180deg, rgba(58,43,56,.97), rgba(26,19,25,.97));
+  --dlg-bg: linear-gradient(180deg, #352838, #241b22);
+}
+
+/* LIGHT = the logo's own sky: warm clouds, parchment panels, brown ink.
+   Scoped to the attribute (not to html[...]) on purpose, so any SUBTREE can
+   flip — the detail dialog uses that to show both themes side by side. */
+[data-theme="light"] {
+  --page-bg: radial-gradient(130% 105% at 50% -12%, #FFF3DC 0%, #FFDDB4 36%, #F3B08C 68%, #DE8FA2 100%);
+  --surface: rgba(120,62,28,.07);
+  --surface-brd: rgba(120,62,28,.20);
+  --ink-hi: #4a2c1a;
+  --ink-mid: rgba(74,44,26,.8);
+  --ink-dim: rgba(74,44,26,.52);
+  --accent: #B5602F;
+  --accent-soft: rgba(181,96,47,.15);
+  --side-bg: linear-gradient(180deg, rgba(255,243,220,.97), rgba(248,196,158,.95));
+  --dlg-bg: linear-gradient(180deg, #FFF3DC, #F8D9B4);
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+body {
+  background: var(--page-bg);
+  background-attachment: fixed;
+  color: var(--ink-hi);
+  font-family: var(--font-ui);
+  display: grid;
+  grid-template-columns: 224px 1fr;
+  min-height: 100vh;
+  transition: background .25s ease, color .25s ease;
+}
+@media (max-width: 860px) { body { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------- sidebar */
+aside {
+  background: var(--side-bg);
+  border-right: 1px solid var(--surface-brd);
+  padding: 20px 0 40px;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+@media (max-width: 860px) { aside { position: static; max-height: none; } }
+
+aside h2 {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 14px 0 4px;
+  padding: 0 18px;
+}
+aside .sub {
+  font-size: 11px;
+  color: var(--ink-dim);
+  padding: 0 18px 10px;
+  line-height: 1.5;
+}
+.round-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 5px 18px;
+  text-decoration: none;
+  color: inherit;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.round-row:hover { background: var(--accent-soft); border-left-color: var(--accent); }
+.round-row .nm { font-size: 12px; color: var(--ink-mid); }
+.round-row .no { font-size: 10px; color: var(--ink-dim); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------- main */
+main { padding: 30px 40px 90px; min-width: 0; }
+@media (max-width: 860px) { main { padding: 22px 16px 60px; } }
+
+.topbar { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
+.topbar h1 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  margin: 0 0 6px;
+}
+.topbar .lead {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--ink-mid);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+.spacer { flex: 1; }
+
+/* The theme switch — itself built from the button grammar. */
+.theme-switch {
+  display: inline-flex;
+  border: 3px solid var(--gold-shade);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: 0 4px 0 #8f5a14, 0 9px 12px rgba(20,12,18,.35);
+  flex: none;
+}
+.theme-switch button {
+  border: 0;
+  padding: 9px 18px;
+  font: bold 13px var(--font-ui);
+  cursor: pointer;
+  background: linear-gradient(180deg, var(--plum-hi), var(--plum));
+  color: var(--cream);
+}
+.theme-switch button.on {
+  background: linear-gradient(180deg, var(--gold-accent), var(--gold));
+  color: #4a2c08;
+  text-shadow: 0 1px 0 rgba(255,255,255,.45);
+}
+
+.hint {
+  margin: 16px 0 0;
+  max-width: 62ch;
+  font-size: 12.5px;
+  color: var(--accent);
+  line-height: 1.6;
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+  opacity: .85;
+}
+
+/* ------------------------------------------------------- the hero emblem */
+.hero {
+  margin: 34px 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.hero .ebtn { --h: 74px; font-size: 26px; padding: 0 44px; }
+.hero .crest.big { width: 58px; height: 58px; position: absolute; top: -32px; left: 50%; transform: translateX(-50%);
+  filter: drop-shadow(0 4px 5px rgba(20,12,18,.5)); }
+.hero-ribbon {
+  margin-top: -6px;
+  background: linear-gradient(180deg, #4FB6C9 0%, var(--teal-deep) 60%, #226680 100%);
+  border: 2px solid #1C5A72;
+  box-shadow: 0 4px 0 #17475b, 0 8px 12px rgba(20,12,18,.4), inset 0 2px 0 rgba(255,255,255,.28);
+  color: var(--cream);
+  font: bold 13px/1 var(--font-ui);
+  letter-spacing: .22em;
+  padding: 10px 34px;
+  clip-path: polygon(2.5% 0, 97.5% 0, 100% 50%, 97.5% 100%, 2.5% 100%, 0 50%);
+  text-shadow: 0 2px 0 rgba(23,71,91,.8);
+  z-index: 1;
+}
+
+section > h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: .06em;
+  margin: 40px 0 4px;
+  color: var(--ink-hi);
+}
+section > .sec-sub { font-size: 12.5px; color: var(--ink-dim); margin: 0 0 16px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+  gap: 14px;
+}
+.cell {
+  background: var(--surface);
+  border: 1px solid var(--surface-brd);
+  border-radius: 14px;
+  padding: 20px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.cell:hover { border-color: var(--accent); transform: translateY(-2px); }
+.cell .row { display: flex; align-items: center; gap: 12px; min-height: 52px; flex-wrap: wrap; justify-content: center; }
+.cell .meta { text-align: center; }
+.cell .name { font-size: 12.5px; color: var(--ink-mid); }
+.cell code {
+  display: block;
+  font-size: 10.5px;
+  color: var(--accent);
+  opacity: .8;
+  margin-top: 3px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.cell .more { font-size: 10px; color: var(--ink-dim); margin-top: 5px; letter-spacing: .08em; text-transform: uppercase; }
+
+/* ============================================================================
+   THE BASE PLATE — shared by every core style and recolorable by variables.
+   ========================================================================== */
+.btn {
+  --face: var(--lava);
+  --face-hi: var(--lava-hi);
+  --edge: var(--lava-shade);
+  --ink: #fff;
+
+  position: relative;
+  height: var(--h);
+  padding: 0 20px;
+  border: 3px solid var(--rim, var(--edge));
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--face-hi) 0%, var(--face) 52%, var(--face) 100%);
+  color: var(--ink);
+  font: bold 15px/1 var(--font-ui);
+  letter-spacing: .01em;
+  cursor: pointer;
+  box-shadow:
+    0 var(--seat) 0 var(--seatc, var(--edge)),
+    0 calc(var(--seat) + 5px) 12px rgba(20,12,18,.45);
+  text-shadow: 0 2px 0 rgba(36,27,34,.38);
+  transition: transform .08s ease, box-shadow .08s ease, filter .12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  flex: none;
+}
+.btn::before {
+  content: '';
+  position: absolute;
+  left: 7px; right: 7px; top: 3px;
+  height: 36%;
+  border-radius: calc(var(--radius) - 6px) calc(var(--radius) - 6px) 40% 40% /
+                 calc(var(--radius) - 6px) calc(var(--radius) - 6px) 100% 100%;
+  background: linear-gradient(180deg, rgba(255,255,255,.42), rgba(255,255,255,0));
+  pointer-events: none;
+}
+.btn:hover { filter: brightness(1.06); transform: translateY(-1px);
+  box-shadow: 0 calc(var(--seat) + 1px) 0 var(--seatc, var(--edge)), 0 calc(var(--seat) + 7px) 14px rgba(20,12,18,.5); }
+.btn:active, .btn.is-pressed { transform: translateY(var(--seat));
+  box-shadow: 0 0 0 var(--seatc, var(--edge)), 0 2px 5px rgba(20,12,18,.5); }
+.btn:focus-visible { outline: 3px solid var(--gold-accent); outline-offset: 3px; }
+.btn[disabled] { filter: grayscale(.75) brightness(.7); cursor: not-allowed; transform: none; }
+.btn[data-ink="dark"] { text-shadow: 0 1px 0 rgba(255,255,255,.45); }
+
+.btn.round { width: var(--h); height: var(--h); padding: 0; border-radius: 50%; font-size: 18px; }
+.btn.round::before { left: 6px; right: 6px; top: 3px; height: 42%; border-radius: 50%; }
+.btn.pill { border-radius: 999px; }
+.btn.pill::before { border-radius: 999px 999px 40% 40% / 999px 999px 100% 100%; }
+.btn.sm { --h: 36px; --seat: 4px; --radius: 12px; font-size: 13px; padding: 0 14px; }
+.btn.sm.round { width: 36px; padding: 0; }
+.btn.lg { --h: 58px; --seat: 6px; --radius: 20px; font-size: 18px; padding: 0 28px; }
+.btn.lg.round { width: 58px; padding: 0; }
+.btn .crest.s { width: 22px; height: 22px; flex: none; filter: drop-shadow(0 1px 1px rgba(20,12,18,.4)); }
+
+/* ============================================================================
+   THE EMBLEM FAMILY — the logo's language: a carved plate in a gold rim,
+   corner rivets, gold beveled lettering, and the Emberkeep crest on every one.
+   ========================================================================== */
+.ebtn {
+  --face: #6B4A33;
+  --face-hi: #8A6547;
+  --edge: #3F2A1C;
+  --seatc: #2B1C12;
+
+  position: relative;
+  height: 54px;
+  padding: 0 22px 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 3px solid var(--gold-shade);
+  border-radius: 14px;
+  background:
+    /* four gold corner rivets, pinned over the carved face */
+    radial-gradient(4.5px 4.5px at 11px 11px,            var(--gold-accent) 40%, #8f5a14 62%, transparent 72%),
+    radial-gradient(4.5px 4.5px at calc(100% - 11px) 11px, var(--gold-accent) 40%, #8f5a14 62%, transparent 72%),
+    radial-gradient(4.5px 4.5px at 11px calc(100% - 11px), var(--gold-accent) 40%, #8f5a14 62%, transparent 72%),
+    radial-gradient(4.5px 4.5px at calc(100% - 11px) calc(100% - 11px), var(--gold-accent) 40%, #8f5a14 62%, transparent 72%),
+    linear-gradient(180deg, var(--face-hi) 0%, var(--face) 48%, var(--edge) 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255,216,77,.35),   /* the inner gold seam */
+    inset 0 -8px 14px rgba(20,12,18,.35),   /* carved depth at the foot */
+    0 var(--seat) 0 var(--seatc),
+    0 calc(var(--seat) + 6px) 14px rgba(20,12,18,.5);
+  cursor: pointer;
+  transition: transform .08s ease, box-shadow .08s ease, filter .12s ease;
+  -webkit-tap-highlight-color: transparent;
+  flex: none;
+}
+.ebtn:hover { filter: brightness(1.07); transform: translateY(-1px); }
+.ebtn:active, .ebtn.is-pressed { transform: translateY(var(--seat));
+  box-shadow: inset 0 0 0 2px rgba(255,216,77,.35), inset 0 -8px 14px rgba(20,12,18,.35),
+              0 0 0 var(--seatc), 0 2px 6px rgba(20,12,18,.5); }
+.ebtn:focus-visible { outline: 3px solid var(--gold-accent); outline-offset: 3px; }
+.ebtn[disabled] { filter: grayscale(.7) brightness(.72); cursor: not-allowed; transform: none; }
+.ebtn .crest { width: 30px; height: 30px; flex: none; filter: drop-shadow(0 2px 2px rgba(20,12,18,.45)); }
+
+/* The logo lettering: gold bevel as a gradient clipped to the glyphs. */
+.glbl {
+  font: bold 16px/1 var(--font-display);
+  letter-spacing: .06em;
+  background: linear-gradient(180deg, #FFE9A6 0%, var(--gold-accent) 34%, var(--gold) 64%, var(--gold-shade) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1.5px 0 rgba(60,30,10,.9)) drop-shadow(0 -1px 0 rgba(255,255,255,.18));
+  white-space: nowrap;
+}
+.hero .glbl { font-size: 27px; letter-spacing: .1em; }
+
+.ebtn.round { width: 54px; height: 54px; padding: 0; border-radius: 50%; }
+.ebtn.sm { height: 42px; padding: 0 16px 0 9px; --seat: 4px; }
+.ebtn.sm .crest { width: 24px; height: 24px; }
+.ebtn.sm .glbl { font-size: 13.5px; }
+.ebtn.sm.round { width: 42px; padding: 0; }
+.ebtn.lg { height: 66px; padding: 0 30px 0 16px; --seat: 6px; }
+.ebtn.lg .crest { width: 38px; height: 38px; }
+.ebtn.lg .glbl { font-size: 20px; }
+
+/* Emblem colorways: the carved face changes metal, the gold furniture stays. */
+.e-ember { --face:#A33F2E; --face-hi:#D4614A; --edge:#6E241A; --seatc:#4A1710; }
+.e-gold  { --face:#B5741C; --face-hi:#E09A35; --edge:#7C4A0E; --seatc:#553208; }
+.e-teal  { --face:#2E7FA6; --face-hi:#4FA8CB; --edge:#1C5A72; --seatc:#123F52; }
+.e-moss  { --face:#5FA63D; --face-hi:#83C95E; --edge:#3D7A25; --seatc:#2A5717; }
+.e-plum  { --face:#4A3845; --face-hi:#6A5468; --edge:#2E2230; --seatc:#1E1620; }
+.e-royal { --face:#3A2B38; --face-hi:#5A4458; --edge:#241B22; --seatc:#8f5a14; border-color: var(--gold); }
+
+/* ============================================================================
+   THE 21 CORE STYLES — each a handful of variables over the shared plate.
+   ========================================================================== */
+.s-ember   { --face: var(--lava); --face-hi: var(--lava-hi); --edge: var(--lava-shade); }
+.s-gold    { --face: var(--gold); --face-hi: var(--gold-accent); --edge: var(--gold-shade); --ink: #4a2c08; text-shadow: 0 1px 0 rgba(255,255,255,.45); }
+.s-moss    { --face: var(--moss); --face-hi: #A8E57A; --edge: var(--moss-shade); --ink: #1e3a10; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
+.s-teal    { --face: var(--teal); --face-hi: #7FD0F2; --edge: var(--teal-deep); }
+.s-plum    { --face: var(--plum-hi); --face-hi: #866E84; --edge: var(--plum-shade); }
+.s-cream   { --face: var(--cream); --face-hi: #fff; --edge: #D9C4A4; --ink: #4a2c1a; text-shadow: 0 1px 0 rgba(255,255,255,.7); }
+.s-stone   { --face: var(--ash); --face-hi: #ADA8B2; --edge: var(--ash-shade); }
+.s-royal   { --face: #5A4458; --face-hi: #7C6279; --edge: #2E2230; --seatc: #8f5a14; --rim: var(--gold); --ink: var(--gold-accent); }
+
+/* RELIC — the treatment asked for by name: a brown plate in a gold rim, the
+   Royal grammar cast in the game's own leather-brown. Collect wears it. */
+.s-relic   { --face: var(--text-brown); --face-hi: #D4813F; --edge: #7C3E1C; --seatc: #5a3410; --rim: var(--gold); --ink: var(--gold-accent); }
+.s-relic::after {
+  content: ''; position: absolute; inset: 3px; border-radius: calc(var(--radius) - 7px);
+  box-shadow: inset 0 0 0 1.5px rgba(255,216,77,.35); pointer-events: none;
+}
+
+.s-candy   { --face: #FF6FA5; --face-hi: #FFB3CE; --edge: #D4437A; --radius: 22px; }
+.s-candy::before { height: 46%; background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.04)); }
+
+.s-wood    { --face: var(--text-brown); --face-hi: #D4813F; --edge: #7C3E1C; }
+.s-wood::after {
+  content: ''; position: absolute; inset: 0; border-radius: calc(var(--radius) - 3px);
+  background:
+    repeating-linear-gradient(90deg, rgba(80,38,14,.16) 0 2px, transparent 2px 13px),
+    repeating-linear-gradient(90deg, rgba(255,220,180,.10) 0 1px, transparent 1px 26px);
+  pointer-events: none;
+}
+
+.s-gem     { --face: #4FC3E8; --face-hi: #9BE7FA; --edge: #227A9E; }
+.s-gem::before { background: linear-gradient(115deg, rgba(255,255,255,.85) 0 38%, rgba(255,255,255,0) 38%); height: 58%; border-radius: inherit; }
+
+.s-night   { --face: #33262F; --face-hi: #4A3845; --edge: #191218; --rim: var(--lava-shade); --ink: #FFC9BE; }
+
+.s-ribbon  { --face: var(--lava); --face-hi: var(--lava-hi); --edge: var(--lava-shade); --radius: 6px; padding: 0 26px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 7px 50%); }
+
+.s-stitch  { --face: #6FBF8F; --face-hi: #9BDCB2; --edge: #45895F; }
+.s-stitch::after {
+  content: ''; position: absolute; inset: 4px; border-radius: calc(var(--radius) - 6px);
+  border: 2px dashed rgba(255,255,255,.62); pointer-events: none;
+}
+
+.s-leaf    { --face: var(--moss); --face-hi: #B4EE87; --edge: var(--moss-shade); --ink: #1c3a0e;
+  border-radius: 24px 6px 24px 6px; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
+.s-leaf::before { border-radius: 20px 4px 40% 40%; }
+
+.s-ingot   { --face: var(--gold); --face-hi: var(--gold-accent); --edge: #A9640F; --radius: 7px; --ink: #4a2c08;
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+  background: linear-gradient(180deg, var(--face-hi) 0 18%, var(--face) 18% 62%, var(--edge) 62% 100%); }
+.s-ingot::before { display: none; }
+
+.s-glow    { --face: var(--lava); --face-hi: var(--lava-hi); --edge: var(--lava-shade);
+  animation: emberPulse 1.9s ease-in-out infinite; }
+@keyframes emberPulse {
+  0%,100% { box-shadow: 0 var(--seat) 0 var(--seatc, var(--edge)), 0 calc(var(--seat) + 5px) 12px rgba(20,12,18,.45), 0 0 0 rgba(255,216,77,0); }
+  50%     { box-shadow: 0 var(--seat) 0 var(--seatc, var(--edge)), 0 calc(var(--seat) + 5px) 12px rgba(20,12,18,.45), 0 0 18px 4px rgba(255,216,77,.42); }
+}
+@media (prefers-reduced-motion: reduce) { .s-glow { animation: none; } }
+
+.s-frost   { --face: rgba(255,246,232,.18); --face-hi: rgba(255,255,255,.34); --edge: rgba(255,246,232,.42); --seatc: rgba(120,105,118,.5);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
+
+.s-sun     { --face: var(--gold); --face-hi: var(--gold-accent); --edge: var(--gold-shade); --seatc: #B87413; --ink: #4a2c08;
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+  background: radial-gradient(120% 150% at 50% 0%, #FFF0A8 0%, var(--face-hi) 34%, var(--face) 72%, var(--edge) 100%); }
+
+.s-tablet  { --face: #7C7684; --face-hi: #98929F; --edge: #4E4954; --radius: 8px;
+  --ink: #E4DFE8; text-shadow: 0 -1px 0 rgba(30,25,34,.85), 0 1px 0 rgba(255,255,255,.18); }
+.s-tablet::before { height: 24%; background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0)); }
+
+/* ----------------------------------------------------------- detail dialog */
+dialog#detail {
+  border: 3px solid var(--gold-shade);
+  border-radius: 18px;
+  padding: 0;
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  background: var(--dlg-bg);
+  color: var(--ink-hi);
+  box-shadow: 0 8px 0 #8f5a14, 0 26px 48px rgba(10,6,10,.6);
+  overflow: hidden;
+}
+dialog#detail::backdrop { background: rgba(16,10,16,.62); backdrop-filter: blur(3px); }
+.dlg-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--surface-brd);
+}
+.dlg-head .crest { width: 34px; height: 34px; flex: none; }
+.dlg-head h4 { margin: 0; font-family: var(--font-display); font-size: 20px; }
+.dlg-head .why { font-size: 12px; color: var(--ink-dim); margin-top: 2px; }
+.dlg-head code { font-size: 11px; color: var(--accent); font-family: ui-monospace, Menlo, Consolas, monospace; }
+.dlg-close { margin-left: auto; }
+.dlg-body { padding: 8px 22px 26px; overflow-y: auto; max-height: calc(100vh - 150px); }
+.dlg-body h5 {
+  font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent); margin: 22px 0 10px; font-family: var(--font-ui);
+}
+.dlg-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.cw { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cw .cw-name { font-size: 10px; color: var(--ink-dim); letter-spacing: .06em; }
+.theme-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .theme-split { grid-template-columns: 1fr; } }
+.theme-chip {
+  border-radius: 14px;
+  border: 1px solid var(--surface-brd);
+  background: var(--page-bg);
+  padding: 22px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.theme-chip .tc-name { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
+</style>
+</head>
+<body>
+
+<!-- The Emberkeep crest — the logo's faceted red egg in its gold ring, drawn
+     once and stamped onto every emblem button with <use>. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="ekEgg" cx="38%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#FF8A66"/>
+      <stop offset="45%" stop-color="#E8503C"/>
+      <stop offset="100%" stop-color="#9E2418"/>
+    </radialGradient>
+    <linearGradient id="ekRing" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFD84D"/>
+      <stop offset="55%" stop-color="#F7A437"/>
+      <stop offset="100%" stop-color="#B5741C"/>
+    </linearGradient>
+    <symbol id="ek-crest" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="29" fill="url(#ekRing)"/>
+      <circle cx="32" cy="32" r="24.5" fill="#3A2B38"/>
+      <path d="M32 11 C43 15 48 26 48 36 C48 47 41 53 32 53 C23 53 16 47 16 36 C16 26 21 15 32 11 Z" fill="url(#ekEgg)"/>
+      <g stroke="#FFB09A" stroke-width="1.1" opacity=".55" fill="none">
+        <path d="M22 24 L32 18 L42 24 L32 31 Z"/>
+        <path d="M18 36 L28 30 L32 31 L36 30 L46 36"/>
+        <path d="M22 47 L28 40 L32 42 L36 40 L42 47"/>
+        <path d="M28 30 L28 40 M36 30 L36 40 M32 31 L32 42"/>
+      </g>
+      <ellipse cx="26" cy="20" rx="4" ry="6" fill="#fff" opacity=".4" transform="rotate(-18 26 20)"/>
+      <circle cx="32" cy="32" r="29" fill="none" stroke="#8f5a14" stroke-width="1.4"/>
+    </symbol>
+  </defs>
+</svg>
+
+<aside>
+  <h2>Emblem set</h2>
+  <div class="sub">The logo's language — crest, gold rim, beveled lettering.</div>
+  <nav id="emblem-roster"></nav>
+  <h2>Round set</h2>
+  <div class="sub">The 21 core styles as icon keys. Click a row to jump.</div>
+  <nav id="roster"></nav>
+</aside>
+
+<main>
+  <div class="topbar">
+    <div>
+      <h1>Button Foundry</h1>
+      <p class="lead">
+        The Emblem family wearing the Emberkeep crest, plus 21 core styles with
+        a round variant of each. Every colour comes verbatim from
+        <code>PALETTE</code> in <code>src/core/Constants.ts</code> — anything
+        picked off this sheet already belongs to the game.
+      </p>
+    </div>
+    <div class="spacer"></div>
+    <div class="theme-switch" role="group" aria-label="Theme">
+      <button id="th-light" type="button">☀ Light</button>
+      <button id="th-dark" type="button" class="on">☾ Dark</button>
+    </div>
+  </div>
+  <p class="hint">
+    Click ANY card to open that style's full range: every palette colorway,
+    three sizes, three shapes, the pressed and disabled states, the crest
+    variant — and the same button sitting on the light and the dark surface,
+    side by side. The theme switch above restyles the whole sheet.
+  </p>
+
+  <div class="hero">
+    <button class="ebtn e-ember hero-btn" type="button">
+      <svg class="crest big"><use href="#ek-crest"/></svg>
+      <span class="glbl">EMBERKEEP</span>
+    </button>
+    <div class="hero-ribbon">THE DRAGON HATCHERY</div>
+  </div>
+
+  <section>
+    <h3>The Emblem family</h3>
+    <p class="sec-sub">One carved plate, gold furniture that never changes, and the crest on every button. Six metals.</p>
+    <div class="grid" id="emblem-grid"></div>
+  </section>
+
+  <section>
+    <h3>Core styles</h3>
+    <p class="sec-sub">21 small styles over one shared plate — each is a handful of CSS variables, so none can drift from the rest.</p>
+    <div class="grid" id="grid"></div>
+  </section>
+</main>
+
+<dialog id="detail">
+  <div class="dlg-head">
+    <svg class="crest"><use href="#ek-crest"/></svg>
+    <div>
+      <h4 id="dlg-title"></h4>
+      <div class="why" id="dlg-why"></div>
+      <code id="dlg-code"></code>
+    </div>
+    <button class="btn s-plum sm dlg-close" id="dlg-close" type="button">Close ✕</button>
+  </div>
+  <div class="dlg-body" id="dlg-body"></div>
+</dialog>
+
+<script>
+/* The roster is data, not markup: cards, sidebar rows and the detail dialog
+   are all generated from the same arrays, so they cannot disagree. */
+
+const CREST = '<svg class="crest s"><use href="#ek-crest"/></svg>';
+
+/* Every palette colorway the detail view can cast a style in. Because every
+   style is variables over one plate, recolouring is just overriding them. */
+const COLORWAYS = [
+  ['Ember',  { '--face':'#E8503C', '--face-hi':'#FF8A66', '--edge':'#C73A2E', '--ink':'#fff' }],
+  ['Gold',   { '--face':'#F7A437', '--face-hi':'#FFD84D', '--edge':'#D9821F', '--ink':'#4a2c08' }, 'dark'],
+  ['Moss',   { '--face':'#7ECB4F', '--face-hi':'#A8E57A', '--edge':'#5FA63D', '--ink':'#1e3a10' }, 'dark'],
+  ['Teal',   { '--face':'#3FA8D9', '--face-hi':'#7FD0F2', '--edge':'#2E7FA6', '--ink':'#fff' }],
+  ['Plum',   { '--face':'#6A5468', '--face-hi':'#866E84', '--edge':'#3A2B38', '--ink':'#fff' }],
+  ['Stone',  { '--face':'#8E8A93', '--face-hi':'#ADA8B2', '--edge':'#6E6A75', '--ink':'#fff' }],
+  ['Cream',  { '--face':'#FFF6E8', '--face-hi':'#FFFFFF', '--edge':'#D9C4A4', '--ink':'#4a2c1a' }, 'dark'],
+  ['Night',  { '--face':'#33262F', '--face-hi':'#4A3845', '--edge':'#191218', '--ink':'#FFC9BE' }],
+  ['Relic',  { '--face':'#B5602F', '--face-hi':'#D4813F', '--edge':'#7C3E1C', '--ink':'#FFD84D', '--rim':'#F7A437', '--seatc':'#5a3410' }],
+  ['Royal',  { '--face':'#5A4458', '--face-hi':'#7C6279', '--edge':'#2E2230', '--ink':'#FFD84D', '--rim':'#F7A437', '--seatc':'#8f5a14' }],
+];
+
+/* cls, name, label, glyph, why */
+const STYLES = [
+  ['s-ember',  'Ember',     'Deliver',  '🔥', 'the primary action'],
+  ['s-gold',   'Gold',      'Buy',      '◎',  'costs or pays'],
+  ['s-moss',   'Moss',      'Confirm',  '✓',  'confirm / go'],
+  ['s-teal',   'Teal',      'Travel',   '⇄',  'travel, information'],
+  ['s-plum',   'Plum',      'Cancel',   '✕',  'the neutral dismiss'],
+  ['s-cream',  'Cream',     'Details',  'i',  'a reading surface'],
+  ['s-stone',  'Stone',     'Later',    '…',  'quiet secondary'],
+  ['s-royal',  'Royal',     'Unlock',   '★',  'premium, gold-rimmed'],
+  ['s-relic',  'Relic',     'Collect',  '❤',  'gold rim over leather-brown'],
+  ['s-candy',  'Candy',     'Sweets',   '♥',  'sweet, farm-game gloss'],
+  ['s-wood',   'Wood',      'Build',    '⚒',  'grain, no image'],
+  ['s-gem',    'Gem',       'Craft',    '◆',  'one hard facet'],
+  ['s-night',  'Night',     'Discard',  '⌫',  'quiet danger'],
+  ['s-ribbon', 'Ribbon',    'Chapter',  '❯',  'notched banner'],
+  ['s-stitch', 'Stitch',    'Harvest',  '✿',  'handmade seam'],
+  ['s-leaf',   'Leaf',      'Plant',    '❧',  'petal corners'],
+  ['s-ingot',  'Ingot',     'Trade',    '▮',  'hard bevel bar'],
+  ['s-glow',   'Emberglow', 'Hatch!',   '✦',  'breathes — one per screen'],
+  ['s-frost',  'Frost',     'Menu',     '☰',  'translucent HUD chrome'],
+  ['s-sun',    'Sunburst',  'Claim',    '☀',  'reward moments'],
+  ['s-tablet', 'Tablet',    'Quests',   '❖',  'carved, old'],
+];
+
+const EMBLEMS = [
+  ['e-ember', 'Ember Seal', 'Play',    'the hero metal'],
+  ['e-gold',  'Gold Seal',  'Shop',    'treasury and trade'],
+  ['e-teal',  'Tide Seal',  'Voyage',  'the hatchery banner teal'],
+  ['e-moss',  'Grove Seal', 'Grow',    'orchard and field'],
+  ['e-plum',  'Dusk Seal',  'Rest',    'the game’s own night plum'],
+  ['e-royal', 'Elder Seal', 'Awaken',  'full gold rim — the premium key'],
+];
+
+const grid = document.getElementById('grid');
+const egrid = document.getElementById('emblem-grid');
+const roster = document.getElementById('roster');
+const eroster = document.getElementById('emblem-roster');
+const dlg = document.getElementById('detail');
+
+function coreBtn(cls, extra, label, styleVars, inkMode) {
+  const s = styleVars
+    ? ' style="' + Object.entries(styleVars).map(([k, v]) => k + ':' + v).join(';') + '"'
+    : '';
+  const ink = inkMode === 'dark' ? ' data-ink="dark"' : '';
+  return '<button type="button" class="btn ' + cls + (extra ? ' ' + extra : '') + '"' + s + ink + '>' + label + '</button>';
+}
+function emblemBtn(cls, extra, label, styleVars) {
+  const s = styleVars
+    ? ' style="' + Object.entries(styleVars).map(([k, v]) => k + ':' + v).join(';') + '"'
+    : '';
+  const inner = label
+    ? CREST + '<span class="glbl">' + label + '</span>'
+    : '<svg class="crest"><use href="#ek-crest"/></svg>';
+  return '<button type="button" class="ebtn ' + cls + (extra ? ' ' + extra : '') + '"' + s + '>' + inner + '</button>';
+}
+
+/* ------------------------------------------------ cards + sidebar rosters */
+STYLES.forEach(([cls, name, label, glyph, why], i) => {
+  const n = String(i + 1).padStart(2, '0');
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.id = cls;
+  cell.innerHTML =
+    '<div class="row">' + coreBtn(cls, '', label) + coreBtn(cls, 'round', glyph) + '</div>' +
+    '<div class="row">' + coreBtn(cls, 'sm', 'Small') + coreBtn(cls, 'sm round', glyph) +
+      '<button type="button" class="btn ' + cls + ' sm" disabled>Off</button></div>' +
+    '<div class="meta"><div class="name">' + n + ' · ' + name + ' — ' + why + '</div>' +
+      '<code>.btn.' + cls + '</code><div class="more">Click for the full range</div></div>';
+  cell.addEventListener('click', () => openDetail({ kind: 'core', cls, name, label, glyph, why }));
+  grid.appendChild(cell);
+
+  const row = document.createElement('a');
+  row.className = 'round-row';
+  row.innerHTML = coreBtn(cls, 'sm round', glyph).replace('<button ', '<button tabindex="-1" aria-hidden="true" ') +
+    '<span class="nm">' + name + '</span><span class="no">' + n + '</span>';
+  row.addEventListener('click', () => { document.getElementById(cls).scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  roster.appendChild(row);
+});
+
+EMBLEMS.forEach(([cls, name, label, why], i) => {
+  const n = 'E' + (i + 1);
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.id = cls;
+  cell.innerHTML =
+    '<div class="row">' + emblemBtn(cls, '', label) + emblemBtn(cls, 'round', null) + '</div>' +
+    '<div class="row">' + emblemBtn(cls, 'sm', label) + emblemBtn(cls, 'sm round', null) + '</div>' +
+    '<div class="meta"><div class="name">' + n + ' · ' + name + ' — ' + why + '</div>' +
+      '<code>.ebtn.' + cls + '</code><div class="more">Click for the full range</div></div>';
+  cell.addEventListener('click', () => openDetail({ kind: 'emblem', cls, name, label, glyph: null, why }));
+  egrid.appendChild(cell);
+
+  const row = document.createElement('a');
+  row.className = 'round-row';
+  row.innerHTML = emblemBtn(cls, 'sm round', null).replace('<button ', '<button tabindex="-1" aria-hidden="true" ') +
+    '<span class="nm">' + name + '</span><span class="no">' + n + '</span>';
+  row.addEventListener('click', () => { document.getElementById(cls).scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  eroster.appendChild(row);
+});
+
+/* --------------------------------------------------------- the detail view */
+function openDetail(spec) {
+  const isEmblem = spec.kind === 'emblem';
+  const mk = isEmblem
+    ? (extra, label, vars) => emblemBtn(spec.cls, extra, label === undefined ? spec.label : label, vars)
+    : (extra, label, vars, ink) => coreBtn(spec.cls, extra, label === undefined ? spec.label : label, vars, ink);
+
+  document.getElementById('dlg-title').textContent = spec.name;
+  document.getElementById('dlg-why').textContent = spec.why;
+  document.getElementById('dlg-code').textContent = (isEmblem ? '.ebtn.' : '.btn.') + spec.cls;
+
+  let h = '';
+
+  h += '<h5>Every palette colorway</h5><div class="dlg-row">';
+  for (const [cwName, vars, ink] of COLORWAYS) {
+    h += '<div class="cw">' + mk('', undefined, vars, ink) + '<span class="cw-name">' + cwName + '</span></div>';
+  }
+  h += '</div>';
+
+  h += '<h5>Sizes</h5><div class="dlg-row">' +
+    mk('lg') + mk('') + mk('sm') +
+    mk('lg round', spec.glyph ?? null) + mk('round', spec.glyph ?? null) + mk('sm round', spec.glyph ?? null) +
+    '</div>';
+
+  if (!isEmblem) {
+    h += '<h5>Shapes</h5><div class="dlg-row">' +
+      mk('') + mk('pill') + mk('round', spec.glyph) +
+      '</div>';
+  }
+
+  h += '<h5>States</h5><div class="dlg-row">' +
+    mk('') + mk('is-pressed', 'Pressed') +
+    (isEmblem
+      ? '<button type="button" class="ebtn ' + spec.cls + '" disabled>' + CREST + '<span class="glbl">Locked</span></button>'
+      : '<button type="button" class="btn ' + spec.cls + '" disabled>Locked</button>') +
+    '</div>';
+
+  if (!isEmblem) {
+    h += '<h5>With the Emberkeep crest</h5><div class="dlg-row">' +
+      coreBtn(spec.cls, '', CREST + spec.label) +
+      coreBtn(spec.cls, 'lg', CREST + spec.label) +
+      coreBtn(spec.cls, 'round', '<svg class="crest s"><use href="#ek-crest"/></svg>') +
+      '</div>';
+  }
+
+  h += '<h5>On both of the game’s surfaces</h5><div class="theme-split">' +
+    '<div class="theme-chip" data-theme="light"><span class="tc-name">Light — morning sky</span>' +
+      '<div class="dlg-row">' + mk('') + mk('round', spec.glyph ?? null) + mk('sm') + '</div></div>' +
+    '<div class="theme-chip" data-theme="dark"><span class="tc-name">Dark — the Keep at night</span>' +
+      '<div class="dlg-row">' + mk('') + mk('round', spec.glyph ?? null) + mk('sm') + '</div></div>' +
+    '</div>';
+
+  document.getElementById('dlg-body').innerHTML = h;
+  dlg.showModal();
+}
+
+document.getElementById('dlg-close').addEventListener('click', () => dlg.close());
+dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+
+/* --------------------------------------------------------------- the theme */
+const thLight = document.getElementById('th-light');
+const thDark = document.getElementById('th-dark');
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  thLight.classList.toggle('on', t === 'light');
+  thDark.classList.toggle('on', t === 'dark');
+  try { localStorage.setItem('ek-foundry-theme', t); } catch (_) {}
+}
+thLight.addEventListener('click', () => setTheme('light'));
+thDark.addEventListener('click', () => setTheme('dark'));
+setTheme((() => {
+  try { const saved = localStorage.getItem('ek-foundry-theme'); if (saved) return saved; } catch (_) {}
+  return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+})());
+</script>
+</body>
+</html>

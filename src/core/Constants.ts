@@ -203,7 +203,7 @@ export const QUEST_TRACKER_RIGHT: number = IS_MOBILE ? 64 : 56;
  *  here rather than a full title-height down. */
 export const QUEST_LIST_TOP_Y = 62;
 /** Sub-row pitch, and how many are on screen before the list scrolls. */
-export const QUEST_ROW_H = 56;
+export const QUEST_ROW_H = 68; // follows the tracker's 32px sub-row type
 export const QUEST_VISIBLE_ROWS = 3;
 /** A sliver of the FOURTH row stays inside the viewport, half-faded — the only
  *  scroll affordance a background-free cluster gets. */
@@ -254,7 +254,18 @@ export const HUD_COLUMN_X: number = LIVE_GAME_WIDTH - (IS_MOBILE ? 190 : 156);
 export const HUD_COLUMN_SLOTS = 5;
 export const HUD_COLUMN_DISC = 174 * UI_SCALE;
 export const HUD_COLUMN_PITCH: number = 186 * UI_SCALE;
-export const HUD_COLUMN_BASE_Y: number = LIVE_GAME_HEIGHT - (IS_MOBILE ? 200 : 120);
+/**
+ * The column's bottom seat, measured up from the canvas floor.
+ *
+ * Moved 14 units closer to it when the quest tracker's type stepped up: a
+ * taller tracker pushes the status readout down, and the readout is the ceiling
+ * this column may not cross (`STATUS_READOUT_BOTTOM_Y`). The spare room was at
+ * the BOTTOM — 33 units of it — so the whole column takes a step down rather
+ * than the tracker giving back the legibility it just gained. HudColumn.spec
+ * holds both ends: the top seat still clears the readout, the bottom seat is
+ * still inside the canvas.
+ */
+export const HUD_COLUMN_BASE_Y: number = LIVE_GAME_HEIGHT - (IS_MOBILE ? 186 : 106);
 export const hudColumnY = (slot: number): number =>
   HUD_COLUMN_BASE_Y - slot * HUD_COLUMN_PITCH;
 

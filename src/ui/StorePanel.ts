@@ -18,8 +18,8 @@ import { uiRegistry } from './theme';
 
 
 /** Card geometry, in the 2560-space. Four across inside the shop frame. */
-const CARD_W = 452;
-const CARD_H = 460;
+const CARD_W = 432;
+const CARD_H = 436;
 const CARD_R = 34;
 const COLS = 4;
 const COL_GAP = 476;
@@ -37,9 +37,19 @@ const VIEW_TOP = -300;
 const VIEW_BOTTOM = 640;
 const VIEW_H = VIEW_BOTTOM - VIEW_TOP;
 const GRID_MID = (VIEW_TOP + VIEW_BOTTOM) / 2;
-/** Two rows of 460 + the 20 between them = 940, the window exactly — which is
- *  why CARD_H cannot grow: a taller card pushes row two onto the bezel again.
- *  A section with more than `COLS * 2` items SCROLLS instead of squeezing. */
+/**
+ * Row PITCH, not row height — the gap between two rows is `ROW_GAP - CARD_H`.
+ *
+ * Two rows used to measure 480 + 460 = 940, and the window is 940: an exact
+ * fit, which is a fit with no air at all. Every card's rim then sat flush
+ * against the frame's inner floor and ceiling, and a rim touching the bezel
+ * reads as a card that overflowed rather than one that fits. CARD_H is 436 now,
+ * so the block is 916 and there are 12 units of background visible above and
+ * below — enough to see that the cards are ON the shelf rather than jammed
+ * into it. The pitch is unchanged, so the gap BETWEEN the rows grows with it.
+ *
+ * A section with more than `COLS * 2` items SCROLLS instead of squeezing.
+ */
 const ROW_GAP = 480;
 /** Past this much drag the gesture is a scroll, and the card under the finger
  *  must not also be bought. */

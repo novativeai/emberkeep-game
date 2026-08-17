@@ -39,16 +39,21 @@ export {
  */
 const MAIN_TITLE_Y = 0;
 
-const MAX_W = 720;
+// One size up, throughout. This HUD is the only place the player reads what to
+// do next, and it was set at a size that assumed they were leaning in. The
+// numbers below are proportional to the type they serve — the icon box tracks
+// the sub-row line, the row height tracks the label — so they move together or
+// the list stops reading as one list.
+const MAX_W = 840;
 /** Never shrink past this — below it the line stops being readable at a glance. */
 const MIN_FIT_SCALE = 0.72;
 
 /** Mask width — rows are right-aligned and grow leftward, so this only has to
  *  be wider than the longest label can ever be. */
-const VIEW_W = 900;
+const VIEW_W = 1040;
 
 /** Gap between a row's label and its `n/target` counter. */
-const COUNT_GAP = 14;
+const COUNT_GAP = 16;
 
 /**
  * The leading item icon on a sub row — the piece the step actually spends (a
@@ -62,8 +67,8 @@ const COUNT_GAP = 14;
  * sits on a soft dark disc — this HUD is background-free, and the disc is to
  * the art what the stroke-and-shadow is to the glyphs.
  */
-const ICON_BOX = 34;
-const ICON_GAP = 12;
+const ICON_BOX = 42;
+const ICON_GAP = 14;
 const ICON_CHIP_PAD = 6;
 
 /** Strike-through baseline, measured from a row's top. */
@@ -157,7 +162,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.mainTitle = this.styleText(
       scene.add.text(0, MAIN_TITLE_Y, '', {
         fontFamily: FONT.ui,
-        fontSize: '34px',
+        fontSize: '42px',
         fontStyle: 'bold',
         color: PALETTE.cream,
         align: 'right'
@@ -166,7 +171,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.mainProgress = this.styleText(
       scene.add.text(0, MAIN_TITLE_Y + 2, '', {
         fontFamily: FONT.ui,
-        fontSize: '28px',
+        fontSize: '34px',
         fontStyle: 'bold',
         color: PALETTE.goldAccent,
         align: 'right'
@@ -423,7 +428,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     const count = this.styleText(
       this.scene.add.text(0, 0, '', {
         fontFamily: FONT.ui,
-        fontSize: '26px',
+        fontSize: '32px',
         fontStyle: 'bold',
         color: PALETTE.goldAccent
       }),
@@ -432,7 +437,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     const label = this.styleText(
       this.scene.add.text(0, 0, this.quests.progressFor(step).label, {
         fontFamily: FONT.ui,
-        fontSize: '26px',
+        fontSize: '32px',
         color: PALETTE.cream
       }),
       5

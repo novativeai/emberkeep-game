@@ -140,9 +140,13 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
 
     // Close button.
     const closeButton = scene.add.container(592, -392);
-    const closeBg = scene.add.circle(0, 0, 42, num(PALETTE.lava)).setStrokeStyle(6, num(PALETTE.cream));
+    // The painted candy disc, not a flat circle: this is the same Close key the
+    // Bag and the Commissions board wear, and a panel that draws its own is a
+    // panel the player has to re-learn. 1.24 reproduces the 84px disc it
+    // replaces, so nothing around it moves.
+    const closeBg = scene.add.image(0, 0, 'ui_btn_round').setScale(1.24);
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: PALETTE.goldAccent })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: PALETTE.lavaShade })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
     closeButton.setSize(96, 96);

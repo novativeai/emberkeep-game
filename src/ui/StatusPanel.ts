@@ -39,8 +39,8 @@ if (LINE_Y + 30 > STATUS_READOUT_H) {
 
 /** Heart size here is smaller than the board's was: this is a readout in a
  *  column of text, not a badge worn over somebody's head. */
-const HEART_SIZE = 34;
-const HEART_GAP = 8;
+const HEART_SIZE = 46; // read at a glance from arm's length, not squinted at
+const HEART_GAP = 10;
 
 /** The dragon's hunger gauge, seated on the same row the hearts use. */
 const GAUGE_W = 300;

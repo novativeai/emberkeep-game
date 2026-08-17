@@ -6253,12 +6253,17 @@ export class BoardScene extends Phaser.Scene {
       .setVisible(false);
     const make = (
       dx: number,
-      tint: number,
+      plate: 'ui_btn_green' | 'ui_btn_play',
       currency: 'gold' | 'warmth',
       method: string,
       text: string
     ): Phaser.GameObjects.Text => {
-      const bg = this.add.image(dx, 0, 'ui_btn_green').setScale(0.46, 0.52).setTint(tint);
+      // GREEN is the go plate, ROYAL is everything else — the game's whole
+      // button vocabulary, and the two skips are exactly that pair. The warmth
+      // key used to be the green plate under a pale blue tint, which made a
+      // third colour that meant nothing: tinting a plate does not restate its
+      // rank, it just muddies the one plate the player has learned to look for.
+      const bg = this.add.image(dx, 0, plate).setScale(0.46, 0.52);
       const label = this.add
         .text(dx, -2, text, {
           fontFamily: 'Segoe UI, sans-serif',
@@ -6282,10 +6287,10 @@ export class BoardScene extends Phaser.Scene {
     };
     // The gold button wears the REAL coin art (the 🪙 emoji read as a generic
     // token); the label carries only the price and sits right of the icon.
-    this.skipGoldLabel = make(-150, 0xffffff, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
+    this.skipGoldLabel = make(-150, 'ui_btn_green', 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
     this.skipGoldLabel.setX(-150 + 22);
     btn.add(this.add.image(-150 - 34, -2, 'item_coin_1').setScale(plateScale('item_coin_1', 0.1)));
-    this.skipWarmthLabel = make(150, 0xa9d6ff, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
+    this.skipWarmthLabel = make(150, 'ui_btn_play', 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
     btn.add(caption); // on top of the buttons
     // Tutorial: bounce an arrow over the WARMTH (⚡) skip so the player learns to
     // pay the House's timer with energy (and watches their Warmth drop).

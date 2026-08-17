@@ -55,9 +55,33 @@ export const UI_NINESLICE: Record<string, { l: number; r: number; t: number; b: 
 };
 
 export const UI_TEXTURE_PARAMS: Record<string, Record<string, string>> = {
-  ui_btn_play: { highlight: lighten(PALETTE.goldAccent, 0.15), base: PALETTE.gold, edge: PALETTE.goldShade },
-  ui_btn_green: { highlight: lighten(PALETTE.moss, 0.25), base: PALETTE.moss, edge: darken(PALETTE.mossShade, 0.1) },
-  ui_btn_round: { plate: PALETTE.goldShade, face: PALETTE.cream },
+  /**
+   * THE TWO BUTTONS, and there are deliberately only two.
+   *
+   * `ui_btn_green` is the GO plate — confirm, deliver, name her, brew, buy.
+   * `ui_btn_play` is everything else, and it is now the ROYAL treatment: a dark
+   * plum face inside a gold rim, the same grammar the Emporium's premium keys
+   * wear. A screen that offers one green plate and any number of royal ones
+   * tells the player where the action is without a word of copy; two golds
+   * competing told them nothing.
+   *
+   * `rim` is drawn INSTEAD of a darkened seat when present, which is the whole
+   * difference between the two looks — the green plate's edge IS its own colour
+   * gone dark, the royal plate's is a different metal.
+   */
+  ui_btn_play: {
+    highlight: PALETTE.plumHighlight,
+    base: PALETTE.plum,
+    edge: darken(PALETTE.plumShade, 0.25),
+    rim: PALETTE.gold
+  },
+  ui_btn_green: {
+    highlight: lighten(PALETTE.moss, 0.3),
+    base: PALETTE.moss,
+    edge: darken(PALETTE.mossShade, 0.12),
+    rim: darken(PALETTE.mossShade, 0.3)
+  },
+  ui_btn_round: { plate: PALETTE.goldShade, face: PALETTE.cream, rim: darken(PALETTE.mossShade, 0.3) },
   ui_panel: { border: PALETTE.lava, borderShade: PALETTE.lavaShade, fill: PALETTE.cream },
   ui_pill: { fill: PALETTE.plumShade, border: PALETTE.gold },
   ui_slot: { fill: '#EFE0C8', border: '#D9C2A0' },
@@ -1363,52 +1387,93 @@ export class TextureFactory {
     });
   }
 
+  /**
+   * THE CANDY PILL — the one plate shape the whole game's UI wears.
+   *
+   * Farm/merge games all reach for the same object, and it is not a rectangle
+   * with a gradient: it is a glossy lozenge SITTING ON a thicker slab of its own
+   * colour, with a hard rim around both. The slab is what makes it read as a
+   * physical key rather than a painted area, and the dome of light across its
+   * top two-fifths is what makes it read as candy rather than plastic.
+   *
+   * Painted at the texture's full footprint so swapping the look never moves a
+   * single caller: every panel that already positions one of these keeps its
+   * layout to the pixel.
+   */
   private button(key: string, w: number, h: number, hi: string, base: string, strip: string): void {
+    const rim = this.uiColor(key, 'rim');
     this.paint(key, w, h, (g) => {
-      const r = Math.min(24, h * 0.3);
-      // Pseudo-3D: darker full plate first, lighter face on top.
-      this.roundRectPath(g, 2, 6, w - 4, h - 8, r);
+      const seat = Math.max(7, h * 0.13); // the slab's visible thickness
+      const faceH = h - seat - 4;
+      const r = faceH / 2; // a PILL: the radius is simply half the face
+
+      // 1 — the slab, in the plate's own dark. Drawn first and full height, so
+      //     the face sits on it rather than beside it.
+      this.roundRectPath(g, 2, 2 + seat * 0.35, w - 4, h - 4 - seat * 0.35, r + seat * 0.3);
       g.fillStyle = strip;
       g.fill();
-      g.lineWidth = 3;
-      g.strokeStyle = withAlpha(darken(strip, 0.35), 0.95);
+
+      // 2 — the rim, around the whole object. One stroke, not two: a rim per
+      //     layer reads as an outline drawing, not as a moulded key.
+      g.lineWidth = Math.max(3, h * 0.055);
+      g.strokeStyle = rim;
       g.stroke();
-      this.roundRectPath(g, 2, 2, w - 4, h - 16, r);
-      const face = g.createLinearGradient(0, 2, 0, h - 14);
-      face.addColorStop(0, hi);
-      face.addColorStop(1, base);
+
+      // 3 — the face.
+      this.roundRectPath(g, 2 + g.lineWidth / 2, 2, w - 4 - g.lineWidth, faceH, r);
+      const face = g.createLinearGradient(0, 2, 0, faceH + 2);
+      face.addColorStop(0, lighten(hi, 0.12));
+      face.addColorStop(0.55, base);
+      face.addColorStop(1, darken(base, 0.06));
       g.fillStyle = face;
       g.fill();
-      g.stroke();
-      // Gloss band.
-      this.roundRectPath(g, 8, 6, w - 16, (h - 16) * 0.42, r * 0.8);
-      g.fillStyle = 'rgba(255,255,255,0.30)';
+
+      // 4 — the dome of light. Inset on both sides and rounded on its own, so
+      //     it reads as a curved surface catching the sky rather than a stripe.
+      const gx = 6 + g.lineWidth;
+      const gh = faceH * 0.44;
+      this.roundRectPath(g, gx, 5, w - gx * 2, gh, gh / 2);
+      const gloss = g.createLinearGradient(0, 5, 0, 5 + gh);
+      gloss.addColorStop(0, 'rgba(255,255,255,0.55)');
+      gloss.addColorStop(1, 'rgba(255,255,255,0.05)');
+      g.fillStyle = gloss;
       g.fill();
     });
   }
 
+  /** The candy pill's round twin — the Close/Quit key and every HUD disc.
+   *  Same three layers (slab, rim, domed face) so a round key and a wide one on
+   *  the same panel are plainly the same material. */
   private roundButton(key: string): void {
     const plate = this.uiColor(key, 'plate');
     const faceCol = this.uiColor(key, 'face');
+    const rim = this.uiColor(key, 'rim');
     this.paint(key, 68, 68, (g) => {
+      // 1 — the slab, sitting 6px proud at the bottom.
       g.beginPath();
       g.arc(34, 38, 29, 0, Math.PI * 2);
       g.fillStyle = plate;
       g.fill();
-      g.lineWidth = 2.6;
-      g.strokeStyle = withAlpha(darken(plate, 0.35), 0.95);
+      g.lineWidth = 3.4;
+      g.strokeStyle = rim;
       g.stroke();
+      // 2 — the face.
       g.beginPath();
-      g.arc(34, 32, 29, 0, Math.PI * 2);
-      const face = g.createLinearGradient(0, 3, 0, 61);
-      face.addColorStop(0, lighten(faceCol, 0.3));
-      face.addColorStop(1, darken(faceCol, 0.12));
+      g.arc(34, 31, 28, 0, Math.PI * 2);
+      const face = g.createLinearGradient(0, 3, 0, 59);
+      face.addColorStop(0, lighten(faceCol, 0.34));
+      face.addColorStop(0.55, faceCol);
+      face.addColorStop(1, darken(faceCol, 0.14));
       g.fillStyle = face;
       g.fill();
       g.stroke();
+      // 3 — the dome, wide and shallow across the top.
       g.beginPath();
-      g.ellipse(34, 20, 18, 8, 0, 0, Math.PI * 2);
-      g.fillStyle = 'rgba(255,255,255,0.55)';
+      g.ellipse(34, 19, 19, 9.5, 0, 0, Math.PI * 2);
+      const gloss = g.createLinearGradient(0, 9, 0, 29);
+      gloss.addColorStop(0, 'rgba(255,255,255,0.68)');
+      gloss.addColorStop(1, 'rgba(255,255,255,0.06)');
+      g.fillStyle = gloss;
       g.fill();
     });
   }

@@ -28,7 +28,10 @@ const TAB_Y = -384;
 // the gold's outer edge at 250/512 — so re-sizing is one constant.
 const MEDALLION_SIZE = 184;
 /** Centred in the band between the card's top edge (-315) and the title. */
-const MEDALLION_Y = -214;
+// Its outer gold sits at MEDALLION_SIZE * 250/512 ≈ 90 from the centre, and the
+// card's top edge is at -315 — at -214 that left barely 11px, so the ring read
+// as welded to the frame. Dropped until the gold has real air above it.
+const MEDALLION_Y = -196;
 const RING_HOLE_R = MEDALLION_SIZE * (200 / 512);
 const RING_OUTER_R = MEDALLION_SIZE * (250 / 512);
 /** Portrait clip radius — just inside the gold, so the crop's edge hides UNDER
@@ -142,9 +145,10 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
 
     // Close button.
     const closeButton = scene.add.container(592, -392);
-    const closeBg = scene.add.circle(0, 0, 42, num(INK.field)).setStrokeStyle(6, num(INK.goldMid));
+    // The painted candy disc — the same Close key every other panel wears.
+    const closeBg = scene.add.image(0, 0, 'ui_btn_round').setScale(1.24);
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: INK.onFieldGold })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: INK.field })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
     closeButton.setSize(96, 96);
@@ -330,7 +334,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
 
     const deliverButton = scene.add.container(0, 232);
-    const deliverBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.86);
+    const deliverBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.72);
     const deliverText = scene.add
       .text(0, -8, 'Deliver', {
         fontFamily: FONT.ui,
