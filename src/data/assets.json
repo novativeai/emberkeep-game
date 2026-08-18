@@ -364,6 +364,11 @@
       "generator": "ui"
     },
     {
+      "key": "ui_panel_tall",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
       "key": "ui_quest_panel",
       "source": "placeholder",
       "generator": "ui"

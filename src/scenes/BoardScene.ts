@@ -76,7 +76,8 @@ import {
   clipsFor,
   clipTextureRect,
   dragonClipCharacter,
-  originFor
+  originFor,
+  sleepFrameFor
 } from '../core/characterAnims';
 import { type ClipRef, clipLoadTiers, planClipEviction } from '../core/dragonClips';
 import { type HintBoard, type MergeStep, nextMergePlan } from '../core/mergeHints';
@@ -205,18 +206,14 @@ const smootherstep = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 const CRYSTAL_KEY = 'item_crystal_1';
 const CRYSTAL_PNG = 'item_crystal_1__painted';
 
-/** Chains whose dragon tiers wear a live rig, and where to fetch each rig.
- *  ember/emerald rig their GENERATOR tiers; golden_egg rigs the Whelp (tier 2,
- *  NOT a generator — she's a baby). See wearsRigTier. */
-/** Keys are a CHAIN (that chain's default rig) or `chain:tier` (a tier-specific
- *  override — e.g. the Adult Red Dragon at ember_dragon tier 4). */
-const DRAGON_RIGS: Record<string, string> = {
-  ember_dragon: 'sprites/characters/dragon/red-dragon/rig/dragon-red.rig.json',
-  'ember_dragon:4': 'sprites/characters/dragon/red-dragon/rig-adult/red-dragon.rig.json',
-  emerald: 'sprites/characters/dragon/emerald-dragon/rig/dragon-emerald.rig.json',
-  'emerald:4': 'sprites/characters/dragon/emerald-dragon/rig-adult/emerald-dragon.rig.json',
-  golden_egg: 'sprites/characters/dragon/golden-dragon/rig-adult/golden-dragon.rig.json'
-};
+/** RIGS ARE OFF ON THIS BRANCH — every dragon is sequence (clip) animated
+ *  from src/data/character-anims.json, which covers the complete roster:
+ *  red 3/4, bare emerald 3/4, golden, ashdrake, rimewyrm, the frost and storm
+ *  breeds, and every Emporium skin (moonwhisker/porcelain on emerald,
+ *  ashglass on red). The table stays as the OFF SWITCH the rig plumbing keys
+ *  on: empty means no rig ever fetches, builds, or wins a race against the
+ *  clips. Re-enabling a breed's puppet is one entry here, not a revert. */
+const DRAGON_RIGS: Record<string, string> = {};
 
 /** The DRAGON_RIGS key an item resolves to: its tier-specific rig if one is
  *  declared, else the chain's default rig. */
@@ -1184,14 +1181,15 @@ export class BoardScene extends Phaser.Scene {
 
   /* ------------------------- live rigged dragons ------------------------- */
 
-  /** True if this chain+tier is a dragon BOARD ITEM that wears a live rig
-   *  (the ember/emerald generator tiers). The Golden Elder is not a board
+  /** True if this chain+tier is a dragon BOARD ITEM that comes alive as an
+   *  animated animal. RIGS ARE OFF on this branch — every breed is sequence
+   *  (clip) animated, so the question is answered from the CLIP CATALOG, not
+   *  from texture residency: a registered breed is live-in-waiting even while
+   *  its sheets are still on the wire (attachDragon fetches, and the arrival
+   *  re-dress mounts anything standing). The Golden Elder is not a board
    *  item — she lives on the Golden Altar fixture (see syncGoldenAltar). */
   private wearsRigTier(chain: string, tier: number): boolean {
-    // …or wears no rig at all because its clip set carries the whole animal.
-    // Either way it is a LIVE dragon rather than a still board piece, which is
-    // the question this answers.
-    if (DRAGON_RIGS[rigKeyFor(chain, tier)] === undefined && !this.clipComplete(chain, tier)) return false;
+    if (this.clipCharacterFor(chain, tier) === null) return false;
     return this.generatorConfigFor(chain, tier) !== undefined;
   }
 
@@ -1278,7 +1276,15 @@ export class BoardScene extends Phaser.Scene {
   private attachDragon(host: BoardItem, intro: boolean): boolean {
     const clipOnly = this.clipComplete(host.chain, host.tier);
     const rig = this.dragonRigs.get(rigKeyFor(host.chain, host.tier));
-    if (!clipOnly && !rig) return false;
+    if (!clipOnly && !rig) {
+      // Not mountable YET — with rigs off that means the breed's sheets are
+      // still on the wire. Ask for them BEFORE bailing: this call is the
+      // bootstrap (`dressBreedClips` mounts everything standing when they
+      // land), and without it a registered breed with no rig would never
+      // fetch and never come alive.
+      this.ensureDragonClips(host.chain, host.tier);
+      return false;
+    }
     // Tear down FIRST, then fetch: `removeDragonRig` reconciles residency, and
     // a fetch queued before it would be offered to that eviction as sheets
     // nothing is wearing yet — dropped and immediately re-fetched.
@@ -1289,9 +1295,13 @@ export class BoardScene extends Phaser.Scene {
     const scale =
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
       (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1);
-    // A clip-only breed has no rig character to look the cadence up by, so the
-    // tier decides: the adults are the calm ones, as they are for the rigs.
-    const calm = clipOnly ? host.tier >= 4 : CALM_DRAGONS.has(rig!.character);
+    // A clip breed has no rig character to look the cadence up by, so the tier
+    // decides: the adults are the calm ones — and the Golden Elder, who is an
+    // elder at tier 2 (CALM_DRAGONS carried her rig name for the same reason,
+    // and that lookup is gone with the rigs).
+    const calm = clipOnly
+      ? host.tier >= 4 || host.chain === GOLDEN_CHAIN
+      : CALM_DRAGONS.has(rig!.character);
     let player: RigPlayer | null = null;
     if (!clipOnly) {
       player = new RigPlayer(this, rig!, (layer) => `rig:${rig!.character}:${layer}`, {
@@ -1691,6 +1701,16 @@ export class BoardScene extends Phaser.Scene {
       if (ld.busy || ld.mood === 'asleep' || ld.mode === 'hover') continue;
       if (ld.flightPhase !== null || ld.host.getData('dragged')) continue;
       this.dragonIdle(ld);
+    }
+    // …and MOUNT anything of this breed still standing as a static sprite.
+    // With rigs off there is no puppet to hold the animal while its sheets
+    // are on the wire: it spawns still, `attachDragon` bails (after asking
+    // for exactly this fetch), and THIS is the arrival that makes it live.
+    for (const sprite of this.itemSprites.values()) {
+      if (this.clipCharacterFor(sprite.chain, sprite.tier) !== id) continue;
+      if (!this.wearsRigTier(sprite.chain, sprite.tier)) continue;
+      if (this.liveDragons.has(sprite.itemId) || sprite.getData('dragged')) continue;
+      this.attachDragon(sprite, false);
     }
   }
 
@@ -2184,20 +2204,31 @@ export class BoardScene extends Phaser.Scene {
       ld.sleepState = 'seated';
       const sleepKey = `sleep_${ld.host.chain}_${ld.host.tier}`;
       if (!this.textures.exists(sleepKey)) {
-        // No curled painting for this breed: dim whatever IS drawing it. The
-        // rig when it has one, its own idle when it does not — a clip-only
-        // breed dimmed to nothing is a dragon that vanishes at dusk. The idle
-        // is re-dressed rather than merely faded because the caller just
-        // cleared the overlay to make room for a painting that isn't there.
+        // No curled painting for this breed: the FULLY-BLINKED idle frame is
+        // the sleep pose — eyes closed is what separates "asleep" from
+        // "stuck". Calibrated per breed (sleep-frames.json); syncDragon's
+        // seated branch breathes the frozen frame exactly as it breathes the
+        // red whelp's tosleep freeze. Only a breed with no calibrated frame
+        // falls back to the old dimmed animated idle — eyes open, so the dim
+        // does the talking.
         if (ld.player) {
           ld.player.container.setVisible(true).setAlpha(0.65);
           return;
         }
         const idle = this.dragonClip(ld, 'idle');
         if (!idle) return;
+        const id = this.clipCharacterFor(ld.host.chain, ld.host.tier);
+        const closed = id ? sleepFrameFor(id) : null;
         const overlay = this.dressOverlay(ld, idle);
-        overlay.setVisible(true).setAlpha(0.65);
-        if (overlay.anims.currentAnim?.key !== idle.key || !overlay.anims.isPlaying) overlay.play(idle.key);
+        overlay.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+        if (closed !== null) {
+          overlay.stop();
+          overlay.setFrame(closed);
+          overlay.setVisible(true).setAlpha(1);
+        } else {
+          overlay.setVisible(true).setAlpha(0.65);
+          if (overlay.anims.currentAnim?.key !== idle.key || !overlay.anims.isPlaying) overlay.play(idle.key);
+        }
         return;
       }
       // The rig steps aside and the painting takes the tile — but the rig's

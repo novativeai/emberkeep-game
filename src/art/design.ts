@@ -139,6 +139,7 @@ export const CHROME_KEYS = [
   'ui_btn_price',
   'ui_btn_free',
   'ui_store_panel',
+  'ui_panel_tall',
   'ui_quest_panel',
   'ui_shop_panel',
   'ui_shop_card',

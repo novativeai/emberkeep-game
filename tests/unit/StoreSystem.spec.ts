@@ -117,6 +117,40 @@ describe('StoreSystem (cosmetics, bought with earned Gold)', () => {
     expect(worn.at(-1)).toEqual({ dragon: 'ember_dragon', itemId: 'ashglass' });
   });
 
+  it('a chain-grant card hands over a clutch, and fills no wardrobe slot', () => {
+    const ctx = createTestContext();
+    fund(ctx, 2000);
+    const worn = capture(ctx.bus, 'store:dragon_skin_changed');
+
+    // `storm` is sold in Emberkeep, which is where a fresh context stands.
+    ctx.bus.emit('ui:store_buy_requested', { itemId: 'storm' });
+
+    // THREE tier-1 eggs — one 3-merge from the animal. Fewer would be a
+    // purchase the player has to top up before it becomes anything.
+    const clutch = [...ctx.state.items.values()].filter((i) => i.chain === 'storm');
+    expect(clutch).toHaveLength(3);
+    expect(clutch.every((i) => i.tier === 1)).toBe(true);
+    expect(ctx.state.coins).toBe(2000 - 1600);
+    expect(ctx.state.ownedCosmetics).toContain('storm');
+    // A breed is not a costume: nothing is worn, so nothing may claim a slot —
+    // a grant that also equipped would re-dress the red dragon it is not.
+    expect(ctx.state.dragonSkins).toEqual({});
+    expect(worn).toEqual([]);
+  });
+
+  it('a chain grant is refused outside the world that sells it', () => {
+    const ctx = createTestContext();
+    fund(ctx, 4000);
+    const failed = capture(ctx.bus, 'store:purchase_failed');
+
+    // `frost` is Borealis stock, and the Keeper is standing in Emberkeep.
+    ctx.bus.emit('ui:store_buy_requested', { itemId: 'frost' });
+
+    expect(failed.at(-1)).toMatchObject({ itemId: 'frost', reason: 'locked' });
+    expect(ctx.state.coins).toBe(4000); // the gate is checked before the till
+    expect([...ctx.state.items.values()].filter((i) => i.chain === 'frost')).toEqual([]);
+  });
+
   it('each dragon has its own slot — two skins are worn at once', () => {
     const ctx = createTestContext();
     fund(ctx, 2000);
@@ -167,9 +201,17 @@ describe("the Keeper's Store shelves (src/data/store.json)", () => {
     }
   });
 
-  it('every dragon skin names a wardrobe slot and ships board art for it', () => {
+  it('every dragon card is a wardrobe skin or a chain grant, with art to back it', () => {
     expect(dragons.items.length).toBeGreaterThan(0);
     for (const item of dragons.items) {
+      // A CHAIN-GRANT card (frost/storm): the breed is its own merge line, so
+      // the purchase must have board art for every tier the clutch can reach.
+      if (item.chain) {
+        expect(item.dragon, `${item.id} is both grant and skin`).toBeUndefined();
+        const tiers = [1, 2, 3].filter((tier) => keys.has(`item_${item.chain}_${tier}`));
+        expect(tiers, `${item.id} grants a chain with missing art`).toEqual([1, 2, 3]);
+        continue;
+      }
       expect(item.dragon, `${item.id} has no chain`).toBeTruthy();
       // Tiers 3 and 4 are the whelp and the adult — the only dragon tiers with
       // rig art to wear. A skin covering neither would be an empty purchase.

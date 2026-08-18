@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import cauldronJson from '../../src/data/cauldron.json';
+import questsJson from '../../src/data/quests.json';
 import chainsJson from '../../src/data/chains.json';
 import { BAG_SLOTS } from '../../src/core/Constants';
 import type { CauldronData } from '../../src/core/types';
@@ -126,5 +127,71 @@ describe('cauldron.json (the recipe book itself)', () => {
       );
       expect(loops, recipe.id).toBe(false);
     }
+  });
+});
+
+describe('Recipe gating (the grimoire is earned page by page)', () => {
+  const quests = (questsJson as {
+    quests: Array<{ id: string; steps?: Array<{ goal?: { kind?: string; recipeId?: string } }> }>;
+  }).quests;
+  const order = quests.map((q) => q.id);
+  const at = (id: string): number => order.indexOf(id);
+
+  it('the ledger opens with exactly the four starter pages', () => {
+    const ctx = createTestContext();
+    const ids = ctx.systems.cauldron.available().map((r) => r.id);
+    expect(ids).toEqual(['hearth_cake', 'treasure_chest', 'red_egg', 'green_egg']);
+  });
+
+  it('every unlock names a quest that exists', () => {
+    for (const r of data.recipes) {
+      if (!r.unlock) continue;
+      expect(at(r.unlock.quest), `${r.id} unlocks off unknown quest ${r.unlock.quest}`).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('no quest demands a brew before its recipe is taught', () => {
+    for (const q of quests) {
+      for (const st of q.steps ?? []) {
+        const g = st.goal;
+        if (g?.kind !== 'brew' || !g.recipeId) continue;
+        const recipe = data.recipes.find((r) => r.id === g.recipeId)!;
+        expect(recipe, `${q.id} brews unknown recipe ${g.recipeId}`).toBeDefined();
+        if (!recipe.unlock) continue; // a starter is always available
+        expect(
+          at(recipe.unlock.quest),
+          `${q.id} demands ${g.recipeId}, taught only by ${recipe.unlock.quest} which comes later`
+        ).toBeLessThan(at(q.id));
+      }
+    }
+  });
+
+  it('a completed quest writes its page in; the star clears when the book closes', () => {
+    const ctx = createTestContext();
+    expect(ctx.systems.cauldron.available().map((r) => r.id)).not.toContain('iron_cap');
+    expect(ctx.systems.cauldron.isNew('iron_cap')).toBe(false); // locked is not new
+
+    ctx.state.addStat('q:done:north_coast', 1);
+    expect(ctx.systems.cauldron.available().map((r) => r.id)).toContain('iron_cap');
+    expect(ctx.systems.cauldron.isNew('iron_cap')).toBe(true);
+
+    ctx.systems.cauldron.markAllSeen();
+    expect(ctx.systems.cauldron.isNew('iron_cap')).toBe(false);
+    // …and only ONCE ever: the latch is monotonic.
+    expect(ctx.state.stat('recipe:seen:iron_cap')).toBe(1);
+    ctx.systems.cauldron.markAllSeen();
+    expect(ctx.state.stat('recipe:seen:iron_cap')).toBe(1);
+  });
+
+  it('a locked page refuses to brew even when the Bag could pay', () => {
+    const ctx = createTestContext();
+    stock(ctx, 'iron_cap');
+    const failed = capture(ctx.bus, 'cauldron:brew_failed');
+    const before = JSON.parse(JSON.stringify(ctx.state.bag));
+
+    ctx.bus.emit('cauldron:brew', { recipeId: 'iron_cap' });
+
+    expect(failed.at(-1)).toMatchObject({ recipeId: 'iron_cap', reason: 'locked' });
+    expect(ctx.state.bag).toEqual(before);
   });
 });

@@ -167,9 +167,17 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     });
   }
 
+  /** The EARNED pages only (CauldronSystem.available) — a formula the player
+   *  has not unlocked is not greyed, it is simply not in the book. */
   private get recipes(): readonly CauldronRecipeConfig[] {
-    return this.ctx.systems.cauldron.recipes;
+    return this.ctx.systems.cauldron.available();
   }
+
+  /** Ids that were new when THIS visit opened — they wear the star for the
+   *  whole visit, and their arrival fade plays exactly once (`introPlayed`
+   *  guards the bag:changed rebuilds from replaying it). */
+  private freshIds = new Set<string>();
+  private introPlayed = false;
 
   /** Tour accessor — the ✕'s page-space anchor for Selyna's pointer. */
   getClosePos(): { x: number; y: number } | null {
@@ -179,6 +187,13 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
   }
 
   open(): void {
+    // What is NEW is decided at the door and held for the visit: the star and
+    // the arrival fade belong to the moment the book opens, not to every
+    // bag-change rebuild while it is open.
+    this.freshIds = new Set(
+      this.recipes.filter((r) => this.ctx.systems.cauldron.isNew(r.id)).map((r) => r.id)
+    );
+    this.introPlayed = false;
     // Egg and ingredient art spans every world's chains, and PreloadScene only
     // loads what the ACTIVE world shows — fetch the rest on the way in, exactly
     // as the Store does for its shelf.
@@ -206,6 +221,10 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
 
   requestClose(): void {
     if (!this.isOpen) return;
+    // One visit is one reveal: everything the open book showed counts as seen,
+    // so the next open is a settled ledger — no star, no fade.
+    this.ctx.systems.cauldron.markAllSeen();
+    this.freshIds.clear();
     this.isOpen = false;
     this.bus.emit('ui:cauldron_toggled', { open: false });
     this.scene.tweens.add({
@@ -301,6 +320,32 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
         row.add(dot);
       }
 
+      // A page earned since the last visit wears the STAR STICKER for this
+      // whole visit: a pulsing gold star with its exclamation, seated at the
+      // row's right edge — the name keeps the left, so the eye reads
+      // "Iron Cap … ★!" as one line. The pulse is the sticker's own; the row
+      // underneath stays an ordinary, tappable row.
+      if (this.freshIds.has(recipe.id)) {
+        const star = this.scene.add
+          .text(ROW_W / 2 - 96, 0, '★', { fontFamily: FONT.ui, fontSize: '44px', color: INK.gold })
+          .setOrigin(0.5);
+        const bang = this.scene.add
+          .text(ROW_W / 2 - 56, 0, '!', {
+            fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: INK.gold
+          })
+          .setOrigin(0.5);
+        row.add([star, bang]);
+        this.scene.tweens.add({
+          targets: [star, bang],
+          scale: { from: 1, to: 1.28 },
+          alpha: { from: 1, to: 0.72 },
+          duration: 520,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+
       row.setSize(ROW_W, ROW_H).setInteractive({ useHandCursor: true });
       row.on('pointerup', () => {
         if (this.selectedId === recipe.id) return;
@@ -308,7 +353,25 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
         this.refresh();
       });
       this.listGroup.add(row);
+
+      // The ARRIVAL: a new page rises into place from just below its seat,
+      // fading up — once, on the visit's first build. Bag-change rebuilds
+      // while the book is open reseat rows instantly (`introPlayed`), and the
+      // next visit opens settled: the close marked everything seen.
+      if (!this.introPlayed && this.freshIds.has(recipe.id)) {
+        const seatY = row.y;
+        row.setAlpha(0).setY(seatY + 56);
+        this.scene.tweens.add({
+          targets: row,
+          alpha: 1,
+          y: seatY,
+          duration: 460,
+          delay: 140,
+          ease: 'Cubic.easeOut'
+        });
+      }
     });
+    this.introPlayed = true;
     // Content taller than the window is what there is to scroll through; a
     // roster that fits leaves this at 0 and the handlers all no-op.
     const contentH = this.recipes.length * ROW_GAP;

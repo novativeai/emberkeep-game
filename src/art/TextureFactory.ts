@@ -236,6 +236,7 @@ export class TextureFactory {
       case 'ui_heart_empty': return this.heart(key, false);
       case 'ui_slot': return this.slot(key);
       case 'ui_store_panel': return this.storePanel(key);
+      case 'ui_panel_tall': return this.tallPanel(key);
       case 'ui_quest_panel': return this.questPanel(key);
       case 'ui_shop_panel': return this.shopPanel(key);
       case 'ui_shop_card': return this.shopCard(key, false);
@@ -1789,6 +1790,28 @@ export class TextureFactory {
       chromeField(g, 22, 16, 1016, 620, 42, { x: 530, y: 70, radius: 620, strength: 0.32 });
       chromeEdge(g, 22, 16, 1016, 620, 42, EDGE.bold);
       chromeClasps(g, 22, 16, 1016, 620, 42, 18, 6.5);
+    });
+  }
+
+  /**
+   * The PORTRAIT sheet — the phone-shaped sibling of the landscape frame
+   * above (the dark Codex opens on it on mobile).
+   *
+   * 1180×2040 logical: ×RES that is 4080 px on the tall axis, deliberately just
+   * under the 4096 old-device MAX_TEXTURE_SIZE (docs/pipelines: a texture past
+   * it is silently clipped by the driver, not scaled). Same chrome grammar as
+   * the landscape frame so the two read as one family.
+   */
+  private tallPanel(key: string): void {
+    this.paint(key, 1180, 2040, (g) => {
+      withShadow(g, 30, 14, () => {
+        this.roundRectPath(g, 22, 16, 1136, 2000, 42);
+        g.fillStyle = INK.fieldDeep;
+        g.fill();
+      });
+      chromeField(g, 22, 16, 1136, 2000, 42, { x: 590, y: 160, radius: 1500, strength: 0.32 });
+      chromeEdge(g, 22, 16, 1136, 2000, 42, EDGE.bold);
+      chromeClasps(g, 22, 16, 1136, 2000, 42, 18, 6.5);
     });
   }
 

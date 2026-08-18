@@ -37,7 +37,10 @@
         }
       ],
       "flavor": "Two glass floats, cracked back down and the metal off their nets drawn out of the melt.",
-      "use": "The wrecks give up iron far too slowly to arm anyone."
+      "use": "The wrecks give up iron far too slowly to arm anyone.",
+      "unlock": {
+        "quest": "north_coast"
+      }
     },
     {
       "id": "light_thread",
@@ -54,7 +57,10 @@
         }
       ],
       "flavor": "A spyglass broken back to its lenses and held against the lights until the colour comes off in a strand.",
-      "use": "Thread without waiting on a whole Orrery to be built."
+      "use": "Thread without waiting on a whole Orrery to be built.",
+      "unlock": {
+        "quest": "north_fuel"
+      }
     },
     {
       "id": "pitch_loaf",
@@ -76,7 +82,10 @@
         }
       ],
       "flavor": "Two beads of pitch and two floats of glass: the glass is what makes it burn slow.",
-      "use": "The north's fuel. Dragons eat it; hulls are sealed with it."
+      "use": "The north's fuel. Dragons eat it; hulls are sealed with it.",
+      "unlock": {
+        "quest": "north_strakes"
+      }
     },
     {
       "id": "oil_lamp",
@@ -98,7 +107,10 @@
         }
       ],
       "flavor": "Pitch for the burning, spirit for the light, and a wick of anything to hand.",
-      "use": "Three make a Storm Lantern. Only a handful were ever left on the ice."
+      "use": "Three make a Storm Lantern. Only a handful were ever left on the ice.",
+      "unlock": {
+        "quest": "north_door"
+      }
     },
     {
       "id": "lodestone",
@@ -120,7 +132,10 @@
         }
       ],
       "flavor": "Two mana pebbles quarrelling over one iron cap, until one of them wins and points.",
-      "use": "The road to a Wayfinder, which pays in helms forever."
+      "use": "The road to a Wayfinder, which pays in helms forever.",
+      "unlock": {
+        "quest": "north_lamplight"
+      }
     },
     {
       "id": "woven_bolt",
@@ -142,7 +157,10 @@
         }
       ],
       "flavor": "Two threads and a lens to hold them apart while they set.",
-      "use": "Three make an Aurora Cloak — what Selyna's last order asks for."
+      "use": "Three make an Aurora Cloak — what Selyna's last order asks for.",
+      "unlock": {
+        "quest": "north_lodestones"
+      }
     },
     {
       "id": "rune_shard",
@@ -164,7 +182,10 @@
         }
       ],
       "flavor": "An Ember Heart burns hot enough to split a nodule clean, and clean is the whole art.",
-      "use": "Three shards begin a second Runestone — and a Runestone makes fuel forever."
+      "use": "Three shards begin a second Runestone — and a Runestone makes fuel forever.",
+      "unlock": {
+        "quest": "north_pitchworks"
+      }
     },
     {
       "id": "fire_brick",
@@ -186,7 +207,10 @@
         }
       ],
       "flavor": "Clay is nothing without a fire under it and an iron collar to hold its shape.",
-      "use": "Nine bricks raise a second Glass Kiln."
+      "use": "Nine bricks raise a second Glass Kiln.",
+      "unlock": {
+        "quest": "north_salvage"
+      }
     },
     {
       "id": "tar_spile",
@@ -208,7 +232,10 @@
         }
       ],
       "flavor": "A glass throat and an iron tooth. That is the whole of a spile, and the glass is the part that matters.",
-      "use": "Nine spiles raise a second Tar Kiln."
+      "use": "Nine spiles raise a second Tar Kiln.",
+      "unlock": {
+        "quest": "north_door"
+      }
     },
     {
       "id": "iron_billet",
@@ -230,7 +257,10 @@
         }
       ],
       "flavor": "Three caps back into the melt, and pitch enough to keep it honest — the forge eats its own work to grow.",
-      "use": "Nine billets raise a second Wreck Forge."
+      "use": "Nine billets raise a second Wreck Forge.",
+      "unlock": {
+        "quest": "north_hulls"
+      }
     },
     {
       "id": "brass_cog",
@@ -252,7 +282,10 @@
         }
       ],
       "flavor": "Helms melted down and poured fine. A tooth this small will not cast unless the crucible stays angry.",
-      "use": "Nine cogs raise a second Starwright's Bench."
+      "use": "Nine cogs raise a second Starwright's Bench.",
+      "unlock": {
+        "quest": "north_skeins"
+      }
     },
     {
       "id": "silver_spindle",
@@ -274,7 +307,10 @@
         }
       ],
       "flavor": "Iron drawn out to a thread's width and set in a collar cut from two lenses.",
-      "use": "Nine spindles raise a second Aurora Loom."
+      "use": "Nine spindles raise a second Aurora Loom.",
+      "unlock": {
+        "quest": "north_pitchworks"
+      }
     },
     {
       "id": "treasure_chest",
@@ -372,7 +408,10 @@
         }
       ],
       "flavor": "Ash wants tar, tar wants fire, and a Radiant Gem is the only fire that burns slow enough.",
-      "use": "Legendary. Three Ashdrake Eggs wake the Ashdrake."
+      "use": "Legendary. Three Ashdrake Eggs wake the Ashdrake.",
+      "unlock": {
+        "quest": "keepers_tasks"
+      }
     },
     {
       "id": "rimewyrm_egg",
@@ -399,7 +438,10 @@
         }
       ],
       "flavor": "Wind the bolt, sink it in moonwater, and let the frost do the remembering.",
-      "use": "Legendary. Three Rimewyrm Eggs wake the Rimewyrm."
+      "use": "Legendary. Three Rimewyrm Eggs wake the Rimewyrm.",
+      "unlock": {
+        "quest": "north_terms"
+      }
     },
     {
       "id": "golden_egg",
@@ -431,7 +473,10 @@
         }
       ],
       "flavor": "Fire that keeps, frost that keeps, and enough moonlight to make them agree. Gold is what agreement looks like.",
-      "use": "Mythic. The rarest shell the cauldron knows."
+      "use": "Mythic. The rarest shell the cauldron knows.",
+      "unlock": {
+        "quest": "the_rimewyrm_wakes"
+      }
     }
   ]
 }

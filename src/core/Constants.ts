@@ -111,6 +111,18 @@ export function panelMobileScale(frameWidth: number): number {
 }
 
 /**
+ * Like `panelMobileScale`, but bound by width AND height, whichever binds: a
+ * phone gets a near-full-screen sheet, a squarer tablet gets the same sheet
+ * held to its shorter height instead of spilling. `1` on desktop, where the
+ * landscape frames keep their authored size. (Ported with the dark Codex —
+ * its portrait tall frame is sized by both axes.)
+ */
+export function panelFitScale(frameW: number, frameH: number): number {
+  if (!IS_MOBILE) return 1;
+  return Math.min(2.2, (LIVE_GAME_WIDTH * 0.94) / frameW, (LIVE_GAME_HEIGHT * 0.92) / frameH);
+}
+
+/**
  * The LIVE coordinate space, in game-space units.
  *
  * The space is AUTHORED at 2560×1600, but a window is rarely 16:10 and FIT just
