@@ -131,11 +131,10 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
    *
    * The lesson walks three pages, and every beat of it is gated on the player
    * getting to the next one — so a book that could be dismissed is a book that
-   * strands the script (tutorial-design law 4). While held, the scrim ignores
-   * taps and both exits are off the page, leaving exactly one thing to do.
-   * Phaser hands a pointerup to EVERY interactive object under it, so without
-   * this the tap that answers Eleanor's bubble also lands on the scrim behind
-   * her and shuts the panel the step is waiting on.
+   * strands the script (tutorial-design law 4). While held, the close key is
+   * off the page and the Back button is withheld, leaving exactly one thing to
+   * do. The scrim no longer needs guarding at all — it stopped dismissing
+   * anything when tap-outside-to-close was retired for the phone.
    */
   private held = false;
   /** Roster cards by chain, for the lesson's first pointer. */
@@ -159,10 +158,11 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     const dim = scene.add
       .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
-    dim.on('pointerup', () => {
-      if (this.held) return; // the lesson owns the book — see `held`
-      this.requestClose();
-    });
+    // ONLY THE ✕ CLOSES — the dim swallows the tap but no longer dismisses.
+    // A thumb scrolling the body releases ON the dim, and tap-outside-to-close
+    // read that as "shut". See the long note in `ShopPanel.ts`. (This also
+    // retires the `held` guard here: the lesson used to need protecting from a
+    // stray tap-outside, and there is no longer such a thing.)
     this.add(dim);
 
     const frame = scene.add.image(0, CX.frameY, CX.frameKey);

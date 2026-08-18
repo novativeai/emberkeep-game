@@ -130,11 +130,13 @@ export class BagPanel extends Phaser.GameObjects.Container {
     const cx = LIVE_GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT / 2;
 
-    // Tap-anywhere-outside closes. The dim sits in the panel so it fades with it.
+    // The dim sits in the panel so it fades with it.
     this.dim = scene.add
       .rectangle(cx, cy, LIVE_GAME_WIDTH * 2, LIVE_GAME_HEIGHT * 2, num(PALETTE.night), 0.62)
       .setInteractive();
-    this.dim.on('pointerup', () => this.requestClose());
+    // ONLY THE ✕ CLOSES — the dim swallows the tap but no longer dismisses.
+    // A thumb scrolling the body releases ON the dim, and tap-outside-to-close
+    // read that as "shut". See the long note in `ShopPanel.ts`.
 
     const body = scene.add.container(cx, cy).setScale(this.baseScale);
 

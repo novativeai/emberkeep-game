@@ -143,10 +143,35 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     // Near-opaque scrim. The concept shows the world reduced to a dark blur
     // beyond the frame; a light dim would leave the board competing with goods
     // it is not selling.
+    // ONLY THE ✕ CLOSES — the canonical note for all eight panels.
+    //
+    // Tap-outside-to-close is a mouse idiom. It survives a cursor, which lands
+    // on one pixel and lifts from the same one; it does not survive a thumb on
+    // a phone, where a scroll of the shelf is a press, a drag and a release,
+    // and Phaser reports the release as a `pointerup` on whatever is under the
+    // finger at the end — very often the dim, because the shelf is narrower
+    // than the screen. So every attempt to browse shut the panel, and the
+    // player never got to read a card. The close key is 96 units of gold in
+    // the corner of every panel in this game; it is not hard to find, and it
+    // is the only thing that should be able to take the panel away.
+    //
+    // THE DIM STILL SWALLOWS, AND IT SWALLOWS BY EXISTING. Being interactive is
+    // the whole mechanism: Phaser walks the live scenes top-down on a pointer
+    // event and stops at the first that captured, so a screen-sized interactive
+    // rectangle in UIScene is what keeps a tap meant for the shop off the board.
+    //
+    // What it must NOT do is call `stopPropagation`. Within one scene
+    // `InputPlugin.topOnly` is true by default and this project never overrides
+    // it, so the pointerup reaches the top object and nothing beneath — the HUD
+    // keys under a scrim were never hearing it, and there is nothing to cancel
+    // for. What cancelling DOES reach is the scene-level `POINTER_UP`, which
+    // `processUpEvents` skips once `_eventData.cancelled` is set — and that is
+    // the event on which StorePanel, CookbookPanel and CauldronPanel release
+    // their scroll drag. Cancel it and `dragFrom` is never nulled and the shelf
+    // follows a cursor with no button held. Tried, measured, taken back out.
     this.dim = scene.add
       .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.fieldDeep), 0.88)
       .setInteractive();
-    this.dim.on('pointerup', () => this.requestClose());
 
     const frame = scene.add.image(0, 0, 'ui_shop_panel');
     this.baseScale = panelMobileScale(frame.width);

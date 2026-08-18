@@ -97,7 +97,9 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     this.dim = scene.add
       .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
-    this.dim.on('pointerup', () => this.requestClose());
+    // ONLY THE ✕ CLOSES — the dim swallows the tap but no longer dismisses.
+    // A thumb scrolling the body releases ON the dim, and tap-outside-to-close
+    // read that as "shut". See the long note in `ShopPanel.ts`.
 
     const frame = scene.add.image(0, 40, 'ui_store_panel');
     this.baseScale = panelMobileScale(frame.width);

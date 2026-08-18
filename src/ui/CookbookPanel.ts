@@ -120,7 +120,9 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     const dim = scene.add
       .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
       .setInteractive();
-    dim.on('pointerup', () => this.requestClose());
+    // ONLY THE ✕ CLOSES — the dim swallows the tap but no longer dismisses.
+    // A thumb scrolling the body releases ON the dim, and tap-outside-to-close
+    // read that as "shut". See the long note in `ShopPanel.ts`.
     this.add(dim);
 
     const panel = scene.add.image(0, 16, 'ui_panel');

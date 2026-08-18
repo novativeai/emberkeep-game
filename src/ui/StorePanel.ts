@@ -67,6 +67,36 @@ import { uiRegistry } from './theme';
  * Plate geometry, measured off the PAINTED frames (both are logical x RES):
  *   ui_store_panel  1016x620 @ y+40  -> inside x -1016..1016, y -588..652
  *   ui_panel_tall   1180x2040 @ y 0  -> inside x -1136..1136, y -2008..1992
+ *
+ * THE PORTRAIT HEADER IS ONE COLUMN OF ARITHMETIC, and it used not to be.
+ *
+ * Every number in it was picked on its own, and two of them landed on top of
+ * each other. `ui_btn_round_royal` is painted 68x68 logical = 136x136 game
+ * units, its slab a r=29 circle at (34,38) and its face a r=28 at (34,31), so
+ * with the 3.4 rims the ink runs x +-61.4, y -65.4..69.4 about the image
+ * centre. At the 0.58 the art is drawn with, dropped 6, inside a container at
+ * TAP_SCALE (2.2), that is x +-78 and y -70..+102 around `closeY` — and the
+ * hit box around it is 96 x 2.2 = 211 square. Parked at (1010, -1900) the ink
+ * therefore covered y -1970..-1798, while two rows of tabs at a 176 pitch put
+ * the top row at -1853..-1703 and its right-hand column at x 34..1094. The
+ * key was printed ON that tab over 55 units of it, across the tab's full
+ * width — which is what the ✕ looked like it was sitting on, because it was.
+ *
+ * So the header is measured DOWN THE PLATE from its own inner rim now:
+ *
+ *   plate inner top (the gold rim)        -2008
+ *   banner band, 270 = px(104)            -2143 .. -1873   straddles the rim, 135 either side
+ *   title, centred on the rim             -2006            band centre + 2, as desktop's -586 = -588 + 2
+ *   ✕ ink   (x 932..1088)                 -1978 .. -1806   30 inside the rim; the corner arc clears it by 28
+ *   ✕ hit box                             -2014 .. -1802
+ *   tab block, 2 rows of 216, pitch 284   -1762 .. -1262   40 under the ✕ hit box, 111 under the band
+ *   section blurb, at most 4 lines of 78  -1194 ..  -794
+ *   shelf window top                       -730
+ *
+ * The gutter down that tab block is 68 — the same 68 the two columns already
+ * had (1128 pitch - 1060 tab), so the grid is spaced by one number, not two.
+ * The shelf window pays for the header: 2660 instead of 3160. It is a SCROLLER,
+ * and 500 units of it are worth a row of tabs the player can read.
  */
 const CX = IS_MOBILE
   ? {
@@ -74,23 +104,44 @@ const CX = IS_MOBILE
       frameY: 0,
       /** The plate's inner box. */
       plateX: 1136,
-      titleY: -1900,
-      bannerY: -1954,
+      titleY: -2006,
+      bannerY: -2143,
+      /** The cartouche may not reach the ✕, whose hit box starts at x 904 — so
+       *  half the band has to stop 32 short of that. The band the authored
+       *  title actually gets is the stepped floor, px(620) = 1612 (166px
+       *  "KEEPER'S STORE" measures ~1280, + 200 = ~1480, under the floor), so
+       *  the cap has 128 of slack today and is here for the day a font fallback
+       *  measures the title wider than the plate can hold beside the key. */
+      bannerMaxW: 1740,
       closeX: 1010,
-      closeY: -1900,
-      tabsY: -1690,
+      closeY: -1908,
+      tabsY: -1512,
       tabCols: 2,
       tabW: 1060,
-      tabH: 150,
+      tabH: 216,
       tabGapX: 1128,
-      tabGapY: 176,
-      tabFont: 56,
-      blurbY: -1330,
+      tabGapY: 284,
+      /** STEPPED, at last. 56 units is 8.5 real pixels on a 390px handset: the
+       *  tabs were the smallest type on a screen whose body blurb is px(30) and
+       *  whose title is px(64) — the navigation was the one thing nobody could
+       *  read. px(36) is 94, and the pill is 216 = 2.3x that, exactly the ratio
+       *  the desktop pill has to its own 40. */
+      tabFont: px(36),
+      /** A 6-unit stroke is 0.9 real pixels in portrait — it disappears, and a
+       *  rim is how the active pill is told from the sunken one. The pill is
+       *  216/92 = 2.35x the desktop one, so its rim is 6 x 2.35 = 14. */
+      tabRim: 14,
+      blurbY: -994,
       blurbWrap: 2100,
+      /** Four lines of px(30), whose line box is ~97: 4 x 97 = 388, so 400. The
+       *  longest blurb is 173 characters and wraps to exactly four lines at
+       *  2100. This is what makes the shelf's top edge a fact instead of a hope
+       *  — see the fit in `buildBody`. */
+      blurbMaxH: 400,
       cols: 2,
       cardW: 1040,
       cardH: 1040,
-      viewTop: -1230,
+      viewTop: -730,
       viewBottom: 1930,
       /** Portrait stacks: the showcase card takes the full width above the
        *  grid rather than a column beside it. */
@@ -104,6 +155,9 @@ const CX = IS_MOBILE
       plateX: 1016,
       titleY: -586,
       bannerY: -640,
+      /** Never binds: the ✕ hit box starts at x 916 and today's band is 712
+       *  wide. Same guard as portrait, same reason. */
+      bannerMaxW: 1760,
       closeX: 964,
       closeY: -538,
       tabsY: -430,
@@ -113,8 +167,14 @@ const CX = IS_MOBILE
       tabGapX: 470,
       tabGapY: 0,
       tabFont: 40,
+      /** The banner's own rim weight — the tabs are made of the same thing. */
+      tabRim: 6,
       blurbY: -344,
       blurbWrap: 1860,
+      /** Measured: the longest blurb is 2 lines of 30px = 72 units here, so the
+       *  budget never binds on the landscape sheet. It is a guard against a
+       *  future line of copy reaching the top row of cards, not a layout rule. */
+      blurbMaxH: 200,
       cols: 4,
       cardW: 428,
       cardH: 380,
@@ -159,6 +219,70 @@ const HERO_COLS = 2;
 const HERO_CARD_W = HERO_W;
 const HERO_COL_GAP = HERO_CARD_W + AIR;
 
+/**
+ * THE TAB IS THE BANNER'S PILL, SHRUNK — the four layers, in the same order.
+ *
+ * `drawBanner` states the vocabulary this panel is built from: a `goldDeep`
+ * SEAT 10 units below the face, the FACE, a `gold` RIM, then a gloss STRIP
+ * inset 14 with its top 8 down and 34 tall. Every one of those is a fraction
+ * of that band's 104, so a pill of any height can be made of the same thing:
+ *
+ *   seat  10/104 = 0.096      strip inset  14/104 = 0.135
+ *   top    8/104 = 0.077      strip height 34/104 = 0.327
+ *
+ * On the desktop pill (92 tall) that comes to 9 / 12 / 7 / 30; on the portrait
+ * one (216), to 21 / 29 / 17 / 71 — one object, twice the size.
+ *
+ * THE SEAT IS PAID FOR OUT OF THE FACE, NOT OUT OF THE AIR UNDER THE ROW —
+ * and that rule is the whole reason this note exists.
+ *
+ * The banner can hang its seat 10 units below its face because nothing is
+ * seated under the banner. A TAB has the section blurb 40 units beneath it,
+ * and this repaint was declared as "no position moved" while quietly moving
+ * the pill's lowest ink 9 units down into it. The desktop arithmetic, which is
+ * the tight one:
+ *
+ *   tab rect (tabsY -430, halfH 46)        -476 .. -384
+ *   seat drawn BELOW the face, +9          -467 .. -375   <- 9 units outside
+ *   sectionBlurb, origin 0.5 at            -344
+ *     longest shipped copy (store.json
+ *     "decor", 173 chars) wraps to 2 lines
+ *     at 30px in the 1860 wrap: 2 x 30 x
+ *     1.16..1.25 = 70..75 tall, so its box  -379 .. -309  ..  -381 .. -306
+ *
+ * i.e. the gold seat's bottom edge landed 3.8 to 6.5 units INSIDE the blurb's
+ * own layout box, on a container (`tabsRow`) that is added to the panel AFTER
+ * the blurb and therefore paints over it. Measured to the visible ink — the
+ * caps of the first line, which start (0.94 - 0.715) x 30 = 6.7 below the
+ * box's top — the air went from 6.8..9.4 units down to 0.3..2.9. Nought point
+ * three is touching.
+ *
+ * There is nowhere to put that 9 back. The blurb's box already ends 6.5 units
+ * above the shelf window at -300, and above the tabs is a measured header. So
+ * the four layers are drawn INSIDE the tab's own rect instead: the face is
+ * `seat` units shorter and the seat fills the gap, bottom edge flush with the
+ * rect. The pill's lowest ink is then -384, the box's own floor — 9.3..11.9
+ * units of visible air, i.e. better than the stroke it replaced, and a
+ * footprint that is exactly the box every other seat on this panel was
+ * measured against (and exactly what `setSize` gives the pointer). On both
+ * devices — which is also what keeps the portrait header column in `CX` true
+ * to the unit: its tab block really does end at -1262, not 21 units lower.
+ */
+const TAB_SEAT = 0.096;
+const TAB_STRIP_INSET = 0.135;
+const TAB_STRIP_TOP = 0.077;
+const TAB_STRIP_H = 0.327;
+
+/** The SOON tab stacks two labels, and both offsets are fractions of the PILL:
+ *  -0.1 lifts the title, +0.28 drops the sub-label, which is 0.55 of the tab's
+ *  type. Fractions of the pill are safe on both devices because the pill is
+ *  kept at 2.3x its own type on both (92/40 and 216/94), so the two glyph
+ *  boxes stay exactly as far apart, relatively, as the desktop pair that
+ *  already reads correctly. */
+const TAB_LABEL_LIFT = 0.1;
+const TAB_SOON_DROP = 0.28;
+const TAB_SOON_FONT = 0.55;
+
 /** Past this much drag the gesture is a scroll, and the card under the finger
  *  must not also be bought. */
 const DRAG_SLOP = 12;
@@ -202,6 +326,10 @@ const HERO_ACTION_TOP = HERO_ACTION_Y - ACTION_PLATE_HALF_H * HERO_ACTION_SCALE;
  *  reads the same size on a phone as on a desktop. */
 const BLURB_PX = px(21);
 const BLURB_MIN_PX = px(16);
+/** The SECTION's blurb — the line under the tabs, not the one on a card. Its
+ *  own constant because `buildBody` has to reset the size before re-fitting
+ *  it, and a size that lives in two places is a size that drifts. */
+const BLURB_SECTION_PX = px(30);
 /** Air under the name's foot, and over the key's top edge. */
 const BLURB_GAP = IS_MOBILE ? 12 : 8;
 const BLURB_FOOT = IS_MOBILE ? 18 : 10;
@@ -260,10 +388,34 @@ export class StorePanel extends Phaser.GameObjects.Container {
     super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
     this.sections = data.sections;
 
+    // THE DIM SWALLOWS; IT DOES NOT DISMISS.
+    //
+    // It stays interactive, because that is the whole reason it exists: Phaser
+    // walks the live scenes top-down on every pointer event and stops at the
+    // first one that captured it, so a screen-sized interactive rectangle in
+    // UIScene is what keeps a tap meant for the shop off the board underneath.
+    // What it must NOT do is close. It carried a `pointerup -> requestClose`,
+    // and with a shelf that scrolls, that meant a drag that ended a few units
+    // off a card, a tap in the gutter between two cards, or a thumb landing on
+    // the plate's margin threw the whole panel away mid-browse. The ✕ is the
+    // only way out — which is also the button Eleanor's walkthrough points at.
+    //
+    // AND IT DOES NOT CANCEL. Being interactive is the whole swallow: Phaser
+    // walks the live scenes top-down and stops at the first that captured, and
+    // WITHIN a scene `InputPlugin.topOnly` is true by default (this project
+    // never overrides it), so the pointerup reaches the top object and nothing
+    // under it. The HUD key beneath this scrim was never hearing it.
+    //
+    // Calling `stopPropagation` here is therefore free of upside and expensive:
+    // it sets `_eventData.cancelled`, and `processUpEvents` skips its own
+    // scene-level `POINTER_UP` emit once that is set. That emit is where THIS
+    // panel releases its scroll drag (`onPointerUp` -> `dragFrom = null`), so
+    // cancelling it leaves the shelf tracking a cursor with no button held, for
+    // the rest of the session. A swallow that silences the whole scene is not a
+    // swallow. It was tried, measured, and taken back out — hence this note.
     this.dim = scene.add
       .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
-    this.dim.on('pointerup', () => this.requestClose());
 
     const frame = scene.add.image(0, CX.frameY, CX.frameKey);
     // Bound by BOTH axes in portrait: the tall sheet is 4080 units high in a
@@ -286,7 +438,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
     // ended up behind the first row of cards.
     this.sectionBlurb = scene.add
       .text(0, CX.blurbY, '', {
-        fontFamily: FONT.ui, fontSize: `${px(30)}px`, color: INK.onFieldDim,
+        fontFamily: FONT.ui, fontSize: `${BLURB_SECTION_PX}px`, color: INK.onFieldDim,
         align: 'center', wordWrap: { width: CX.blurbWrap }
       })
       .setOrigin(0.5);
@@ -300,7 +452,13 @@ export class StorePanel extends Phaser.GameObjects.Container {
     //
     // In portrait the pocket is not the constraint, the THUMB is: 96 units of
     // hit box is 15 real pixels on a handset, well under the 44px platform
-    // minimum. `TAP_SCALE` is the smallest multiplier that clears it.
+    // minimum. `TAP_SCALE` is the smallest multiplier that clears it — and it
+    // grows the HIT BOX to 211 square, which is why the portrait key needed a
+    // pocket of its own rather than the corner the landscape one is tucked in.
+    // At `closeY` -1908 its ink runs y -1978..-1806 and its hit box -2014..
+    // -1802: 30 below the plate's inner rim, clear of the rounded corner by 28
+    // at its widest, and 40 above the first row of tabs. It used to be at -1900
+    // with the tabs starting at -1853, i.e. printed on the right-hand tab.
     const close = scene.add.container(CX.closeX, CX.closeY);
     this.closeBtn = close;
     // The royal candy disc: a plum face in a gold rim, painted rather than a
@@ -553,21 +711,66 @@ export class StorePanel extends Phaser.GameObjects.Container {
     this.scene.tweens.add({ targets: card, x: card.x + 10, duration: 45, yoyo: true, repeat: 3 });
   }
 
+  /**
+   * The title cartouche — a candy band pinned ACROSS the plate's top rim.
+   *
+   * Its y was the literal -640, which is the landscape `bannerY` and nothing
+   * else: on a handset the title text moved to the top of the tall sheet and
+   * the band stayed behind, painting a 1480x104 gold-rimmed bar across the
+   * middle of the shelf, under the cards, 590 units inside the scroll window.
+   * It reads off `CX.bannerY` now, and every measurement in it is stepped, so
+   * the band grows with the type it is a plate for: at px(64) = 166 the title's
+   * line box is ~200 and a 104-tall band would have been a stripe behind a word
+   * twice its height. 104 x 2.6 = 270, which is the 135-either-side-of-the-rim
+   * the portrait header column is built on. Desktop steps by 1 — every number
+   * below is the number it has always been, to the unit.
+   */
   private drawBanner(width: number): void {
-    const w = Math.max(620, width);
-    const y = -640;
+    const w = Math.min(CX.bannerMaxW, Math.max(px(620), width));
+    const y = CX.bannerY;
+    const h = px(104);
+    const r = px(34);
     const g = this.titleBg;
     g.clear();
     g.fillStyle(num(INK.goldDeep), 1);
-    g.fillRoundedRect(-w / 2, y + 10, w, 104, 34);
+    g.fillRoundedRect(-w / 2, y + px(10), w, h, r);
     g.fillStyle(num(INK.field), 1);
-    g.fillRoundedRect(-w / 2, y, w, 104, 34);
-    g.lineStyle(6, num(INK.gold), 1);
-    g.strokeRoundedRect(-w / 2, y, w, 104, 34);
+    g.fillRoundedRect(-w / 2, y, w, h, r);
+    g.lineStyle(px(6), num(INK.gold), 1);
+    g.strokeRoundedRect(-w / 2, y, w, h, r);
     g.fillStyle(num(INK.fieldLift), 0.5);
-    g.fillRoundedRect(-w / 2 + 14, y + 8, w - 28, 34, 18);
+    g.fillRoundedRect(-w / 2 + px(14), y + px(8), w - px(28), px(34), px(18));
   }
 
+  /**
+   * The shelf switcher — four SEATED pills, one of them plainly out of its hole.
+   *
+   * They were a flat fill and a 5-unit stroke: the only surface in the panel
+   * that was not made of anything, which is why a row of them read as a browser
+   * toolbar dropped onto a candy plate, and why the section you were on had to
+   * be worked out from a colour. They are the banner's pill now (see TAB_SEAT
+   * and friends), and the two states differ four ways at once:
+   *
+   *   ACTIVE   a goldDeep seat under the face, the lit `fieldLift` face, the
+   *            full `gold` rim, a `fieldGlow` gloss along the top, cream ink.
+   *   INACTIVE nothing under it, the `fieldDeep` face — darker than the plate
+   *            it is cut into — a `goldDeep` rim, dim ink, and the same strip
+   *            painted in scrim instead of light, which is what the top edge of
+   *            a sunken thing looks like.
+   *
+   * Four differences means the live shelf is legible at arm's length on a
+   * handset without reading a single colour. Both faces are painted at the SAME
+   * rect, so switching tabs never moves one by a unit; the lift is entirely in
+   * what is drawn around it.
+   *
+   * ALL FOUR LAYERS STAY INSIDE THE TAB'S OWN RECT — the face is `seat` units
+   * shorter than the box and the gold fills the gap, rather than the gold
+   * hanging below the box the way the banner's does. The rect is what the
+   * section blurb 40 units below was measured against, and what `setSize`
+   * hands the pointer; a pill that paints past it is a layout change wearing a
+   * repaint's clothes. See TAB_SEAT for the arithmetic and for what it cost the
+   * blurb before this.
+   */
   private buildTabs(): void {
     this.tabsRow.removeAll(true);
     // FOUR ACROSS, OR TWO BY TWO. Four 420-wide tabs fit the landscape plate
@@ -580,6 +783,30 @@ export class StorePanel extends Phaser.GameObjects.Container {
     const startY = -((rows - 1) * CX.tabGapY) / 2;
     const halfW = CX.tabW / 2;
     const halfH = CX.tabH / 2;
+    // The pill's own geometry, off its height: the corner is a third of it (the
+    // banner's 34 on 104), and the seat and strip are the fractions above.
+    const radius = CX.tabH / 3;
+    const seat = Math.round(CX.tabH * TAB_SEAT);
+    const stripX = Math.round(CX.tabH * TAB_STRIP_INSET);
+    const stripY = Math.round(CX.tabH * TAB_STRIP_TOP);
+    const stripH = Math.round(CX.tabH * TAB_STRIP_H);
+    // THE FACE PAYS FOR THE SEAT (see TAB_SEAT). The face keeps the rect's top
+    // edge and gives up `seat` at the bottom; the seat fills that gap and ends
+    // flush with the rect. Desktop: a 92-tall box holds an 83-tall face with 9
+    // of gold showing under it, and the pill's lowest ink is back at -384
+    // where the blurb below was measured against it. Portrait: 195 and 21.
+    //
+    // The `tabFont` note's "the pill is 2.3x its own type on both devices"
+    // survives this: it is stated of the BOX, which has not changed, and the
+    // face keeps the equality anyway — 83/40 = 2.08 desktop, 195/94 = 2.07
+    // portrait. Still one object at two sizes, with 9.6% less of it showing.
+    const faceH = CX.tabH - seat;
+    // Everything printed on the pill is centred on the FACE, not on the box, so
+    // the type sits where it always did relative to the surface it is on: the
+    // label was 2 units above the face's middle before this and is 2 units
+    // above it now. Nothing on screen moves; the face moved out from under it
+    // by `seat / 2` and the type follows.
+    const faceMid = -seat / 2;
     this.sections.forEach((section, i) => {
       const active = i === this.activeIndex;
       const tab = this.scene.add.container(
@@ -587,30 +814,51 @@ export class StorePanel extends Phaser.GameObjects.Container {
         startY + Math.floor(i / cols) * CX.tabGapY
       );
       const g = this.scene.add.graphics();
+      // 1 — the seat, under the ACTIVE pill only. A lifted thing has something
+      //     under it; a recessed one has nothing to cast onto. It ends on the
+      //     rect's bottom edge, so the gold is the only thing in the pill that
+      //     reaches it and nothing reaches past it.
+      if (active) {
+        g.fillStyle(num(INK.goldDeep), 1);
+        g.fillRoundedRect(-halfW, -halfH + seat, CX.tabW, faceH, radius);
+      }
+      // 2 — the face, `seat` short of the rect's floor.
       g.fillStyle(num(active ? INK.fieldLift : INK.fieldDeep), 1);
-      g.fillRoundedRect(-halfW, -halfH, CX.tabW, CX.tabH, CX.tabH / 3);
-      g.lineStyle(5, num(active ? INK.gold : INK.goldDeep), 1);
-      g.strokeRoundedRect(-halfW, -halfH, CX.tabW, CX.tabH, CX.tabH / 3);
+      g.fillRoundedRect(-halfW, -halfH, CX.tabW, faceH, radius);
+      // 3 — the rim. Same weight either way, so only its COLOUR moves and the
+      //     pill's footprint is the same in both states.
+      g.lineStyle(CX.tabRim, num(active ? INK.gold : INK.goldDeep), 1);
+      g.strokeRoundedRect(-halfW, -halfH, CX.tabW, faceH, radius);
+      // 4 — the strip along the top: the hall's own cool light (`fieldGlow`,
+      //     the token that exists for exactly this) on the lifted pill, and the
+      //     scrim on the sunken one.
+      g.fillStyle(num(active ? INK.fieldGlow : INK.scrim), active ? 0.42 : 0.34);
+      g.fillRoundedRect(-halfW + stripX, -halfH + stripY, CX.tabW - stripX * 2, stripH, stripH / 2);
       const label = this.scene.add
-        .text(0, -2, section.title, {
+        .text(0, faceMid - 2, section.title, {
           fontFamily: FONT.ui,
           fontSize: `${CX.tabFont}px`,
           fontStyle: 'bold',
           color: active ? INK.onField : INK.onFieldDim
         })
         .setOrigin(0.5);
+      // The live tab's type sits ON something, so it casts too. Stepped, or the
+      // shadow is a third of a real pixel on a handset and simply is not there.
+      if (active) label.setShadow(0, px(3), 'rgba(21,15,20,0.6)', px(4));
       tab.add([g, label]);
       // "Soon" sections still read as tabs — the shelf is the announcement.
       if (section.kind === 'soon') {
         tab.add(
           this.scene.add
-            .text(0, CX.tabH * 0.28, 'SOON', {
-              fontFamily: FONT.ui, fontSize: `${Math.round(CX.tabFont * 0.55)}px`, fontStyle: 'bold',
+            .text(0, faceMid + CX.tabH * TAB_SOON_DROP, 'SOON', {
+              fontFamily: FONT.ui,
+              fontSize: `${Math.round(CX.tabFont * TAB_SOON_FONT)}px`,
+              fontStyle: 'bold',
               color: active ? INK.onFieldGold : INK.onFieldDim
             })
             .setOrigin(0.5)
         );
-        label.setY(-CX.tabH * 0.1);
+        label.setY(faceMid - CX.tabH * TAB_LABEL_LIFT);
       }
       tab.setSize(CX.tabW, CX.tabH).setInteractive({ useHandCursor: true });
       tab.on('pointerup', () => {
@@ -634,7 +882,16 @@ export class StorePanel extends Phaser.GameObjects.Container {
     this.priceCoins.clear();
     this.cardsById.clear();
     const section = this.sections[this.activeIndex]!;
-    this.sectionBlurb.setText(section.blurb);
+    // THE BLURB IS FITTED TO ITS BAND, not hoped into it. The copy is authored
+    // prose and the longest of the four is 173 characters: at px(30) = 78 that
+    // wraps to four lines in portrait, and the header column budgeted exactly
+    // four (CX.blurbMaxH). A fifth would print on the top row of cards, so the
+    // same treatment a card's blurb gets applies here — shrink a point at a
+    // time, truncate only if the floor still overflows. The size is reset first
+    // because `fitBlurb` shrinks the object in place: a section opened after a
+    // long one would otherwise keep the smaller type for the rest of the visit.
+    this.sectionBlurb.setFontSize(BLURB_SECTION_PX).setText(section.blurb);
+    this.fitBlurb(this.sectionBlurb, CX.blurbMaxH);
 
     if (section.kind === 'soon') {
       this.shelf.add(

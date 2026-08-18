@@ -19,6 +19,7 @@ import {
   num,
   OPENING_HOLD_MS,
   PALETTE,
+  panelFitScale,
   SCENES,
   STORY_BEAT_HOLD_MS,
   TILE_W,
@@ -80,6 +81,61 @@ const DEPTH_DIALOG = 200;
 // loads at its native pixel size, so each is scaled to these.
 const HAND_MARKER_H = 172;
 const ARROW_MARKER_H = 148;
+
+/* ---------------------- the Settings plate ------------------------ */
+/**
+ * The Settings dialog is DRAWN, not textured — a rounded rect 900 units wide.
+ * The number lives here rather than as four `-450`s and a `900` inside
+ * `openResetDialog`, because the portrait sizing below is derived from it and
+ * a plate whose width is stated twice is a plate that will disagree with its
+ * own scale one day.
+ */
+const SETTINGS_W = 900;
+
+/**
+ * THE PLATE GROWS, and the graphics blurb spends all of the extra.
+ *
+ * Cycling the quality can append "Reload the page to resize the canvas." to
+ * that blurb, taking it to three wrapped lines. Even at the authored 26px that
+ * is 3 x 31.2 + 2 x 6 of lineSpacing = 105.6 units hanging off a top edge at
+ * -52, so it ends at +53.6 and crosses the divider at +46 — 98 units of room
+ * for a block that wants 105.6. That is a DESKTOP defect too, and it always
+ * was: the third line only appears after the player cycles the quality, which
+ * is why nobody had met it. 24 units of slack puts the divider at +58 and the
+ * block's floor at +41.6 — 16 units of air where there were -7.6.
+ *
+ * Portrait makes it worse, because portrait needs a bigger blurb to be
+ * readable at all (see SETTINGS_NOTE_PX): 3 x 38.4 + 12 = 127, and the
+ * two-line case leaves ~30 units of air today, so the honest budget there is
+ * 157 against the same 98. 60 closes it.
+ *
+ * The slack is inserted in the MIDDLE — the top block (title → blurb) moves up
+ * half of it, everything from the divider down moves down the other half — so
+ * the plate stays centred on the container origin and every margin EXCEPT the
+ * one that was short comes out exactly as authored.
+ */
+const SETTINGS_EXTRA_H = IS_MOBILE ? 60 : 24;
+/** Plate height: the authored 736-unit landscape card plus the portrait slack. */
+const SETTINGS_H = 736 + SETTINGS_EXTRA_H;
+/** Rows ABOVE the graphics blurb rise by half the slack… */
+const SETTINGS_TOP_DY = -SETTINGS_EXTRA_H / 2;
+/** …and the divider and everything under it drops by the other half. */
+const SETTINGS_BOT_DY = SETTINGS_EXTRA_H / 2;
+
+/**
+ * The graphics blurb is the smallest type on the plate and the only line on it
+ * that fails to read once the panel is scaled for a phone.
+ *
+ * A unit of the 2560-wide space is 390/2560 = 0.152 real pixels on the handset
+ * the TYPE_STEP note is written against; at the 2.2 panel scale that is 0.335.
+ * So the authored 26 arrives at 8.7 real px — under the 10.5 that same note
+ * calls readable — while the button label right above it (32) arrives at 10.7
+ * and passes. Handing the blurb that identical 32 is the smallest change that
+ * clears the bar, and it puts no new size into the plate's type scale. NOT
+ * `px()`: the container is already carrying 2.2, and 26 x 2.6 x 2.2 would land
+ * a caption at 23 real px, larger than the heading above it.
+ */
+const SETTINGS_NOTE_PX = IS_MOBILE ? 32 : 26;
 
 /**
  * Runs in parallel above BoardScene: HUD, tooltip, Eleanor's Ledger, the
@@ -2320,21 +2376,62 @@ export class UIScene extends Phaser.Scene {
 
   /* ----------------------------- dialogs ---------------------------- */
 
+  /**
+   * SETTINGS — music, graphics quality, and the reset confirmation.
+   *
+   * IT IS SCALED FOR PORTRAIT, like every other popup in the game. The plate is
+   * 900 units of a 2560-unit-wide live space, which on a desktop window is a
+   * comfortable card and on a handset is 35% of the screen — a stamp, with type
+   * arriving at 2-5 real pixels. `panelFitScale` is the shared answer to that,
+   * and this is the arithmetic it does here:
+   *   width   2560 x 0.94 / 900   = 2.67
+   *   height  the SHORTEST live portrait space is 2560 tall (a square screen;
+   *           a real phone is ~5500), so 2560 x 0.92 / 796 = 2.96 — height
+   *           cannot bind for a plate this short, on any handset or tablet
+   *   cap     2.2
+   * The cap wins on every device, so the sheet lands at 1980x1751 units: 77% of
+   * the portrait width, up from 35%. On a 390px-wide phone, where a unit is
+   * 390/2560 = 0.152 real px, that is a 302x267 real-pixel card.
+   * (It is the CAP that holds it short of the 94% the width bound would allow —
+   * raising it is a decision for the shared primitive, not for this panel.)
+   *
+   * `panelFitScale` rather than `panelMobileScale` even though the two return
+   * the same 2.2 today: this plate is one of the few that CHANGES height
+   * between the two layouts (see SETTINGS_EXTRA_H), so the bound that watches
+   * the height is the one that keeps the promise if it ever grows again.
+   *
+   * Desktop gets exactly 1 from it and does not move by a unit.
+   */
   private openResetDialog(): void {
     if (this.dialog) return;
+    const scale = panelFitScale(SETTINGS_W, SETTINGS_H);
     const container = this.add.container(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
+    // The dim stays a CHILD of the scaled container, the way the Codex and the
+    // Store scrims do. Scaling it can only ever make it BIGGER than the screen
+    // — the scale is 1 on desktop and 2.2 in portrait, never below 1 — so it
+    // covers a full screen at 1 and 2.2 screens in portrait, and there is no
+    // edge for the board to show through. Its default hit area is the
+    // rectangle itself and is mapped through the very same transform, so what
+    // it catches always matches what it paints.
+    //
+    // ONLY THE BUTTON ROW CLOSES THIS. The dim catches the tap — being
+    // interactive is the whole of that, and it deliberately does NOT cancel the
+    // event (see the note in `ShopPanel.ts`) — but it does not dismiss: a thumb
+    // brushing the edge of the sheet must not throw away the settings the
+    // player opened it to change. "Keep Playing" is the way out and it is the
+    // widest, greenest thing on the plate.
     const dim = this.add
       .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
       .setInteractive();
     const panel = this.add.graphics();
     panel.fillStyle(num(PALETTE.night), 0.25);
-    panel.fillRoundedRect(-450, -368 + 16, 900, 736, 52);
+    panel.fillRoundedRect(-SETTINGS_W / 2, -SETTINGS_H / 2 + 16, SETTINGS_W, SETTINGS_H, 52);
     panel.fillStyle(num(PALETTE.cream), 1);
-    panel.fillRoundedRect(-450, -368, 900, 736, 52);
+    panel.fillRoundedRect(-SETTINGS_W / 2, -SETTINGS_H / 2, SETTINGS_W, SETTINGS_H, 52);
     panel.lineStyle(8, num(PALETTE.lava), 1);
-    panel.strokeRoundedRect(-450, -368, 900, 736, 52);
+    panel.strokeRoundedRect(-SETTINGS_W / 2, -SETTINGS_H / 2, SETTINGS_W, SETTINGS_H, 52);
     const title = this.add
-      .text(0, -312, 'Settings', {
+      .text(0, -312 + SETTINGS_TOP_DY, 'Settings', {
         fontFamily: FONT.ui,
         fontSize: '54px',
         fontStyle: 'bold',
@@ -2351,7 +2448,7 @@ export class UIScene extends Phaser.Scene {
     // where the title's descenders are — the word "Settings" was being cut by
     // the button under it. 0.86x0.62 gives a 361x94 key with 14 units of air
     // under the heading.
-    const musicBtn = this.add.container(0, -224);
+    const musicBtn = this.add.container(0, -224 + SETTINGS_TOP_DY);
     const musicBg = this.add
       .image(0, 0, getMusicMuted() ? 'ui_btn_play' : 'ui_btn_green')
       .setScale(0.86, 0.62);
@@ -2377,7 +2474,7 @@ export class UIScene extends Phaser.Scene {
     // Graphics quality. Cycles Auto → High → Balanced → Low. `high` is the
     // engine unchanged, so nothing here can cost a capable device anything —
     // the lower tiers only ever subtract.
-    const gfxBtn = this.add.container(0, -112);
+    const gfxBtn = this.add.container(0, -112 + SETTINGS_TOP_DY);
     const gfxBg = this.add.image(0, 0, 'ui_btn_green').setScale(0.86, 0.62);
     const gfxText = this.add
       .text(0, -8, graphics.label, {
@@ -2391,9 +2488,9 @@ export class UIScene extends Phaser.Scene {
     gfxBtn.add([gfxBg, gfxText]);
     gfxBtn.setSize(370, 100).setInteractive({ useHandCursor: true });
     const gfxNote = this.add
-      .text(0, -52, GRAPHICS_PROFILES[graphics.tier].note, {
+      .text(0, -52 + SETTINGS_TOP_DY, GRAPHICS_PROFILES[graphics.tier].note, {
         fontFamily: FONT.ui,
-        fontSize: '26px',
+        fontSize: `${SETTINGS_NOTE_PX}px`,
         color: '#8A6248',
         align: 'center',
         lineSpacing: 6,
@@ -2416,9 +2513,9 @@ export class UIScene extends Phaser.Scene {
       this.game.events.emit(GRAPHICS_EVENT);
     });
 
-    const divider = this.add.rectangle(0, 46, 760, 3, num(PALETTE.lava), 0.22);
+    const divider = this.add.rectangle(0, 46 + SETTINGS_BOT_DY, 760, 3, num(PALETTE.lava), 0.22);
     const resetTitle = this.add
-      .text(0, 88, 'Reset Cinder Hollow?', {
+      .text(0, 88 + SETTINGS_BOT_DY, 'Reset Cinder Hollow?', {
         fontFamily: FONT.ui,
         fontSize: '40px',
         fontStyle: 'bold',
@@ -2426,7 +2523,7 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     const body = this.add
-      .text(0, 150, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
+      .text(0, 150 + SETTINGS_BOT_DY, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
         fontFamily: FONT.ui,
         fontSize: '30px',
         color: '#8A6248',
@@ -2442,7 +2539,7 @@ export class UIScene extends Phaser.Scene {
       scaleX: number,
       onTap: () => void
     ): Phaser.GameObjects.Container => {
-      const button = this.add.container(x, 272);
+      const button = this.add.container(x, 272 + SETTINGS_BOT_DY);
       const bg = this.add.image(0, 0, texture).setScale(scaleX, 0.78);
       const text = this.add
         .text(0, -10, label, {
@@ -2471,11 +2568,19 @@ export class UIScene extends Phaser.Scene {
     // tool is out of the player's way without being out of reach.
     const showEditor =
       MAP_EDITOR_IN_SETTINGS || new URLSearchParams(window.location.search).has('mapedit');
+    // It rides the TOP block, so it takes the top block's shift and the title
+    // row stays the title row in both layouts. The geometry it has to respect:
+    // `ui_btn_green` is painted 210x76 logical, so 420x152 units, and at
+    // 0.68x0.78 the key is 286x119. At x=292 its left edge is 149 — clear of
+    // the centred 54px heading, which is ~240 units wide and so reaches ±120 —
+    // and its right edge is 435, 15 units inside the plate's 450. Scaling the
+    // container is uniform, so portrait holds every one of those margins in
+    // proportion instead of re-deriving them.
     const editorButton = showEditor
       ? makeButton(292, 'Map Editor', 'ui_btn_green', 0.68, () => {
           this.closeResetDialog();
           this.ctx.bus.emit('editor:open', {});
-        }).setY(-320)
+        }).setY(-320 + SETTINGS_TOP_DY)
       : null;
 
     const resetButton = makeButton(-210, 'Reset', 'ui_btn_play', 0.72, () => {
@@ -2489,8 +2594,11 @@ export class UIScene extends Phaser.Scene {
     container.add([dim, panel, title, musicBtn, gfxBtn, gfxNote, divider, resetTitle, body, resetButton, keepButton]);
     if (editorButton) container.add(editorButton); // last: it sits alone on the title row, nothing to sort against
     container.setAlpha(0);
-    container.setScale(0.94);
-    this.tweens.add({ targets: container, alpha: 1, scale: 1, duration: 170, ease: 'Back.easeOut' });
+    // The open pops from 94% to the PANEL scale, not to 1 — tweening to a bare
+    // 1 would play the flourish and then shrink the portrait sheet back to the
+    // stamp it was.
+    container.setScale(0.94 * scale);
+    this.tweens.add({ targets: container, alpha: 1, scale, duration: 170, ease: 'Back.easeOut' });
     this.dialog = container;
   }
 
