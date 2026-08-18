@@ -239,17 +239,32 @@ export class GeneratorSystem {
       this.bus.emit('generator:skipped', { itemId, chain: item.chain, currency });
       return;
     }
+    //
+    // A REFUSAL REPORTS ITS PRICE. The cost of a skip is only knowable here —
+    // it falls as the timer drains and a per-generator cap can raise it — so
+    // "you are N short" cannot be re-derived by whatever draws that line, and
+    // `generator:skip_refused` carries the number the wallet was measured
+    // against. `item:harvest_failed` still fires beside it and still owns the
+    // FEEL of the denial (the deny sound, the red flash on the piece); it just
+    // no longer has to pretend a Gold shortfall is a Warmth one, which is what
+    // made the HUD shake the Warmth gauge when the player ran out of Gold.
     if (currency === 'warmth') {
       const cost = skipWarmthCost(timer.at - now, timer.total, cfg.skipMaxGold);
       if (this.state.energyCurrent < cost) {
         this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
+        this.bus.emit('generator:skip_refused', {
+          itemId, chain: item.chain, tier: item.tier, currency, cost
+        });
         return;
       }
       this.bus.emit('energy:spend', { amount: cost, reason: 'skip_cooldown' });
     } else {
       const cost = skipEnergyCost(timer.at - now, timer.total, cfg.skipMaxGold);
       if (this.state.coins < cost) {
-        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
+        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'gold' });
+        this.bus.emit('generator:skip_refused', {
+          itemId, chain: item.chain, tier: item.tier, currency, cost
+        });
         return;
       }
       this.bus.emit('economy:add', { coins: -cost, reason: 'skip_cooldown' });

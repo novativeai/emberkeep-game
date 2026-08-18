@@ -7351,6 +7351,26 @@ export class BoardScene extends Phaser.Scene {
       bus.on('dragon:wandered', ({ itemId, to }) => this.flyWander(itemId, to)),
       bus.on('dragon:rest', ({ dragonId }) => this.showRestBadge(dragonId)), // already home — the work trip is a brief flourish
       bus.on('dragon:rested', ({ dragonId }) => this.wakeDragon(dragonId)),
+      // THE PRODUCER'S BUBBLE, when the purse is empty.
+      //
+      // The skip pin is the one gold spend that happens on the BOARD rather
+      // than on a shelf, and it was the deadest of the dead ends: the pin just
+      // sat there and the piece flashed red. It gets the same shortfall notice
+      // the Store and the Emporium raise — but this scene does not draw it.
+      // UIScene owns every modal in the game (and the tutorial gate that says
+      // whether this one is allowed at all), so the board's part is to say what
+      // was refused and what it cost, in the piece's own name.
+      bus.on('generator:skip_refused', ({ chain, tier, currency, cost }) => {
+        if (currency !== 'gold') return; // a Warmth shortfall is not a Gold one
+        const name =
+          this.ctx.data.chains.chains
+            .find((c) => c.id === chain)
+            ?.tiers.find((t) => t.tier === tier)?.name ?? chain;
+        // No article of our own: `chains.json` writes tier names as they are
+        // meant to be read, and several already carry one ("The Starwright's
+        // Bench"), so prefixing produced "skipping the The Starwright's Bench".
+        bus.emit('ui:topup_requested', { label: `skipping ${name}`, price: cost, source: 'skip' });
+      }),
       bus.on('item:harvest_failed', ({ generatorId, reason }) => {
         const sprite = this.itemSprites.get(generatorId);
         // A sleeping dragon is not REFUSING — it is asleep. The red denial

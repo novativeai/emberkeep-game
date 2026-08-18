@@ -362,6 +362,16 @@ export class StorePanel extends Phaser.GameObjects.Container {
   private maxScroll = 0;
   private dragFrom: number | null = null;
   private dragScrollFrom = 0;
+  /**
+   * The shortfall notice is up over this panel — the shelf holds still.
+   *
+   * Not politeness, and not something the scrim can do for us: the drag is read
+   * off `scene.input`'s own POINTER_DOWN/MOVE/UP, which fire for every pointer
+   * in the scene regardless of which object captured the event. Without this a
+   * thumb sliding on the notice scrolls the shelf underneath it, which is
+   * exactly the place the notice exists to keep.
+   */
+  private frozen = false;
   /** True once a pointer has travelled past DRAG_SLOP — consumed by the buy
    *  handler so a scroll that ends over a card does not also buy it. */
   private dragged = false;
@@ -500,6 +510,14 @@ export class StorePanel extends Phaser.GameObjects.Container {
     this.offBus.push(
       bus.on('store:purchase_failed', ({ itemId, reason }) => this.refuse(itemId, reason))
     );
+    this.offBus.push(
+      bus.on('ui:topup_toggled', ({ open }) => {
+        this.frozen = open;
+        // Drop any drag in flight, so the shelf does not resume a gesture that
+        // started before the notice went up and ended somewhere else entirely.
+        if (open) this.dragFrom = null;
+      })
+    );
     // Scene-level input rather than an interactive Zone over the shelf: a Zone
     // big enough to catch the drag would sit on top of every card and swallow
     // the taps that buy them. The handlers gate on `isOpen` instead.
@@ -575,6 +593,60 @@ export class StorePanel extends Phaser.GameObjects.Container {
     if (i < 0 || i >= this.sections.length || this.activeIndex === i) return;
     this.activeIndex = i;
     this.refresh();
+  }
+
+  /**
+   * WHERE THE PLAYER WAS, as a value they can be put back at.
+   *
+   * A gold refusal here sends them to the Emporium, and the whole reason the
+   * shortfall notice exists is that being sent somewhere must not cost them
+   * their place. Section AND scroll, because the shelf is four tabs of a list
+   * that scrolls: coming back to the right tab at the top of it is still
+   * losing your place if the card you were reading was eight rows down.
+   */
+  viewState(): { section: number; scroll: number } {
+    return { section: this.activeIndex, scroll: this.scrollY };
+  }
+
+  /**
+   * Put the shelf back. Both halves are re-clamped rather than trusted: the
+   * catalogue can have changed while the player was away (a purchase, a world
+   * crossing), so the row they were looking at may no longer exist and the
+   * remembered scroll may be past the end of a shorter shelf.
+   */
+  /**
+   * Put the player back where they were — and SURVIVE the rebuild that follows.
+   *
+   * `setScroll` here is not enough on its own. `open()` kicks off
+   * `ensureTextures(...)`, whose callback rebuilds the body when the art
+   * arrives, and `buildBody()` ends with `setScroll(0)` in both layout
+   * branches. On a warm cache the textures are already resident and the
+   * callback runs before this line; on a cold one it runs after, and the
+   * restored position is thrown away. The whole promise of the return ticket
+   * is the second case, which is the one a player crossing into a new world
+   * actually meets.
+   *
+   * So the position is PARKED as well as applied, and `buildBody` spends the
+   * parked value instead of zeroing. One-shot: a rebuild the player caused by
+   * changing tabs must still start at the top.
+   */
+  restoreView(view: { section: number; scroll: number }): void {
+    this.activeIndex = Phaser.Math.Clamp(view.section, 0, this.sections.length - 1);
+    this.pendingScroll = view.scroll;
+    this.refresh();
+  }
+
+  /** A scroll offset owed to a restore, spent by the next `buildBody`. Null
+   *  when a rebuild should land at the top, which is every other time. */
+  private pendingScroll: number | null = null;
+
+  /** Land the shelf: at the parked offset if a restore owes one, otherwise at
+   *  the top. `setScroll` re-clamps, so a section with less content than the
+   *  one we left cannot strand the view past its own floor. */
+  private spendPendingScroll(): void {
+    const owed = this.pendingScroll;
+    this.pendingScroll = null;
+    this.setScroll(owed ?? 0);
   }
 
   requestClose(): void {
@@ -683,6 +755,16 @@ export class StorePanel extends Phaser.GameObjects.Container {
     }
   }
 
+  /** A catalogue item by id, across every section — the shelf draws one section
+   *  at a time, but a refusal can name any of them. */
+  private itemById(itemId: string): StoreItem | undefined {
+    for (const section of this.sections) {
+      const found = section.items.find((item) => item.id === itemId);
+      if (found) return found;
+    }
+    return undefined;
+  }
+
   /** Where a padlocked card is sold, as the player would name it. */
   private lockedIn(item: StoreItem): string {
     return this.gameState.worlds.get(item.world ?? '')?.name ?? 'another world';
@@ -691,6 +773,19 @@ export class StorePanel extends Phaser.GameObjects.Container {
   /** Shake + redden the refused price, so a denial is felt on the card the
    *  player tapped rather than announced somewhere else on screen. */
   private refuse(itemId: string, reason: 'gold' | 'owned' | 'no_room' | 'locked'): void {
+    // OFFERED BEFORE THE SHAKE, and before the early return below.
+    //
+    // The shake needs the refused card to still be on screen; the notice does
+    // not, and a purchase can be refused for an item the shelf has since
+    // scrolled or re-tabbed away from (StoreSystem re-validates on its own
+    // data, not on what is drawn). Whether the offer is ALLOWED is UIScene's
+    // question, not this panel's — it holds the tutorial gate and `TOP_UP.offer`.
+    if (reason === 'gold') {
+      const item = this.itemById(itemId);
+      if (item) {
+        this.bus.emit('ui:topup_requested', { label: item.name, price: item.gold, source: 'store' });
+      }
+    }
     const label = this.priceLabels.get(itemId);
     const card = this.cardsById.get(itemId);
     if (!label || !card) return;
@@ -943,7 +1038,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
           item
         );
       });
-      this.setScroll(0);
+      this.spendPendingScroll();
       this.seatMask();
       return;
     }
@@ -986,7 +1081,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
         item
       );
     });
-    this.setScroll(0);
+    this.spendPendingScroll();
     this.seatMask();
   }
 
@@ -1015,12 +1110,12 @@ export class StorePanel extends Phaser.GameObjects.Container {
 
   /** Wheel and drag both scroll; neither may reach the board behind the panel. */
   private onWheel = (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number): void => {
-    if (!this.isOpen || this.maxScroll <= 0) return;
+    if (!this.isOpen || this.frozen || this.maxScroll <= 0) return;
     this.setScroll(this.scrollY + dy);
   };
 
   private onPointerDown = (p: Phaser.Input.Pointer): void => {
-    if (!this.isOpen) return;
+    if (!this.isOpen || this.frozen) return;
     this.dragFrom = p.y;
     this.dragScrollFrom = this.scrollY;
     this.dragged = false;

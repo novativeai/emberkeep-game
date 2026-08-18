@@ -24,6 +24,7 @@ import {
   STORY_BEAT_HOLD_MS,
   TILE_W,
   TIMINGS,
+  TOP_UP,
   TRAVEL_VEIL_TIMEOUT_MS,
   TRAVEL_WIPE,
   UI_SCALE,
@@ -46,6 +47,7 @@ import type {
   ResolvedHand,
   SpeakerId,
   TilePos,
+  TopUpSource,
   TutorialStepEvent,
   TutorialUiTarget
 } from '../core/types';
@@ -64,6 +66,7 @@ import { LedgerPanel } from '../ui/LedgerPanel';
 import { QuestTracker } from '../ui/QuestTracker';
 import { StatusPanel } from '../ui/StatusPanel';
 import { ShopPanel } from '../ui/ShopPanel';
+import { TopUpNotice } from '../ui/TopUpNotice';
 import { renderScale } from '../core/render-scale';
 import { GRAPHICS_QUALITIES } from '../core/graphics';
 import { GRAPHICS_EVENT, GRAPHICS_PROFILES, graphics } from '../core/graphicsState';
@@ -174,6 +177,24 @@ export class UIScene extends Phaser.Scene {
   private commission!: CommissionPanel;
   private store!: StorePanel;
   private cauldron!: CauldronPanel;
+  /** "You are 42 gold short" — raised over whatever refused, never on its own. */
+  private topUp!: TopUpNotice;
+  /**
+   * THE RETURN TICKET, and why it is a VALUE rather than a callback.
+   *
+   * The shortfall notice's whole promise is that being sent to the coin shop
+   * does not cost the player their place, so something has to remember where
+   * they were while they are away. A stored closure over a panel is how that
+   * leaks: it survives the panel being closed, reset or rebuilt underneath it,
+   * and fires into a corpse. This is plain data — a section index and a scroll
+   * offset — re-clamped by the panel when it is handed back, so the worst a
+   * stale ticket can do is put the player at the top of the first tab.
+   *
+   * It is consumed on the first `ui:shop_toggled { open: false }` after it is
+   * written, and dropped on a world crossing (the stall's catalogue changes
+   * with the world, so the place it names has stopped meaning anything).
+   */
+  private topUpReturn: { store: { section: number; scroll: number } } | null = null;
   private tourUiArrow?: Phaser.GameObjects.Image;
   /** Self-driven: opens on `nest:hatched`. Held so it stays on the display
    *  list and the UI Builder can style it; never read back. */
@@ -239,6 +260,32 @@ export class UIScene extends Phaser.Scene {
    * the hint asks a question with an answer instead of guessing from a pixel.
    */
   private handOwner: 'tutorial' | 'hint' | 'carry' | null = null;
+
+  /**
+   * Is any modal panel out?
+   *
+   * Every panel in this scene is a full-screen scrim plus a plate, so "open"
+   * and "the board is hidden" are the same fact. The idle merge hint asks this
+   * before pointing at a cell; the tutorial deliberately does NOT, because its
+   * hand's whole job is sometimes to point at a control ON one of these.
+   *
+   * Listed rather than derived: there is no registry of panels to walk, and a
+   * panel missing from this list fails SILENTLY (a hand over a shelf), so the
+   * list is the thing to update when a ninth panel arrives.
+   */
+  private panelUp(): boolean {
+    return (
+      this.ledger.isOpen ||
+      this.shop.isOpen ||
+      this.bag.isOpen ||
+      this.commission.isOpen ||
+      this.store.isOpen ||
+      this.cauldron.isOpen ||
+      this.cookbook.isOpen ||
+      this.codex.isOpen ||
+      this.topUp.isOpen
+    );
+  }
   /** The carry lesson holds the hand until the thing has been carried — see
    *  `hint:carry`. Kept apart from `hintHand` so the idle merge suggestion
    *  cannot take the hand out from under a lesson in progress. */
@@ -323,6 +370,16 @@ export class UIScene extends Phaser.Scene {
 
     this.store = new StorePanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.store, this.ctx);
     this.store.setDepth(DEPTH_PANEL + 7);
+
+    // ABOVE EVERY PANEL (69 is the highest, the Commission's), because it is
+    // always raised OVER one and its scrim is what keeps the shelf underneath
+    // from taking a second tap. Still well under the tutorial band (100) and
+    // the dialog band (200): it is post-tutorial-only, and the IAP confirm card
+    // it hands the player on to must be able to sit on top of it.
+    this.topUp = new TopUpNotice(this, this.ctx.bus, this.ctx.state, (source) =>
+      this.goToCoinShop(source)
+    );
+    this.topUp.setDepth(DEPTH_PANEL + 15);
 
     // Selyna's Cauldron — opened by tapping the pot decor in the Runevault hub.
     this.cauldron = new CauldronPanel(this, this.ctx.bus, this.ctx);
@@ -464,6 +521,7 @@ export class UIScene extends Phaser.Scene {
       this.cookbook.teardown();
       this.codex.teardown();
       this.shop.teardown();
+      this.topUp.teardown();
       this.commission.teardown();
       this.questTracker.teardown();
       this.statusPanel.teardown();
@@ -482,6 +540,17 @@ export class UIScene extends Phaser.Scene {
 
   override update(_time: number, delta: number): void {
     this.reveal.tick(delta);
+    // A PANEL OPENED OVER A STANDING HINT. The gate in `hint:merge` stops one
+    // from going up while a panel is out; this is the other order of events,
+    // and it is the common one — the hand appears on a quiet board, then the
+    // player opens the shop it was waiting for them to afford. Withdrawn here
+    // rather than on eight `*_opened` events, because the question is "is any
+    // panel up", not "did this one just open", and one test cannot drift out
+    // of sync with the others.
+    if (this.hintHand && this.panelUp()) {
+      this.hintHand = false;
+      this.clearMarkers();
+    }
     // Re-project board-anchored tutorial markers EVERY frame so they stay glued
     // to their cell as the board camera pans/zooms (they live on the UI scene's
     // own fixed camera, so without this they'd appear stuck to the screen).
@@ -682,8 +751,62 @@ export class UIScene extends Phaser.Scene {
         if (!this.lastStep?.done) return;
         this.openIapConfirmDialog(packId);
       }),
+      /*
+       * THE SHORTFALL NOTICE, AND THE ONE GATE THAT CAN BRICK A PLAYTHROUGH.
+       *
+       * `!this.lastStep?.done` — the SAME test the checkout above uses, and for
+       * a harder reason. Step 58 (`buy_energy`) has `allow: marketplace`, so
+       * the Emporium is open mid-tutorial, and its WARMTH rows 2 and 3 cost 60
+       * and 130 Gold. A player at that beat holding fewer than 60 taps "Hearth
+       * Bundle" and gets a Gold refusal — mid-lesson, from a panel the script
+       * put in front of them. Raise a modal over that and its scrim covers the
+       * free Spark plate (`ShopPanel.getFreeButtonPos`), which is the ONLY
+       * thing that can fire `marketplace:purchased`, which is that step's gate.
+       * The run would be unfinishable. So "the tutorial is over" is the test —
+       * not "no lesson is on screen right now", which that beat would pass.
+       *
+       * The second half of the gate is `TOP_UP.offer`: a surface has to be
+       * named there before it can put a paywall in front of anybody.
+       */
+      bus.on('ui:topup_requested', ({ label, price, source }) => {
+        if (!this.lastStep?.done) return;
+        if (!TOP_UP.offer[source]) return;
+        if (this.topUp.isOpen || this.iapDialog || this.dialog) return;
+        this.topUp.open(label, price, source);
+      }),
+      /*
+       * THE WAY BACK. Consumed on the first close after it was written, so a
+       * ticket can never be spent twice, and dropped rather than followed when
+       * the panel it names has since been closed by something else — the store
+       * simply re-opens where it was, which is the whole promise.
+       */
+      bus.on('ui:shop_toggled', ({ open, cause }) => {
+        if (open) return;
+        // A close the game made on its own (the finale clearing the stage) is
+        // not the player walking out of the coin shop. Drop the ticket rather
+        // than follow it — re-opening the Store over the finale is worse than
+        // losing a scroll position.
+        if (cause === 'system') {
+          this.topUpReturn = null;
+          return;
+        }
+        const back = this.topUpReturn;
+        this.topUpReturn = null;
+        if (!back) return;
+        this.store.open();
+        this.store.restoreView(back.store);
+      }),
       bus.on('iap:completed', (grant) => this.celebratePurchase(grant)),
       bus.on('iap:failed', ({ reason }) => this.onIapFailed(reason)),
+      // A crossing changes the stall's catalogue (local goods are only on the
+      // shelf in the world that makes them), so a ticket back to a section of
+      // the old world's Store has stopped meaning anything — and a notice about
+      // the price of skipping a House on the isle the player has just left is
+      // about a piece that is no longer on the board.
+      bus.on('world:switched', () => {
+        this.topUpReturn = null;
+        this.topUp.requestClose();
+      }),
       bus.on('order:completed', ({ orderId, rewards }) => {
         this.time.delayedCall(650, () => {
           if (this.ledger.isOpen && this.lastStep?.gateType === 'tap') this.ledger.requestClose();
@@ -809,6 +932,19 @@ export class UIScene extends Phaser.Scene {
         // asked whether the hand was visible, which is why an ownerless hand
         // silenced the hint forever.
         if (this.handOwner === 'tutorial' || this.handOwner === 'carry') return;
+        // AND SO DOES AN OPEN PANEL — a hand pointing at a board the player
+        // cannot see is not help, it is litter.
+        //
+        // The hand sits at DEPTH_TUTORIAL + 2 = 102 and the panels between 60
+        // and 69, so it paints OVER every one of them. That is deliberate and
+        // must stay: the tutorial's hand has to be able to point at the
+        // Ledger's Deliver key and the Cookbook's ✕. But the idle hint points
+        // at BOARD CELLS, and when a panel is up those cells are behind it —
+        // so the gauntlet lands on a shop card, pointing at nothing, looking
+        // exactly like a stray sprite. It was always possible (open a panel
+        // while a hand is up); the 30s heartbeat is what made it likely,
+        // because now the hint re-poses itself while you shop.
+        if (this.panelUp()) return;
         // Same rule the board's tick uses: a beat can only be on screen in the
         // world the walkthrough is authored for, so `tutorialDone` alone was
         // silencing the hint for every save that left the isle early.
@@ -1345,7 +1481,7 @@ export class UIScene extends Phaser.Scene {
     this.finaleReleased = false;
     this.clearRecipeHint(); // the finale owns the stage — no competing pointers
     this.ledger.requestClose();
-    this.shop.requestClose();
+    this.shop.requestClose('system'); // clearing the stage is not the player leaving
     this.cookbook.requestClose();
     this.time.delayedCall(FINALE.elderAtMs, () =>
       this.beat('elder.speaks', () => {
@@ -2654,6 +2790,40 @@ export class UIScene extends Phaser.Scene {
     if (grant.keys > 0) parts.push(`🗝 +${grant.keys} Gold Key${grant.keys > 1 ? 's' : ''}`);
     if (grant.energy > 0) parts.push(`⚡ +${grant.energy} Warmth`);
     return parts.join('    ');
+  }
+
+  /**
+   * THE SWITCH: the shortfall notice's one action, and the only thing on it
+   * that leaves.
+   *
+   * It opens the coin shop — never a checkout. `iapBridge.beginCheckout` has to
+   * run inside a user gesture or the payment window is popup-blocked, and this
+   * runs at the end of a chain that STARTED with a refusal; the tap that opens
+   * a window is the one the player makes on a pack in the Emporium, two screens
+   * from here. That is not a detail of this method, it is the reason it exists.
+   *
+   * Three sources, two behaviours:
+   *
+   *   warmth  the refusal happened inside the Emporium already, so the coin
+   *           shop is the tab next door — switch, do not stack a second copy of
+   *           the same hall over the first.
+   *   store   the Keeper's Store is a different panel, so it stands down and
+   *           leaves a ticket back to the exact shelf and scroll it was on.
+   *   skip    the refusal happened on the BOARD, which is where closing the
+   *           Emporium returns the player anyway. No ticket, and none needed.
+   */
+  private goToCoinShop(source: TopUpSource): void {
+    // Robust rather than assumed: `warmth` can only be raised from an open
+    // Emporium, but if it somehow is not open the action must still do the
+    // thing it promises rather than nothing at all.
+    if (source === 'warmth' && this.shop.isOpen) {
+      this.shop.showCurrency('coins');
+      return;
+    }
+    // Read the place BEFORE closing the panel that holds it.
+    this.topUpReturn = this.store.isOpen ? { store: this.store.viewState() } : null;
+    if (this.store.isOpen) this.store.requestClose();
+    this.shop.open('coins');
   }
 
   /**

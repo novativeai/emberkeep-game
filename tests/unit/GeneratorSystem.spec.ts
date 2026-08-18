@@ -147,7 +147,13 @@ describe('skip cooldown for Warmth', () => {
     expect(ctx.state.coins).toBeLessThan(coinsBefore);
   });
 
-  it('refuses to skip without enough Warmth (and keeps the cooldown)', () => {
+  /**
+   * The refusal names the currency it was refused IN. It used to say `energy`
+   * whichever purse was empty — which is why the HUD shook the Warmth gauge at
+   * a player who had plenty of Warmth and no Gold, and why this very test was
+   * titled "without enough Warmth" while spending Gold.
+   */
+  it('refuses a GOLD skip as `gold`, keeps the cooldown, and reports the price', () => {
     const ctx = createTestContext();
     const gen = ctx.state.addItem({
       chain: 'ember_dragon',
@@ -161,11 +167,61 @@ describe('skip cooldown for Warmth', () => {
     const cooldownEnds = gen.readyAt!;
     ctx.state.coins = GENERATOR_SKIP_MAX_ENERGY - 1; // not enough GOLD for a fresh skip
     const fails = capture(ctx.bus, 'item:harvest_failed');
+    const refused = capture(ctx.bus, 'generator:skip_refused');
 
     ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
 
     expect(gen.readyAt!).toBe(cooldownEnds); // unchanged
+    expect(fails.some((f) => f.reason === 'gold')).toBe(true);
+    expect(fails.some((f) => f.reason === 'energy')).toBe(false);
+    // The PRICE rides the refusal: it is only knowable here (it falls as the
+    // timer drains), so "you are N short" cannot be re-derived by the UI.
+    expect(refused).toHaveLength(1);
+    expect(refused[0]).toMatchObject({ itemId: gen.id, chain: 'ember_dragon', currency: 'gold' });
+    expect(refused[0]!.cost).toBeGreaterThan(ctx.state.coins);
+  });
+
+  it('refuses a WARMTH skip as `energy`, and reports its own (dearer) price', () => {
+    const ctx = createTestContext();
+    const gen = ctx.state.addItem({
+      chain: 'ember_dragon',
+      tier: 3,
+      col: 2,
+      row: 2,
+      kind: 'item',
+      readyAt: ctx.clock.now()
+    });
+    ctx.bus.emit('item:tapped', { itemId: gen.id }); // cooling
+    const cooldownEnds = gen.readyAt!;
+    ctx.state.energyCurrent = 0;
+    const fails = capture(ctx.bus, 'item:harvest_failed');
+    const refused = capture(ctx.bus, 'generator:skip_refused');
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'warmth' });
+
+    expect(gen.readyAt!).toBe(cooldownEnds);
     expect(fails.some((f) => f.reason === 'energy')).toBe(true);
+    expect(refused).toHaveLength(1);
+    expect(refused[0]).toMatchObject({ currency: 'warmth' });
+  });
+
+  it('a skip that goes through refuses nothing', () => {
+    const ctx = createTestContext();
+    const gen = ctx.state.addItem({
+      chain: 'ember_dragon',
+      tier: 3,
+      col: 2,
+      row: 2,
+      kind: 'item',
+      readyAt: ctx.clock.now()
+    });
+    ctx.bus.emit('item:tapped', { itemId: gen.id });
+    ctx.state.coins = 999;
+    const refused = capture(ctx.bus, 'generator:skip_refused');
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
+
+    expect(refused).toHaveLength(0);
   });
 });
 

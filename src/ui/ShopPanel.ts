@@ -3,14 +3,16 @@ import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../cor
 import { FONT, INK } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
-import { iapBridge } from '../core/iapBridge';
+import { coinOffers } from '../core/coinPacks';
 import { uiRegistry } from './theme';
 
 type Currency = 'energy' | 'coins';
 
 interface Product {
   amount: number;
-  /** Real-money price tag ("€2.99"). Mock values when the hub isn't there. */
+  /** Real-money price tag, ALWAYS in EUR and always formatted by
+   *  `coinPacks.priceOf` — the hub's catalog is EUR and so is the authored
+   *  showcase that stands in for it. Empty on a Gold-priced row. */
   price: string;
   /** In-game GOLD price — the demo's Warmth refills are bought with the Gold
    *  the player earns (MECHANICS §7: Gold buys comfort, never progression). */
@@ -19,10 +21,19 @@ interface Product {
   /** Shelf name, so a pack reads as a good rather than as a number. */
   name: string;
   /** Set when this row is a REAL hub pack — tapping it starts the purchase
-   *  flow (`ui:iap_buy_requested`) instead of the mock grant. */
+   *  flow (`ui:iap_buy_requested`) instead of the mock grant. Its PRESENCE is
+   *  the routing rule, and `coinOffers()` is the only thing that sets it. */
   packId?: string;
 }
-const SHOP: Record<Currency, { title: string; tab: string; icon: string; iconScale: number; items: Product[] }> = {
+/**
+ * The two shelves' CHROME. The WARMTH shelf's goods are authored right here,
+ * because they are a Gold sink and Gold is a game number; the GOLD shelf's are
+ * NOT, because they are money. `src/data/coin-packs.json` is the one place a
+ * coin pack is written down and `coinOffers()` is the one thing that reads it
+ * (see src/core/coinPacks.ts) — the dollar-priced copy that used to live here
+ * beside a EUR catalog was a divergence with a currency symbol on it.
+ */
+const SHOP: Record<Currency, { title: string; tab: string; icon: string; iconScale: number; items?: Product[] }> = {
   energy: {
     title: 'Warmth',
     tab: 'WARMTH',
@@ -38,12 +49,7 @@ const SHOP: Record<Currency, { title: string; tab: string; icon: string; iconSca
     title: 'Gold',
     tab: 'GOLD',
     icon: 'ui_icon_coin',
-    iconScale: 0.34,
-    items: [
-      { amount: 200, price: '$2.99', name: 'Coin Purse' },
-      { amount: 900, price: '$9.99', best: true, name: 'Merchant’s Chest' },
-      { amount: 2100, price: '$19.99', name: 'Dragon’s Hoard' }
-    ]
+    iconScale: 0.34
   }
   // No Key shop: keys gate STORY and are never sold (MECHANICS §7 — monetise
   // impatience and friction, never progression).
@@ -237,6 +243,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     this.build();
 
     this.isOpen = true;
+    this.bus.emit('ui:shop_toggled', { open: true, currency });
     this.setVisible(true).setAlpha(0).setScale(this.baseScale * 0.94);
     this.scene.tweens.add({
       targets: this,
@@ -247,9 +254,27 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     });
   }
 
-  requestClose(): void {
+  /**
+   * `cause` SAYS WHO CLOSED IT, and the return ticket depends on the answer.
+   *
+   * The shortfall notice's ticket rides `ui:shop_toggled { open: false }`: the
+   * player left the coin shop, so put them back on the shelf they came from.
+   * But the game closes this panel on its own too — the finale calls
+   * `requestClose()` on the Ledger, the Emporium and the Cookbook to clear the
+   * stage, and a ticket fired from THAT re-opened the Keeper's Store, scroll
+   * position and all, on top of the chapter's one irreversible story beat.
+   *
+   * So a system close says so, and the ticket only answers to `'player'`. The
+   * default is `'player'` because the ✕ is what calls this in every other
+   * place; the exceptions are the ones that have to be explicit.
+   */
+  requestClose(cause: 'player' | 'system' = 'player'): void {
     if (!this.isOpen) return;
     this.isOpen = false;
+    // Announced on the way OUT, before the fade: the shortfall notice's return
+    // ticket rides this, and a player who has left the coin shop should be back
+    // where they came from by the time the Emporium has finished dissolving.
+    this.bus.emit('ui:shop_toggled', { open: false, currency: this.currency, cause });
     this.scene.tweens.add({
       targets: this,
       alpha: 0,
@@ -258,6 +283,23 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       ease: 'Sine.easeIn',
       onComplete: () => this.setVisible(false)
     });
+  }
+
+  /**
+   * Switch shelves on an already-open Emporium.
+   *
+   * The WARMTH shelf's own Gold refusal raises the shortfall notice INSIDE this
+   * panel, and the coin shop it has to send the player to is this same panel's
+   * other tab — so the way across is a tab switch, never a second Emporium
+   * opened over the first. A no-op when the panel is shut: the notice is
+   * dismissed before its action runs, and nothing else may open a shelf without
+   * opening the hall.
+   */
+  showCurrency(currency: Currency): void {
+    if (!this.isOpen || this.currency === currency) return;
+    this.currency = currency;
+    this.build();
+    this.bus.emit('ui:shop_toggled', { open: true, currency });
   }
 
   /** Screen position of the live FREE plate (UIScene camera is fixed, so the
@@ -348,6 +390,25 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     const order = items.map((item, tier) => ({ item, tier }));
     if (freeIndex >= 0) order.unshift(...order.splice(freeIndex, 1));
 
+    // A LIVE GATEWAY THAT SELLS NO COIN PACKS. `coinOffers()` answers `[]`
+    // rather than falling back to the free showcase (that fallback is only for
+    // a build with no hub at all — see coinPacks.ts), so the honest shelf here
+    // is an empty one that says so. Without this the row loop simply draws
+    // nothing and the player reads a blank frame as a broken screen.
+    if (order.length === 0) {
+      this.shelf.add(
+        this.scene.add
+          .text(0, SHELF_TOP + SHELF_H / 2, 'No packs are on sale right now.', {
+            fontFamily: FONT.ui,
+            fontSize: '40px',
+            color: INK.onFieldDim,
+            align: 'center'
+          })
+          .setOrigin(0.5)
+      );
+      return;
+    }
+
     const total = order.length * ROW_H + (order.length - 1) * ROW_GAP;
     const top = SHELF_TOP + (SHELF_H - total) / 2 + ROW_H / 2;
     order.forEach(({ item, tier }, i) => {
@@ -365,19 +426,15 @@ export class ShopPanel extends Phaser.GameObjects.Container {
    */
   private shelfItems(): Product[] {
     if (this.currency === 'coins') {
-      const packs = iapBridge.coinPacks();
-      if (packs.length > 0) {
-        const biggest = Math.max(...packs.map((p) => p.coins));
-        return packs.map((p) => ({
-          amount: p.coins,
-          price: `€${p.amountEur.toFixed(2)}`,
-          name: p.name,
-          best: packs.length > 1 && p.coins === biggest,
-          packId: p.id
-        }));
-      }
+      return coinOffers().map((offer) => ({
+        amount: offer.coins,
+        price: offer.price,
+        name: offer.name,
+        best: offer.best,
+        packId: offer.packId
+      }));
     }
-    return SHOP[this.currency].items;
+    return SHOP[this.currency].items ?? [];
   }
 
   /**
@@ -436,7 +493,9 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       const cost = p.gold ?? Number(p.price.replace(/[^0-9.]/g, ''));
       return cost > 0 ? p.amount / cost : 0;
     };
-    const base = rate(items[0]!);
+    const first = items[0];
+    if (!first) return 0;
+    const base = rate(first);
     if (!base) return 0;
     return Math.round((rate(item) / base - 1) * 100);
   }
@@ -586,12 +645,21 @@ export class ShopPanel extends Phaser.GameObjects.Container {
         return;
       }
       // GOLD-priced pack: check the coffer; deny with a shake + red flash when
-      // short (the coins never go negative).
+      // short (the coins never go negative), and offer the way out.
       if (!isFree && item.gold !== undefined) {
         if (this.gameState.coins < item.gold) {
           text.setColor('#C4361F');
           this.scene.time.delayedCall(450, () => text.setColor(INK.onPlate));
           this.scene.tweens.add({ targets: btn, x: btn.x + 10, duration: 45, yoyo: true, repeat: 3 });
+          // Source `warmth`, because this refusal happened INSIDE the coin
+          // shop's own hall: the notice's action switches this panel to its
+          // GOLD tab rather than opening a second Emporium over this one.
+          // UIScene decides whether the offer is allowed at all.
+          this.bus.emit('ui:topup_requested', {
+            label: item.name,
+            price: item.gold,
+            source: 'warmth'
+          });
           return;
         }
         this.bus.emit('economy:add', { coins: -item.gold, reason: 'shop:warmth' });

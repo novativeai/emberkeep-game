@@ -1,0 +1,7 @@
+{
+  "showcase": [
+    { "name": "Coin Purse", "coins": 200, "amountEur": 2.99 },
+    { "name": "Merchant’s Chest", "coins": 900, "amountEur": 9.99, "best": true },
+    { "name": "Dragon’s Hoard", "coins": 2100, "amountEur": 19.99 }
+  ]
+}

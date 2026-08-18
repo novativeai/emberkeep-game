@@ -1231,6 +1231,61 @@ export interface IapPackInfo {
   energy: number;
 }
 
+/**
+ * One authored SHOWCASE coin pack (`src/data/coin-packs.json`).
+ *
+ * The showcase is what a build with no gateway shows where the hub's real
+ * catalog would be — the Emporium's GOLD shelf falls back to it. It is
+ * deliberately id-LESS: an offer's `packId` is what routes a tap to the real
+ * checkout, so a showcase row must have no way of growing one.
+ */
+export interface CoinPackShowcase {
+  name: string;
+  coins: number;
+  /** Price in EUR. A NUMBER, formatted at the one place that prints it — the
+   *  hub's own packs arrive as `amountEur` too, so both sources print alike. */
+  amountEur: number;
+  /** The authored "MOST POPULAR" row. Presentation only. */
+  best?: boolean;
+}
+
+export interface CoinPacksData {
+  showcase: CoinPackShowcase[];
+}
+
+/**
+ * A coin pack as a SHELF sees it, whichever source it came from
+ * (`src/core/coinPacks.ts` resolves the two into this one shape).
+ */
+export interface CoinOffer {
+  name: string;
+  coins: number;
+  /** Formatted for print ("€9.99") — EUR on both sources. */
+  price: string;
+  /** Set ONLY on a REAL hub pack. Its PRESENCE is the routing rule: with it a
+   *  tap emits `ui:iap_buy_requested`; without it this row came from the
+   *  authored showcase and a tap can only take the mock-grant path. */
+  packId?: string;
+  best?: boolean;
+}
+
+/**
+ * Which refused purchase raised the shortfall notice.
+ *
+ * Named surfaces rather than a free string, so adding one is a deliberate edit
+ * — `TOP_UP.offer` decides whether that surface actually offers the notice, and
+ * a surface it has never heard of cannot quietly start showing a paywall.
+ *
+ *   store   the Keeper's Store — a skin/decor/dragon refused for want of Gold.
+ *   warmth  the Emporium's own WARMTH shelf, refused the same way. This one is
+ *           already INSIDE the coin shop's panel, so its way out is a TAB
+ *           switch rather than a second copy of the Emporium.
+ *   skip    the offer pinned over a working producer (the House's bubble) —
+ *           the board surface the owner named, and the only one of the three
+ *           that is not a panel.
+ */
+export type TopUpSource = 'store' | 'warmth' | 'skip';
+
 /* ------------------------------------------------------------------ */
 /* EventBus contract                                                    */
 /* ------------------------------------------------------------------ */
@@ -1301,6 +1356,14 @@ export interface EventMap {
   'ui:ledger_toggled': { open: boolean };
   /** The Keeper's Store opened/closed. */
   'ui:store_toggled': { open: boolean };
+  /** The Ember Emporium opened/closed, and on which shelf. The shortfall
+   *  notice's "return ticket" rides the CLOSE: the player who was sent here
+   *  from another panel is put back where they were when they leave. */
+  /** `cause` is who closed it: the player (the ✕) or the game itself (the
+   *  finale clearing the stage). The shortfall notice's return ticket only
+   *  answers to `'player'` — a system close must not put the Keeper's Store
+   *  back on screen over a story beat. Absent on the `open: true` side. */
+  'ui:shop_toggled': { open: boolean; currency: 'energy' | 'coins'; cause?: 'player' | 'system' };
   /** The Emberkeep Cookbook panel opened/closed (tutorial gates + analytics). */
   'ui:cookbook_opened': { discovered: number };
   'ui:cookbook_closed': { discovered: number };
@@ -1322,6 +1385,34 @@ export interface EventMap {
   /** Intent: a real-money pack's price plate was tapped in the Emporium.
    *  UIScene gates it (post-tutorial only) and opens the confirm dialog. */
   'ui:iap_buy_requested': { packId: string };
+  /**
+   * Intent: a purchase was just refused for want of GOLD, and the surface that
+   * refused would like the shortfall notice raised over itself.
+   *
+   * The refusing surface knows WHAT was refused and WHAT it costs; it does not
+   * decide whether the offer is allowed. UIScene owns that gate — strictly
+   * post-tutorial, and the surface must be one `TOP_UP.offer` names — and it
+   * owns the notice, wherever the refusal came from. A board surface therefore
+   * emits this rather than drawing anything: BoardScene has no business
+   * painting a modal, and UIScene has no business knowing about a skip pin.
+   *
+   * `price` is the FULL price, not the shortfall: the wallet moves while the
+   * notice is up (a grant can land behind it), so the notice subtracts live
+   * state itself and its headline stays true afterwards.
+   */
+  'ui:topup_requested': { label: string; price: number; source: TopUpSource };
+  /**
+   * Fact: the shortfall notice opened/closed.
+   *
+   * The panel underneath suspends its SCROLL while it is up. This is not
+   * politeness: the scrolling panels read drag off `scene.input`'s own
+   * POINTER_DOWN/MOVE/UP, which fire for every pointer in the scene no matter
+   * which object captured them — so without this, a thumb sliding on the notice
+   * scrolls the shelf the player is trying to keep their place in. Only
+   * StorePanel listens (it is the one scrolling panel a refusal can be raised
+   * over); Cookbook and Cauldron sell nothing and cannot raise this.
+   */
+  'ui:topup_toggled': { open: boolean };
   /** Intent: buy a store cosmetic. StoreSystem validates gold and ownership. */
   'ui:store_buy_requested': { itemId: string };
   /** Intent: wear an owned Manor skin, or null to go back to the authored one. */
@@ -1439,9 +1530,12 @@ export interface EventMap {
    *  writes a new page (MergeSystem emits once per chain:fromTier>resultTier). */
   'cookbook:discovered': { chain: string; fromTier: number; resultTier: number };
   'item:harvested': { generatorId: number; output: ItemSnapshot };
+  /** `energy` is short of WARMTH and `gold` short of GOLD — they were one
+   *  reason until the Gold-priced skip arrived, which meant a Gold shortfall
+   *  shook the Warmth gauge (Hud) while the notice said "not enough gold". */
   'item:harvest_failed': {
     generatorId: number;
-    reason: 'cooldown' | 'energy' | 'no_space' | 'asleep';
+    reason: 'cooldown' | 'energy' | 'gold' | 'no_space' | 'asleep';
   };
   /** A generator passively gifted an item (no tap, no energy). */
   'item:produced': { generatorId: number; output: ItemSnapshot };
@@ -1449,6 +1543,23 @@ export interface EventMap {
   'generator:reward': { generatorId: number; coins: number; xp: number; energy: number };
   /** A generator's wait was paid off (the skip button) — currency tells which. */
   'generator:skipped': { itemId: number; chain: string; currency: 'gold' | 'warmth' | 'gift' };
+  /**
+   * Fact: the skip was refused because the wallet was short, with the price it
+   * was refused AT.
+   *
+   * GeneratorSystem is the only thing that knows a skip's true cost (it falls
+   * as the timer drains, and a per-generator cap can raise it), so the price in
+   * a "you are N short" line has to come from here rather than be re-derived by
+   * whatever draws it. Separate from `item:harvest_failed`, which stays the
+   * FEEL of a refusal (the deny sound, the red flash) and carries no price.
+   */
+  'generator:skip_refused': {
+    itemId: number;
+    chain: string;
+    tier: number;
+    currency: 'gold' | 'warmth';
+    cost: number;
+  };
   /** A Gold coin was tapped to bank it — UI flies coin(s) to the Gold gauge,
    *  one gauge pulse per arrival (the Pouch sends 3; default 1). */
   /** A piece went into the Bag — UIScene flies it to the satchel and pulses it. */

@@ -258,7 +258,13 @@ export class Hud {
         this.deliverableByOrder.delete(orderId);
         this.refreshLedgerDot();
       }),
-      bus.on('item:harvest_failed', ({ reason }) => { if (reason === 'energy') this.shakeEnergy(); })
+      // THE GAUGE THAT SHAKES IS THE ONE THAT IS EMPTY. Both shortfalls used
+      // to arrive as `energy`, so running out of GOLD on a Gold-priced skip
+      // rattled the Warmth meter — the one currency the player had plenty of.
+      bus.on('item:harvest_failed', ({ reason }) => {
+        if (reason === 'energy') this.shakeEnergy();
+        else if (reason === 'gold') this.shakeCoin();
+      })
     );
 
     // Key pill hidden until the tutorial unlock step — or a key — makes it real.
@@ -485,7 +491,19 @@ export class Hud {
   }
 
   private shakeEnergy(): void {
-    const container = this.energyPill.container;
+    this.shakePill(this.energyPill);
+  }
+
+  /** The Gold gauge's own refusal. Optional-chained because the coin pill is
+   *  built conditionally — a HUD without it simply says nothing. */
+  private shakeCoin(): void {
+    if (this.coinPill) this.shakePill(this.coinPill);
+  }
+
+  /** A gauge saying "not this one": four quick shoves and its number in lava
+   *  for the length of the shove, then back to cream. */
+  private shakePill(pill: Pill): void {
+    const container = pill.container;
     this.scene.tweens.add({
       targets: container,
       x: container.x + 12,
@@ -493,7 +511,7 @@ export class Hud {
       yoyo: true,
       repeat: 3
     });
-    this.energyPill.value.setColor(PALETTE.lavaHighlight);
-    this.scene.time.delayedCall(600, () => this.energyPill.value.setColor(PALETTE.cream));
+    pill.value.setColor(PALETTE.lavaHighlight);
+    this.scene.time.delayedCall(600, () => pill.value.setColor(PALETTE.cream));
   }
 }

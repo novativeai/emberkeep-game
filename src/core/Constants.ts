@@ -2,7 +2,7 @@
  * Every tunable in Emberkeep lives here or in src/data/*.json.
  * Systems and scenes must not contain magic numbers.
  */
-import type { SpeakerId } from './types';
+import type { SpeakerId, TopUpSource } from './types';
 
 /** Emberkeep palette (string form for Canvas2D, use num() for Phaser). */
 export const PALETTE = {
@@ -2589,6 +2589,187 @@ export const IAP = {
    *  verdict before calling it cancelled — the gateway's webhook can land
    *  moments after the window goes. */
   popupGraceMs: 15_000
+} as const;
+
+/**
+ * THE SHORTFALL NOTICE — the answer to "you cannot afford this".
+ *
+ * A gold refusal used to end at a red price and a shake: the player was told
+ * no and given nowhere to go. This is the compact notice that opens OVER
+ * whatever refused — over, not instead of, because the shelf they were
+ * browsing (and its scroll position) is the thing they came for, and losing it
+ * is a second punishment. It says how short they are OF WHAT, and offers two
+ * ways out: the one that takes them to the coin shop, and the one that costs
+ * nothing.
+ *
+ * IT SELLS NOTHING ITSELF. There is exactly one coin shop in this game — the
+ * Emporium's GOLD tab — and a second list of packs floating over a panel would
+ * be a second coin shop to keep in step with the hub catalog and with
+ * `coin-packs.json`. The notice's action SWITCHES the player to the real one;
+ * `ui:shop_toggled` carries them back when they leave it. So there are no pack
+ * rows here, no prices, and nothing in this block that money depends on.
+ *
+ * ── THE DEVICE LAYOUT, and why it is two sets of numbers rather than one
+ *
+ * The rule the Store's `CX` block states: the space is 2560 units wide
+ * WHATEVER the device, so on a handset a unit is ~0.15 real pixels instead of
+ * ~0.5, and type authored for the landscape notice arrives at a third of its
+ * apparent size. Scaling the whole plate cannot repay that — it is already at
+ * 94% of the portrait width. So portrait gets its own frame, its own stepped
+ * type (`px`) and keys tall enough for a thumb; desktop keeps the landscape
+ * numbers.
+ *
+ * THE HEIGHT IS DERIVED, NOT LISTED. `shortLine` x `shortMaxLines` is the
+ * RESERVE the arithmetic below is budgeted against, but the notice lays itself
+ * out from the text object's own measured height — a one-line shortfall must
+ * not leave a line of dead plate under it, and a three-line one must not run
+ * off the bottom. Everything else here is a fixed part, and the parts are what
+ * these numbers are.
+ *
+ * Every number is stated from the PAINTED art upward. Art is painted at
+ * LOGICAL units x RES (2), so:
+ *
+ *   `ui_btn_green` is painted 210x76 logical = 420x152 game units
+ *   `ui_btn_play`  is painted 264x96 logical = 528x192 game units
+ *   `ui_icon_coin` is fitted to the wallet line's own box, never upscaled
+ *
+ * DESKTOP   width 1040, pad 44  ->  content 952 wide
+ *   title    46px type in a 58 line box
+ *   short    36px type, 47 per line, 2 lines reserved            = 94
+ *   wallet   28px type in a 36 line box
+ *   keys     ONE ROW: the green 420x152 primary, 44 of air, the
+ *            royal 380x150 secondary                     = 844 wide, 152 tall
+ *            844 <= 952, so the row never touches the pad.
+ *   height   44 + 58 + 18 + 94 + 16 + 36 + 40 + 152 + 44 = 502   (of 1600) ✓
+ *
+ * PORTRAIT  width 2400, pad 88  ->  content 2224 wide
+ *   title    px(46) = 120 type in a 150 line box
+ *   short    px(36) = 94 type, 122 per line, 2 reserved           = 244
+ *   wallet   px(28) = 73 type in a 92 line box
+ *   keys     STACKED, and the stack is the platform minimum rather than a
+ *            taste: 44 CSS px is the floor, a 390px-wide handset runs the
+ *            2560-unit space at 6.56 units to the pixel, so 44px is 289 units.
+ *            The primary is 1400x340 (51.8px) and the secondary 1120x300
+ *            (45.7px) — both clear it before the fit scale is applied, and a
+ *            thumb picks one of two rows far more reliably than one of two
+ *            columns.
+ *   height   88 + 150 + 44 + 244 + 36 + 92 + 90 + 340 + 36 + 300 + 88 = 1508
+ *
+ *   fit      panelFitScale(2400, 1508)
+ *            = min(2.2, 2560x0.94/2400, LIVE_HEIGHTx0.92/1508)
+ *            = min(2.2, 1.003, >=2.07) = 1.003
+ *            -> 2407 x 1512 units. On a 390x844 phone the live space is
+ *               2560x5539, so the notice is 94% of the width and 27% of the
+ *               height. The squarest device the mobile path allows is a 4:3
+ *               tablet at 2560x3413, where the height bound is 2.08 — the
+ *               width binds on everything, which is what keeps the notice the
+ *               same shape on every handset.
+ */
+export const TOP_UP = {
+  /**
+   * WHICH REFUSALS OFFER IT. A paywall in the wrong place is worse than a dead
+   * end, so this is a list of named surfaces rather than "anywhere gold is
+   * spent" — see `TopUpSource`. Turning one off leaves that refusal exactly as
+   * it was (the shake, the red price) and costs nothing else.
+   */
+  offer: { store: true, warmth: true, skip: true } as Record<TopUpSource, boolean>,
+  /** Scrim over whatever is underneath. Lighter than a panel's own (0.62): the
+   *  shelf has to stay legible behind it, because not losing your place is the
+   *  entire reason this is a notice and not the whole Emporium. */
+  dimAlpha: 0.5,
+  /** Open/close flourish, matching the panels' own (Back.easeOut in, Sine.easeIn out). */
+  openMs: 190,
+  closeMs: 150,
+  /** Geometry, per device. See the arithmetic above. */
+  box: IS_MOBILE
+    ? {
+        width: 2400,
+        pad: 88,
+        radius: 96,
+        /** The gold seat under the face, and the rim around it — the plate is
+         *  the banner's four layers at notice size (see `drawBanner`). */
+        seat: 28,
+        rim: 16,
+        /** The gloss strip: inset from the sides, dropped from the top, tall. */
+        glossInset: 64,
+        glossTop: 30,
+        glossH: 100,
+        titleBox: 150,
+        gapTitle: 44,
+        shortLine: 122,
+        gapShort: 36,
+        walletBox: 92,
+        gapKeys: 90,
+        keyPrimaryW: 1400,
+        keyPrimaryH: 340,
+        keySecondaryW: 1120,
+        keySecondaryH: 300,
+        keyGap: 36,
+        /** Portrait stacks the two keys; landscape sets them side by side. */
+        keysStacked: true
+      }
+    : {
+        width: 1040,
+        pad: 44,
+        radius: 48,
+        seat: 12,
+        rim: 8,
+        glossInset: 28,
+        glossTop: 14,
+        glossH: 44,
+        titleBox: 58,
+        gapTitle: 18,
+        shortLine: 47,
+        gapShort: 16,
+        walletBox: 36,
+        gapKeys: 40,
+        keyPrimaryW: 420,
+        keyPrimaryH: 152,
+        keySecondaryW: 380,
+        keySecondaryH: 150,
+        keyGap: 44,
+        keysStacked: false
+      },
+  /** How many lines of shortfall copy the height is BUDGETED for. The notice
+   *  measures the real thing and grows or shrinks to it; this is what the
+   *  arithmetic above was checked against, not a clamp. */
+  shortMaxLines: 2,
+  /**
+   * TYPE, in AUTHORED units — the notice steps every one through `px()`, so
+   * `title: 46` is 46 on a desktop and 120 on a handset and reads the same
+   * apparent size on both. Device-INDEPENDENT on purpose: stating them once is
+   * what keeps the two `box` blocks honest, since both header columns above are
+   * measured from exactly these stepped line boxes.
+   */
+  type: {
+    title: 46,
+    short: 36,
+    wallet: 28,
+    key: 36
+  },
+  /**
+   * Copy. `{n}` is the shortfall and `{what}` the thing that was refused — both
+   * filled from LIVE state, because "not enough gold" is a shrug and "42 more
+   * gold for the Mushroom Cottage" is an answer.
+   */
+  copy: {
+    title: 'NOT ENOUGH GOLD',
+    short: '{n} more gold for {what}',
+    /** Once the wallet covers it the offer is ANSWERED, not withdrawn: the
+     *  notice never closes itself, because a modal that vanishes while a thumb
+     *  is travelling towards it hands the tap to whatever was underneath. Both
+     *  lines change together — a green headline over "42 more gold" would be
+     *  two states of one fact on screen at once. */
+    titleCovered: 'YOU HAVE ENOUGH',
+    /** Phrased so it reads with EVERY `{what}` the three sources produce — a
+     *  Store item's own name ("Mushroom Cottage"), an Emporium pack's ("Hearth
+     *  Bundle"), and the board's verb phrase ("skipping the House"). */
+    covered: 'Your purse covers {what} now',
+    wallet: 'You have',
+    /** The one call to action, and the only thing on screen that leaves. */
+    go: 'GET GOLD',
+    exit: 'Not now'
+  }
 } as const;
 
 /** Audio master volumes 0..1. */
