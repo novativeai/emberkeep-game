@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import tutorial from '../../src/data/tutorial.json';
-import type { TilePos, TutorialAllow, TutorialStepConfig } from '../../src/core/types';
+import type { MarkerPoint, TutorialAllow, TutorialStepConfig } from '../../src/core/types';
 import { capture, createTestContext } from './helpers';
 
 const steps = tutorial.steps as unknown as TutorialStepConfig[];
@@ -261,10 +261,12 @@ describe('the tutorial pointer tracks live pieces', () => {
   };
 
   /** Re-open the beat with a listener attached, so the emitted view is visible. */
-  const handOf = (ctx: ReturnType<typeof createTestContext>): { from: TilePos; to: TilePos } => {
+  const handOf = (
+    ctx: ReturnType<typeof createTestContext>
+  ): { from: MarkerPoint; to: MarkerPoint } => {
     const seen = capture(ctx.bus, 'tutorial:step');
     ctx.systems.tutorial.begin();
-    return seen.at(-1)!.hand as { from: TilePos; to: TilePos };
+    return seen.at(-1)!.hand as { from: MarkerPoint; to: MarkerPoint };
   };
 
   it('names a hand made of two different pieces', () => {
@@ -305,9 +307,12 @@ describe('the tutorial pointer tracks live pieces', () => {
     ctx.bus.emit('drag:dropped', { itemId, from: before.from, to: free });
 
     // The hand followed the piece rather than staying on the tile it left.
-    const after = moved.at(-1)?.hand as { from: TilePos; to: TilePos } | undefined;
+    const after = moved.at(-1)?.hand as { from: MarkerPoint; to: MarkerPoint } | undefined;
     expect(after, 'the pointer was never re-aimed').toBeTruthy();
-    expect(after!.from).toEqual(free);
+    // `toMatchObject`, not `toEqual`: the end also carries the id of the piece
+    // it is following now (see MarkerPoint), and that id is the point.
+    expect(after!.from).toMatchObject(free);
+    expect(after!.from.item).toBe(itemId);
   });
 
   it('says nothing when a move changes no answer', () => {

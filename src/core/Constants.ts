@@ -2075,6 +2075,110 @@ export const DRAG = {
 export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000, followUpMs: 420, repulseMs: 30_000 } as const;
 
 /**
+ * WHAT THE HAND WEIGHS — the merge hint's decision, written as numbers.
+ *
+ * The planner (src/core/mergeHints.ts) can usually make several merges. Which
+ * one it OFFERS used to be settled by effort alone — fewest drags, then the
+ * shortest swipe, then whichever set had waited longest. That is a fine model
+ * of what a move COSTS and says nothing about what it is WORTH, and measured
+ * over 1200 generated mid-session boards on the three exported worlds it is
+ * daft on a fifth to a half of them: it points across the isle when an equally
+ * cheap merge sits under the player's hand (20.7% / 23.0% / 22.5% of boards
+ * more than half a screen further away than it had to be), off the edge of the
+ * screen while an equally cheap one is in frame (17.9% / 14.8% / 1.5%), at two
+ * tier-1 trinkets while a tier-2 pair costs exactly the same (17.1% / 48.3% /
+ * 43.5%), and at a chain no standing order asks for while an equally cheap one
+ * would fill the Ledger (2.5% / 8.0% / 13.0%).
+ *
+ * So the offer is SCORED, in merit points, and these are the terms. Every one
+ * of them is a claim about what a thinking player would do next, and every one
+ * of them is arguable — which is the point of writing them as eight numbers
+ * rather than as a sort order. Raising one is a design decision, not a tuning
+ * accident.
+ *
+ * THE ONE STRUCTURAL RULE: `drag` alone is larger than every other weight
+ * added together, so no combination of merit can ever talk the hand into
+ * asking for an extra drag. Effort is not one voice among several — it is the
+ * floor the rest of the argument stands on, and a hint that asks for two drags
+ * while a one-drag merge sits on the board is the exact defect the effort
+ * ranking was introduced to remove. `MergeHints.spec.ts` asserts the
+ * inequality so a future weight cannot quietly break it.
+ */
+export const MERGE_HINT_WEIGHTS = {
+  /** Per drag BEYOND THE FIRST. Dominant by construction: > the sum of the
+   *  rest, so fewer drags always wins whatever else is true. */
+  drag: 120,
+  /**
+   * Being near where the player last acted.
+   *
+   * The largest soft term, because it is the one the player reads as
+   * intelligence. Two one-drag merges are not equally good if one is a nudge
+   * beside the piece they just dropped and the other is across the isle: the
+   * hand that stays in the neighbourhood of the work looks like it is watching,
+   * and the hand that teleports looks like it is guessing. Falls off
+   * hyperbolically (`nearHalfTiles`), never to a cliff — there is no distance
+   * at which a merge stops counting, only one at which it stops being handy.
+   */
+  near: 30,
+  /** The swipe the plan asks for, in tiles. Costs less than a whole extra drag
+   *  (that is what `drag` is for) and more than any single merit below it: a
+   *  cross-map haul is real work even when it is only one gesture. */
+  haul: 20,
+  /** Any of it visible on screen right now. A hand pointing off the edge of
+   *  the viewport is an instruction the player cannot follow without first
+   *  finding what it means — and only the FIRST offer moves the camera, so
+   *  every re-aim and every heartbeat after it speaks from where the player
+   *  chose to be looking. */
+  frame: 14,
+  /** How deep into its chain the merge is, as a fraction (tier 1 scores 0, the
+   *  last mergeable tier scores 1). Three Gem Shards are always available and
+   *  always coming; two Flame Gems standing idle are an opportunity the player
+   *  worked for and has forgotten. Worth less than proximity, because a deep
+   *  merge across the isle is still a trek. */
+  tier: 12,
+  /** Offered, seen, and left alone. Not a ban — `skip` is the ban — but enough
+   *  merit to hand the turn to a different merge once the player has declined
+   *  this one `declineCap` times. A hand that insists is nagging. */
+  declined: 12,
+  /** It MAKES something a live order or quest still asks for. What the player
+   *  is trying to do is worth more than what happens to be lying around. */
+  order: 10,
+  /** It EATS something a live order still asks for — three Gem Shards merged
+   *  away from an order that wants six. Slightly smaller than `order` so a
+   *  merge that both feeds a deeper goal and spends a shallower one still
+   *  reads as progress. */
+  orderSpend: 8,
+  /** Distance at which the proximity merit is halved, in tiles. Four is about
+   *  a quarter of the visible board at the framing the camera holds — near
+   *  enough to mean "by your hand", far enough that the whole neighbourhood
+   *  counts. */
+  nearHalfTiles: 4,
+  /** Swipe length at which the haul penalty is half-spent, in tiles. Three is
+   *  roughly the reach of one comfortable drag. */
+  haulHalfTiles: 3,
+  /** Declines past this stop making it worse — the penalty saturates rather
+   *  than burying a merge for ever. */
+  declineCap: 3,
+  /**
+   * How many candidate SETS one chain:tier may put forward.
+   *
+   * A bucket of six Gem Shards holds twenty possible trios. The planner used to
+   * consider exactly one of them — the tightest — which is why it could point
+   * at a huddle across the isle while three of the same kind sat around the
+   * player's last move (15.9% of Emberkeep boards, 16.0% of Borealis). It now
+   * puts forward the tightest trio around EACH piece, deduped, and keeps the
+   * cheapest few by their proven drag floor. Four is where the measured defect
+   * flattens; every extra one is a planning pass that almost never wins.
+   */
+  groupsPerBucket: 4,
+  /** Scores are compared as integers on this grid. Floating point ties are
+   *  exact when the arithmetic is identical, but quantising first means two
+   *  plans that differ by a rounding artefact fall to the stable tie-break
+   *  (first-completed, then the set's own ids) instead of to iteration order. */
+  quantum: 1_000_000
+} as const;
+
+/**
  * HOW FAR THE MERGE MAGNET REACHES — in tiles, from where the piece was let go.
  *
  * A drop that lands beside a mergeable cluster fuses anyway (MergeSystem
@@ -2673,6 +2777,28 @@ export const TOP_UP = {
    * it was (the shake, the red price) and costs nothing else.
    */
   offer: { store: true, warmth: true, skip: true } as Record<TopUpSource, boolean>,
+  /**
+   * AND HOW IT ANSWERS — the difference between a card and a door.
+   *
+   * `'switch'` takes the player straight to the coin shop. `'notice'` raises
+   * the shortfall card first and lets them choose.
+   *
+   * The split is about WHERE the refusal happened, not about how much we want
+   * the sale. A refusal inside a shop is a request that was already made: the
+   * player came to spend, tapped a price, and was told no. Putting a card
+   * between them and the till is a speed bump in the middle of an errand they
+   * started — so `store` and `warmth` switch. `warmth` barely even moves: the
+   * coin shelf is the tab next door.
+   *
+   * `skip` is the other case. That refusal happens on the BOARD, mid-merge,
+   * from a timer bubble the player tapped in passing. Yanking the whole
+   * Emporium over the board there is the game changing the subject, so it
+   * keeps the card: it names the piece, says how short they are, and offers.
+   */
+  mode: { store: 'switch', warmth: 'switch', skip: 'notice' } as Record<
+    TopUpSource,
+    'switch' | 'notice'
+  >,
   /** Scrim over whatever is underneath. Lighter than a panel's own (0.62): the
    *  shelf has to stay legible behind it, because not losing your place is the
    *  entire reason this is a notice and not the whole Emporium. */

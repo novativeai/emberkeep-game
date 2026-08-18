@@ -22,41 +22,101 @@
  * first made it mergeable — IS its completion order. Sorting by that is exact,
  * survives a save/load, and costs nothing to keep up to date.
  *
- * The OFFER (`nextMergePlan`) is ordered by EFFORT, and that is a correction,
- * not a change of mind. First-completed is a fact about the board; it is not a
- * claim about what is easy, and the hand used to hand out whichever plannable
- * merge happened to be oldest. Measured over 600 mid-session boards on the
- * three exported worlds that can host a 3-merge, that meant: on 30% of them a
- * merge sat there needing ONE drag — a pair already touching, one piece to
- * bring — and the hand asked for a two-drag gather instead, at a median 1250
- * world units of swipe on Emberkeep where 506 was available. A player who
- * looks at a touching pair and is pointed somewhere else does not read that as
- * "that one is older", they read it as the hint being wrong.
+ * The OFFER (`nextMergePlan`) is not that queue, and has not been for two
+ * revisions. First it became the CHEAPEST plannable merge — fewest drags, then
+ * the shortest haul — because first-completed is a fact about the board and
+ * not a claim about what is easy, and a hand that sends the player on a
+ * two-drag gather while a pair sits touching reads as broken rather than as
+ * old-fashioned. That fixed the arithmetic. It did not make the hand look like
+ * it was thinking, and this revision is about the difference.
  *
- * So the offer is: fewest DRAGS first, then the shortest total haul, then the
- * queue's own first-completed order as the tie-break. Drags lead because a
- * drag is the unit of work the player actually spends — one drag across the
- * isle and one drag across a tile cost the same gesture — and haul only sorts
- * plans that already cost the same number of them. The tie-break is what keeps
- * this stable and deterministic: equal-effort merges still surface oldest
- * first, so the same board always answers the same way.
+ * ─────────────────────────────────────────────────────────────────────────
+ * WHY EFFORT ALONE IS NOT ENOUGH — measured, not guessed.
  *
+ * Cost is not worth. Ranking by drags-then-haul answers "what is the smallest
+ * gesture available" and never asks "and is that the gesture a person would
+ * make next". Over 1200 generated mid-session boards (a third to two thirds of
+ * the ground carrying six or seven chains, a cluster by the player's last move
+ * and a cluster across the map, decor in the way) on Emberkeep / Borealis /
+ * Roothold, the effort-only offer was defensible and daft at these rates:
+ *
+ *   points more than half a screen further from the player's last
+ *   action than an equally cheap merge sitting there ........ 20.7 / 23.0 / 22.5 %
+ *   points off the visible board while an equally cheap merge
+ *   is in frame ............................................ 17.9 / 14.8 /  1.5 %
+ *   points at a tier-1 trinket while an equally cheap merge
+ *   one tier deeper is available ........................... 17.1 / 48.3 / 43.5 %
+ *   points at a chain no standing order wants while an equally
+ *   cheap one would fill the Ledger ......................... 2.5 /  8.0 / 13.0 %
+ *   points at a trio across the isle when three of the same
+ *   kind sit around the player's last move (the bucket only
+ *   ever put ONE trio forward) ............................. 15.9 / 16.0 /  0.3 %
+ *
+ * Two hypotheses did NOT survive contact with the measurement and are written
+ * down so nobody re-invents them: the offer does NOT flicker (drop an unrelated
+ * piece anywhere on the board and the offer changes identity on 0.3–0.5% of
+ * boards, and only when the drop really did change what was cheapest), and the
+ * planner never re-offers a DECLINED set on its own account — it cannot, since
+ * `skip` is passed by the caller and BoardScene passes none. That last one is a
+ * wiring gap, not a ranking defect, and the weight below exists for the day it
+ * is wired.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * THE OFFER, AS PSEUDOCODE. Weights live in `MERGE_HINT_WEIGHTS`.
+ *
+ *   CANDIDATES
+ *     for each chain:tier bucket on the WHOLE WORLD (a move is not zone-bound):
+ *       for each piece in the bucket, take the `need` pieces nearest to it
+ *       → dedupe → keep the `groupsPerBucket` with the lowest proven drag floor
+ *     for each candidate: plan ← planFor(candidate)   (unchanged, still exact)
+ *
+ *   SCORE(plan), in merit points, higher is better:
+ *       − W.drag        × (drags − 1)                    the work it asks for
+ *       − W.haul        × d/(d + haulHalf)               d = swipe, in tiles
+ *       + W.near        × nearHalf/(nearHalf + f)        f = tiles from where
+ *                                                        the player last acted
+ *       + W.frame       × [any of it is on screen]
+ *       + W.tier        × (tier−1)/(deepest mergeable tier−1)
+ *       + W.order       × [it MAKES what a live order still wants]
+ *       − W.orderSpend  × [it EATS what a live order still wants]
+ *       − W.declined    × min(times shown and ignored, cap)/cap
+ *
+ *   OFFER ← argmax score, ties broken by first-completed, then by the set's
+ *           own sorted ids. Scores are quantised to integers first, so a
+ *           rounding artefact falls to the tie-break instead of to iteration
+ *           order.
+ *
+ *   INVARIANT (asserted in MergeHints.spec.ts): W.drag exceeds the sum of every
+ *   other weight, so no amount of merit can buy an extra drag. Effort is the
+ *   floor the argument stands on; the rest only ever sorts moves that cost the
+ *   same. That is also what keeps `dragFloor`'s prune legitimate.
+ *
+ *   DEGRADES GRACEFULLY. `focus`, `inView`, `wants` and `declines` are OPTIONAL
+ *   members of `HintBoard`. A caller that supplies none — every unit fixture,
+ *   and BoardScene until the wiring lands — gets a planner that scores drags,
+ *   haul and tier depth and nothing else, which is still strictly better than
+ *   the ordering it replaces. Nothing throws, nothing is skipped, and the
+ *   answer is still total and deterministic.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
  * Phaser-free on purpose (like worldArt.ts and dragonClips.ts): what the hand
  * should point at is a rule the unit tests can check, and the scene spends a
  * couple of lines pointing it.
  */
+import { MERGE_HINT_WEIGHTS as W } from './Constants';
 import type { BoardItemState, ChainConfig, ChainsData, TilePos } from './types';
 
 /**
- * THE BOARD THE PLANNER REASONS ABOUT.
+ * THE BOARD THE PLANNER REASONS ABOUT — and, now, the PLAYER as well.
  *
  * Injected rather than imported, for the same reason this whole file is
  * Phaser-free: what the hand should ask for is a rule, and a rule is worth
  * nothing if it can only be checked by looking at a screenshot. The unit tests
  * hand it a fixture; BoardScene hands it `GameState` + `world.ts`.
  *
- * `neighbors` is the one that matters. A merge is an ORTHOGONALLY-CONNECTED
- * flood (MergeSystem.collectGroup) and adjacency never leaves a zone (world.ts
+ * The first four members are the BOARD and are required. `neighbors` is the one
+ * that matters. A merge is an ORTHOGONALLY-CONNECTED flood
+ * (MergeSystem.collectGroup) and adjacency never leaves a zone (world.ts
  * `neighborsOf`), so the SHAPE a plan gathers onto can never span two slabs.
  *
  * A MOVE, however, can. MergeSystem's drop validation asks `isTileActive` and
@@ -66,6 +126,12 @@ import type { BoardItemState, ChainConfig, ChainsData, TilePos } from './types';
  * applied to the gather. On Emberkeep's one dense slab that is invisible;
  * Borealis is 38 slabs of at most 9 cells, so three of a kind almost never
  * shared a bucket and the hand simply never came up.
+ *
+ * Everything after `distance` is OPTIONAL and describes the player's situation
+ * rather than the board's shape: where they are working, what they can see,
+ * what they are trying to get, and what they have already turned down. Each
+ * missing member zeroes exactly one term of the score (see the header), so a
+ * caller may supply as many or as few as it can honestly answer.
  */
 export interface HintBoard {
   /** Playable ground of the ACTIVE world — a piece may be dropped here. */
@@ -85,8 +151,66 @@ export interface HintBoard {
    * columns apart may be on different islands. A board that can project its
    * cells should answer in world units; without this the planner falls back to
    * cell distance, which is exactly right for the fixtures and the dense isle.
+   *
+   * SQUARED, in whatever unit the board thinks in. The planner never compares
+   * it across boards and converts it to TILES before it reaches any weight (see
+   * `rulerFor`), so the unit only has to be consistent with itself.
    */
   distance?(a: TilePos, b: TilePos): number;
+  /**
+   * WHERE THE PLAYER IS WORKING — the cell they last acted on.
+   *
+   * The single most valuable thing the scene can tell the planner, and the
+   * whole of the `near` weight. A merge game is played in a neighbourhood: the
+   * player drops a piece, looks at what is around it, and drops another. A hand
+   * that answers from that neighbourhood looks like it is watching them; a hand
+   * that answers from the far corner of the isle looks like it is reading a
+   * different board, which is exactly what "il n'est pas logique" describes.
+   *
+   * Absent = the planner has no idea where the player is and says nothing about
+   * it — every candidate scores zero on proximity and the rest of the model
+   * decides. Never used as a filter, only as merit: a merge does not stop being
+   * worth making because it is far away.
+   */
+  focus?: TilePos;
+  /**
+   * CAN THE PLAYER SEE THIS CELL RIGHT NOW — camera, and anything covering it.
+   *
+   * Only the FIRST offer moves the camera (BoardScene aims once, deliberately:
+   * a heartbeat that yanks the view every thirty seconds is the board arguing
+   * with the finger). Every re-aim after that speaks from wherever the player
+   * chose to be standing, so an offer whose pieces are off screen is a hand
+   * pointing at the edge of the world. This is also the right place to hang
+   * "under a panel" — a cell behind an open sheet is a cell the player cannot
+   * act on, whatever the camera says.
+   *
+   * Absent = the planner assumes nothing is hidden and the term drops out.
+   */
+  inView?(col: number, row: number): boolean;
+  /**
+   * HOW MANY MORE OF THIS PIECE THE PLAYER'S LIVE GOALS STILL WANT.
+   *
+   * Counted AFTER what is already standing on the board — so a Ledger asking
+   * for six Gem Shards with five on the board answers 1, and answers 0 once the
+   * sixth arrives. Zero (or absent) means nothing is waiting on it.
+   *
+   * It cuts both ways, which is the point. A merge that MAKES a wanted piece is
+   * what the player is trying to do. A merge that EATS one — three Gem Shards
+   * fused while an order still wants six of them — is the hand asking them to
+   * walk backwards, and no amount of "it is only one drag" makes that a good
+   * suggestion. Both terms are small: an order is a preference, not a rail.
+   */
+  wants?(chain: string, tier: number): number;
+  /**
+   * HOW MANY TIMES THIS EXACT SET HAS BEEN OFFERED AND LEFT ALONE.
+   *
+   * Keyed by `MergeHint.key`, which names the set and not the chain, so a
+   * player who ignores one trio of Gem Shards is not read as having refused
+   * every trio of Gem Shards. Distinct from `skip`, which is a ban: this is
+   * merely enough merit to hand the turn to something else once they have said
+   * no `declineCap` times, and it saturates so nothing is buried for ever.
+   */
+  declines?(key: string): number;
 }
 
 /** One drag: pick up `itemId`, drop it on `to`. */
@@ -107,15 +231,16 @@ export interface MergeStep {
 export interface MergePlan extends MergeHint {
   steps: MergeStep[];
   /**
-   * HOW FAR THE PLAN ASKS THE PLAYER TO SWIPE, summed over its legs.
+   * HOW FAR THE PLAN ASKS THE PLAYER TO SWIPE, summed over its legs, IN TILES.
    *
-   * In the board's own ranking unit — `HintBoard.distance` when the board has
-   * one (squared world units in the game), Chebyshev cells when it does not.
-   * Never a length in pixels, and never compared across boards: it exists so
-   * that `nextMergePlan` can sort two plans that cost the SAME number of drags,
-   * and inside one board every plan is measured with the same ruler. Zero for
-   * a set that is already standing connected — nothing has to travel, only the
-   * one flick that fuses it.
+   * A real length now, not a squared one: each leg is converted through the
+   * board's own step size (`rulerFor`) before it is added, so `travel` reads as
+   * "about nine tiles of dragging" on any world and in any fixture. That
+   * matters because the score puts it through a saturating curve — a number
+   * that is squared on one board and linear on another cannot share a weight.
+   *
+   * Zero for a set that is already standing connected: nothing has to travel,
+   * only the one flick that fuses it.
    */
   travel: number;
 }
@@ -128,6 +253,15 @@ export interface MergeHint {
   /** The pieces to point at, oldest first. Exactly `need` of them: pointing at
    *  a seventh Dew Drop teaches nothing the first three did not. */
   ids: number[];
+  /**
+   * THE SET'S OWN NAME — chain, tier and the exact pieces, in one string.
+   *
+   * The last tie-break, and the key a caller counts declines against. A bucket
+   * of six now puts several trios forward and two of them can share a
+   * `completedBy` (both may contain the newest piece), so `completedBy` alone
+   * is no longer a total order and the ids have to finish the job.
+   */
+  key: string;
   /**
    * The id that completed the set. This orders the queue, and it is also what
    * makes the hint STABLE: the same board always yields the same hint, whatever
@@ -162,6 +296,46 @@ function metric(board?: HintBoard): (a: TilePos, b: TilePos) => number {
   return d ? (a, b) => d.call(board, a, b) : cellGap;
 }
 
+/* ------------------------------------------------------------------------- *
+ * THE RULER — turning the board's own metric into TILES.
+ *
+ * Every weight in the score is a number with an opinion about distance:
+ * "halved at four tiles", "half-spent at three". A board that answers in
+ * squared world units (the game: ~20480 per step) and a board that answers in
+ * squared cells (every fixture: 1 per step) cannot share those numbers, and
+ * asking the caller to declare its scale is a member somebody will forget to
+ * wire — after which the proximity term silently evaluates to zero everywhere
+ * and the whole point of this revision quietly stops working.
+ *
+ * So the scale is MEASURED off the board instead: walk the pieces, ask each one
+ * what the metric says about its first neighbour, and take the median. That is
+ * the length of one tile step in the board's own unit, whatever that unit is,
+ * and it adapts per world without anybody declaring anything. A board where
+ * nothing has a neighbour (one-cell islets) has no scale to measure and falls
+ * back to 1, which costs nothing: no merge can be planned there anyway.
+ * ------------------------------------------------------------------------- */
+interface Ruler {
+  /** One tile step, in the board's own squared metric. */
+  span: number;
+  /** Distance in TILES — the unit every weight is written in. */
+  tiles(a: TilePos, b: TilePos): number;
+}
+
+function rulerFor(items: readonly BoardItemState[], board: HintBoard): Ruler {
+  const gap = metric(board);
+  // Sorted by id so the median is the same however the caller iterated.
+  const cells = [...items].sort((a, b) => a.id - b.id);
+  const spans: number[] = [];
+  for (const c of cells) {
+    const n = board.neighbors(c.col, c.row)[0];
+    if (n) spans.push(gap(c, n));
+  }
+  spans.sort((a, b) => a - b);
+  const span = spans.length ? (spans[(spans.length - 1) >> 1] ?? 1) : 1;
+  const scale = span > 0 ? span : 1;
+  return { span: scale, tiles: (a, b) => Math.sqrt(gap(a, b) / scale) };
+}
+
 /**
  * The `need` pieces that are actually TOGETHER, out of a bucket that may hold
  * many more.
@@ -177,6 +351,12 @@ function metric(board?: HintBoard): (a: TilePos, b: TilePos) => number {
  * (never more than a boardful) and exact for the sizes a merge ever asks for.
  * Ties go to the set that has been ready LONGEST, which is the ordering the
  * queue was already built on.
+ *
+ * ONE ANSWER, which is why the offer no longer relies on it alone: the tightest
+ * trio on the board is not always the trio the player is standing next to, and
+ * `groupsIn` below puts the alternatives forward. This still decides what the
+ * QUEUE says a bucket's merge is, because a queue with three entries for one
+ * chain would be a queue about nothing.
  */
 function tightest(bucket: BoardItemState[], need: number, board?: HintBoard): BoardItemState[] {
   if (bucket.length <= need) return [...bucket];
@@ -197,6 +377,38 @@ function tightest(bucket: BoardItemState[], need: number, board?: HintBoard): Bo
     }
   }
   return best;
+}
+
+/**
+ * EVERY set a bucket could reasonably put forward — one per anchor, deduped.
+ *
+ * A bucket of six holds twenty trios and enumerating all of them is both slow
+ * and pointless: nineteen of them are the same three pieces with one swapped
+ * for a further-away twin. The ones worth planning are the tight ones, and
+ * every tight one is "the `need` nearest to SOME piece" — so one candidate per
+ * anchor covers the field, at bucket size rather than at the binomial.
+ *
+ * Returned in a stable order (by the set's own ids) so the caller's ranking,
+ * not the iteration, decides which survives the `groupsPerBucket` cut.
+ */
+function groupsIn(bucket: BoardItemState[], need: number, board?: HintBoard): BoardItemState[][] {
+  if (bucket.length <= need) return bucket.length === need ? [[...bucket]] : [];
+  const gap = metric(board);
+  const seen = new Set<string>();
+  const out: BoardItemState[][] = [];
+  for (const anchor of bucket) {
+    const group = [...bucket]
+      .sort((a, b) => gap(a, anchor) - gap(b, anchor) || a.id - b.id)
+      .slice(0, need);
+    const key = group
+      .map((p) => p.id)
+      .sort((a, b) => a - b)
+      .join('-');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(group);
+  }
+  return out.sort((a, b) => (a[0]!.id - b[0]!.id) || (a.at(-1)!.id - b.at(-1)!.id));
 }
 
 /** The odd one out: the piece whose distance to the others is largest. Ties by
@@ -221,23 +433,29 @@ function needFor(config: ChainConfig, tier: number, data: ChainsData): number {
   return config.tiers.find((t) => t.tier === tier)?.merge?.group ?? config.merge?.group ?? data.mergeRule.minGroup;
 }
 
-/**
- * Every merge the board can currently make, in the order they became possible.
- *
- * WHETHER a merge exists is still blind to position — two Dew Drops on opposite
- * corners are as mergeable as two side by side, and dragging one onto the other
- * is exactly the move the hand is there to suggest. Adjacency is MergeSystem's
- * business at the moment of the drop, not the hint's.
- *
- * WHICH pieces to point at is not, and used to be. That is the difference
- * between "this merge is available" and "here is the move", and getting it
- * wrong makes the hand look broken rather than helpful.
- */
-export function mergeHints(
-  items: Iterable<BoardItemState>,
-  data: ChainsData,
-  board?: HintBoard
-): MergeHint[] {
+/** Build the hint record for one already-chosen set of pieces. */
+function hintOf(chain: string, tier: number, need: number, group: BoardItemState[], board?: HintBoard): MergeHint {
+  const ids = group.map((i) => i.id).sort((a, b) => a - b);
+  return {
+    chain,
+    tier,
+    need,
+    ids,
+    key: `${chain}:${tier}#${ids.join('-')}`,
+    completedBy: ids[need - 1]!,
+    moveId: outlier(group, board).id
+  };
+}
+
+/** Chain+tier buckets across the WHOLE WORLD, skipping what can never merge. */
+interface Bucket {
+  chain: string;
+  tier: number;
+  need: number;
+  items: BoardItemState[];
+}
+
+function bucketsOf(items: Iterable<BoardItemState>, data: ChainsData): Bucket[] {
   // BUCKETED BY CHAIN+TIER, across the whole world — because a MOVE is not
   // zone-bound even though a MERGE is. The zone rule is enforced where it
   // belongs, in `shapesFrom`: the destination shape is grown through the
@@ -252,7 +470,7 @@ export function mergeHints(
     else byKey.set(key, { chain: item.chain, tier: item.tier, items: [item] });
   }
 
-  const hints: MergeHint[] = [];
+  const out: Bucket[] = [];
   for (const { chain, tier, items: bucket } of byKey.values()) {
     const config = data.chains.find((c) => c.id === chain);
     if (!config) continue;
@@ -261,16 +479,35 @@ export function mergeHints(
     if (!config.tiers.some((t) => t.tier === tier + 1)) continue;
     const need = needFor(config, tier, data);
     if (bucket.length < need) continue;
-    const group = tightest(bucket, need, board);
-    const ids = group.map((i) => i.id).sort((a, b) => a - b);
-    hints.push({
-      chain,
-      tier,
-      need,
-      ids,
-      completedBy: ids[need - 1]!,
-      moveId: outlier(group, board).id
-    });
+    out.push({ chain, tier, need, items: bucket });
+  }
+  return out;
+}
+
+/**
+ * Every merge the board can currently make, in the order they became possible.
+ *
+ * WHETHER a merge exists is still blind to position — two Dew Drops on opposite
+ * corners are as mergeable as two side by side, and dragging one onto the other
+ * is exactly the move the hand is there to suggest. Adjacency is MergeSystem's
+ * business at the moment of the drop, not the hint's.
+ *
+ * WHICH pieces to point at is not, and used to be. That is the difference
+ * between "this merge is available" and "here is the move", and getting it
+ * wrong makes the hand look broken rather than helpful.
+ *
+ * ONE ENTRY PER BUCKET, still — this is the QUEUE, a reading of what the board
+ * holds. The offer looks wider (`groupsIn`), but a queue that listed four
+ * different trios of Gem Shards would be listing one fact four times.
+ */
+export function mergeHints(
+  items: Iterable<BoardItemState>,
+  data: ChainsData,
+  board?: HintBoard
+): MergeHint[] {
+  const hints: MergeHint[] = [];
+  for (const { chain, tier, need, items: bucket } of bucketsOf(items, data)) {
+    hints.push(hintOf(chain, tier, need, tightest(bucket, need, board), board));
   }
   return hints.sort((a, b) => a.completedBy - b.completedBy);
 }
@@ -322,14 +559,6 @@ export function nextMergeHint(
  * ========================================================================= */
 
 const cellKey = (col: number, row: number): string => `${col},${row}`;
-
-/** Chebyshev cell distance — the tiebreak, never the cost. One drag is one
- *  drag whatever it crosses; this only decides which of two equal plans asks
- *  for the shorter swipe. On a zoned world the board's own metric replaces it
- *  (see `HintBoard.distance`): index arithmetic across slabs ranks by nothing. */
-function reach(a: TilePos, b: TilePos): number {
-  return Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row));
-}
 
 /**
  * The biggest clump these pieces already form, walked through the BOARD'S OWN
@@ -531,12 +760,17 @@ interface Candidate {
  * after k < need pieces are standing on the shape, the connected group is k,
  * so no intermediate drop can fuse early.
  */
-function planOnShape(pieces: BoardItemState[], shape: Shape, board: HintBoard): Candidate | null {
-  // The haul is the board's own metric where it has one — a leg that crosses
-  // from one slab to another is a real distance on screen and a meaningless
-  // one in index space, and this number decides which plan asks the shorter
-  // swipe of the player.
-  const haul = board.distance ? (a: TilePos, b: TilePos): number => board.distance!(a, b) : reach;
+function planOnShape(
+  pieces: BoardItemState[],
+  shape: Shape,
+  board: HintBoard,
+  ruler: Ruler
+): Candidate | null {
+  // The haul is measured in TILES through the board's own metric — a leg that
+  // crosses from one slab to another is a real distance on screen and a
+  // meaningless one in index space, and this number decides both which plan
+  // asks the shorter swipe and how much the score docks it for asking.
+  const haul = (a: TilePos, b: TilePos): number => ruler.tiles(a, b);
   const shapeKeys = new Set(shape.cells.map((c) => cellKey(c.col, c.row)));
   const movers = pieces.filter((p) => !shapeKeys.has(cellKey(p.col, p.row)));
   const free = shape.cells.filter((c) => board.itemIdAt(c.col, c.row) === null);
@@ -615,11 +849,16 @@ function planOnShape(pieces: BoardItemState[], shape: Shape, board: HintBoard): 
  *
  * Ties break on drags, then on swipe length, then on the shape's own cells —
  * in that order and never on iteration order, so the same board always answers
- * the same way and the hand does not flicker between two equal plans.
+ * the same way and the hand does not flicker between two equal plans. This is
+ * the plan for ONE set of pieces; which SET to ask for is `nextMergePlan`'s
+ * question and is decided by score, not here.
  */
-export function planFor(hint: MergeHint, items: Iterable<BoardItemState>, board: HintBoard): MergePlan | null {
-  const byId = new Map<number, BoardItemState>();
-  for (const item of items) byId.set(item.id, item);
+function planWith(
+  hint: MergeHint,
+  byId: Map<number, BoardItemState>,
+  board: HintBoard,
+  ruler: Ruler
+): MergePlan | null {
   const pieces = hint.ids.map((id) => byId.get(id)).filter((p): p is BoardItemState => !!p);
   if (pieces.length !== hint.need) return null;
 
@@ -633,7 +872,7 @@ export function planFor(hint: MergeHint, items: Iterable<BoardItemState>, board:
 
   let best: Candidate | null = null;
   for (const shape of shapesAround([...seeds.values()], hint.need, board, usable)) {
-    const candidate = planOnShape(pieces, shape, board);
+    const candidate = planOnShape(pieces, shape, board, ruler);
     if (!candidate) continue;
     if (
       !best ||
@@ -645,6 +884,17 @@ export function planFor(hint: MergeHint, items: Iterable<BoardItemState>, board:
     }
   }
   return best ? { ...hint, steps: best.steps, travel: best.travel } : null;
+}
+
+/** `planWith`, for a caller that has items rather than an index. Measures the
+ *  board's step size itself, so a plan costed here reads the same as one costed
+ *  inside `nextMergePlan` — the two must agree or the tests are checking a
+ *  different ruler from the game. */
+export function planFor(hint: MergeHint, items: Iterable<BoardItemState>, board: HintBoard): MergePlan | null {
+  const all = [...items];
+  const byId = new Map<number, BoardItemState>();
+  for (const item of all) byId.set(item.id, item);
+  return planWith(hint, byId, board, rulerFor(all, board));
 }
 
 /**
@@ -672,10 +922,10 @@ export function planFor(hint: MergeHint, items: Iterable<BoardItemState>, board:
  * 10.0% of Roothold. Never the drag count (`need` is 2 or 3 in chains.json,
  * which caps the over-statement at one drag and the fuzz never spent it):
  * always the haul tie-break, and on every single mis-ranked board both plans
- * cost ONE drag — so `travel` there is one leg's squared world distance and its
- * root is a real swipe length. A median 206–420 world units of extra swipe,
- * 1485 at the worst. That is the same defect class the effort ranking exists to
- * remove, arriving through the optimisation instead of through the ordering.
+ * cost ONE drag — so `travel` there is one leg's distance and a real swipe
+ * length. A median 206–420 world units of extra swipe, 1485 at the worst. That
+ * is the same defect class the effort ranking exists to remove, arriving
+ * through the optimisation instead of through the ordering.
  *
  * WHAT IS ACTUALLY TRUE. A plan gathers onto ONE connected shape S of exactly
  * `need` usable cells (`shapesAround`); the pieces that stay standing are
@@ -703,6 +953,11 @@ export function planFor(hint: MergeHint, items: Iterable<BoardItemState>, board:
  * floor can read 1 where the truth is 2. That costs a plan that was not needed.
  * The other direction, reading 2 where the truth is 1, is the bug above, and
  * the proof is what rules it out.
+ *
+ * It survives the scoring model unchanged, and only because of the dominance
+ * rule: `W.drag` is larger than every other weight together, so a plan costing
+ * more drags can never out-score one costing fewer, and a floor above the
+ * incumbent's drag count still proves nothing left can win.
  */
 function dragFloor(hint: MergeHint, byId: Map<number, BoardItemState>, board: HintBoard): number {
   const pieces = hint.ids.map((id) => byId.get(id)).filter((p): p is BoardItemState => !!p);
@@ -733,28 +988,165 @@ function dragFloor(hint: MergeHint, byId: Map<number, BoardItemState>, board: Hi
   return Math.max(1, hint.need - keep);
 }
 
+/* ========================================================================= *
+ *                              THE SCORE                                    *
+ *                                                                           *
+ * The "petite IA": a legible weighted opinion about which of several legal
+ * moves a thinking player would make next. Not a search, not a model — eight
+ * numbers and a sentence each, arguable line by line, and every one of them
+ * measured against a defect that was really on the board (see the header).
+ * ========================================================================= */
+
+/** A plan carries ids; the score wants cells. Resolved once, here, so `meritOf`
+ *  never has to look a piece up. */
+interface PlacedPlan extends MergePlan {
+  /** Where the plan's pieces are standing right now. */
+  at: TilePos[];
+}
+
+function withCells(plan: MergePlan, items: readonly BoardItemState[]): PlacedPlan {
+  const at: TilePos[] = [];
+  for (const id of plan.ids) {
+    const piece = items.find((i) => i.id === id);
+    if (piece) at.push({ col: piece.col, row: piece.row });
+  }
+  return { ...plan, at };
+}
+
+/** A saturating 0..1 ramp: 0 at no distance, ½ at `half`, never quite 1. Used
+ *  for every distance term, so nothing has a cliff the player could feel. */
+function ramp(distance: number, half: number): number {
+  return distance / (distance + half);
+}
+
+/** What the score can know about the player, resolved once per call so every
+ *  candidate is judged against exactly the same reading of the board. */
+interface Situation {
+  ruler: Ruler;
+  board: HintBoard;
+  /** chain id → its deepest tier that can still merge. Fixes the denominator of
+   *  the tier term, so "one from the top" means the same in a 3-tier chain and
+   *  a 6-tier one. */
+  deepest: Map<string, number>;
+}
+
+function situationOf(items: readonly BoardItemState[], data: ChainsData, board: HintBoard): Situation {
+  const deepest = new Map<string, number>();
+  for (const chain of data.chains) {
+    const tiers = chain.tiers.map((t) => t.tier).sort((a, b) => a - b);
+    // The deepest tier that has somewhere to merge TO — the top of the chain is
+    // not a merge, so it is not the top of this scale either.
+    const top = tiers.filter((t) => tiers.includes(t + 1)).at(-1) ?? 1;
+    deepest.set(chain.id, top);
+  }
+  return { ruler: rulerFor(items, board), board, deepest };
+}
+
+/**
+ * WHAT THIS MERGE IS WORTH, in merit points. Higher is better; see the header
+ * for the model and `MERGE_HINT_WEIGHTS` for the argument behind each number.
+ *
+ * Every optional term is zero when the board cannot answer it, so a fixture
+ * that supplies nothing but ground gets `− drag − haul + tier` and a ranking
+ * that is still total, still deterministic, and still an improvement on the
+ * ordering it replaces.
+ */
+function meritOf(plan: PlacedPlan, it: Situation): number {
+  const { board, ruler } = it;
+  let merit = 0;
+
+  // WORK. Dominant, by construction: no combination of the merits below can
+  // reach `W.drag`, so a cheaper plan always wins.
+  merit -= W.drag * (plan.steps.length - 1);
+  merit -= W.haul * ramp(plan.travel, W.haulHalfTiles);
+
+  // THE CELLS THE PLAN TOUCHES — every piece where it stands, and every place
+  // it is asked to go. "Near" and "on screen" are questions about the whole
+  // gesture, not about one end of it.
+  const touched: TilePos[] = [...plan.at];
+  for (const step of plan.steps) touched.push(step.to);
+
+  // PROXIMITY. The distance to the CLOSEST end of the gesture: a merge whose
+  // far piece is across the isle but whose gathering spot is beside the
+  // player's last move is still work happening where they are looking.
+  if (board.focus) {
+    const focus = board.focus;
+    const near = Math.min(...touched.map((c) => ruler.tiles(focus, c)));
+    merit += W.near * (1 - ramp(near, W.nearHalfTiles));
+  }
+
+  // ACTIONABILITY. Anything at all on screen is enough — the hand will point at
+  // one end of the gesture and the player's eye follows the rest.
+  if (board.inView) {
+    const seen = touched.some((c) => board.inView!(c.col, c.row));
+    if (seen) merit += W.frame;
+  }
+
+  // DEPTH. Where this merge sits in its chain, as a fraction of the mergeable
+  // tiers. Tier 1 scores nothing; the last tier that can still merge scores the
+  // whole weight.
+  const top = it.deepest.get(plan.chain) ?? 1;
+  merit += W.tier * (top > 1 ? (plan.tier - 1) / (top - 1) : 0);
+
+  // INTENT. What the player is trying to get, and what they would be spending
+  // to get it.
+  if (board.wants) {
+    if (board.wants(plan.chain, plan.tier + 1) > 0) merit += W.order;
+    if (board.wants(plan.chain, plan.tier) > 0) merit -= W.orderSpend;
+  }
+
+  // INSISTENCE. Shown, seen, ignored.
+  if (board.declines) {
+    const times = Math.min(board.declines(plan.key), W.declineCap);
+    merit -= W.declined * (times / W.declineCap);
+  }
+
+  return merit;
+}
+
+/**
+ * The score of one plan, on the same terms `nextMergePlan` uses.
+ *
+ * Exported so a test can rank the whole field by hand and assert the offer is
+ * its argmax — checking the OFFER against an independently computed order is
+ * the only way to test a ranking without hand-picking the answer it should
+ * give.
+ */
+export function scorePlan(
+  plan: MergePlan,
+  items: Iterable<BoardItemState>,
+  data: ChainsData,
+  board: HintBoard
+): number {
+  const all = [...items];
+  return meritOf(withCells(plan, all), situationOf(all, data, board));
+}
+
 /**
  * The next merge the hand should offer, as the drags that make it.
  *
- * THE CHEAPEST ONE, not the oldest one — see the ranking argument at the top of
- * the file. This used to return the first plannable hint in queue order, which
- * meant the hand regularly sent the player on a two-drag gather across the isle
- * while a pair sat touching three tiles away, and that is what "the hint is
- * worse than it used to be" describes. Ordered by drags, then by haul, then by
- * first completed — the third key written out rather than left to fall out of
- * the iteration order, because the walk below is re-ordered by `dragFloor` and
- * a tie-break that depends on which loop reached the candidate first is not a
- * tie-break at all. No two hints can share a `completedBy` (ids are unique,
- * buckets are disjoint), so the three keys are a TOTAL order and the same board
- * always answers the same way.
+ * THE HIGHEST-SCORING ONE — the model is in the file header and the weights are
+ * in `MERGE_HINT_WEIGHTS`. Two things about it are worth stating here because
+ * they are what make it safe to reason about:
  *
- * Every hint is planned rather than stopping at the first that works, and
- * `dragFloor` is what keeps that affordable: hints are walked cheapest-floor
- * first and the walk breaks the moment the plan in hand costs fewer drags than
- * anything left could. The break is only legitimate because that floor is a
- * PROVEN lower bound. The one that shipped before was not — it threw the
- * cheapest plan away on up to 10% of boards — and both the proof and the
- * retraction are written out on `dragFloor`.
+ * TOTAL. Every candidate the board can produce is planned unless a PROVEN bound
+ * says it cannot win. If a legal merge exists, one is offered — the ranking may
+ * choose badly, but it never falls silent. The `groupsPerBucket` cut is the one
+ * place that could break that (a bucket's plannable set could be cut in favour
+ * of unplannable ones), so it is repaired explicitly: if the cut field yields
+ * nothing at all, the leftovers are walked too.
+ *
+ * DETERMINISTIC. Scores are quantised to integers before they are compared, and
+ * the tie-break below them is the set's first-completed id and then its own
+ * sorted ids — a total order with no appeal to iteration. The same board answers
+ * the same way whichever direction it is walked, which is what the mirrored-
+ * iteration assertions in both spec files check.
+ *
+ * `dragFloor` is what keeps this affordable: candidates are walked cheapest-
+ * floor first and the walk breaks the moment the plan in hand costs fewer drags
+ * than anything left could. The break is only legitimate because that floor is a
+ * PROVEN lower bound AND because `W.drag` dominates — a plan with more drags can
+ * never out-score one with fewer, however much merit it carries.
  *
  * WHAT CORRECTNESS COSTS, measured on the densest hint list a world can hold: a
  * half-full board carrying exactly three of every chain, which is 23 mergeable
@@ -765,14 +1157,9 @@ function dragFloor(hint: MergeHint, byId: Map<number, BoardItemState>, board: Hi
  *     ... and the proven floor pruning the walk               2.1ms / 1.3ms
  *
  * (One machine, the rows timed against each other in one process, so read the
- * ratios and not the absolutes.) The unsound floor it replaces ran 0.9ms /
- * 1.2ms on the same boards. So the
- * fix buys a provably minimal offer for about 1.2ms on Borealis and 0.1ms on
- * Roothold in the worst case the game can build — against the 9.3ms that "just
- * plan everything" would have cost, two thirds of which was the planner
- * enumerating the same gathering spot from each of its own cells. That budget
- * matters because `refreshHint` re-plans on every board change while a hand is
- * up, and four of those can land in one frame when a merge fires.
+ * ratios and not the absolutes.) That budget matters because `refreshHint`
+ * re-plans on every board change while a hand is up, and four of those can land
+ * in one frame when a merge fires.
  *
  * A merge with no plan is not skipped for ever, it is skipped for NOW: the
  * board changes, and the set that had nowhere to gather this minute may have
@@ -787,31 +1174,57 @@ export function nextMergePlan(
   const all = [...items];
   const byId = new Map<number, BoardItemState>();
   for (const item of all) byId.set(item.id, item);
-  const queue = mergeHints(all, data, board)
-    .filter((hint) => !skip.has(hint.completedBy))
-    .map((hint) => ({ hint, floor: dragFloor(hint, byId, board) }))
-    .sort((a, b) => a.floor - b.floor || a.hint.completedBy - b.hint.completedBy);
+  const situation = situationOf(all, data, board);
+
+  // CANDIDATES. Several sets per bucket, not one — the tightest trio on the
+  // board is not always the trio the player is standing beside. Ranked by the
+  // proven floor so the cut keeps the cheap ones, then by the set's own name so
+  // the cut itself never depends on iteration order.
+  const candidates: { hint: MergeHint; floor: number }[] = [];
+  const spare: { hint: MergeHint; floor: number }[] = [];
+  for (const { chain, tier, need, items: bucket } of bucketsOf(all, data)) {
+    const graded = groupsIn(bucket, need, board)
+      .map((group) => hintOf(chain, tier, need, group, board))
+      .filter((hint) => !skip.has(hint.completedBy))
+      .map((hint) => ({ hint, floor: dragFloor(hint, byId, board) }))
+      .sort((a, b) => a.floor - b.floor || (a.hint.key < b.hint.key ? -1 : a.hint.key > b.hint.key ? 1 : 0));
+    candidates.push(...graded.slice(0, W.groupsPerBucket));
+    spare.push(...graded.slice(W.groupsPerBucket));
+  }
+  candidates.sort((a, b) => a.floor - b.floor || (a.hint.key < b.hint.key ? -1 : a.hint.key > b.hint.key ? 1 : 0));
+  spare.sort((a, b) => a.floor - b.floor || (a.hint.key < b.hint.key ? -1 : a.hint.key > b.hint.key ? 1 : 0));
 
   let best: MergePlan | null = null;
-  for (const { hint, floor } of queue) {
-    // Ascending floors: once the incumbent is STRICTLY cheaper than the floor
-    // of everything remaining, nothing left can beat it — not even on haul,
-    // because haul only ever sorts plans of equal length. This line is the one
-    // that makes `dragFloor` load-bearing rather than advisory, and it is why
-    // that floor has to be a bound with a proof behind it: a floor one drag too
-    // high here does not cost time, it silently deletes the best answer.
-    if (best && best.steps.length < floor) break;
-    const plan = planFor(hint, all, board);
-    if (!plan) continue;
-    if (
-      !best ||
-      plan.steps.length < best.steps.length ||
-      (plan.steps.length === best.steps.length &&
-        (plan.travel < best.travel ||
-          (plan.travel === best.travel && plan.completedBy < best.completedBy)))
-    ) {
-      best = plan;
+  let bestRank = -Infinity;
+  const consider = (queue: { hint: MergeHint; floor: number }[]): void => {
+    for (const { hint, floor } of queue) {
+      // Ascending floors: once the incumbent is STRICTLY cheaper than the floor
+      // of everything remaining, nothing left can beat it — not even on merit,
+      // because `W.drag` is larger than every other weight together. This line
+      // is what makes `dragFloor` load-bearing rather than advisory, and it is
+      // why that floor has to be a bound with a proof behind it: a floor one
+      // drag too high here does not cost time, it silently deletes the best
+      // answer.
+      if (best && best.steps.length < floor) break;
+      const plan = planWith(hint, byId, board, situation.ruler);
+      if (!plan) continue;
+      const rank = Math.round(meritOf(withCells(plan, all), situation) * W.quantum);
+      if (
+        !best ||
+        rank > bestRank ||
+        (rank === bestRank &&
+          (plan.completedBy < best.completedBy ||
+            (plan.completedBy === best.completedBy && plan.key < best.key)))
+      ) {
+        best = plan;
+        bestRank = rank;
+      }
     }
-  }
+  };
+  consider(candidates);
+  // TOTALITY REPAIR. The per-bucket cut is a performance measure and must never
+  // be the reason the hand says nothing: if every set that survived it turned
+  // out to be unplannable, walk the ones it dropped.
+  if (!best) consider(spare);
   return best;
 }

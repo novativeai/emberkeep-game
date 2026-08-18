@@ -43,6 +43,7 @@ import { iapBridge } from '../core/iapBridge';
 import { gridToWorld } from '../core/iso';
 import type {
   EventMap,
+  MarkerPoint,
   ResolvedArrow,
   ResolvedHand,
   SpeakerId,
@@ -51,6 +52,11 @@ import type {
   TutorialStepEvent,
   TutorialUiTarget
 } from '../core/types';
+// The two pure readers every board-anchored pointer goes through — the tutorial's
+// hand, the idle merge hint and the carry lesson alike. They live beside the
+// director because that is what decides WHICH piece a marker means; these decide
+// where that piece is standing right now. Pure functions, no bus traffic.
+import { markerPointAt, markerPointCell } from '../systems/TutorialDirector';
 import type { BoardScene } from './BoardScene';
 import { CharacterBubble } from '../entities/CharacterBubble';
 import { BagPanel } from '../ui/BagPanel';
@@ -84,6 +90,29 @@ const DEPTH_DIALOG = 200;
 // loads at its native pixel size, so each is scaled to these.
 const HAND_MARKER_H = 172;
 const ARROW_MARKER_H = 148;
+
+/**
+ * WHAT a marker points at, as one comparable string.
+ *
+ * The distinction it draws is the whole reason the pointer stopped jumping: an
+ * end that follows a PIECE is identified by that piece, not by the tile it is
+ * standing on this second, so dragging the piece changes where the marker is
+ * drawn without changing what it means. `tutorial:markers` fires on every board
+ * change, and re-placing a marker restarts its gesture from the top — a hand
+ * that re-poses itself every time the player nudges the very dragon it is
+ * following looks broken. So the beat's markers are only re-placed when this
+ * answer changes: a different piece, a different cell, a different button.
+ */
+function markerAim(marker: ResolvedHand | ResolvedArrow | null): string {
+  if (!marker) return '-';
+  const end = (p: MarkerPoint): string =>
+    p.item !== undefined ? `#${p.item}` : `${p.col},${p.row}`;
+  if ('from' in marker) return `drag ${end(marker.from)}>${end(marker.to)}`;
+  if ('tile' in marker) return `tile ${end(marker.tile)}`;
+  if ('ui' in marker) return `ui ${marker.ui}`;
+  if ('character' in marker) return `char ${marker.character}`;
+  return `fog ${marker.fogRegion}`;
+}
 
 /* ---------------------- the Settings plate ------------------------ */
 /**
@@ -241,7 +270,13 @@ export class UIScene extends Phaser.Scene {
   // camera pans/zooms over the big map, so each frame we re-project the cell to
   // its current on-screen spot (update()). Otherwise a marker would appear glued
   // to the screen and slide off its target the moment the camera moves.
-  private handDrag: { from: TilePos; to: TilePos } | null = null;
+  //
+  // And to the PIECE, not merely the cell, whenever a piece is what the marker
+  // means: both ends are `MarkerPoint`s, so update() asks where that piece is
+  // standing this frame rather than replaying where it stood when the hand went
+  // up. That is the difference between a gauntlet that follows the dragon the
+  // player is dragging and one left hovering over the tile it started on.
+  private handDrag: { from: MarkerPoint; to: MarkerPoint } | null = null;
   /** True while the HAND is showing an idle merge hint rather than a tutorial
    *  beat — so the hint only ever takes back what the hint put there. */
   private hintHand = false;
@@ -295,6 +330,9 @@ export class UIScene extends Phaser.Scene {
   /** `height` = how far the target extends below the anchor point (0 for a
    *  button, a full standee for a world character) — see update(). */
   private arrowAnchor: (() => { x: number; y: number; height?: number } | null) | null = null;
+  /** True while the arrow is anchored to a board PIECE — see update(): only
+   *  those go quiet when their anchor stops answering. */
+  private arrowOnPiece = false;
   private arrowLift = 128;
   private arrowBob = { v: 0 };
   private handBob = { v: 0 }; // tap-press offset for the point gesture
@@ -556,12 +594,26 @@ export class UIScene extends Phaser.Scene {
     // own fixed camera, so without this they'd appear stuck to the screen).
     if (this.hand.visible) {
       if (this.handDrag) {
-        const f = this.cellToScreen(this.handDrag.from.col, this.handDrag.from.row);
-        const t = this.cellToScreen(this.handDrag.to.col, this.handDrag.to.row);
-        this.hand.setPosition(
-          Phaser.Math.Linear(f.x, t.x, this.handProg.t) + 16,
-          Phaser.Math.Linear(f.y, t.y, this.handProg.t) - 12
-        );
+        // Both ends re-read from the live board. An end that answers `null` has
+        // lost the piece it was aimed at — merged, sold, pocketed, or standing
+        // on a board the player has left — and the honest response is to take
+        // the hand back rather than let it finish its stroke over the tile a
+        // piece used to occupy. (The tutorial re-aims itself an instant later
+        // off `item:removed`; a lesson's hand simply goes.)
+        const from = markerPointCell(this.ctx.state, this.handDrag.from);
+        const to = markerPointCell(this.ctx.state, this.handDrag.to);
+        if (!from || !to) {
+          // Nothing to point at any more. clearMarkers() also drops the arrow
+          // and the owner, so the block below finds nothing to re-anchor.
+          this.clearMarkers();
+        } else {
+          const f = this.cellToScreen(from.col, from.row);
+          const t = this.cellToScreen(to.col, to.row);
+          this.hand.setPosition(
+            Phaser.Math.Linear(f.x, t.x, this.handProg.t) + 16,
+            Phaser.Math.Linear(f.y, t.y, this.handProg.t) - 12
+          );
+        }
       } else if (this.handPoint) {
         const p = this.handPoint();
         if (p) this.hand.setPosition(p.x, p.y + this.handBob.v);
@@ -569,6 +621,11 @@ export class UIScene extends Phaser.Scene {
     }
     if (this.arrow.visible && this.arrowAnchor) {
       const a = this.arrowAnchor();
+      // A PIECE-anchored arrow whose piece is gone points at nothing, so it
+      // goes. A UI-anchored one answering null is a different thing entirely —
+      // a control that is off-screen for a beat (the Codex's ✕ behind a held
+      // page) — and that one keeps its place, exactly as it always has.
+      if (!a && this.arrowOnPiece) this.arrow.setVisible(false);
       if (a) {
         // A target near the top of the screen (the ⚡+ Warmth button) would push
         // the down-pointing arrow off-screen above it — so flip it UP and sit it
@@ -614,9 +671,27 @@ export class UIScene extends Phaser.Scene {
       bus.on('tutorial:markers', (markers) => {
         const step = this.lastStep;
         if (!step || step.done) return;
+        const was = `${markerAim(step.hand)}|${markerAim(step.arrow)}`;
         step.highlight = markers.highlight;
         step.hand = markers.hand;
         step.arrow = markers.arrow;
+        const now = `${markerAim(markers.hand)}|${markerAim(markers.arrow)}`;
+        // THE PIECE MOVING IS NOT THE MARKER CHANGING. This event fires on every
+        // board change so the BOARD can repaint its highlights, and a marker that
+        // still names the same piece is already following it live in update() —
+        // re-placing it here would restart the gesture from the top, mid-drag,
+        // which is the flicker the old cell-anchored pointer had instead of a
+        // fix. Only a marker that now names something ELSE is put up again.
+        //
+        // Unless nothing of ours is on screen to follow: a crossing or a panel
+        // takes the hand down without the beat changing, and an unchanged aim
+        // must not be the reason the pointer never comes back.
+        const showing = markers.hand
+          ? this.handOwner === 'tutorial' && this.hand.visible
+          : markers.arrow
+            ? this.arrow.visible
+            : false;
+        if (showing && now === was) return;
         // A hand mid-gesture over a piece the player has already picked up is
         // the thing being fixed, so this re-places rather than waiting for the
         // current sweep to finish.
@@ -742,13 +817,13 @@ export class UIScene extends Phaser.Scene {
         )
       ),
       bus.on('ui:shop_requested', ({ currency }) => {
-        if (!(this.lastStep?.done || (this.lastStep?.allow.marketplace ?? false))) return;
+        if (!(this.tutorialOver() || (this.lastStep?.allow.marketplace ?? false))) return;
         this.shop.open(currency);
       }),
       // Real-money packs: strictly post-tutorial (the buy_energy beat allows
       // the Emporium, never a checkout — its gate is the free Spark).
       bus.on('ui:iap_buy_requested', ({ packId }) => {
-        if (!this.lastStep?.done) return;
+        if (!this.tutorialOver()) return;
         this.openIapConfirmDialog(packId);
       }),
       /*
@@ -769,9 +844,22 @@ export class UIScene extends Phaser.Scene {
        * named there before it can put a paywall in front of anybody.
        */
       bus.on('ui:topup_requested', ({ label, price, source }) => {
-        if (!this.lastStep?.done) return;
+        if (!this.tutorialOver()) return;
         if (!TOP_UP.offer[source]) return;
         if (this.topUp.isOpen || this.iapDialog || this.dialog) return;
+        // A REFUSAL INSIDE A SHOP DOES NOT NEED TO BE ASKED TWICE. The player
+        // came to spend, tapped a price and was told no; a card between them
+        // and the till is a speed bump in an errand they already started. So
+        // the shop surfaces go straight there, and the shortfall travels as a
+        // floating line rather than as a panel — it is information, not a
+        // question. `skip` keeps the card, because that refusal happens on the
+        // board and switching halls there changes the subject (see TOP_UP.mode).
+        if (TOP_UP.mode[source] === 'switch') {
+          const short = Math.max(0, price - this.ctx.state.coins);
+          this.goToCoinShop(source);
+          if (short > 0) this.floatWarning(`${short} more gold for ${label}`);
+          return;
+        }
         this.topUp.open(label, price, source);
       }),
       /*
@@ -1727,7 +1815,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** The board changed under an active demonstration: re-aim the gauntlet at the
-   *  pair's CURRENT cells, or retire it if the pair no longer exists. */
+   *  pair the recipe is about, or retire it if that pair no longer exists. */
   private refreshRecipeHint(): void {
     if (!this.recipeHint) return;
     const [chain, tiers] = this.recipeHint.split(':') as [string, string];
@@ -1739,10 +1827,16 @@ export class UIScene extends Phaser.Scene {
       this.clearRecipeHint(); // sold/consumed — the discovery handler covers the merge case
       return;
     }
-    this.placeHand({
-      from: { col: pieces[1]!.col, row: pieces[1]!.row },
-      to: { col: pieces[0]!.col, row: pieces[0]!.row }
-    });
+    const hand: ResolvedHand = {
+      from: { col: pieces[1]!.col, row: pieces[1]!.row, item: pieces[1]!.id },
+      to: { col: pieces[0]!.col, row: pieces[0]!.row, item: pieces[0]!.id }
+    };
+    // Still the same two pieces? Then there is nothing to re-place: the hand is
+    // already following them frame by frame, and putting it up again would
+    // restart its stroke every time either one is nudged.
+    const shown = this.handDrag;
+    if (shown && shown.from.item === hand.from.item && shown.to.item === hand.to.item) return;
+    this.placeHand(hand);
   }
 
   /** "While you were away" — consumes the load payload nothing used to read:
@@ -2153,6 +2247,25 @@ export class UIScene extends Phaser.Scene {
    *  never during it. There is no `allow.store`: no beat teaches it, because
    *  nothing in it is a rule. */
   private storeAllowed(): boolean {
+    return this.tutorialOver();
+  }
+
+  /**
+   * THE TUTORIAL IS OVER — and `lastStep?.done` alone does NOT say so.
+   *
+   * `lastStep` is null until a `tutorial:step` event arrives, so the bare test
+   * `!this.lastStep?.done` reads `undefined`, negates to TRUE, and refuses.
+   * That is the right answer while a lesson runs and the WRONG one in every
+   * state where no step is live — which includes the one that matters, a save
+   * whose walkthrough finished long ago. Three gates were written that way and
+   * all three were silently shut for exactly the player who had finished the
+   * game: the real-money checkout, the currency shop, and the gold shortfall.
+   * `storeAllowed` had the correct form all along; this is that form, named.
+   *
+   * `state.tutorialDone` is the persisted fact and the honest fallback. During
+   * a lesson `lastStep.done` is false and wins, so the protection is unchanged.
+   */
+  private tutorialOver(): boolean {
     return this.lastStep?.done ?? this.ctx.state.tutorialDone;
   }
 
@@ -2194,6 +2307,7 @@ export class UIScene extends Phaser.Scene {
     this.handDrag = null;
     this.handPoint = null;
     this.arrowAnchor = null;
+    this.arrowOnPiece = false;
     this.hintHand = false;
     this.handOwner = null;
   }
@@ -2371,13 +2485,44 @@ export class UIScene extends Phaser.Scene {
     return { x: sx / tiles.length, y: sy / tiles.length - 52 };
   }
 
+  /**
+   * DECIDE ONCE WHAT AN END MEANS, then follow it.
+   *
+   * A marker end arrives either already aimed at a piece (the tutorial's
+   * director pins which one, so a re-rank cannot swap the beat's dragon for its
+   * neighbour) or as a bare cell — which is how every pointer the BOARD raises
+   * arrives: the idle merge hint and the carry lesson that teaches world travel
+   * both speak in cells. A bare cell with a piece standing on it means that
+   * piece, and this is where it stops being a place and becomes a thing.
+   *
+   * Asked once, here, and never again: re-asking each frame would let the end
+   * drift onto whatever wandered over the tile later, which is a pointer that
+   * changes its mind — the failure this whole path exists to avoid.
+   */
+  private anchorEnd(point: MarkerPoint): MarkerPoint {
+    return point.item !== undefined ? point : markerPointAt(this.ctx.state, point.col, point.row);
+  }
+
   private placeHand(hand: ResolvedHand, owner: 'tutorial' | 'hint' | 'carry' = 'tutorial'): void {
     this.handOwner = owner;
     if ('from' in hand) {
-      // Drag gesture: store the from/to CELLS and drive a 0→1 progress proxy;
-      // update() lerps the live re-projected cell positions so the hand follows
-      // the camera. (Alpha still fades on the hand itself; that's screen-space.)
-      this.handDrag = { from: hand.from, to: hand.to };
+      // Drag gesture: store the from/to ENDS and drive a 0→1 progress proxy;
+      // update() lerps the live re-projected positions so the hand follows the
+      // camera AND the pieces. (Alpha still fades on the hand itself; that's
+      // screen-space.)
+      this.handDrag = { from: this.anchorEnd(hand.from), to: this.anchorEnd(hand.to) };
+      // A drag whose two ends turn out to be the same piece is the player having
+      // already done the half of it that mattered; the destination reverts to
+      // the ground it names so the gesture still says "put it HERE" rather than
+      // collapsing onto the thing being carried. (The director applies the same
+      // rule to its own beats — this catches the pointers that come from the
+      // board, where the ends arrive as bare cells.)
+      if (
+        this.handDrag.from.item !== undefined &&
+        this.handDrag.from.item === this.handDrag.to.item
+      ) {
+        this.handDrag.to = { col: hand.to.col, row: hand.to.row };
+      }
       this.hand.setVisible(true);
       const base = this.handBaseScale;
       const run = (): void => {
@@ -2460,7 +2605,16 @@ export class UIScene extends Phaser.Scene {
 
   private placeArrow(arrow: ResolvedArrow): void {
     if ('tile' in arrow) {
-      this.arrowAnchor = () => this.cellToScreen(arrow.tile.col, arrow.tile.row);
+      // Same law as the hand: decide once whether this names a piece or the
+      // ground, then re-read its position every frame. An arrow over a tapped
+      // generator has to stay over it when the player shuffles the board around
+      // it, and go quiet when the thing it names is carried off.
+      const end = this.anchorEnd(arrow.tile);
+      this.arrowOnPiece = end.item !== undefined;
+      this.arrowAnchor = () => {
+        const at = markerPointCell(this.ctx.state, end);
+        return at ? this.cellToScreen(at.col, at.row) : null;
+      };
       this.arrowLift = 156;
     } else {
       this.arrowAnchor = () => this.uiTarget(arrow);

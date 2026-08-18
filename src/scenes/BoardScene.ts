@@ -1001,6 +1001,43 @@ export class BoardScene extends Phaser.Scene {
   /** Untouched time on this board, in ms — reset by anything the player does. */
   private hintIdleMs = 0;
   /** The step currently on screen, so it is offered once and taken back once. */
+  /**
+   * WHERE THE PLAYER IS WORKING — the cell they last put a piece on.
+   *
+   * The planner's single most valuable input, and the whole of its `near`
+   * weight. A merge game is played in a neighbourhood: you drop something, look
+   * at what is around it, drop another. A hand that answers from that
+   * neighbourhood looks like it is watching you. A hand that answers from the
+   * far corner of the isle is what "il n'est pas logique" actually describes —
+   * the offer was legal and cheap and had nothing to do with what you were
+   * doing. Set on every landed move, cleared on a world switch (a cell index
+   * means nothing once the lattice under it changes).
+   */
+  private playerFocus: TilePos | null = null;
+  /**
+   * HOW MANY MORE OF EACH PIECE THE LIVE LEDGER STILL WANTS, by `chain:tier`.
+   *
+   * Rebuilt from `order:progress`, which carries `have[]` and `need[]` against
+   * the order's own `requires[]` — so the two are zipped by index and the
+   * shortfall is what is left. The scene CACHES rather than asks: OrderSystem
+   * owns this and systems are never called across, so the fact arrives on the
+   * bus and is remembered here.
+   */
+  private orderWants = new Map<string, number>();
+  /** Per-order shortfalls, so one order completing cannot leave its rows in the
+   *  flattened total above. */
+  private orderShortfalls = new Map<string, Array<{ key: string; short: number }>>();
+  /**
+   * HOW MANY TIMES A SET WAS OFFERED AND LEFT ALONE, by `MergeHint.key`.
+   *
+   * Enough merit to hand the turn to something else once the player has said no
+   * a few times, never a ban — the planner saturates it, so an ignored merge
+   * sinks but is never buried. Counted here because the scene is what knows a
+   * hand went up and came down without being followed.
+   */
+  private hintDeclines = new Map<string, number>();
+  /** The key of the set currently being offered, for the decline count. */
+  private hintKey: string | null = null;
   private hintShown: MergeStep | null = null;
   /** The last step the hand ASKED for, kept past the take-back.
    *
@@ -1049,8 +1086,61 @@ export class BoardScene extends Phaser.Scene {
         const pa = worldPointOf(state.world, a.col, a.row);
         const pb = worldPointOf(state.world, b.col, b.row);
         return (pa.x - pb.x) ** 2 + (pa.y - pb.y) ** 2;
-      }
+      },
+      // THE FOUR SIGNALS THAT MAKE THE PLANNER SEE THE PLAYER, not just the
+      // board. Each is OPTIONAL on `HintBoard` and each degrades to silence, so
+      // the unit fixtures keep scoring on drags and haul alone; what they buy
+      // here is the difference between a legal offer and a sensible one.
+      ...(this.playerFocus ? { focus: this.playerFocus } : {}),
+      // ON SCREEN — the camera only, and deliberately so. Only the FIRST offer
+      // moves the view; every re-aim and every heartbeat after it speaks from
+      // wherever the player chose to stand, so an offer whose pieces are off
+      // screen is a hand pointing at the edge of the world. Generous by a tile
+      // in each direction: a piece whose art overlaps the rim is still a piece
+      // the player can see and reach.
+      inView: (col, row) => {
+        const v = this.cameras.main.worldView;
+        const p = worldPointOf(state.world, col, row);
+        const pad = TILE_W;
+        return (
+          p.x >= v.x - pad &&
+          p.x <= v.right + pad &&
+          p.y >= v.y - pad &&
+          p.y <= v.bottom + pad
+        );
+      },
+      wants: (chain, tier) => this.orderWants.get(`${chain}:${tier}`) ?? 0,
+      declines: (key) => this.hintDeclines.get(key) ?? 0
     };
+  }
+
+  /**
+   * Re-read what the Ledger is still short of, from a progress fact.
+   *
+   * `order:progress` fires once per ACTIVE order on every board change, so the
+   * cheapest correct thing is to rebuild that order's contribution each time
+   * and keep the rest. Keyed per order so a completed one stops counting the
+   * moment its own progress event says it is done.
+   */
+  private noteOrderWants(orderId: string, have: number[], need: number[]): void {
+    const order = this.ctx.data.orders.orders.find((o) => o.id === orderId);
+    if (!order) return;
+    this.orderShortfalls.set(
+      orderId,
+      order.requires.map((req, i) => ({
+        key: `${req.chain}:${req.tier}`,
+        short: Math.max(0, (need[i] ?? req.count) - (have[i] ?? 0))
+      }))
+    );
+    // Flatten every live order into one lookup. Small maps, rebuilt rarely —
+    // clearer than trying to patch a total in place and get the arithmetic
+    // right when an order completes.
+    this.orderWants.clear();
+    for (const rows of this.orderShortfalls.values()) {
+      for (const { key, short } of rows) {
+        if (short > 0) this.orderWants.set(key, (this.orderWants.get(key) ?? 0) + short);
+      }
+    }
   }
 
   /**
@@ -1103,6 +1193,15 @@ export class BoardScene extends Phaser.Scene {
     if (this.hintShown) {
       this.hintPulseMs += delta;
       if (this.hintPulseMs < MERGE_HINT.repulseMs) return;
+      // A HAND THAT HAS STOOD A FULL HEARTBEAT UNANSWERED IS A DECLINE, and
+      // this is the only place that can honestly say so. Not `takeBackHint` —
+      // that fires when the player merges, moves, or picks anything up, which
+      // is the opposite of ignoring it. Here, thirty seconds have passed with
+      // the hand out and the board untouched. The planner saturates the count,
+      // so this sinks a stubbornly-ignored set rather than banning it.
+      if (this.hintKey) {
+        this.hintDeclines.set(this.hintKey, (this.hintDeclines.get(this.hintKey) ?? 0) + 1);
+      }
       this.refreshHint(true);
       return;
     }
@@ -1117,7 +1216,7 @@ export class BoardScene extends Phaser.Scene {
       this.hintFollowUp = false;
       return;
     }
-    this.showHintStep(step, from, true);
+    this.showHintStep(step, from, true, plan?.key ?? null);
   }
 
   /**
@@ -1153,7 +1252,15 @@ export class BoardScene extends Phaser.Scene {
    * what `refreshHint` did before the three paths were merged — the yank was
    * never a decision, it was a consequence of sharing the code.
    */
-  private showHintStep(step: MergeStep, from: BoardItemState, aim = false): void {
+  private showHintStep(
+    step: MergeStep,
+    from: BoardItemState,
+    aim = false,
+    key: string | null = null
+  ): void {
+    // Remembered so the heartbeat can tell "the same set, still ignored" from
+    // "a different set" — the decline count is per set, never per chain.
+    this.hintKey = key;
     this.ctx.bus.emit('hint:merge', null);
     this.hintShown = step;
     this.hintAsked = step;
@@ -1217,6 +1324,10 @@ export class BoardScene extends Phaser.Scene {
    * hand goes back to waiting its full ten seconds rather than chasing them.
    */
   private notePlayerMove(itemId: number, to: TilePos): void {
+    // Where they are working, for the planner's `near` weight. Set on the LANDED
+    // cell rather than on pick-up: the question the hint answers is "what next",
+    // and next happens where the piece came to rest.
+    this.playerFocus = { col: to.col, row: to.row };
     const asked = this.hintAsked;
     this.hintAsked = null;
     this.hintFollowUp =
@@ -1266,7 +1377,7 @@ export class BoardScene extends Phaser.Scene {
       step.to.col === this.hintShown.to.col &&
       step.to.row === this.hintShown.to.row;
     if (same && !pulse) return;
-    this.showHintStep(step, from);
+    this.showHintStep(step, from, false, plan?.key ?? null);
   }
 
   /**
@@ -1372,6 +1483,7 @@ export class BoardScene extends Phaser.Scene {
     this.hintPulseMs = 0;
     if (!this.hintShown) return;
     this.hintShown = null;
+    this.hintKey = null;
     this.ctx.bus.emit('hint:merge', null);
   }
 
@@ -7264,6 +7376,13 @@ export class BoardScene extends Phaser.Scene {
         // does NOT — so an un-retracted hint survived the journey and went on
         // pointing at cells belonging to a board that is no longer on screen.
         this.takeBackHint();
+        // A cell index only means something beside the lattice that owns it, so
+        // the focus from the isle would name a cell on the new world's grid
+        // that the player has never touched — and the `near` weight would then
+        // pull every offer toward a random corner. Declines go too: they are
+        // keyed per set, and the sets are a different board's.
+        this.playerFocus = null;
+        this.hintDeclines.clear();
         this.ctx.bus.emit('hint:carry', null);
         // And the new world starts its idle clock from zero. Arriving somewhere
         // is the one moment a player is reading the board rather than stuck on
@@ -7323,6 +7442,9 @@ export class BoardScene extends Phaser.Scene {
         const { x, y } = gridToWorld(to.col, to.row);
         this.settleAfterDrag(sprite, x, y);
       }),
+      bus.on('order:progress', ({ orderId, have, need }) =>
+        this.noteOrderWants(orderId, have, need)
+      ),
       bus.on('item:move_bounced', ({ itemId, at }) => {
         const sprite = this.itemSprites.get(itemId);
         if (!sprite) return;

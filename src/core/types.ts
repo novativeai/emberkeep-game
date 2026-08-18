@@ -1850,13 +1850,40 @@ export interface EventMap {
   'tour:completed': { id: string };
 }
 
+/**
+ * WHERE A MARKER AIMS — a cell, plus the identity of the PIECE it is aimed at
+ * when it is aimed at a piece rather than at bare ground.
+ *
+ * A cell is a place; a piece is a thing, and a thing can be picked up. Resolving
+ * a marker to a cell alone is what pinned the tutorial's hand to the tile a
+ * dragon happened to be standing on when the beat opened: drag the dragon and
+ * the hand stayed behind, still pointing at ground, telling the player to do
+ * something to a piece that is not there any more.
+ *
+ * So the cell is kept — it is what every reader that only needs a PLACE still
+ * reads (the board's camera-follow aims once, when the beat opens) — and `item`
+ * rides beside it as the identity that survives a drag. Whoever draws the marker
+ * re-reads that piece's cell every frame, exactly as `character` is re-read, so
+ * the pointer follows the piece instead of the tile.
+ *
+ * Absent `item` = this end names GROUND (an empty gather cell, a fog gate, an
+ * authored tile nobody is standing on) and the cell is the whole answer.
+ *
+ * `item` is a board-item id, and board items are per WORLD: an id that no longer
+ * resolves means the piece is gone OR is standing on another isle, and both
+ * answers are the same one — there is nothing here to point at.
+ */
+export interface MarkerPoint extends TilePos {
+  item?: number;
+}
+
 export type ResolvedHand =
-  | { from: TilePos; to: TilePos }
+  | { from: MarkerPoint; to: MarkerPoint }
   | { ui: TutorialUiTarget }
   | { fogRegion: string };
 
 export type ResolvedArrow =
-  | { tile: TilePos }
+  | { tile: MarkerPoint }
   | { ui: TutorialUiTarget }
   | { fogRegion: string }
   /** Stays an id through the payload, exactly like `ui`: the UI re-reads her

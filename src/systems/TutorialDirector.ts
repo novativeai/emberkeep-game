@@ -3,6 +3,7 @@ import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
 import type {
   BoardItemState,
+  MarkerPoint,
   ResolvedArrow,
   ResolvedHand,
   TileRef,
@@ -61,6 +62,56 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
  *  field. */
 function markerKey(view: TutorialStepEvent): string {
   return JSON.stringify([view.highlight, view.hand, view.arrow]);
+}
+
+/* --------------------------------------------------------------------------
+ * MARKER POINTS — the two-line pair every pointer in the game reads through.
+ *
+ * They live beside the director because the director is what decides WHICH
+ * piece a beat means, and these decide where that piece IS; splitting the two
+ * halves across modules is how the tutorial's hand and the board's own hint
+ * ended up with different answers to the same question. They are pure — no
+ * Phaser, no scene, no ambient projection — so the code the UI runs every frame
+ * is the code the unit tests run in node, and they are WORLD-BLIND on purpose:
+ * everything they touch is `state.items`, which is the ACTIVE world's board and
+ * nothing else. That is the whole of "every map has this system" — there is no
+ * per-world branch to get wrong.
+ * ----------------------------------------------------------------------- */
+
+/**
+ * The marker end for a cell — tagged with the PIECE standing on it, if any.
+ *
+ * A pointer aimed at ground and a pointer aimed at a piece look identical when
+ * they are placed and behave nothing alike a second later, so the question is
+ * asked ONCE, when the marker goes up: whatever is standing here is what this
+ * end means from now on. Pieces only — a `decor` fixture cannot be picked up,
+ * so pinning to one buys nothing and would make an immovable thing look movable.
+ */
+export function markerPointAt(state: GameState, col: number, row: number): MarkerPoint {
+  const standing = state.itemAt(col, row);
+  return standing?.kind === 'item' ? { col, row, item: standing.id } : { col, row };
+}
+
+/**
+ * Where a marker end is NOW — `null` when it has nothing left to point at.
+ *
+ * Ground never moves, so a cell answers itself. A piece answers with wherever it
+ * is standing this frame, which is what makes a hand follow a dragon across the
+ * board instead of hovering over the tile it started on.
+ *
+ * `null` covers both ways a piece can stop being pointable, and they deserve the
+ * same answer: it was consumed (merged, sold, pocketed, eaten), or it is on
+ * ANOTHER WORLD'S board — `state.items` is the active world's, so a piece the
+ * player left on the isle simply is not in it. A hand pointing at a piece on
+ * another isle is worse than no hand, and a hand pointing at the cell a merged
+ * piece used to occupy is worse still. Callers hide the marker; nothing throws,
+ * because this is read inside a per-frame `guard()` that swallows throws
+ * silently and permanently.
+ */
+export function markerPointCell(state: GameState, point: MarkerPoint): TilePos | null {
+  if (point.item === undefined) return { col: point.col, row: point.row };
+  const item = state.items.get(point.item);
+  return item ? { col: item.col, row: item.row } : null;
 }
 
 /**
@@ -389,15 +440,32 @@ export class TutorialDirector {
   }
 
   private resolveStep(step: TutorialStepConfig): TutorialStepEvent {
+    // Highlights stay CELLS: a glow is painted on the ground, and the board
+    // repaints it whenever this view is re-emitted (which a move does).
     const highlight = (step.highlight ?? [])
       .map((ref) => this.resolveTileRef(ref))
-      .filter((p): p is TilePos => p !== null);
+      .filter((p): p is MarkerPoint => p !== null)
+      .map((p): TilePos => ({ col: p.col, row: p.row }));
 
     let hand: ResolvedHand | null = null;
     if (step.hand) {
       if ('from' in step.hand) {
         const from = this.resolveTileRef(step.hand.from);
-        const to = this.resolveTileRef(step.hand.to);
+        let to = this.resolveTileRef(step.hand.to);
+        // A DRAG HAS TWO ENDS AND THEY CANNOT BE THE SAME PIECE.
+        //
+        // Both ends follow their piece, which is what makes "drag that tuft
+        // onto this one" survive either of them being moved. But the player is
+        // free to answer the beat halfway — to drop `from` on the very cell the
+        // beat was pointing at — and from that moment a `to` that re-resolved
+        // by position would name the piece already in the player's hand, and
+        // the gesture would collapse to a hand waving at itself. So a `to`
+        // that lands on the carried piece falls back to the GROUND it names:
+        // "put it here" still reads, and the destination stops moving with the
+        // thing being moved.
+        if (from?.item !== undefined && to?.item === from.item) {
+          to = { col: to.col, row: to.row };
+        }
         if (from && to) hand = { from, to };
       } else {
         hand = step.hand;
@@ -434,11 +502,20 @@ export class TutorialDirector {
     };
   }
 
-  private resolveTileRef(ref: TileRef): TilePos | null {
+  /**
+   * A ref as a MARKER END: the cell it names, plus the piece standing there.
+   *
+   * The `item` id is the half that survives a drag — see `MarkerPoint`. The cell
+   * is still filled in for every reader that only wants a place (the board aims
+   * its camera once, when the beat opens), and it is the WHOLE answer for a ref
+   * that names ground: an authored cell nobody is standing on stays exactly the
+   * frozen tile it was authored as, because that is what it means.
+   */
+  private resolveTileRef(ref: TileRef): MarkerPoint | null {
     const item = this.resolveRefItem(ref);
-    if (item) return { col: item.col, row: item.row };
+    if (item) return { col: item.col, row: item.row, item: item.id };
     if (Array.isArray(ref)) return { col: ref[0], row: ref[1] };
-    if (ref === 'last_hatched' && this.lastHatched) return this.lastHatched;
+    if (ref === 'last_hatched' && this.lastHatched) return { ...this.lastHatched };
     return null;
   }
 
