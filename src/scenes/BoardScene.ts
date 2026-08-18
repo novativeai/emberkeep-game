@@ -57,6 +57,7 @@ import {
   STANDEE_SHADOW_DX,
   STANDEE_SHADOW_DY,
   STANDEE_SHADOW_SQUASH,
+  SKIP_KEYS,
   STANDEE_SHADOW_WIDTH,
   TAP_MAX_DISTANCE_PX,
   TAP_MAX_MS,
@@ -78,7 +79,7 @@ import {
   originFor
 } from '../core/characterAnims';
 import { type ClipRef, clipLoadTiers, planClipEviction } from '../core/dragonClips';
-import { type MergeHint, nextMergeHint } from '../core/mergeHints';
+import { type HintBoard, type MergeStep, nextMergePlan } from '../core/mergeHints';
 import { LoadQueue } from '../core/LoadQueue';
 import { ensureTextures } from '../core/lazyTextures';
 import { plateScale } from '../core/artScale';
@@ -91,7 +92,7 @@ import { editorStore } from '../editor/editorStore';
 import { gridToWorld } from '../core/iso';
 import { guard, recordError } from '../core/crash';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
-import { artScaleAt, cellAtWorldPoint, setActiveWorld, worldPointOf } from '../core/world';
+import { artScaleAt, cellAtWorldPoint, setActiveWorld, worldPointOf, zoneAt } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
 import { cappedTier } from '../core/graphics';
 import { GRAPHICS_EVENT, graphics, liveCrystalAvailable } from '../core/graphicsState';
@@ -701,6 +702,8 @@ export class BoardScene extends Phaser.Scene {
     const doze = state === 'doze';
     for (const emitter of this.ambientEmitters) emitter.emitting = !doze;
     if (this.twinkleTimer) this.twinkleTimer.paused = doze;
+    this.hubGlow?.setVisible(!doze);
+    this.hubSign?.setVisible(!doze);
     // The FX director takes the state itself: it caps quality in two steps
     // (active → high, idle → medium, doze → off) rather than the single on/off
     // the older ambient emitters have.
@@ -937,17 +940,54 @@ export class BoardScene extends Phaser.Scene {
 
   /** Untouched time on this board, in ms — reset by anything the player does. */
   private hintIdleMs = 0;
-  /** The hint currently on screen, so it is offered once and taken back once. */
-  private hintShown: MergeHint | null = null;
+  /** The step currently on screen, so it is offered once and taken back once. */
+  private hintShown: MergeStep | null = null;
+  /** The last step the hand ASKED for, kept past the take-back.
+   *
+   *  The hand is withdrawn the instant the player picks anything up, so by the
+   *  time the move lands there is nothing left on screen to compare it against.
+   *  This is what remembers the question long enough to recognise the answer. */
+  private hintAsked: MergeStep | null = null;
+  /**
+   * THE PLAYER IS FOLLOWING THE HAND — show the next drag at once.
+   *
+   * Set when a move lands exactly where the hand asked for it. A plan is two or
+   * three drags, and making someone wait ten seconds between them turns help
+   * into a stutter: they have proved they are cooperating, so the board keeps
+   * up rather than making them idle their way back to the next instruction.
+   */
+  private hintFollowUp = false;
+
+  /**
+   * The board, as the planner sees it. `GameState` for occupancy and ground,
+   * `world.ts` for the two facts that actually decide a merge — who is next to
+   * whom, and which zone owns the cell.
+   */
+  private hintBoard(): HintBoard {
+    const state = this.ctx.state;
+    return {
+      isActive: (col, row) => state.isTileActive(col, row),
+      itemIdAt: (col, row) => state.itemIdAt(col, row),
+      neighbors: (col, row) => state.neighbors(col, row),
+      zoneOf: (col, row) => zoneAt(state.world, col, row)?.id
+    };
+  }
 
   /**
    * Offer a merge when the board has gone quiet.
    *
-   * The RULE — which merge is worth pointing at — is `nextMergeHint`, pure and
-   * unit-tested. This is only the clock around it, and it is deliberately made
-   * of the two things a distracted player actually does: nothing at all, or
-   * something. Any drag resets the wait and takes the hand back, because a
-   * player with a piece in their hand does not need to be told about another.
+   * The RULE — which merge, and the drags that make it — is `nextMergePlan`,
+   * pure and unit-tested. This is only the clock around it, and it is
+   * deliberately made of the two things a distracted player actually does:
+   * nothing at all, or something. Any drag resets the wait and takes the hand
+   * back, because a player with a piece in their hand does not need to be told
+   * about another.
+   *
+   * ONE STEP AT A TIME, re-planned from the live board rather than remembered.
+   * The plan is a pure function of what is standing where, so recomputing it
+   * after every move is both cheaper than tracking one and self-correcting: a
+   * producer dropping a piece mid-plan, or the player gathering somewhere else
+   * entirely, simply changes the answer instead of stranding a stale script.
    *
    * Silent for the whole tutorial. The tutorial has its own hand and its own
    * script, and a second hand pointing somewhere else during a scripted beat
@@ -962,36 +1002,82 @@ export class BoardScene extends Phaser.Scene {
     }
     if (this.hintShown) return; // already offered; it stands until acted on
     this.hintIdleMs += delta;
-    if (this.hintIdleMs < MERGE_HINT.idleMs) return;
+    const wait = this.hintFollowUp ? MERGE_HINT.followUpMs : MERGE_HINT.idleMs;
+    if (this.hintIdleMs < wait) return;
 
-    const hint = nextMergeHint(this.ctx.state.items.values(), this.ctx.data.chains);
-    if (!hint) return;
-    // FROM the piece that has to travel, TO the one of its set standing nearest
-    // it. The hand used to run between the two OLDEST ids in the set, which on a
-    // spread board drew a line between two pieces that were not the move — and
-    // pointed away from the pair sitting side by side.
-    const from = this.ctx.state.items.get(hint.moveId);
-    const to = hint.ids
-      .filter((id) => id !== hint.moveId)
-      .map((id) => this.ctx.state.items.get(id))
-      .filter((i): i is NonNullable<typeof i> => !!i)
-      .sort(
-        (a, b) =>
-          (a.col - (from?.col ?? 0)) ** 2 +
-          (a.row - (from?.row ?? 0)) ** 2 -
-          ((b.col - (from?.col ?? 0)) ** 2 + (b.row - (from?.row ?? 0)) ** 2)
-      )[0];
-    if (!from || !to) return;
-    this.hintShown = hint;
+    const plan = nextMergePlan(this.ctx.state.items.values(), this.ctx.data.chains, this.hintBoard());
+    const step = plan?.steps[0];
+    const from = step ? this.ctx.state.items.get(step.itemId) : undefined;
+    if (!step || !from) {
+      this.hintFollowUp = false;
+      return;
+    }
+    this.hintShown = step;
+    this.hintAsked = step;
     this.bounceHintPiece(from.id);
     // Through the WORLD's projection, never the ambient `gridToWorld`: a zoned
     // world places its cells per zone, so the authored lattice would aim the
     // camera at open sky anywhere but the opening isle.
     this.bringIntoView(worldPointOf(this.ctx.state.world, from.col, from.row));
+    this.markHintTarget(step);
     this.ctx.bus.emit('hint:merge', {
       from: { col: from.col, row: from.row },
-      to: { col: to.col, row: to.row }
+      to: { col: step.to.col, row: step.to.row }
     });
+  }
+
+  /**
+   * A pulse on the ground the hand is pointing at.
+   *
+   * The destination of a gathering step is now usually an EMPTY cell, and a
+   * hand travelling to bare stone says "somewhere over there" where the old
+   * one, landing on a piece, at least said "onto THAT". The marker is what
+   * makes it "here" — and it is drawn only for an empty target, because a
+   * diamond under the piece you are being told to drop onto is noise.
+   */
+  private markHintTarget(step: MergeStep): void {
+    this.clearHintTarget();
+    if (this.ctx.state.itemIdAt(step.to.col, step.to.row) !== null) return;
+    const { x, y } = gridToWorld(step.to.col, step.to.row);
+    this.hintTarget = this.add
+      .image(x, y, 'ui_tile_highlight')
+      .setDepth(DEPTHS.tileHighlight)
+      .setAlpha(0.35);
+    this.tweens.add({
+      targets: this.hintTarget,
+      alpha: 0.85,
+      scaleX: 1.06,
+      scaleY: 1.06,
+      duration: 620,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+  }
+
+  private clearHintTarget(): void {
+    if (!this.hintTarget) return;
+    this.tweens.killTweensOf(this.hintTarget);
+    this.hintTarget.destroy();
+    this.hintTarget = undefined;
+  }
+
+  private hintTarget?: Phaser.GameObjects.Image;
+
+  /**
+   * Did the player just do what the hand asked?
+   *
+   * Called on every landed move. Answering yes is what makes the next step come
+   * straight back — and answering NO matters just as much: a player who gathers
+   * somewhere else of their own accord has stopped following the plan, and the
+   * hand goes back to waiting its full ten seconds rather than chasing them.
+   */
+  private notePlayerMove(itemId: number, to: TilePos): void {
+    const asked = this.hintAsked;
+    this.hintAsked = null;
+    this.hintFollowUp =
+      !!asked && asked.itemId === itemId && asked.to.col === to.col && asked.to.row === to.row;
+    this.hintIdleMs = 0;
   }
 
   /**
@@ -1090,6 +1176,7 @@ export class BoardScene extends Phaser.Scene {
   /** Take the hand back — after a merge, on a drag, or when the board goes. */
   private takeBackHint(): void {
     this.stopHintBounce();
+    this.clearHintTarget();
     if (!this.hintShown) return;
     this.hintShown = null;
     this.ctx.bus.emit('hint:merge', null);
@@ -2612,12 +2699,15 @@ export class BoardScene extends Phaser.Scene {
       .setTint(num(PALETTE.goldAccent))
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(DEPTHS.itemBase + p.y - 0.5)
-      .setScale(0.5)
+      // Follows the egg's own +20%: `fx_glow` is a fixed 512px texture, so a
+      // halo left at 0.5 reads 17% tighter around the bigger egg — a ring that
+      // hugs it instead of a light it is sitting in.
+      .setScale(0.6)
       .setAlpha(0.18);
     this.tweens.add({
       targets: this.eggAura,
       alpha: 0.34,
-      scale: 0.62,
+      scale: 0.744,
       duration: 1700,
       yoyo: true,
       repeat: -1,
@@ -4430,18 +4520,105 @@ export class BoardScene extends Phaser.Scene {
   private buildHubLandmarks(): void {
     if (this.ctx.state.worldId !== 'roothold') return;
     const r = ROOTHOLD_HOUSE;
+    const openShop = (pointer: Phaser.Input.Pointer): void => {
+      if (!this.isTap(pointer)) return;
+      this.tapClaimed = true;
+      this.ctx.bus.emit('ui:emporium_requested', {});
+    };
     const zone = this.add
       .zone(r.x + r.width / 2, r.y + r.height / 2, r.width, r.height)
       .setDepth(DEPTHS.itemBase + r.y + r.height)
       .setInteractive({ useHandCursor: true });
-    zone.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (!this.isTap(pointer)) return;
-      this.tapClaimed = true;
-      this.ctx.bus.emit('ui:emporium_requested', {});
-    });
+    zone.on('pointerup', openShop);
     // The tour's arrow lands over the roofline.
     this.tourTargets.set('roothold_house', { x: r.x + r.width / 2, y: r.y + 40 });
+
+    /*
+     * THE ONE BUILDING YOU CAN WALK INTO — and it had nothing to say so.
+     *
+     * The Emporium is PAINTED INTO THE BACKDROP: there is no sprite here, only
+     * a tap zone over a picture, so it reads as one more roof in a hillside of
+     * roofs. An outline is the honest answer and it is an ART job (cut the
+     * storefront out of `roothold.webp`, register it as decor, re-export the
+     * world) — SpriteInk needs a sprite to hang its ink twin on.
+     *
+     * A LIGHT does not. One ADD-blended `fx_glow` behind the roofline says "a
+     * lamp is lit in there" rather than drawing a border around a painting, and
+     * it costs one draw call and one tween: no particles, no pipeline, no new
+     * asset (`fx_glow` is painted at runtime and is resident everywhere).
+     * The slow breath is what the eye catches — a still glow is just paint.
+     *
+     * At 0.1 -> 0.26 it was invisible, and it was always going to be: the
+     * backdrop it sits on is a WARM painting lit by its own braziers, so a
+     * faint gold ADD on top of it is gold on gold. The breath is the readable
+     * part, so the band is wide (0.22 -> 0.58) rather than merely brighter.
+     */
+    this.hubGlow = this.add
+      .image(r.x + r.width / 2, r.y + r.height * 0.55, 'fx_glow')
+      .setTint(num(PALETTE.goldAccent))
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(DEPTHS.itemBase + r.y + r.height - 1) // under the tap zone, over the paint
+      .setDisplaySize(r.width * 1.35, r.height * 1.15)
+      .setAlpha(0.22);
+    this.tweens.add({
+      targets: this.hubGlow,
+      alpha: 0.58,
+      displayWidth: r.width * 1.52,
+      displayHeight: r.height * 1.3,
+      duration: 2200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    /*
+     * AND A SIGN — because a light is atmosphere, and only a sign is
+     * information.
+     *
+     * The glow can say "something is lit in there". It cannot say "this one is
+     * the shop, and you may walk into it", which is the single fact the player
+     * needs in a hub whose every roof was painted by the same hand at the same
+     * hour. So the storefront gets what a real market street gives it: a
+     * hanging sign over the door, carrying the Emporium's own glyph — the same
+     * `ui_icon_shop` the HUD's shop button wears, so the board and the chrome
+     * agree about what that picture means — on a spike aimed at the roofline.
+     *
+     * It bobs, and it is tappable in its own right. A still marker at the top
+     * of a painting becomes part of the painting within about four seconds,
+     * which is the exact failure being fixed.
+     */
+    const sign = this.add
+      .container(r.x + r.width / 2, r.y - 52)
+      .setDepth(DEPTHS.itemBase + r.y + r.height + 1);
+    const plate = this.add.graphics();
+    plate.fillStyle(num(PALETTE.night), 0.82);
+    plate.fillCircle(0, 0, 64);
+    plate.fillStyle(num(PALETTE.gold), 1);
+    plate.fillTriangle(-20, 54, 20, 54, 0, 96); // the spike, pointing at the door
+    plate.lineStyle(8, num(PALETTE.gold), 1);
+    plate.strokeCircle(0, 0, 64);
+    const icon = this.add.image(0, 0, 'ui_icon_shop');
+    icon.setScale(84 / Math.max(icon.width, icon.height));
+    sign.add([plate, icon]);
+    sign.setSize(150, 150).setInteractive({ useHandCursor: true });
+    sign.on('pointerup', openShop);
+    this.tweens.add({
+      targets: sign,
+      y: sign.y - 24,
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    this.hubSign = sign;
   }
+
+  /** The lit-shop glow over Roothold's Emporium — hidden while the device dozes,
+   *  because a pulse nobody is watching is a pulse nobody should be paying for. */
+  private hubGlow?: Phaser.GameObjects.Image;
+  /** Its hanging sign. Dozes with it: the marker's whole value is the motion,
+   *  and a frozen marker is worth less than none. */
+  private hubSign?: Phaser.GameObjects.Container;
 
   /** The hub tours' bouncing pointer over a board landmark. */
   /**
@@ -4517,6 +4694,14 @@ export class BoardScene extends Phaser.Scene {
     this.clearTourArrow();
     const at = this.tourTargets.get(target);
     if (!at) return;
+    // THE CAMERA GOES WHERE THE POINTER GOES. This was the one pointer path in
+    // the scene that did not ask — the tutorial's does (`followTutorialPointer`),
+    // the idle merge hint does, the carry lesson does. The hub tours are
+    // deliberately not TutorialDirector beats, so they were simply never brought
+    // under the rule, and the Emporium tour ended up aiming at a storefront that
+    // was off the top of the frame on arrival. `bringIntoView` no-ops when the
+    // target is already comfortably inside, so a tour that needs no glide gets none.
+    this.bringIntoView(at);
     const arrow = this.add.image(at.x, at.y - 60, 'ui_arrow').setScale(0.5).setDepth(DEPTHS.dragged + 10);
     this.tweens.add({
       targets: arrow,
@@ -6253,21 +6438,19 @@ export class BoardScene extends Phaser.Scene {
       .setVisible(false);
     const make = (
       dx: number,
-      plate: 'ui_btn_green' | 'ui_btn_play',
       currency: 'gold' | 'warmth',
       method: string,
       text: string
     ): Phaser.GameObjects.Text => {
-      // GREEN is the go plate, ROYAL is everything else — the game's whole
-      // button vocabulary, and the two skips are exactly that pair. The warmth
-      // key used to be the green plate under a pale blue tint, which made a
-      // third colour that meant nothing: tinting a plate does not restate its
-      // rank, it just muddies the one plate the player has learned to look for.
-      const bg = this.add.image(dx, 0, plate).setScale(0.46, 0.52);
+      // BOTH keys are the green plate. They are one offer in two currencies —
+      // pay the timer with gold, or pay it with warmth — so ranking one above
+      // the other with a different plate said something untrue about them. The
+      // difference the player needs is the icon and the number, not the colour.
+      const bg = this.add.image(dx, 0, 'ui_btn_green').setScale(SKIP_KEYS.scaleX, SKIP_KEYS.scaleY);
       const label = this.add
         .text(dx, -2, text, {
           fontFamily: 'Segoe UI, sans-serif',
-          fontSize: '30px',
+          fontSize: `${SKIP_KEYS.fontPx}px`,
           fontStyle: 'bold',
           color: '#fff6e0',
           stroke: '#1f3a14',
@@ -6287,21 +6470,26 @@ export class BoardScene extends Phaser.Scene {
     };
     // The gold button wears the REAL coin art (the 🪙 emoji read as a generic
     // token); the label carries only the price and sits right of the icon.
-    this.skipGoldLabel = make(-150, 'ui_btn_green', 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
-    this.skipGoldLabel.setX(-150 + 22);
-    btn.add(this.add.image(-150 - 34, -2, 'item_coin_1').setScale(plateScale('item_coin_1', 0.1)));
-    this.skipWarmthLabel = make(150, 'ui_btn_play', 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
+    const keyX = SKIP_KEYS.dx;
+    this.skipGoldLabel = make(-keyX, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
+    this.skipGoldLabel.setX(-keyX + SKIP_KEYS.labelDx);
+    btn.add(
+      this.add
+        .image(-keyX + SKIP_KEYS.coinDx, -2, 'item_coin_1')
+        .setScale(plateScale('item_coin_1', 0.086))
+    );
+    this.skipWarmthLabel = make(keyX, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
     btn.add(caption); // on top of the buttons
     // Tutorial: bounce an arrow over the WARMTH (⚡) skip so the player learns to
     // pay the House's timer with energy (and watches their Warmth drop).
     if (this.tutorialStepId === 'house_skip') {
       // Small bounce hint over the ⚡ skip. Scaled to a ~74px height off the real
       // arrow art (222×400) — the down-pointing tip reads clearly at this size.
-      const hint = this.add.image(150, -52, 'ui_arrow').setScale(0.185);
+      const hint = this.add.image(keyX, -46, 'ui_arrow').setScale(0.16);
       btn.add(hint);
       this.tweens.add({
         targets: hint,
-        y: -38,
+        y: -34,
         duration: 420,
         yoyo: true,
         repeat: -1,
@@ -6696,6 +6884,12 @@ export class BoardScene extends Phaser.Scene {
         // it, so a suggestion waiting on the doormat is noise — and it would be
         // the first thing seen after a crossing.
         this.hintIdleMs = 0;
+        // The plan the player was mid-way through belongs to the world they
+        // just left. Forgetting it is what stops the follow-up clock — 420ms,
+        // not ten seconds — from firing a hint at someone who has only just
+        // arrived somewhere new.
+        this.hintAsked = null;
+        this.hintFollowUp = false;
         this.fetchWorldArt(() => this.scene.restart());
       }),
       bus.on('store:skin_changed', () => this.applyManorSkin()),
@@ -6725,6 +6919,9 @@ export class BoardScene extends Phaser.Scene {
         else this.showAltarEgg(true);
       }),
       bus.on('item:moved', ({ itemId, to }) => {
+        // A landed move is the answer to the hand's question: if it is the move
+        // that was asked for, the next step of the plan comes straight back.
+        this.notePlayerMove(itemId, to);
         const sprite = this.itemSprites.get(itemId);
         if (!sprite) return;
         sprite.col = to.col;
@@ -6743,6 +6940,8 @@ export class BoardScene extends Phaser.Scene {
         // offered — the player is playing, so the clock starts over and the
         // next offer waits out `restMs` rather than arriving on their heels.
         this.takeBackHint();
+        this.hintAsked = null;
+        this.hintFollowUp = false; // the plan is finished, not in progress
         this.hintIdleMs = MERGE_HINT.idleMs - MERGE_HINT.restMs;
         this.onMerged(payload);
       }),
@@ -6814,6 +7013,15 @@ export class BoardScene extends Phaser.Scene {
         if (!region) return;
         const centroid = this.regionCentroid(region.tiles.map(([c, r]) => ({ col: c, row: r })));
         this.floatText(centroid.x, centroid.y - 100, 'Needs a Gold Key', PALETTE.goldAccent);
+      }),
+      // THE SAME BEAT, RE-AIMED. The diamonds under the pieces a step names have
+      // to move with them: a marker left on the tile a piece was dragged off is
+      // pointing at bare ground, which is worse than pointing at nothing. Only
+      // the highlights — the hand and the arrow are UIScene's.
+      bus.on('tutorial:markers', ({ highlight }) => {
+        if (this.tutorialDone) return;
+        this.setHighlights(highlight);
+        if (this.tutorialStep) this.tutorialStep.highlight = highlight;
       }),
       bus.on('tutorial:step', (step) => {
         this.allow = step.allow;

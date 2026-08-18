@@ -104,14 +104,16 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5)
       .setShadow(0, 5, 'rgba(36,27,34,0.55)', 6);
 
-    const close = scene.add.container(956, -540);
+    // Inside the plate (x -1016..1016, y -588..652), at the size and seat the
+    // Store's ✕ uses — the two panels share this frame, so they share its corner.
+    const close = scene.add.container(964, -538);
     this.closeBtn = close;
-    const closeBg = scene.add.image(0, 6, 'ui_btn_round').setScale(0.92).setTint(num(INK.field));
+    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.58);
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '54px', fontStyle: 'bold', color: INK.onFieldGold })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     close.add([closeBg, closeX]);
-    close.setSize(120, 120).setInteractive({ useHandCursor: true });
+    close.setSize(96, 96).setInteractive({ useHandCursor: true });
     close.on('pointerover', () => close.setScale(1.08));
     close.on('pointerout', () => close.setScale(1));
     close.on('pointerup', () => this.requestClose());

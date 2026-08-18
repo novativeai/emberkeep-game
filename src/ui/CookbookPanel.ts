@@ -48,7 +48,24 @@ const ROW_GAP = 140;
 const CHIP = 96;
 const CHIP_FROM_X = -212;
 const CHIP_TO_X = 188;
-const ICON_FIT = 72;
+/**
+ * How big a piece is drawn on the page.
+ *
+ * The result used to be the bigger of the two by wearing a bigger PLATE
+ * (`CHIP + 8`), and with the plates gone that hierarchy would have gone with
+ * them — a recipe that reads "three of these make one of those" needs the
+ * "those" to be the payoff. It moves onto the art itself. Both still sit
+ * comfortably inside the boxes the plates used to occupy (96 and 104), so the
+ * arrow, the caption and the row pitch are all untouched.
+ */
+const ICON_FIT = 84;
+const ICON_FIT_TO = 92;
+
+/** The ✕, in panel space. ONE pair of numbers, because the tutorial's pointer
+ *  is aimed at it by `getClosePos` — a close key that moves without its anchor
+ *  is a lesson pointing at empty page. */
+const CLOSE_X = 578;
+const CLOSE_Y = -352;
 
 /** The scrolling window, in panel space: under the subtitle, above the count. */
 const VIEW_TOP = -278;
@@ -138,15 +155,15 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     seam.lineBetween(0, VIEW_TOP, 0, VIEW_TOP + VIEW_H);
     this.add(seam);
 
-    // Close button.
-    const closeButton = scene.add.container(592, -392);
-    // The painted candy disc, not a flat circle: this is the same Close key the
-    // Bag and the Commissions board wear, and a panel that draws its own is a
-    // panel the player has to re-learn. 1.24 reproduces the 84px disc it
-    // replaces, so nothing around it moves.
-    const closeBg = scene.add.image(0, 0, 'ui_btn_round').setScale(1.24);
+    // Close button — inside the page, clear of the title lozenge (which ends at
+    // x 330) and above the recipe viewport (which starts at y -278).
+    const closeButton = scene.add.container(CLOSE_X, CLOSE_Y);
+    // The royal candy disc, not a flat circle and not the cream HUD disc: this
+    // is the same Close key every other panel wears, and a panel that draws its
+    // own is a panel the player has to re-learn.
+    const closeBg = scene.add.image(0, 0, 'ui_btn_round_royal').setScale(0.62);
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: PALETTE.lavaShade })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: PALETTE.goldAccent })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
     closeButton.setSize(96, 96);
@@ -266,18 +283,18 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     const arrow = scene.add.graphics();
     rowC.add([fromChip, toChip, arrow]);
 
-    const mkIcon = (tier: number, cx: number): Phaser.GameObjects.Image | null => {
+    const mkIcon = (tier: number, cx: number, fit: number): Phaser.GameObjects.Image | null => {
       const key = `item_${recipe.chain}_${tier}`;
       if (!scene.textures.exists(key)) return null;
       const icon = scene.add.image(cx, -8, key);
-      // Normalise every icon to the chip's inner box — a recipe book wants a
-      // tidy grid, not board-relative sizes.
-      icon.setScale(ICON_FIT / Math.max(icon.width, icon.height));
+      // Normalise every icon to one box — a recipe book wants a tidy grid, not
+      // board-relative sizes.
+      icon.setScale(fit / Math.max(icon.width, icon.height));
       rowC.add(icon);
       return icon;
     };
-    const fromIcon = mkIcon(recipe.fromTier, CHIP_FROM_X);
-    const toIcon = mkIcon(recipe.toTier, CHIP_TO_X);
+    const fromIcon = mkIcon(recipe.fromTier, CHIP_FROM_X, ICON_FIT);
+    const toIcon = mkIcon(recipe.toTier, CHIP_TO_X, ICON_FIT_TO);
 
     // "?" marks for undiscovered pages (also the fallback if art is missing).
     const mkMark = (cx: number): Phaser.GameObjects.Text => {
@@ -308,8 +325,10 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5, 0);
     rowC.add(caption);
 
-    // ×N badge riding the input chip's bottom edge.
-    const badge = scene.add.container(CHIP_FROM_X + 34, 34);
+    // ×N badge, at the input art's bottom-right corner. It used to ride the
+    // plate's edge; with the plate gone it would have sat ON the piece, so it
+    // moves out to where the plate's corner used to be.
+    const badge = scene.add.container(CHIP_FROM_X + 46, 40);
     const badgeBg = scene.add.graphics();
     badgeBg.fillStyle(num(PALETTE.gold), 1);
     badgeBg.fillRoundedRect(-33, -19, 66, 38, 19);
@@ -331,20 +350,27 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
 
   /** Repaint one row for its discovered/undiscovered state (row-local). */
   private paintRow(row: RecipeRow, discovered: boolean): void {
+    /*
+     * A DISCOVERED RECIPE IS THE ART, AND NOTHING ELSE.
+     *
+     * The chip used to be a cream tile with a darker inset and a gold ring —
+     * a hand-copy of the `ui_slot` texture — and on a cream page that is a
+     * plate on paper: the eye reads the row as a row of BOXES with something in
+     * them, when the only thing that matters is the piece. Removing it is not
+     * losing an affordance, because a cookbook line is not tappable.
+     *
+     * The UNDISCOVERED tile stays exactly as it was. Its plum ground is what
+     * makes a 0.55-alpha gold "?" legible on cream at all, and it is what makes
+     * the book read as a collection with holes in it rather than a list with
+     * gaps.
+     */
     const chip = (g: Phaser.GameObjects.Graphics, cx: number, size: number): void => {
       const half = size / 2;
       g.clear();
-      if (discovered) {
-        g.fillStyle(num(PALETTE.cream), 1);
-        g.fillRoundedRect(cx - half, -8 - half, size, size, 20);
-        g.fillStyle(0xefe0c8, 1);
-        g.fillRoundedRect(cx - half + 4, -8 - half + 4, size - 8, size - 8, 16);
-        g.lineStyle(4, num(PALETTE.goldShade), 0.55);
-      } else {
-        g.fillStyle(num(PALETTE.plumShade), 0.88);
-        g.fillRoundedRect(cx - half, -8 - half, size, size, 20);
-        g.lineStyle(4, num(PALETTE.plumShade), 1);
-      }
+      if (discovered) return;
+      g.fillStyle(num(PALETTE.plumShade), 0.88);
+      g.fillRoundedRect(cx - half, -8 - half, size, size, 20);
+      g.lineStyle(4, num(PALETTE.plumShade), 1);
       g.strokeRoundedRect(cx - half, -8 - half, size, size, 20);
     };
     chip(row.fromChip, CHIP_FROM_X, CHIP);
@@ -479,6 +505,6 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   getClosePos(): { x: number; y: number } {
     // Offset is panel-LOCAL — scale it by the panel's own scale (>1 on mobile)
     // so the tutorial pointer lands on the ✕ instead of a shrunken/enlarged gap.
-    return { x: this.x + 592 * this.scaleX, y: this.y - 392 * this.scaleY };
+    return { x: this.x + CLOSE_X * this.scaleX, y: this.y + CLOSE_Y * this.scaleY };
   }
 }

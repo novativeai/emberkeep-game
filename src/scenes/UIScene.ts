@@ -12,6 +12,8 @@ import {
   STORY_BEAT_HOLD_MS,
   TRAVEL_WIPE,
   GOLDEN_TREMBLE_PROGRESS,
+  HUD_COLUMN_ICON,
+  HUD_COLUMN_PLATE,
   HUD_COLUMN_X,
   hudColumnY,
   LIVE_GAME_HEIGHT,
@@ -466,6 +468,19 @@ export class UIScene extends Phaser.Scene {
     const bus = this.ctx.bus;
     this.offBus.push(
       bus.on('tutorial:step', (step) => this.onTutorialStep(step)),
+      // The beat has not changed — only where it points. Markers only: the
+      // bubble, the permissions and the staging all stay exactly as they are.
+      bus.on('tutorial:markers', (markers) => {
+        const step = this.lastStep;
+        if (!step || step.done) return;
+        step.highlight = markers.highlight;
+        step.hand = markers.hand;
+        step.arrow = markers.arrow;
+        // A hand mid-gesture over a piece the player has already picked up is
+        // the thing being fixed, so this re-places rather than waiting for the
+        // current sweep to finish.
+        this.applyMarkers(step);
+      }),
       // THE SECOND HALF OF A TWO-PART STEP. `eleanor_helps` says "tap me, then
       // tap the House" and carries an `arrowThen` naming that House — resolved
       // with the step since 0ce3efd and, until now, never drawn by anybody. The
@@ -998,18 +1013,18 @@ export class UIScene extends Phaser.Scene {
       .container(HUD_COLUMN_X, hudColumnY(2))
       .setScale(UI_SCALE)
       .setDepth(DEPTH_HUD);
-    // Plate, icon and dot all at the column's shared 1.5 — this button used to be
-    // built at 1.05 and read as a runt beside the Bag and the Ledger.
-    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.5);
+    // Plate, icon and dot all at the column's shared plate scale — this button
+    // used to be built at 1.05 and read as a runt beside the Bag and the Ledger.
+    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(HUD_COLUMN_PLATE);
     const icon = this.textures.exists('ui_icon_cookbook')
-      ? this.add.image(0, -12, 'ui_icon_cookbook').setDisplaySize(125, 125)
-      : this.add.text(0, -12, '📖', { fontSize: '76px' }).setOrigin(0.5);
+      ? this.add.image(0, -8 * HUD_COLUMN_PLATE, 'ui_icon_cookbook').setDisplaySize(HUD_COLUMN_ICON, HUD_COLUMN_ICON)
+      : this.add.text(0, -11, '📖', { fontSize: '68px' }).setOrigin(0.5);
     this.cookbookDot = this.add
-      .circle(68, -68, 18, num(PALETTE.lava))
+      .circle(45 * HUD_COLUMN_PLATE, -45 * HUD_COLUMN_PLATE, 16, num(PALETTE.lava))
       .setStrokeStyle(5, num(PALETTE.cream))
       .setVisible(false);
     button.add([bg, icon, this.cookbookDot]);
-    button.setSize(192, 192);
+    button.setSize(128 * HUD_COLUMN_PLATE, 128 * HUD_COLUMN_PLATE);
     button.setInteractive({ useHandCursor: true });
     button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
     button.on('pointerout', () => button.setScale(UI_SCALE));
@@ -1038,12 +1053,12 @@ export class UIScene extends Phaser.Scene {
       .container(HUD_COLUMN_X, hudColumnY(4))
       .setScale(UI_SCALE)
       .setDepth(DEPTH_HUD);
-    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(1.5);
+    const bg = this.add.image(0, 0, 'ui_btn_round').setScale(HUD_COLUMN_PLATE);
     const icon = this.textures.exists('ui_icon_dragondex')
-      ? this.add.image(0, -12, 'ui_icon_dragondex').setDisplaySize(125, 125)
-      : this.add.text(0, -12, '🐉', { fontSize: '76px' }).setOrigin(0.5);
+      ? this.add.image(0, -8 * HUD_COLUMN_PLATE, 'ui_icon_dragondex').setDisplaySize(HUD_COLUMN_ICON, HUD_COLUMN_ICON)
+      : this.add.text(0, -11, '🐉', { fontSize: '68px' }).setOrigin(0.5);
     button.add([bg, icon]);
-    button.setSize(192, 192);
+    button.setSize(128 * HUD_COLUMN_PLATE, 128 * HUD_COLUMN_PLATE);
     button.setInteractive({ useHandCursor: true });
     button.on('pointerover', () => button.setScale(UI_SCALE * 1.06));
     button.on('pointerout', () => button.setScale(UI_SCALE));
@@ -2296,7 +2311,7 @@ export class UIScene extends Phaser.Scene {
     panel.lineStyle(8, num(PALETTE.lava), 1);
     panel.strokeRoundedRect(-450, -368, 900, 736, 52);
     const title = this.add
-      .text(0, -320, 'Settings', {
+      .text(0, -312, 'Settings', {
         fontFamily: FONT.ui,
         fontSize: '54px',
         fontStyle: 'bold',
@@ -2308,21 +2323,26 @@ export class UIScene extends Phaser.Scene {
 
     // Background-music toggle (persists; the AudioManager applies it via the bus).
     const musicLabel = (): string => (getMusicMuted() ? 'Music: Off' : 'Music: On');
-    const musicBtn = this.add.container(0, -232);
+    // SMALLER THAN IT WAS, because it was sitting on the heading. At 1.05x0.8
+    // the plate came out 441x122 and its top edge landed at -293, which is
+    // where the title's descenders are — the word "Settings" was being cut by
+    // the button under it. 0.86x0.62 gives a 361x94 key with 14 units of air
+    // under the heading.
+    const musicBtn = this.add.container(0, -224);
     const musicBg = this.add
       .image(0, 0, getMusicMuted() ? 'ui_btn_play' : 'ui_btn_green')
-      .setScale(1.05, 0.8);
+      .setScale(0.86, 0.62);
     const musicText = this.add
-      .text(0, -10, musicLabel(), {
+      .text(0, -8, musicLabel(), {
         fontFamily: FONT.ui,
-        fontSize: '40px',
+        fontSize: '36px',
         fontStyle: 'bold',
         color: '#FFFFFF'
       })
       .setOrigin(0.5)
       .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
     musicBtn.add([musicBg, musicText]);
-    musicBtn.setSize(380 * 1.05, 118).setInteractive({ useHandCursor: true });
+    musicBtn.setSize(370, 100).setInteractive({ useHandCursor: true });
     musicBtn.on('pointerup', () => {
       const muted = !getMusicMuted();
       setMusicMuted(muted);
@@ -2334,21 +2354,21 @@ export class UIScene extends Phaser.Scene {
     // Graphics quality. Cycles Auto → High → Balanced → Low. `high` is the
     // engine unchanged, so nothing here can cost a capable device anything —
     // the lower tiers only ever subtract.
-    const gfxBtn = this.add.container(0, -104);
-    const gfxBg = this.add.image(0, 0, 'ui_btn_green').setScale(1.05, 0.8);
+    const gfxBtn = this.add.container(0, -112);
+    const gfxBg = this.add.image(0, 0, 'ui_btn_green').setScale(0.86, 0.62);
     const gfxText = this.add
-      .text(0, -10, graphics.label, {
+      .text(0, -8, graphics.label, {
         fontFamily: FONT.ui,
-        fontSize: '36px',
+        fontSize: '32px',
         fontStyle: 'bold',
         color: '#FFFFFF'
       })
       .setOrigin(0.5)
       .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
     gfxBtn.add([gfxBg, gfxText]);
-    gfxBtn.setSize(380 * 1.05, 118).setInteractive({ useHandCursor: true });
+    gfxBtn.setSize(370, 100).setInteractive({ useHandCursor: true });
     const gfxNote = this.add
-      .text(0, -30, GRAPHICS_PROFILES[graphics.tier].note, {
+      .text(0, -52, GRAPHICS_PROFILES[graphics.tier].note, {
         fontFamily: FONT.ui,
         fontSize: '26px',
         color: '#8A6248',

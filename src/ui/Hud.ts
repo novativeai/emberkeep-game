@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import {
   LIVE_GAME_WIDTH,
+  HUD_COLUMN_PLATE,
   HUD_COLUMN_X,
   hudColumnY,
   IS_MOBILE,
@@ -107,7 +108,7 @@ export class Hud {
       HUD_COLUMN_X,
       hudColumnY(0),
       'ui_icon_scroll',
-      1.5,
+      HUD_COLUMN_PLATE,
       () => {
         // Dimmed during the tutorial. A dimmed button that does nothing at all
         // reads as broken, so it re-points at the live step instead.
@@ -122,7 +123,7 @@ export class Hud {
       HUD_COLUMN_X,
       hudColumnY(1),
       'ui_icon_bag',
-      1.5,
+      HUD_COLUMN_PLATE,
       callbacks.onBag
     );
     // Store button — slot 3, top of the column. Cosmetics only, so it is the one
@@ -132,12 +133,14 @@ export class Hud {
       HUD_COLUMN_X,
       hudColumnY(3),
       'ui_icon_shop',
-      1.5,
+      HUD_COLUMN_PLATE,
       callbacks.onStore
     );
 
-    this.bagBadge = scene.add.container(62, -62);
-    const badgeBg = scene.add.circle(0, 0, 26, num(PALETTE.gold)).setStrokeStyle(5, num(PALETTE.night));
+    // Seated off the PLATE's own radius, so the badge follows it when the
+    // column's scale changes rather than floating away from the satchel.
+    this.bagBadge = scene.add.container(42 * HUD_COLUMN_PLATE, -42 * HUD_COLUMN_PLATE);
+    const badgeBg = scene.add.circle(0, 0, 24, num(PALETTE.gold)).setStrokeStyle(5, num(PALETTE.night));
     this.bagBadgeText = scene.add
       .text(0, 0, '0', { fontFamily: FONT.ui, fontSize: '30px', fontStyle: 'bold', color: PALETTE.night })
       .setOrigin(0.5);

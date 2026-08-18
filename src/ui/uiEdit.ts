@@ -49,6 +49,7 @@ const ICON_KEYS = [
   'ui_icon_gear',
   'ui_icon_scroll',
   'ui_btn_round',
+  'ui_btn_round_royal',
   'portrait_eleanor',
   'portrait_golden_elder'
 ];

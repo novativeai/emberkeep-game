@@ -499,13 +499,15 @@ export class ShopPanel extends Phaser.GameObjects.Container {
   private ribbon(x: number, y: number, label: string): Phaser.GameObjects.Container {
     const tag = this.scene.add.container(x, y);
     tag.add(this.scene.add.image(0, 0, 'ui_shop_ribbon').setOrigin(0, 0.5));
-    // The parchment body runs x 6..214 in game units; its text rides the same
-    // -0.11rad tilt the painter gave the paper.
+    // The sash body runs x 8..216 in game units; its text rides the same
+    // -0.11rad tilt the painter gave the cloth. Cream ink with a dark shadow,
+    // because the sash is ember now — brown on orange was unreadable.
     tag.add(
       this.scene.add
-        .text(108, 2, label, { fontFamily: FONT.ui, fontSize: '24px', fontStyle: 'bold', color: '#6B4A2A' })
+        .text(112, 2, label, { fontFamily: FONT.ui, fontSize: '24px', fontStyle: 'bold', color: '#FFF3DC' })
         .setOrigin(0.5)
         .setAngle(-6.3)
+        .setShadow(0, 2, 'rgba(94,36,10,0.75)', 3)
     );
     return tag;
   }
@@ -532,14 +534,16 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       fitArt(coin, 54);
       btn.add(coin);
     }
+    // The plate is a plum face in a gold rim now, so its type is the rim's gold.
     const text = this.scene.add
       .text(item.gold !== undefined && !isFree ? 22 : 0, -2, label, {
         fontFamily: FONT.ui,
         fontSize: '46px',
         fontStyle: 'bold',
-        color: INK.onPlate
+        color: INK.onFieldGold
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setShadow(0, 3, 'rgba(24,16,22,0.5)', 4);
     btn.add(text);
 
     if (isFree) this.freeBtn = btn; // tutorial hand anchors here

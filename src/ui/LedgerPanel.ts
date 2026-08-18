@@ -20,18 +20,28 @@ const TAB_W = 520;
 const TAB_H = 104;
 const TAB_Y = -384;
 
+/** The Keeper's Tasks checklist, in panel space. Shared by the page that BUILDS
+ *  the rows and the one that repaints them — two copies of the same two numbers
+ *  is how a row and its progress bar end up in different places. They spread
+ *  into the frame's new height rather than leaving it empty above the footer. */
+const TASK_ROW_TOP = -240;
+const TASK_ROW_GAP = 140;
+
 // ---- Order-card portrait medallion ----
 // Eleanor sits in the SAME gold ring the dialogue bubble frames her with
 // (`portrait_ring`, 512px art), so the quest book and her bubble read as one
 // medallion language rather than two unrelated treatments. Every radius below
 // is a ratio of that art's own geometry — the window hole ends at 200/512 and
 // the gold's outer edge at 250/512 — so re-sizing is one constant.
-const MEDALLION_SIZE = 184;
-/** Centred in the band between the card's top edge (-315) and the title. */
-// Its outer gold sits at MEDALLION_SIZE * 250/512 ≈ 90 from the centre, and the
-// card's top edge is at -315 — at -214 that left barely 11px, so the ring read
-// as welded to the frame. Dropped until the gold has real air above it.
-const MEDALLION_Y = -196;
+// 164, not 184. The band it has to live in is fixed — the card's painted plate
+// starts at -304 and the requirement slot at -36 — and at 184 the ring filled
+// it almost exactly: 18 units of air above the gold and 5 below it, before the
+// title. Both edges read as touching, because 18 units at this size IS
+// touching. A smaller ring is the only thing that buys air at both ends.
+const MEDALLION_SIZE = 164;
+/** Centred in the band between the card's top edge and the title, with 30
+ *  units of air above the gold and 30 below it. */
+const MEDALLION_Y = -194;
 const RING_HOLE_R = MEDALLION_SIZE * (200 / 512);
 const RING_OUTER_R = MEDALLION_SIZE * (250 / 512);
 /** Portrait clip radius — just inside the gold, so the crop's edge hides UNDER
@@ -135,7 +145,15 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .setInteractive(); // swallow board input behind the panel
     this.dim.on('pointerup', () => this.requestClose());
 
-    const panel = scene.add.image(0, 16, 'ui_quest_panel');
+    // SEATED SO THE FRAME GREW DOWNWARD, not outward from its middle.
+    //
+    // `ui_quest_panel` is 136 game units taller than it was, and a centred image
+    // would have split that between the top and the bottom — moving the frame's
+    // top edge up under the tabs, which straddle it, and re-cutting the header
+    // for a problem that is entirely at the floor. At y 86 the inner plate still
+    // starts at -404, exactly where every number in this file expects it, and
+    // all 136 units land where the blurb needed them.
+    const panel = scene.add.image(0, 86, 'ui_quest_panel');
     this.baseScale = panelMobileScale(panel.width);
 
     // Tab lozenges along the top edge — Orders sits centred (classic Ledger
@@ -143,12 +161,19 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.ordersTab = this.buildTab(scene, 'Eleanor’s Orders', () => this.switchTab('orders'));
     this.tasksTab = this.buildTab(scene, 'Keeper’s Tasks', () => this.switchTab('tasks'));
 
-    // Close button.
-    const closeButton = scene.add.container(592, -392);
-    // The painted candy disc — the same Close key every other panel wears.
-    const closeBg = scene.add.image(0, 0, 'ui_btn_round').setScale(1.24);
+    // Close button — INSIDE the board, not straddling its corner.
+    //
+    // The frame's inner rect is x -632..632, y -404..420; the Tasks tab ends at
+    // x 530 and the right order card starts at y -299. That leaves one clear
+    // pocket, and the key is sized to sit in it with air on all four sides
+    // rather than hung on the rim like a sticker.
+    const closeButton = scene.add.container(580, -350);
+    // The royal candy disc — the same Close key every other panel wears, and
+    // deliberately NOT the cream HUD disc, which means "open something". 0.58
+    // is what fits the pocket: the Tasks tab ends at 530 and the frame at 632.
+    const closeBg = scene.add.image(0, 0, 'ui_btn_round_royal').setScale(0.58);
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '44px', fontStyle: 'bold', color: INK.field })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
     closeButton.setSize(96, 96);
@@ -160,14 +185,21 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.cards.push(this.buildCard(scene, -CARD_X), this.buildCard(scene, CARD_X));
 
     // The active card's flavor line runs along the bottom of the board.
+    // BOLD, and in the field's full ink. It is Eleanor's own line about the
+    // order the player is looking at — the one piece of writing on this board
+    // that is neither a label nor a number — and it was set dim, small and
+    // italic, which is how you set a footnote nobody is meant to read.
     this.blurb = scene.add
-      .text(0, 372, '', {
+      .text(0, 440, '', {
         fontFamily: FONT.ui,
-        fontSize: '26px',
-        fontStyle: 'italic',
-        color: INK.onFieldDim,
+        fontSize: '30px',
+        fontStyle: 'bold italic',
+        color: INK.onField,
         align: 'center',
-        wordWrap: { width: 1050 }
+        lineSpacing: 6,
+        // 1100 of the plate's 1264: three lines of the longest order blurb, with
+        // room for a fourth before it could reach the frame's floor at 556.
+        wordWrap: { width: 1100 }
       })
       .setOrigin(0.5);
 
@@ -234,8 +266,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
 
   /** Five checklist rows + the reward footer, in panel space. */
   private buildTasksPage(scene: Phaser.Scene): void {
-    const rowTop = -236;
-    const rowGap = 118;
+    const rowTop = TASK_ROW_TOP;
+    const rowGap = TASK_ROW_GAP;
     this.taskSystem.tasks.forEach((task, i) => {
       const y = rowTop + i * rowGap;
       const label = scene.add
@@ -285,8 +317,9 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       this.taskRows.push({ label, count, barBg, fill, check, hint });
     });
 
+    // Follows the frame's new floor (556) rather than staying at the old one.
     const footer = scene.add
-      .text(0, 348, `Finish all ${this.taskSystem.tasks.length} → a golden reward from Eleanor`, {
+      .text(0, 462, `Finish all ${this.taskSystem.tasks.length} → a golden reward from Eleanor`, {
         fontFamily: FONT.ui,
         fontSize: '28px',
         fontStyle: 'bold',
@@ -302,7 +335,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     const cardBg = scene.add.image(0, 0, 'ui_card').setScale(0.9);
     const { layers: medallion, portrait } = this.buildMedallion(scene, root);
     const title = scene.add
-      .text(0, -96, '', {
+      .text(0, -84, '', {
         fontFamily: FONT.ui,
         fontSize: '30px',
         fontStyle: 'bold',
@@ -334,7 +367,11 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
 
     const deliverButton = scene.add.container(0, 232);
-    const deliverBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.72);
+    // WIDER THAN IT IS TALL, on purpose. At a uniform 0.72 the word filled the
+    // pill end to end and the rounded caps ate what padding was left, so the
+    // key looked shut. The height stays where it was — it is the air either
+    // side of the word that was missing, not the size of the button.
+    const deliverBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.88, 0.74);
     const deliverText = scene.add
       .text(0, -8, 'Deliver', {
         fontFamily: FONT.ui,
@@ -632,8 +669,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
 
   /** Repaint the checklist rows AND the tab's live done-counter. */
   private refreshTasks(): void {
-    const rowTop = -236;
-    const rowGap = 118;
+    const rowTop = TASK_ROW_TOP;
+    const rowGap = TASK_ROW_GAP;
     const barX = 160;
     let doneCount = 0;
     this.taskSystem.tasks.forEach((task, i) => {

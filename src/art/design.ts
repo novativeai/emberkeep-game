@@ -133,6 +133,7 @@ export const CHROME_KEYS = [
   'ui_pill',
   'ui_slot',
   'ui_btn_round',
+  'ui_btn_round_royal',
   'ui_btn_play',
   'ui_btn_green',
   'ui_btn_price',

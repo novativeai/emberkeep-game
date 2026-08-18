@@ -1665,6 +1665,20 @@ export interface EventMap {
   /** Every Keeper's Task reached its target (fired once; reward already paid). */
   'tasks:all_complete': Record<string, never>;
   'tutorial:step': TutorialStepEvent;
+  /**
+   * THE SAME BEAT, RE-AIMED. Only the markers — where the hand, the arrow and
+   * the highlights should be NOW that the board has changed under them.
+   *
+   * Its own event rather than a re-emitted step on purpose: the beat's text,
+   * speaker and permissions are settled when it opens, and re-emitting the step
+   * to move a pointer would restart the bubble and replay every staging effect
+   * hanging off it. Emitted only when the answer has actually changed.
+   */
+  'tutorial:markers': {
+    highlight: TilePos[];
+    hand: ResolvedHand | null;
+    arrow: ResolvedArrow | null;
+  };
   /** The player touched something this step disallows. Never refuse in silence
    *  (tutorial-design law 3) — the UI re-pulses the hand/arrow at what the step
    *  actually wants, so a dead tap reads as guidance, not a broken button. */

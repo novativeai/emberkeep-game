@@ -164,18 +164,19 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     this.add([this.pageRoster, this.pageDetail, this.pageEvolution]);
 
     // The ✕ — the close affordance the tutorial's pointer aims at.
-    this.closeBtn = scene.add.container(EDGE_X - 44, HEAD_Y + 46);
-    const closeBg = scene.add.image(0, 6, 'ui_btn_round').setScale(0.92).setTint(num(INK.field));
+    // Seated inside the plate's corner (x -1016..1016, y -588..652), not on it.
+    this.closeBtn = scene.add.container(EDGE_X - 36, HEAD_Y + 48);
+    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.58);
     const closeGlyph = scene.add
       .text(0, -2, '✕', {
         fontFamily: FONT.ui,
-        fontSize: `${TYPE.title}px`,
+        fontSize: `${Math.round(TYPE.title * 0.74)}px`,
         fontStyle: 'bold',
         color: INK.onFieldGold
       })
       .setOrigin(0.5);
     this.closeBtn.add([closeBg, closeGlyph]);
-    this.closeBtn.setSize(120, 120);
+    this.closeBtn.setSize(96, 96);
     this.closeBtn.setInteractive({ useHandCursor: true });
     this.closeBtn.on('pointerover', () => this.closeBtn.setScale(1.08));
     this.closeBtn.on('pointerout', () => this.closeBtn.setScale(1));

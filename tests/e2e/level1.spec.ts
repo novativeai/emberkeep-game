@@ -201,8 +201,10 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await page.mouse.click(1202, 516);
     await waitStep(page, 'cookbook_close');
     await page.screenshot({ path: shot('04c-cookbook-open') });
-    // Close the book YOURSELF (✕ at game 1872,408 → CSS ÷2) — that's the gate.
-    await page.mouse.click(936, 204);
+    // Close the book YOURSELF — that's the gate. The ✕ sits at panel-local
+    // (578,-352) (CookbookPanel's CLOSE_X/CLOSE_Y), i.e. game (1858,448) at
+    // scale 1 → CSS ÷2.
+    await page.mouse.click(929, 224);
 
     // ---------- Ruby merge: the WARMTH, and now contiguous with the hatch ----------
     await waitStep(page, 'ruby_merge');
@@ -577,8 +579,9 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       return item ? `${item.chain}:${item.tier}` : 'none';
     });
     expect(skipTarget).toBe('lumber:4'); // the roof tap raised the MANOR's popup
-    // Pay with Warmth via the popup's real ⚡ button (game offset +150,+100 → CSS ÷2).
-    await page.mouse.click(housePage.x + 75, housePage.y + 50);
+    // Pay with Warmth via the popup's real ⚡ button (game offset
+    // +SKIP_KEYS.dx,+100 → CSS ÷2).
+    await page.mouse.click(housePage.x + 46, housePage.y + 50);
     await page.waitForTimeout(500);
     if ((await gameText(page)).tutorial.step !== 'buy_energy') {
       // Flake fallback (software rendering): perform the skip via a direct emit.

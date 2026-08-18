@@ -147,20 +147,25 @@ export class NamePanel extends Phaser.GameObjects.Container {
     this.optionRow = scene.add.container(0, OPTIONS_Y);
 
     const reroll = scene.add
-      .text(0, 196, '↺  Other suggestions', {
-        fontFamily: FONT.display, fontSize: '34px', fontStyle: 'bold', color: PALETTE.goldAccent
+      .text(0, 188, '↺  Other suggestions', {
+        fontFamily: FONT.display, fontSize: '30px', fontStyle: 'bold', color: PALETTE.goldAccent
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
     reroll.on('pointerup', () => this.offer());
 
-    // Smaller than it was: this plate is one line of a card, not the card.
-    this.confirmBtn = scene.add.image(0, 288, 'ui_btn_green').setScale(1.18);
+    // THE PLATE IS A LINE OF THE CARD, NOT THE CARD.
+    //
+    // At 1.18 the painted 210x76 plate came out 496x179, whose top edge landed
+    // at y 198 — straight through the reroll line at 196. Every number below is
+    // spacing, not taste: 0.86 gives a 360x131 key seated at 296, so it clears
+    // the line above it by 43 and the frame's floor by 45.
+    this.confirmBtn = scene.add.image(0, 296, 'ui_btn_green').setScale(0.86);
     this.confirmLabel = scene.add
-      .text(0, 284, 'Choose a name', {
+      .text(0, 292, 'Choose a name', {
         // `ui_btn_green` is painted with the CREAM plate tone, so its ink is the
         // dark plate ink. Cream-on-cream was unreadable.
-        fontFamily: FONT.display, fontSize: '40px', fontStyle: 'bold', color: PALETTE.night
+        fontFamily: FONT.display, fontSize: '34px', fontStyle: 'bold', color: PALETTE.night
       })
       .setOrigin(0.5);
     this.confirmBtn.setInteractive({ useHandCursor: true });
@@ -349,13 +354,27 @@ export class NamePanel extends Phaser.GameObjects.Container {
     });
   }
 
+  /**
+   * A suggestion key, built like every other key in the game: a face sitting on
+   * a slab of its own dark, one rim around both, a dome of light across the top.
+   *
+   * It was a flat rectangle with a hairline around it while the plate below it
+   * was candy, so the card read as a text box the player was not sure they were
+   * allowed to press. Same silhouette, same tap target — only the moulding.
+   */
   private paintCard(g: Phaser.GameObjects.Graphics, on: boolean): void {
     const w = CARD_W;
+    const h = CARD_H;
+    const seat = 10; // the slab's visible thickness under the face
     g.clear();
-    g.fillStyle(num(on ? PALETTE.gold : PALETTE.plumShade), 1);
-    g.fillRoundedRect(-w / 2, -CARD_H / 2, w, CARD_H, 22);
-    g.lineStyle(6, num(on ? PALETTE.goldAccent : PALETTE.gold), 1);
-    g.strokeRoundedRect(-w / 2, -CARD_H / 2, w, CARD_H, 22);
+    g.fillStyle(num(on ? PALETTE.goldShade : PALETTE.plumShade), 1);
+    g.fillRoundedRect(-w / 2, -h / 2 + 4, w, h - 4, 26);
+    g.lineStyle(5, num(on ? PALETTE.goldAccent : PALETTE.gold), 1);
+    g.strokeRoundedRect(-w / 2, -h / 2 + 4, w, h - 4, 26);
+    g.fillStyle(num(on ? PALETTE.gold : PALETTE.plum), 1);
+    g.fillRoundedRect(-w / 2 + 5, -h / 2, w - 10, h - seat, 24);
+    g.fillStyle(0xffffff, on ? 0.3 : 0.16);
+    g.fillRoundedRect(-w / 2 + 20, -h / 2 + 7, w - 40, (h - seat) * 0.38, 16);
   }
 
   private paintOptions(names: string[]): void {
@@ -367,9 +386,10 @@ export class NamePanel extends Phaser.GameObjects.Container {
       const card = this.scene.add.container(x, 0);
       const g = this.scene.add.graphics();
       this.paintCard(g, false);
+      // -5, not 0: the face sits above the slab, so its centre is not the card's.
       const label = this.scene.add
-        .text(0, 0, name, {
-          fontFamily: FONT.display, fontSize: '40px', fontStyle: 'bold', color: PALETTE.cream
+        .text(0, -5, name, {
+          fontFamily: FONT.display, fontSize: '38px', fontStyle: 'bold', color: PALETTE.cream
         })
         .setOrigin(0.5);
       card.add([g, label]);

@@ -171,15 +171,19 @@ export class BagPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0, 0.5);
 
-    const close = scene.add.image(FRAME_W / 2 - 40, -FRAME_H / 2 + 20, 'ui_btn_round').setScale(0.62);
+    // Seated INSIDE the frame: at the old corner the disc hung 22 units above
+    // the gold edge and 2 past its right, which reads as a sticker on the panel
+    // rather than a key in it.
+    const close = scene.add
+      .image(FRAME_W / 2 - 52, -FRAME_H / 2 + 54, 'ui_btn_round_royal')
+      .setScale(0.62);
     const closeX = scene.add
-      .text(FRAME_W / 2 - 40, -FRAME_H / 2 + 18, '✕', {
+      .text(FRAME_W / 2 - 52, -FRAME_H / 2 + 52, '✕', {
         fontFamily: FONT.display,
-        fontSize: '54px',
+        fontSize: '48px',
         fontStyle: 'bold',
-        // `ui_btn_round` is a CREAM disc, so a cream glyph vanishes on it — the
-        // ✕ takes the same brown as the title text instead.
-        color: PALETTE.textBrown
+        // The royal disc is a dark plum face, so the ✕ is its rim's gold.
+        color: PALETTE.goldAccent
       })
       .setOrigin(0.5);
     close.setInteractive({ useHandCursor: true });

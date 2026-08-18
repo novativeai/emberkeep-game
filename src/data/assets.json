@@ -330,6 +330,11 @@
       "file": "raw/ai/ui_btn_round.png"
     },
     {
+      "key": "ui_btn_round_royal",
+      "source": "placeholder",
+      "generator": "ui"
+    },
+    {
       "key": "ui_panel",
       "source": "placeholder",
       "generator": "ui",

@@ -2,6 +2,7 @@ import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
 import type {
+  BoardItemState,
   ResolvedArrow,
   ResolvedHand,
   TileRef,
@@ -54,6 +55,14 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
   give: true
 };
 
+/** Everything about a step that the POINTER depends on, as one comparable
+ *  string — so "did the answer change?" is one cheap test rather than a
+ *  hand-written deep compare that grows a hole every time a marker gains a
+ *  field. */
+function markerKey(view: TutorialStepEvent): string {
+  return JSON.stringify([view.highlight, view.hand, view.arrow]);
+}
+
 /**
  * Drives the scripted Level-1 tutorial from data (tutorial.json). Each step
  * gates on a tap, a bus event, or a board count; the emitted
@@ -63,6 +72,25 @@ const ALLOW_EVERYTHING: Required<TutorialAllow> = {
  */
 export class TutorialDirector {
   private lastHatched: TilePos | null = null;
+  /**
+   * WHICH PIECE a `{chain, nth}` ref means, decided ONCE per step.
+   *
+   * The ref names a rank — "the third Ash Moss" — and rank is read off the
+   * board's own order, which is positional. So the moment the player drags one
+   * of them the ranking re-sorts under the pointer: "the third" becomes a
+   * different tuft, and a hand that was following a piece jumps to another one.
+   *
+   * Resolving the rank to an ITEM ID the first time the step asks, and then
+   * following that id, is what makes the pointer track the piece the player is
+   * actually moving. Cleared whenever the step changes, and re-resolved if the
+   * piece it named is gone (merged into the next tier, eaten, sold).
+   */
+  private pinned = new Map<string, number>();
+  /** The step the pins belong to — the pins are per BEAT, not per session. */
+  private pinnedFor = -1;
+  /** The last markers put on screen, so a re-resolve that changes nothing does
+   *  not restart the hand's animation for no reason. */
+  private lastMarkers = '';
 
   constructor(
     private state: GameState,
@@ -126,12 +154,23 @@ export class TutorialDirector {
       if (page === 'detail') this.onGateEvent('ui:codex_dragon_opened');
       if (page === 'evolution') this.onGateEvent('ui:codex_evolution_opened');
     });
-    bus.on('item:spawned', () => this.checkCountGate());
-    bus.on('item:removed', () => this.checkCountGate());
+    bus.on('item:spawned', () => {
+      this.checkCountGate();
+      this.refreshMarkers();
+    });
+    bus.on('item:removed', () => {
+      this.checkCountGate();
+      this.refreshMarkers();
+    });
+    // THE POINTER FOLLOWS THE PIECE. Every board change that can move what a
+    // beat is pointing at re-aims it; `refreshMarkers` is silent when the
+    // answer has not changed, so this costs nothing on an unrelated move.
+    bus.on('item:move_bounced', () => this.refreshMarkers());
     // The board-hygiene lesson: a piece CARRIED into a region. Gated on the
     // drop landing inside the named region's tiles, so a wiggle on the spot
     // cannot satisfy it.
     bus.on('item:moved', ({ itemId, to }) => {
+      this.refreshMarkers(); // the piece moved — so does whatever pointed at it
       const step = this.currentStep;
       if (!step || step.gate.type !== 'move') return;
       if (this.state.items.get(itemId)?.chain !== step.gate.chain) return;
@@ -292,7 +331,43 @@ export class TutorialDirector {
   private emitStep(): void {
     const step = this.currentStep;
     if (!step) return;
-    this.bus.emit('tutorial:step', this.resolveStep(step));
+    // A new beat: the pins belong to the beat that made them.
+    if (this.pinnedFor !== this.state.tutorialIndex) {
+      this.pinned.clear();
+      this.pinnedFor = this.state.tutorialIndex;
+    }
+    const view = this.resolveStep(step);
+    this.lastMarkers = markerKey(view);
+    this.bus.emit('tutorial:step', view);
+  }
+
+  /**
+   * RE-AIM THE POINTER AT THE LIVE BOARD.
+   *
+   * The step is a one-shot — its text, its speaker and its permissions are
+   * settled the moment it opens — but where it POINTS is not: a player who
+   * picks up one of the three tufts they were asked to merge has changed the
+   * answer to "where is the move", and a hand still hovering over the tile they
+   * emptied is telling them to do something that no longer exists.
+   *
+   * So the markers get their own event. Nothing else about the beat is
+   * re-emitted — re-emitting `tutorial:step` would restart the bubble, re-run
+   * the codex hold and replay the opening — and it only fires when the answer
+   * has actually CHANGED, so a move somewhere else on the board does not
+   * restart the hand's animation for nothing.
+   */
+  private refreshMarkers(): void {
+    const step = this.currentStep;
+    if (!step || this.state.tutorialDone) return;
+    const view = this.resolveStep(step);
+    const key = markerKey(view);
+    if (key === this.lastMarkers) return;
+    this.lastMarkers = key;
+    this.bus.emit('tutorial:markers', {
+      highlight: view.highlight,
+      hand: view.hand,
+      arrow: view.arrow
+    });
   }
 
   private emitDone(): void {
@@ -360,28 +435,63 @@ export class TutorialDirector {
   }
 
   private resolveTileRef(ref: TileRef): TilePos | null {
+    const item = this.resolveRefItem(ref);
+    if (item) return { col: item.col, row: item.row };
     if (Array.isArray(ref)) return { col: ref[0], row: ref[1] };
+    if (ref === 'last_hatched' && this.lastHatched) return this.lastHatched;
+    return null;
+  }
+
+  /**
+   * The LIVE PIECE a ref names, or null for a ref that names ground.
+   *
+   * Everything the tutorial points at that can move resolves through here, and
+   * it answers with the item itself rather than a copy of where the item was
+   * standing — which is the whole difference between a pointer that follows the
+   * piece and one that keeps pointing at the tile the piece has left.
+   */
+  private resolveRefItem(ref: TileRef): BoardItemState | null {
+    if (Array.isArray(ref)) {
+      // An authored cell can still be pointing AT something: a beat that names
+      // the tile a piece was seeded on means that piece, and the player is free
+      // to pick it up before doing what they were asked.
+      const standing = this.state.itemAt(ref[0], ref[1]);
+      return standing?.kind === 'item' ? standing : null;
+    }
     if (ref === 'last_hatched') {
-      if (this.lastHatched) return this.lastHatched;
+      if (this.lastHatched) {
+        const standing = this.state.itemAt(this.lastHatched.col, this.lastHatched.row);
+        if (standing?.kind === 'item') return standing;
+      }
       // Resume fallback: point at any generator on the board.
       for (const item of this.state.items.values()) {
-        if (item.kind === 'item' && item.readyAt !== undefined) {
-          return { col: item.col, row: item.row };
-        }
+        if (item.kind === 'item' && item.readyAt !== undefined) return item;
       }
       return null;
     }
-    // `{ chain, nth }`: the nth board item of that chain (optionally filtered to a
-    // specific tier), in a stable order, so hints track wherever items actually land.
-    const cells = [...this.state.items.values()]
+    // `{ chain, nth }`: the nth board item of that chain, optionally of one
+    // tier. PINNED on first resolve — see `pinned`.
+    const key = `${ref.chain}:${ref.tier ?? '*'}:${ref.nth}`;
+    const pinnedId = this.pinned.get(key);
+    if (pinnedId !== undefined) {
+      const held = this.state.items.get(pinnedId);
+      if (held && held.kind === 'item') return held;
+      this.pinned.delete(key); // it merged, was eaten, or was sold — re-rank
+    }
+    const ranked = [...this.state.items.values()]
       .filter(
         (i) =>
           i.kind === 'item' &&
           i.chain === ref.chain &&
           (ref.tier === undefined || i.tier === ref.tier)
       )
-      .sort((a, b) => a.col + a.row - (b.col + b.row) || a.col - b.col)
-      .map((i) => ({ col: i.col, row: i.row }));
-    return cells[ref.nth] ?? cells[cells.length - 1] ?? null;
+      .sort((a, b) => a.col + a.row - (b.col + b.row) || a.col - b.col);
+    // Never pin over a piece another rank of the same step already claimed:
+    // "from the third to the first" must be two pieces, not one twice.
+    const taken = new Set(this.pinned.values());
+    const pick = ranked[ref.nth] ?? ranked[ranked.length - 1] ?? null;
+    const chosen = pick && taken.has(pick.id) ? (ranked.find((i) => !taken.has(i.id)) ?? pick) : pick;
+    if (chosen) this.pinned.set(key, chosen.id);
+    return chosen;
   }
 }

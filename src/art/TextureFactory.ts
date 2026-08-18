@@ -6,7 +6,6 @@ import {
   chromeClasps,
   chromeEdge,
   chromeField,
-  chromePlate,
   EDGE,
   FONT,
   INK,
@@ -75,17 +74,69 @@ export const UI_TEXTURE_PARAMS: Record<string, Record<string, string>> = {
     edge: darken(PALETTE.plumShade, 0.25),
     rim: PALETTE.gold
   },
+  /**
+   * The GO plate, and its rim is GOLD like the royal one's.
+   *
+   * Every frame, card and clasp in this game is milled gold; a green key edged
+   * in its own dark green was the one object on screen made of something else,
+   * which is why it read as pasted onto the order card rather than set into it.
+   * Same metal on both plates, face colour doing the ranking.
+   */
   ui_btn_green: {
     highlight: lighten(PALETTE.moss, 0.3),
     base: PALETTE.moss,
-    edge: darken(PALETTE.mossShade, 0.12),
-    rim: darken(PALETTE.mossShade, 0.3)
+    edge: darken(PALETTE.mossShade, 0.16),
+    rim: PALETTE.gold
   },
-  ui_btn_round: { plate: PALETTE.goldShade, face: PALETTE.cream, rim: darken(PALETTE.mossShade, 0.3) },
+  /**
+   * The HUD disc, and it is deliberately UNCHANGED. The bag, the codex, the
+   * cookbook and the quest scroll have worn this cream-on-brass button since
+   * the first build; the player finds that column by its colour, so it is not a
+   * surface a button restyle gets to repaint. Close keys took the royal disc
+   * below instead of dragging this one along with them.
+   */
+  ui_btn_round: { plate: PALETTE.goldShade, face: PALETTE.cream },
+  /** The CLOSE key — the candy pill in the round, in the royal colours: a plum
+   *  face inside a gold rim. Every panel's ✕ wears it, so quitting looks the
+   *  same wherever the player is, and never like a HUD button. */
+  ui_btn_round_royal: {
+    plate: darken(PALETTE.plumShade, 0.3),
+    face: PALETTE.plum,
+    rim: PALETTE.gold
+  },
+  /**
+   * The Emporium's price/owned plates — the royal candy, laid flat.
+   *
+   * They used to be `chromePlate` cream with an ember bloom around them, and
+   * that bloom is what read as a translucent smear behind every shop button.
+   * A plate is an object, not a light source.
+   */
+  ui_btn_price: {
+    highlight: PALETTE.plumHighlight,
+    base: PALETTE.plum,
+    edge: darken(PALETTE.plumShade, 0.28),
+    rim: PALETTE.gold
+  },
+  /** The same key with the life let out of it: bought, worn, or behind a locked
+   *  door. Same material and same rim, a face two steps darker — an inert plate
+   *  must still be plainly the SAME plate. */
+  ui_btn_free: {
+    highlight: PALETTE.plum,
+    base: darken(PALETTE.plumShade, 0.12),
+    edge: darken(PALETTE.plumShade, 0.4),
+    rim: darken(PALETTE.gold, 0.22)
+  },
   ui_panel: { border: PALETTE.lava, borderShade: PALETTE.lavaShade, fill: PALETTE.cream },
   ui_pill: { fill: PALETTE.plumShade, border: PALETTE.gold },
   ui_slot: { fill: '#EFE0C8', border: '#D9C2A0' },
   // Ember Emporium (shop) chrome — trending merge-shop treatment.
+  /** The Emporium's buy key: the same royal candy as the Store's. */
+  ui_shop_price: {
+    highlight: PALETTE.plumHighlight,
+    base: PALETTE.plum,
+    edge: darken(PALETTE.plumShade, 0.28),
+    rim: PALETTE.gold
+  },
   ui_shop_panel: { rim: PALETTE.lava, rimShade: PALETTE.lavaShade, fill: PALETTE.cream },
   ui_shop_card: { rim: PALETTE.gold, rimShade: PALETTE.goldShade, fill: '#FFFDF6' },
   ui_shop_ribbon: { base: PALETTE.gold, edge: PALETTE.goldShade },
@@ -176,6 +227,7 @@ export class TextureFactory {
       case 'ui_btn_green':
         return this.button(key, 210, 76, this.uiColor(key, 'highlight'), this.uiColor(key, 'base'), this.uiColor(key, 'edge'));
       case 'ui_btn_round': return this.roundButton(key);
+      case 'ui_btn_round_royal': return this.roundCandy(key);
       case 'ui_panel': return this.panel(key);
       case 'ui_card': return this.card(key);
       case 'ui_pill': return this.pill(key);
@@ -197,10 +249,13 @@ export class TextureFactory {
       case 'ui_shop_ribbon': return this.shopRibbon(key);
       case 'ui_shop_badge': return this.shopBadge(key);
       case 'ui_shop_burst': return this.shopBurst(key);
-      // The Store's own two buttons — nothing else wears them, so they follow
-      // the shop material rather than the board's moss.
-      case 'ui_btn_price': return this.shopButton(key, false);
-      case 'ui_btn_free': return this.shopButton(key, true);
+      // The Store's own two buttons. They wear the CANDY PILL like every other
+      // key in the game — the shop is a different room, not a different game,
+      // and its old cream plate came wrapped in an ember bloom that read as a
+      // translucent smear behind the button.
+      case 'ui_btn_price':
+      case 'ui_btn_free':
+        return this.button(key, 230, 66, this.uiColor(key, 'highlight'), this.uiColor(key, 'base'), this.uiColor(key, 'edge'));
       case 'ui_icon_bolt': return this.iconBolt(key);
       case 'ui_icon_key': return this.iconKey(key);
       case 'ui_icon_gear': return this.iconGear(key);
@@ -1441,15 +1496,48 @@ export class TextureFactory {
     });
   }
 
-  /** The candy pill's round twin — the Close/Quit key and every HUD disc.
-   *  Same three layers (slab, rim, domed face) so a round key and a wide one on
-   *  the same panel are plainly the same material. */
+  /**
+   * The HUD disc — the bag, the codex, the cookbook, the quest scroll.
+   *
+   * Left exactly as it was authored. It is the one button family the player
+   * navigates by, and a column of five that changes colour is a column they
+   * have to find again; the Close key is what took the new material.
+   */
   private roundButton(key: string): void {
+    const plate = this.uiColor(key, 'plate');
+    const faceCol = this.uiColor(key, 'face');
+    this.paint(key, 68, 68, (g) => {
+      g.beginPath();
+      g.arc(34, 38, 29, 0, Math.PI * 2);
+      g.fillStyle = plate;
+      g.fill();
+      g.lineWidth = 2.6;
+      g.strokeStyle = withAlpha(darken(plate, 0.35), 0.95);
+      g.stroke();
+      g.beginPath();
+      g.arc(34, 32, 29, 0, Math.PI * 2);
+      const face = g.createLinearGradient(0, 3, 0, 61);
+      face.addColorStop(0, lighten(faceCol, 0.3));
+      face.addColorStop(1, darken(faceCol, 0.12));
+      g.fillStyle = face;
+      g.fill();
+      g.stroke();
+      g.beginPath();
+      g.ellipse(34, 22, 18, 9, 0, 0, Math.PI * 2);
+      g.fillStyle = 'rgba(255,255,255,0.35)';
+      g.fill();
+    });
+  }
+
+  /** The candy pill's round twin — the Close/Quit key on every panel.
+   *  Same three layers (slab, rim, domed face) as the wide plate, so a round ✕
+   *  and a Deliver key on the same board are plainly the same material. */
+  private roundCandy(key: string): void {
     const plate = this.uiColor(key, 'plate');
     const faceCol = this.uiColor(key, 'face');
     const rim = this.uiColor(key, 'rim');
     this.paint(key, 68, 68, (g) => {
-      // 1 — the slab, sitting 6px proud at the bottom.
+      // 1 — the slab, sitting proud at the bottom.
       g.beginPath();
       g.arc(34, 38, 29, 0, Math.PI * 2);
       g.fillStyle = plate;
@@ -1471,8 +1559,8 @@ export class TextureFactory {
       g.beginPath();
       g.ellipse(34, 19, 19, 9.5, 0, 0, Math.PI * 2);
       const gloss = g.createLinearGradient(0, 9, 0, 29);
-      gloss.addColorStop(0, 'rgba(255,255,255,0.68)');
-      gloss.addColorStop(1, 'rgba(255,255,255,0.06)');
+      gloss.addColorStop(0, 'rgba(255,255,255,0.55)');
+      gloss.addColorStop(1, 'rgba(255,255,255,0.05)');
       g.fillStyle = gloss;
       g.fill();
     });
@@ -1684,16 +1772,6 @@ export class TextureFactory {
    * A Store button — a milled gold rim, a dark keyline, a lit cream face.
    * `glow` adds the ember bloom that marks a screen's one featured action.
    */
-  private shopButton(key: string, glow: boolean): void {
-    this.paint(key, 230, 66, (g) => {
-      const inset = glow ? 9 : 4;
-      chromePlate(g, inset, inset, 230 - inset * 2, 66 - inset * 2, (66 - inset * 2) / 2, {
-        weight: EDGE.bold,
-        glow
-      });
-    });
-  }
-
   /**
    * The Keeper's Store frame — the big showcase board the cosmetics sit on.
    *
@@ -1721,16 +1799,25 @@ export class TextureFactory {
    * still a cream page, so re-pointing the shared key would have dragged the
    * book along with the quests.
    */
+  /**
+   * TALLER THAN THE COOKBOOK'S FRAME, and that is the whole reason it has its
+   * own key rather than sharing `ui_panel`'s 412.
+   *
+   * The board carries two order cards AND Eleanor's line about the order under
+   * them, and that line runs to three lines of type. At 412 the cards ended at
+   * 331 with the frame's floor at 420 — 89 units for a 129-unit paragraph, so
+   * the last line was cut off by the frame. 480 gives it room to be read.
+   */
   private questPanel(key: string): void {
-    this.paint(key, 660, 440, (g) => {
+    this.paint(key, 660, 510, (g) => {
       withShadow(g, 30, 14, () => {
-        this.roundRectPath(g, 14, 10, 632, 412, RADIUS_TEX.xl);
+        this.roundRectPath(g, 14, 10, 632, 480, RADIUS_TEX.xl);
         g.fillStyle = INK.fieldDeep;
         g.fill();
       });
-      chromeField(g, 14, 10, 632, 412, RADIUS_TEX.xl, { x: 330, y: 50, radius: 420, strength: 0.3 });
-      chromeEdge(g, 14, 10, 632, 412, RADIUS_TEX.xl, EDGE.bold);
-      chromeClasps(g, 14, 10, 632, 412, RADIUS_TEX.xl, 16, 6);
+      chromeField(g, 14, 10, 632, 480, RADIUS_TEX.xl, { x: 330, y: 50, radius: 470, strength: 0.3 });
+      chromeEdge(g, 14, 10, 632, 480, RADIUS_TEX.xl, EDGE.bold);
+      chromeClasps(g, 14, 10, 632, 480, RADIUS_TEX.xl, 16, 6);
     });
   }
 
@@ -1833,29 +1920,18 @@ export class TextureFactory {
 
   /** Cream price plate — the one bright element on the whole panel, which is
    *  why the reference puts the number the player is deciding on inside it. */
+  /** The Emporium's buy key — the ROYAL candy pill, same as every other key in
+   *  the game. It was the one cream plate left on a dark shelf, which made the
+   *  shop look like a different product rather than a different room. */
   private shopPricePill(key: string): void {
-    this.paint(key, 210, 56, (g) => {
-      g.shadowColor = 'rgba(0,0,0,0.5)';
-      g.shadowBlur = 10;
-      g.shadowOffsetY = 4;
-      this.roundRectPath(g, 6, 5, 198, 44, 22);
-      const face = g.createLinearGradient(0, 5, 0, 49);
-      face.addColorStop(0, '#FFF6DC');
-      face.addColorStop(0.5, INK.cream);
-      face.addColorStop(1, INK.creamWarm);
-      g.fillStyle = face;
-      g.fill();
-      g.shadowColor = 'transparent';
-      g.shadowBlur = 0;
-      g.shadowOffsetY = 0;
-      g.lineWidth = 3;
-      g.strokeStyle = INK.goldMid;
-      g.stroke();
-      g.lineWidth = 1.4;
-      g.strokeStyle = withAlpha('#FFFFFF', 0.75);
-      this.roundRectPath(g, 9, 8, 192, 38, 19);
-      g.stroke();
-    });
+    this.button(
+      key,
+      210,
+      56,
+      this.uiColor(key, 'highlight'),
+      this.uiColor(key, 'base'),
+      this.uiColor(key, 'edge')
+    );
   }
 
   /** A shelf tab. The active one is lighter, brighter-edged and open along the
@@ -1995,32 +2071,83 @@ export class TextureFactory {
 
   /** Rarity/offer ribbon — a small parchment banner pinned to a card's top-left
    *  corner, with a folded tail, exactly as the reference hangs them. */
+  /**
+   * THE TAG — a cloth sash, not a rectangle with a bite out of it.
+   *
+   * The old one was a pale parallelogram with a notched end, and it read as
+   * paper someone had torn: flat fill, hairline edge, no thickness anywhere. A
+   * cartoon ribbon is three things, and it needs all three — a FOLD tucked
+   * behind the left end so the sash reads as passing under something, a
+   * swallowtail cut at the right, and a lit top half over a shaded bottom so
+   * the cloth has a body. The dark keyline around it is what makes it belong
+   * on a lit shop shelf rather than float over it.
+   *
+   * Painted with its own left fold, so the caller still anchors at x=0 and the
+   * body still runs to 214 game units — the label placement is unchanged.
+   */
   private shopRibbon(key: string): void {
-    this.paint(key, 118, 42, (g) => {
+    this.paint(key, 122, 46, (g) => {
       g.save();
-      g.translate(3, 9);
+      g.translate(4, 10);
       g.rotate(-0.11);
+
+      const H = 26;
+      const W = 104;
+      const ink = '#6E2E14';
+
+      // 1 — the FOLD: a small tab tucked behind the left end, in the sash's own
+      //     dark. Drawn first so the body covers where they meet.
+      g.beginPath();
+      g.moveTo(-6, 4);
+      g.lineTo(4, 4);
+      g.lineTo(4, H - 2);
+      g.lineTo(-6, H + 4);
+      g.closePath();
+      g.fillStyle = '#8E3A19';
+      g.fill();
+      g.lineWidth = 2;
+      g.strokeStyle = ink;
+      g.stroke();
+
+      // 2 — the body, swallowtailed at the right.
       g.shadowColor = 'rgba(0,0,0,0.45)';
       g.shadowBlur = 7;
       g.shadowOffsetY = 3;
       g.beginPath();
       g.moveTo(0, 0);
-      g.lineTo(104, 0);
-      g.lineTo(97, 12);
-      g.lineTo(108, 24);
-      g.lineTo(0, 24);
+      g.lineTo(W, 0);
+      g.lineTo(W - 9, H / 2);
+      g.lineTo(W + 4, H);
+      g.lineTo(0, H);
       g.closePath();
-      const face = g.createLinearGradient(0, 0, 0, 30);
-      face.addColorStop(0, '#FBEEC8');
-      face.addColorStop(1, '#DDBE8C');
+      const face = g.createLinearGradient(0, 0, 0, H);
+      face.addColorStop(0, '#F2A03C');
+      face.addColorStop(0.48, '#E2621F');
+      face.addColorStop(0.52, '#D2500F');
+      face.addColorStop(1, '#B03A0A');
       g.fillStyle = face;
       g.fill();
       g.shadowColor = 'transparent';
       g.shadowBlur = 0;
       g.shadowOffsetY = 0;
-      g.lineWidth = 1.6;
-      g.strokeStyle = withAlpha('#8A6A45', 0.7);
+      g.lineWidth = 2.4;
+      g.strokeStyle = ink;
       g.stroke();
+
+      // 3 — the sheen along the top third, clipped to the body so it never
+      //     spills past the swallowtail.
+      g.save();
+      g.clip();
+      g.beginPath();
+      g.moveTo(0, 2);
+      g.lineTo(W, 2);
+      g.lineTo(W, 9);
+      g.lineTo(0, 11);
+      g.closePath();
+      g.fillStyle = 'rgba(255,255,255,0.28)';
+      g.fill();
+      g.restore();
+
       g.restore();
     });
   }

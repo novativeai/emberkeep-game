@@ -252,7 +252,23 @@ export const HUD_COLUMN_X: number = LIVE_GAME_WIDTH - (IS_MOBILE ? 190 : 156);
  * with it.
  */
 export const HUD_COLUMN_SLOTS = 5;
-export const HUD_COLUMN_DISC = 174 * UI_SCALE;
+/**
+ * The plate scale every door in the column wears.
+ *
+ * 1.5 put a 174-unit disc on a 186-unit pitch — twelve units of board between
+ * two plates, which at arm's length is no gap at all: the five read as one
+ * welded strip. The pitch cannot grow (the top seat is already close to the
+ * status readout), so the PLATE is what gives: 1.32 draws a 153-unit disc and
+ * leaves 33 units of air between neighbours, and the icons scale with it.
+ */
+export const HUD_COLUMN_PLATE = 1.32;
+/** `ui_btn_round` is a disc of radius 29 LOGICAL units — 116 game units across
+ *  at plate scale 1 — so the visible plate follows the scale above. */
+export const HUD_COLUMN_DISC: number = 116 * HUD_COLUMN_PLATE * UI_SCALE;
+/** What an icon is fitted to on one of those plates. Icons arrive at two
+ *  resolutions (painted at 44 logical units, file-backed at whatever the PNG
+ *  is), so both are fitted to this rather than multiplied by a shared factor. */
+export const HUD_COLUMN_ICON: number = 88 * HUD_COLUMN_PLATE * 0.95;
 export const HUD_COLUMN_PITCH: number = 186 * UI_SCALE;
 /**
  * The column's bottom seat, measured up from the canvas floor.
@@ -1706,7 +1722,21 @@ export const GOLDEN_TREMBLE_PROGRESS = 0.8;
  */
 export const GOLDEN_ALTAR = {
   cell: { col: -2, row: 2 }, // off-grid is fine — gridToWorld is unbounded
-  calibration: { offsetX: 135, offsetY: -137, scale: 0.13, anchor: { x: 0.5, y: 0 } },
+  /**
+   * The egg is 20% bigger than it was (0.13), and `offsetY` moved WITH it.
+   *
+   * `anchor.y` is 0 — the art hangs from its TOP — so scaling it up adds every
+   * new pixel BELOW the old foot: at 0.156 alone the egg and its ground shadow
+   * would sink 23px through the altar ledge. Worse, `eggBottom` is the line the
+   * Golden Elder, her shadow and her fallback are all seated on
+   * (BoardScene.showAltarElder), so she would stand 23px low for the rest of
+   * the session — on the one beat of the chapter that cannot be replayed.
+   *
+   * -175 is -137 minus the added height in AUTHORED px (1451 x 0.026 = 38), so
+   * the foot lands exactly where it lands today: the egg grows UPWARD, and the
+   * ledge contact, the shadow and the Elder's ground line do not move.
+   */
+  calibration: { offsetX: 135, offsetY: -175, scale: 0.156, anchor: { x: 0.5, y: 0 } },
   /** Elder rig display scale at the altar (rig pieces ~550px) — the legendary
    *  Golden Elder reads bigger than a board dragon (upsized on request). */
   elderScale: 0.44,
@@ -1871,6 +1901,25 @@ export const TIMINGS = {
  * The dragged item EASES toward the pointer (exponential smoothing) instead of
  * locking 1:1, lifts with a ground shadow, and the target cell lights up.
  */
+/**
+ * THE SKIP KEYS — the pair of plates a waiting generator floats under itself.
+ *
+ * They are ONE offer in two currencies, so they have to read as a pair. At 150
+ * apart on a 193-wide plate they sat with 107px of board showing between them,
+ * which reads as two unrelated buttons that happened to appear together, and
+ * the pair was wider than the House it belonged to. Every number here is that
+ * pair's geometry, in board pixels; `coinDx`/`labelDx` are measured from each
+ * plate's own centre.
+ */
+export const SKIP_KEYS = {
+  dx: 92,
+  scaleX: 0.38,
+  scaleY: 0.44,
+  fontPx: 26,
+  coinDx: -28,
+  labelDx: 18
+} as const;
+
 export const DRAG = {
   /** Pick-up scale-up and how high the art floats above the finger (px). */
   liftScale: 1.16,
@@ -1944,7 +1993,14 @@ export const DRAG = {
  * is the cost of distraction, the second the cost of interrupting momentum,
  * and they are free to diverge if either turns out wrong in play.
  */
-export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000 } as const;
+/**
+ * `followUpMs` is the third: how long the hand waits before showing the NEXT
+ * drag of a plan the player is already following. A merge on a spread board is
+ * two or three gestures, and making someone idle ten seconds between them
+ * turns help into a stutter — they have just proved they are cooperating. Long
+ * enough only for the piece to finish landing.
+ */
+export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000, followUpMs: 420 } as const;
 
 /**
  * HOW FAR THE MERGE MAGNET REACHES — in tiles, from where the piece was let go.

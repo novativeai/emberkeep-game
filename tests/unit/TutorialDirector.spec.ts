@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import tutorial from '../../src/data/tutorial.json';
-import type { TutorialAllow, TutorialStepConfig } from '../../src/core/types';
+import type { TilePos, TutorialAllow, TutorialStepConfig } from '../../src/core/types';
 import { capture, createTestContext } from './helpers';
 
 const steps = tutorial.steps as unknown as TutorialStepConfig[];
@@ -226,5 +226,116 @@ describe('the Codex lesson walks the book', () => {
     ctx.state.tutorialIndex = stepAt('codex_cycles');
     ctx.systems.tutorial.begin();
     expect(asked).toEqual([{ page: 'evolution' }]);
+  });
+});
+
+/**
+ * THE POINTER FOLLOWS THE PIECE.
+ *
+ * A beat that says "merge those three" points at pieces the player is free to
+ * pick up, and the hand used to be aimed at CELLS resolved once when the beat
+ * opened. Move one of the tufts and the hand went on hovering over the tile it
+ * had left — an instruction that is not merely stale but WRONG, since the thing
+ * it names is no longer there.
+ *
+ * Two properties, and they are different: the pointer must re-aim when the
+ * board changes, and it must re-aim at the SAME PIECE. The refs name a rank
+ * ("the third Ash Moss") and rank is read positionally, so without pinning a
+ * drag re-sorts the set and the hand jumps to a different tuft — which looks
+ * like following, and is not.
+ */
+describe('the tutorial pointer tracks live pieces', () => {
+  /** The first beat whose hand names two pieces: "three tufts make a bundle". */
+  const MERGE_BEAT = 'ash_green';
+
+  /** The beat's own spawn effect belongs to the step before it, so the fixture
+   *  seeds the three tufts the way that step would have. */
+  const openMergeBeat = (): ReturnType<typeof createTestContext> => {
+    const ctx = createTestContext();
+    ctx.state.addItem({ chain: 'ashmoss', tier: 1, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'ashmoss', tier: 1, col: 2, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'ashmoss', tier: 1, col: 5, row: 4, kind: 'item' });
+    ctx.state.tutorialIndex = stepAt(MERGE_BEAT);
+    ctx.systems.tutorial.begin();
+    return ctx;
+  };
+
+  /** Re-open the beat with a listener attached, so the emitted view is visible. */
+  const handOf = (ctx: ReturnType<typeof createTestContext>): { from: TilePos; to: TilePos } => {
+    const seen = capture(ctx.bus, 'tutorial:step');
+    ctx.systems.tutorial.begin();
+    return seen.at(-1)!.hand as { from: TilePos; to: TilePos };
+  };
+
+  it('names a hand made of two different pieces', () => {
+    const ctx = openMergeBeat();
+    const hand = handOf(ctx);
+    expect(hand).toBeTruthy();
+    expect(hand.from).not.toEqual(hand.to);
+  });
+
+  it('re-aims when the piece it points at is dragged away', () => {
+    const ctx = openMergeBeat();
+    const before = handOf(ctx);
+
+    const moved = capture(ctx.bus, 'tutorial:markers');
+    // Pick up the piece the hand is asking for and put it somewhere else.
+    const itemId = ctx.state.itemIdAt(before.from.col, before.from.row)!;
+    // Free ground WELL CLEAR of the other two tufts: land it beside them and
+    // the magnet completes the merge, which ends the beat instead of re-aiming
+    // it — a different (and also correct) outcome, but not the one under test.
+    const others = [...ctx.state.items.values()].filter(
+      (i) => i.chain === 'ashmoss' && i.id !== ctx.state.itemIdAt(before.from.col, before.from.row)
+    );
+    const free = (() => {
+      for (let col = 0; col < 8; col++) {
+        for (let row = 0; row < 8; row++) {
+          if (!ctx.state.isTileActive(col, row) || ctx.state.itemIdAt(col, row) !== null) continue;
+          // > 3, not > 2: the magnet searches two rings out from the drop and
+          // fuses from a cell adjacent to the pair, so three tiles away still
+          // merges. Four is the first distance that is genuinely "elsewhere".
+          const clear = others.every(
+            (o) => Math.max(Math.abs(o.col - col), Math.abs(o.row - row)) > 3
+          );
+          if (clear) return { col, row };
+        }
+      }
+      throw new Error('the fixture board has no free cell clear of the pair');
+    })();
+    ctx.bus.emit('drag:dropped', { itemId, from: before.from, to: free });
+
+    // The hand followed the piece rather than staying on the tile it left.
+    const after = moved.at(-1)?.hand as { from: TilePos; to: TilePos } | undefined;
+    expect(after, 'the pointer was never re-aimed').toBeTruthy();
+    expect(after!.from).toEqual(free);
+  });
+
+  it('says nothing when a move changes no answer', () => {
+    const ctx = openMergeBeat();
+    const seen = capture(ctx.bus, 'tutorial:markers');
+    // A move on a piece no marker names must not restart the hand's animation.
+    const other = [...ctx.state.items.values()].find(
+      (i) => i.kind === 'item' && i.chain !== 'ashmoss'
+    );
+    if (other) {
+      const free = (() => {
+        for (let col = 7; col >= 0; col--) {
+          for (let row = 7; row >= 0; row--) {
+            if (ctx.state.isTileActive(col, row) && ctx.state.itemIdAt(col, row) === null) {
+              return { col, row };
+            }
+          }
+        }
+        return null;
+      })();
+      if (free) {
+        ctx.bus.emit('drag:dropped', {
+          itemId: other.id,
+          from: { col: other.col, row: other.row },
+          to: free
+        });
+      }
+    }
+    expect(seen.length).toBe(0);
   });
 });

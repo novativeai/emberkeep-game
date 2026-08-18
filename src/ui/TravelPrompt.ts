@@ -7,6 +7,27 @@ import { uiRegistry } from './theme';
 const FRAME_W = 980;
 const FRAME_H = 520;
 
+/*
+ * THE TWO VERBS WERE OVERLAPPING, and the arithmetic says so.
+ *
+ * `ui_btn_green` is painted 210x76 logical, so the plate is 420x152 board
+ * units. At 1.15 that is 483 wide — and the pair sat at ±235, a pitch of 470.
+ * The keys were not "close together": they were 13 units INSIDE each other,
+ * and the only reason it read as a seam rather than a bug is that both are the
+ * same green.
+ *
+ * So the pitch and the plate are stated together, and the air between them is
+ * whatever is left: 2*230 - 412 = 48. The pair spans 872 inside a 980 frame,
+ * which leaves 54 down each margin — the same air outside as in.
+ */
+const BTN_SCALE = 0.98;
+const BTN_DX = 230;
+const BTN_Y = 138;
+/** Half the PLATE, from the texture's own painted size — not a guess that has
+ *  to be re-guessed whenever the scale moves. */
+const BTN_HALF_W = 210 * BTN_SCALE;
+const BTN_HALF_H = 76 * BTN_SCALE;
+
 /**
  * The travel prompt — a portal was tapped, and this asks before the world
  * changes under the player.
@@ -79,16 +100,18 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
       .setVisible(false);
     const bw = FRAME_W * pScale;
     const bh = FRAME_H * pScale;
-    const btnHalfW = 242 * pScale;
-    const btnHalfH = 90 * pScale;
+    // A hair of slack around the plate, so the blocker's hole is never smaller
+    // than the key it is meant to be a hole for.
+    const btnHalfW = (BTN_HALF_W + 6) * pScale;
+    const btnHalfH = (BTN_HALF_H + 6) * pScale;
     blocker.setInteractive({
       hitArea: new Phaser.Geom.Rectangle(0, 0, bw, bh),
       hitAreaCallback: (area: Phaser.Geom.Rectangle, x: number, y: number): boolean => {
         if (!Phaser.Geom.Rectangle.Contains(area, x, y)) return false;
         const lx = x - bw / 2;
         const ly = y - bh / 2;
-        for (const bx of [-235 * pScale, 235 * pScale]) {
-          if (Math.abs(lx - bx) < btnHalfW && Math.abs(ly - 138 * pScale) < btnHalfH) return false;
+        for (const bx of [-BTN_DX * pScale, BTN_DX * pScale]) {
+          if (Math.abs(lx - bx) < btnHalfW && Math.abs(ly - BTN_Y * pScale) < btnHalfH) return false;
         }
         return true;
       }
@@ -138,8 +161,12 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
       onTap: () => void
     ): Phaser.GameObjects.Text => {
       const bx = cx + x * scale;
-      const by = cy + 138 * scale;
-      const btn = scene.add.image(bx, by, 'ui_btn_green').setScale(1.15 * scale).setDepth(60002).setVisible(false);
+      const by = cy + BTN_Y * scale;
+      const btn = scene.add
+        .image(bx, by, 'ui_btn_green')
+        .setScale(BTN_SCALE * scale)
+        .setDepth(60002)
+        .setVisible(false);
       const label = scene.add
         .text(bx, by - 4 * scale, text, {
           fontFamily: FONT.display, fontSize: '38px', fontStyle: 'bold', color: PALETTE.night
@@ -157,12 +184,12 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
       this.chrome.push(btn, label);
       return label;
     };
-    this.crossLabel = mkBtn(-235, 'Cross', () => {
+    this.crossLabel = mkBtn(-BTN_DX, 'Cross', () => {
       const to = this.to;
       this.close();
       if (to) this.bus.emit('world:switch', { to });
     });
-    mkBtn(235, 'Stay', () => this.close());
+    mkBtn(BTN_DX, 'Stay', () => this.close());
 
     body.add([frame, this.title, this.sub]);
     body.sendToBack(frame);
