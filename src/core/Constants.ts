@@ -111,6 +111,41 @@ export function panelMobileScale(frameWidth: number): number {
 }
 
 /**
+ * THE PORTRAIT TYPE STEP — why a phone needs its own number at all.
+ *
+ * The UI is authored in a fixed 2560-unit-wide space and FIT-scales, so a unit
+ * is worth whatever the screen is wide. On a 1280px-wide desktop window a unit
+ * is half a pixel and a 21-unit blurb lands at a readable 10.5px. On a phone
+ * the SAME 2560 units span ~390 real pixels, so that blurb arrives at 3.8px —
+ * not small, unreadable, and no amount of panel scaling fixes it because the
+ * panel is already at 94% of the width.
+ *
+ * 2560/390 over 2560/1280 is 3.3; 2.6 is that ratio held back to where the
+ * type still fits the plates it sits on. It is the same constant main's dark
+ * Codex arrived at independently (its private `F()`), promoted here so every
+ * screen steps by the same amount instead of each one guessing.
+ *
+ * Use it for TYPE. For a control the thumb has to hit, use `TAP_SCALE`.
+ */
+export const TYPE_STEP: number = IS_MOBILE ? 2.6 : 1;
+
+/** Step a font size into the portrait space. `px(21)` is 21 on a desktop and
+ *  55 on a phone — the same apparent size on both. */
+export const px = (n: number): number => Math.round(n * TYPE_STEP);
+
+/**
+ * How much a TAP TARGET grows in portrait.
+ *
+ * Lower than the type step on purpose: type has to stay readable at any size,
+ * a control only has to be reachable. 44 CSS px is the platform minimum for a
+ * thumb, which on a 390px phone is 289 units — and the panels' ✕ disc is 96,
+ * so 2.2 is the smallest honest multiplier that clears the bar (211 units of
+ * hit box around a 148-unit disc). Bigger would start eating the plate corner
+ * the disc was carefully seated inside.
+ */
+export const TAP_SCALE: number = IS_MOBILE ? 2.2 : 1;
+
+/**
  * Like `panelMobileScale`, but bound by width AND height, whichever binds: a
  * phone gets a near-full-screen sheet, a squarer tablet gets the same sheet
  * held to its shorter height instead of spilling. `1` on desktop, where the
@@ -2232,8 +2267,25 @@ export const DRAGON_ANIM = {
 export const DRAGON_CLIPS = {
   budgetMb: 288,
   leanBudgetMb: 96,
-  /** Weak devices load the idle only and fly on the rig. */
-  lean: IS_LOW_END
+  /**
+   * LEAN: fetch a breed's idle when it appears, and nothing else until it is
+   * needed. Every other sheet arrives on the beat that uses it — the roar when
+   * the dragon goes hungry, the fly on takeoff (`ensureMoodClip`).
+   *
+   * This used to read "weak devices load the idle only and fly on the rig",
+   * and that sentence stopped being true the day the rigs were switched off:
+   * there is no puppet left to cover a missing fly sheet, so deferring it is
+   * now a real decision rather than a free one. It is still the right one,
+   * because the fetch is triggered at takeoff and a first glide is a far
+   * smaller cost than 3 MB down the wire before the animal has ever flown.
+   *
+   * Widened from IS_LOW_END to every HANDSET. A modern phone with 8 cores and
+   * 8 GB is not "weak" by either signal, so it was pulling the full eager wave
+   * — idle AND fly, 6-9 MB per breed — over a mobile connection at the moment
+   * a dragon first stood on the board. The size axis was never the reason to
+   * defer here; the WIRE is.
+   */
+  lean: IS_LOW_END || IS_MOBILE
 } as const;
 
 /** Per-dragon-chain rig scale factor so different art reads at the SAME on-board

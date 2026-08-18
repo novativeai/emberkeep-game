@@ -47,6 +47,9 @@ declare global {
     __emberkeep: {
       gridToPage: (col: number, row: number) => { x: number; y: number };
       itemToPage: (col: number, row: number) => { x: number; y: number };
+      skipKeyToPage: (currency: 'gold' | 'warmth') => { x: number; y: number } | null;
+      /** Why the merge hint is or is not on screen. */
+      hint: () => unknown;
       characterToPage: (characterId: string) => { x: number; y: number } | null;
       centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
@@ -358,6 +361,33 @@ window.__emberkeep = {
         })
       | undefined;
     return worldToPage(board?.itemArtWorldPoint?.(col, row) ?? gridToWorld(col, row));
+  },
+  /**
+   * Where to AIM at one of the generator popup's two keys.
+   *
+   * The popup used to be a pair of keys at a fixed offset under the piece, so a
+   * test could hard-code `+SKIP_KEYS.dx, +100` and hit it. It is a hanging pin
+   * now, stacked, and it rides the ART's height so a tall House is not covered
+   * by its own offer — which means the offset is no longer a constant anything
+   * outside the scene can know. Ask the scene instead: this reports the live
+   * world point of the row, so the test aims at what is actually drawn however
+   * the pin is later re-tuned.
+   */
+  /** Why the merge hint is (or is not) showing — see BoardScene.hintDiagnostics. */
+  hint: () => {
+    const board = game.scene.getScene(SCENES.board) as
+      | (Phaser.Scene & { hintDiagnostics?: () => unknown })
+      | undefined;
+    return board?.hintDiagnostics?.() ?? { error: 'board scene not running' };
+  },
+  skipKeyToPage: (currency: 'gold' | 'warmth') => {
+    const board = game.scene.getScene(SCENES.board) as
+      | (Phaser.Scene & {
+          skipKeyWorldPoint?: (c: 'gold' | 'warmth') => { x: number; y: number } | null;
+        })
+      | undefined;
+    const at = board?.skipKeyWorldPoint?.(currency);
+    return at ? worldToPage(at) : null;
   },
   /**
    * Where to AIM at a world character — the middle of her BODY, not her cell.

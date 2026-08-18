@@ -1,6 +1,14 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, PALETTE, panelMobileScale } from '../core/Constants';
+import {
+  IS_MOBILE,
+  LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
+  num,
+  PALETTE,
+  panelMobileScale,
+  px
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { uiRegistry } from './theme';
 
@@ -20,13 +28,25 @@ const FRAME_H = 520;
  * whatever is left: 2*230 - 412 = 48. The pair spans 872 inside a 980 frame,
  * which leaves 54 down each margin — the same air outside as in.
  */
-const BTN_SCALE = 0.98;
-const BTN_DX = 230;
+/* In portrait the prompt is the same 980-wide frame blown up to 94% of a
+ * 2560-unit space, so the PLATES are already thumb-sized — it is only the type
+ * on them that arrives at 6px. The pitch grows a little with the wider label. */
+const BTN_SCALE = IS_MOBILE ? 1.4 : 0.98;
+const BTN_DX = IS_MOBILE ? 354 : 230;
 const BTN_Y = 138;
 /** Half the PLATE, from the texture's own painted size — not a guess that has
  *  to be re-guessed whenever the scale moves. */
 const BTN_HALF_W = 210 * BTN_SCALE;
 const BTN_HALF_H = 76 * BTN_SCALE;
+/**
+ * The frame has to HOLD the pair, whatever the pair is.
+ *
+ * 108 is chosen so the desktop case comes to 979.6 and the `max` keeps the
+ * authored 980 EXACTLY — the landscape prompt does not move by a unit. In
+ * portrait the keys are 1.4x, so the plate grows to 1404 to keep the same 60
+ * units of margin down each side and the same 120 of air between the verbs.
+ */
+const FRAME_FIT_W = Math.max(FRAME_W, 2 * (BTN_DX + BTN_HALF_W) + 108);
 
 /**
  * The travel prompt — a portal was tapped, and this asks before the world
@@ -72,7 +92,7 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
     // (measured: the full-screen dim swallowed Cross regardless of depth).
     // So each piece's hit area EXCLUDES the others': the dim is tappable only
     // outside the frame, the frame-blocker only outside the buttons.
-    const pScale = panelMobileScale(FRAME_W);
+    const pScale = panelMobileScale(FRAME_FIT_W);
     const dimW = LIVE_GAME_WIDTH * 2;
     const dimH = LIVE_GAME_HEIGHT * 2;
     this.dim = scene.add
@@ -85,7 +105,7 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
         if (!Phaser.Geom.Rectangle.Contains(area, x, y)) return false;
         const lx = x - dimW / 2;
         const ly = y - dimH / 2;
-        return Math.abs(lx) > (FRAME_W / 2) * pScale || Math.abs(ly) > (FRAME_H / 2) * pScale;
+        return Math.abs(lx) > (FRAME_FIT_W / 2) * pScale || Math.abs(ly) > (FRAME_H / 2) * pScale;
       }
     });
     this.dim.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
@@ -95,10 +115,10 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
     // The frame itself swallows taps (a tap on the title must not reach the
     // board beneath) but yields the two button rectangles.
     const blocker = scene.add
-      .zone(cx, cy, FRAME_W * pScale, FRAME_H * pScale)
+      .zone(cx, cy, FRAME_FIT_W * pScale, FRAME_H * pScale)
       .setDepth(60000)
       .setVisible(false);
-    const bw = FRAME_W * pScale;
+    const bw = FRAME_FIT_W * pScale;
     const bh = FRAME_H * pScale;
     // A hair of slack around the plate, so the blocker's hole is never smaller
     // than the key it is meant to be a hole for.
@@ -126,24 +146,24 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
       this.chrome = [];
     });
 
-    const body = scene.add.container(cx, cy).setScale(panelMobileScale(FRAME_W));
+    const body = scene.add.container(cx, cy).setScale(panelMobileScale(FRAME_FIT_W));
     const frame = scene.add.graphics();
     frame.fillStyle(num(PALETTE.plum), 0.98);
-    frame.fillRoundedRect(-FRAME_W / 2, -FRAME_H / 2, FRAME_W, FRAME_H, 46);
+    frame.fillRoundedRect(-FRAME_FIT_W / 2, -FRAME_H / 2, FRAME_FIT_W, FRAME_H, 46);
     frame.lineStyle(9, num(PALETTE.gold), 1);
-    frame.strokeRoundedRect(-FRAME_W / 2, -FRAME_H / 2, FRAME_W, FRAME_H, 46);
+    frame.strokeRoundedRect(-FRAME_FIT_W / 2, -FRAME_H / 2, FRAME_FIT_W, FRAME_H, 46);
 
     this.title = scene.add
       .text(0, -FRAME_H / 2 + 88, 'THE EMBER GATE', {
-        fontFamily: FONT.display, fontSize: '58px', fontStyle: 'bold', color: PALETTE.goldAccent
+        fontFamily: FONT.display, fontSize: `${px(58)}px`, fontStyle: 'bold', color: PALETTE.goldAccent
       })
       .setOrigin(0.5);
     this.sub = scene.add
       .text(0, -34, '', {
         fontFamily: FONT.display,
-        fontSize: '38px',
+        fontSize: `${px(38)}px`,
         color: PALETTE.cream,
-        wordWrap: { width: FRAME_W - 160 },
+        wordWrap: { width: FRAME_FIT_W - 160 },
         align: 'center'
       })
       .setOrigin(0.5)
@@ -154,7 +174,7 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
     // container their input priority collapses to the container tree's zeros
     // and the full-screen dim outranks them (measured — Cross went dead).
     // Root-level siblings sort purely by depth, and 60002 > the dim's 59999.
-    const scale = panelMobileScale(FRAME_W);
+    const scale = panelMobileScale(FRAME_FIT_W);
     const mkBtn = (
       x: number,
       text: string,
@@ -169,7 +189,7 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
         .setVisible(false);
       const label = scene.add
         .text(bx, by - 4 * scale, text, {
-          fontFamily: FONT.display, fontSize: '38px', fontStyle: 'bold', color: PALETTE.night
+          fontFamily: FONT.display, fontSize: `${px(38)}px`, fontStyle: 'bold', color: PALETTE.night
         })
         .setOrigin(0.5)
         .setScale(scale)

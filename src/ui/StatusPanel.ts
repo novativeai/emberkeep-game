@@ -38,9 +38,12 @@ if (LINE_Y + 30 > STATUS_READOUT_H) {
 }
 
 /** Heart size here is smaller than the board's was: this is a readout in a
- *  column of text, not a badge worn over somebody's head. */
-const HEART_SIZE = 46; // read at a glance from arm's length, not squinted at
-const HEART_GAP = 10;
+ *  column of text, not a badge worn over somebody's head — but it is also the
+ *  ONE place Regard is ever shown, so it has to survive being glanced at.
+ *  Raised again (46 -> 58); the row is 5 hearts at pitch size+gap, so this
+ *  takes it from 270 to 330 wide, still inside the readout column. */
+const HEART_SIZE = 58;
+const HEART_GAP = 8;
 
 /** The dragon's hunger gauge, seated on the same row the hearts use. */
 const GAUGE_W = 300;

@@ -1,6 +1,12 @@
 import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
-import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
+import {
+  LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
+  num,
+  panelMobileScale,
+  TAP_SCALE
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameContext } from '../core/Context';
 import type { CauldronRecipeConfig } from '../core/types';
@@ -113,9 +119,13 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     close.add([closeBg, closeX]);
-    close.setSize(96, 96).setInteractive({ useHandCursor: true });
-    close.on('pointerover', () => close.setScale(1.08));
-    close.on('pointerout', () => close.setScale(1));
+    // A THUMB, NOT A CURSOR. 96 units of hit box is ~15 real pixels on a
+    // handset — well under the 44px every platform asks for — so in portrait
+    // the whole disc steps up by `TAP_SCALE`. `1` on desktop, where the seat
+    // inside the plate's corner was measured and must not move.
+    close.setSize(96, 96).setScale(TAP_SCALE).setInteractive({ useHandCursor: true });
+    close.on('pointerover', () => close.setScale(TAP_SCALE * 1.08));
+    close.on('pointerout', () => close.setScale(TAP_SCALE));
     close.on('pointerup', () => this.requestClose());
 
     // The list lives inside a VIEWPORT so it can scroll: the viewport is fixed

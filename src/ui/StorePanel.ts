@@ -2,11 +2,15 @@ import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
 import {
   FOIL,
+  IS_MOBILE,
   LIVE_GAME_WIDTH,
   LIVE_GAME_HEIGHT,
   num,
+  panelFitScale,
   panelMobileScale,
-  RARITY
+  px,
+  RARITY,
+  TAP_SCALE
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameContext } from '../core/Context';
@@ -41,34 +45,116 @@ import { uiRegistry } from './theme';
  * three equal columns, so the block is the same 1904 wide on every tab and
  * stops jumping sideways when the player changes shelf.
  */
+/**
+ * THE DEVICE LAYOUT, and why the shelf needed one at all.
+ *
+ * The numbers below used to be one set, tuned against the authored 2560x1600
+ * landscape space and then simply scaled up on a phone. That is what broke it:
+ * the space is 2560 units wide WHATEVER the device, so on a handset those units
+ * span ~390 real pixels instead of ~1280, and a 21-unit blurb arrives at 3.8px.
+ * The panel was not too small — the TYPE was, by a factor the panel scale
+ * cannot recover because the panel is already at 94% of the width.
+ *
+ * Worse, the landscape frame is 2032x1240 in a portrait space that is ~5500
+ * tall: the store sat in a letterbox using a quarter of the screen and left the
+ * rest black, then crammed four columns into it.
+ *
+ * So, exactly as the dark Codex does it (`CX` there): a phone gets the PORTRAIT
+ * sheet, TWO columns, cards tall enough to hold stepped type, and a showcase
+ * card that spans the full width at the top of the shelf rather than standing
+ * beside the grid. Desktop keeps every number it had, to the unit.
+ *
+ * Plate geometry, measured off the PAINTED frames (both are logical x RES):
+ *   ui_store_panel  1016x620 @ y+40  -> inside x -1016..1016, y -588..652
+ *   ui_panel_tall   1180x2040 @ y 0  -> inside x -1136..1136, y -2008..1992
+ */
+const CX = IS_MOBILE
+  ? {
+      frameKey: 'ui_panel_tall',
+      frameY: 0,
+      /** The plate's inner box. */
+      plateX: 1136,
+      titleY: -1900,
+      bannerY: -1954,
+      closeX: 1010,
+      closeY: -1900,
+      tabsY: -1690,
+      tabCols: 2,
+      tabW: 1060,
+      tabH: 150,
+      tabGapX: 1128,
+      tabGapY: 176,
+      tabFont: 56,
+      blurbY: -1330,
+      blurbWrap: 2100,
+      cols: 2,
+      cardW: 1040,
+      cardH: 1040,
+      viewTop: -1230,
+      viewBottom: 1930,
+      /** Portrait stacks: the showcase card takes the full width above the
+       *  grid rather than a column beside it. */
+      heroStacked: true,
+      heroW: 2144,
+      heroH: 1500
+    }
+  : {
+      frameKey: 'ui_store_panel',
+      frameY: 40,
+      plateX: 1016,
+      titleY: -586,
+      bannerY: -640,
+      closeX: 964,
+      closeY: -538,
+      tabsY: -430,
+      tabCols: 4,
+      tabW: 420,
+      tabH: 92,
+      tabGapX: 470,
+      tabGapY: 0,
+      tabFont: 40,
+      blurbY: -344,
+      blurbWrap: 1860,
+      cols: 4,
+      cardW: 428,
+      cardH: 380,
+      viewTop: -300,
+      viewBottom: 652,
+      heroStacked: false,
+      heroW: 592,
+      heroH: 824
+    };
+
+/*
+ * THE SHELF, DERIVED FROM ONE NUMBER — still true, on both layouts.
+ *
+ * AIR is the outer margin AND every gutter, and the card sizes are whatever is
+ * left once it has been paid on all four sides.
+ *
+ *   desktop  4*428 + 3*64 = 1904, + 2*64 = 2032  ✓  (hero 592+64+592+64+592)
+ *   phone    2*1040 + 64 = 2144,  + 2*64 = 2272  ✓  (hero spans all 2144)
+ */
 const AIR = 64;
-const CARD_W = 428; // (1904 - 3*AIR) / 4
-const CARD_H = 380; // (824 - AIR) / 2
-const CARD_R = 34;
-const COLS = 4;
+const CARD_W = CX.cardW;
+const CARD_H = CX.cardH;
+const CARD_R = IS_MOBILE ? 46 : 34;
+const COLS = CX.cols;
 const COL_GAP = CARD_W + AIR; // a PITCH: the visible gutter is AIR
-const VIEW_TOP = -300;
-/** The plate's true inner floor. The shelf may use all of it, because the air
- *  is now paid by the layout rather than by leaving the window short. */
-const VIEW_BOTTOM = 652;
+const VIEW_TOP = CX.viewTop;
+const VIEW_BOTTOM = CX.viewBottom;
 const VIEW_H = VIEW_BOTTOM - VIEW_TOP;
 const GRID_MID = (VIEW_TOP + VIEW_BOTTOM) / 2;
 /** Row PITCH, not row height — the gap between two rows is `ROW_GAP - CARD_H`. */
 const ROW_GAP = CARD_H + AIR;
 
-/**
- * The showcase card. Its height IS the whole grid — both rows and the gap
- * between them — so it can never disagree with the cards beside it, and its
- * width is one column of the hero layout. 592/824 = 0.718, which is the
- * trading-card proportion a foiled legendary is pretending to be, arrived at
- * by the arithmetic rather than imposed on it.
- */
-const HERO_H = ROW_GAP + CARD_H;
-const HERO_W = 592;
+/** The showcase card. On desktop its height IS the whole grid, so it can never
+ *  disagree with the cards beside it; in portrait it is a full-width banner
+ *  above them and answers only to itself. */
+const HERO_H = CX.heroStacked ? CX.heroH : ROW_GAP + CARD_H;
+const HERO_W = CX.heroW;
 const HERO_GAP = AIR;
-/** A section with a showcase card fits two ordinary columns beside it, and in
- *  that layout those columns are HERO-width — three equal columns, not a wide
- *  card beside two narrow ones. */
+/** Ordinary columns BESIDE a hero are hero-width — three equal columns, not a
+ *  wide card beside two narrow ones. Meaningless when the hero is stacked. */
 const HERO_COLS = 2;
 const HERO_CARD_W = HERO_W;
 const HERO_COL_GAP = HERO_CARD_W + AIR;
@@ -80,51 +166,45 @@ const DRAG_SLOP = 12;
 /**
  * THE CARD'S TYPE IS LAID OUT FROM ITS KEY UPWARDS, not from its top down.
  *
- * Every one of these used to be a y picked by eye, and nothing measured
- * anything: the name sat at a fixed height, the blurb started at a fixed
- * height below it, and the buy key was drawn afterwards at a fixed height of
- * its own. On a 380-tall card that left the blurb 39 units — one and a half
- * lines — and every two-line blurb in the shop had its second line sliced in
- * half by the plate. That is what shipped, on all three tabs.
- *
- * So the geometry is stated once, here, and the words are FITTED into what is
- * left over (`fitBlurb`). The one number that has to be right is ACTION_TOP:
- * everything the player reads has to end above it.
+ * Nothing used to measure anything: a fixed name y, a fixed blurb y, and the
+ * buy plate drawn afterwards at a fixed y of its own — which left the blurb 39
+ * units on a 380-tall card and put every two-line description under the button.
+ * The geometry is stated once here and the words are FITTED into what is left
+ * (`fitBlurb`). The one number that has to be right is ACTION_TOP: everything
+ * the player reads has to end above it.
  */
 
 /** Where a BLED card's name sits — the scrim under it is placed FROM this, so
  *  it cannot move without the gradient moving with it. */
-const NAME_Y = 8;
-/** And where a PLAIN card's name sits: there is no scrim to answer to here,
- *  only the art above and the key below, so the name rides as high as the
- *  picture allows and hands its slack to the blurb. */
-const PLAIN_NAME_Y = -18;
-/** The showcase card's name. Sized off the WORST case rather than the one on
- *  screen: at four lines the blurb still ends clear of the key. */
-const HERO_NAME_Y = 138;
+const NAME_Y = IS_MOBILE ? 60 : 8;
+/** And where a PLAIN card's name sits: no scrim to answer to, only the art
+ *  above and the key below, so it rides high and hands its slack to the blurb. */
+const PLAIN_NAME_Y = IS_MOBILE ? -80 : -18;
+/** The showcase card's name. */
+const HERO_NAME_Y = IS_MOBILE ? 120 : 138;
 
 /** `ui_btn_price`/`ui_btn_free` are painted 230x66 logical, so the plate is
  *  460x132 board units and its half-height is 66 x whatever scales it. */
 const ACTION_PLATE_HALF_H = 66;
-/** Reduced from 0.74: at 340 wide the key ate 79% of the card and its top edge
- *  cut into the blurb. 267 is 62% — a key, not a drawer front. */
-const ACTION_SCALE = 0.58;
-const ACTION_FONT = 32;
-const ACTION_Y = CARD_H / 2 - 50;
+/** Reduced from 0.74 on desktop: at 340 wide the key ate 79% of the card and
+ *  its top edge cut into the blurb. In portrait it grows with the card. */
+const ACTION_SCALE = IS_MOBILE ? 1.5 : 0.58;
+const ACTION_FONT = px(32);
+const ACTION_Y = CARD_H / 2 - (IS_MOBILE ? 130 : 50);
 const ACTION_TOP = ACTION_Y - ACTION_PLATE_HALF_H * ACTION_SCALE;
-const HERO_ACTION_SCALE = 0.82;
-const HERO_ACTION_FONT = 40;
-const HERO_ACTION_Y = HERO_H / 2 - 64;
+const HERO_ACTION_SCALE = IS_MOBILE ? 2 : 0.82;
+const HERO_ACTION_FONT = px(40);
+const HERO_ACTION_Y = HERO_H / 2 - (IS_MOBILE ? 170 : 64);
 const HERO_ACTION_TOP = HERO_ACTION_Y - ACTION_PLATE_HALF_H * HERO_ACTION_SCALE;
 
 /** The blurb's preferred size, and the floor it may shrink to before the text
- *  is truncated instead. Below 16 the type stops being readable at all, and an
- *  unreadable full sentence is worth less than a readable half one. */
-const BLURB_PX = 21;
-const BLURB_MIN_PX = 16;
+ *  is truncated instead. Stepped into the portrait space so the same sentence
+ *  reads the same size on a phone as on a desktop. */
+const BLURB_PX = px(21);
+const BLURB_MIN_PX = px(16);
 /** Air under the name's foot, and over the key's top edge. */
-const BLURB_GAP = 8;
-const BLURB_FOOT = 10;
+const BLURB_GAP = IS_MOBILE ? 12 : 8;
+const BLURB_FOOT = IS_MOBILE ? 18 : 10;
 
 /**
  * The Keeper's Store — cosmetics, bought with earned Gold.
@@ -185,13 +265,18 @@ export class StorePanel extends Phaser.GameObjects.Container {
       .setInteractive();
     this.dim.on('pointerup', () => this.requestClose());
 
-    const frame = scene.add.image(0, 40, 'ui_store_panel');
-    this.baseScale = panelMobileScale(frame.width);
+    const frame = scene.add.image(0, CX.frameY, CX.frameKey);
+    // Bound by BOTH axes in portrait: the tall sheet is 4080 units high in a
+    // ~5500-unit space, and a width-only fit would let it run off the bottom on
+    // a squarer handset. Desktop keeps the width-only rule it was tuned with.
+    this.baseScale = IS_MOBILE
+      ? panelFitScale(frame.width, frame.height)
+      : panelMobileScale(frame.width);
 
     this.titleBg = scene.add.graphics();
     this.titleText = scene.add
-      .text(0, -586, "KEEPER'S STORE", {
-        fontFamily: FONT.ui, fontSize: '64px', fontStyle: 'bold', color: INK.onField
+      .text(0, CX.titleY, "KEEPER'S STORE", {
+        fontFamily: FONT.ui, fontSize: `${px(64)}px`, fontStyle: 'bold', color: INK.onField
       })
       .setOrigin(0.5)
       .setShadow(0, 5, 'rgba(36,27,34,0.55)', 6);
@@ -200,20 +285,23 @@ export class StorePanel extends Phaser.GameObjects.Container {
     // two-row section starts at -300, and a blurb parked in the shelf container
     // ended up behind the first row of cards.
     this.sectionBlurb = scene.add
-      .text(0, -344, '', {
-        fontFamily: FONT.ui, fontSize: '30px', color: INK.onFieldDim,
-        align: 'center', wordWrap: { width: 1860 }
+      .text(0, CX.blurbY, '', {
+        fontFamily: FONT.ui, fontSize: `${px(30)}px`, color: INK.onFieldDim,
+        align: 'center', wordWrap: { width: CX.blurbWrap }
       })
       .setOrigin(0.5);
 
     // THE POCKET IS 101 UNITS WIDE, and that is what sizes this key.
     //
     // `ui_store_panel`'s inner plate runs x -1016..1016, y -588..652, and the
-    // rightmost tab (`buildTabs`: 4 tabs, 420 wide, 470 apart) ends at x 915
-    // with its top edge at y -476. So the free corner is 101 x 112 — a 0.92
-    // disc is 125 across and cannot sit in it without riding the frame, which
-    // is exactly what it was doing.
-    const close = scene.add.container(964, -538);
+    // rightmost tab (`buildTabs`) ends at x 915 with its top edge at y -476. So
+    // the free corner is 101 x 112 — a 0.92 disc is 125 across and cannot sit in
+    // it without riding the frame, which is exactly what it was doing.
+    //
+    // In portrait the pocket is not the constraint, the THUMB is: 96 units of
+    // hit box is 15 real pixels on a handset, well under the 44px platform
+    // minimum. `TAP_SCALE` is the smallest multiplier that clears it.
+    const close = scene.add.container(CX.closeX, CX.closeY);
     this.closeBtn = close;
     // The royal candy disc: a plum face in a gold rim, painted rather than a
     // cream HUD button under a flat tint.
@@ -222,13 +310,14 @@ export class StorePanel extends Phaser.GameObjects.Container {
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     close.add([closeBg, closeX]);
-    // 96, not 120: the old hit box reached over the last tab.
+    // 96, not 120: on desktop the old hit box reached over the last tab.
     close.setSize(96, 96).setInteractive({ useHandCursor: true });
-    close.on('pointerover', () => close.setScale(1.08));
-    close.on('pointerout', () => close.setScale(1));
+    close.setScale(TAP_SCALE);
+    close.on('pointerover', () => close.setScale(TAP_SCALE * 1.08));
+    close.on('pointerout', () => close.setScale(TAP_SCALE));
     close.on('pointerup', () => this.requestClose());
 
-    this.tabsRow = scene.add.container(0, -430);
+    this.tabsRow = scene.add.container(0, CX.tabsY);
     this.viewport = scene.add.container(0, GRID_MID);
     this.shelf = scene.add.container(0, 0);
     this.viewport.add(this.shelf);
@@ -481,20 +570,31 @@ export class StorePanel extends Phaser.GameObjects.Container {
 
   private buildTabs(): void {
     this.tabsRow.removeAll(true);
-    const gap = 470;
-    const startX = -((this.sections.length - 1) * gap) / 2;
+    // FOUR ACROSS, OR TWO BY TWO. Four 420-wide tabs fit the landscape plate
+    // exactly; in portrait a tab wide enough to hold "Manor Skins" at readable
+    // type is 1060, and two of those are the whole plate — so the row wraps into
+    // a grid rather than shrinking type nobody could read.
+    const cols = CX.tabCols;
+    const rows = Math.ceil(this.sections.length / cols);
+    const startX = -((cols - 1) * CX.tabGapX) / 2;
+    const startY = -((rows - 1) * CX.tabGapY) / 2;
+    const halfW = CX.tabW / 2;
+    const halfH = CX.tabH / 2;
     this.sections.forEach((section, i) => {
       const active = i === this.activeIndex;
-      const tab = this.scene.add.container(startX + i * gap, 0);
+      const tab = this.scene.add.container(
+        startX + (i % cols) * CX.tabGapX,
+        startY + Math.floor(i / cols) * CX.tabGapY
+      );
       const g = this.scene.add.graphics();
       g.fillStyle(num(active ? INK.fieldLift : INK.fieldDeep), 1);
-      g.fillRoundedRect(-210, -46, 420, 92, 30);
+      g.fillRoundedRect(-halfW, -halfH, CX.tabW, CX.tabH, CX.tabH / 3);
       g.lineStyle(5, num(active ? INK.gold : INK.goldDeep), 1);
-      g.strokeRoundedRect(-210, -46, 420, 92, 30);
+      g.strokeRoundedRect(-halfW, -halfH, CX.tabW, CX.tabH, CX.tabH / 3);
       const label = this.scene.add
         .text(0, -2, section.title, {
           fontFamily: FONT.ui,
-          fontSize: '40px',
+          fontSize: `${CX.tabFont}px`,
           fontStyle: 'bold',
           color: active ? INK.onField : INK.onFieldDim
         })
@@ -504,15 +604,15 @@ export class StorePanel extends Phaser.GameObjects.Container {
       if (section.kind === 'soon') {
         tab.add(
           this.scene.add
-            .text(0, 34, 'SOON', {
-              fontFamily: FONT.ui, fontSize: '22px', fontStyle: 'bold',
+            .text(0, CX.tabH * 0.28, 'SOON', {
+              fontFamily: FONT.ui, fontSize: `${Math.round(CX.tabFont * 0.55)}px`, fontStyle: 'bold',
               color: active ? INK.onFieldGold : INK.onFieldDim
             })
             .setOrigin(0.5)
         );
-        label.setY(-12);
+        label.setY(-CX.tabH * 0.1);
       }
-      tab.setSize(420, 92).setInteractive({ useHandCursor: true });
+      tab.setSize(CX.tabW, CX.tabH).setInteractive({ useHandCursor: true });
       tab.on('pointerup', () => {
         if (this.activeIndex === i) return;
         this.activeIndex = i;
@@ -540,7 +640,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
       this.shelf.add(
         this.scene.add
           .text(0, -60, 'AVAILABLE SOON', {
-            fontFamily: FONT.ui, fontSize: '76px', fontStyle: 'bold', color: INK.onFieldGold
+            fontFamily: FONT.ui, fontSize: `${px(76)}px`, fontStyle: 'bold', color: INK.onFieldGold
           })
           .setOrigin(0.5)
           .setAlpha(0.85)
@@ -548,20 +648,59 @@ export class StorePanel extends Phaser.GameObjects.Container {
       return;
     }
 
-    // One showcase card may claim the left of the shelf at full grid height;
-    // everything else falls into the columns left over. Both halves are laid
-    // out from the same measured total, so the block stays centred whether or
-    // not the section has a hero.
     const hero = section.items.find((item) => item.hero) ?? null;
     const rest = hero ? section.items.filter((item) => item !== hero) : section.items;
+
+    if (CX.heroStacked) {
+      /*
+       * PORTRAIT: the showcase card is a BANNER, not a column.
+       *
+       * Beside-the-grid only works when the grid is wide enough to lose a
+       * column to it. On a phone the shelf is two columns; giving one to the
+       * hero leaves a single file of cards down half a screen, with the other
+       * half a tall poster. So the hero takes the full width at the top and the
+       * grid runs whole underneath it — the shelf scrolls anyway, and vertical
+       * room is the one thing a portrait screen is not short of.
+       */
+      const rows = Math.ceil(rest.length / COLS);
+      const gridH = rows > 0 ? (rows - 1) * ROW_GAP + CARD_H : 0;
+      const contentH = (hero ? HERO_H + AIR : 0) + gridH;
+      // Short sections stay optically centred; an overflowing one starts at the
+      // top of the window, because a centred overflow hides its first row as
+      // well as its last. Either way it pays AIR top and bottom.
+      const top =
+        contentH <= VIEW_H - 2 * AIR ? -contentH / 2 : -VIEW_H / 2 + AIR;
+      this.maxScroll = Math.max(0, contentH + 2 * AIR - VIEW_H);
+      if (hero) this.place(this.makeHeroCard(0, top + HERO_H / 2, hero, section), hero);
+      const gridTop = top + (hero ? HERO_H + AIR : 0);
+      const colStartX = -((COLS - 1) * COL_GAP) / 2;
+      rest.forEach((item, i) => {
+        this.place(
+          this.makeCard(
+            colStartX + (i % COLS) * COL_GAP,
+            gridTop + Math.floor(i / COLS) * ROW_GAP + CARD_H / 2,
+            item,
+            section,
+            CARD_W
+          ),
+          item
+        );
+      });
+      this.setScroll(0);
+      this.seatMask();
+      return;
+    }
+
+    // LANDSCAPE: one showcase card may claim the left of the shelf at full grid
+    // height; everything else falls into the columns left over. Both halves are
+    // laid out from the same measured total, so the block stays centred whether
+    // or not the section has a hero.
     const cols = hero ? HERO_COLS : COLS;
     // THE COLUMN WIDTH IS A PROPERTY OF THE LAYOUT, not of the card.
     //
     // A hero shelf is three equal columns and a plain shelf is four, and both
     // come to the same 1904 — so the block is the same width on every tab and
-    // stops sliding sideways when the player changes shelf. The old code used
-    // one card width for both, which is why the two-up rows beside the hero
-    // were narrow cards adrift in a wide gap.
+    // stops sliding sideways when the player changes shelf.
     const cardW = hero ? HERO_CARD_W : CARD_W;
     const colGap = hero ? HERO_COL_GAP : COL_GAP;
     const blockW = (cols - 1) * colGap + cardW;
@@ -572,22 +711,15 @@ export class StorePanel extends Phaser.GameObjects.Container {
 
     const blockMidX = hero ? left + HERO_W + HERO_GAP + blockW / 2 : 0;
     const rows = Math.ceil(rest.length / cols);
-    // Short sections stay optically centred; a section that overflows starts at
-    // the top of the window instead, because a centred overflow hides its first
-    // row as well as its last. Either way it pays AIR at the top and bottom —
-    // the window is the plate's whole inner floor now, so the margin has to
-    // come from the layout rather than from leaving the window short.
     const contentH = (rows - 1) * ROW_GAP + CARD_H;
     const startY =
       contentH <= VIEW_H - 2 * AIR
         ? -((rows - 1) * ROW_GAP) / 2
         : -VIEW_H / 2 + AIR + CARD_H / 2;
     this.maxScroll = Math.max(0, contentH + 2 * AIR - VIEW_H);
-    // Every row starts at the block's left edge — the BLOCK is centred, the
-    // rows inside it are a grid. A short final row therefore leaves its gap on
-    // the right rather than re-centring itself, so columns line up top to
-    // bottom and a lone last item sits under the first column, not adrift in
-    // the middle.
+    // Every row starts at the block's left edge — the BLOCK is centred, the rows
+    // inside it are a grid. A short final row therefore leaves its gap on the
+    // right rather than re-centring itself.
     const colStartX = blockMidX - ((cols - 1) * colGap) / 2;
     rest.forEach((item, i) => {
       const col = i % cols;
@@ -676,13 +808,13 @@ export class StorePanel extends Phaser.GameObjects.Container {
     const ribbon = this.scene.add.container(0, y);
     const label = this.scene.add
       .text(0, 0, look.label, {
-        fontFamily: FONT.ui, fontSize: '22px', fontStyle: 'bold', color: look.ink
+        fontFamily: FONT.ui, fontSize: `${px(22)}px`, fontStyle: 'bold', color: look.ink
       })
       .setLetterSpacing(4)
       .setOrigin(0.5)
       .setShadow(0, 2, 'rgba(36,27,34,0.5)', 3);
-    const w = label.width + 58;
-    const h = 44;
+    const w = label.width + px(58);
+    const h = px(44);
     const g = this.scene.add.graphics();
     g.fillStyle(num(INK.scrim), 0.45);
     g.fillRoundedRect(-w / 2, -h / 2 + 5, w, h, h / 2);
@@ -854,10 +986,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
     card.add(plate.rim);
     this.sheens.push(runSheen(this.scene, plate.sheen));
 
-    if (item.rarity) card.add(this.makeRibbon(item.rarity, -HERO_H / 2 + 46));
+    if (item.rarity) card.add(this.makeRibbon(item.rarity, -HERO_H / 2 + px(46)));
     const name = this.scene.add
       .text(0, HERO_NAME_Y, item.name, {
-        fontFamily: FONT.ui, fontSize: '46px', fontStyle: 'bold', color: INK.onField,
+        fontFamily: FONT.ui, fontSize: `${px(46)}px`, fontStyle: 'bold', color: INK.onField,
         align: 'center', wordWrap: { width: inner.w - 72 }
       })
       .setOrigin(0.5)
@@ -875,7 +1007,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
       .setShadow(0, 3, 'rgba(36,27,34,0.7)', 5);
     this.fitBlurb(blurb, HERO_ACTION_TOP - blurbTop - BLURB_FOOT);
     card.add(blurb);
-    if (this.isLocked(item)) this.addLockOverlay(card, art, -HERO_H * 0.16, 132);
+    if (this.isLocked(item)) this.addLockOverlay(card, art, -HERO_H * 0.16, px(132));
     card.add(
       this.makeAction(item, section, owned, worn, HERO_ACTION_Y, HERO_ACTION_SCALE, HERO_ACTION_FONT)
     );
@@ -963,8 +1095,14 @@ export class StorePanel extends Phaser.GameObjects.Container {
         // under it could have three lines instead of one and a half. A stage
         // that fills the card and a blurb nobody can finish reading is the
         // wrong trade on a shelf whose whole job is to describe things.
-        art = this.scene.add.image(0, -114, item.art);
-        art.setScale(Math.min(300 / art.width, 140 / art.height));
+        // The stage is a fraction of the CARD, not a fixed rectangle: the
+        // portrait card is 2.7x taller and an art box tuned for the landscape
+        // one would float a thumbnail in the middle of it.
+        const stageY = IS_MOBILE ? -325 : -114;
+        const stageW = IS_MOBILE ? 760 : 300;
+        const stageH = IS_MOBILE ? 360 : 140;
+        art = this.scene.add.image(0, stageY, item.art);
+        art.setScale(Math.min(stageW / art.width, stageH / art.height));
         card.add(art);
       }
     }
@@ -976,14 +1114,14 @@ export class StorePanel extends Phaser.GameObjects.Container {
       this.sheens.push(runSheen(this.scene, sheen, this.sheens.length * 900));
     }
     if (rim) card.add(rim);
-    if (item.rarity) card.add(this.makeRibbon(item.rarity, -CARD_H / 2 + 8));
+    if (item.rarity) card.add(this.makeRibbon(item.rarity, -CARD_H / 2 + px(8)));
 
     // A BLED card's name has to stay on its scrim; a PLAIN card's has only the
     // picture above it, so it rides higher and hands the slack to the blurb.
     const nameY = bleed ? NAME_Y : PLAIN_NAME_Y;
     const name = this.scene.add
       .text(0, nameY, item.name, {
-        fontFamily: FONT.ui, fontSize: '32px', fontStyle: 'bold',
+        fontFamily: FONT.ui, fontSize: `${px(32)}px`, fontStyle: 'bold',
         color: INK.onField,
         align: 'center', wordWrap: { width: w - 56 }
       })
@@ -1005,7 +1143,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
     if (bleed) blurb.setShadow(0, 3, 'rgba(36,27,34,0.7)', 5);
     this.fitBlurb(blurb, ACTION_TOP - blurbTop - BLURB_FOOT);
     card.add(blurb);
-    if (this.isLocked(item)) this.addLockOverlay(card, art, bleed ? -60 : -114, 88);
+    if (this.isLocked(item)) this.addLockOverlay(card, art, bleed ? px(-60) : (IS_MOBILE ? -325 : -114), px(88));
     card.add(this.makeAction(item, section, owned, worn, ACTION_Y, ACTION_SCALE, ACTION_FONT));
     return card;
   }

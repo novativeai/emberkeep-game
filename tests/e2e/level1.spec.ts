@@ -579,9 +579,12 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
       return item ? `${item.chain}:${item.tier}` : 'none';
     });
     expect(skipTarget).toBe('lumber:4'); // the roof tap raised the MANOR's popup
-    // Pay with Warmth via the popup's real ⚡ button (game offset
-    // +SKIP_KEYS.dx,+100 → CSS ÷2).
-    await page.mouse.click(housePage.x + 46, housePage.y + 50);
+    // Pay with Warmth via the popup's real ⚡ key. Its position is ASKED FOR
+    // rather than computed: the offer is a hanging pin now, stacked and seated
+    // off the art's own height, so no fixed offset off the tile can find it.
+    const warmthKey = await page.evaluate(() => window.__emberkeep.skipKeyToPage('warmth'));
+    expect(warmthKey, 'the generator popup should be up').not.toBeNull();
+    await page.mouse.click(warmthKey!.x, warmthKey!.y);
     await page.waitForTimeout(500);
     if ((await gameText(page)).tutorial.step !== 'buy_energy') {
       // Flake fallback (software rendering): perform the skip via a direct emit.

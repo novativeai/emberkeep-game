@@ -658,6 +658,8 @@ export class BoardScene extends Phaser.Scene {
       this.aurora = undefined;
       this.snow?.destroy();
       this.snow = undefined;
+      this.snowFlakes?.destroy();
+      this.snowFlakes = undefined;
     });
 
     // The board this world needs is now built and holding its own textures, so
@@ -715,6 +717,9 @@ export class BoardScene extends Phaser.Scene {
     if (this.aurora) this.aurora.setTier(cappedTier(this.aurora.currentTier, ceiling));
     this.snow?.setPowerState(state);
     if (this.snow) this.snow.setTier(cappedTier(this.snow.currentTier, ceiling));
+    // Flakes stop being emitted on doze but the ones in the air finish falling —
+    // a sky that empties is gentler than one that blinks out.
+    if (this.snowFlakes) this.snowFlakes.emitting = !doze;
   }
 
   /**
@@ -726,11 +731,14 @@ export class BoardScene extends Phaser.Scene {
    * world but Borealis today.
    */
   private buildWeather(): void {
-    // Weather is the first thing a weak device gives up: two full-screen shader
-    // passes buy atmosphere, not playability.
-    if (!graphics.profile.weather) return;
     const spec = (weatherJson as WeatherFile).worlds?.[this.ctx.state.worldId];
     if (!spec) return;
+    // FLAKES FIRST, and outside the profile gate on purpose — see below. The
+    // shader is the atmosphere; these are the weather you can actually see.
+    if (spec.snow) this.buildSnowFlakes();
+    // The shader passes are the first thing a weak device gives up: two
+    // full-screen passes buy atmosphere, not playability.
+    if (!graphics.profile.weather) return;
     const now = (): number => this.ctx.clock.now();
     const state = (this.power?.state ?? 'active') as PowerState;
 
@@ -756,6 +764,52 @@ export class BoardScene extends Phaser.Scene {
       this.snow.setPowerState(state);
     }
   }
+
+  /**
+   * REAL FLAKES — because the shader is allowed to not be there.
+   *
+   * The drifting snow is a full-screen shader quad, and it can silently fail to
+   * exist in two ways: the `low` graphics profile turns weather off outright,
+   * and `ensureSnowPipeline` returns false whenever the pipeline will not
+   * register (an old driver, a lost context). Both paths left Borealis with a
+   * clear sky and no fallback — which is the "sometimes there is no snow" of it.
+   * The world is CALLED Borealis; its weather is not decoration it can lose.
+   *
+   * Particles need no pipeline and no shader, so this layer always exists where
+   * the world declares snow. It is also the thing that was missing visually:
+   * the shader draws a fine drift, and a fine drift reads as film grain. These
+   * are flakes — few, large enough to see, and falling on a slant.
+   *
+   * `scrollFactor 0`, like the shader: weather is not in the world, so it must
+   * not slide when the board pans.
+   */
+  private buildSnowFlakes(): void {
+    const density = graphics.profile.ambient; // 1 / 0.6 / 0.25 by tier
+    if (density <= 0) return;
+    this.snowFlakes = this.add
+      .particles(0, -60, 'fx_glow', {
+        x: { min: -80, max: LIVE_GAME_WIDTH + 80 },
+        // Slow, and spread over a wide band of speeds: flakes at one speed read
+        // as a moving texture rather than as falling snow.
+        speedY: { min: 55, max: 150 },
+        speedX: { min: -34, max: 12 }, // the same slant the shader's wind takes
+        lifespan: { min: 9000, max: 15000 },
+        scale: { min: 0.03, max: 0.085 },
+        alpha: { min: 0.35, max: 0.8 },
+        rotate: { min: 0, max: 360 },
+        frequency: Math.round(150 / density),
+        tint: 0xecf6ff,
+        blendMode: Phaser.BlendModes.NORMAL
+      })
+      .setDepth(DEPTHS.weather + 1)
+      .setScrollFactor(0);
+    // Start mid-storm rather than with an empty sky that fills over 15 seconds.
+    this.snowFlakes.fastForward(9000, 16);
+  }
+
+  /** Borealis's flakes. Held apart from `snow` (the shader) because they
+   *  survive the shader being unavailable — which is the whole point of them. */
+  private snowFlakes?: Phaser.GameObjects.Particles.ParticleEmitter;
 
   /**
    * Place the authored world emitters (src/data/emitters.json, written by the
@@ -811,6 +865,16 @@ export class BoardScene extends Phaser.Scene {
    */
   override update(time: number, delta: number): void {
     guard('board.update', () => this.stepBoard(time, delta), undefined);
+    // ITS OWN GUARDED STEP, and not the last line of `stepBoard`.
+    //
+    // `guard` catches and records rather than letting a throw end Phaser's RAF
+    // chain — which is right — but it also means everything AFTER the throw in
+    // that callback stops running, every frame, in silence. The hint tick sat
+    // at the bottom of a two-hundred-line step behind bobs, breathing, the
+    // crystal readback and every cooldown pill: any one of them failing took
+    // the hint with it and nothing on screen said so. A subsystem that has to
+    // keep working when the rest degrades gets its own guard.
+    guard('board.hint', () => this.tickMergeHint(delta), undefined);
   }
 
   private stepBoard(time: number, delta: number): void {
@@ -921,7 +985,6 @@ export class BoardScene extends Phaser.Scene {
       }
     }
 
-    this.tickMergeHint(delta);
 
     this.regenAccum += delta;
     if (this.regenAccum >= 500) {
@@ -966,7 +1029,18 @@ export class BoardScene extends Phaser.Scene {
       isActive: (col, row) => state.isTileActive(col, row),
       itemIdAt: (col, row) => state.itemIdAt(col, row),
       neighbors: (col, row) => state.neighbors(col, row),
-      zoneOf: (col, row) => zoneAt(state.world, col, row)?.id
+      zoneOf: (col, row) => zoneAt(state.world, col, row)?.id,
+      // REAL distance, in world units. The planner ranks candidate gathers by
+      // how far the player has to swipe, and now that a gather may cross from
+      // one slab to another, `|Δcol|` is a number about nothing: index blocks
+      // sit side by side with gutters, so two cells five columns apart can be
+      // on different islands. `worldPointOf` projects PER ZONE, which is the
+      // only projection that means anything here.
+      distance: (a, b) => {
+        const pa = worldPointOf(state.world, a.col, a.row);
+        const pb = worldPointOf(state.world, b.col, b.row);
+        return (pa.x - pb.x) ** 2 + (pa.y - pb.y) ** 2;
+      }
     };
   }
 
@@ -992,7 +1066,19 @@ export class BoardScene extends Phaser.Scene {
    * can hand the player two gestures at once.
    */
   private tickMergeHint(delta: number): void {
-    if (!this.tutorialDone || this.dragSprite) {
+    // A LESSON, not a FLAG. The gate used to be `tutorialDone`, which reads as
+    // "has the player ever finished the walkthrough" — and the answer is no for
+    // anyone who left the isle early (the ruby teleport drops you in Roothold
+    // mid-tutorial), so the hint was switched off for the whole rest of that
+    // save, in every world. What the gate actually wants to know is whether a
+    // beat is on screen competing with it, and a beat can only be on screen in
+    // the world the walkthrough is authored for.
+    const lessonRunning = !this.tutorialDone && this.ctx.state.worldId === WORLD_ID;
+    // A drag that ended without its pointerup — a crossing mid-drag, a pointer
+    // lost off the canvas — used to hold this closed for the session. If the
+    // sprite it names is gone, the drag is over whatever the field says.
+    if (this.dragSprite && !this.itemSprites.has(this.dragSprite.itemId)) this.dragSprite = null;
+    if (lessonRunning || this.dragSprite) {
       this.hintIdleMs = 0;
       this.takeBackHint();
       return;
@@ -1075,6 +1161,51 @@ export class BoardScene extends Phaser.Scene {
     this.hintFollowUp =
       !!asked && asked.itemId === itemId && asked.to.col === to.col && asked.to.row === to.row;
     this.hintIdleMs = 0;
+  }
+
+  /**
+   * THE HINT FOLLOWS THE PIECE — the same law the tutorial's pointer lives by.
+   *
+   * `hint:merge` carries CELLS, and they were resolved once when the hand went
+   * up. Move the piece it is pointing at and the hand went on pointing at bare
+   * ground; the plan behind it might not even be legal any more. The tutorial
+   * got this fixed (`tutorial:markers` re-aims on every board change) but the
+   * HINT did not — and the hint is what speaks in every world once the lesson
+   * is over, which is why it read as "the smart pointer works on the isle and
+   * not in Roothold". It was never about the world. It was about which of the
+   * two systems happened to be talking.
+   *
+   * So: re-plan on any board change while a hand is up, and re-aim if the
+   * answer moved. Silent when the plan is unchanged — an identical re-emit
+   * would restart the hand's travel tween every time anything on the board
+   * twitched.
+   */
+  private refreshHint(): void {
+    if (!this.hintShown) return;
+    const plan = nextMergePlan(this.ctx.state.items.values(), this.ctx.data.chains, this.hintBoard());
+    const step = plan?.steps[0];
+    const from = step ? this.ctx.state.items.get(step.itemId) : undefined;
+    if (!step || !from) {
+      // Nothing left to suggest (the player just merged it, or the board moved
+      // out from under the plan). Take the hand back rather than leave it
+      // pointing at a fusion that can no longer happen.
+      this.takeBackHint();
+      this.hintIdleMs = 0;
+      return;
+    }
+    const same =
+      step.itemId === this.hintShown.itemId &&
+      step.to.col === this.hintShown.to.col &&
+      step.to.row === this.hintShown.to.row;
+    if (same) return;
+    this.hintShown = step;
+    this.hintAsked = step;
+    this.bounceHintPiece(from.id);
+    this.markHintTarget(step);
+    this.ctx.bus.emit('hint:merge', {
+      from: { col: from.col, row: from.row },
+      to: { col: step.to.col, row: step.to.row }
+    });
   }
 
   /**
@@ -2016,6 +2147,13 @@ export class BoardScene extends Phaser.Scene {
     // wing is wearing what it will land in.
     ld.sleepState = 'none';
     this.restoreStandingArt(ld);
+    // ASK FOR THE WINGS. On a handset the eager wave is the idle alone, so the
+    // fly sheet is not resident the first time an animal takes off — and with
+    // the rigs off there is no puppet to cover for it, only the glide the
+    // fallback below falls back to. This is the same on-demand fetch the roar
+    // and the sleep curl use: the first flight glides, every one after it has
+    // wings, and a session whose dragons never fly never pays for them at all.
+    this.ensureMoodClip(ld, 'fly');
     const f = this.flySegments(ld);
     if (!f) {
       // No phased clip: the whole-loop overlay, else the rig's hover preset
@@ -6252,7 +6390,11 @@ export class BoardScene extends Phaser.Scene {
     // Harvest ✋) duplicated verbs that already exist — work is the drag onto a
     // House the tutorial teaches, harvest is the tap itself — at the price of a
     // second UI language for one item kind. Only the status readout stays.
-    if (DRAGON_RIGS[item.chain] && isGenerator && (this.tutorialDone || this.allow.dragonWork)) {
+    // `DRAGON_RIGS[item.chain]` used to answer "is this a dragon"; the table is
+    // EMPTY now that every breed is clip-animated, so that test went silently
+    // false and a tapped dragon stopped showing its status readout. The clip
+    // catalog is the register of breeds — the same source `wearsRigTier` reads.
+    if (this.clipCharacterFor(item.chain, item.tier) && isGenerator && (this.tutorialDone || this.allow.dragonWork)) {
       this.selectSubject('dragon', String(item.id), false);
     }
     // A SLEEPING dragon is not a button. The tap wakes it — and only wakes it:
@@ -6452,34 +6594,96 @@ export class BoardScene extends Phaser.Scene {
     this.hideSkipButton();
     this.ctx.bus.emit('ui:skip_offered', { itemId: sprite.itemId });
     this.skipMaxGold = maxGold; // per-generator gold cap (Crystal emeralds are dear)
-    const btn = this.add.container(sprite.x, sprite.y + 100).setDepth(DEPTHS.dragged - 1);
-    // Caption shown on hover, telling the player which payment a button uses.
+
+    /*
+     * THE OFFER IS A PIN, NOT A PAIR OF KEYS ON THE FLOOR.
+     *
+     * They used to sit side by side BELOW the piece — 184 units wide, over the
+     * tile in front of it, which is the tile the player is usually trying to
+     * see (and, on a crowded board, over the next piece down). Two wide keys
+     * under an object also read as part of the ground rather than as an answer
+     * to the tap that just happened.
+     *
+     * So it takes the shape the Roothold storefront already taught: a rounded
+     * plate on a spike, hanging just ABOVE the thing it belongs to, with the
+     * verbs stacked in a tight column inside it. A column, because two stacked
+     * keys are half the width of two side by side — the pin covers the roof it
+     * points at and nothing else — and because a thumb picks one of two rows
+     * far more reliably than one of two columns.
+     */
+    const KEY_W = 206;
+    const KEY_H = 70;
+    const ROW_GAP = 10;
+    const PAD_X = 22;
+    const PAD_Y = 18;
+    const bodyW = KEY_W + PAD_X * 2;
+    const bodyH = KEY_H * 2 + ROW_GAP + PAD_Y * 2;
+    const SPIKE = 30;
+    // Seated so the spike's tip lands just over the art's crown: `sprite.y` is
+    // the tile origin and the piece stands on it, so the pin hangs off the top
+    // of the ART rather than a fixed offset that would sink into a tall House.
+    const lift = Math.max(150, sprite.artHitRect().height * 0.62);
+    const btn = this.add
+      .container(sprite.x, sprite.y - lift - bodyH / 2)
+      .setDepth(DEPTHS.dragged - 1);
+
+    const plate = this.add.graphics();
+    // A CREAM plate, not the night one.
+    //
+    // Night was borrowed from the Roothold sign, and a sign is a thing you
+    // read from across a hillside: dark and lit. This is a thing you read from
+    // ten centimetres away with two green keys on it, and against dark plum the
+    // keys were the only light in the object — the plate read as a hole the
+    // buttons floated in. Cream puts the light in the plate and lets the keys be
+    // the coloured thing on it, which is the same order every other panel in
+    // the game uses.
+    plate.fillStyle(num(PALETTE.goldShade), 1); // seat, one step down
+    plate.fillRoundedRect(-bodyW / 2, -bodyH / 2 + 6, bodyW, bodyH, 30);
+    plate.fillStyle(num(PALETTE.cream), 1);
+    plate.fillRoundedRect(-bodyW / 2, -bodyH / 2, bodyW, bodyH, 30);
+    // The spike is drawn BEFORE the rim and inside the same path family, so the
+    // gold reads as one moulding around plate and point rather than a badge
+    // with a triangle stuck under it.
+    plate.fillStyle(num(PALETTE.cream), 1);
+    plate.fillTriangle(-22, bodyH / 2 - 2, 22, bodyH / 2 - 2, 0, bodyH / 2 + SPIKE);
+    plate.lineStyle(6, num(PALETTE.gold), 1);
+    plate.strokeRoundedRect(-bodyW / 2, -bodyH / 2, bodyW, bodyH, 30);
+    btn.add(plate);
+
+    // Caption shown on hover, telling the player which payment a row uses. It
+    // sits ABOVE the pin — inside it there is no room, and below it is the
+    // spike and the piece.
     const caption = this.add
-      .text(0, -58, '', {
+      .text(0, -bodyH / 2 - 34, '', {
         fontFamily: FONT,
         fontSize: '28px',
         fontStyle: 'bold',
         color: '#fff6e0',
         stroke: '#241b22',
         strokeThickness: 5,
-        backgroundColor: 'rgba(28,20,26,0.78)',
+        backgroundColor: 'rgba(28,20,26,0.82)',
         padding: { x: 12, y: 5 }
       })
       .setOrigin(0.5)
       .setVisible(false);
+
+    const rowY = (i: number): number => -bodyH / 2 + PAD_Y + KEY_H / 2 + i * (KEY_H + ROW_GAP);
     const make = (
-      dx: number,
+      row: number,
       currency: 'gold' | 'warmth',
       method: string,
       text: string
     ): Phaser.GameObjects.Text => {
+      const dy = rowY(row);
       // BOTH keys are the green plate. They are one offer in two currencies —
       // pay the timer with gold, or pay it with warmth — so ranking one above
       // the other with a different plate said something untrue about them. The
       // difference the player needs is the icon and the number, not the colour.
-      const bg = this.add.image(dx, 0, 'ui_btn_green').setScale(SKIP_KEYS.scaleX, SKIP_KEYS.scaleY);
+      const bg = this.add
+        .image(0, dy, 'ui_btn_green')
+        .setDisplaySize(KEY_W, KEY_H);
       const label = this.add
-        .text(dx, -2, text, {
+        .text(0, dy - 2, text, {
           fontFamily: 'Segoe UI, sans-serif',
           fontSize: `${SKIP_KEYS.fontPx}px`,
           fontStyle: 'bold',
@@ -6489,7 +6693,7 @@ export class BoardScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
       bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerover', () => caption.setText(method).setX(dx).setVisible(true));
+      bg.on('pointerover', () => caption.setText(method).setVisible(true));
       bg.on('pointerout', () => caption.setVisible(false));
       bg.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
         ev.stopPropagation();
@@ -6499,36 +6703,103 @@ export class BoardScene extends Phaser.Scene {
       btn.add([bg, label]);
       return label;
     };
-    // The gold button wears the REAL coin art (the 🪙 emoji read as a generic
+    // The gold row wears the REAL coin art (the 🪙 emoji read as a generic
     // token); the label carries only the price and sits right of the icon.
-    const keyX = SKIP_KEYS.dx;
-    this.skipGoldLabel = make(-keyX, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
-    this.skipGoldLabel.setX(-keyX + SKIP_KEYS.labelDx);
+    this.skipGoldLabel = make(0, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
+    this.skipGoldLabel.setX(SKIP_KEYS.labelDx);
     btn.add(
       this.add
-        .image(-keyX + SKIP_KEYS.coinDx, -2, 'item_coin_1')
+        .image(SKIP_KEYS.coinDx, rowY(0) - 2, 'item_coin_1')
         .setScale(plateScale('item_coin_1', 0.086))
     );
-    this.skipWarmthLabel = make(keyX, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
-    btn.add(caption); // on top of the buttons
-    // Tutorial: bounce an arrow over the WARMTH (⚡) skip so the player learns to
-    // pay the House's timer with energy (and watches their Warmth drop).
+    this.skipWarmthLabel = make(1, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
+    btn.add(caption); // on top of the keys
+    // Tutorial: bounce an arrow over the WARMTH (⚡) row so the player learns to
+    // pay the House's timer with energy (and watches their Warmth drop). It
+    // points at the row from the LEFT now that the keys are stacked — an arrow
+    // above the second row would sit on the first one.
     if (this.tutorialStepId === 'house_skip') {
-      // Small bounce hint over the ⚡ skip. Scaled to a ~74px height off the real
-      // arrow art (222×400) — the down-pointing tip reads clearly at this size.
-      const hint = this.add.image(keyX, -46, 'ui_arrow').setScale(0.16);
+      const hint = this.add
+        .image(-bodyW / 2 - 46, rowY(1), 'ui_arrow')
+        .setScale(0.16)
+        .setAngle(-90);
       btn.add(hint);
       this.tweens.add({
         targets: hint,
-        y: -34,
+        x: -bodyW / 2 - 30,
         duration: 420,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.easeInOut'
       });
     }
+    // A pin ARRIVES: it pops from the spike's tip, which is the point it is
+    // about, rather than fading in over the roof.
+    btn.setScale(0.7).setAlpha(0);
+    this.tweens.add({ targets: btn, scale: 1, alpha: 1, duration: 170, ease: 'Back.easeOut' });
+    // AND BRING IT INTO VIEW. A tap near the edge of the frame raises a pin
+    // that hangs ABOVE the piece — which is exactly the direction the screen
+    // runs out. The same rule every other pointer in this scene follows: what
+    // the game asks the player to look at, the camera shows them. Aimed at the
+    // pin's own top edge, not the piece, because the pin is the new thing.
+    this.bringIntoView({ x: btn.x, y: btn.y - bodyH / 2 });
     this.skipButton = btn;
     this.skipForId = sprite.itemId;
+  }
+
+  /**
+   * WHY IS THERE NO HAND? — the whole gate, in one object.
+   *
+   * Three separate things can hold the merge hint shut (a lesson on screen, a
+   * drag in progress, the idle clock) and a fourth can refuse it after the fact
+   * (UIScene's hand owner), and NONE of them look different from "there is
+   * simply nothing worth suggesting". That is why this bug survived two
+   * confident fixes: every wrong theory and the truth produce the same empty
+   * screen. So the gate reports itself, and the next question is answered by
+   * reading rather than guessing:
+   *
+   *     window.__emberkeep.hint()
+   *
+   * `plan` is the honest one — if it is null the board genuinely has no legal
+   * gather to suggest, and no amount of fixing the plumbing will draw a hand.
+   */
+  hintDiagnostics(): {
+    world: string;
+    tutorialDone: boolean;
+    lessonRunning: boolean;
+    dragging: boolean;
+    idleMs: number;
+    waitMs: number;
+    showing: boolean;
+    plan: { chain: string; tier: number; moves: number } | null;
+    items: number;
+  } {
+    const lessonRunning = !this.tutorialDone && this.ctx.state.worldId === WORLD_ID;
+    const plan = nextMergePlan(this.ctx.state.items.values(), this.ctx.data.chains, this.hintBoard());
+    return {
+      world: this.ctx.state.worldId,
+      tutorialDone: this.tutorialDone,
+      lessonRunning,
+      dragging: !!this.dragSprite,
+      idleMs: Math.round(this.hintIdleMs),
+      waitMs: this.hintFollowUp ? MERGE_HINT.followUpMs : MERGE_HINT.idleMs,
+      showing: !!this.hintShown,
+      plan: plan ? { chain: plan.chain, tier: plan.tier, moves: plan.steps.length } : null,
+      items: this.ctx.state.items.size
+    };
+  }
+
+  /**
+   * The world point of one of the popup's keys — the instrumentation contract's
+   * answer to a pin whose offset is no longer a constant (see main.ts). Null
+   * whenever no offer is up.
+   */
+  skipKeyWorldPoint(currency: 'gold' | 'warmth'): { x: number; y: number } | null {
+    const label = currency === 'gold' ? this.skipGoldLabel : this.skipWarmthLabel;
+    if (!this.skipButton || !label) return null;
+    // The label rides the row; its x is nudged for the coin, so the ROW's
+    // centre is the honest target and that is the container's own x.
+    return { x: this.skipButton.x, y: this.skipButton.y + label.y };
   }
 
   /** Keep both skip prices in step as the timer drains. */
@@ -6949,10 +7220,18 @@ export class BoardScene extends Phaser.Scene {
         else if (this.goldenQuestDone()) this.lateGoldenAwakening();
         else this.showAltarEgg(true);
       }),
+      // Spawns, removals and merges all change what the best plan IS — a hand
+      // left pointing through them is the same stale-pointer bug in a different
+      // costume. `refreshHint` is a no-op when no hand is up.
+      bus.on('item:spawned', () => this.refreshHint()),
+      bus.on('item:removed', () => this.refreshHint()),
       bus.on('item:moved', ({ itemId, to }) => {
         // A landed move is the answer to the hand's question: if it is the move
         // that was asked for, the next step of the plan comes straight back.
         this.notePlayerMove(itemId, to);
+        // …and if it was any OTHER move, the hand re-aims at where the plan
+        // lives now instead of pointing at the cell the piece has left.
+        this.refreshHint();
         const sprite = this.itemSprites.get(itemId);
         if (!sprite) return;
         sprite.col = to.col;

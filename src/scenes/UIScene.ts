@@ -6,27 +6,28 @@ import {
   FINALE,
   FIRST_CONTACT,
   FIRST_CONTACT_RETRY_MS,
-  LIVE_GAME_WIDTH,
   GOLDEN_ALTAR,
-  IS_MOBILE,
-  STORY_BEAT_HOLD_MS,
-  TRAVEL_WIPE,
   GOLDEN_TREMBLE_PROGRESS,
   HUD_COLUMN_ICON,
   HUD_COLUMN_PLATE,
   HUD_COLUMN_X,
   hudColumnY,
+  IS_MOBILE,
   LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
   MAP_EDITOR_IN_SETTINGS,
   num,
-  PALETTE,
   OPENING_HOLD_MS,
+  PALETTE,
   SCENES,
+  STORY_BEAT_HOLD_MS,
   TILE_W,
   TIMINGS,
   TRAVEL_VEIL_TIMEOUT_MS,
+  TRAVEL_WIPE,
   UI_SCALE,
-  WELCOME_BACK_MIN_MS
+  WELCOME_BACK_MIN_MS,
+  WORLD_ID
 } from '../core/Constants';
 import { FONT } from '../art/design';
 import { guard } from '../core/crash';
@@ -167,6 +168,21 @@ export class UIScene extends Phaser.Scene {
   /** True while the HAND is showing an idle merge hint rather than a tutorial
    *  beat — so the hint only ever takes back what the hint put there. */
   private hintHand = false;
+  /**
+   * WHO IS HOLDING THE HAND — stated, not inferred.
+   *
+   * It used to be deduced: "the hand is visible and `hintHand` is false, so the
+   * tutorial must own it". That reading has no way back. Anything that raised
+   * the hand without setting one of the two flags — a lesson that ended without
+   * clearing, a beat interrupted by a crossing — left `visible` true with no
+   * claimant, and from that moment `hint:merge` was refused for the rest of the
+   * session, in every world. Which is exactly the shape of the bug: the merge
+   * hint stopped appearing in Borealis AND on the isle you came back to.
+   *
+   * An owner is a fact. `placeHand` records one, `clearMarkers` clears it, and
+   * the hint asks a question with an answer instead of guessing from a pixel.
+   */
+  private handOwner: 'tutorial' | 'hint' | 'carry' | null = null;
   /** The carry lesson holds the hand until the thing has been carried — see
    *  `hint:carry`. Kept apart from `hintHand` so the idle merge suggestion
    *  cannot take the hand out from under a lesson in progress. */
@@ -721,7 +737,7 @@ export class UIScene extends Phaser.Scene {
         // being torn down. Clearing markers with nothing to clear is free.
         this.hintHand = false;
         this.carryHand = false;
-        this.clearMarkers();
+        this.clearMarkers(); // also releases `handOwner`
       }),
       // The idle merge hint. UIScene owns the hand, so it — not the board —
       // is what decides the hand is free: the tutorial's own gestures always
@@ -733,11 +749,16 @@ export class UIScene extends Phaser.Scene {
           this.clearMarkers();
           return;
         }
-        if (this.hand.visible && !this.hintHand) return; // the tutorial is using it
-        if (!this.ctx.state.tutorialDone) return;
-        if (this.carryHand) return; // a lesson outranks an idle suggestion
+        // A LESSON outranks an idle suggestion; nothing else does. The old test
+        // asked whether the hand was visible, which is why an ownerless hand
+        // silenced the hint forever.
+        if (this.handOwner === 'tutorial' || this.handOwner === 'carry') return;
+        // Same rule the board's tick uses: a beat can only be on screen in the
+        // world the walkthrough is authored for, so `tutorialDone` alone was
+        // silencing the hint for every save that left the isle early.
+        if (!this.ctx.state.tutorialDone && this.ctx.state.worldId === WORLD_ID) return;
         this.hintHand = true;
-        this.placeHand({ from: hint.from, to: hint.to });
+        this.placeHand({ from: hint.from, to: hint.to }, 'hint');
       }),
       // The carry lesson — "pick it up and take it THERE". Outranks the idle
       // merge hint while it is up: the hint is a suggestion the player may
@@ -751,10 +772,10 @@ export class UIScene extends Phaser.Scene {
           return;
         }
         if (!this.ctx.state.tutorialDone) return;
-        if (this.hand.visible && !this.hintHand && !this.carryHand) return; // the tutorial owns it
+        if (this.handOwner === 'tutorial') return; // only a beat outranks a lesson
         this.carryHand = true;
         this.hintHand = false;
-        this.placeHand({ from: lesson.from, to: lesson.to });
+        this.placeHand({ from: lesson.from, to: lesson.to }, 'carry');
       })
     );
   }
@@ -1982,6 +2003,7 @@ export class UIScene extends Phaser.Scene {
     this.handPoint = null;
     this.arrowAnchor = null;
     this.hintHand = false;
+    this.handOwner = null;
   }
 
   /** Register a looping marker tween-chain so clearMarkers() can destroy it.
@@ -2157,7 +2179,8 @@ export class UIScene extends Phaser.Scene {
     return { x: sx / tiles.length, y: sy / tiles.length - 52 };
   }
 
-  private placeHand(hand: ResolvedHand): void {
+  private placeHand(hand: ResolvedHand, owner: 'tutorial' | 'hint' | 'carry' = 'tutorial'): void {
+    this.handOwner = owner;
     if ('from' in hand) {
       // Drag gesture: store the from/to CELLS and drive a 0→1 progress proxy;
       // update() lerps the live re-projected cell positions so the hand follows

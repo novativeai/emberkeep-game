@@ -1,6 +1,14 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { chainHiddenIn, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale, PALETTE } from '../core/Constants';
+import {
+  chainHiddenIn,
+  LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
+  num,
+  PALETTE,
+  panelMobileScale,
+  TAP_SCALE
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import { reachableRecipeKeys, type AuditData } from '../core/availability';
@@ -166,7 +174,11 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: PALETTE.goldAccent })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
-    closeButton.setSize(96, 96);
+    // A THUMB, NOT A CURSOR. 96 units of hit box is ~15 real pixels on a
+    // handset — well under the 44px every platform asks for — so in portrait
+    // the whole disc steps up by `TAP_SCALE`. `1` on desktop, where the seat
+    // inside the plate's corner was measured and must not move.
+    closeButton.setSize(96, 96).setScale(TAP_SCALE);
     closeButton.setInteractive({ useHandCursor: true });
     closeButton.on('pointerup', () => this.requestClose());
     this.add(closeButton);

@@ -1,6 +1,13 @@
 import Phaser from 'phaser';
 import { FONT, INK } from '../art/design';
-import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
+import {
+  LIVE_GAME_HEIGHT,
+  LIVE_GAME_WIDTH,
+  num,
+  panelMobileScale,
+  px,
+  TAP_SCALE
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { speakerName } from '../entities/CharacterBubble';
 import { discTextureFor } from '../entities/PortraitAnimator';
@@ -176,7 +183,11 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     closeButton.add([closeBg, closeX]);
-    closeButton.setSize(96, 96);
+    // A THUMB, NOT A CURSOR. 96 units of hit box is ~15 real pixels on a
+    // handset — well under the 44px every platform asks for — so in portrait
+    // the whole disc steps up by `TAP_SCALE`. `1` on desktop, where the seat
+    // inside the plate's corner was measured and must not move.
+    closeButton.setSize(96, 96).setScale(TAP_SCALE);
     closeButton.setInteractive({ useHandCursor: true });
     closeButton.on('pointerup', () => this.requestClose());
 
@@ -192,7 +203,10 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     this.blurb = scene.add
       .text(0, 440, '', {
         fontFamily: FONT.ui,
-        fontSize: '30px',
+        // Stepped into the portrait space: at a flat 30 this line lands at
+        // 4.6 real pixels on a handset, which is the whole reason the order's
+        // own words were unreadable there.
+        fontSize: `${px(30)}px`,
         fontStyle: 'bold italic',
         color: INK.onField,
         align: 'center',
