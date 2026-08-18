@@ -33,11 +33,17 @@ import type { BoardItemState, ChainConfig, ChainsData, TilePos } from './types';
  * nothing if it can only be checked by looking at a screenshot. The unit tests
  * hand it a fixture; BoardScene hands it `GameState` + `world.ts`.
  *
- * `neighbors` and `zoneOf` are the two that matter. A merge is an
- * ORTHOGONALLY-CONNECTED flood (MergeSystem.collectGroup) and adjacency never
- * leaves a zone (world.ts `neighborsOf`), so three pieces in two zones cannot
- * be merged by any gesture at all — a fact the hint has to know before it
- * points at them.
+ * `neighbors` is the one that matters. A merge is an ORTHOGONALLY-CONNECTED
+ * flood (MergeSystem.collectGroup) and adjacency never leaves a zone (world.ts
+ * `neighborsOf`), so the SHAPE a plan gathers onto can never span two slabs.
+ *
+ * A MOVE, however, can. MergeSystem's drop validation asks `isTileActive` and
+ * nothing else — no zone test — so a piece may be carried from any slab to any
+ * other. Confusing those two rules is what silenced this hint everywhere but
+ * the authored isle: pieces were bucketed BY ZONE, which is the merge rule
+ * applied to the gather. On Emberkeep's one dense slab that is invisible;
+ * Borealis is 38 slabs of at most 9 cells, so three of a kind almost never
+ * shared a bucket and the hand simply never came up.
  */
 export interface HintBoard {
   /** Playable ground of the ACTIVE world — a piece may be dropped here. */
@@ -46,8 +52,19 @@ export interface HintBoard {
   itemIdAt(col: number, row: number): number | null;
   /** Orthogonal neighbours; never crosses into another zone. */
   neighbors(col: number, row: number): TilePos[];
-  /** Which zone owns this cell. Two pieces in different zones never merge. */
+  /** Which zone owns this cell. Kept for callers that need it; the planner no
+   *  longer buckets on it (see above) — the SHAPE carries the zone rule. */
   zoneOf(col: number, row: number): string | undefined;
+  /**
+   * How far apart two cells really are, for RANKING only.
+   *
+   * Index arithmetic is the honest answer on a dense lattice and a number about
+   * nothing on a zoned world: slabs are laid out with gutters, so two cells five
+   * columns apart may be on different islands. A board that can project its
+   * cells should answer in world units; without this the planner falls back to
+   * cell distance, which is exactly right for the fixtures and the dense isle.
+   */
+  distance?(a: TilePos, b: TilePos): number;
 }
 
 /** One drag: pick up `itemId`, drop it on `to`. */
@@ -100,8 +117,15 @@ export interface MergeHint {
 
 /** Squared cell distance. Squared because nothing here needs the real length —
  *  only the ORDER — and a square root per pair buys nothing. */
-function gap(a: BoardItemState, b: BoardItemState): number {
+function cellGap(a: TilePos, b: TilePos): number {
   return (a.col - b.col) ** 2 + (a.row - b.row) ** 2;
+}
+
+/** The board's own metric when it has one, cell distance when it does not.
+ *  Ranking only — never a legality test. */
+function metric(board?: HintBoard): (a: TilePos, b: TilePos) => number {
+  const d = board?.distance;
+  return d ? (a, b) => d.call(board, a, b) : cellGap;
 }
 
 /**
@@ -120,8 +144,9 @@ function gap(a: BoardItemState, b: BoardItemState): number {
  * Ties go to the set that has been ready LONGEST, which is the ordering the
  * queue was already built on.
  */
-function tightest(bucket: BoardItemState[], need: number): BoardItemState[] {
+function tightest(bucket: BoardItemState[], need: number, board?: HintBoard): BoardItemState[] {
   if (bucket.length <= need) return [...bucket];
+  const gap = metric(board);
   let best: BoardItemState[] = [];
   let bestCost = Infinity;
   let bestAge = Infinity;
@@ -142,7 +167,8 @@ function tightest(bucket: BoardItemState[], need: number): BoardItemState[] {
 
 /** The odd one out: the piece whose distance to the others is largest. Ties by
  *  id, so an evenly spread set still names one piece and always the same one. */
-function outlier(group: BoardItemState[]): BoardItemState {
+function outlier(group: BoardItemState[], board?: HintBoard): BoardItemState {
+  const gap = metric(board);
   let worst = group[0]!;
   let worstCost = -1;
   for (const p of group) {
@@ -178,16 +204,15 @@ export function mergeHints(
   data: ChainsData,
   board?: HintBoard
 ): MergeHint[] {
-  // BUCKETED BY ZONE when a board is given, and that is not a detail.
-  //
-  // The flood that merges never leaves a zone, so a chain+tier with two pieces
-  // on one isle and two on another has no mergeable set at all — while a
-  // zone-blind bucket counts four and offers a move nothing can complete.
+  // BUCKETED BY CHAIN+TIER, across the whole world — because a MOVE is not
+  // zone-bound even though a MERGE is. The zone rule is enforced where it
+  // belongs, in `shapesFrom`: the destination shape is grown through the
+  // board's own adjacency and therefore always lies on one slab. What may
+  // travel onto it is anything the player owns, from anywhere.
   const byKey = new Map<string, { chain: string; tier: number; items: BoardItemState[] }>();
   for (const item of items) {
     if (item.kind !== 'item') continue; // decor never merges
-    const zone = board?.zoneOf(item.col, item.row) ?? '';
-    const key = `${item.chain}:${item.tier}:${zone}`;
+    const key = `${item.chain}:${item.tier}`;
     const bucket = byKey.get(key);
     if (bucket) bucket.items.push(item);
     else byKey.set(key, { chain: item.chain, tier: item.tier, items: [item] });
@@ -202,7 +227,7 @@ export function mergeHints(
     if (!config.tiers.some((t) => t.tier === tier + 1)) continue;
     const need = needFor(config, tier, data);
     if (bucket.length < need) continue;
-    const group = tightest(bucket, need);
+    const group = tightest(bucket, need, board);
     const ids = group.map((i) => i.id).sort((a, b) => a - b);
     hints.push({
       chain,
@@ -210,7 +235,7 @@ export function mergeHints(
       need,
       ids,
       completedBy: ids[need - 1]!,
-      moveId: outlier(group).id
+      moveId: outlier(group, board).id
     });
   }
   return hints.sort((a, b) => a.completedBy - b.completedBy);
@@ -266,7 +291,8 @@ const cellKey = (col: number, row: number): string => `${col},${row}`;
 
 /** Chebyshev cell distance — the tiebreak, never the cost. One drag is one
  *  drag whatever it crosses; this only decides which of two equal plans asks
- *  for the shorter swipe. */
+ *  for the shorter swipe. On a zoned world the board's own metric replaces it
+ *  (see `HintBoard.distance`): index arithmetic across slabs ranks by nothing. */
 function reach(a: TilePos, b: TilePos): number {
   return Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row));
 }
@@ -351,6 +377,11 @@ interface Candidate {
  * so no intermediate drop can fuse early.
  */
 function planOnShape(pieces: BoardItemState[], shape: TilePos[], board: HintBoard): Candidate | null {
+  // The haul is the board's own metric where it has one — a leg that crosses
+  // from one slab to another is a real distance on screen and a meaningless
+  // one in index space, and this number decides which plan asks the shorter
+  // swipe of the player.
+  const haul = board.distance ? (a: TilePos, b: TilePos): number => board.distance!(a, b) : reach;
   const shapeKeys = new Set(shape.map((c) => cellKey(c.col, c.row)));
   const movers = pieces.filter((p) => !shapeKeys.has(cellKey(p.col, p.row)));
   const free = shape.filter((c) => board.itemIdAt(c.col, c.row) === null);
@@ -384,7 +415,7 @@ function planOnShape(pieces: BoardItemState[], shape: TilePos[], board: HintBoar
   // that keeps a piece standing beats it outright.
   let best: { travel: number; order: MergeStep[] } | null = null;
   for (const arrangement of permutations(free)) {
-    const legs = movers.map((p, i) => ({ piece: p, to: arrangement[i]!, cost: reach(p, arrangement[i]!) }));
+    const legs = movers.map((p, i) => ({ piece: p, to: arrangement[i]!, cost: haul(p, arrangement[i]!) }));
     const travel = legs.reduce((sum, leg) => sum + leg.cost, 0);
     if (best && travel >= best.travel) continue;
     legs.sort((a, b) => b.cost - a.cost || a.piece.id - b.piece.id);

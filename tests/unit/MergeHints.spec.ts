@@ -287,19 +287,44 @@ describe('the plan', () => {
     expect(target).not.toBe(plan.steps[0]!.itemId);
   });
 
-  it('refuses to point at a set split across two zones', () => {
+  it('CARRIES a piece across zones — the move is not zone-bound, the merge is', () => {
     nextId = 1;
-    // Adjacency never leaves a zone, so this trio cannot be merged by any
-    // gesture at all. The old hint counted three and pointed anyway.
+    // The rule the planner has to get right, and got wrong: `MergeSystem`'s
+    // drop validation asks `isTileActive` and NOTHING about zones, so a piece
+    // may be carried from any slab to any other. Only the flood that fuses is
+    // zone-bound. Bucketing by zone confused the two and silenced the hint on
+    // every world but the authored isle, which happens to be one dense slab.
     const split = [
       item('moonwater', 1, { col: 1, row: 1 }),
       item('moonwater', 1, { col: 2, row: 1 }),
       item('moonwater', 1, { col: 6, row: 6 })
     ];
     const twoZones = isle(split, { zoneAt: (c) => (c < 4 ? 'main' : 'far') });
-    expect(nextMergePlan(split, CHAINS, twoZones)).toBeNull();
-    // …and the plain hint agrees, once it is given the board.
-    expect(mergeHints(split, CHAINS, twoZones)).toEqual([]);
+    const plan = nextMergePlan(split, CHAINS, twoZones)!;
+    expect(plan).not.toBeNull();
+    // …and EVERY cell it gathers onto lies in ONE zone, because the shape is
+    // grown through the board's own adjacency. That is where the zone rule
+    // lives, and it is the half that must never be relaxed.
+    const zones = new Set(plan.steps.map((st) => twoZones.zoneOf(st.to.col, st.to.row)));
+    expect(zones.size).toBe(1);
+    // The last step is the one that fuses; every other lands on free ground.
+    expect(plan.steps.at(-1)!.completes).toBe(true);
+    for (const st of plan.steps.slice(0, -1)) expect(st.completes).toBe(false);
+  });
+
+  it('still refuses when no single slab can hold the set', () => {
+    nextId = 1;
+    // Three pieces, and a world cut into one-cell slabs: there is nowhere for
+    // three of a kind to stand connected, so there is no gesture to suggest.
+    // Silence here is the CORRECT answer, and the reason the zone rule has to
+    // survive on the shape even though it left the bucket.
+    const scattered = [
+      item('moonwater', 1, { col: 0, row: 0 }),
+      item('moonwater', 1, { col: 2, row: 2 }),
+      item('moonwater', 1, { col: 4, row: 4 })
+    ];
+    const crumbs = isle(scattered, { zoneAt: (c, r) => `${c},${r}` });
+    expect(nextMergePlan(scattered, CHAINS, crumbs)).toBeNull();
   });
 
   it('plans around holes in the ground', () => {
