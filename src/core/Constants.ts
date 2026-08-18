@@ -2047,7 +2047,32 @@ export const DRAG = {
  * turns help into a stutter — they have just proved they are cooperating. Long
  * enough only for the piece to finish landing.
  */
-export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000, followUpMs: 420 } as const;
+/**
+ * `repulseMs` is the HEARTBEAT — how often a hint that is already up says it
+ * again.
+ *
+ * An offered hint used to be a one-shot: the board set it and then returned
+ * early on every tick for ever, so a player who did not act got ONE answer,
+ * computed once, and nothing after it. Two things go wrong with that and both
+ * read as "the hint does not really work". The plan goes STALE — it is only
+ * re-derived on a board change, so a hand raised while the board was crowded
+ * goes on asking for the gather it worked out then. And the offer can be
+ * REFUSED without the board hearing: UIScene owns the hand, and a tutorial
+ * beat or a carry lesson holding it makes `hint:merge` a no-op — the board
+ * still believes a hand is up, so it never offers again for the rest of the
+ * session. A heartbeat repairs both without either side knowing about the
+ * other: whatever went wrong, the next pulse re-plans and re-asks.
+ *
+ * Thirty seconds, not ten. `idleMs` is the cost of DISTRACTION — how long a
+ * quiet board waits before anyone is offered anything — and it is short because
+ * arriving to help is the whole point. This is the cost of INSISTENCE, paid by
+ * someone who has already been shown the answer and has not taken it, and at
+ * ten seconds that is three re-poses a minute of a gesture they are ignoring,
+ * which is nagging. Thirty is roughly the span the hand's own loop takes to
+ * play out several times (`placeHand`'s cycle is ~1.6s), so a pulse lands as a
+ * fresh reading of the board rather than as an interruption of one.
+ */
+export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000, followUpMs: 420, repulseMs: 30_000 } as const;
 
 /**
  * HOW FAR THE MERGE MAGNET REACHES — in tiles, from where the piece was let go.

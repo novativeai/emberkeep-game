@@ -1017,6 +1017,15 @@ export class BoardScene extends Phaser.Scene {
    * up rather than making them idle their way back to the next instruction.
    */
   private hintFollowUp = false;
+  /**
+   * Time on the clock since the STANDING hint last spoke — the heartbeat.
+   *
+   * Separate from `hintIdleMs` on purpose: that one measures how long the board
+   * has gone untouched and stops the moment a hand goes up, and conflating the
+   * two would have the first offer and the re-offer racing the same counter.
+   * Reset by anything that raises, re-aims or withdraws the hand.
+   */
+  private hintPulseMs = 0;
 
   /**
    * The board, as the planner sees it. `GameState` for occupancy and ground,
@@ -1083,7 +1092,20 @@ export class BoardScene extends Phaser.Scene {
       this.takeBackHint();
       return;
     }
-    if (this.hintShown) return; // already offered; it stands until acted on
+    // A HAND THAT IS UP IS NOT A QUESTION THAT HAS BEEN ANSWERED. This used to
+    // be a bare `return`, and that one line is most of "the hint does not
+    // really work": the offer was computed once and then frozen for ever, so a
+    // player who ignored it got a single stale answer, and an offer UIScene
+    // REFUSED (a lesson owned the hand) left the board believing a hand was up
+    // for the rest of the session. The heartbeat costs nothing and repairs both
+    // — every `repulseMs` the plan is worked out again from the live board and
+    // said again, whether or not the answer moved.
+    if (this.hintShown) {
+      this.hintPulseMs += delta;
+      if (this.hintPulseMs < MERGE_HINT.repulseMs) return;
+      this.refreshHint(true);
+      return;
+    }
     this.hintIdleMs += delta;
     const wait = this.hintFollowUp ? MERGE_HINT.followUpMs : MERGE_HINT.idleMs;
     if (this.hintIdleMs < wait) return;
@@ -1095,13 +1117,52 @@ export class BoardScene extends Phaser.Scene {
       this.hintFollowUp = false;
       return;
     }
+    this.showHintStep(step, from, true);
+  }
+
+  /**
+   * RAISE THE HAND at a step — the one place the offer is actually made.
+   *
+   * Shared by the first offer, the re-aim when the board moves under a standing
+   * hint, and the heartbeat, because all three have to do exactly the same five
+   * things and a fourth copy of them is how the three drifted apart.
+   *
+   * It RETRACTS before it offers, and that is not cosmetic. UIScene's hand is a
+   * self-restarting tween chain (`placeHand`'s `run()` re-enters itself for
+   * ever); pointing it somewhere new over a live one lays a SECOND chain on the
+   * same sprite and the two fight over its alpha and angle for the rest of the
+   * session. The retraction makes UIScene run `clearMarkers`, which kills the
+   * chain first — and it costs nothing when the hint does not own the hand,
+   * because the null branch there returns early unless `hintHand` is set, so a
+   * tutorial beat or a carry lesson holding the hand is never disturbed by it.
+   *
+   * `aim` MOVES THE CAMERA, and only the first offer asks for it.
+   *
+   * The camera goes where the pointer goes — the law every other pointer in
+   * this scene follows — but that law is about ARRIVING somewhere, and the
+   * heartbeat is not an arrival. A player who has been shown a merge, left it,
+   * and panned somewhere else has said where they want to be looking; gliding
+   * them back every thirty seconds is the board arguing with the finger, and a
+   * pulse that lands mid-pan puts a camera tween in a fight with a live drag.
+   * `bringIntoView` being a no-op for a piece already in frame does not save
+   * it: the case that matters is exactly the one where the piece is NOT in
+   * frame, because the player put it there.
+   *
+   * So: aim once, when the hand first goes up, and let every re-aim and every
+   * pulse after that speak from wherever the player is standing. This is also
+   * what `refreshHint` did before the three paths were merged — the yank was
+   * never a decision, it was a consequence of sharing the code.
+   */
+  private showHintStep(step: MergeStep, from: BoardItemState, aim = false): void {
+    this.ctx.bus.emit('hint:merge', null);
     this.hintShown = step;
     this.hintAsked = step;
+    this.hintPulseMs = 0;
     this.bounceHintPiece(from.id);
     // Through the WORLD's projection, never the ambient `gridToWorld`: a zoned
     // world places its cells per zone, so the authored lattice would aim the
     // camera at open sky anywhere but the opening isle.
-    this.bringIntoView(worldPointOf(this.ctx.state.world, from.col, from.row));
+    if (aim) this.bringIntoView(worldPointOf(this.ctx.state.world, from.col, from.row));
     this.markHintTarget(step);
     this.ctx.bus.emit('hint:merge', {
       from: { col: from.col, row: from.row },
@@ -1179,8 +1240,15 @@ export class BoardScene extends Phaser.Scene {
    * answer moved. Silent when the plan is unchanged — an identical re-emit
    * would restart the hand's travel tween every time anything on the board
    * twitched.
+   *
+   * `pulse` is the one caller that wants the opposite. The heartbeat re-plays
+   * the beat even when the answer came back identical, because a hint that has
+   * stood unacted for half a minute has to look like living help rather than an
+   * icon someone left on: the hop under the piece, the pulse on the ground and
+   * the hand's own gesture all start again from the top. Everything else about
+   * the two paths is the same, which is why they are one function.
    */
-  private refreshHint(): void {
+  private refreshHint(pulse = false): void {
     if (!this.hintShown) return;
     const plan = nextMergePlan(this.ctx.state.items.values(), this.ctx.data.chains, this.hintBoard());
     const step = plan?.steps[0];
@@ -1197,15 +1265,8 @@ export class BoardScene extends Phaser.Scene {
       step.itemId === this.hintShown.itemId &&
       step.to.col === this.hintShown.to.col &&
       step.to.row === this.hintShown.to.row;
-    if (same) return;
-    this.hintShown = step;
-    this.hintAsked = step;
-    this.bounceHintPiece(from.id);
-    this.markHintTarget(step);
-    this.ctx.bus.emit('hint:merge', {
-      from: { col: from.col, row: from.row },
-      to: { col: step.to.col, row: step.to.row }
-    });
+    if (same && !pulse) return;
+    this.showHintStep(step, from);
   }
 
   /**
@@ -1305,6 +1366,10 @@ export class BoardScene extends Phaser.Scene {
   private takeBackHint(): void {
     this.stopHintBounce();
     this.clearHintTarget();
+    // Whatever comes next starts its own heartbeat: a half-spent pulse carried
+    // across a withdrawal would have the next offer re-pose itself seconds
+    // after it went up.
+    this.hintPulseMs = 0;
     if (!this.hintShown) return;
     this.hintShown = null;
     this.ctx.bus.emit('hint:merge', null);
@@ -6762,6 +6827,12 @@ export class BoardScene extends Phaser.Scene {
    *
    * `plan` is the honest one — if it is null the board genuinely has no legal
    * gather to suggest, and no amount of fixing the plumbing will draw a hand.
+   *
+   * The cadence half is reported too, because "it came up once and then just
+   * sat there" and "it never came up" look identical from a screenshot and are
+   * opposite bugs. `showing` says a hand is out; `pulseMs`/`nextPulseMs` say
+   * how far through the heartbeat it is, so a hint that has genuinely stopped
+   * breathing is visible as a `pulseMs` that does not climb.
    */
   hintDiagnostics(): {
     world: string;
@@ -6770,8 +6841,11 @@ export class BoardScene extends Phaser.Scene {
     dragging: boolean;
     idleMs: number;
     waitMs: number;
+    followUp: boolean;
     showing: boolean;
-    plan: { chain: string; tier: number; moves: number } | null;
+    pulseMs: number;
+    nextPulseMs: number;
+    plan: { chain: string; tier: number; moves: number; travel: number } | null;
     items: number;
   } {
     const lessonRunning = !this.tutorialDone && this.ctx.state.worldId === WORLD_ID;
@@ -6783,8 +6857,18 @@ export class BoardScene extends Phaser.Scene {
       dragging: !!this.dragSprite,
       idleMs: Math.round(this.hintIdleMs),
       waitMs: this.hintFollowUp ? MERGE_HINT.followUpMs : MERGE_HINT.idleMs,
+      followUp: this.hintFollowUp,
       showing: !!this.hintShown,
-      plan: plan ? { chain: plan.chain, tier: plan.tier, moves: plan.steps.length } : null,
+      pulseMs: Math.round(this.hintPulseMs),
+      // Counts down only while a hand is actually out — with none up there is
+      // no heartbeat to be part-way through, and reporting `repulseMs` there
+      // would read as one that is about to fire.
+      nextPulseMs: this.hintShown ? Math.max(0, Math.round(MERGE_HINT.repulseMs - this.hintPulseMs)) : 0,
+      // `travel` is the planner's own ranking unit (squared world units here),
+      // not pixels — it is what separates two plans that cost the same drags.
+      plan: plan
+        ? { chain: plan.chain, tier: plan.tier, moves: plan.steps.length, travel: Math.round(plan.travel) }
+        : null,
       items: this.ctx.state.items.size
     };
   }
