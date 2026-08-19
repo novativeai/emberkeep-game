@@ -18,6 +18,21 @@ const NAME_MAX = 16;
  *  answer, only shortcuts into the field above them. */
 const CARD_W = 300;
 const CARD_H = 104;
+/**
+ * THE KEY'S THREE THICKNESSES, named once — because the face has to sit INSIDE
+ * the slab it is standing on, and the only way that stays true is if every
+ * layer is derived from the same three numbers instead of each one carrying its
+ * own hand-tuned offset.
+ *
+ * `LIP` is the slab's top shoulder, the strip the rim is stroked along.
+ * `INSET` is how much slab shows between that rim and the face, and it is the
+ * same all the way round — 5 on the sides was already right, the top simply
+ * never had one. `SEAT` is the slab's visible thickness UNDER the face, which
+ * is what makes a key look pressable rather than printed.
+ */
+const CARD_LIP = 4;
+const CARD_INSET = 5;
+const CARD_SEAT = 10;
 
 /** Name pools per dragon line. Short, warm, sayable out loud — Eleanor's whole
  *  point is that a name only takes if something hears it. */
@@ -365,16 +380,39 @@ export class NamePanel extends Phaser.GameObjects.Container {
   private paintCard(g: Phaser.GameObjects.Graphics, on: boolean): void {
     const w = CARD_W;
     const h = CARD_H;
-    const seat = 10; // the slab's visible thickness under the face
+    const slabTop = -h / 2 + CARD_LIP;
+    const slabH = h - CARD_LIP;
+    // The face, seated INSIDE the slab on all four sides.
+    //
+    // It used to start at `-h/2` — four units ABOVE the slab and, since the rim
+    // is stroked centred on the slab's edge, a unit and a half above the rim's
+    // outer edge as well. So the pale face and its dome of light poked out over
+    // the top of the moulding and the rim cut straight across them: the key
+    // read as a card whose top had been sliced off, which is exactly what it
+    // was. The sides were always inset; only the top was not.
+    const faceX = -w / 2 + CARD_INSET;
+    const faceW = w - CARD_INSET * 2;
+    const faceY = slabTop + CARD_INSET;
+    const faceH = slabH - CARD_INSET - CARD_SEAT;
     g.clear();
     g.fillStyle(num(on ? PALETTE.goldShade : PALETTE.plumShade), 1);
-    g.fillRoundedRect(-w / 2, -h / 2 + 4, w, h - 4, 26);
+    g.fillRoundedRect(-w / 2, slabTop, w, slabH, 26);
     g.lineStyle(5, num(on ? PALETTE.goldAccent : PALETTE.gold), 1);
-    g.strokeRoundedRect(-w / 2, -h / 2 + 4, w, h - 4, 26);
+    g.strokeRoundedRect(-w / 2, slabTop, w, slabH, 26);
     g.fillStyle(num(on ? PALETTE.gold : PALETTE.plum), 1);
-    g.fillRoundedRect(-w / 2 + 5, -h / 2, w - 10, h - seat, 24);
+    g.fillRoundedRect(faceX, faceY, faceW, faceH, 22);
+    // The dome rides the face, not the card, so it can never sit on the rim.
     g.fillStyle(0xffffff, on ? 0.3 : 0.16);
-    g.fillRoundedRect(-w / 2 + 20, -h / 2 + 7, w - 40, (h - seat) * 0.38, 16);
+    g.fillRoundedRect(faceX + 15, faceY + 6, faceW - 30, faceH * 0.38, 16);
+  }
+
+  /** The face's own vertical centre — what a label on a key is centred on, and
+   *  the reason the card's centre is the wrong answer (the seat is only at the
+   *  bottom, so the face sits high). Derived, so it moves with the geometry. */
+  private static faceMid(): number {
+    const slabTop = -CARD_H / 2 + CARD_LIP;
+    const faceH = CARD_H - CARD_LIP - CARD_INSET - CARD_SEAT;
+    return slabTop + CARD_INSET + faceH / 2;
   }
 
   private paintOptions(names: string[]): void {
@@ -386,9 +424,10 @@ export class NamePanel extends Phaser.GameObjects.Container {
       const card = this.scene.add.container(x, 0);
       const g = this.scene.add.graphics();
       this.paintCard(g, false);
-      // -5, not 0: the face sits above the slab, so its centre is not the card's.
+      // The face's centre, not the card's: the seat is only at the bottom, so
+      // the two are not the same point (see `faceMid`).
       const label = this.scene.add
-        .text(0, -5, name, {
+        .text(0, NamePanel.faceMid(), name, {
           fontFamily: FONT.display, fontSize: '38px', fontStyle: 'bold', color: PALETTE.cream
         })
         .setOrigin(0.5);

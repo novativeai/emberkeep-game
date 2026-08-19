@@ -1810,6 +1810,17 @@ export interface EventMap {
   /** The skip popup opened — it offers BOTH a Gold and a Warmth price. Drives
    *  the one-shot `goldSkip` lesson (the tutorial only demonstrates Warmth). */
   'ui:skip_offered': { itemId: number };
+  /**
+   * The skip popup came down — paid, dismissed, or replaced by another one.
+   *
+   * The pair exists because the pin TAKES OVER the pointer while it is up: the
+   * `house_skip` beat stands an arrow on the House so the player knows what to
+   * tap, and the pin then draws its own arrow on the ⚡ row. Two arrows, one of
+   * them pointing at a thing already done. So the tutorial's tile arrow stands
+   * down on `offered` and comes back on `dismissed` — which is only correct if
+   * the pin says when it leaves as reliably as it says when it arrives.
+   */
+  'ui:skip_dismissed': { itemId: number };
   'state:saved': { at: number };
   'state:loaded': { offlineMs: number; energyRecovered: number };
   'game:reset': Record<string, never>;

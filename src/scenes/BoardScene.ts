@@ -7005,11 +7005,17 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private hideSkipButton(): void {
+    // Announced only when one was actually up. This is called defensively from
+    // half a dozen places (a tap elsewhere, the timer running out, a new pin
+    // replacing this one), and a `dismissed` for a pin that never existed would
+    // hand the tutorial's arrow back on beats that never took it away.
+    const had = this.skipForId;
     this.skipButton?.destroy();
     this.skipButton = undefined;
     this.skipGoldLabel = undefined;
     this.skipWarmthLabel = undefined;
     this.skipForId = 0;
+    if (had) this.ctx.bus.emit('ui:skip_dismissed', { itemId: had });
   }
 
   /** Send a dragon to WORK a House: it flies over and stands by it, speeding its
@@ -7127,7 +7133,7 @@ export class BoardScene extends Phaser.Scene {
     }
     let badge = existing;
     if (!badge) {
-      badge = this.add.container(sprite.x, sprite.y).setDepth(DEPTHS.flash);
+      badge = this.add.container(sprite.x, sprite.y).setDepth(DEPTHS.badge);
       const pill = this.add.image(0, 0, 'fx_timepill');
       const icon = this.add
         .circle(0, 0, 18, num(PALETTE.gold))
@@ -7176,7 +7182,7 @@ export class BoardScene extends Phaser.Scene {
     const sprite = this.itemSprites.get(dragonId);
     if (!sprite) return;
 
-    const badge = this.add.container(sprite.x, sprite.y - 160).setDepth(DEPTHS.flash);
+    const badge = this.add.container(sprite.x, sprite.y - 160).setDepth(DEPTHS.badge);
     const pill = this.add.image(0, 0, 'fx_timepill');
     const zzz = this.add.text(0, -2, '💤', { fontSize: '32px' }).setOrigin(0.5);
     const rest = this.ctx.systems.jobs.restRemaining(dragonId);

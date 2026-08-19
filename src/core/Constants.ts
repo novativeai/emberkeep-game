@@ -360,6 +360,20 @@ export const DEPTHS = {
   // but stays under the always-on-top bands: a flake must never fall in front
   // of the piece in the player's hand.
   weather: 20000,
+  /**
+   * PERSISTENT READOUTS floating over a piece — a generator's countdown, a
+   * dragon's 💤 rest pill. Above the board and above the weather, because a
+   * number the player is waiting on must not be read through falling snow; and
+   * BELOW `dragged`, because it must not be read over the thing the player just
+   * opened.
+   *
+   * They used to sit on `flash`, the top band of all, which put a countdown in
+   * front of the skip offer pinned over the very piece it belongs to — the ⚡
+   * row was behind the seconds ticking down on it. A badge is state, not a
+   * flash: `flash` is for the glows and the floating "+12" that live for half a
+   * second and are gone before anything can be hidden by them.
+   */
+  badge: 30000,
   // The authored 51×24 board pushes screenY (and so itemBase+y) up to ~5100,
   // so the always-on-top bands sit far above that.
   dragged: 50000,

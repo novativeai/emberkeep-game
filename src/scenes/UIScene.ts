@@ -333,6 +333,9 @@ export class UIScene extends Phaser.Scene {
   /** True while the arrow is anchored to a board PIECE — see update(): only
    *  those go quiet when their anchor stops answering. */
   private arrowOnPiece = false;
+  /** A generator's skip offer is on screen, so it owns the pointer over the
+   *  board (see `setSkipPinOpen`). */
+  private skipPinOpen = false;
   private arrowLift = 128;
   private arrowBob = { v: 0 };
   private handBob = { v: 0 }; // tap-press offset for the point gesture
@@ -954,7 +957,12 @@ export class UIScene extends Phaser.Scene {
       bus.on('tutorial:nudge', () => this.nudgeMarkers()),
       // The popup offers Gold AND Warmth; the tutorial only ever demonstrated
       // Warmth on the House, so name the cheaper option the first time it shows.
-      bus.on('ui:skip_offered', () => this.showHint('goldSkip')),
+      bus.on('ui:skip_offered', () => {
+        this.showHint('goldSkip');
+        this.setSkipPinOpen(true);
+      }),
+      // …and the pointer comes back if the offer leaves unanswered.
+      bus.on('ui:skip_dismissed', () => this.setSkipPinOpen(false)),
       bus.on('cookbook:discovered', ({ chain, fromTier, resultTier }) => {
         // The demonstrated recipe was performed — retire the guiding hand.
         if (`${chain}:${fromTier}>${resultTier}` === this.recipeHint) this.clearRecipeHint();
@@ -2354,6 +2362,33 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * THE PIN OWNS THE POINTER WHILE IT IS UP.
+   *
+   * `house_skip` says "tap it, then spend Warmth", and stands an arrow on the
+   * House so the player knows which roof to tap. They tap it, the skip pin
+   * rises over that same roof — and the pin draws its OWN arrow on the ⚡ row.
+   * The House arrow stayed, bouncing at a thing already done, right beside the
+   * one pointing at what to do next. Two pointers is not twice the guidance; it
+   * is the player wondering which of the two they got wrong.
+   *
+   * So a BOARD arrow stands down for as long as an offer is open, and comes
+   * back if the offer leaves without being paid — the beat is still live and
+   * would otherwise be left pointing at nothing.
+   *
+   * The flag is read inside `placeArrow` rather than here, because a step's
+   * arrow is drawn from four places (the step itself, a marker refresh, the
+   * `arrowThen` hand-off, a nudge) and a rule enforced at one caller is a rule
+   * three callers break. Here it only asks the live step to re-assert itself,
+   * which is what applies — or now withholds — the arrow.
+   */
+  private setSkipPinOpen(open: boolean): void {
+    if (this.skipPinOpen === open) return;
+    this.skipPinOpen = open;
+    const step = this.lastStep;
+    if (step && !step.done) this.applyMarkers(step);
+  }
+
   private applyMarkers(step: TutorialStepEvent): void {
     this.clearMarkers();
     // The gauntlet demonstrates ACTIONS (drags); the arrow points at static
@@ -2604,6 +2639,11 @@ export class UIScene extends Phaser.Scene {
   }
 
   private placeArrow(arrow: ResolvedArrow): void {
+    // The skip offer hanging over a piece already points at what to do next
+    // (see `setSkipPinOpen`); a second arrow on the piece under it is one
+    // pointer too many. UI targets are unaffected — the Emporium's ⚡ + and the
+    // satchel are nowhere near the pin.
+    if (this.skipPinOpen && 'tile' in arrow) return;
     if ('tile' in arrow) {
       // Same law as the hand: decide once whether this names a piece or the
       // ground, then re-read its position every frame. An arrow over a tapped
