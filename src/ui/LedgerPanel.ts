@@ -110,7 +110,12 @@ const BLURB_Y = 440;
  * It is a PREFERRED size — `fitBlock` takes it down toward the floor below
  * when the paragraph will not fit its band.
  */
-const BLURB_PX = px(30);
+/** 66 in portrait, not px(30)=78 — the owner read the quote as a step too
+ *  loud on a phone. Still 18 real px through the panel's own magnification
+ *  (66 x 0.278), well over the 10.5 readability bar, and two lines of it
+ *  (2 x 82.5 + 6 = 171) sit inside the 212-unit band with room the 78 never
+ *  had. Desktop is untouched. */
+const BLURB_PX = IS_MOBILE ? 66 : 30;
 /** 1100 of the plate's 1264 on desktop, exactly as authored — three lines of the
  *  longest order blurb at 30px. In portrait the type is 2.6x bigger and has to
  *  earn every unit back, so it takes 1200 of the 1264 instead (32 units of air

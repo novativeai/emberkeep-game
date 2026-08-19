@@ -61,7 +61,11 @@ const CX = IS_MOBILE
   ? {
       frameKey: 'ui_panel_tall', frameY: 0,
       edgeX: 990, headY: -1790, bodyTop: -1400, bodyFloor: 1740,
-      bannerH: 208, closeDisc: 0.64, backScale: CHROME_STEP,
+      /** closeDisc 1.05 / backScale 2.1, not 0.64 / 1.2: at those the pair
+       *  rendered ~10 real px on a 390px handset — the owner called both keys
+       *  too small. Ø143 disc and a 357x134 pill are matched weights (~17 real
+       *  px), and the pair shares one row (CLOSE_ROW_Y = BACK_Y below). */
+      bannerH: 208, closeDisc: 1.05, backScale: 2.1,
       specX: 0, specW: 1500, specH: 1000,
       // dossierTop -40, not -120: the specimen block ends with its WELL FED
       // gauge at y -170..-110 (top + specH + 130 + 100, 60 tall), and a story
@@ -147,8 +151,12 @@ const CLOSE_GLYPH_PX = Math.round(CLOSE_ART * CLOSE_DISC_SCALE * 0.507);
  * from a disc that is also smaller. Landscape x is the arc centre; y stays on
  * the chrome row so the mark and the BACK pill still read as a pair.
  */
-const CLOSE_SEAT_X = IS_MOBILE ? CX.edgeX - 92 : 932;
+const CLOSE_SEAT_X = IS_MOBILE ? CX.edgeX - 130 : 932;
 const BACK_Y = IS_MOBILE ? HEAD_Y + 230 : -508;
+/** Portrait puts BOTH keys on the BACK row, under the plaque — they sat on two
+ *  different rows (✕ on the banner, BACK below it) and the owner read the
+ *  page as misaligned. Landscape keeps its corner-arc seat. */
+const CLOSE_ROW_Y = IS_MOBILE ? BACK_Y : CHROME_ROW_Y;
 
 const TASTE_W = 566;
 const TASTE_H = 148;
@@ -283,7 +291,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // (`CX.closeScale` still multiplies it — the portrait sheet needs a thumb.)
     // 92 in from the head corner, not 36: at the old seat the disc's ink ended
     // 6 units from the plate's inner face and read as pinned ON the corner arc.
-    this.closeBtn = scene.add.container(CLOSE_SEAT_X, CHROME_ROW_Y);
+    this.closeBtn = scene.add.container(CLOSE_SEAT_X, CLOSE_ROW_Y);
     const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(CLOSE_DISC_SCALE);
     const closeGlyph = scene.add
       .text(0, -2, '✕', {
