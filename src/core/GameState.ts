@@ -855,6 +855,65 @@ export class GameState {
     );
   }
 
+  /**
+   * THE SAME COUNT, ACROSS EVERY BOARD THE KEEPER HAS EVER STOOD ON.
+   *
+   * A quest is the Keeper's business, not a board's. The pieces it asks for are
+   * hers wherever she left them, so travelling north must not make six Gem
+   * Shards on the home isle read as zero — which is exactly what the per-world
+   * count did, and why the ladder used to be hidden outside the world that
+   * authored it rather than merely being inconvenient there.
+   *
+   * Only MATERIALISED boards are searched, which is the whole set that can hold
+   * anything: a world nobody has visited has no items to find.
+   */
+  countItemsAnywhere(chain: string, tier: number): number {
+    let n = 0;
+    for (const board of this.boards.values()) {
+      for (const item of board.items.values()) {
+        if (item.kind === 'item' && item.chain === chain && item.tier === tier) n++;
+      }
+    }
+    return n;
+  }
+
+  /** The pieces behind `countItemsAnywhere`, each with the board it stands on —
+   *  because consuming one means reaching into THAT world's grid, not this
+   *  one's. Sorted by id so a delivery always takes the oldest first, which is
+   *  the order the single-board path has always used. */
+  itemsMatchingAnywhere(chain: string, tier: number): { worldId: string; item: BoardItemState }[] {
+    const found: { worldId: string; item: BoardItemState }[] = [];
+    for (const [worldId, board] of this.boards) {
+      for (const item of board.items.values()) {
+        if (item.kind === 'item' && item.chain === chain && item.tier === tier) {
+          found.push({ worldId, item });
+        }
+      }
+    }
+    return found.sort((a, b) => a.item.id - b.item.id);
+  }
+
+  /** Which board holds this item, if any — the lookup a cross-world consume
+   *  needs before it can take one off its grid. */
+  worldOfItem(id: number): string | undefined {
+    for (const [worldId, board] of this.boards) {
+      if (board.items.has(id)) return worldId;
+    }
+    return undefined;
+  }
+
+  /** `removeItem`, addressed to a named board. The active-world version is this
+   *  with `activeId` filled in; they are separate only because everything that
+   *  removes a piece the player is LOOKING at should keep saying so. */
+  removeItemIn(worldId: string, id: number): BoardItemState | undefined {
+    const board = this.boards.get(worldId);
+    const item = board?.items.get(id);
+    if (!board || !item) return undefined;
+    board.grid[item.row]![item.col] = null;
+    board.items.delete(id);
+    return item;
+  }
+
   get level(): number {
     let level = 1;
     for (let i = 0; i < LEVEL_XP.length; i++) {

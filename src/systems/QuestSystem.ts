@@ -142,16 +142,31 @@ export class QuestSystem {
   }
 
   /**
-   * The quests tracked in the world the player is STANDING in.
+   * EVERY quest, whichever world authored it — because a ladder the Keeper
+   * cannot reach is a ladder she has to walk home to climb.
    *
-   * Not tidiness — correctness. `state.countItems` reads the active world's
-   * board, so an Emberkeep quest asking for six Gem Shards would sit at `0 / 6`
-   * the whole time the player is in the north, and its subquests would look
-   * broken rather than absent. A quest belongs to one board; the HUD shows the
-   * board you are on.
+   * This used to filter to the world she was standing in, and the reason given
+   * was correctness rather than tidiness: `countItems` read the ACTIVE board,
+   * so an Emberkeep quest asking for six Gem Shards sat at `0 / 6` the whole
+   * time she was in the north, and its subquests looked broken rather than
+   * absent. Hiding them was the honest response to a count that lied.
+   *
+   * The count no longer lies. `countItemsAnywhere` sums every board she has
+   * stood on and `itemsMatchingAnywhere` pays the delivery out of whichever one
+   * holds the pieces, so a quest is her business from anywhere — which is what
+   * a quest was always meant to be. The filter's own justification is what
+   * removed it.
+   *
+   * WHAT REPLACES IT IS NOT NOTHING. The gate is now the world having been
+   * REACHED rather than being underfoot: a ladder she has walked into follows
+   * her home, and one she has never seen stays out of sight. Dropping the test
+   * altogether put Selyna on the roster during the tutorial, three worlds and a
+   * chapter before the player has any idea who she is — which is a spoiler, not
+   * a convenience. `visited` is the same fact WorldSystem uses, so the two can
+   * never disagree about where the Keeper has been.
    */
   get tracked(): QuestConfig[] {
-    return this.quests.quests.filter((q) => (q.world ?? WORLD_ID) === this.state.worldId);
+    return this.quests.quests.filter((q) => this.state.visited(q.world ?? WORLD_ID));
   }
 
   /** The quest the HUD tracks by default: the first LIVE one in THIS world not
@@ -393,7 +408,7 @@ export class QuestSystem {
     switch (goal.kind) {
       case 'have':
         return {
-          have: Math.min(this.state.countItems(goal.chain, goal.tier), goal.count),
+          have: Math.min(this.state.countItemsAnywhere(goal.chain, goal.tier), goal.count),
           need: goal.count
         };
       case 'order': {

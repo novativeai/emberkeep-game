@@ -125,7 +125,7 @@ export class OrderSystem {
   progressFor(order: OrderConfig): { have: number[]; need: number[]; deliverable: boolean } {
     const have = order.requires.map((req) =>
       Math.min(
-        this.state.countItems(req.chain, req.tier) + this.banked(order, req.chain, req.tier),
+        this.state.countItemsAnywhere(req.chain, req.tier) + this.banked(order, req.chain, req.tier),
         req.count
       )
     );
@@ -188,11 +188,12 @@ export class OrderSystem {
     const consumeIds: number[] = [];
     for (const req of order.requires) {
       const remaining = Math.max(0, req.count - this.banked(order, req.chain, req.tier));
-      const matches = this.state
-        .itemsMatching(req.chain, req.tier)
-        .sort((a, b) => a.id - b.id)
-        .slice(0, remaining);
-      consumeIds.push(...matches.map((m) => m.id));
+      // ANY board, oldest first: the pieces an order asks for are the
+      // Keeper's wherever she left them, so a delivery made in the north can
+      // still be paid for out of the home isle. `itemsMatchingAnywhere` is
+      // already id-sorted, which is the order the single-board path used.
+      const matches = this.state.itemsMatchingAnywhere(req.chain, req.tier).slice(0, remaining);
+      consumeIds.push(...matches.map((m) => m.item.id));
     }
     this.complete(order, consumeIds);
   }

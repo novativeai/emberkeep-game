@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { CHARACTER_ANIMS, type CharacterClip, clipFor, clipKey, type PortraitView } from '../core/characterAnims';
-import { num, PALETTE, PORTRAIT_CLIP_TALK, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
+import { num, PALETTE, PORTRAIT_CLIP_TALK, readMs, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { SpeakerId, TutorialStepEvent } from '../core/types';
 import {
@@ -561,7 +561,10 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
    * Never used
    * while a tutorial step is up — the tutorial owns the bubble until it's done.
    */
-  say(speaker: SpeakerId, text: string, holdMs = 4200): void {
+  /** `holdMs` defaults to the line's own reading time (`readMs`) rather than a
+   *  flat 4.2s: a long aside used to be taken away mid-sentence, which is what
+   *  "the text goes too fast" actually is. A caller may still name its own. */
+  say(speaker: SpeakerId, text: string, holdMs = readMs(text)): void {
     this.cancelSequence();
     this.sayTimer?.remove();
     this.currentStepId = '';
@@ -622,7 +625,11 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.layout(this.seqSpeaker);
     this.setChevron(true);
     this.popIn();
-    this.sayTimer = this.scene.time.delayedCall(STORY_BEAT_HOLD_MS, () => this.advanceSequence());
+    // The safety net is a FLOOR, not the whole answer: a story beat longer than
+    // nine seconds' reading gets the time it needs before it advances itself.
+    this.sayTimer = this.scene.time.delayedCall(readMs(text, STORY_BEAT_HOLD_MS), () =>
+      this.advanceSequence()
+    );
   }
 
   private advanceSequence(): void {

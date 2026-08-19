@@ -38,11 +38,29 @@ type Page = 'roster' | 'detail' | 'evolution';
  * steps up through `F()` because the tall frame's fit scale still leaves a
  * unit at a third of its desktop size.
  */
+/**
+ * THE PORTRAIT CHROME STEP — one dial, because it was four.
+ *
+ * The mobile sheet magnifies its CONTENTS (type 2.6x, the ✕ 2.2x, the back key
+ * 2x, the EVOLUTION key 1.9x) on the reasoning that a unit is worth a third as
+ * much on a phone. That reasoning is sound for TYPE and wrong for the chrome,
+ * because the frame it all sits in does not grow to match: `ui_panel_tall` is
+ * 2360 units wide against the landscape sheet's 2032, so the panel gains 16%
+ * of relative width while the keys on it gained a hundred. The ✕ and the back
+ * arrow ended up occupying twice the share of the sheet they hold on desktop,
+ * and EVOLUTION ran the width of the page it was supposed to sit under.
+ *
+ * So the keys step by this instead, and the number is one place. It is the
+ * middle of the two claims: enough magnification that a thumb still has 40-odd
+ * real pixels of target, not so much that a button is furniture.
+ */
+const CHROME_STEP = 1.45;
+
 const CX = IS_MOBILE
   ? {
       frameKey: 'ui_panel_tall', frameY: 0,
       edgeX: 990, headY: -1790, bodyTop: -1400, bodyFloor: 1740,
-      bannerH: 208, closeScale: 2.2, backScale: 2,
+      bannerH: 208, closeScale: CHROME_STEP, backScale: CHROME_STEP,
       specX: 0, specW: 1500, specH: 1000,
       dossierX: -1040, dossierW: 2080, dossierTop: -120,
       cardW: 300, cardH: 380, cardScale: 2.1, gapX: 960, gapY: 880, rosterCols: 2, cardArtFit: 226,
@@ -80,9 +98,19 @@ const TASTE_W = 566;
 const TASTE_H = 148;
 const TASTE_GAP = 48;
 
-/** Font step: desktop sizes pass through; mobile steps every size up 2.6× so a
- *  unit that renders a third the size still lands the same on-screen type. */
-const F = (n: number): number => (IS_MOBILE ? Math.round(n * 2.6) : n);
+/**
+ * Font step: desktop sizes pass through; mobile steps every size up so a unit
+ * that renders a third the size still lands as readable type.
+ *
+ * 2.0, down from 2.6. The old step was derived from the unit's on-screen worth
+ * alone — a phone spans the 2560 space in ~390 real pixels, a third of a
+ * desktop window's — and ignored that the SHEET does not get three times wider
+ * to hold the result. At 2.6 a two-line blurb became five, the dossier's
+ * columns ran into each other, and the roster cards carried names longer than
+ * the cards. 2.0 still lands every size above the desktop's real pixel height;
+ * what it stops doing is asking a page for room the page does not have.
+ */
+const F = (n: number): number => (IS_MOBILE ? Math.round(n * 2) : n);
 
 /**
  * The Dragon Codex — the keepsake record of the dragons the Keeper has NAMED.
@@ -365,24 +393,41 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
   /* ------------------------------- roster -------------------------------- */
 
   /**
-   * MAIN page — the whole BREED roster, not just the dragons already met.
+   * MAIN page — EVERY dragon you have named, then every breed you have not.
    *
    * A codex is a collection screen, and a collection screen with one card in a
-   * two-thousand-unit panel reads as broken rather than as early. Every breed
-   * `dragondex.json` knows about gets a slot: the ones you have named stand in
-   * colour, the rest are locked silhouettes. The page is then full from the
-   * first dragon on, and it says what is still out there — which is the whole
-   * reason to open a codex twice.
+   * two-thousand-unit panel reads as broken rather than as early. So the breeds
+   * `dragondex.json` knows about fill the rest of the grid as locked
+   * silhouettes: the page is full from the first dragon on, and it says what is
+   * still out there — which is the whole reason to open a codex twice.
+   *
+   * ONE CARD PER DRAGON, NOT PER BREED, and that is the fix here. The roster
+   * used to build `new Map(namedDragons().map((d) => [d.chain, d]))`, which
+   * COLLAPSES two dragons of one breed into a single entry — the second red
+   * dragon you name simply never appeared, and the map silently kept whichever
+   * came last. A codex whose whole promise is "these are yours" cannot answer
+   * "I hatched another one" with the same one card.
+   *
+   * So a named dragon is a slot, a breed nobody has named is a slot, and the
+   * cards are keyed by the dragon's ITEM ID (breeds keep their chain id) —
+   * because two entries that share a chain need two different keys or the
+   * lesson's pointer lands on the wrong card.
    */
   private renderRoster(): void {
     this.pageRoster.removeAll(true);
     this.cards.clear();
     this.setHeading('Dragon Codex');
-    const named = new Map(this.dragons.namedDragons().map((d) => [d.chain, d]));
+    const named = this.dragons.namedDragons();
+    const met = new Set(named.map((d) => d.chain));
     const breeds = Object.keys(this.dex.dragons);
+    /** Yours first, in the order you named them; then what is still out there. */
+    const slots: { key: string; chain: string; dragon: (typeof named)[number] | null }[] = [
+      ...named.map((d) => ({ key: String(d.itemId), chain: d.chain, dragon: d })),
+      ...breeds.filter((b) => !met.has(b)).map((b) => ({ key: b, chain: b, dragon: null }))
+    ];
 
-    const cols = Math.min(breeds.length, ROSTER_COLS);
-    const rows = Math.ceil(breeds.length / cols);
+    const cols = Math.min(slots.length, ROSTER_COLS);
+    const rows = Math.ceil(slots.length / cols);
     const gridH = (rows - 1) * CARD_GAP_Y + CARD_H * CX.cardScale;
     // Rows start at the block's left edge so the columns line up top to bottom
     // and a short last row leaves its gap on the right — the same rule the
@@ -392,24 +437,24 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     const blockTop = (BODY_TOP + BODY_FLOOR) / 2 - (gridH + 90) / 2;
     const startY = blockTop + (CARD_H * CX.cardScale) / 2;
 
-    breeds.forEach((chain, i) => {
+    slots.forEach((slot, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const card = this.rosterCard(
         startX + col * CARD_GAP_X,
         startY + row * CARD_GAP_Y,
-        chain,
-        named.get(chain) ?? null
+        slot.chain,
+        slot.dragon
       );
       card.setScale(CX.cardScale);
-      this.cards.set(chain, card);
+      this.cards.set(slot.key, card);
       this.pageRoster.add(card);
     });
 
     // The completion line — the number that makes the locked slots a goal.
     this.pageRoster.add(
       this.scene.add
-        .text(0, blockTop + gridH + 62, `${named.size} OF ${breeds.length} NAMED`, {
+        .text(0, blockTop + gridH + 62, `${met.size} OF ${breeds.length} BREEDS NAMED`, {
           fontFamily: FONT.ui,
           fontSize: `${CX.completionFont}px`,
           fontStyle: 'bold',
@@ -463,17 +508,26 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
 
     // Name plate along the card's foot — a cream strip that carries dark type,
     // the system's rule for anything that must be read at a glance.
-    const nameY = half.h - 74;
+    //
+    // SEATED ON A FOOT, not hung from a number. `half.h - 74` left 12 units
+    // between the strip and the card's own 5-unit rim — three per cent of the
+    // card, which is not a margin but the remainder of an arithmetic nobody
+    // checked. The strip is inset 22 on each side; it now gets the same order
+    // of air underneath, so the name sits INSIDE the card rather than on its
+    // moulding.
+    const NAME_STRIP_H = 62;
+    const NAME_FOOT = 24;
+    const nameY = half.h - NAME_FOOT - NAME_STRIP_H;
     const strip = this.scene.add.graphics();
     strip.fillStyle(num(owned ? INK.cream : INK.field), 1);
-    strip.fillRoundedRect(-half.w + 22, nameY, CARD_W - 44, 62, RADIUS.sm);
+    strip.fillRoundedRect(-half.w + 22, nameY, CARD_W - 44, NAME_STRIP_H, RADIUS.sm);
     if (!owned) {
       strip.lineStyle(3, num(INK.idleDeep), 1);
-      strip.strokeRoundedRect(-half.w + 22, nameY, CARD_W - 44, 62, RADIUS.sm);
+      strip.strokeRoundedRect(-half.w + 22, nameY, CARD_W - 44, NAME_STRIP_H, RADIUS.sm);
     }
     card.add(strip);
     const name = this.scene.add
-      .text(0, nameY + 31, dragon ? dragon.name : '? ? ?', {
+      .text(0, nameY + NAME_STRIP_H / 2, dragon ? dragon.name : '? ? ?', {
         fontFamily: FONT.display,
         fontSize: `${TYPE.label}px`,
         fontStyle: 'bold',
@@ -540,7 +594,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
         'EVOLUTION  ›',
         () => this.showPage('evolution')
       );
-      if (IS_MOBILE) this.evolutionBtn.setScale(1.9);
+      if (IS_MOBILE) this.evolutionBtn.setScale(CHROME_STEP);
       this.pageDetail.add(this.evolutionBtn);
     }
   }
@@ -956,7 +1010,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     btn.add([g, label]);
     btn.setSize(w, h);
     btn.setInteractive({ useHandCursor: true });
-    const rest = IS_MOBILE ? 1.9 : 1;
+    const rest = IS_MOBILE ? CHROME_STEP : 1;
     btn.on('pointerover', () => btn.setScale(rest * 1.05));
     btn.on('pointerout', () => btn.setScale(rest));
     btn.on('pointerup', onTap);
@@ -1089,12 +1143,27 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     return this.pointAt(this.closeBtn);
   }
 
-  /** The selected dragon's card on the roster — the lesson's first pointer.
-   *  Null off the roster page, so the arrow follows the book rather than
-   *  hovering over the page that replaced it. */
+  /**
+   * The card the lesson's first pointer wants — the dragon's own.
+   *
+   * Null off the roster page, so the arrow follows the book rather than
+   * hovering over the page that replaced it.
+   *
+   * AND IT NO LONGER NEEDS A SELECTION. `codex_meal` says "open your dragon's
+   * page" and points here, but `selected` is only written when a card is
+   * TAPPED — so at the exact moment the lesson was asking for that tap there
+   * was nothing selected, this returned null, and the beat ran with no arrow on
+   * a page full of cards. The pointer falls back to the first dragon on the
+   * roster, which on the only board that ever sees this lesson is the dragon
+   * the player just named.
+   */
   getCardPos(): { x: number; y: number } | null {
     if (!this.isOpen || !this.visible || this.page !== 'roster') return null;
-    const card = this.selected ? this.cards.get(this.selected.chain) : undefined;
+    // By item id, not chain: two dragons of one breed are two cards now, and
+    // the pointer has to land on the one that is selected.
+    const owned = this.dragons.namedDragons();
+    const wanted = this.selected ?? owned[0];
+    const card = wanted ? this.cards.get(String(wanted.itemId)) : undefined;
     return card ? this.pointAt(card) : null;
   }
 

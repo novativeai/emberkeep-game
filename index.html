@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <!-- `maximum-scale=1` as well as `user-scalable=no`: Chrome on Android honours
+         the cap where it ignores the flag, and the pair is what stops the page
+         zooming when the naming field takes focus. iOS ignores both by design —
+         there the 16px font on that input is what does it (see NamePanel). -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title>Emberkeep — The Dragon Hatchery</title>
     <style>
       html,

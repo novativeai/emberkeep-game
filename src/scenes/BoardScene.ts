@@ -92,7 +92,7 @@ import { editorStore } from '../editor/editorStore';
 import { gridToWorld } from '../core/iso';
 import { guard, recordError } from '../core/crash';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
-import { artScaleAt, cellAtWorldPoint, groundCellAtWorldPoint, setActiveWorld, worldPointOf, zoneAt } from '../core/world';
+import { artScaleAt, groundCellAtWorldPoint, nearestPlayableCell, setActiveWorld, worldPointOf, zoneAt } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
 import { cappedTier } from '../core/graphics';
 import { GRAPHICS_EVENT, graphics, liveCrystalAvailable } from '../core/graphicsState';
@@ -1437,12 +1437,20 @@ export class BoardScene extends Phaser.Scene {
     if (!door) return;
     // The nearest dragon to the arch: on a board with several, the one already
     // closest is the one the gesture is cheapest to try with.
-    const at = cellAtWorldPoint(world, door.x + door.width / 2, door.y + door.height / 2);
+    //
+    // In WORLD PIXELS, from the door's own centre. It used to resolve the door
+    // to a cell and compare `|Δcol|` — two mistakes at once: a gateway painted
+    // off the playable ground resolves through the unbounded lattice to an
+    // address that means nothing here, and cell indices are not a distance
+    // across a world whose zones sit in separate blocks. Both are avoided by
+    // measuring the thing the player is actually looking at.
+    const doorX = door.x + door.width / 2;
+    const doorY = door.y + door.height / 2;
     let best: BoardItem | undefined;
     let bestD = Infinity;
     for (const s of this.itemSprites.values()) {
       if (!this.wearsRigTier(s.chain, s.tier)) continue;
-      const d = (s.col - at.col) ** 2 + (s.row - at.row) ** 2;
+      const d = (s.x - doorX) ** 2 + (s.y - doorY) ** 2;
       if (d < bestD) {
         bestD = d;
         best = s;
@@ -1455,9 +1463,14 @@ export class BoardScene extends Phaser.Scene {
     // reach are rarely both in a frame the player is already looking at — and a
     // lesson you cannot see is the one case where the hand teaches nothing.
     this.bringIntoView(worldPointOf(this.ctx.state.world, best.col, best.row));
+    // The hand needs a CELL to point at, and the arch is painted off the ground,
+    // so it points at the ground cell nearest the arch rather than at whatever
+    // the unbounded lattice makes of a portal's centre.
+    const gate = nearestPlayableCell(world, doorX, doorY);
+    if (!gate) return;
     this.ctx.bus.emit('hint:carry', {
       from: { col: best.col, row: best.row },
-      to: { col: at.col, row: at.row }
+      to: { col: gate.col, row: gate.row }
     });
   }
 

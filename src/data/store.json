@@ -210,13 +210,6 @@
           "world": "emberkeep"
         }
       ]
-    },
-    {
-      "id": "keepers",
-      "title": "Keepers",
-      "blurb": "Who stands on your isle, and what they wear while they do it.",
-      "kind": "soon",
-      "items": []
     }
   ]
 }

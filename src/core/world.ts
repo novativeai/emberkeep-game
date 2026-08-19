@@ -286,6 +286,48 @@ export function cellAtWorldPoint(world: WorldRuntime, x: number, y: number): Til
 }
 
 /**
+ * The playable cell PHYSICALLY nearest a world point, in pixels.
+ *
+ * The rule every "where does this thing go" question needs and none of them
+ * had. Two traps it exists to avoid, both of which had already been fallen
+ * into:
+ *
+ *   • Resolving the point to a cell first. A gateway, a portal or a decor
+ *     rectangle is authored in world pixels and is very often painted OFF the
+ *     playable ground; `cellAtWorldPoint` answers such a point through the
+ *     unbounded lattice, which in any world but Emberkeep is an address some
+ *     other zone owns. Everything measured from it is then measured from
+ *     nowhere.
+ *   • Measuring in cell indices. A world is a registry of zones whose blocks
+ *     sit side by side with gutters, so `|Δcol| + |Δrow|` calls a cell on the
+ *     next island two away and the slab underfoot thirty.
+ *
+ * `accept` lets a caller add its own condition (free of items, say) without
+ * this function knowing anything about boards.
+ */
+export function nearestPlayableCell(
+  world: WorldRuntime,
+  x: number,
+  y: number,
+  accept?: (col: number, row: number) => boolean
+): TilePos | null {
+  let best: TilePos | null = null;
+  let bestD = Infinity;
+  for (const cell of world.playable) {
+    const [col, row] = cell.split(',').map(Number);
+    if (col === undefined || row === undefined) continue;
+    if (accept && !accept(col, row)) continue;
+    const p = worldPointOf(world, col, row);
+    const d = (p.x - x) ** 2 + (p.y - y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = { col, row };
+    }
+  }
+  return best;
+}
+
+/**
  * The world address nearest this point ON A NAMED ZONE, whether or not that
  * zone has ground there. Used by save recovery, which knows which grid a piece
  * came from and wants the answer inside it rather than the nearest answer

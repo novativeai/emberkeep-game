@@ -1,7 +1,7 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { WorldRuntime } from '../core/world';
-import { cellAtWorldPoint } from '../core/world';
+import { groundCellAtWorldPoint, nearestPlayableCell } from '../core/world';
 import type { TilePos } from '../core/types';
 import { storyOpen, worldOpen } from '../core/worldGates';
 
@@ -72,41 +72,41 @@ export class WorldSystem {
 
     // The door BACK is the anchor: a dragon that crossed at the arch comes out
     // beside the arch. Portals are authored as world-pixel rectangles, so the
-    // cell is whichever one their centre lands on.
+    // anchor is the world POINT at their centre.
     const doorBack = world.portals.find((p) => p.to === from);
     if (doorBack) {
-      const at = cellAtWorldPoint(
-        world,
-        doorBack.x + doorBack.width / 2,
-        doorBack.y + doorBack.height / 2
-      );
-      // Rings out from it, so "he is waiting at the arch" stays true even when
-      // the exact tile under the door is occupied or is not playable ground.
-      for (let r = 0; r <= 3; r++) {
-        for (let dc = -r; dc <= r; dc++) {
-          for (let dr = -r; dr <= r; dr++) {
-            if (Math.max(Math.abs(dc), Math.abs(dr)) !== r) continue;
-            if (free(at.col + dc, at.row + dr)) return { col: at.col + dc, row: at.row + dr };
+      const door = {
+        x: doorBack.x + doorBack.width / 2,
+        y: doorBack.y + doorBack.height / 2
+      };
+      // `groundCellAtWorldPoint`, not `cellAtWorldPoint`: an archway is painted
+      // OFF the playable ground more often than not, and the unbounded version
+      // answers such a point with a projection through the authored Emberkeep
+      // lattice — an address a Roothold zone may well own, hundreds of pixels
+      // from the door. Every step below then rang out from a cell that had
+      // nothing to do with the arch, which is the "he came out miles away" of
+      // it. Null simply means the ring has no honest centre; the sweep below
+      // does not need one.
+      const at = groundCellAtWorldPoint(world, door.x, door.y);
+      if (at) {
+        // Rings out from it, so "he is waiting at the arch" stays true even when
+        // the exact tile under the door is occupied.
+        for (let r = 0; r <= 3; r++) {
+          for (let dc = -r; dc <= r; dc++) {
+            for (let dr = -r; dr <= r; dr++) {
+              if (Math.max(Math.abs(dc), Math.abs(dr)) !== r) continue;
+              if (free(at.col + dc, at.row + dr)) return { col: at.col + dc, row: at.row + dr };
+            }
           }
         }
       }
-      // Past the ring, the NEAREST cell it can stand on — never "the first one
-      // in the set", which is what this used to fall through to. A gateway is
-      // painted off the playable ground and can sit further than three cells
-      // from any of it, and when it did the arriving dragon was seated at
-      // whatever cell the registry happened to list first: the bottom of the
-      // world, under the clouds, nowhere near the door it came through.
-      let best: TilePos | null = null;
-      let bestD = Infinity;
-      for (const key of world.playable) {
-        const [col, row] = key.split(',').map(Number);
-        if (!free(col!, row!)) continue;
-        const d = (col! - at.col) ** 2 + (row! - at.row) ** 2;
-        if (d < bestD) {
-          bestD = d;
-          best = { col: col!, row: row! };
-        }
-      }
+      // Past the ring — or with no ring at all — the cell PHYSICALLY nearest the
+      // door. In world pixels, never in cell indices: a world is a registry of
+      // zones whose blocks sit side by side with gutters between them, so
+      // `|Δcol| + |Δrow|` calls a cell on the next island two away and the slab
+      // under your feet thirty. Measuring where the player actually looks is
+      // the only distance that means anything across a zoned world.
+      const best = nearestPlayableCell(world, door.x, door.y, free);
       if (best) return best;
     }
     // No door back at all: anywhere it can stand.

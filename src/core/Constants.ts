@@ -251,7 +251,29 @@ export const QUEST_TRACKER_RIGHT: number = IS_MOBILE ? 64 : 56;
 export const QUEST_LIST_TOP_Y = 62;
 /** Sub-row pitch, and how many are on screen before the list scrolls. */
 export const QUEST_ROW_H = 68; // follows the tracker's 32px sub-row type
-export const QUEST_VISIBLE_ROWS = 3;
+/**
+ * HOW MUCH OF THE LADDER YOU CAN SEE AT ONCE — and why the two layouts differ
+ * by a factor of two.
+ *
+ * Three rows is a keyhole. A quest with five subquests showed three of them and
+ * a half-faded sliver, so the one HUD that says what to do next said a third of
+ * it, and the player had to drag a list they had no reason to know was a list.
+ *
+ * PORTRAIT HAS THE ROOM AND ALWAYS DID. Its live space is ~5540 units tall
+ * against the landscape 1600, and the measured slack between the status
+ * readout's foot and the top seat of the HUD column is 3771 units — fifty-five
+ * rows' worth. Six is simply as many as a quest ever has.
+ *
+ * LANDSCAPE HAS 15.4 UNITS, and a row costs 68. That is not a number anyone
+ * chose; it is what is left after the settings gear (bottom edge y 180.6) sets
+ * the tracker's ceiling at 196 and the five-door column sets its floor at
+ * 673.4. A fourth row overruns the Dragon Codex button by 52.6 units and prints
+ * a subquest across it — the exact collision `HudColumn.spec` exists to catch.
+ * Making it fit means moving the gear or re-cutting the column, which is a
+ * different job than this one; until then the landscape list scrolls, and the
+ * peek row below is what says so.
+ */
+export const QUEST_VISIBLE_ROWS: number = IS_MOBILE ? 6 : 3;
 /** A sliver of the FOURTH row stays inside the viewport, half-faded — the only
  *  scroll affordance a background-free cluster gets. */
 export const QUEST_PEEK_H = 26;
@@ -1144,6 +1166,37 @@ export const DRAGON_REVEAL: Record<string, { art: string; name: string; epithet:
     art: 'reveal_golden',
     name: 'Golden Elder',
     epithet: 'older than the isle, and awake because you insisted'
+  },
+  /*
+   * FROST AND STORM — the two breeds whose cards were painted and never hung.
+   *
+   * `reveal_frost`, `reveal_frost_adult`, `reveal_storm` and
+   * `reveal_storm_adult` have shipped in assets.json all along; what was
+   * missing was these eight lines. RevealSystem asks this table and nothing
+   * else, so a breed absent from it hatches in silence — which is the whole of
+   * "the frost dragon's reveal never happens". Nothing was broken; nothing was
+   * mounted. `DragonReveal.spec` now fails if a hatching chain is left out
+   * again.
+   */
+  'frost:2': {
+    art: 'reveal_frost',
+    name: 'Frost Dragon',
+    epithet: 'hatched out of weather, and in no hurry to warm up'
+  },
+  'frost:3': {
+    art: 'reveal_frost_adult',
+    name: 'Adult Frost Dragon',
+    epithet: 'grown; the air around her keeps its distance now'
+  },
+  'storm:2': {
+    art: 'reveal_storm',
+    name: 'Storm Dragon',
+    epithet: 'the first quiet one, and the sky has not stopped watching'
+  },
+  'storm:3': {
+    art: 'reveal_storm_adult',
+    name: 'Adult Storm Dragon',
+    epithet: 'grown, and the weather asks HER permission'
   }
 };
 
@@ -2680,8 +2733,34 @@ export const OPENING_HOLD_MS = 1500;
 
 /** How long a post-tutorial story beat rests on screen if the player never taps
  *  it. Chapter beats are tap-advanced; this is the safety net so a bubble can
- *  never strand the board. */
+ *  never strand the board. A FLOOR now — `readMs` lengthens it for a long
+ *  line, because a safety net cut to the average sentence strands the ones
+ *  above average. */
 export const STORY_BEAT_HOLD_MS = 9000;
+
+/**
+ * HOW LONG A LINE STAYS UP, FROM HOW LONG IT TAKES TO READ.
+ *
+ * Every un-tapped bubble used to hold for a flat count — 4.2 seconds for a
+ * nudge, 9 for a story beat — whatever it said. So a four-word aside sat there
+ * long after it was finished and a thirty-word one was taken away mid-sentence,
+ * and the second is the one the player notices: text that "appears too fast" is
+ * almost always text that LEAVES too fast.
+ *
+ * 55ms a character is about 18 characters a second — roughly 200 words a minute,
+ * the pace of comfortable adult reading, and deliberately not the pace of
+ * skimming. `lead` is the moment before reading starts at all: the eye has to
+ * find the bubble, which just popped in somewhere it was not before.
+ */
+export const READING = { perChar: 55, lead: 900, minMs: 3600, maxMs: 16000 } as const;
+
+/** Reading time for one line, clamped. Pure — the bubble and anything else that
+ *  puts words on screen for a fixed while should ask this rather than pick a
+ *  number. */
+export function readMs(text: string, floorMs: number = READING.minMs): number {
+  const want = READING.lead + text.length * READING.perChar;
+  return Math.min(READING.maxMs, Math.max(floorMs, want));
+}
 
 /** Host-page IAP bridge — real-money packs; the EmberGames hub does the
  *  charging, the game only confirms, celebrates and applies the grant.

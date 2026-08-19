@@ -316,15 +316,27 @@ export class BoardSystem {
     this.bus.emit('item:spawned', { item: this.state.snapshot(item), cause });
   }
 
+  /**
+   * Take pieces off the board — ANY board, not only the one on screen.
+   *
+   * An order can now be delivered from a world the pieces are not standing in
+   * (see `GameState.countItemsAnywhere`), so the consume that pays for it has
+   * to be able to reach into the board that holds them. The active world is
+   * simply the common case of that, so it is not a special case in the code.
+   *
+   * `item:removed` is emitted either way. BoardScene looks the sprite up by id
+   * and finds nothing for a piece on another isle, which is the correct amount
+   * of work to do about a thing the player cannot see.
+   */
   consume(itemIds: number[], reason: string): void {
     for (const id of itemIds) {
-      const item = this.state.items.get(id);
+      const worldId = this.state.worldOfItem(id);
+      if (!worldId) continue;
+      const item = this.state.removeItemIn(worldId, id);
       if (!item) continue;
-      const at = { col: item.col, row: item.row };
-      this.state.removeItem(id);
       this.bus.emit('item:removed', {
         itemId: id,
-        at,
+        at: { col: item.col, row: item.row },
         reason: reason === 'sold' ? 'sold' : 'delivered'
       });
     }

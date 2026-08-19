@@ -29,8 +29,21 @@ describe('weather.json', () => {
     for (const id of Object.keys(DOC.worlds)) expect(WORLD_IDS, id).toContain(id);
   });
 
-  it('gives Borealis both its aurora and its snow', () => {
-    expect(DOC.worlds.borealis).toEqual({ aurora: 'borealis', auroraBand: 0.5, snow: 'snowfall' });
+  /**
+   * THE AURORA IS OFF, BY DECISION, NOT BY ACCIDENT.
+   *
+   * Its curtain drew a dead-straight horizontal edge across the middle of the
+   * Borealis sky — the shader's dither was lifting the black above it and
+   * stopping at the band's foot. That arithmetic is fixed (the dither now sits
+   * under the fade), but the owner still read an edge on his screen, so the
+   * effect is off rather than tuned.
+   *
+   * Asserted as an absence so it cannot come back by accident, and so that the
+   * day someone puts it back they have to say so here. Everything that draws it
+   * is still shipped, still preset, and still covered by the tests above.
+   */
+  it('gives Borealis its snow, and no aurora', () => {
+    expect(DOC.worlds.borealis).toEqual({ snow: 'snowfall' });
   });
 
   it('leaves the authored world alone', () => {

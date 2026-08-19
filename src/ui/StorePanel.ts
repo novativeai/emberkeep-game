@@ -314,18 +314,44 @@ const ACTION_PLATE_HALF_H = 66;
  *  its top edge cut into the blurb. In portrait it grows with the card. */
 const ACTION_SCALE = IS_MOBILE ? 1.5 : 0.58;
 const ACTION_FONT = px(32);
-const ACTION_Y = CARD_H / 2 - (IS_MOBILE ? 130 : 50);
+/**
+ * THE AIR UNDER THE KEY — a MARGIN, not an offset from the card's middle.
+ *
+ * It used to be written as "130 (or 50) up from the half-height", which says
+ * nothing about the only thing that matters: how much card is left underneath.
+ * Once the plate's own half-height was subtracted, the answer was 11.7 units on
+ * the landscape card and 31 in portrait — against a 6-unit rim with an 8-unit
+ * seat drawn below it, so the key was sitting ON the moulding rather than
+ * inside it. Three per cent of the card's height is not a margin, it is a
+ * rounding error that happened to be positive.
+ *
+ * Stated as a foot instead, and paid out of the gutter the shelf already uses:
+ * AIR in portrait, where a 1040-tall card has it to spare, and 40% of AIR on
+ * the 380-tall landscape one, which is the most it can give without eating a
+ * line of blurb (`fitBlurb` shrinks to fit, and the budget is measured from
+ * ACTION_TOP).
+ */
+const ACTION_FOOT = IS_MOBILE ? AIR : Math.round(AIR * 0.4);
+const ACTION_Y = CARD_H / 2 - ACTION_FOOT - ACTION_PLATE_HALF_H * ACTION_SCALE;
 const ACTION_TOP = ACTION_Y - ACTION_PLATE_HALF_H * ACTION_SCALE;
 const HERO_ACTION_SCALE = IS_MOBILE ? 2 : 0.82;
 const HERO_ACTION_FONT = px(40);
-const HERO_ACTION_Y = HERO_H / 2 - (IS_MOBILE ? 170 : 64);
+/** The showcase card's key gets the same foot. Its plate is bigger, so the
+ *  number it used to carry (170 / 64) was even further from being a margin. */
+const HERO_ACTION_Y = HERO_H / 2 - ACTION_FOOT - ACTION_PLATE_HALF_H * HERO_ACTION_SCALE;
 const HERO_ACTION_TOP = HERO_ACTION_Y - ACTION_PLATE_HALF_H * HERO_ACTION_SCALE;
 
 /** The blurb's preferred size, and the floor it may shrink to before the text
  *  is truncated instead. Stepped into the portrait space so the same sentence
- *  reads the same size on a phone as on a desktop. */
-const BLURB_PX = px(21);
-const BLURB_MIN_PX = px(16);
+ *  reads the same size on a phone as on a desktop.
+ *
+ *  25/17, up from 21/16 — the owner read the card copy at ~10 real px on a
+ *  1080p screen and called it too small. Sized against the measured budgets:
+ *  a PLAIN landscape card hands the blurb 68.2 units (3 lines at the 17 floor
+ *  = 64.8, still fits) and a BLED one 42.2 (2 lines at 17 = 40.8, still fits),
+ *  so the raise buys size where there is room and costs no line anywhere. */
+const BLURB_PX = px(25);
+const BLURB_MIN_PX = px(17);
 /** The SECTION's blurb — the line under the tabs, not the one on a card. Its
  *  own constant because `buildBody` has to reset the size before re-fitting
  *  it, and a size that lives in two places is a size that drifts. */

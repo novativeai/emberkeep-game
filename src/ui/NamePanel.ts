@@ -287,20 +287,33 @@ export class NamePanel extends Phaser.GameObjects.Container {
       el.setAttribute('autocorrect', 'off');
       el.spellcheck = false;
       el.setAttribute('aria-label', 'Dragon name');
-      // Off-screen but focusable — NOT `display:none` or `visibility:hidden`,
+      // Invisible but focusable — NOT `display:none` or `visibility:hidden`,
       // which make an element unfocusable and kill the mobile keyboard. The
       // 16px font size is what stops iOS zooming the page on focus.
+      //
+      // AND IT SITS IN THE MIDDLE, not in the corner. A browser brings the
+      // focused element into view when the soft keyboard opens, and the game is
+      // served inside an iframe on the hub — so a control pinned to the top-left
+      // of the viewport asked the PARENT page to scroll, and the whole screen
+      // jumped as the keyboard came up. Centred, that scroll has nothing to do:
+      // the element is already where the browser wants to put it. `preventScroll`
+      // below is the belt to this pair of braces.
       Object.assign(el.style, {
         position: 'fixed',
-        left: '0px',
-        top: '0px',
+        left: '50%',
+        top: '50%',
         width: '1px',
         height: '1px',
         opacity: '0',
         border: '0',
         padding: '0',
         fontSize: '16px',
-        zIndex: '-1'
+        // Not -1: a negative z-index puts it behind the canvas, and a control
+        // the compositor has decided is behind an opaque layer is one some
+        // browsers decline to scroll to or focus at all. Zero and transparent
+        // says the same thing without the ambiguity.
+        zIndex: '0',
+        pointerEvents: 'none'
       } as Partial<CSSStyleDeclaration>);
       el.addEventListener('input', () => this.onTyped());
       el.addEventListener('keydown', (e) => {
@@ -317,7 +330,12 @@ export class NamePanel extends Phaser.GameObjects.Container {
       });
     }
     this.nameInput.value = '';
-    this.nameInput.focus();
+    // `preventScroll` is the whole fix for "typing the name moves the screen".
+    // Focus normally scrolls the element into view, and inside the hub's iframe
+    // that scroll is the PARENT document's — the page slid under the game every
+    // time the keyboard opened. Supported everywhere that matters and simply
+    // ignored where it is not, so there is nothing to feature-detect.
+    this.nameInput.focus({ preventScroll: true });
   }
 
   private onTyped(): void {

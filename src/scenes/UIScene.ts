@@ -128,25 +128,24 @@ const SETTINGS_W = 900;
  * THE PLATE GROWS, and the graphics blurb spends all of the extra.
  *
  * Cycling the quality can append "Reload the page to resize the canvas." to
- * that blurb, taking it to three wrapped lines. Even at the authored 26px that
- * is 3 x 31.2 + 2 x 6 of lineSpacing = 105.6 units hanging off a top edge at
- * -52, so it ends at +53.6 and crosses the divider at +46 — 98 units of room
- * for a block that wants 105.6. That is a DESKTOP defect too, and it always
- * was: the third line only appears after the player cycles the quality, which
- * is why nobody had met it. 24 units of slack puts the divider at +58 and the
- * block's floor at +41.6 — 16 units of air where there were -7.6.
+ * that blurb, taking it to three wrapped lines. At the desktop 30px that is
+ * 3 x 36 + 2 x 6 of lineSpacing = 120 units hanging off a top edge at -52.
+ * The divider is seated at +38 (it was +46; the owner read the reset warning
+ * as touching the keys, so the whole bottom block rose 8), which makes the
+ * slack formula `air = EXTRA_H - 30`: 48 buys 18 units under the worst-case
+ * blurb. (At the original 26px the shortfall was 7.6 and 24 of slack bought
+ * 16 — that arithmetic is in git; the blurb grew because 26 arrived at 13
+ * real px on a 1080p screen and the owner called it unreadable.)
  *
- * Portrait makes it worse, because portrait needs a bigger blurb to be
- * readable at all (see SETTINGS_NOTE_PX): 3 x 38.4 + 12 = 127, and the
- * two-line case leaves ~30 units of air today, so the honest budget there is
- * 157 against the same 98. 60 closes it.
+ * Portrait needs a bigger blurb again (see SETTINGS_NOTE_PX): 3 x 38.4 + 12 =
+ * 127.2, so its air is `EXTRA_H - 37.2` and the authored 60 buys 22.8.
  *
  * The slack is inserted in the MIDDLE — the top block (title → blurb) moves up
  * half of it, everything from the divider down moves down the other half — so
  * the plate stays centred on the container origin and every margin EXCEPT the
  * one that was short comes out exactly as authored.
  */
-const SETTINGS_EXTRA_H = IS_MOBILE ? 60 : 24;
+const SETTINGS_EXTRA_H = IS_MOBILE ? 60 : 48;
 /** Plate height: the authored 736-unit landscape card plus the portrait slack. */
 const SETTINGS_H = 736 + SETTINGS_EXTRA_H;
 /** Rows ABOVE the graphics blurb rise by half the slack… */
@@ -160,14 +159,18 @@ const SETTINGS_BOT_DY = SETTINGS_EXTRA_H / 2;
  *
  * A unit of the 2560-wide space is 390/2560 = 0.152 real pixels on the handset
  * the TYPE_STEP note is written against; at the 2.2 panel scale that is 0.335.
- * So the authored 26 arrives at 8.7 real px — under the 10.5 that same note
+ * So the original 26 arrived at 8.7 real px — under the 10.5 that same note
  * calls readable — while the button label right above it (32) arrives at 10.7
  * and passes. Handing the blurb that identical 32 is the smallest change that
  * clears the bar, and it puts no new size into the plate's type scale. NOT
  * `px()`: the container is already carrying 2.2, and 26 x 2.6 x 2.2 would land
  * a caption at 23 real px, larger than the heading above it.
+ *
+ * Desktop went 26 → 30 for the same reason at the other scale: FIT halves the
+ * 2560 space on a 1080p screen, so 26 read at 13 real px there and the owner
+ * called it too small. 30 keeps it under the 32px button label above it.
  */
-const SETTINGS_NOTE_PX = IS_MOBILE ? 32 : 26;
+const SETTINGS_NOTE_PX = IS_MOBILE ? 32 : 30;
 
 /**
  * Runs in parallel above BoardScene: HUD, tooltip, Eleanor's Ledger, the
@@ -2843,19 +2846,22 @@ export class UIScene extends Phaser.Scene {
       this.game.events.emit(GRAPHICS_EVENT);
     });
 
-    const divider = this.add.rectangle(0, 46 + SETTINGS_BOT_DY, 760, 3, num(PALETTE.lava), 0.22);
+    const divider = this.add.rectangle(0, 38 + SETTINGS_BOT_DY, 760, 3, num(PALETTE.lava), 0.22);
     const resetTitle = this.add
-      .text(0, 88 + SETTINGS_BOT_DY, 'Reset Cinder Hollow?', {
+      .text(0, 80 + SETTINGS_BOT_DY, 'Reset Cinder Hollow?', {
         fontFamily: FONT.ui,
         fontSize: '40px',
         fontStyle: 'bold',
         color: PALETTE.night
       })
       .setOrigin(0.5);
+    // 34px and seated at 154: the warning grew with the graphics blurb (30 read
+    // at 15 real px on a 1080p screen), and at 34 its two lines reach ±45.8 —
+    // 154 keeps 4 units of air under the 40px heading and 20 over the keys.
     const body = this.add
-      .text(0, 150 + SETTINGS_BOT_DY, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
+      .text(0, 154 + SETTINGS_BOT_DY, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
         fontFamily: FONT.ui,
-        fontSize: '30px',
+        fontSize: '34px',
         color: '#8A6248',
         align: 'center',
         lineSpacing: 10
@@ -2869,7 +2875,7 @@ export class UIScene extends Phaser.Scene {
       scaleX: number,
       onTap: () => void
     ): Phaser.GameObjects.Container => {
-      const button = this.add.container(x, 272 + SETTINGS_BOT_DY);
+      const button = this.add.container(x, 276 + SETTINGS_BOT_DY);
       const bg = this.add.image(0, 0, texture).setScale(scaleX, 0.78);
       const text = this.add
         .text(0, -10, label, {

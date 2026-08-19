@@ -323,8 +323,13 @@ const MOSS_LIGHT = 0x549270;
  *   -113.9 ..  -36    THE TITLE'S BAND        ( 77.9)
  *     -36   ..  108   the requirement slot    (144)
  *     108   ..  166   the reward line         ( 58)
- *     175.75.. 288.25 the Deliver key         (112.5)
- *     288.25.. 304.2  air under it            ( 15.9)
+ *     172.8 .. 279.2  the Deliver key         (106.4)
+ *     279.2 .. 304.2  air under it            ( 25.0)
+ * The key used to sit at 175.75..288.25 and leave 15.9 — but the card art
+ * paints its own rim inside the plate's edge, so on screen the key's foot sat
+ * ON the moulding, exactly the defect the Store's ACTION_FOOT fixed. The 25 is
+ * that same foot; it is paid for by the key giving up 4 units of height
+ * (scaleY 0.74 → 0.70) and riding 6 higher, not by any line above it moving.
  * so the title's 77.9 is all there is. It is set at origin 0.5, which means a
  * second line grows 19 units UP into the medallion's gold as well as 19 down —
  * that, and not the wrap, is why a wrapped title read as touching the ring.
@@ -829,12 +834,12 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
 
-    const deliverButton = scene.add.container(0, 232);
+    const deliverButton = scene.add.container(0, 226);
     // WIDER THAN IT IS TALL, on purpose. At a uniform 0.72 the word filled the
     // pill end to end and the rounded caps ate what padding was left, so the
-    // key looked shut. The height stays where it was — it is the air either
-    // side of the word that was missing, not the size of the button.
-    const deliverBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.88, 0.74);
+    // key looked shut. 0.70 tall and seated at 226 so its foot clears the
+    // card's painted rim by a real 25 units — see the card map above.
+    const deliverBg = scene.add.image(0, 0, 'ui_btn_green').setScale(0.88, 0.7);
     const deliverText = scene.add
       .text(0, -8, 'Deliver', {
         fontFamily: FONT.ui,

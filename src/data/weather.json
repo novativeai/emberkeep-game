@@ -1,9 +1,8 @@
 {
   "version": 1,
+  "_note": "Borealis keeps its SNOW and has lost its aurora. The curtain drew a dead-straight horizontal edge across the middle of the sky at the bottom of its band — the shader's dither was lifting the black above it and stopping dead at the band's foot. Moving the dither under the fade removed the arithmetic cause; the owner still read an edge there on his screen, so the effect is off rather than tuned. Everything that draws it is still shipped and still tested: put \"aurora\": \"borealis\" and \"auroraBand\" back to bring it home.",
   "worlds": {
     "borealis": {
-      "aurora": "borealis",
-      "auroraBand": 0.5,
       "snow": "snowfall"
     }
   }
