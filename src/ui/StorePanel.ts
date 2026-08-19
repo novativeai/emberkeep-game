@@ -483,20 +483,26 @@ export class StorePanel extends Phaser.GameObjects.Container {
 
     // THE POCKET IS 101 UNITS WIDE, and that is what sizes this key.
     //
-    // `ui_store_panel`'s inner plate runs x -1016..1016, y -588..652, and the
-    // rightmost tab (`buildTabs`) ends at x 915 with its top edge at y -476. So
-    // the free corner is 101 x 112 — a 0.92 disc is 125 across and cannot sit in
-    // it without riding the frame, which is exactly what it was doing.
+    // THE PLATE IS PAINTED, SO ITS GEOMETRY IS EXACT — read it, do not quote it.
+    // TextureFactory.storePanel draws `roundRectPath(22, 16, 1016, 620, 42)` on
+    // a 1060x660 logical canvas, and a logical unit is two game units, so in
+    // panel space (the image seated at y+40):
+    //
+    //   inner plate   x -1016..1016, y -588..652
+    //   corner radius 84 — NOT the 60 quoted elsewhere, which is RADIUS_TEX.xl
+    //                 and belongs to `questPanel`; this plate rounds by 42
+    //   deepest ink   3.8 logical inward (chromeEdge's inner hairline), 7.6 units
+    //   top-right arc centre (932, -504)
+    //
+    // Every seat derived against a radius of 60 was derived against the wrong
+    // arc, which is how two consecutive "pull it off the edge" moves each put
+    // this key somewhere worse.
     //
     // In portrait the pocket is not the constraint, the THUMB is: 96 units of
     // hit box is 15 real pixels on a handset, well under the 44px platform
-    // minimum. `TAP_SCALE` is the smallest multiplier that clears it — and it
-    // grows the HIT BOX to 211 square, which is why the portrait key needed a
-    // pocket of its own rather than the corner the landscape one is tucked in.
-    // At `closeY` -1908 its ink runs y -1978..-1806 and its hit box -2014..
-    // -1802: 30 below the plate's inner rim, clear of the rounded corner by 28
-    // at its widest, and 40 above the first row of tabs. It used to be at -1900
-    // with the tabs starting at -1853, i.e. printed on the right-hand tab.
+    // minimum. TAP_SCALE clears it — but only on the HIT BOX. Applied to the
+    // container it multiplied the artwork too, which is how portrait ended up
+    // wearing a Ø174 disc hanging 5.6 units off its own frame.
     const close = scene.add.container(CX.closeX, CX.closeY);
     this.closeBtn = close;
     // The royal candy disc: a plum face in a gold rim, painted rather than a
