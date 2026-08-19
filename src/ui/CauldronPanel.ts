@@ -114,13 +114,14 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
 
     // Inside the plate (x -1016..1016, y -588..652), at the size and seat the
     // Store's ✕ uses — the two panels share this frame, so they share its corner.
-    // In from (964, -538): the disc rode the frame's corner arc — same pull
-    // as the Store and the Codex, whose plate this panel shares.
-    const close = scene.add.container(924, -512);
+    // On the corner arc's own centre (932,-504), the safest point on this
+    // plate — see StorePanel's close block for the derivation. Same seat and
+    // same weight as every other key on this frame.
+    const close = scene.add.container(932, -512);
     this.closeBtn = close;
-    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.58);
+    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.4);
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: INK.onFieldGold })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '28px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     close.add([closeBg, closeX]);
     // A THUMB, NOT A CURSOR. 96 units of hit box is ~15 real pixels on a

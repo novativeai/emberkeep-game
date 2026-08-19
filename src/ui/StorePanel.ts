@@ -113,8 +113,9 @@ const CX = IS_MOBILE
        *  the cap has 128 of slack today and is here for the day a font fallback
        *  measures the title wider than the plate can hold beside the key. */
       bannerMaxW: 1740,
-      closeX: 1010,
-      closeY: -1908,
+      closeX: 1052,
+      closeY: -1924,
+      closeDisc: 0.64,
       tabsY: -1512,
       tabCols: 2,
       tabW: 1060,
@@ -158,10 +159,9 @@ const CX = IS_MOBILE
       /** Never binds: the ✕ hit box starts at x 916 and today's band is 712
        *  wide. Same guard as portrait, same reason. */
       bannerMaxW: 1760,
-      /** 924/-512, in from 964/-538: the disc's ink ended 6 units from the
-       *  plate's face and sat on the corner arc. */
-      closeX: 924,
-      closeY: -512,
+      closeX: 932,
+      closeY: -522,
+      closeDisc: 0.4,
       tabsY: -430,
       tabCols: 4,
       tabW: 420,
@@ -501,16 +501,42 @@ export class StorePanel extends Phaser.GameObjects.Container {
     this.closeBtn = close;
     // The royal candy disc: a plum face in a gold rim, painted rather than a
     // cream HUD button under a flat tint.
-    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.58);
+    //
+    // SEATED ON THE CORNER ARC'S OWN CENTRE (932,-522), and sized to the band
+    // it lives in rather than to a thumb. Two measurements decided both:
+    //
+    //   • THE BAND IS 104 UNITS. The plate's ink ends at -580 (the path inset
+    //     by chromeEdge's inner hairline, 3.8 logical) and the tab row's top
+    //     is -476. A Ø79 disc centred in that has 12 units to spare, which is
+    //     why every seat tried so far touched something — at (924,-512) it
+    //     overlapped the Dragons pill by 3.4 units, which is exactly what the
+    //     owner photographed. Ø54 leaves 18.8 to the tabs and 31.2 to the ink.
+    //
+    //   • THE ARC CENTRE IS THE SAFEST POINT, not the furthest from the
+    //     corner. The plate's corner is an arc of radius 84 about (932,-504);
+    //     a disc AT that centre is 84 from the ink in every corner direction,
+    //     while sliding it inboard along x walks it toward the straight edges
+    //     AND toward the tabs. Moving it in was the wrong instinct twice.
+    //
+    // And the container is NEVER scaled — TAP_SCALE on it multiplied the PAINT
+    // as well as the target, which is how portrait ended up with a Ø174 disc
+    // hanging 5.6 units off its own frame. The thumb budget lives in the hit
+    // box below, the way the Ledger's key has done since its own re-seat.
+    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(CX.closeDisc);
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: INK.onFieldGold })
+      .text(0, -2, '✕', {
+        fontFamily: FONT.ui,
+        // 0.507 of the disc — the ratio the Ledger's mark wears, so the glyph
+        // can never outgrow the button it sits in.
+        fontSize: `${Math.round(136 * CX.closeDisc * 0.507)}px`,
+        fontStyle: 'bold',
+        color: INK.onFieldGold
+      })
       .setOrigin(0.5);
     close.add([closeBg, closeX]);
-    // 96, not 120: on desktop the old hit box reached over the last tab.
-    close.setSize(96, 96).setInteractive({ useHandCursor: true });
-    close.setScale(TAP_SCALE);
-    close.on('pointerover', () => close.setScale(TAP_SCALE * 1.08));
-    close.on('pointerout', () => close.setScale(TAP_SCALE));
+    close.setSize(96 * TAP_SCALE, 96 * TAP_SCALE).setInteractive({ useHandCursor: true });
+    close.on('pointerover', () => close.setScale(1.06));
+    close.on('pointerout', () => close.setScale(1));
     close.on('pointerup', () => this.requestClose());
 
     this.tabsRow = scene.add.container(0, CX.tabsY);

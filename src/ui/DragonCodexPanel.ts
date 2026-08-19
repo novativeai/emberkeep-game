@@ -61,7 +61,7 @@ const CX = IS_MOBILE
   ? {
       frameKey: 'ui_panel_tall', frameY: 0,
       edgeX: 990, headY: -1790, bodyTop: -1400, bodyFloor: 1740,
-      bannerH: 208, closeScale: CHROME_STEP, backScale: CHROME_STEP,
+      bannerH: 208, closeDisc: 0.64, backScale: CHROME_STEP,
       specX: 0, specW: 1500, specH: 1000,
       // dossierTop -40, not -120: the specimen block ends with its WELL FED
       // gauge at y -170..-110 (top + specH + 130 + 100, 60 tall), and a story
@@ -75,7 +75,7 @@ const CX = IS_MOBILE
   : {
       frameKey: 'ui_store_panel', frameY: 40,
       edgeX: 1000, headY: -586, bodyTop: -466, bodyFloor: 636,
-      bannerH: 104, closeScale: 1, backScale: 1,
+      bannerH: 104, closeDisc: 0.4, backScale: 1,
       specX: -636, specW: 700, specH: 700,
       dossierX: -240, dossierW: 1180, dossierTop: -466,
       cardW: 300, cardH: 380, cardScale: 1, gapX: 336, gapY: 420, rosterCols: 4, cardArtFit: 226,
@@ -124,16 +124,30 @@ const CHROME_ROW_Y = HEAD_Y + 88;
  *
  * One ladder now: the disc's painted 136 units carry a scale, and the glyph is
  * 0.507 of whatever that renders — the ratio the Ledger's key has always worn
- * (40 on 78.9) and which reads correctly on both devices. The container's own
- * CHROME_STEP then carries BOTH, so they can never drift apart again.
+ * (40 on 78.9) and which reads correctly on both devices. Nothing scales the
+ * CONTAINER any more, so the two cannot drift apart again.
  *
- * 0.50, down from 0.58, because at 0.58 the desktop disc reached within 18
- * units of the plate's right edge and read as touching it. At 0.50 it is 74
- * clear on the right and 56 under the top.
+ * The scale itself is per-orientation (`CX.closeDisc`) and shared with the
+ * Store and the Cauldron, which wear the same plate: 0.40 landscape, 0.64
+ * portrait. Landscape is set by the tightest band in the family — the Store's
+ * 104 units between the plate's ink and its tab row — so one weight serves
+ * every panel on this frame instead of three that disagree.
  */
 const CLOSE_ART = 136;
-const CLOSE_DISC_SCALE = 0.5;
+const CLOSE_DISC_SCALE = CX.closeDisc;
 const CLOSE_GLYPH_PX = Math.round(CLOSE_ART * CLOSE_DISC_SCALE * 0.507);
+/**
+ * THE ✕ SITS ON THE CORNER ARC'S OWN CENTRE.
+ *
+ * `ui_store_panel` rounds its plate by 42 logical, so the corner is an arc of
+ * radius 84 about (932,-504) in panel space — and a disc AT that centre is 84
+ * units from the ink in every corner direction. Sliding it inboard, which is
+ * what "pull it away from the edge" means by instinct, walks it toward the
+ * straight edges instead: the seat this replaces had 48 units, this one 49
+ * from a disc that is also smaller. Landscape x is the arc centre; y stays on
+ * the chrome row so the mark and the BACK pill still read as a pair.
+ */
+const CLOSE_SEAT_X = IS_MOBILE ? CX.edgeX - 92 : 932;
 const BACK_Y = IS_MOBILE ? HEAD_Y + 230 : CHROME_ROW_Y;
 
 const TASTE_W = 566;
@@ -269,7 +283,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // (`CX.closeScale` still multiplies it — the portrait sheet needs a thumb.)
     // 92 in from the head corner, not 36: at the old seat the disc's ink ended
     // 6 units from the plate's inner face and read as pinned ON the corner arc.
-    this.closeBtn = scene.add.container(EDGE_X - 92, CHROME_ROW_Y);
+    this.closeBtn = scene.add.container(CLOSE_SEAT_X, CHROME_ROW_Y);
     const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(CLOSE_DISC_SCALE);
     const closeGlyph = scene.add
       .text(0, -2, '✕', {
@@ -280,14 +294,12 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     this.closeBtn.add([closeBg, closeGlyph]);
-    this.closeBtn.setScale(CX.closeScale);
-    // The hit box keeps the FULL thumb budget (96 x TAP-scale world units)
-    // whatever calmer visual step the disc wears — the chrome shrank, the
-    // finger target must not.
-    this.closeBtn.setSize((96 * TAP_SCALE) / CX.closeScale, (96 * TAP_SCALE) / CX.closeScale);
+    // The container is NEVER scaled — it carries the TARGET, the disc carries
+    // the paint. The thumb keeps its full budget whatever the mark weighs.
+    this.closeBtn.setSize(96 * TAP_SCALE, 96 * TAP_SCALE);
     this.closeBtn.setInteractive({ useHandCursor: true });
-    this.closeBtn.on('pointerover', () => this.closeBtn.setScale(CX.closeScale * 1.08));
-    this.closeBtn.on('pointerout', () => this.closeBtn.setScale(CX.closeScale));
+    this.closeBtn.on('pointerover', () => this.closeBtn.setScale(1.06));
+    this.closeBtn.on('pointerout', () => this.closeBtn.setScale(1));
     this.closeBtn.on('pointerup', () => {
       if (this.held) return;
       this.requestClose();
@@ -1085,7 +1097,14 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
   /** The ‹ Back pill every inner page carries, mirroring the ✕. */
   private backButton(onTap: () => void): Phaser.GameObjects.Container {
     const btn = this.scene.add
-      .container(-EDGE_X + (IS_MOBILE ? 240 : 110), BACK_Y)
+      // 144 IN from the content edge on desktop, not 110 — and the extra 34 is
+      // the whole fix. The owner asked twice for this pill to stop touching the
+      // frame and described the remedy as "lower"; lowering it changes NOTHING,
+      // because the wall it is against is the LEFT one. Measured on the plate's
+      // signed distance field: at -890 the pill's left cap clears the ink by
+      // 18.4 units WHATEVER its y, and at -856 by 40.4. Nor can it go down
+      // instead — its foot already sits 10 units above the specimen plate.
+      .container(-EDGE_X + (IS_MOBILE ? 240 : 144), BACK_Y)
       .setScale(CX.backScale);
     const w = 200;
     const h = 84;
