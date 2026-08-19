@@ -17,6 +17,8 @@ import { uiRegistry } from './theme';
 
 const FRAME_W = 1560;
 const FRAME_H = 900;
+/** Air between the capacity counter's last digit and the close disc's rim. */
+const CAP_AIR = 30;
 /** 6 x 2 — the layout the concept frame settled on. Twelve slots read better in
  *  one wide band at 16:9 than in a 4x3 block, and the count is what matters. */
 const COLS = 6;
@@ -78,6 +80,8 @@ export class BagPanel extends Phaser.GameObjects.Container {
   private dim: Phaser.GameObjects.Rectangle;
   private slots: Phaser.GameObjects.Container[] = [];
   private capacityText: Phaser.GameObjects.Text;
+  /** Seated from the counter's measured width every render — see `capRight`. */
+  private capIcon!: Phaser.GameObjects.Image;
   /** The Gold balance, drawn as Pouches (or Coins below a Pouch's worth). */
   private purse!: Phaser.GameObjects.Container;
   private baseScale = 1;
@@ -162,23 +166,34 @@ export class BagPanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
 
-    // Capacity readout: satchel icon + used/total, top-right inside the frame.
-    const capIcon = scene.add.image(FRAME_W / 2 - 286, -FRAME_H / 2 + 92, 'ui_icon_bag').setScale(0.52);
-    this.capacityText = scene.add
-      .text(FRAME_W / 2 - 220, -FRAME_H / 2 + 92, '', {
-        fontFamily: FONT.display,
-        fontSize: '46px',
-        fontStyle: 'bold',
-        color: PALETTE.cream
-      })
-      .setOrigin(0, 0.5);
-
     // Seated INSIDE the frame: at the old corner the disc hung 22 units above
     // the gold edge and 2 past its right, which reads as a sticker on the panel
     // rather than a key in it.
     const close = scene.add
       .image(FRAME_W / 2 - 88, -FRAME_H / 2 + 88, 'ui_btn_round_royal')
       .setScale(0.62);
+
+    /**
+     * Capacity readout: satchel icon + used/total, top-right inside the frame.
+     *
+     * ANCHORED TO THE CLOSE KEY'S MEASURED EDGE, and built after it for that
+     * reason. It used to grow RIGHTWARD from a fixed x 560 while the disc —
+     * painted 68 logical, so 136 units, 84 at this scale — occupied 650..734.
+     * "12/12" is the widest the counter ever reads and it ran to ~686, so the
+     * ✕ printed over the second 12. Two numbers that had to agree and never
+     * did; now there is one, and it is read off the object itself.
+     */
+    const capRight = close.x - close.displayWidth / 2 - CAP_AIR;
+    const capIcon = scene.add.image(0, -FRAME_H / 2 + 92, 'ui_icon_bag').setScale(0.52);
+    this.capIcon = capIcon;
+    this.capacityText = scene.add
+      .text(capRight, -FRAME_H / 2 + 92, '', {
+        fontFamily: FONT.display,
+        fontSize: '46px',
+        fontStyle: 'bold',
+        color: PALETTE.cream
+      })
+      .setOrigin(1, 0.5);
     const closeX = scene.add
       .text(FRAME_W / 2 - 88, -FRAME_H / 2 + 88, '✕', {
         fontFamily: FONT.display,
@@ -271,6 +286,9 @@ export class BagPanel extends Phaser.GameObjects.Container {
     this.closeChooser();
     const stacks = this.gameState.bag;
     this.capacityText.setText(`${stacks.length}/${BAG_SLOTS}`);
+    // The counter is right-anchored, so the icon follows its width: "3/12" and
+    // "12/12" are different lengths and the pair must stay one block.
+    this.capIcon.setX(this.capacityText.x - this.capacityText.width - 20);
     this.paintPurse();
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i]!;

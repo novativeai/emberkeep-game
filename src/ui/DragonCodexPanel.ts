@@ -98,6 +98,22 @@ const CARD_H = CX.cardH;
 const CARD_GAP_X = CX.gapX;
 const CARD_GAP_Y = CX.gapY;
 const ROSTER_COLS = CX.rosterCols;
+/**
+ * THE CHROME ROW — ✕ on the right, ‹ BACK mirroring it on the left, one seat.
+ *
+ * They were two numbers (close HEAD_Y+74, back HEAD_Y+46) and they disagreed:
+ * the BACK pill is 84 tall, so at +46 it ran y -582..-498 against a plate
+ * whose inner face is -588 — six units of air, which is why it read as sitting
+ * ON the frame's top rim. At this row it runs -554..-470, the same band the
+ * close disc occupies (136 units painted, 0.58 scale, -551..-473).
+ *
+ * PORTRAIT KEEPS ITS OWN BACK SEAT. The tall frame's plaque is 208 units and
+ * at least 1240 wide, so at this row the pill's right edge would come within
+ * 10 units of the plaque's left edge; it drops below the banner instead.
+ */
+const CHROME_ROW_Y = HEAD_Y + 74;
+const BACK_Y = IS_MOBILE ? HEAD_Y + 230 : CHROME_ROW_Y;
+
 const TASTE_W = 566;
 const TASTE_H = 148;
 const TASTE_GAP = 48;
@@ -229,10 +245,10 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // frame: the Store, the Cauldron and the Ledger all wear this same disc at
     // this same size, and the Codex shares their frame, so it shares the seat.
     // (`CX.closeScale` still multiplies it — the portrait sheet needs a thumb.)
-    // 76/74 in from the head corner, not 36/48: at the old seat the disc's
-    // ink ended 6 units from the plate's inner face and read as pinned ON the
-    // corner arc. Same family seat as the Store's landscape key.
-    this.closeBtn = scene.add.container(EDGE_X - 76, HEAD_Y + 74);
+    // 76 in from the head corner, not 36: at the old seat the disc's ink ended
+    // 6 units from the plate's inner face and read as pinned ON the corner arc.
+    // Same family seat as the Store's landscape key.
+    this.closeBtn = scene.add.container(EDGE_X - 76, CHROME_ROW_Y);
     const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.58);
     const closeGlyph = scene.add
       .text(0, -2, '✕', {
@@ -1047,7 +1063,9 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
 
   /** The ‹ Back pill every inner page carries, mirroring the ✕. */
   private backButton(onTap: () => void): Phaser.GameObjects.Container {
-    const btn = this.scene.add.container(-EDGE_X + (IS_MOBILE ? 240 : 110), HEAD_Y + (IS_MOBILE ? 230 : 46)).setScale(CX.backScale);
+    const btn = this.scene.add
+      .container(-EDGE_X + (IS_MOBILE ? 240 : 110), BACK_Y)
+      .setScale(CX.backScale);
     const w = 200;
     const h = 84;
     const r = h / 2; // spelled out — see emberButton on why not RADIUS.pill
