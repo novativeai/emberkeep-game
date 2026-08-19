@@ -52,7 +52,6 @@ import {
   DRAGON_WANDER_FLIGHT_MS,
   PRODUCE_BADGE_LIFT,
   PRODUCE_BADGE_R,
-  REVEAL_HOLD_BACK_MAX_MS,
   SLEEP_BREATH,
   STANDEE_SHADOW_DX,
   STANDEE_SHADOW_DY,
@@ -7514,7 +7513,6 @@ export class BoardScene extends Phaser.Scene {
         }
       }),
       bus.on('bag:give_armed', ({ chain, tier }) => this.armGive(chain, tier)),
-      bus.on('ui:reveal_toggled', ({ open }) => this.onRevealToggled(open)),
       // The reaction rides the FACT, not the gesture: dragged in or handed over
       // from the satchel, a meal looks the same and only DragonSystem knows
       // whether it was the one food this breed loves.
@@ -7705,39 +7703,24 @@ export class BoardScene extends Phaser.Scene {
     });
   }
 
-  /** Shell-crack flash, spark confetti, then the hatchling pops in. */
   /**
-   * The whelp waits behind her own introduction.
+   * Shell-crack flash, spark confetti, then the hatchling pops in — AT ONCE.
    *
-   * The reveal card goes up in the same `item:hatched` emit that runs this
-   * ceremony (RevealSystem is subscribed first), so without holding the hatch
-   * the player would find her already standing on the board when the card
-   * closes — the card would be announcing something they had watched happen
-   * behind a scrim. Held here, the order reads the way it should: three eggs
-   * fuse, the isle stops to name what came out, and THEN she is standing there.
+   * This used to be held behind the reveal card. The reasoning was that the
+   * card goes up in the same `item:hatched` emit (RevealSystem is subscribed
+   * first), so an unheld ceremony means the player finds her already standing
+   * there when the card lifts — the card announcing something that happened
+   * behind its own scrim.
+   *
+   * It cost more than it bought. The card holds itself for 3.4 seconds, and for
+   * every one of them the tile the eggs just fused on sat EMPTY; only then did
+   * the shell start to shake. The one thing a merge game owes a player is that
+   * what they made appears where they made it, immediately — and "immediately"
+   * is not a beat that survives being scheduled behind an unrelated animation.
+   * So the shell breaks and she is there, and the card is what it always was:
+   * her name, said over an isle that already has her on it.
    */
-  private heldHatches: ItemSnapshot[] = [];
-
-  private onRevealToggled(open: boolean): void {
-    this.revealOpen = open;
-    if (open) return;
-    const held = this.heldHatches;
-    this.heldHatches = [];
-    for (const snap of held) this.hatchSequence(snap);
-  }
-
-  private revealOpen = false;
-
   private hatchSequence(snap: ItemSnapshot): void {
-    if (this.revealOpen) {
-      this.heldHatches.push(snap);
-      // Never lost to a card that fails to close: the ceremony runs anyway once
-      // the longest a card can hold has passed.
-      this.time.delayedCall(REVEAL_HOLD_BACK_MAX_MS, () => {
-        if (this.heldHatches.includes(snap)) this.onRevealToggled(false);
-      });
-      return;
-    }
     // The tutorial can MOVE the hatchling in state synchronously inside the
     // 'item:hatched' emit (the chest step slides the green dragon aside) —
     // before this ceremony has created a sprite. Re-read the live cell so the

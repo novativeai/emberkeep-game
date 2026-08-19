@@ -1186,16 +1186,6 @@ export const REVEAL = {
 } as const;
 
 /**
- * The longest BoardScene will hold a hatch waiting for the reveal card to close.
- *
- * Derived from the card's own timeline plus a margin, so it is a safety net and
- * never the thing that decides the timing: if the card closes normally (it holds
- * itself, and a tap skips it) the hatch runs the instant it does.
- */
-export const REVEAL_HOLD_BACK_MAX_MS =
-  REVEAL.nameAtMs + REVEAL.nameRiseMs + REVEAL.holdMs + REVEAL.outMs + 1500;
-
-/**
  * How a shelf item's rarity is DRESSED — the Emporium's only use of it. Rarity
  * buys nothing: a legendary dragon skin re-textures a dragon exactly the way an
  * epic one does. It changes the plate the card is printed on, the ribbon it
