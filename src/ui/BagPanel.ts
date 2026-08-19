@@ -287,8 +287,13 @@ export class BagPanel extends Phaser.GameObjects.Container {
     const stacks = this.gameState.bag;
     this.capacityText.setText(`${stacks.length}/${BAG_SLOTS}`);
     // The counter is right-anchored, so the icon follows its width: "3/12" and
-    // "12/12" are different lengths and the pair must stay one block.
-    this.capIcon.setX(this.capacityText.x - this.capacityText.width - 20);
+    // "12/12" are different lengths and the pair must stay one block. MINUS ITS
+    // OWN HALF-WIDTH: `add.image` origins at the centre, so seating the centre
+    // 20 units left of the text put half the satchel back inside the gap and
+    // into the digits — which is the collision the owner photographed.
+    this.capIcon.setX(
+      this.capacityText.x - this.capacityText.width - 20 - this.capIcon.displayWidth / 2
+    );
     this.paintPurse();
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i]!;

@@ -900,11 +900,32 @@ export class StorePanel extends Phaser.GameObjects.Container {
     // exactly; in portrait a tab wide enough to hold "Manor Skins" at readable
     // type is 1060, and two of those are the whole plate — so the row wraps into
     // a grid rather than shrinking type nobody could read.
-    const cols = CX.tabCols;
-    const rows = Math.ceil(this.sections.length / cols);
-    const startX = -((cols - 1) * CX.tabGapX) / 2;
+    /**
+     * THE ROW FILLS ITS FIELD, whatever the shelf count happens to be.
+     *
+     * `cols` used to be the LAYOUT's column count, not the section count, so
+     * when the empty Keepers shelf was retired the three survivors were seated
+     * in slots one, two and three of a four-slot grid and the fourth slot's
+     * space stayed behind as a hole on the right — which is exactly what the
+     * owner saw. Two rules fix it and neither hard-codes a count: a row is
+     * centred on the tabs it actually holds, and a SINGLE row that no longer
+     * fills the authored span widens to fill it, keeping the authored gutter
+     * so the pills look spaced the way they were drawn.
+     */
+    const count = this.sections.length;
+    const cols = Math.max(1, Math.min(CX.tabCols, count));
+    const rows = Math.ceil(count / cols);
+    /** The visible air between two pills — preserved, never recomputed. */
+    const gutter = CX.tabGapX - CX.tabW;
+    /** What the row spans when the layout is full: the width to keep. */
+    const designSpan = (CX.tabCols - 1) * CX.tabGapX + CX.tabW;
+    const fills = rows === 1 && cols < CX.tabCols;
+    const tabW = fills ? (designSpan - gutter * (cols - 1)) / cols : CX.tabW;
+    const gapX = fills ? tabW + gutter : CX.tabGapX;
+    /** How many pills sit on row `r` — the last row is short when it wraps. */
+    const inRow = (r: number): number => Math.min(cols, count - r * cols);
     const startY = -((rows - 1) * CX.tabGapY) / 2;
-    const halfW = CX.tabW / 2;
+    const halfW = tabW / 2;
     const halfH = CX.tabH / 2;
     // The pill's own geometry, off its height: the corner is a third of it (the
     // banner's 34 on 104), and the seat and strip are the fractions above.
@@ -932,9 +953,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
     const faceMid = -seat / 2;
     this.sections.forEach((section, i) => {
       const active = i === this.activeIndex;
+      const row = Math.floor(i / cols);
       const tab = this.scene.add.container(
-        startX + (i % cols) * CX.tabGapX,
-        startY + Math.floor(i / cols) * CX.tabGapY
+        -((inRow(row) - 1) * gapX) / 2 + (i % cols) * gapX,
+        startY + row * CX.tabGapY
       );
       const g = this.scene.add.graphics();
       // 1 — the seat, under the ACTIVE pill only. A lifted thing has something
@@ -943,20 +965,20 @@ export class StorePanel extends Phaser.GameObjects.Container {
       //     reaches it and nothing reaches past it.
       if (active) {
         g.fillStyle(num(INK.goldDeep), 1);
-        g.fillRoundedRect(-halfW, -halfH + seat, CX.tabW, faceH, radius);
+        g.fillRoundedRect(-halfW, -halfH + seat, tabW, faceH, radius);
       }
       // 2 — the face, `seat` short of the rect's floor.
       g.fillStyle(num(active ? INK.fieldLift : INK.fieldDeep), 1);
-      g.fillRoundedRect(-halfW, -halfH, CX.tabW, faceH, radius);
+      g.fillRoundedRect(-halfW, -halfH, tabW, faceH, radius);
       // 3 — the rim. Same weight either way, so only its COLOUR moves and the
       //     pill's footprint is the same in both states.
       g.lineStyle(CX.tabRim, num(active ? INK.gold : INK.goldDeep), 1);
-      g.strokeRoundedRect(-halfW, -halfH, CX.tabW, faceH, radius);
+      g.strokeRoundedRect(-halfW, -halfH, tabW, faceH, radius);
       // 4 — the strip along the top: the hall's own cool light (`fieldGlow`,
       //     the token that exists for exactly this) on the lifted pill, and the
       //     scrim on the sunken one.
       g.fillStyle(num(active ? INK.fieldGlow : INK.scrim), active ? 0.42 : 0.34);
-      g.fillRoundedRect(-halfW + stripX, -halfH + stripY, CX.tabW - stripX * 2, stripH, stripH / 2);
+      g.fillRoundedRect(-halfW + stripX, -halfH + stripY, tabW - stripX * 2, stripH, stripH / 2);
       const label = this.scene.add
         .text(0, faceMid - 2, section.title, {
           fontFamily: FONT.ui,
@@ -983,7 +1005,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
         );
         label.setY(faceMid - CX.tabH * TAB_LABEL_LIFT);
       }
-      tab.setSize(CX.tabW, CX.tabH).setInteractive({ useHandCursor: true });
+      tab.setSize(tabW, CX.tabH).setInteractive({ useHandCursor: true });
       tab.on('pointerup', () => {
         if (this.activeIndex === i) return;
         this.activeIndex = i;

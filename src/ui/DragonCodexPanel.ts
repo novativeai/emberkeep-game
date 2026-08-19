@@ -111,7 +111,29 @@ const ROSTER_COLS = CX.rosterCols;
  * at least 1240 wide, so at this row the pill's right edge would come within
  * 10 units of the plaque's left edge; it drops below the banner instead.
  */
-const CHROME_ROW_Y = HEAD_Y + 74;
+const CHROME_ROW_Y = HEAD_Y + 88;
+
+/**
+ * THE ✕ IS A FRACTION OF ITS DISC, not a step on the type ladder.
+ *
+ * It was `F(TYPE.title) * 0.74`, and `F` doubles on a phone: the glyph went
+ * 40 -> 80 while the disc it sits in grew only by CHROME_STEP (78.9 -> 94.7).
+ * A 80-unit ✕ in a 94.7 disc is the "trop grand" the owner saw — the mark had
+ * outgrown the button by construction, because the two were stepped by
+ * different ladders.
+ *
+ * One ladder now: the disc's painted 136 units carry a scale, and the glyph is
+ * 0.507 of whatever that renders — the ratio the Ledger's key has always worn
+ * (40 on 78.9) and which reads correctly on both devices. The container's own
+ * CHROME_STEP then carries BOTH, so they can never drift apart again.
+ *
+ * 0.50, down from 0.58, because at 0.58 the desktop disc reached within 18
+ * units of the plate's right edge and read as touching it. At 0.50 it is 74
+ * clear on the right and 56 under the top.
+ */
+const CLOSE_ART = 136;
+const CLOSE_DISC_SCALE = 0.5;
+const CLOSE_GLYPH_PX = Math.round(CLOSE_ART * CLOSE_DISC_SCALE * 0.507);
 const BACK_Y = IS_MOBILE ? HEAD_Y + 230 : CHROME_ROW_Y;
 
 const TASTE_W = 566;
@@ -245,15 +267,14 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // frame: the Store, the Cauldron and the Ledger all wear this same disc at
     // this same size, and the Codex shares their frame, so it shares the seat.
     // (`CX.closeScale` still multiplies it — the portrait sheet needs a thumb.)
-    // 76 in from the head corner, not 36: at the old seat the disc's ink ended
+    // 92 in from the head corner, not 36: at the old seat the disc's ink ended
     // 6 units from the plate's inner face and read as pinned ON the corner arc.
-    // Same family seat as the Store's landscape key.
-    this.closeBtn = scene.add.container(EDGE_X - 76, CHROME_ROW_Y);
-    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.58);
+    this.closeBtn = scene.add.container(EDGE_X - 92, CHROME_ROW_Y);
+    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(CLOSE_DISC_SCALE);
     const closeGlyph = scene.add
       .text(0, -2, '✕', {
         fontFamily: FONT.ui,
-        fontSize: `${Math.round(F(TYPE.title) * 0.74)}px`,
+        fontSize: `${CLOSE_GLYPH_PX}px`,
         fontStyle: 'bold',
         color: INK.onFieldGold
       })

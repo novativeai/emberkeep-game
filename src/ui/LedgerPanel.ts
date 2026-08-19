@@ -258,11 +258,28 @@ const CLOSE_DESKTOP_SCALE = 0.58;
  * units (11.7 from the arc centre + 44 ≤ 60), the tab by 8.4 and the card by 25.
  * 2 x 44 / 136 = 0.647.
  */
-const CLOSE_DISC_SCALE = IS_MOBILE ? 0.647 : CLOSE_DESKTOP_SCALE;
-/** Pulled IN from (580, -350): the disc's edge rode the frame's rounded
- *  corner (owner: "il touche le bord du cadre"). Same face, 48 further in. */
-const CLOSE_SEAT_X = IS_MOBILE ? 530 : 532;
-const CLOSE_SEAT_Y = IS_MOBILE ? -332 : -328;
+/**
+ * A SMALLER DISC IN THE DERIVED POCKET — not the same disc shoved inwards.
+ *
+ * The owner read the old key as touching the frame, which the arithmetic above
+ * agrees with: at radius 44 it cleared the corner arc by 4.3 units, the
+ * thinnest of its three walls. The obvious answer — pull it in 48 — walked it
+ * straight into the Tasks lozenge instead (centre 77.8 from the cap against 96
+ * of summed radii: 18 units of overlap, and the owner saw that too). The
+ * pocket was never the problem; the disc was too big for it.
+ *
+ * Radius 32 at (572, -352) clears all three walls at once, and the tightest is
+ * now three times what the tightest used to be:
+ *   • frame corner arc, centre (572,-344) r 60 — 8 away, 8+32 ≤ 60: 20 units
+ *   • Tasks capsule cap (478,-384) r 52 — 99.3 apart against 84 summed: 15.3
+ *   • right card corner (577.2,-288.2) r 25.2 — 64.0 against 57.2: 6.8
+ * 2 x 32 / 136 = 0.47, and ONE number serves both devices because the panel is
+ * already magnified as a whole; the thumb budget lives in CLOSE_HIT, which is
+ * the whole point of the disc and the target being two numbers.
+ */
+const CLOSE_DISC_SCALE = 0.47;
+const CLOSE_SEAT_X = 572;
+const CLOSE_SEAT_Y = -352;
 /** The ✕ is 40 units of type on the desktop disc's 78.9, so it keeps that
  *  proportion whatever scales the disc — 40 exactly on desktop, 45 in portrait. */
 const CLOSE_GLYPH_PX = Math.round(
