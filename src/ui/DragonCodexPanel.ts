@@ -75,7 +75,7 @@ const CX = IS_MOBILE
   : {
       frameKey: 'ui_store_panel', frameY: 40,
       edgeX: 1000, headY: -586, bodyTop: -466, bodyFloor: 636,
-      bannerH: 104, closeDisc: 0.4, backScale: 1,
+      bannerH: 104, closeDisc: 0.5, backScale: 1,
       specX: -636, specW: 700, specH: 700,
       dossierX: -240, dossierW: 1180, dossierTop: -466,
       cardW: 300, cardH: 380, cardScale: 1, gapX: 336, gapY: 420, rosterCols: 4, cardArtFit: 226,
@@ -127,11 +127,11 @@ const CHROME_ROW_Y = HEAD_Y + 88;
  * (40 on 78.9) and which reads correctly on both devices. Nothing scales the
  * CONTAINER any more, so the two cannot drift apart again.
  *
- * The scale itself is per-orientation (`CX.closeDisc`) and shared with the
- * Store and the Cauldron, which wear the same plate: 0.40 landscape, 0.64
- * portrait. Landscape is set by the tightest band in the family — the Store's
- * 104 units between the plate's ink and its tab row — so one weight serves
- * every panel on this frame instead of three that disagree.
+ * The scale itself is per-panel (`CX.closeDisc`), because the CONSTRAINT is:
+ * the Store's key lives over a tab row and tops out at 0.44 (Ø60, 16 units
+ * above the pills); this panel and the Cauldron have no tab row, so they wear
+ * 0.5 (Ø68, 48 clear) — the owner read Ø54 as too small next to the BACK
+ * pill, and the pair is now sized as a pair (see `backButton`).
  */
 const CLOSE_ART = 136;
 const CLOSE_DISC_SCALE = CX.closeDisc;
@@ -148,7 +148,7 @@ const CLOSE_GLYPH_PX = Math.round(CLOSE_ART * CLOSE_DISC_SCALE * 0.507);
  * the chrome row so the mark and the BACK pill still read as a pair.
  */
 const CLOSE_SEAT_X = IS_MOBILE ? CX.edgeX - 92 : 932;
-const BACK_Y = IS_MOBILE ? HEAD_Y + 230 : CHROME_ROW_Y;
+const BACK_Y = IS_MOBILE ? HEAD_Y + 230 : -508;
 
 const TASTE_W = 566;
 const TASTE_H = 148;
@@ -1085,7 +1085,9 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     g.lineStyle(5, num(INK.goldHi), 0.9);
     g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
     btn.add([g, label]);
-    btn.setSize(w, h);
+    // The TARGET keeps the old pill's footprint — the paint shrank, the thumb
+    // budget must not (same split as every close key on this frame).
+    btn.setSize(Math.max(w, 200), Math.max(h, 84));
     btn.setInteractive({ useHandCursor: true });
     const rest = IS_MOBILE ? CHROME_STEP : 1;
     btn.on('pointerover', () => btn.setScale(rest * 1.05));
@@ -1094,20 +1096,31 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     return btn;
   }
 
-  /** The ‹ Back pill every inner page carries, mirroring the ✕. */
+  /**
+   * The ‹ Back pill every inner page carries, mirroring the ✕ — and now
+   * genuinely mirroring it, which is what three rounds of nudging missed.
+   *
+   * The band this pill lives in is only 114 units tall: the plate's ink ends
+   * at -580 and the specimen plate begins at -466. A 200x84 pill in a 114
+   * band keeps at most 30 units of total slack WHEREVER it sits — it reads as
+   * wedged against the frame because it very nearly is, and no seat can fix a
+   * pill that fills 74% of its band. Meanwhile the ✕ across from it had gone
+   * down to Ø54, so the pair read as one oversized key and one undersized one
+   * — which is exactly how the owner described it.
+   *
+   * So the pair is sized as a pair: the pill drops to 170x64 (56% of the
+   * band, the same share the Ø68 disc takes of its corner) and the ✕ comes
+   * back up to 0.5. At (-836, -508) the pill keeps 38 units over it, 10
+   * under, and 87 to the left ink — detached from the border on every side.
+   * The label is a fixed 36 (0.56 of the pill, the ✕'s own ratio); it was
+   * `F(TYPE.label)`, which doubles on a phone and filled 80% of the old pill.
+   */
   private backButton(onTap: () => void): Phaser.GameObjects.Container {
     const btn = this.scene.add
-      // 144 IN from the content edge on desktop, not 110 — and the extra 34 is
-      // the whole fix. The owner asked twice for this pill to stop touching the
-      // frame and described the remedy as "lower"; lowering it changes NOTHING,
-      // because the wall it is against is the LEFT one. Measured on the plate's
-      // signed distance field: at -890 the pill's left cap clears the ink by
-      // 18.4 units WHATEVER its y, and at -856 by 40.4. Nor can it go down
-      // instead — its foot already sits 10 units above the specimen plate.
-      .container(-EDGE_X + (IS_MOBILE ? 240 : 144), BACK_Y)
+      .container(IS_MOBILE ? -EDGE_X + 240 : -836, BACK_Y)
       .setScale(CX.backScale);
-    const w = 200;
-    const h = 84;
+    const w = 170;
+    const h = 64;
     const r = h / 2; // spelled out — see emberButton on why not RADIUS.pill
     const g = this.scene.add.graphics();
     g.fillStyle(num(INK.goldDeep), 1);
@@ -1119,14 +1132,16 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     const label = this.scene.add
       .text(0, 0, '‹  BACK', {
         fontFamily: FONT.ui,
-        fontSize: `${F(TYPE.label)}px`,
+        fontSize: '36px',
         fontStyle: 'bold',
         color: INK.onFieldGold
       })
       .setOrigin(0.5)
       .setLetterSpacing(3);
     btn.add([g, label]);
-    btn.setSize(w, h);
+    // The TARGET keeps the old pill's footprint — the paint shrank, the thumb
+    // budget must not (same split as every close key on this frame).
+    btn.setSize(Math.max(w, 200), Math.max(h, 84));
     btn.setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => btn.setScale(CX.backScale * 1.06));
     btn.on('pointerout', () => btn.setScale(CX.backScale));

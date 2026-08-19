@@ -161,7 +161,10 @@ const CX = IS_MOBILE
       bannerMaxW: 1760,
       closeX: 932,
       closeY: -522,
-      closeDisc: 0.4,
+      /** Ø60: 16.1 units above the tab row, 28.2 from the plate's ink — the
+       *  most disc this band takes. The Codex and Cauldron wear 0.5 because
+       *  their plates have no tab row underneath. */
+      closeDisc: 0.44,
       tabsY: -430,
       tabCols: 4,
       tabW: 420,

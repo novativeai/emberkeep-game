@@ -119,9 +119,9 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
     // same weight as every other key on this frame.
     const close = scene.add.container(932, -512);
     this.closeBtn = close;
-    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.4);
+    const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.5);
     const closeX = scene.add
-      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '28px', fontStyle: 'bold', color: INK.onFieldGold })
+      .text(0, -2, '✕', { fontFamily: FONT.ui, fontSize: '34px', fontStyle: 'bold', color: INK.onFieldGold })
       .setOrigin(0.5);
     close.add([closeBg, closeX]);
     // A THUMB, NOT A CURSOR. 96 units of hit box is ~15 real pixels on a
