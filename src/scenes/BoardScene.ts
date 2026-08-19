@@ -3799,6 +3799,43 @@ export class BoardScene extends Phaser.Scene {
       if (d.name === CAULDRON_DECOR) {
         // The Runevault tour points here ("The cauldron, on the rune — tap it").
         this.tourTargets.set('runevault_cauldron', { x: sprite.x, y: baseY - sprite.displayHeight * 0.55 });
+        // A pot that brews LOOKS like it brews, wherever a world seats one: a
+        // breathing glow at the mouth and a few slow motes rising off the brew.
+        // Ambient-gated like the snow — the low tier keeps the still pot — and
+        // never tracked by hand: this scene restarts on travel, so the world
+        // that owns the cauldron owns its steam.
+        if (graphics.profile.ambient > 0) {
+          const mouthY = baseY + sprite.displayHeight * 0.18;
+          const glow = this.add
+            .image(sprite.x, mouthY, 'fx_glow')
+            .setBlendMode(Phaser.BlendModes.ADD)
+            .setTint(0xff9ee0)
+            .setAlpha(0.28)
+            .setScale((sprite.displayWidth * 0.5) / 512)
+            .setDepth(DEPTHS.itemBase + y + 1);
+          this.tweens.add({
+            targets: glow,
+            alpha: { from: 0.18, to: 0.4 },
+            scale: glow.scale * 1.18,
+            duration: 1600,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+          });
+          this.add
+            .particles(sprite.x, mouthY, 'fx_glow', {
+              x: { min: -sprite.displayWidth * 0.16, max: sprite.displayWidth * 0.16 },
+              speedY: { min: -34, max: -14 },
+              speedX: { min: -6, max: 6 },
+              lifespan: { min: 1800, max: 3200 },
+              scale: { start: 0.05, end: 0.012 },
+              alpha: { start: 0.5, end: 0 },
+              frequency: Math.round(420 / graphics.profile.ambient),
+              tint: [0xffb3ec, 0xd48bff, 0xff8fd2],
+              blendMode: Phaser.BlendModes.ADD
+            })
+            .setDepth(DEPTHS.itemBase + y + 2);
+        }
         sprite.setInteractive({ useHandCursor: true });
         sprite.on(
           'pointerup',

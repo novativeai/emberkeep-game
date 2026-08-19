@@ -117,10 +117,10 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
 
     // Inside the gold edge, like every other ✕ in the game.
     const close = scene.add
-      .image(FRAME_W / 2 - 52, -FRAME_H / 2 + 54, 'ui_btn_round_royal')
+      .image(FRAME_W / 2 - 88, -FRAME_H / 2 + 88, 'ui_btn_round_royal')
       .setScale(0.62);
     const closeX = scene.add
-      .text(FRAME_W / 2 - 52, -FRAME_H / 2 + 52, '✕', {
+      .text(FRAME_W / 2 - 88, -FRAME_H / 2 + 88, '✕', {
         fontFamily: FONT.display,
         fontSize: `${Math.round(TYPE.title * 0.86)}px`,
         fontStyle: 'bold',

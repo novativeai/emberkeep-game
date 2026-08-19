@@ -64,10 +64,16 @@ const COMPASS: Array<[fixture: string, product: string | null]> = [
 const ICE = { satMax: 0.55, darkMax: 0.52, brightMin: 0.8 };
 /**
  * What is left of the pale roster. Named rather than skipped, because the list
- * IS the problem the rule exists to stop growing — and it is now one dragon,
+ * IS the problem the rule exists to stop growing — and it is now two dragons,
  * whose art comes off the breed pipeline rather than a chain sheet.
+ *
+ * `frost` joined when the owner bound the breed to Borealis (chains.json
+ * `world`) — the pale-on-ice risk this spec exists to catch is real for it,
+ * and accepted: its art is breed-pipeline (frost_baby/frost_adult clips), not
+ * a chain sheet a re-cut could fix, and the owner's call was availability
+ * first. If a recolour ever lands, take it back OUT of this set.
  */
-const GRANDFATHERED = new Set(['rimewyrm']);
+const GRANDFATHERED = new Set(['rimewyrm', 'frost']);
 
 /** Mean saturation/value of a webp's opaque pixels, straight off the file. */
 function meanHsv(file: string): { sat: number; val: number } {

@@ -158,8 +158,10 @@ const CX = IS_MOBILE
       /** Never binds: the ✕ hit box starts at x 916 and today's band is 712
        *  wide. Same guard as portrait, same reason. */
       bannerMaxW: 1760,
-      closeX: 964,
-      closeY: -538,
+      /** 924/-512, in from 964/-538: the disc's ink ended 6 units from the
+       *  plate's face and sat on the corner arc. */
+      closeX: 924,
+      closeY: -512,
       tabsY: -430,
       tabCols: 4,
       tabW: 420,

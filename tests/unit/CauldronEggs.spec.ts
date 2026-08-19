@@ -33,6 +33,13 @@ describe('brewed eggs → board → dragon (the whole road)', () => {
 
     it(`${egg.chain}: a banked egg DROPS from the bag onto the board`, () => {
       const ctx = createTestContext();
+      // A WORLD-BOUND egg only leaves the bag on its own soil (BagSystem's
+      // gate — the rimewyrm and the frost are Borealis-born). The road the
+      // player actually walks includes the travel, so the test walks it too.
+      if (chain.world) {
+        expect(ctx.state.worlds.has(chain.world), `fixture has ${chain.world}`).toBe(true);
+        ctx.state.switchWorld(chain.world);
+      }
       ctx.bus.emit('bag:bank', { chain: egg.chain, tier: egg.tier, count: 3 });
       for (let i = 0; i < 3; i++) {
         ctx.bus.emit('ui:bag_retrieve_requested', { chain: egg.chain, tier: egg.tier });

@@ -8,6 +8,7 @@ import {
   cellInZone,
   cellsWithin,
   hasCell,
+  nearestPlayableCell,
   neighborsOf,
   setActiveWorld,
   worldPointOf,
@@ -573,6 +574,51 @@ export class GameState {
     board.items.set(id, item);
     board.grid[to.row]![to.col] = id;
     return true;
+  }
+
+  /**
+   * Send every WORLD-BOUND chain's pieces home — the save-heal for a chain
+   * that acquired a `world` after players already owned it.
+   *
+   * The bag made the leak: a Borealis-only egg bought in Borealis overflows
+   * into the bag, the bag follows the Keeper, and the egg comes out on any
+   * board she likes. Closing the faucet (BagSystem now refuses the placement)
+   * fixes tomorrow; this fixes the saves that already carry a frost dragon on
+   * a southern isle. Items go to a free playable cell of their home world —
+   * anchored at its first door so they read as having ARRIVED, not spawned —
+   * and only fall back to the bag when the home board is genuinely full,
+   * because a named dragon stacked into the bag would lose its name.
+   */
+  exileForeignChains(homeOf: (chain: string) => string | undefined): number {
+    let moved = 0;
+    for (const [worldId, board] of [...this.boards]) {
+      for (const item of [...board.items.values()]) {
+        if (item.kind !== 'item') continue;
+        const home = homeOf(item.chain);
+        if (!home || home === worldId || !this.worlds.has(home)) continue;
+        board.grid[item.row]![item.col] = null;
+        board.items.delete(item.id);
+        const world = this.worlds.get(home)!;
+        const target = this.board(home); // materialises an unvisited far side
+        const door = world.portals[0];
+        const anchor = door
+          ? { x: door.x + door.width / 2, y: door.y + door.height / 2 }
+          : worldPointOf(world, 0, 0);
+        const free = (col: number, row: number): boolean =>
+          target.grid[row]?.[col] === null;
+        const at = nearestPlayableCell(world, anchor.x, anchor.y, free);
+        if (at) {
+          item.col = at.col;
+          item.row = at.row;
+          target.items.set(item.id, item);
+          target.grid[at.row]![at.col] = item.id;
+        } else {
+          this.stashStack(item.chain, item.tier, 1);
+        }
+        moved += 1;
+      }
+    }
+    return moved;
   }
 
   removeItem(id: number): BoardItemState {

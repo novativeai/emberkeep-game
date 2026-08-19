@@ -412,6 +412,7 @@
     },
     {
       "id": "frost",
+      "world": "borealis",
       "name": "Frost Dragons",
       "hatchAtTier": 2,
       "tiers": [

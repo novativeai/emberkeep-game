@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import {
   chainHiddenIn,
+  IS_MOBILE,
   LIVE_GAME_HEIGHT,
   LIVE_GAME_WIDTH,
   num,
@@ -72,12 +73,20 @@ const ICON_FIT_TO = 92;
 /** The ✕, in panel space. ONE pair of numbers, because the tutorial's pointer
  *  is aimed at it by `getClosePos` — a close key that moves without its anchor
  *  is a lesson pointing at empty page. */
-const CLOSE_X = 578;
-const CLOSE_Y = -352;
+/** Pulled IN from (578, -352): the royal disc's edge reached x 626 against a
+ *  painted face that rounds off near 590, so the key sat ON the corner arc —
+ *  the owner read it as hanging off the book. 530/-330 keeps it clear of the
+ *  title lozenge (ends x 330) and above the viewport (starts y -278). */
+const CLOSE_X = 530;
+const CLOSE_Y = -330;
 
-/** The scrolling window, in panel space: under the subtitle, above the count. */
-const VIEW_TOP = -278;
-const VIEW_H = 612;
+/** The world-tab row (Emberkeep / Borealis / ...) between subtitle and page. */
+const TABS_Y = -240;
+/** The scrolling window, in panel space: under the WORLD TABS, above the count.
+ *  It gave 74 units to the tab row — the floor stays where it was, the
+ *  window scrolls the difference. */
+const VIEW_TOP = -204;
+const VIEW_H = 538;
 /** Centre of that window — where the viewport container sits. */
 const VIEW_MID = VIEW_TOP + VIEW_H / 2;
 /** First row's centre inside the scrolling content. */
@@ -107,6 +116,14 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   private counter: Phaser.GameObjects.Text;
   /** Open/rest scale — >1 on mobile so the frame fills the portrait width. */
   private baseScale = 1;
+  /** The world whose page is open — the ACTIVE world until a tab is tapped.
+   *  The book is one volume with a page per world the Keeper has visited:
+   *  merges discovered in the south stopped "disappearing" in the north the
+   *  day this stopped being welded to where she happens to stand. */
+  private viewWorld: string;
+  private tabsRow: Phaser.GameObjects.Container;
+  private readonly audit: AuditData;
+  private readonly chains: ChainsData;
 
   constructor(
     scene: Phaser.Scene,
@@ -116,6 +133,9 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   ) {
     super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
     const chains = data.chains;
+    this.audit = data;
+    this.chains = chains;
+    this.viewWorld = gameState.worldId;
 
     const dim = scene.add
       .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.45)
@@ -180,7 +200,13 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     // handset — well under the 44px every platform asks for — so in portrait
     // the whole disc steps up by `TAP_SCALE`. `1` on desktop, where the seat
     // inside the plate's corner was measured and must not move.
-    closeButton.setSize(96, 96).setScale(TAP_SCALE);
+    // Visual and thumb are SEPARATE dials now: at the full TAP_SCALE the disc
+    // was a quarter of the page's width and the owner called it ugly. The
+    // container wears a calmer visual step and the HIT BOX keeps the whole
+    // thumb budget by growing in local units instead.
+    const closeVisual = IS_MOBILE ? 1.45 : 1;
+    closeButton.setSize((96 * TAP_SCALE) / closeVisual, (96 * TAP_SCALE) / closeVisual);
+    closeButton.setScale(closeVisual);
     closeButton.setInteractive({ useHandCursor: true });
     closeButton.on('pointerup', () => this.requestClose());
     this.add(closeButton);
@@ -201,10 +227,6 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
       this.pageMask.destroy();
     });
 
-    // ---- Recipe rows: every mergeable tier pair, chains.json order. Two
-    // columns split evenly; with more than 6 rows per column the gap squeezes
-    // so the last row never collides with the counter line below. ----
-    const recipes = this.enumerateRecipes(chains, reachableRecipeKeys(data));
     this.viewport = scene.add.container(0, VIEW_MID);
     this.rowsGroup = scene.add.container(0, 0);
     this.viewport.add(this.rowsGroup);
@@ -214,16 +236,9 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.pageMask = scene.make.graphics();
     this.rowsGroup.setMask(this.pageMask.createGeometryMask());
 
-    // Row-major, left then right: scrolling then reveals recipes IN ORDER.
-    // Filling column one before column two put recipe 1 beside recipe 13, and
-    // a scroll moved both by twelve places at once.
-    recipes.forEach((recipe, i) => {
-      const x = (i % 2 === 0 ? -1 : 1) * COL_X;
-      const y = ROW_TOP + Math.floor(i / 2) * ROW_GAP;
-      this.rows.push(this.buildRow(scene, recipe, x, y));
-    });
-    const contentH = Math.ceil(recipes.length / 2) * ROW_GAP;
-    this.maxScroll = Math.max(0, contentH - VIEW_H);
+    this.tabsRow = scene.add.container(0, TABS_Y);
+    this.add(this.tabsRow);
+    this.buildRows();
 
     this.counter = scene.add
       .text(0, 384, '', {
@@ -264,7 +279,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   private enumerateRecipes(chains: ChainsData, discoverable: Set<string>): Recipe[] {
     const out: Recipe[] = [];
     for (const chain of chains.chains) {
-      if (chain.id === 'golden_egg' || chainHiddenIn(chain, this.gameState.worldId)) continue;
+      if (chain.id === 'golden_egg' || chainHiddenIn(chain, this.viewWorld)) continue;
       for (const tier of chain.tiers) {
         const next = chain.tiers.find((t) => t.tier === tier.tier + 1);
         if (!next) continue;
@@ -419,6 +434,85 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     row.badge.setVisible(discovered);
   }
 
+  /**
+   * Rebuild the page for `viewWorld`: its reachable recipe list, laid out
+   * row-major, two columns. Called at construction and on every tab change.
+   * `reachableRecipeKeys` caches per (chains, world), so flipping tabs costs
+   * a lookup, not a ladder walk.
+   */
+  private buildRows(): void {
+    this.rowsGroup.removeAll(true);
+    this.rows = [];
+    const recipes = this.enumerateRecipes(
+      this.chains,
+      reachableRecipeKeys({ ...this.audit, worldId: this.viewWorld })
+    );
+    // Row-major, left then right: scrolling then reveals recipes IN ORDER.
+    // Filling column one before column two put recipe 1 beside recipe 13, and
+    // a scroll moved both by twelve places at once.
+    recipes.forEach((recipe, i) => {
+      const x = (i % 2 === 0 ? -1 : 1) * COL_X;
+      const y = ROW_TOP + Math.floor(i / 2) * ROW_GAP;
+      this.rows.push(this.buildRow(this.scene, recipe, x, y));
+    });
+    const contentH = Math.ceil(recipes.length / 2) * ROW_GAP;
+    this.maxScroll = Math.max(0, contentH - VIEW_H);
+    this.setScroll(0);
+  }
+
+  /**
+   * The little navbar the owner asked for: one pill per VISITED world, the
+   * open page's pill lit. Hidden entirely while only one world has been seen
+   * — a navbar with one destination is furniture.
+   */
+  private buildTabs(): void {
+    this.tabsRow.removeAll(true);
+    const visited = [...this.gameState.worlds.keys()].filter((id) => this.gameState.visited(id));
+    if (visited.length < 2) return;
+    const PILL_H = 60;
+    const PAD = 34;
+    const GAP = 18;
+    const labels = visited.map((id) => this.gameState.worlds.get(id)?.name ?? id);
+    const texts = labels.map((label, i) =>
+      this.scene.add
+        .text(0, 0, label, {
+          fontFamily: FONT.ui,
+          fontSize: '28px',
+          fontStyle: 'bold',
+          color: visited[i] === this.viewWorld ? PALETTE.textBrown : '#8A6248'
+        })
+        .setOrigin(0.5)
+    );
+    const widths = texts.map((t) => t.width + PAD * 2);
+    const total = widths.reduce((a, b) => a + b, 0) + GAP * (widths.length - 1);
+    let x = -total / 2;
+    visited.forEach((id, i) => {
+      const w = widths[i]!;
+      const cx = x + w / 2;
+      const on = id === this.viewWorld;
+      const g = this.scene.add.graphics();
+      g.fillStyle(num(on ? PALETTE.gold : PALETTE.goldShade), on ? 1 : 0.35);
+      g.fillRoundedRect(cx - w / 2, -PILL_H / 2, w, PILL_H, PILL_H / 2);
+      if (on) {
+        g.lineStyle(4, num(PALETTE.cream), 0.95);
+        g.strokeRoundedRect(cx - w / 2, -PILL_H / 2, w, PILL_H, PILL_H / 2);
+      }
+      texts[i]!.setPosition(cx, -1);
+      const hit = this.scene.add
+        .zone(cx, 0, w, PILL_H + 24)
+        .setInteractive({ useHandCursor: true });
+      hit.on('pointerup', () => {
+        if (this.viewWorld === id) return;
+        this.viewWorld = id;
+        this.buildTabs();
+        this.buildRows();
+        this.refresh();
+      });
+      this.tabsRow.add([g, texts[i]!, hit]);
+      x += w + GAP;
+    });
+  }
+
   private refresh(): void {
     let found = 0;
     for (const row of this.rows) {
@@ -437,6 +531,13 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   open(): void {
     if (this.isOpen) return;
     this.isOpen = true;
+    // The book opens on the page of the world the Keeper is STANDING in —
+    // the tabs are for looking back, not a preference to remember.
+    if (this.viewWorld !== this.gameState.worldId) {
+      this.viewWorld = this.gameState.worldId;
+      this.buildRows();
+    }
+    this.buildTabs();
     this.refresh();
     this.setScroll(0);
     this.scene.tweens.killTweensOf(this);

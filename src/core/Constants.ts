@@ -285,7 +285,7 @@ export const QUEST_TRACKER_BOTTOM = QUEST_LIST_TOP_Y + QUEST_VIEW_H;
 export const STATUS_READOUT_GAP = 44;
 /** The readout's own height in LOCAL units: the name at 0, the hearts at 58,
  *  the line at 96, and that line's own type under it. */
-export const STATUS_READOUT_H = 126;
+export const STATUS_READOUT_H = 140;
 /** Where the readout ENDS on screen — the ceiling the HUD column may not cross. */
 export const STATUS_READOUT_BOTTOM_Y: number =
   QUEST_TRACKER_TOP_Y + (QUEST_TRACKER_BOTTOM + STATUS_READOUT_GAP + STATUS_READOUT_H) * UI_SCALE;
@@ -1439,7 +1439,10 @@ export const DRAGON_RARITY: Record<string, DragonRarity> = {
 export const DRAGON_DIET: Record<string, { favourite: string; refuses: string }> = {
   ember_dragon: { favourite: 'resin', refuses: 'emberheart' },
   emerald: { favourite: 'emberberry', refuses: 'emberheart' },
-  frost: { favourite: 'ashmoss', refuses: 'resin' },
+  // The frost dragon is BOREALIS-BORN (chains.json `world`), so its favourite
+  // is northern vocabulary: an ember heart, the one warm thing on the ice —
+  // not ashmoss, which grows a world away and would price its adult at 4x.
+  frost: { favourite: 'emberheart', refuses: 'resin' },
   storm: { favourite: 'stormcap', refuses: 'emberberry' },
   moonwhisker: { favourite: 'nightbloom', refuses: 'emberheart' }
 };

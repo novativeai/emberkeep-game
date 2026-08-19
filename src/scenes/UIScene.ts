@@ -125,33 +125,17 @@ function markerAim(marker: ResolvedHand | ResolvedArrow | null): string {
 const SETTINGS_W = 900;
 
 /**
- * THE PLATE GROWS, and the graphics blurb spends all of the extra.
+ * THE PLATE IS MEASURED, NOT RESERVED.
  *
- * Cycling the quality can append "Reload the page to resize the canvas." to
- * that blurb, taking it to three wrapped lines. At the desktop 30px that is
- * 3 x 36 + 2 x 6 of lineSpacing = 120 units hanging off a top edge at -52.
- * The divider is seated at +38 (it was +46; the owner read the reset warning
- * as touching the keys, so the whole bottom block rose 8), which makes the
- * slack formula `air = EXTRA_H - 30`: 48 buys 18 units under the worst-case
- * blurb. (At the original 26px the shortfall was 7.6 and 24 of slack bought
- * 16 — that arithmetic is in git; the blurb grew because 26 arrived at 13
- * real px on a 1080p screen and the owner called it unreadable.)
- *
- * Portrait needs a bigger blurb again (see SETTINGS_NOTE_PX): 3 x 38.4 + 12 =
- * 127.2, so its air is `EXTRA_H - 37.2` and the authored 60 buys 22.8.
- *
- * The slack is inserted in the MIDDLE — the top block (title → blurb) moves up
- * half of it, everything from the divider down moves down the other half — so
- * the plate stays centred on the container origin and every margin EXCEPT the
- * one that was short comes out exactly as authored.
+ * It used to be a fixed 736 plus a slack constant sized for the worst case —
+ * the graphics blurb growing to three lines after a quality change appends
+ * "Reload the page to resize the canvas." — which meant the REST state carried
+ * the worst case's emptiness as a permanent hole between the blurb and the
+ * divider. The owner called it out twice. `openResetDialog` now flows its rows
+ * top-down off their measured heights and redraws the plate to fit, and when
+ * the blurb grows the plate grows WITH it instead of having paid for the room
+ * in advance.
  */
-const SETTINGS_EXTRA_H = IS_MOBILE ? 60 : 48;
-/** Plate height: the authored 736-unit landscape card plus the portrait slack. */
-const SETTINGS_H = 736 + SETTINGS_EXTRA_H;
-/** Rows ABOVE the graphics blurb rise by half the slack… */
-const SETTINGS_TOP_DY = -SETTINGS_EXTRA_H / 2;
-/** …and the divider and everything under it drops by the other half. */
-const SETTINGS_BOT_DY = SETTINGS_EXTRA_H / 2;
 
 /**
  * The graphics blurb is the smallest type on the plate and the only line on it
@@ -781,8 +765,14 @@ export class UIScene extends Phaser.Scene {
       }),
       bus.on('bag:stored', ({ chain, tier, at }) => this.flyItemToBag(chain, tier, at)),
       bus.on('bag:changed', ({ used }) => this.hud.setBagCount(used)),
-      bus.on('bag:store_failed', ({ reason }) =>
-        this.floatWarning(reason === 'full' ? 'Bag is full!' : 'No room on the board!')
+      bus.on('bag:store_failed', ({ reason, world }) =>
+        this.floatWarning(
+          reason === 'full'
+            ? 'Bag is full!'
+            : reason === 'wrong_world'
+              ? `Only in ${this.ctx.state.worlds.get(world ?? '')?.name ?? 'its own world'}!`
+              : 'No room on the board!'
+        )
       ),
       // A character's refusal is never silent. `not_mine` is the story one:
       // she cannot wake what is sleeping, and saying so every time is what
@@ -2729,21 +2719,19 @@ export class UIScene extends Phaser.Scene {
    * raising it is a decision for the shared primitive, not for this panel.)
    *
    * `panelFitScale` rather than `panelMobileScale` even though the two return
-   * the same 2.2 today: this plate is one of the few that CHANGES height
-   * between the two layouts (see SETTINGS_EXTRA_H), so the bound that watches
-   * the height is the one that keeps the promise if it ever grows again.
+   * the same 2.2 today: this plate MEASURES its own height (see `relayout`),
+   * so the bound that watches the height is the one that keeps the promise
+   * whenever the graphics blurb grows a line.
    *
    * Desktop gets exactly 1 from it and does not move by a unit.
    */
   private openResetDialog(): void {
     if (this.dialog) return;
-    const scale = panelFitScale(SETTINGS_W, SETTINGS_H);
     const container = this.add.container(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2).setDepth(DEPTH_DIALOG);
     // The dim stays a CHILD of the scaled container, the way the Codex and the
     // Store scrims do. Scaling it can only ever make it BIGGER than the screen
-    // — the scale is 1 on desktop and 2.2 in portrait, never below 1 — so it
-    // covers a full screen at 1 and 2.2 screens in portrait, and there is no
-    // edge for the board to show through. Its default hit area is the
+    // — the scale is 1 on desktop and >1 in portrait, never below 1 — so there
+    // is no edge for the board to show through. Its default hit area is the
     // rectangle itself and is mapped through the very same transform, so what
     // it catches always matches what it paints.
     //
@@ -2756,15 +2744,15 @@ export class UIScene extends Phaser.Scene {
     const dim = this.add
       .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(PALETTE.night), 0.55)
       .setInteractive();
+    // The SHEET: its (0,0) is the plate's TOP CENTRE. Content flows downward
+    // in `relayout`, the plate is drawn to fit what the flow measured, and the
+    // sheet is then lifted by half the result so the dialog stays centred.
     const panel = this.add.graphics();
-    panel.fillStyle(num(PALETTE.night), 0.25);
-    panel.fillRoundedRect(-SETTINGS_W / 2, -SETTINGS_H / 2 + 16, SETTINGS_W, SETTINGS_H, 52);
-    panel.fillStyle(num(PALETTE.cream), 1);
-    panel.fillRoundedRect(-SETTINGS_W / 2, -SETTINGS_H / 2, SETTINGS_W, SETTINGS_H, 52);
-    panel.lineStyle(8, num(PALETTE.lava), 1);
-    panel.strokeRoundedRect(-SETTINGS_W / 2, -SETTINGS_H / 2, SETTINGS_W, SETTINGS_H, 52);
+    const sheet = this.add.container(0, 0);
+    sheet.add(panel);
+
     const title = this.add
-      .text(0, -312 + SETTINGS_TOP_DY, 'Settings', {
+      .text(0, 0, 'Settings', {
         fontFamily: FONT.ui,
         fontSize: '54px',
         fontStyle: 'bold',
@@ -2773,15 +2761,21 @@ export class UIScene extends Phaser.Scene {
         color: PALETTE.night
       })
       .setOrigin(0.5);
+    sheet.add(title);
+
+    /** Shrink a key's label until it fits its plate — "Graphics: Auto
+     *  (Balanced)" overflowed the pill on phones and read as broken. */
+    const fitLabel = (label: Phaser.GameObjects.Text, budget: number): void => {
+      let px = Math.round(parseFloat(String(label.style.fontSize))) || 32;
+      while (label.width > budget && px > 18) {
+        px -= 1;
+        label.setFontSize(px);
+      }
+    };
 
     // Background-music toggle (persists; the AudioManager applies it via the bus).
     const musicLabel = (): string => (getMusicMuted() ? 'Music: Off' : 'Music: On');
-    // SMALLER THAN IT WAS, because it was sitting on the heading. At 1.05x0.8
-    // the plate came out 441x122 and its top edge landed at -293, which is
-    // where the title's descenders are — the word "Settings" was being cut by
-    // the button under it. 0.86x0.62 gives a 361x94 key with 14 units of air
-    // under the heading.
-    const musicBtn = this.add.container(0, -224 + SETTINGS_TOP_DY);
+    const musicBtn = this.add.container(0, 0);
     const musicBg = this.add
       .image(0, 0, getMusicMuted() ? 'ui_btn_play' : 'ui_btn_green')
       .setScale(0.86, 0.62);
@@ -2794,6 +2788,7 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
+    fitLabel(musicText, 315);
     musicBtn.add([musicBg, musicText]);
     musicBtn.setSize(370, 100).setInteractive({ useHandCursor: true });
     musicBtn.on('pointerup', () => {
@@ -2803,11 +2798,12 @@ export class UIScene extends Phaser.Scene {
       musicText.setText(musicLabel());
       musicBg.setTexture(muted ? 'ui_btn_play' : 'ui_btn_green');
     });
+    sheet.add(musicBtn);
 
     // Graphics quality. Cycles Auto → High → Balanced → Low. `high` is the
     // engine unchanged, so nothing here can cost a capable device anything —
     // the lower tiers only ever subtract.
-    const gfxBtn = this.add.container(0, -112 + SETTINGS_TOP_DY);
+    const gfxBtn = this.add.container(0, 0);
     const gfxBg = this.add.image(0, 0, 'ui_btn_green').setScale(0.86, 0.62);
     const gfxText = this.add
       .text(0, -8, graphics.label, {
@@ -2818,10 +2814,12 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
+    fitLabel(gfxText, 315);
     gfxBtn.add([gfxBg, gfxText]);
     gfxBtn.setSize(370, 100).setInteractive({ useHandCursor: true });
+    sheet.add(gfxBtn);
     const gfxNote = this.add
-      .text(0, -52 + SETTINGS_TOP_DY, GRAPHICS_PROFILES[graphics.tier].note, {
+      .text(0, 0, GRAPHICS_PROFILES[graphics.tier].note, {
         fontFamily: FONT.ui,
         fontSize: `${SETTINGS_NOTE_PX}px`,
         color: '#8A6248',
@@ -2830,36 +2828,23 @@ export class UIScene extends Phaser.Scene {
         wordWrap: { width: 780 }
       })
       .setOrigin(0.5, 0);
-    gfxBtn.on('pointerup', () => {
-      const order = GRAPHICS_QUALITIES;
-      const next = order[(order.indexOf(graphics.quality) + 1) % order.length];
-      const needsReload = graphics.set(next);
-      gfxText.setText(graphics.label);
-      gfxNote.setText(
-        needsReload
-          ? `${GRAPHICS_PROFILES[graphics.tier].note}\nReload the page to resize the canvas.`
-          : GRAPHICS_PROFILES[graphics.tier].note
-      );
-      (this.registry.get('power') as { refreshFps?: () => void } | undefined)?.refreshFps?.();
-      // Weather, the crystal and the ambient counts are decided when the board
-      // is built, so the board rebuilds rather than half-applying.
-      this.game.events.emit(GRAPHICS_EVENT);
-    });
+    sheet.add(gfxNote);
 
-    const divider = this.add.rectangle(0, 38 + SETTINGS_BOT_DY, 760, 3, num(PALETTE.lava), 0.22);
+    const divider = this.add.rectangle(0, 0, 760, 3, num(PALETTE.lava), 0.22);
+    sheet.add(divider);
     const resetTitle = this.add
-      .text(0, 80 + SETTINGS_BOT_DY, 'Reset Cinder Hollow?', {
+      .text(0, 0, 'Reset Cinder Hollow?', {
         fontFamily: FONT.ui,
         fontSize: '40px',
         fontStyle: 'bold',
         color: PALETTE.night
       })
       .setOrigin(0.5);
-    // 34px and seated at 154: the warning grew with the graphics blurb (30 read
-    // at 15 real px on a 1080p screen), and at 34 its two lines reach ±45.8 —
-    // 154 keeps 4 units of air under the 40px heading and 20 over the keys.
+    sheet.add(resetTitle);
+    // 34px: the warning grew with the graphics blurb — 30 read at 15 real px
+    // on a 1080p screen and the owner called both too small.
     const body = this.add
-      .text(0, 154 + SETTINGS_BOT_DY, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
+      .text(0, 0, 'The ash will settle back over everything\nyou have rekindled. This cannot be undone.', {
         fontFamily: FONT.ui,
         fontSize: '34px',
         color: '#8A6248',
@@ -2867,6 +2852,7 @@ export class UIScene extends Phaser.Scene {
         lineSpacing: 10
       })
       .setOrigin(0.5);
+    sheet.add(body);
 
     const makeButton = (
       x: number,
@@ -2875,7 +2861,7 @@ export class UIScene extends Phaser.Scene {
       scaleX: number,
       onTap: () => void
     ): Phaser.GameObjects.Container => {
-      const button = this.add.container(x, 276 + SETTINGS_BOT_DY);
+      const button = this.add.container(x, 0);
       const bg = this.add.image(0, 0, texture).setScale(scaleX, 0.78);
       const text = this.add
         .text(0, -10, label, {
@@ -2886,38 +2872,14 @@ export class UIScene extends Phaser.Scene {
         })
         .setOrigin(0.5)
         .setShadow(0, 4, 'rgba(36,27,34,0.5)', 4);
+      fitLabel(text, 380 * scaleX - 60);
       button.add([bg, text]);
       button.setSize(380 * scaleX, 112);
       button.setInteractive({ useHandCursor: true });
       button.on('pointerup', onTap);
+      sheet.add(button);
       return button;
     };
-
-    // Map Editor — the tool that authors the zone registry the engine runs
-    // (`src/editor/`). Parked on the title row so it never crowds the reset copy.
-    // It only emits the intent; the editor lives outside the scene tree entirely.
-    //
-    // HIDDEN by default (`MAP_EDITOR_IN_SETTINGS`), because a button that opens
-    // the world-authoring tool does not belong one tap away on a player's
-    // settings panel. `?mapedit` on the URL brings it back for whoever is
-    // actually authoring, the same way `?uiedit` opens the UI Builder — so the
-    // tool is out of the player's way without being out of reach.
-    const showEditor =
-      MAP_EDITOR_IN_SETTINGS || new URLSearchParams(window.location.search).has('mapedit');
-    // It rides the TOP block, so it takes the top block's shift and the title
-    // row stays the title row in both layouts. The geometry it has to respect:
-    // `ui_btn_green` is painted 210x76 logical, so 420x152 units, and at
-    // 0.68x0.78 the key is 286x119. At x=292 its left edge is 149 — clear of
-    // the centred 54px heading, which is ~240 units wide and so reaches ±120 —
-    // and its right edge is 435, 15 units inside the plate's 450. Scaling the
-    // container is uniform, so portrait holds every one of those margins in
-    // proportion instead of re-deriving them.
-    const editorButton = showEditor
-      ? makeButton(292, 'Map Editor', 'ui_btn_green', 0.68, () => {
-          this.closeResetDialog();
-          this.ctx.bus.emit('editor:open', {});
-        }).setY(-320 + SETTINGS_TOP_DY)
-      : null;
 
     const resetButton = makeButton(-210, 'Reset', 'ui_btn_play', 0.72, () => {
       this.closeResetDialog();
@@ -2927,8 +2889,81 @@ export class UIScene extends Phaser.Scene {
       this.closeResetDialog()
     );
 
-    container.add([dim, panel, title, musicBtn, gfxBtn, gfxNote, divider, resetTitle, body, resetButton, keepButton]);
-    if (editorButton) container.add(editorButton); // last: it sits alone on the title row, nothing to sort against
+    // Map Editor — the tool that authors the zone registry the engine runs
+    // (`src/editor/`). Parked on the title row so it never crowds the reset
+    // copy. HIDDEN by default (`MAP_EDITOR_IN_SETTINGS`); `?mapedit` on the
+    // URL brings it back for whoever is actually authoring, the same way
+    // `?uiedit` opens the UI Builder.
+    const showEditor =
+      MAP_EDITOR_IN_SETTINGS || new URLSearchParams(window.location.search).has('mapedit');
+    const editorButton = showEditor
+      ? makeButton(292, 'Map Editor', 'ui_btn_green', 0.68, () => {
+          this.closeResetDialog();
+          this.ctx.bus.emit('editor:open', {});
+        })
+      : null;
+
+    /**
+     * The flow. Every row is seated off the MEASURED bottom of the row above,
+     * so there is never a reserve hole at rest — and when the blurb grows to
+     * three lines the plate grows with it, right here, instead of having
+     * carried the worst case's emptiness from the first frame.
+     */
+    const relayout = (): number => {
+      let y = 26;
+      title.setY(y + title.height / 2);
+      editorButton?.setPosition(292, title.y);
+      y = title.y + title.height / 2 + 24;
+      musicBtn.setY(y + 47); // the pill plate is 94 tall at 0.62
+      y = musicBtn.y + 47 + 18;
+      gfxBtn.setY(y + 47);
+      y = gfxBtn.y + 47 + 16;
+      gfxNote.setY(y);
+      y += gfxNote.height + 30;
+      divider.setY(y);
+      y += 40;
+      resetTitle.setY(y + resetTitle.height / 2);
+      y = resetTitle.y + resetTitle.height / 2 + 14;
+      body.setY(y + body.height / 2);
+      y = body.y + body.height / 2 + 26;
+      resetButton.setY(y + 56);
+      keepButton.setY(y + 56);
+      y += 112 + 36;
+      const h = y;
+      panel.clear();
+      panel.fillStyle(num(PALETTE.night), 0.25);
+      panel.fillRoundedRect(-SETTINGS_W / 2, 16, SETTINGS_W, h, 52);
+      panel.fillStyle(num(PALETTE.cream), 1);
+      panel.fillRoundedRect(-SETTINGS_W / 2, 0, SETTINGS_W, h, 52);
+      panel.lineStyle(8, num(PALETTE.lava), 1);
+      panel.strokeRoundedRect(-SETTINGS_W / 2, 0, SETTINGS_W, h, 52);
+      sheet.setY(-h / 2);
+      return h;
+    };
+
+    gfxBtn.on('pointerup', () => {
+      const order = GRAPHICS_QUALITIES;
+      const next = order[(order.indexOf(graphics.quality) + 1) % order.length];
+      const needsReload = graphics.set(next);
+      gfxText.setFontSize(32);
+      gfxText.setText(graphics.label);
+      fitLabel(gfxText, 315);
+      gfxNote.setText(
+        needsReload
+          ? `${GRAPHICS_PROFILES[graphics.tier].note}\nReload the page to resize the canvas.`
+          : GRAPHICS_PROFILES[graphics.tier].note
+      );
+      // The blurb may have grown or shrunk a line: reflow the plate around it.
+      container.setScale(panelFitScale(SETTINGS_W, relayout()));
+      (this.registry.get('power') as { refreshFps?: () => void } | undefined)?.refreshFps?.();
+      // Weather, the crystal and the ambient counts are decided when the board
+      // is built, so the board rebuilds rather than half-applying.
+      this.game.events.emit(GRAPHICS_EVENT);
+    });
+
+    const height = relayout();
+    const scale = panelFitScale(SETTINGS_W, height);
+    container.add([dim, sheet]);
     container.setAlpha(0);
     // The open pops from 94% to the PANEL scale, not to 1 — tweening to a bare
     // 1 would play the flourish and then shrink the portrait sheet back to the

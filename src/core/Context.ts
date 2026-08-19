@@ -173,7 +173,7 @@ export class GameContext {
       tasks,
       quests,
       regard: new RegardSystem(this.state, this.bus, this.data.characters, quests, order),
-      bag: new BagSystem(this.state, this.bus),
+      bag: new BagSystem(this.state, this.bus, this.data.chains),
       store: new StoreSystem(this.state, this.bus, this.data.store),
       story: new StorySystem(this.state, this.bus, this.data.dialogue),
       characters: new WorldCharacterSystem(
@@ -224,6 +224,17 @@ export class GameContext {
       this.systems.save.suspend(() => this.systems.board.newGame());
       this.systems.save.save();
       this.systems.order.announceProgress();
+    } else {
+      // A chain that gained a `world` after saves already carried its pieces
+      // elsewhere (frost went Borealis-born) heals HERE, before any scene
+      // reads a board: the strays go home, and the healed state is persisted
+      // so the exile happens once, not on every boot.
+      const homes = new Map(
+        this.data.chains.chains.filter((c) => c.world).map((c) => [c.id, c.world!] as const)
+      );
+      if (homes.size && this.state.exileForeignChains((chain) => homes.get(chain))) {
+        this.systems.save.save();
+      }
     }
     this.systems.tutorial.begin();
   }

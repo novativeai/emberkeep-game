@@ -114,7 +114,9 @@ export class CauldronPanel extends Phaser.GameObjects.Container {
 
     // Inside the plate (x -1016..1016, y -588..652), at the size and seat the
     // Store's ✕ uses — the two panels share this frame, so they share its corner.
-    const close = scene.add.container(964, -538);
+    // In from (964, -538): the disc rode the frame's corner arc — same pull
+    // as the Store and the Codex, whose plate this panel shares.
+    const close = scene.add.container(924, -512);
     this.closeBtn = close;
     const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.58);
     const closeX = scene.add

@@ -1565,7 +1565,9 @@ export interface EventMap {
   /** A piece went into the Bag — UIScene flies it to the satchel and pulses it. */
   'bag:stored': { chain: string; tier: number; at: TilePos };
   /** Nothing was stored. `full` = no free slot; `no_room` = nowhere to put it back. */
-  'bag:store_failed': { reason: 'full' | 'no_room' };
+  /** `wrong_world` carries the chain's home world id so the toast can name
+   *  the door the piece is waiting behind. */
+  'bag:store_failed': { reason: 'full' | 'no_room' | 'wrong_world'; world?: string };
   /** A piece came back out of the Bag onto `at`. */
   'bag:retrieved': { chain: string; tier: number; at: TilePos };
   /** The Bag's contents changed — the panel and the HUD badge re-read it. */

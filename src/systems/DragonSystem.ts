@@ -460,6 +460,31 @@ export class DragonSystem {
     return found;
   }
 
+  /**
+   * Every HATCHED dragon across all materialised boards, named or not — what
+   * the Codex actually lists. A dragon that hatched while its reveal card was
+   * missing (frost, before its entries were mounted) never met the naming
+   * prompt, and "you own a dragon the collection screen denies" is exactly
+   * the broken promise a codex cannot make. `name` is null until the player
+   * gives one; callers label those by breed.
+   */
+  ownedDragons(): Array<{ itemId: number; name: string | null; chain: string; tier: number }> {
+    const found: Array<{ itemId: number; name: string | null; chain: string; tier: number }> = [];
+    for (const worldId of this.state.worlds.keys()) {
+      for (const item of this.state.itemsIn(worldId)?.values() ?? []) {
+        if (this.isBoardDragon(item)) {
+          found.push({
+            itemId: item.id,
+            name: item.dragonName ?? null,
+            chain: item.chain,
+            tier: item.tier
+          });
+        }
+      }
+    }
+    return found;
+  }
+
   private findAnywhere(itemId: number): BoardItemState | undefined {
     for (const worldId of this.state.worlds.keys()) {
       const item = this.state.itemsIn(worldId)?.get(itemId);

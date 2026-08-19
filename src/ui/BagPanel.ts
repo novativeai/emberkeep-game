@@ -177,10 +177,10 @@ export class BagPanel extends Phaser.GameObjects.Container {
     // the gold edge and 2 past its right, which reads as a sticker on the panel
     // rather than a key in it.
     const close = scene.add
-      .image(FRAME_W / 2 - 52, -FRAME_H / 2 + 54, 'ui_btn_round_royal')
+      .image(FRAME_W / 2 - 88, -FRAME_H / 2 + 88, 'ui_btn_round_royal')
       .setScale(0.62);
     const closeX = scene.add
-      .text(FRAME_W / 2 - 52, -FRAME_H / 2 + 52, '✕', {
+      .text(FRAME_W / 2 - 88, -FRAME_H / 2 + 88, '✕', {
         fontFamily: FONT.display,
         fontSize: '48px',
         fontStyle: 'bold',

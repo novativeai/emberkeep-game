@@ -30,8 +30,11 @@ import { uiRegistry } from './theme';
 const GAP = STATUS_READOUT_GAP;
 
 const NAME_Y = 0;
-const HEARTS_Y = 58;
-const LINE_Y = 96;
+/** 72, not 58: the name line is TYPE.sub (~34px, ~41 tall), so a gauge whose
+ *  top edge sat at 43 let the descenders TOUCH the meter — the owner flagged
+ *  it on the frost readout. 14 units of air now, and the caption follows. */
+const HEARTS_Y = 72;
+const LINE_Y = 110;
 /** The rows above must fit inside the height the column clears. */
 if (LINE_Y + 30 > STATUS_READOUT_H) {
   throw new Error(`StatusPanel is taller than STATUS_READOUT_H (${STATUS_READOUT_H})`);

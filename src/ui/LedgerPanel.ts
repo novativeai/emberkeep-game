@@ -259,8 +259,10 @@ const CLOSE_DESKTOP_SCALE = 0.58;
  * 2 x 44 / 136 = 0.647.
  */
 const CLOSE_DISC_SCALE = IS_MOBILE ? 0.647 : CLOSE_DESKTOP_SCALE;
-const CLOSE_SEAT_X = IS_MOBILE ? 578 : 580;
-const CLOSE_SEAT_Y = IS_MOBILE ? -354 : -350;
+/** Pulled IN from (580, -350): the disc's edge rode the frame's rounded
+ *  corner (owner: "il touche le bord du cadre"). Same face, 48 further in. */
+const CLOSE_SEAT_X = IS_MOBILE ? 530 : 532;
+const CLOSE_SEAT_Y = IS_MOBILE ? -332 : -328;
 /** The ✕ is 40 units of type on the desktop disc's 78.9, so it keeps that
  *  proportion whatever scales the disc — 40 exactly on desktop, 45 in portrait. */
 const CLOSE_GLYPH_PX = Math.round(

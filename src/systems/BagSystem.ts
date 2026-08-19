@@ -1,7 +1,7 @@
 import { BAG_SLOTS, GOLD_UNIT, POUCH_UNIT } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
-import type { BagStack } from '../core/types';
+import type { BagStack, ChainsData } from '../core/types';
 
 /** What a coin tier is worth in Gold. */
 const coinValue = (tier: number): number => (tier >= 2 ? POUCH_UNIT : GOLD_UNIT);
@@ -26,7 +26,8 @@ const coinValue = (tier: number): number => (tier >= 2 ? POUCH_UNIT : GOLD_UNIT)
 export class BagSystem {
   constructor(
     private state: GameState,
-    private bus: EventBus
+    private bus: EventBus,
+    private chains: ChainsData
   ) {
     bus.on('ui:store_requested', ({ itemId }) => this.store(itemId));
     bus.on('ui:bag_retrieve_requested', ({ chain, tier, count }) => this.retrieve(chain, tier, count ?? 1));
@@ -146,6 +147,15 @@ export class BagSystem {
   private retrieveOne(chain: string, tier: number, announceFailure: boolean): boolean {
     const idx = this.state.bag.findIndex((s) => s.chain === chain && s.tier === tier);
     if (idx < 0) return false;
+    // A WORLD-BOUND chain only comes out of the bag on its own soil. The bag
+    // follows the Keeper everywhere — that is its job — but it must not be the
+    // ferry that lands a Borealis-only egg on a southern board: the store
+    // already refuses to SELL across the door, and a leak here would undo it.
+    const home = this.chains.chains.find((c) => c.id === chain)?.world;
+    if (home && home !== this.state.worldId) {
+      if (announceFailure) this.bus.emit('bag:store_failed', { reason: 'wrong_world', world: home });
+      return false;
+    }
     const stack = this.state.bag[idx]!;
 
     const before = this.state.items.size;

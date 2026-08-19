@@ -7,6 +7,7 @@ import {
   num,
   panelFitScale,
   panelMobileScale,
+  TAP_SCALE,
   WELL_FED_EVOLUTION
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
@@ -54,7 +55,7 @@ type Page = 'roster' | 'detail' | 'evolution';
  * middle of the two claims: enough magnification that a thumb still has 40-odd
  * real pixels of target, not so much that a button is furniture.
  */
-const CHROME_STEP = 1.45;
+const CHROME_STEP = 1.2;
 
 const CX = IS_MOBILE
   ? {
@@ -62,7 +63,10 @@ const CX = IS_MOBILE
       edgeX: 990, headY: -1790, bodyTop: -1400, bodyFloor: 1740,
       bannerH: 208, closeScale: CHROME_STEP, backScale: CHROME_STEP,
       specX: 0, specW: 1500, specH: 1000,
-      dossierX: -1040, dossierW: 2080, dossierTop: -120,
+      // dossierTop -40, not -120: the specimen block ends with its WELL FED
+      // gauge at y -170..-110 (top + specH + 130 + 100, 60 tall), and a story
+      // that starts at -120 printed itself across the meter. 70 units of air.
+      dossierX: -1040, dossierW: 2080, dossierTop: -40,
       cardW: 300, cardH: 380, cardScale: 2.1, gapX: 960, gapY: 880, rosterCols: 2, cardArtFit: 226,
       tasteScale: 2.05, tasteStack: true,
       stageW: 2080, stageH: 1440, evoArtW: 1880, evoArtH: 1050, gaugeW: 1400, gaugeH: 66,
@@ -225,7 +229,10 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // frame: the Store, the Cauldron and the Ledger all wear this same disc at
     // this same size, and the Codex shares their frame, so it shares the seat.
     // (`CX.closeScale` still multiplies it — the portrait sheet needs a thumb.)
-    this.closeBtn = scene.add.container(EDGE_X - 36, HEAD_Y + 48);
+    // 76/74 in from the head corner, not 36/48: at the old seat the disc's
+    // ink ended 6 units from the plate's inner face and read as pinned ON the
+    // corner arc. Same family seat as the Store's landscape key.
+    this.closeBtn = scene.add.container(EDGE_X - 76, HEAD_Y + 74);
     const closeBg = scene.add.image(0, 6, 'ui_btn_round_royal').setScale(0.58);
     const closeGlyph = scene.add
       .text(0, -2, '✕', {
@@ -237,7 +244,10 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
     this.closeBtn.add([closeBg, closeGlyph]);
     this.closeBtn.setScale(CX.closeScale);
-    this.closeBtn.setSize(96, 96);
+    // The hit box keeps the FULL thumb budget (96 x TAP-scale world units)
+    // whatever calmer visual step the disc wears — the chrome shrank, the
+    // finger target must not.
+    this.closeBtn.setSize((96 * TAP_SCALE) / CX.closeScale, (96 * TAP_SCALE) / CX.closeScale);
     this.closeBtn.setInteractive({ useHandCursor: true });
     this.closeBtn.on('pointerover', () => this.closeBtn.setScale(CX.closeScale * 1.08));
     this.closeBtn.on('pointerout', () => this.closeBtn.setScale(CX.closeScale));
@@ -417,7 +427,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     this.pageRoster.removeAll(true);
     this.cards.clear();
     this.setHeading('Dragon Codex');
-    const named = this.dragons.namedDragons();
+    const named = this.ownedForDisplay();
     const met = new Set(named.map((d) => d.chain));
     const breeds = Object.keys(this.dex.dragons);
     /** Yours first, in the order you named them; then what is still out there. */
@@ -454,7 +464,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     // The completion line — the number that makes the locked slots a goal.
     this.pageRoster.add(
       this.scene.add
-        .text(0, blockTop + gridH + 62, `${met.size} OF ${breeds.length} BREEDS NAMED`, {
+        .text(0, blockTop + gridH + 62, `${met.size} OF ${breeds.length} BREEDS MET`, {
           fontFamily: FONT.ui,
           fontSize: `${CX.completionFont}px`,
           fontStyle: 'bold',
@@ -463,6 +473,24 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
         .setOrigin(0.5)
         .setLetterSpacing(8)
     );
+  }
+
+  /**
+   * Every hatched dragon, wearing a DISPLAY name: its own if the player gave
+   * one, its breed title otherwise. One list feeds the roster, the reveal
+   * open, the reload re-open and the lesson pointer — a dragon that hatched
+   * without meeting the naming prompt (frost, while its reveal entries were
+   * missing) is still a dragon the codex owes a card.
+   */
+  private ownedForDisplay(): Array<{ itemId: number; name: string; chain: string; tier: number }> {
+    return this.dragons
+      .ownedDragons()
+      .map((d) => ({ ...d, name: d.name ?? this.breedLabel(d.chain) }));
+  }
+
+  /** The breed's title — "Frost Dragon" — for a dragon nobody has named yet. */
+  private breedLabel(chain: string): string {
+    return this.dex.dragons[chain]?.title ?? chain;
   }
 
   /** The breed's young art — the form a codex card should show. */
@@ -1064,7 +1092,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
    */
   openReveal(itemId: number): void {
     const dragon =
-      this.dragons.namedDragons().find((d) => d.itemId === itemId) ?? this.dragons.namedDragons()[0];
+      this.ownedForDisplay().find((d) => d.itemId === itemId) ?? this.ownedForDisplay()[0];
     if (!dragon) return;
     this.selected = dragon;
     this.revealPending = true;
@@ -1091,7 +1119,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
    */
   openAt(itemId: number, page: Page): void {
     const dragon =
-      this.dragons.namedDragons().find((d) => d.itemId === itemId) ?? this.dragons.namedDragons()[0];
+      this.ownedForDisplay().find((d) => d.itemId === itemId) ?? this.ownedForDisplay()[0];
     if (!dragon) return;
     this.selected = dragon;
     this.open();
@@ -1161,7 +1189,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     if (!this.isOpen || !this.visible || this.page !== 'roster') return null;
     // By item id, not chain: two dragons of one breed are two cards now, and
     // the pointer has to land on the one that is selected.
-    const owned = this.dragons.namedDragons();
+    const owned = this.ownedForDisplay();
     const wanted = this.selected ?? owned[0];
     const card = wanted ? this.cards.get(String(wanted.itemId)) : undefined;
     return card ? this.pointAt(card) : null;
