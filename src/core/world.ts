@@ -219,12 +219,33 @@ export function worldPointOf(
 }
 
 /**
- * The address under a world point. Prefers a zone that has real ground there;
- * failing that, falls back to the unbounded lattice so a drag released over the
- * void still resolves to a cell the caller can reject (which is how "snap back
- * home" has always worked).
+ * The cell a point is actually STANDING ON, or null when it is over open sky.
+ *
+ * THE HONEST HALF of `cellAtWorldPoint`, and the one anything that cares
+ * whether there is FLOOR under a point must ask. The difference is the whole
+ * bug this exists to close:
+ *
+ * `cellAtWorldPoint` falls back to the world's lattice when no zone owns the
+ * point, so that a drag released over the void still resolves to *an* address
+ * the caller can reject. But every world ships the SAME fallback — the authored
+ * Emberkeep isle's 148px grid at origin (1280,316) — while Borealis, Roothold
+ * and the Runevault are built from the editor's own zones, on their own pitch,
+ * at their own origins. So in those worlds the fallback projects a point in the
+ * open sky onto a small Emberkeep index like (0,0) or (1,1) — and those indices
+ * are inside a real zone's block. `hasCell` then answers about a cell on a
+ * different island entirely: a probe of Borealis found 532 sky points claiming
+ * ground up to 2700px away, which is most of the world.
+ *
+ * That claim is what put a shadow under a piece carried out over the clouds,
+ * and what would have let a drop there teleport it to another isle.
+ *
+ * So: same search, no fallback. Null means null.
  */
-export function cellAtWorldPoint(world: WorldRuntime, x: number, y: number): TilePos {
+export function groundCellAtWorldPoint(
+  world: WorldRuntime,
+  x: number,
+  y: number
+): TilePos | null {
   let best: { pos: TilePos; d2: number } | undefined;
   for (const z of world.zones) {
     const e = zoneLocalExact(z, x, y);
@@ -240,7 +261,23 @@ export function cellAtWorldPoint(world: WorldRuntime, x: number, y: number): Til
       best = { pos: { col: z.block.col + i, row: z.block.row + j }, d2 };
     }
   }
-  if (best) return best.pos;
+  return best?.pos ?? null;
+}
+
+/**
+ * The address under a world point. Prefers a zone that has real ground there;
+ * failing that, falls back to the unbounded lattice so a caller that needs an
+ * address for a point in open space still gets one.
+ *
+ * READ THE WARNING ON `groundCellAtWorldPoint` BEFORE USING THIS to decide
+ * whether a point is on the floor. The fallback address is a projection, not a
+ * claim about ground, and in every world but Emberkeep it can land on an index
+ * a real zone owns — at which point it becomes indistinguishable from a true
+ * one. Anything asking "is there floor here" wants the other function.
+ */
+export function cellAtWorldPoint(world: WorldRuntime, x: number, y: number): TilePos {
+  const standing = groundCellAtWorldPoint(world, x, y);
+  if (standing) return standing;
   const f = world.fallback;
   const e = zoneLocalExact(f, x, y);
   // `|| 0` collapses negative zero — Math.round(-0.2) is -0, which stringifies

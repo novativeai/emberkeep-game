@@ -221,17 +221,29 @@ void main() {
   d = min(d, 1.0 - d); // wrap, so the surge never restarts with a visible jump
   col *= 1.0 + uSurgeGain * exp(-(d * d) / max(uSurgeWidth * uSurgeWidth, 1e-5));
 
-  // Dissolve into the sky at the bottom of the band, so the effect has no edge.
-  col *= smoothstep(0.0, uFadeBottom, p.y);
   col *= uIntensity * uAlpha;
 
   // The framebuffer is 8-bit: without this, a gradient this smooth and this
   // large lands as hard contour bands. Sub-LSB noise turns them back into a
   // gradient. Animated with time so it never reads as fixed grain.
+  //
+  // IT MUST BE ADDED BEFORE THE FADE, and this is not a stylistic ordering.
+  // The noise is symmetric about zero, but the max(col, 0.0) below is not: it
+  // clips the negative half and leaves a POSITIVE mean everywhere the aurora
+  // itself is black. Added after the fade, that bias survived the fade — so the
+  // band lifted the whole night sky by a fraction of a level, uniformly, all
+  // the way to its bottom edge and not one pixel further. Half the sky slightly
+  // brighter than the other half, divided by a dead-straight horizontal line
+  // across the screen: the "bar in the middle of the sky" this fixes.
+  //
+  // Under the fade, the noise is part of the signal and dies with it.
   vec3 dp = fract(vec3(gl_FragCoord.xy + fract(t) * 91.7, gl_FragCoord.x) * 0.1031);
   dp += dot(dp, vec3(dp.y, dp.z, dp.x) + 33.33);
   float dith = fract((dp.x + dp.y) * dp.z);
   col += (dith - 0.5) * (uDither / 255.0);
+
+  // Dissolve into the sky at the bottom of the band, so the effect has no edge.
+  col *= smoothstep(0.0, uFadeBottom, p.y);
 
   col = max(col, vec3(0.0));
   // Additive: the aurora only ever ADDS light to the night sky. Alpha carries

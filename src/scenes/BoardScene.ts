@@ -92,7 +92,7 @@ import { editorStore } from '../editor/editorStore';
 import { gridToWorld } from '../core/iso';
 import { guard, recordError } from '../core/crash';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
-import { artScaleAt, cellAtWorldPoint, setActiveWorld, worldPointOf, zoneAt } from '../core/world';
+import { artScaleAt, cellAtWorldPoint, groundCellAtWorldPoint, setActiveWorld, worldPointOf, zoneAt } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
 import { cappedTier } from '../core/graphics';
 import { GRAPHICS_EVENT, graphics, liveCrystalAvailable } from '../core/graphicsState';
@@ -5557,7 +5557,13 @@ export class BoardScene extends Phaser.Scene {
         // item's tracked position), NOT the raw pointer — the two differ by the
         // grab offset, so pointer-based drops could land one tile off and
         // bounce home even though the item hovered a free tile.
-        const to = this.dropCellUnderDrag();
+        // Open sky resolves to null, and a piece let go over the clouds goes
+        // home: naming its OWN cell makes the dispatch below a same-tile drop,
+        // which MergeSystem already answers with `item:move_bounced`. The
+        // feed / hire / gate branches under this are unaffected — they match on
+        // the dropped ART's bounds as well as on a cell, so a dragon released
+        // on a House's roof is still a hire even when its feet are over air.
+        const to = this.dropCellUnderDrag() ?? this.dragFrom;
 
         // Food dragged onto a DRAGON → feed it. The mirror of the gesture just
         // below (a dragon dragged onto a House), so the board has one verb for
@@ -5880,9 +5886,9 @@ export class BoardScene extends Phaser.Scene {
     // The piece's OWN shadows answer to the same question as the diamond: over
     // open sky there is no floor to darken, so it carries none (BoardItem
     // `setOverGround`). One test, one answer, three things obeying it.
-    const live = this.ctx.state.isTileActive(cell.col, cell.row);
+    const live = cell !== null && this.ctx.state.isTileActive(cell.col, cell.row);
     s.setOverGround(live);
-    if (!live) {
+    if (!cell || !live) {
       this.dragCell.setVisible(false);
       return;
     }
@@ -5910,10 +5916,16 @@ export class BoardScene extends Phaser.Scene {
    * Read off the piece instead, so the bias means the same THING at every size
    * and no future art can inherit the bug by being short.
    */
-  private dropCellUnderDrag(): TilePos {
+  private dropCellUnderDrag(): TilePos | null {
     const height = this.dragSprite?.artHitRect().height ?? 0;
     const bias = height > 0 ? Math.min(DRAG.dropBiasMaxPx, height * DRAG.dropBiasOfHeight) : DRAG.dropBiasMaxPx;
-    return cellAtWorldPoint(this.ctx.state.world, this.dragTarget.x, this.dragTarget.y + bias);
+    // `groundCellAtWorldPoint`, NOT `cellAtWorldPoint`: the latter falls back to
+    // the authored Emberkeep lattice when no zone owns the point, and in every
+    // other world that fallback lands on an index a real zone owns. A drag out
+    // over the Borealis sky was therefore told it was standing on an island
+    // 2700px away — which is what kept the piece's shadow lit over open cloud.
+    // Null is the honest answer for open sky, and both callers below take it.
+    return groundCellAtWorldPoint(this.ctx.state.world, this.dragTarget.x, this.dragTarget.y + bias);
   }
 
   /**
