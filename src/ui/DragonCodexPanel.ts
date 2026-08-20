@@ -673,9 +673,16 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     if (entry?.evolution) {
       // Mobile: centred under the taste stack (the specimen no longer owns a
       // column to close); the button itself doubles for a thumb.
+      // PORTRAIT SEAT, MEASURED AGAINST BOTH NEIGHBOURS. At BODY_FLOOR + 60 the
+      // key's top edge landed at 1745 against a WON'T TOUCH card whose plate
+      // ends at 1720 — 24.8 units, which is a rounding error, not a margin, and
+      // the owner read the two as touching. `ui_panel_tall` paints its plate to
+      // y 1992 (1180x2040 logical, inset 16, x2 for game units), so the band
+      // between the card and the ink is 272 units and the key is 110.4 of it.
+      // The remaining 161.6 splits ~100 above / ~62 below: BODY_FLOOR + 135.
       this.evolutionBtn = this.emberButton(
         IS_MOBILE ? 0 : SPEC_X,
-        IS_MOBILE ? BODY_FLOOR + 60 : BODY_FLOOR - 96,
+        IS_MOBILE ? BODY_FLOOR + 135 : BODY_FLOOR - 96,
         'EVOLUTION  ›',
         () => this.showPage('evolution')
       );

@@ -2933,7 +2933,7 @@ export class BoardScene extends Phaser.Scene {
       this.beat('glide', () => {
         if (!this.altarEgg) return;
         const p = this.altarPoint();
-        this.glideToWorld(p.x, p.y + 60, 900);
+        this.glideToWorld(p.x, p.y + 60, 1150);
       })
     );
     // …and the Golden Egg cracks: the legendary Elder AWAKENS on her ledge.
@@ -2962,7 +2962,7 @@ export class BoardScene extends Phaser.Scene {
     this.time.delayedCall(FINALE.returnAtMs, () =>
       this.beat('return', () => {
         const frame = this.frameForLevel(this.ctx.state.level);
-        this.glideToWorld(frame.x, frame.y, 1100);
+        this.glideToWorld(frame.x, frame.y, 1400);
       })
     );
   }
@@ -3113,16 +3113,18 @@ export class BoardScene extends Phaser.Scene {
     if (!ceremony || !this.altarEgg) return;
     const p = this.altarPoint();
     const home = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
-    this.glideToWorld(p.x, p.y + 60, 900);
-    this.time.delayedCall(1000, () =>
+    // The glide and the beat that waits on it are ONE number apart — the flare
+    // fires 250ms after the camera settles, and it must stay 250 after it.
+    this.glideToWorld(p.x, p.y + 60, 1150);
+    this.time.delayedCall(1400, () =>
       this.beat('ceremony.flare', () => {
         this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.85, 1.6);
         this.sparks.explode(22, p.x, p.y + 40);
         this.floatText(p.x, p.y - 40, '???', PALETTE.goldAccent);
       })
     );
-    this.time.delayedCall(2600, () =>
-      this.beat('ceremony.return', () => this.glideToWorld(home.x, home.y, 900))
+    this.time.delayedCall(3000, () =>
+      this.beat('ceremony.return', () => this.glideToWorld(home.x, home.y, 1150))
     );
   }
 
@@ -3360,9 +3362,12 @@ export class BoardScene extends Phaser.Scene {
       targets: egg,
       x: egg.x + 3,
       angle: 5,
-      duration: 60,
+      // The half-swing and the divisor are ONE number — 150 IS 2 x 75. At the
+      // old 60 the wobble ran at 8.3 Hz, which reads as a buzz rather than as
+      // something struggling to get out. Move one and you must move the other.
+      duration: 75,
       yoyo: true,
-      repeat: Math.floor(TIMINGS.hatchShake / 120),
+      repeat: Math.floor(TIMINGS.hatchShake / 150),
       ease: 'Sine.easeInOut',
       // TWO fences, not one: the flourish and the animal fail independently.
       // A burst that throws must still leave the Elder standing, and an Elder
@@ -3397,8 +3402,10 @@ export class BoardScene extends Phaser.Scene {
     const p = this.altarPoint();
     const home = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
     this.showAltarEgg(false); // no competing camera script — this one drives
-    this.glideToWorld(p.x, p.y + 60, 900);
-    this.time.delayedCall(1000, () =>
+    // The glide and the beat that waits on it are ONE number apart — the flare
+    // fires 250ms after the camera settles, and it must stay 250 after it.
+    this.glideToWorld(p.x, p.y + 60, 1150);
+    this.time.delayedCall(1400, () =>
       this.beat('late.flare', () => {
         this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.85, 1.6);
         this.sparks.explode(22, p.x, p.y + 40);
@@ -3406,8 +3413,8 @@ export class BoardScene extends Phaser.Scene {
       })
     );
     this.time.delayedCall(2400, () => this.beat('late.awaken', () => this.awakenAltarElder()));
-    this.time.delayedCall(5600, () =>
-      this.beat('late.return', () => this.glideToWorld(home.x, home.y, 900))
+    this.time.delayedCall(6000, () =>
+      this.beat('late.return', () => this.glideToWorld(home.x, home.y, 1150))
     );
   }
 
@@ -4828,9 +4835,11 @@ export class BoardScene extends Phaser.Scene {
     this.keyRevealPlaying = true;
     const cam = this.cameras.main;
     const home = { x: cam.midPoint.x, y: cam.midPoint.y, zoom: cam.zoom };
-    this.glideToWorld(badge.x, badge.y + 60, 850);
-    cam.zoomTo(home.zoom * 1.16, 850, 'Sine.easeInOut');
-    this.time.delayedCall(870, () => {
+    // Glide, zoom and the beat that waits on them are ONE move: all three
+    // carry the same length, and the delay clears it by 20ms.
+    this.glideToWorld(badge.x, badge.y + 60, 1050);
+    cam.zoomTo(home.zoom * 1.16, 1050, 'Sine.easeInOut');
+    this.time.delayedCall(1070, () => {
       badge.setVisible(true).setAlpha(0).setScale(0.25);
       this.glowFlash(badge.x, badge.y, PALETTE.goldAccent, 0.65, 1.5);
       this.sparks.explode(12, badge.x, badge.y);
@@ -4842,9 +4851,9 @@ export class BoardScene extends Phaser.Scene {
         ease: 'Back.easeOut'
       });
       this.time.delayedCall(1000, () => {
-        cam.zoomTo(home.zoom, 700, 'Sine.easeInOut');
-        this.glideToWorld(home.x, home.y, 700);
-        this.time.delayedCall(730, () => this.playNextKeyReveal());
+        cam.zoomTo(home.zoom, 900, 'Sine.easeInOut');
+        this.glideToWorld(home.x, home.y, 900);
+        this.time.delayedCall(930, () => this.playNextKeyReveal());
       });
     });
   }
@@ -7806,9 +7815,12 @@ export class BoardScene extends Phaser.Scene {
       targets: ghost,
       x: x + 3,
       angle: 4,
-      duration: 60,
+      // The half-swing and the divisor are ONE number — 150 IS 2 x 75. At the
+      // old 60 the wobble ran at 8.3 Hz, which reads as a buzz rather than as
+      // something struggling to get out. Move one and you must move the other.
+      duration: 75,
       yoyo: true,
-      repeat: Math.floor(TIMINGS.hatchShake / 120),
+      repeat: Math.floor(TIMINGS.hatchShake / 150),
       ease: 'Sine.easeInOut'
     });
     this.time.delayedCall(TIMINGS.hatchShake, () => {      ghost.destroy();
@@ -8149,7 +8161,20 @@ export class BoardScene extends Phaser.Scene {
 
   /* ----------------------------- helpers ---------------------------- */
 
-  /** Smooth tween to any world position (keeps current zoom). */
+  /**
+   * Smooth tween to any world position (keeps current zoom).
+   *
+   * ONE EASING CURVE, NOT TWO. The tween ran `Sine.easeInOut` and then
+   * `onUpdate` put `smootherstep` on top of its output — two S-curves composed,
+   * which does not make a move gentler, it makes it PEAKIER: measured, the
+   * midpoint velocity was 2.95 against a single curve's 1.57, so every camera
+   * move crawled at both ends and whipped through the middle. That compression
+   * is most of why the glides read as hurried whatever their duration said.
+   *
+   * The tween is linear now and `smootherstep` is the only curve. It is the
+   * better of the two for a camera: zero velocity AND zero acceleration at both
+   * ends, so the move has no visible start or stop.
+   */
   private glideToWorld(worldX: number, worldY: number, duration = 900): void {
     const cam = this.cameras.main;
     const from = { x: cam.midPoint.x, y: cam.midPoint.y };
@@ -8159,7 +8184,7 @@ export class BoardScene extends Phaser.Scene {
       targets: proxy,
       t: 1,
       duration,
-      ease: 'Sine.easeInOut',
+      ease: 'Linear',
       onUpdate: () => {
         const s = smootherstep(proxy.t);
         cam.centerOn(Phaser.Math.Linear(from.x, worldX, s), Phaser.Math.Linear(from.y, worldY, s));

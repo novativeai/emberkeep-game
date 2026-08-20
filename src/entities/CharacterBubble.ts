@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { CHARACTER_ANIMS, type CharacterClip, clipFor, clipKey, type PortraitView } from '../core/characterAnims';
-import { num, PALETTE, PORTRAIT_CLIP_TALK, readMs, STORY_BEAT_HOLD_MS, TIMINGS } from '../core/Constants';
+import { num, PALETTE, PORTRAIT_CLIP_TALK, readMs, STORY_BEAT_HOLD_MS, TIMINGS, TYPEWRITER } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { SpeakerId, TutorialStepEvent } from '../core/types';
 import {
@@ -98,6 +98,10 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   private hitZone: Phaser.GameObjects.Zone;
   private currentStepId = '';
   private tapGated = false;
+  /** The typewriter: the line in full, the timer revealing it, and how far in. */
+  private fullLine = '';
+  private typeTimer: Phaser.Time.TimerEvent | null = null;
+  private typeCursor = 0;
   private lastStep: TutorialStepEvent | null = null;
   private samplePeek = false;
   private sayTimer: Phaser.Time.TimerEvent | null = null;
@@ -189,6 +193,10 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.hitZone.setInteractive({ useHandCursor: true });
     this.hitZone.on('pointerup', () => {
       if (!this.visible) return;
+      // The tap is never spent on the typewriter: it snaps the line whole AND
+      // does what it always did, in the same gesture. One tap is still one
+      // beat, which is what the tutorial e2e drives.
+      this.completeLine();
       // A story run owns the tap while it is playing; only the tutorial's own
       // steps may ask the director to advance.
       if (this.seqLines.length) {
@@ -230,7 +238,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   setToken(token: string, value: string): void {
     if (this.tokens[token] === value) return;
     this.tokens[token] = value;
-    if (this.visible) this.setLine(this.rawLine);
+    if (this.visible) this.setLine(this.rawLine, true);
   }
 
   /**
@@ -239,9 +247,83 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
    * Two jobs: substitute `{token}`s, and remember the raw form so a token that
    * arrives later can re-render the same sentence.
    */
-  private setLine(text: string): void {
+  /**
+   * The one sink every spoken line passes through — tutorial steps, Eleanor's
+   * asides, story runs, the peek sample — so the typewriter lives HERE and no
+   * speaker in any world can be added that misses it.
+   *
+   * `instant` is for lines that are not being spoken to anyone: the blank, and
+   * the theme editor's re-render of a line already on screen.
+   */
+  private setLine(text: string, instant = false): void {
     this.rawLine = text;
-    this.label.setText(this.resolveTokens(text));
+    const wasTyping = this.typeTimer !== null;
+    const cursor = this.typeCursor;
+    this.fullLine = this.resolveTokens(text);
+    this.typeTimer?.remove();
+    this.typeTimer = null;
+    // A TOKEN ARRIVING MID-LINE RE-RENDERS, IT DOES NOT RESTART. `setToken`
+    // re-enters here when the dragon's name lands while the bubble is already
+    // open; replaying the reveal from zero would stutter the sentence the
+    // player is halfway through, and snapping it whole would throw away the
+    // rest of the reveal. The cursor is kept and the line simply carries on.
+    if (wasTyping && !instant && cursor < this.fullLine.length) {
+      this.typeCursor = cursor;
+      this.label.setText(this.fullLine.slice(0, cursor));
+      this.startTyping();
+      return;
+    }
+    if (instant || !this.fullLine) {
+      this.typeCursor = this.fullLine.length;
+      this.label.setText(this.fullLine);
+      this.paintHighlight();
+      return;
+    }
+    this.typeCursor = 0;
+    this.label.setText('');
+    this.startTyping();
+  }
+
+  /** Run the reveal from wherever the cursor already is. */
+  private startTyping(): void {
+    this.typeTimer?.remove();
+    this.typeTimer = this.scene.time.addEvent({
+      delay: TYPEWRITER.tickMs,
+      loop: true,
+      callback: () => {
+        const step = Math.max(1, Math.ceil(this.fullLine.length / this.typeTicks()));
+        this.typeCursor = Math.min(this.fullLine.length, this.typeCursor + step);
+        this.label.setText(this.fullLine.slice(0, this.typeCursor));
+        if (this.typeCursor >= this.fullLine.length) this.completeLine();
+      }
+    });
+  }
+
+  /** How many ticks this line's reveal gets — its own length, capped. */
+  private typeTicks(): number {
+    return Math.max(1, Math.round(this.typeMs() / TYPEWRITER.tickMs));
+  }
+
+  /** How long this line takes to type. Also drives the portrait's talking
+   *  mouth, so the lips move exactly while the words appear. */
+  private typeMs(text: string = this.fullLine): number {
+    return Math.min(TYPEWRITER.maxMs, text.length * TYPEWRITER.msPerChar);
+  }
+
+  /**
+   * Snap the line whole. Called when the reveal finishes, when the bubble is
+   * dismissed or advanced, and on a tap — a tap must never be spent buying the
+   * animation it interrupts.
+   */
+  private completeLine(): void {
+    this.typeTimer?.remove();
+    this.typeTimer = null;
+    if (this.typeCursor >= this.fullLine.length && this.label.text === this.fullLine) {
+      this.paintHighlight();
+      return;
+    }
+    this.typeCursor = this.fullLine.length;
+    this.label.setText(this.fullLine);
     this.paintHighlight();
   }
 
@@ -445,8 +527,13 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.portraitBack.setVisible(true);
     this.startAtlasMode('talking');
     this.atlasTalkHold?.remove();
+    // THE LIPS MOVE WHILE THE WORDS APPEAR. This used to be its own
+    // length-proportional guess (55ms/char), which meant the mouth kept going
+    // long after the line had finished landing. It is the typewriter's own
+    // duration now — one number, so they cannot drift — floored by the clip's
+    // own minimum so a three-word line still reads as speech.
     const holdMs = Phaser.Math.Clamp(
-      text.length * PORTRAIT_CLIP_TALK.msPerChar,
+      this.typeMs(this.resolveTokens(text)),
       PORTRAIT_CLIP_TALK.minMs,
       PORTRAIT_CLIP_TALK.maxMs
     );
@@ -532,12 +619,12 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       this.tapGated = true;
       this.nameTag.setText(SPEAKERS.eleanor.name);
       const sample = 'Long ago, Emberkeep blazed with dragon fire. Then the cold came... and the dragons slept.';
-      this.setLine(sample);
+      this.setLine(sample, true); // the theme editor measures text, it does not read it
       this.setSpeakerArt(ANIMATED_SPEAKER, sample);
       this.layout(ANIMATED_SPEAKER);
     } else if (this.samplePeek) {
       this.samplePeek = false;
-      this.setLine('');
+      this.setLine('', true);
       this.setVisible(false);
     }
   }
@@ -577,7 +664,9 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.setSpeakerArt(speaker, text);
     this.layout(speaker);
     this.popIn();
-    this.sayTimer = this.scene.time.delayedCall(holdMs, () => this.hide());
+    // The reading time is granted AFTER the line has finished arriving — the
+    // hold is time to READ, and a line still being typed is not yet readable.
+    this.sayTimer = this.scene.time.delayedCall(holdMs + this.typeMs(), () => this.hide());
   }
 
   /**
@@ -627,7 +716,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.popIn();
     // The safety net is a FLOOR, not the whole answer: a story beat longer than
     // nine seconds' reading gets the time it needs before it advances itself.
-    this.sayTimer = this.scene.time.delayedCall(readMs(text, STORY_BEAT_HOLD_MS), () =>
+    this.sayTimer = this.scene.time.delayedCall(readMs(text, STORY_BEAT_HOLD_MS) + this.typeMs(), () =>
       this.advanceSequence()
     );
   }
@@ -704,7 +793,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       targets: this.chevron,
       alpha: 0.45,
       y: this.chevron.y + 6,
-      duration: 520,
+      duration: 660,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut'
@@ -730,7 +819,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
         targets: this,
         scale: { from: 0.97, to: 1 },
         alpha: { from: 0.85, to: 1 },
-        duration: 160,
+        duration: 210,
         ease: 'Sine.easeOut'
       });
     }
@@ -755,7 +844,15 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.label.setWordWrapWidth(Math.min(textWidth, width - TEXT_LEFT - PAD - 8));
     this.label.setScale(oText.scale);
 
+    // MEASURED ON THE WHOLE LINE, not on what the typewriter has revealed. The
+    // card is sized once, at its final height, and the words appear INSIDE it —
+    // measuring the prefix would grow the bubble letter by letter under the
+    // reader. Same object, same wrap, same scale, so the measurement is exact.
+    const revealed = this.label.text;
+    const typing = revealed !== this.fullLine;
+    if (typing) this.label.setText(this.fullLine);
     const textHeight = this.label.getBounds().height;
+    if (typing) this.label.setText(revealed);
     const height = Math.max(minHeight, textHeight + PAD * 2);
     const left = -width / 2;
     const top = -height / 2;
@@ -867,6 +964,10 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
 
   hide(): void {
     if (!this.visible) return;
+    // The reveal dies with the line it was revealing — a timer that outlived
+    // the bubble would keep typing an invisible line until the next `setLine`.
+    this.typeTimer?.remove();
+    this.typeTimer = null;
     this.portraitAnim.rest();
     this.stopAtlasPortrait();
     const targetY = this.y;

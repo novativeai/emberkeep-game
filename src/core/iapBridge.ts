@@ -1,4 +1,3 @@
-import { IAP } from './Constants';
 import type { EventBus } from './EventBus';
 import type { IapPackInfo } from './types';
 
@@ -12,11 +11,11 @@ import type { IapPackInfo } from './types';
  *   game → hub   catalog_request · checkout(packId) · ack(purchaseId) · abort
  *   hub → game   catalog · checkout_ready(paymentUrl) · checkout_failed · result
  *
- * `beginCheckout` MUST be called inside a user-gesture handler: it opens the
- * secure checkout window synchronously (an async open would be popup-blocked)
- * and only then asks the hub for the payment URL to steer it to. Standalone
- * builds (dev server, e2e preview) have no parent — the catalog stays empty,
- * `isAvailable()` is false and the Emporium keeps its mock showcase.
+ * `beginCheckout` asks the hub to start a payment; the HUB shows it, in a panel
+ * over the game, so no window is opened here and no user-gesture activation is
+ * needed or can be lost. Standalone builds (dev server, e2e preview) have no
+ * parent — the catalog stays empty, `isAvailable()` is false and the Emporium
+ * keeps its mock showcase.
  *
  * Grants are applied by IapSystem off the `iap:grant` command; the ack back to
  * the hub is what lets it mark the purchase delivered, so the ack is sent only
@@ -42,10 +41,8 @@ interface HubMessage {
 interface PendingCheckout {
   requestId: string;
   packId: string;
-  popup: Window | null;
+  /** Cleared by `settle`; kept so a late message for an old request is ignored. */
   watch: number | null;
-  /** Wall-clock deadline once the popup closed with no verdict yet. */
-  graceUntil: number | null;
 }
 
 export class IapBridge {
@@ -76,36 +73,48 @@ export class IapBridge {
     return this.catalog.filter((pack) => pack.coins > 0);
   }
 
+  /**
+   * The Warmth packs it sells — the real-money row on the WARMTH shelf, under
+   * the authored gold-sink offers.
+   *
+   * Filtered on what a pack GRANTS, not on what it is called, so a bundle that
+   * carries both coins and Warmth appears on both shelves. That is the honest
+   * reading of a bundle: a player looking at either shelf should see every way
+   * to get the thing that shelf is about.
+   */
+  warmthPacks(): IapPackInfo[] {
+    return this.catalog.filter((pack) => pack.energy > 0);
+  }
+
   pack(packId: string): IapPackInfo | undefined {
     return this.catalog.find((p) => p.id === packId);
   }
 
   /**
-   * Open the secure checkout for a pack. Must run inside a user-gesture
-   * handler (the Buy tap). Returns false when unavailable or already busy.
+   * Ask the hub to start the secure checkout for a pack.
+   *
+   * THE GAME NO LONGER OPENS A WINDOW. It used to `window.open` synchronously
+   * inside the tap, because a popup needs the tap's transient activation — and
+   * that is exactly what made the flow fragile: a blocked popup fell back to
+   * navigating the whole page away from the board, and an allowed one put the
+   * card form in a window the player then had to go and find.
+   *
+   * The hub owns the page the player is looking at, so the hub shows the
+   * payment over the game (`GamePlayer`), framing the gateway's own page when
+   * the gateway permits it and offering a single hand-off tap when it does not.
+   * Nothing here needs an activation any more, so nothing here can lose one.
+   *
+   * Still returns false when unavailable or already busy — the caller uses that
+   * to keep its own "opening…" state honest.
    */
   beginCheckout(packId: string): boolean {
     if (!this.bus || !this.embedded || this.pending || !this.pack(packId)) return false;
     const requestId = `ck_${Date.now().toString(36)}_${this.seq++}`;
-    // Synchronous open, while the tap's transient activation is still live.
-    const popup = window.open(
-      '',
-      'emberkeep_checkout',
-      `popup=yes,width=${IAP.popupWidth},height=${IAP.popupHeight}`
-    );
-    if (popup) {
-      popup.document.write(
-        '<title>Secure checkout</title>' +
-          '<body style="margin:0;display:grid;place-items:center;height:100vh;' +
-          'background:#241B22;color:#FFF6E8;font:600 16px system-ui">' +
-          'Opening secure checkout…</body>'
-      );
-    }
-    this.pending = { requestId, packId, popup, watch: null, graceUntil: null };
-    // Popup blocked → the hub falls back to navigating the top page (the game
-    // flushes its save on pagehide, the hub delivers on return).
-    this.post({ type: 'embergames:iap:checkout', packId, requestId, popup: popup !== null });
-    this.startWatch();
+    this.pending = { requestId, packId, watch: null };
+    // `popup: true` tells the hub the caller is NOT asking for a top-level
+    // redirect. The field is kept for the older hub builds that still branch on
+    // it; a hub with the in-page panel ignores it entirely.
+    this.post({ type: 'embergames:iap:checkout', packId, requestId, popup: true });
     this.bus.emit('iap:checkout_opened', { packId });
     return true;
   }
@@ -124,11 +133,8 @@ export class IapBridge {
         return;
       }
       case 'embergames:iap:checkout_ready': {
-        const pending = this.pending;
-        const url = (data as { paymentUrl?: string }).paymentUrl;
-        if (pending && data.requestId === pending.requestId && url && pending.popup) {
-          pending.popup.location.href = url;
-        }
+        // Acknowledged only. The hub mounts the payment page over the game
+        // itself now; the game has no window to steer.
         return;
       }
       case 'embergames:iap:checkout_failed': {
@@ -136,6 +142,9 @@ export class IapBridge {
         if (!pending || data.requestId !== pending.requestId) return;
         const packId = pending.packId;
         this.settle();
+        // Covers both "the gateway would not start" and "the player pressed
+        // Cancel on the hub's panel" — from the game's side they are the same
+        // fact: this checkout is over and the Emporium may offer again.
         this.bus.emit('iap:failed', { packId, reason: 'unavailable' });
         return;
       }
@@ -168,26 +177,17 @@ export class IapBridge {
     }
   };
 
-  /** Watch the checkout window; a closed window with no verdict is a cancel
-   *  after a grace period (the webhook can land moments after the close). */
-  private startWatch(): void {
-    if (!this.pending) return;
-    const pending = this.pending;
-    pending.watch = window.setInterval(() => {
-      if (this.pending !== pending) return;
-      const closed = pending.popup === null || pending.popup.closed;
-      if (!closed) return;
-      if (pending.graceUntil === null) {
-        pending.graceUntil = Date.now() + IAP.popupGraceMs;
-        return;
-      }
-      if (Date.now() < pending.graceUntil) return;
-      const packId = pending.packId;
-      this.post({ type: 'embergames:iap:abort', requestId: pending.requestId });
-      this.settle();
-      this.bus?.emit('iap:failed', { packId, reason: 'cancelled' });
-    }, IAP.popupWatchMs);
-  }
+  /**
+   * There is no window to watch any more.
+   *
+   * This used to poll the popup and treat a closed one as a cancel. With the
+   * payment shown IN the page, `popup` is always null — and the old test read
+   * "no window" as "window closed", so the watchdog would have aborted every
+   * purchase a few seconds in, while the player was still typing their card.
+   * Cancellation now comes from the hub, which owns the panel and its Cancel
+   * key, and arrives as `checkout_failed`. Deliberately left as a record of
+   * why the poll is gone rather than a silent deletion.
+   */
 
   private settle(): void {
     if (this.pending?.watch !== null && this.pending?.watch !== undefined) {

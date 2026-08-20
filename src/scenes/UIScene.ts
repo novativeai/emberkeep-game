@@ -1149,7 +1149,7 @@ export class UIScene extends Phaser.Scene {
       this.tweens.add({
         targets: scrim,
         alpha: 1,
-        duration: 220,
+        duration: 400,
         ease: 'Sine.easeOut',
         onComplete: () => this.travelVeilCovered(veil)
       });
@@ -2564,14 +2564,16 @@ export class UIScene extends Phaser.Scene {
           targets: this.hand,
           alpha: 1,
           scale: base,
-          duration: 240,
+          duration: 310,
           ease: 'Back.easeOut',
           onComplete: () => {
-            this.tweens.add({ targets: this.hand, angle: 4, duration: 950, ease: 'Sine.easeInOut' });
+            // ONE STROKE, TWO TWEENS — the tilt and the travel must carry the
+            // same duration or the hand finishes leaning before it arrives.
+            this.tweens.add({ targets: this.hand, angle: 4, duration: 1200, ease: 'Sine.easeInOut' });
             this.tweens.add({
               targets: this.handProg,
               t: 1,
-              duration: 950,
+              duration: 1200,
               ease: 'Sine.easeInOut',
               onComplete: () => {
                 // Release: tiny overshoot pop as the item "drops".
@@ -2580,7 +2582,14 @@ export class UIScene extends Phaser.Scene {
                   targets: this.hand,
                   alpha: 0,
                   duration: 260,
-                  delay: 160,
+                  delay: 220,
+                  // A BEAT OF REST before the gesture starts over — it used to
+                  // restart the instant it faded, which is what made the hand
+                  // read as frantic rather than as a demonstration.
+                  // `completeDelay`, never a `delayedCall`: `clearMarkers`
+                  // kills TWEENS, so a timer would resurrect a hand after the
+                  // step it belongs to has already gone.
+                  completeDelay: 450,
                   onComplete: run
                 });
               }
@@ -2614,7 +2623,7 @@ export class UIScene extends Phaser.Scene {
     this.markerChain({
       targets: this.handBob,
       loop: -1,
-      loopDelay: 140,
+      loopDelay: 200, // PAIRED with the other chain — equal, or the tap splits in two
       tweens: [
         { v: 14, duration: 260, ease: 'Quad.easeIn' },
         { v: 0, duration: 430, ease: 'Back.easeOut' }
@@ -2623,7 +2632,7 @@ export class UIScene extends Phaser.Scene {
     this.markerChain({
       targets: this.hand,
       loop: -1,
-      loopDelay: 140,
+      loopDelay: 200, // PAIRED with the other chain — equal, or the tap splits in two
       tweens: [
         { scale: base * 0.9, duration: 260, ease: 'Quad.easeIn' },
         { scale: base, duration: 430, ease: 'Back.easeOut' }

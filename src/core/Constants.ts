@@ -1115,6 +1115,32 @@ export const PORTRAIT_CLIP_TALK = {
 } as const;
 
 /**
+ * THE TYPEWRITER — dialogue arrives a letter at a time, in every world.
+ *
+ * The lines used to appear whole and then sit for `readMs`, which is why the
+ * game read as hurried even after the HOLD was fixed: a paragraph that is
+ * simply THERE has no pace of its own, so the eye finishes it long before the
+ * bubble moves and the wait feels like a wait.
+ *
+ * `msPerChar` is deliberately well under `READING.perChar` (55): the reveal has
+ * to finish comfortably before the hold expires or a line would be taken away
+ * mid-word. At 26 a 200-character beat types in 5.2 s and its hold is 11.9 s.
+ * `maxMs` caps the longest line so a rare 400-character speech cannot crawl.
+ *
+ * A TAP NEVER PAYS FOR THE ANIMATION. Tapping snaps the line whole and does
+ * whatever the tap already did in the same gesture — one tap is still one beat,
+ * which is what the tutorial e2e drives and what a replaying player expects.
+ */
+export const TYPEWRITER = {
+  msPerChar: 26,
+  maxMs: 7000,
+  /** Repaint cadence. 2 characters a frame at 60fps reads as continuous while
+   *  costing a sixth of the `setText` calls a per-character timer would. */
+  charsPerTick: 2,
+  tickMs: 32
+} as const;
+
+/**
  * The full-screen DRAGON REVEAL — the card a player is shown the first time a
  * dragon form is theirs.
  *
@@ -1877,7 +1903,11 @@ export const GOLDEN_ALTAR = {
  */
 export const FINALE = {
   hatchAtMs: 900, // camera glides WEST to the Golden Altar…
-  awakenAtMs: 2000, // …where the Golden Egg cracks: the Elder AWAKENS
+  // 2300, not 2000: the westward glide grew to 1150 and departs at `hatchAtMs`,
+  // so it now SETTLES at 2050 — the egg used to start cracking while the camera
+  // was still arriving. 2300 keeps the authored 200ms of stillness before the
+  // crack, and the crack's own 600ms still ends at 2900, clear of `elderAtMs`.
+  awakenAtMs: 2300, // …where the Golden Egg cracks: the Elder AWAKENS
   elderAtMs: 3200, // she speaks — her first words in the whole game
   returnAtMs: 6000, // camera returns to the player's zone while she finishes
   elderHoldMs: 5200 // her line holds, then play simply continues
@@ -1982,18 +2012,17 @@ export const OFFLINE_BANK_CYCLES = 3;
 
 /** Item motion & juice timings (ms unless noted). */
 export const TIMINGS = {
-  dragReturn: 220,
-  mergeGather: 130,
-  mergePop: 260,
-  spawnPop: 240,
-  hatchShake: 420,
+  dragReturn: 290,
+  mergeGather: 170,
+  spawnPop: 310,
+  hatchShake: 540,
   hatchPop: 380,
   fogLift: 900,
-  fogStaggerPerTile: 38,
+  fogStaggerPerTile: 50,
   warmFlash: 1100,
   tileBloom: 700,
-  harvestHop: 240,
-  bubbleIn: 240,
+  harvestHop: 330,
+  bubbleIn: 310,
   /** Wait after an order celebration before a chapter beat opens — her
    *  reaction has to land AFTER the thing she is reacting to. */
   chapterBeatDelay: 2600,
@@ -2032,9 +2061,9 @@ export const DRAG = {
   liftScale: 1.16,
   liftY: -34,
   liftMs: 120,
-  settleMs: 150,
+  settleMs: 210,
   /** Exponential-smoothing time constant (ms): lower = snappier follow. */
-  followTau: 70,
+  followTau: 90,
   /**
    * WHERE A CARRIED PIECE IS CONSIDERED TO BE STANDING.
    *
@@ -2058,7 +2087,7 @@ export const DRAG = {
    * rendering bug rather than as weight. One shadow, and lifting makes it grow.
    */
   shadowGrow: 1.32,
-  shadowFadeMs: 130,
+  shadowFadeMs: 175,
   /**
    * The drop-target reticle on the cell under the dragged item.
    *
@@ -2132,7 +2161,7 @@ export const DRAG = {
  * play out several times (`placeHand`'s cycle is ~1.6s), so a pulse lands as a
  * fresh reading of the board rather than as an interruption of one.
  */
-export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000, followUpMs: 420, repulseMs: 30_000 } as const;
+export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000, followUpMs: 490, repulseMs: 30_000 } as const;
 
 /**
  * WHAT THE HAND WEIGHS — the merge hint's decision, written as numbers.
@@ -2264,14 +2293,14 @@ export const MERGE_SNAP_RADIUS = 2;
  * the curtain never shows a world still arriving out of black.
  */
 export const TRAVEL_WIPE = {
-  coverMs: 620,
+  coverMs: 780,
   /** Fully-covered floor even on an instant (resident-art) hop — a
    *  same-session return journey loads in one frame, and a veil that blinked
    *  would read as a glitch, not a crossing. */
   holdMinMs: 480,
   /** After `world:ready`, before the reveal starts — spans the board camera's
    *  fade-in closely enough that nothing arrives out of black. */
-  revealDelayMs: 240,
+  revealDelayMs: 340,
   revealMs: 760,
   /** Diamonds across the SHORT screen axis — cell size follows the device, so
    *  a portrait phone gets the same chunky tiles as a desktop. */
@@ -2300,7 +2329,7 @@ export const TRAVEL_WIPE = {
  * follow exists to protect.
  */
 export const TUTORIAL_FOLLOW_INSET = 1 / 6;
-export const TUTORIAL_FOLLOW_MS = 700;
+export const TUTORIAL_FOLLOW_MS = 880;
 
 /** The save latch for the gate lesson — the hand that teaches world travel by
  *  drawing "carry the dragon to the arch" once, after Eleanor's Emporium visit.
@@ -2769,17 +2798,22 @@ export function readMs(text: string, floorMs: number = READING.minMs): number {
  *  charging, the game only confirms, celebrates and applies the grant.
  *  Real wall-clock, deliberately NOT GameClock: a payment happens in the
  *  world outside the simulation and must not fast-forward with it. */
-export const IAP = {
-  /** Checkout window size (CSS pixels, the hosted card page's own space). */
-  popupWidth: 520,
-  popupHeight: 780,
-  /** Cadence for watching the checkout window's closed flag. */
-  popupWatchMs: 1_000,
-  /** After the checkout window closes, keep waiting this long for the hub's
-   *  verdict before calling it cancelled — the gateway's webhook can land
-   *  moments after the window goes. */
-  popupGraceMs: 15_000
-} as const;
+/**
+ * Empty ON PURPOSE, and kept rather than deleted.
+ *
+ * It held four numbers that sized and watched a checkout POPUP: the window's
+ * width and height, the cadence for polling its `closed` flag, and the grace
+ * period after it closed before calling the purchase cancelled. The payment is
+ * shown in a panel over the game now (`iapBridge.beginCheckout` → the hub's
+ * `GamePlayer`), so the game opens no window, and every one of those four
+ * described machinery that no longer exists. The hub owns the panel, its Cancel
+ * key and the poll for the gateway's verdict.
+ *
+ * The export stays because the shape is the right home for whatever the bridge
+ * next needs to tune, and a re-added constant should land here rather than
+ * somewhere new.
+ */
+export const IAP = {} as const;
 
 /**
  * THE SHORTFALL NOTICE — the answer to "you cannot afford this".
