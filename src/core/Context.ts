@@ -185,7 +185,7 @@ export class GameContext {
       ),
       dragons,
       dragonLife: new DragonLifeSystem(this.state, this.bus, this.clock, dragons, jobs),
-      worlds: new WorldSystem(this.state, this.bus),
+      worlds: new WorldSystem(this.state, this.bus, this.data.characters),
       save,
       tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial)
     };

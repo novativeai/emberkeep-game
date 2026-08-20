@@ -1,21 +1,56 @@
 import { describe, expect, it } from 'vitest';
 import { capture, createTestContext } from './helpers';
 import { GATE_LANDING } from '../../src/core/Constants';
+import characters from '../../src/data/characters.json';
 import type { WorldRuntime } from '../../src/core/world';
-import { worldPointOf, zoneAt } from '../../src/core/world';
-import type { TilePos } from '../../src/core/types';
+import { nearestPlayableCell, worldPointOf, zoneAt } from '../../src/core/world';
+import type { CharactersData, TilePos } from '../../src/core/types';
 
 type Ctx = ReturnType<typeof createTestContext>;
 
-/** How far a landing cell sits from its own door back, in tiles of the ground
- *  it stands on — the unit `GATE_LANDING` is stated in. */
-function tilesFromDoor(world: WorldRuntime, from: string, at: TilePos): number {
+/** The door's own centre, in world px. */
+function doorPoint(world: WorldRuntime, from: string): { x: number; y: number } {
   const door = world.portals.find((p) => p.to === from)!;
-  const c = { x: door.x + door.width / 2, y: door.y + door.height / 2 };
-  const zone = zoneAt(world, at.col, at.row)!;
-  const step = (Math.hypot(zone.u.x, zone.u.y) + Math.hypot(zone.v.x, zone.v.y)) / 2;
+  return { x: door.x + door.width / 2, y: door.y + door.height / 2 };
+}
+
+/**
+ * ONE TILE, taken from the ground the arch opens onto — the unit GATE_LANDING
+ * is stated in, and deliberately NOT the landing cell's own.
+ *
+ * Measuring each candidate against its own zone is the bug this pins: Eleanor's
+ * slab has 89px tiles against the plaza's 95.6, so it cleared a four-tile bar
+ * at 357 real px and won the sweep for being nearest. A test that re-derived
+ * the unit from the landing cell would have agreed with the defect.
+ */
+function doorTile(world: WorldRuntime, from: string): number {
+  const c = doorPoint(world, from);
+  const anchor = nearestPlayableCell(world, c.x, c.y)!;
+  const zone = zoneAt(world, anchor.col, anchor.row)!;
+  return (Math.hypot(zone.u.x, zone.u.y) + Math.hypot(zone.v.x, zone.v.y)) / 2;
+}
+
+/** How far a landing cell sits from its own door back, in door-tiles. */
+function tilesFromDoor(world: WorldRuntime, from: string, at: TilePos): number {
+  const c = doorPoint(world, from);
   const p = worldPointOf(world, at.col, at.row);
-  return Math.hypot(p.x - c.x, p.y - c.y) / step;
+  return Math.hypot(p.x - c.x, p.y - c.y) / doorTile(world, from);
+}
+
+/** How far it sits from the NEAREST authored standee, in the same unit. */
+function tilesFromFolk(world: WorldRuntime, from: string, at: TilePos): number {
+  const people = (characters as unknown as CharactersData).characters.filter(
+    (c) => c.world === world.id
+  );
+  if (!people.length) return Infinity;
+  const p = worldPointOf(world, at.col, at.row);
+  const unit = doorTile(world, from);
+  return Math.min(
+    ...people.map((c) => {
+      const f = worldPointOf(world, c.anchor[0], c.anchor[1]);
+      return Math.hypot(p.x - f.x, p.y - f.y) / unit;
+    })
+  );
 }
 
 /** Any cell of a world, for seating a dragon somewhere other than the isle. */
@@ -115,6 +150,51 @@ describe('a dragon crossing a gate', () => {
     const paces = tilesFromDoor(roothold, 'emberkeep', crossed[0]!.at);
     expect(paces).toBeGreaterThanOrEqual(GATE_LANDING.standoffCells);
     expect(paces).toBeLessThanOrEqual(GATE_LANDING.standoffCells + GATE_LANDING.slackCells);
+  });
+
+  it('does not come out on the innkeeper, which four tiles from the door does not prevent', () => {
+    // Roothold's arch and Roothold's Eleanor are 3.4 tiles apart, so "four from
+    // the door" is BEHIND her. The first version of this rule landed him on the
+    // far half of her own two-cell slab — 1.26 tiles away — and passed the
+    // assertion above while looking exactly like the defect it replaced.
+    const ctx = createTestContext();
+    const itemId = namedDragon(ctx);
+    const crossed = capture(ctx.bus, 'dragon:crossed');
+    ctx.bus.emit('dragon:cross_gate', { itemId, to: 'roothold' });
+
+    const roothold = ctx.state.worlds.get('roothold')!;
+    expect(tilesFromFolk(roothold, 'emberkeep', crossed[0]!.at)).toBeGreaterThanOrEqual(
+      GATE_LANDING.folkCells
+    );
+  });
+
+  it('measures a tile at the DOOR, so a small-tiled slab cannot buy its way in', () => {
+    // The unit is the whole trap: against its own 89px tiles Eleanor's slab
+    // cleared the bar at 357 real px, where the plaza's 95.6px tiles put the
+    // same bar at 382. Nearest-qualifying then chose the cheat. This asserts
+    // the unit is taken from the ground the arch opens onto, once.
+    const ctx = createTestContext();
+    const roothold = ctx.state.worlds.get('roothold')!;
+    const c = doorPoint(roothold, 'emberkeep');
+    const anchor = nearestPlayableCell(roothold, c.x, c.y)!;
+    const anchorZone = zoneAt(roothold, anchor.col, anchor.row)!;
+
+    const itemId = namedDragon(ctx);
+    const crossed = capture(ctx.bus, 'dragon:crossed');
+    ctx.bus.emit('dragon:cross_gate', { itemId, to: 'roothold' });
+    const at = crossed[0]!.at;
+    const landedZone = zoneAt(roothold, at.col, at.row)!;
+    const landedTile =
+      (Math.hypot(landedZone.u.x, landedZone.u.y) + Math.hypot(landedZone.v.x, landedZone.v.y)) / 2;
+    const anchorTile =
+      (Math.hypot(anchorZone.u.x, anchorZone.u.y) + Math.hypot(anchorZone.v.x, anchorZone.v.y)) / 2;
+    // Real distance, against the DOOR's tile — the reading the rule is stated
+    // in — and it must clear the bar even if the landing zone's own tile is
+    // smaller, which is precisely what the broken version could not promise.
+    const p = worldPointOf(roothold, at.col, at.row);
+    const real = Math.hypot(p.x - c.x, p.y - c.y);
+    expect(real / anchorTile).toBeGreaterThanOrEqual(GATE_LANDING.standoffCells);
+    expect(landedTile).toBeGreaterThan(0);
   });
 
   it('keeps a one-cell island beside its arch rather than fling him across the sky', () => {

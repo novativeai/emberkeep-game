@@ -1935,25 +1935,40 @@ export const TRAVEL_VEIL_TIMEOUT_MS = 20_000;
 export const GATE_FX_HEIGHT = 380;
 
 /**
- * How far from the arch an arriving dragon comes out — in TILES OF THE GROUND
- * IT LANDS ON, never in pixels, because a Borealis tile is 95px and an
- * Emberkeep one 145 and "four tiles" has to read the same in both.
+ * Where an arriving dragon comes out: clear of the ARCH, and clear of the
+ * PERSON standing by it.
  *
- * A dragon used to come out ON the door: measured against the real data the
- * crossings landed 0.2 to 2.7 tiles from their own arch, and Roothold's at
- * 1.78 — close enough that the animal stood inside the painted archway it had
- * just walked out of. Four is the distance at which he reads as HAVING
- * arrived: clear of the arch, still plainly waiting by it.
+ * Both halves are load-bearing, and the second was learned the hard way. A
+ * dragon used to come out ON the door — measured, the six crossings landed
+ * 0.19..2.69 tiles from their own arch. Pushing it four tiles down the road
+ * then seated it on Eleanor's doorstep instead, because Roothold's arch and
+ * Roothold's innkeeper are 3.4 tiles apart: "four from the door" is BEHIND her,
+ * not away from her. So the rule is stated against both landmarks.
+ *
+ * A TILE IS THE TILE BY THE DOOR, not the candidate's own. That sounds like a
+ * detail and is the entire bug the first version shipped: measuring each
+ * candidate against ITS OWN zone let a small-tiled slab qualify at a shorter
+ * real distance, and Eleanor's two-cell slab (89px tiles against the plaza's
+ * 95.6) cleared a 4-tile bar at 357px — 1.6px over its own threshold, and
+ * therefore NEARER than the honest candidates, so the sweep chose it. The
+ * dragon landed one tile from her and the owner reported, correctly, that
+ * nothing had changed. One unit for the whole sweep, taken from the ground the
+ * arch actually opens onto.
  *
  * `slackCells` is the ceiling, and it is not a nicety. The Rune Way's door
  * stands on a ONE-CELL island: past two tiles the nearest ground it could
  * legally take is 8 tiles away across open sky, which is exactly the "he came
- * out miles away" the door anchor exists to prevent. So the standoff is a
- * PREFERENCE — honoured only when a cell exists in [standoff, standoff+slack]
- * — and a door with no such cell keeps the old answer, beside the arch. At 4+2
- * every crossing but that island lands at 4.0..4.6 tiles; the island stays put.
+ * out miles away" the door anchor exists to prevent. So all of this is a
+ * PREFERENCE — honoured only when a cell satisfies every part of it — and a
+ * door with no such cell keeps the old answer, beside the arch.
+ *
+ * Probed against the shipped data. Roothold now lands (74,0): 4.53 tiles from
+ * its arch and 4.57 from Eleanor, out on the open plaza. Emberkeep→Roothold
+ * 4.62, Emberkeep→Borealis 4.08, Borealis→Emberkeep 4.41, Borealis→Runevault
+ * 4.04 — none of them moved, their people being nowhere near their doors. The
+ * Rune Way's island keeps its 0.19 and its cell.
  */
-export const GATE_LANDING = { standoffCells: 4, slackCells: 2 } as const;
+export const GATE_LANDING = { standoffCells: 4, slackCells: 2, folkCells: 3 } as const;
 
 /**
  * Portal colours, keyed by DESTINATION — the door wears where it goes, so the

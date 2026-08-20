@@ -25,8 +25,15 @@ const FRAME_H = 520;
  * same green.
  *
  * So the pitch and the plate are stated together, and the air between them is
- * whatever is left: 2*230 - 412 = 48. The pair spans 872 inside a 980 frame,
- * which leaves 54 down each margin — the same air outside as in.
+ * whatever is left: 2*210 - 344.4 = 75.6. The pair spans 764.4 inside a 980
+ * frame, which leaves 107.8 down each margin.
+ *
+ * The outside used to equal the inside (54 and 48, at a 0.98 plate). It no
+ * longer does, and that is a choice rather than a drift: the owner read the
+ * whole panel as too loud, so the keys came down to 0.82 and the pitch with
+ * them. Holding the two airs equal would have needed BTN_DX 221 — 97 units
+ * between two 344-wide plates, which unties the pair. 210 keeps the gap
+ * smaller than the margin, so the two verbs still read as one offer.
  */
 /*
  * PORTRAIT IS THE SAME PANEL, MAGNIFIED — not a second, louder layout.
@@ -45,9 +52,37 @@ const FRAME_H = 520;
  * units INSIDE each other, and that is the failure this pitch is measured
  * against, not a taste.
  */
-const BTN_SCALE = IS_MOBILE ? 1.05 : 0.98;
-const BTN_DX = IS_MOBILE ? 245 : 230;
-const BTN_Y = 138;
+/*
+ * AND LANDSCAPE CAME DOWN TOO, for the opposite reason.
+ *
+ * Nothing was crushed there — the four gaps were 51.8 / 78 / 73.8 / 47.5 in a
+ * 520-unit frame — but the CONTENT was 269 of those 520 units, over half the
+ * panel, and the tightest air in it was under the keys. So the panel read as
+ * big furniture in a small room, and the keys as sitting low in it.
+ *
+ * Type down ~21%, plate down 16% (30% by area), keys up 20 units. The content
+ * falls to 219.6 and the four gaps become 67.3 / 82.5 / 70.9 / 79.7 — a spread
+ * of 15 where it used to be 30.5, and the floor under the keys stops being the
+ * panel's tightest measure. The plate is still 172 x 62 CSS px, well past the
+ * 44px tap bar.
+ *
+ * EVERY PORTRAIT NUMBER IS UNTOUCHED and each of these is a ternary for that
+ * reason. The phone's layout was measured against its own magnification a few
+ * hours ago; re-tuning it blind, off a landscape screenshot, is how a panel
+ * ends up correct on neither.
+ */
+const BTN_SCALE = IS_MOBILE ? 1.05 : 0.82;
+const BTN_DX = IS_MOBILE ? 245 : 210;
+const BTN_Y = IS_MOBILE ? 138 : 118;
+/** Type, in the size it is meant to be READ at — `fpx` divides the panel's own
+ *  magnification back out (see PANEL_SCALE). Portrait keeps 58/38. */
+const TITLE_PX = IS_MOBILE ? 58 : 46;
+const BODY_PX = IS_MOBILE ? 38 : 30;
+/** The title's drop from the frame's top edge. 96, not 88: with a 46-unit
+ *  title the old anchor left 59.3 above it against 90.5 below, and the panel's
+ *  biggest gap sat between its two lines of type. Portrait gains 8 units of
+ *  air by the same move, which it can spare. */
+const TITLE_DROP = 96;
 /** Half the PLATE, from the texture's own painted size — not a guess that has
  *  to be re-guessed whenever the scale moves. */
 const BTN_HALF_W = 210 * BTN_SCALE;
@@ -188,14 +223,14 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
     frame.strokeRoundedRect(-FRAME_FIT_W / 2, -FRAME_H / 2, FRAME_FIT_W, FRAME_H, 46);
 
     this.title = scene.add
-      .text(0, -FRAME_H / 2 + 88, 'THE EMBER GATE', {
-        fontFamily: FONT.display, fontSize: `${fpx(58)}px`, fontStyle: 'bold', color: PALETTE.goldAccent
+      .text(0, -FRAME_H / 2 + TITLE_DROP, 'THE EMBER GATE', {
+        fontFamily: FONT.display, fontSize: `${fpx(TITLE_PX)}px`, fontStyle: 'bold', color: PALETTE.goldAccent
       })
       .setOrigin(0.5);
     this.sub = scene.add
       .text(0, -34, '', {
         fontFamily: FONT.display,
-        fontSize: `${fpx(38)}px`,
+        fontSize: `${fpx(BODY_PX)}px`,
         color: PALETTE.cream,
         wordWrap: { width: FRAME_FIT_W - 160 },
         align: 'center'
@@ -223,7 +258,7 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
         .setVisible(false);
       const label = scene.add
         .text(bx, by - 4 * scale, text, {
-          fontFamily: FONT.display, fontSize: `${fpx(38)}px`, fontStyle: 'bold', color: PALETTE.night
+          fontFamily: FONT.display, fontSize: `${fpx(BODY_PX)}px`, fontStyle: 'bold', color: PALETTE.night
         })
         .setOrigin(0.5)
         .setScale(scale)

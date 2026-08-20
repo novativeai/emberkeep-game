@@ -3,7 +3,7 @@ import type { GameState } from '../core/GameState';
 import type { WorldRuntime } from '../core/world';
 import { groundCellAtWorldPoint, nearestPlayableCell, worldPointOf, zoneAt } from '../core/world';
 import { GATE_LANDING } from '../core/Constants';
-import type { TilePos } from '../core/types';
+import type { CharactersData, TilePos } from '../core/types';
 import { storyOpen, worldOpen } from '../core/worldGates';
 
 /**
@@ -30,7 +30,11 @@ import { storyOpen, worldOpen } from '../core/worldGates';
 export class WorldSystem {
   constructor(
     private state: GameState,
-    private bus: EventBus
+    private bus: EventBus,
+    /** Who stands where. Read ONLY to keep an arriving dragon off their feet —
+     *  a standee is decor, never a board item, so nothing else in this file
+     *  can see them and a landing would otherwise treat their ground as empty. */
+    private folk: CharactersData
   ) {
     bus.on('world:switch', ({ to }) => this.switchTo(to));
     bus.on('dragon:cross_gate', ({ itemId, to }) => this.crossDragon(itemId, to));
@@ -128,35 +132,56 @@ export class WorldSystem {
   }
 
   /**
-   * The nearest cell a stated number of TILES clear of the door — the paces a
-   * dragon takes before he stops and waits.
+   * The nearest cell that is clear of the arch AND clear of the people by it.
    *
-   * Measured in world pixels against each candidate's OWN tile step, so the
-   * same `standoffCells` means the same picture on a 95px Roothold tile and a
-   * 145px Emberkeep one. `slackCells` caps it: a door whose island holds no
-   * ground in the band gets null, and the caller keeps the old answer beside
-   * the arch rather than flinging the animal across open sky to satisfy a
-   * number (see GATE_LANDING).
+   * ONE UNIT FOR THE WHOLE SWEEP — the tile of the ground the arch opens onto,
+   * not each candidate's own. Measuring per candidate is what let Eleanor's
+   * small-tiled slab satisfy a four-tile bar at 357 real px and win the sweep
+   * for being nearest; see GATE_LANDING. The anchor ignores occupancy on
+   * purpose: what a tile MEASURES cannot depend on whether a piece happens to
+   * be standing on the cell we took the measurement from.
+   *
+   * Null when nothing satisfies it, and the caller then keeps the old answer
+   * beside the arch rather than flinging the animal across open sky.
    */
   private standoffCell(
     world: WorldRuntime,
     door: { x: number; y: number },
     free: (col: number, row: number) => boolean
   ): TilePos | null {
+    const anchor = nearestPlayableCell(world, door.x, door.y);
+    const zone = anchor ? zoneAt(world, anchor.col, anchor.row) : undefined;
+    if (!zone) return null;
+    // The average of the two lattice steps: a tile is a diamond, and either
+    // edge on its own reads as "a cell" from the player's side.
+    const tile = (Math.hypot(zone.u.x, zone.u.y) + Math.hypot(zone.v.x, zone.v.y)) / 2;
+    const near = GATE_LANDING.standoffCells * tile;
+    const far = (GATE_LANDING.standoffCells + GATE_LANDING.slackCells) * tile;
+    const clear = GATE_LANDING.folkCells * tile;
+    const standing = this.folkPoints(world);
+
     return nearestPlayableCell(world, door.x, door.y, (col, row) => {
       if (!free(col, row)) return false;
-      const zone = zoneAt(world, col, row);
-      if (!zone) return false;
-      // The average of the two lattice steps: a tile is a diamond, and either
-      // edge on its own reads as "a cell" from the player's side.
-      const step = (Math.hypot(zone.u.x, zone.u.y) + Math.hypot(zone.v.x, zone.v.y)) / 2;
       const p = worldPointOf(world, col, row);
       const d = Math.hypot(p.x - door.x, p.y - door.y);
-      return (
-        d >= GATE_LANDING.standoffCells * step &&
-        d <= (GATE_LANDING.standoffCells + GATE_LANDING.slackCells) * step
-      );
+      if (d < near || d > far) return false;
+      return standing.every((f) => Math.hypot(p.x - f.x, p.y - f.y) >= clear);
     });
+  }
+
+  /**
+   * Where this world's authored characters stand, in world px.
+   *
+   * Their ANCHOR CELL, not their drawn standee: `dx`/`dy` are World-Builder
+   * pixels that the renderer rebases by the map's own tile width, so adding
+   * them raw here would be a different measurement from the one on screen.
+   * The cell is where she is STANDING, which is the thing a dragon must not
+   * land on, and it needs no rebasing to be true.
+   */
+  private folkPoints(world: WorldRuntime): Array<{ x: number; y: number }> {
+    return this.folk.characters
+      .filter((c) => c.world === world.id)
+      .map((c) => worldPointOf(world, c.anchor[0], c.anchor[1]));
   }
 
 
