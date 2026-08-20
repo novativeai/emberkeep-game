@@ -3,7 +3,8 @@ import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../cor
 import { FONT, INK } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
-import { coinOffers } from '../core/coinPacks';
+import { coinOffers, priceOf } from '../core/coinPacks';
+import { iapBridge } from '../core/iapBridge';
 import { uiRegistry } from './theme';
 
 type Currency = 'energy' | 'coins';
@@ -22,12 +23,13 @@ interface Product {
   name: string;
   /** Set when this row is a REAL hub pack — tapping it starts the purchase
    *  flow (`ui:iap_buy_requested`) instead of the mock grant. Its PRESENCE is
-   *  the routing rule, and `coinOffers()` is the only thing that sets it. */
+   *  the routing rule; `shelfItems()` is the only thing that sets it, from
+   *  `coinOffers()` on the Gold shelf and `iapBridge.warmthPacks()` on Warmth. */
   packId?: string;
 }
 /**
- * The two shelves' CHROME. The WARMTH shelf's goods are authored right here,
- * because they are a Gold sink and Gold is a game number; the GOLD shelf's are
+ * The two shelves' CHROME. The WARMTH shelf's GOLD-SINK goods are authored
+ * right here, because Gold is a game number; the GOLD shelf's are
  * NOT, because they are money. `src/data/coin-packs.json` is the one place a
  * coin pack is written down and `coinOffers()` is the one thing that reads it
  * (see src/core/coinPacks.ts) — the dollar-priced copy that used to live here
@@ -44,6 +46,9 @@ const SHOP: Record<Currency, { title: string; tab: string; icon: string; iconSca
       { amount: 20, price: '', gold: 60, best: true, name: 'Hearth Bundle' },
       { amount: 50, price: '', gold: 130, name: 'Keeper’s Blaze' }
     ]
+    // A hub Warmth pack, when the hub sells one, is APPENDED to these by
+    // `shelfItems()` — real money under the Gold sink, in that order, so the
+    // earned way through is the one the eye reaches first.
   },
   coins: {
     title: 'Gold',
@@ -113,9 +118,12 @@ function fitArt(img: Phaser.GameObjects.Image, slot: number): void {
  * printed on. `SHOP_INK` (TextureFactory) holds the sampled values.
  *
  * Content is still MECHANICS §7: the WARMTH shelf is a real GOLD SINK (after
- * the one-time free Ember Spark, refills cost earned Gold). The GOLD shelf is
- * the REAL IAP shop when the game runs inside the EmberGames hub — packs and
- * EUR prices arrive over `iapBridge`, and tapping one starts the confirm →
+ * the one-time free Ember Spark, refills cost earned Gold) — and, when the hub
+ * sells one, a real-money refill APPENDED under it. Both, in that order: the
+ * earned way through is the one the eye reaches first, and the euro row is the
+ * impatient way past it, never the only way. The GOLD shelf is the REAL IAP
+ * shop when the game runs inside the EmberGames hub — packs and EUR prices
+ * arrive over `iapBridge`, and tapping either shelf's pack starts the confirm →
  * secure-checkout flow (`ui:iap_buy_requested`). Standalone builds keep the
  * authored mock tags as the showcase, since there is no gateway to charge.
  * The two are tabs of one hall, which is what lets a player who came for
@@ -434,7 +442,23 @@ export class ShopPanel extends Phaser.GameObjects.Container {
         packId: offer.packId
       }));
     }
-    return SHOP[this.currency].items ?? [];
+    // The Gold sink first, then whatever real-money Warmth the hub sells.
+    //
+    // Read straight off the bridge rather than through a resolver of its own:
+    // `coinOffers()` exists because TWO surfaces have to agree about coin packs
+    // (the shelf and the shortfall notice, which sends the player to it), and
+    // there is no second surface for Warmth. A standalone build has an empty
+    // catalog, so this adds nothing and the shelf is the authored one it has
+    // always been.
+    return [
+      ...(SHOP[this.currency].items ?? []),
+      ...iapBridge.warmthPacks().map((pack) => ({
+        amount: pack.energy,
+        price: priceOf(pack.amountEur),
+        name: pack.name,
+        packId: pack.id
+      }))
+    ];
   }
 
   /**
@@ -493,7 +517,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       const cost = p.gold ?? Number(p.price.replace(/[^0-9.]/g, ''));
       return cost > 0 ? p.amount / cost : 0;
     };
-    const first = items[0];
+    const first = this.kin(items, item)[0];
     if (!first) return 0;
     const base = rate(first);
     if (!base) return 0;
@@ -515,10 +539,35 @@ export class ShopPanel extends Phaser.GameObjects.Container {
    */
   private tagFor(items: Product[], item: Product, isFree: boolean): string | null {
     if (isFree) return 'GIFT';
-    const bonuses = items.map((i) => this.bonusPercent(items, i));
-    const topValue = items[bonuses.indexOf(Math.max(...bonuses))];
-    if (item === topValue) return 'BEST VALUE';
+    // Judged inside its own currency, and only where there is a judgement to
+    // make: the best value of ONE pack is not a claim, it is a decoration, and
+    // `bonusPercent` already answers 0 for a lone row so the tag had no number
+    // behind it either.
+    const kin = this.kin(items, item);
+    if (kin.length > 1) {
+      const bonuses = kin.map((i) => this.bonusPercent(items, i));
+      if (kin[bonuses.indexOf(Math.max(...bonuses))] === item) return 'BEST VALUE';
+    }
     return item.best ? 'MOST POPULAR' : null;
+  }
+
+  /**
+   * Gold-priced, or money-priced.
+   *
+   * The Warmth shelf now carries both, and NOTHING that compares value may
+   * cross that line: 50 Warmth for €1.99 and 5 Warmth for 20 Gold are not two
+   * rates, they are two currencies. Divided anyway, the euro pack returns
+   * "+9940% MORE" and takes BEST VALUE off a shelf whose whole point is that
+   * the earned way is a real way.
+   */
+  private priceKind(item: Product): 'gold' | 'money' {
+    return item.gold !== undefined ? 'gold' : 'money';
+  }
+
+  /** The rows this one may be measured against — its own currency, in shelf
+   *  order, so `[0]` is still the entry pack of that currency. */
+  private kin(items: Product[], item: Product): Product[] {
+    return items.filter((i) => this.priceKind(i) === this.priceKind(item));
   }
 
   private makeRow(
@@ -641,6 +690,25 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       // checkout). The Emporium stays open — the wallet updates live when the
       // grant lands, which is the shop's own receipt.
       if (item.packId) {
+        /**
+         * A FULL BAR TAKES NO MONEY.
+         *
+         * `energy:add` clamps at `energyMax` (EnergySystem.gain), and
+         * `computeRegen` clamps again on every catch-up, so a Warmth pack
+         * bought at the top of the bar charges in euros and delivers nothing.
+         * This is the one refusal that has to land BEFORE the checkout window
+         * opens rather than after the receipt.
+         *
+         * Same red-and-shake as the Gold shortfall below, and deliberately no
+         * top-up notice: a shortfall has a way out to offer, a full bar has
+         * nothing to fix.
+         */
+        if (this.currency === 'energy' && this.gameState.energyCurrent >= this.gameState.energyMax) {
+          text.setColor('#C4361F');
+          this.scene.time.delayedCall(450, () => text.setColor(INK.onFieldGold));
+          this.scene.tweens.add({ targets: btn, x: btn.x + 10, duration: 45, yoyo: true, repeat: 3 });
+          return;
+        }
         this.bus.emit('ui:iap_buy_requested', { packId: item.packId });
         return;
       }
@@ -649,7 +717,10 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       if (!isFree && item.gold !== undefined) {
         if (this.gameState.coins < item.gold) {
           text.setColor('#C4361F');
-          this.scene.time.delayedCall(450, () => text.setColor(INK.onPlate));
+          // Back to the colour it was BUILT with. This restored `INK.onPlate`,
+          // a dark brown the plate never wore: one refused purchase left the
+          // price near-unreadable on the plum face until the shelf rebuilt.
+          this.scene.time.delayedCall(450, () => text.setColor(INK.onFieldGold));
           this.scene.tweens.add({ targets: btn, x: btn.x + 10, duration: 45, yoyo: true, repeat: 3 });
           // Source `warmth`, because this refusal happened INSIDE the coin
           // shop's own hall: the notice's action switches this panel to its
