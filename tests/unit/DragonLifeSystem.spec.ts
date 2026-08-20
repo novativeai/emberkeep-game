@@ -36,6 +36,23 @@ function atPhase(ctx: Ctx, index: number): void {
 }
 
 /**
+ * Move the clock so that `spanMs` from now is NOT inside this dragon's nap.
+ *
+ * The nap cycle (10-15 min) and the day (32 min) are incommensurate, so where a
+ * 15-second window falls inside a phase depends on the absolute clock — which
+ * is anchored to real time. A test about what a WORK SHIFT costs would
+ * therefore pass or fail by the hour it happened to be run at, and did. Asks
+ * the system for the schedule rather than re-deriving the hashes here, for the
+ * reason `napScheduleOf` is public at all.
+ */
+function clearOfNap(ctx: Ctx, itemId: number, spanMs: number): void {
+  const { cycleMs, offsetMs, lengthMs } = ctx.systems.dragonLife.napScheduleOf(itemId);
+  const end = ctx.clock.now() + spanMs;
+  const into = (((end - offsetMs) % cycleMs) + cycleMs) % cycleMs;
+  if (into < lengthMs) ctx.clock.advance(lengthMs - into);
+}
+
+/**
  * Park the clock at the first millisecond of THIS dragon's own nap window.
  *
  * Every dragon draws its own period (10-15 min) and its own offset inside it,
@@ -250,6 +267,10 @@ describe('DragonLifeSystem — a dragon that lives on the isle', () => {
     // sleep here. Fed AFTER the jump: `atPhase` lands on the next DAY, and the
     // care record rolls its meal tally over on a new day.
     atPhase(ctx, 1);
+    // …and clear of its own nap, which is a different mechanism with its own
+    // test. Nothing else here moves the clock, so this fixes where the shift
+    // ENDS — the instant the mood below is read.
+    clearOfNap(ctx, dragon.id, DRAGON_WORK_MS + 1000);
     ctx.bus.emit('ui:feed_dragon_requested', { itemId: dragon.id, chain: 'emberberry', tier: 3 });
     ctx.bus.emit('dragon:work', { dragonId: dragon.id, houseId: house.id });
     tick(ctx, 0);

@@ -1,7 +1,8 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { WorldRuntime } from '../core/world';
-import { groundCellAtWorldPoint, nearestPlayableCell } from '../core/world';
+import { groundCellAtWorldPoint, nearestPlayableCell, worldPointOf, zoneAt } from '../core/world';
+import { GATE_LANDING } from '../core/Constants';
 import type { TilePos } from '../core/types';
 import { storyOpen, worldOpen } from '../core/worldGates';
 
@@ -59,10 +60,10 @@ export class WorldSystem {
   }
 
   /**
-   * Where an arriving dragon comes out: beside the far side's own door back,
-   * else the first free playable cell. Never on top of something — the far
-   * board is live even while unwatched, and a crossing must not displace a
-   * piece the player left there.
+   * Where an arriving dragon comes out: a few paces clear of the far side's own
+   * door back, else beside it, else the first free playable cell. Never on top
+   * of something — the far board is live even while unwatched, and a crossing
+   * must not displace a piece the player left there.
    */
   private landingCell(world: WorldRuntime, from: string): TilePos | null {
     const board = this.state.itemsIn(world.id);
@@ -79,6 +80,15 @@ export class WorldSystem {
         x: doorBack.x + doorBack.width / 2,
         y: doorBack.y + doorBack.height / 2
       };
+      // FIRST ASK FOR A FEW PACES OF DISTANCE. A dragon seated on the door's
+      // own cell is standing inside the archway he just came through — the
+      // picture says "still crossing", not "arrived". `standoffCell` answers
+      // with the NEAREST ground a stated number of its own tiles clear of the
+      // arch, and null when the door's island cannot offer one; everything
+      // below is then exactly the landing this had before, unchanged.
+      const clear = this.standoffCell(world, door, free);
+      if (clear) return clear;
+
       // `groundCellAtWorldPoint`, not `cellAtWorldPoint`: an archway is painted
       // OFF the playable ground more often than not, and the unbounded version
       // answers such a point with a projection through the authored Emberkeep
@@ -115,6 +125,38 @@ export class WorldSystem {
       if (free(col!, row!)) return { col: col!, row: row! };
     }
     return null;
+  }
+
+  /**
+   * The nearest cell a stated number of TILES clear of the door — the paces a
+   * dragon takes before he stops and waits.
+   *
+   * Measured in world pixels against each candidate's OWN tile step, so the
+   * same `standoffCells` means the same picture on a 95px Roothold tile and a
+   * 145px Emberkeep one. `slackCells` caps it: a door whose island holds no
+   * ground in the band gets null, and the caller keeps the old answer beside
+   * the arch rather than flinging the animal across open sky to satisfy a
+   * number (see GATE_LANDING).
+   */
+  private standoffCell(
+    world: WorldRuntime,
+    door: { x: number; y: number },
+    free: (col: number, row: number) => boolean
+  ): TilePos | null {
+    return nearestPlayableCell(world, door.x, door.y, (col, row) => {
+      if (!free(col, row)) return false;
+      const zone = zoneAt(world, col, row);
+      if (!zone) return false;
+      // The average of the two lattice steps: a tile is a diamond, and either
+      // edge on its own reads as "a cell" from the player's side.
+      const step = (Math.hypot(zone.u.x, zone.u.y) + Math.hypot(zone.v.x, zone.v.y)) / 2;
+      const p = worldPointOf(world, col, row);
+      const d = Math.hypot(p.x - door.x, p.y - door.y);
+      return (
+        d >= GATE_LANDING.standoffCells * step &&
+        d <= (GATE_LANDING.standoffCells + GATE_LANDING.slackCells) * step
+      );
+    });
   }
 
 

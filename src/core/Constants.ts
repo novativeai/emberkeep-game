@@ -1935,6 +1935,27 @@ export const TRAVEL_VEIL_TIMEOUT_MS = 20_000;
 export const GATE_FX_HEIGHT = 380;
 
 /**
+ * How far from the arch an arriving dragon comes out — in TILES OF THE GROUND
+ * IT LANDS ON, never in pixels, because a Borealis tile is 95px and an
+ * Emberkeep one 145 and "four tiles" has to read the same in both.
+ *
+ * A dragon used to come out ON the door: measured against the real data the
+ * crossings landed 0.2 to 2.7 tiles from their own arch, and Roothold's at
+ * 1.78 — close enough that the animal stood inside the painted archway it had
+ * just walked out of. Four is the distance at which he reads as HAVING
+ * arrived: clear of the arch, still plainly waiting by it.
+ *
+ * `slackCells` is the ceiling, and it is not a nicety. The Rune Way's door
+ * stands on a ONE-CELL island: past two tiles the nearest ground it could
+ * legally take is 8 tiles away across open sky, which is exactly the "he came
+ * out miles away" the door anchor exists to prevent. So the standoff is a
+ * PREFERENCE — honoured only when a cell exists in [standoff, standoff+slack]
+ * — and a door with no such cell keeps the old answer, beside the arch. At 4+2
+ * every crossing but that island lands at 4.0..4.6 tiles; the island stays put.
+ */
+export const GATE_LANDING = { standoffCells: 4, slackCells: 2 } as const;
+
+/**
  * Portal colours, keyed by DESTINATION — the door wears where it goes, so the
  * player learns the routes by colour before they learn them by name:
  * flame red/pink carries you home to Emberkeep, forest green to Roothold,

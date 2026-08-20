@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { capture, createTestContext } from './helpers';
+import { GATE_LANDING } from '../../src/core/Constants';
+import type { WorldRuntime } from '../../src/core/world';
+import { worldPointOf, zoneAt } from '../../src/core/world';
+import type { TilePos } from '../../src/core/types';
 
 type Ctx = ReturnType<typeof createTestContext>;
+
+/** How far a landing cell sits from its own door back, in tiles of the ground
+ *  it stands on — the unit `GATE_LANDING` is stated in. */
+function tilesFromDoor(world: WorldRuntime, from: string, at: TilePos): number {
+  const door = world.portals.find((p) => p.to === from)!;
+  const c = { x: door.x + door.width / 2, y: door.y + door.height / 2 };
+  const zone = zoneAt(world, at.col, at.row)!;
+  const step = (Math.hypot(zone.u.x, zone.u.y) + Math.hypot(zone.v.x, zone.v.y)) / 2;
+  const p = worldPointOf(world, at.col, at.row);
+  return Math.hypot(p.x - c.x, p.y - c.y) / step;
+}
+
+/** Any cell of a world, for seating a dragon somewhere other than the isle. */
+function firstCell(world: WorldRuntime): TilePos {
+  const [col, row] = [...world.playable][0]!.split(',').map(Number);
+  return { col: col!, row: row! };
+}
 
 /** A named dragon standing on the authored isle, ready to be sent ahead. */
 function namedDragon(ctx: Ctx): number {
@@ -78,6 +99,44 @@ describe('a dragon crossing a gate', () => {
     ctx.bus.emit('dragon:cross_gate', { itemId, to: 'roothold' });
     const at = crossed[0]!.at;
     expect(seats).not.toContain(`${at.col},${at.row}`);
+  });
+
+  it('comes out a few paces clear of the arch, not standing in it', () => {
+    // The picture is the point: on the door's own cell he reads as still
+    // crossing. Roothold's arch used to seat him 1.78 tiles away — inside the
+    // painted archway — and the fix is stated in TILES because a Roothold tile
+    // is 95px and an Emberkeep one 145.
+    const ctx = createTestContext();
+    const itemId = namedDragon(ctx);
+    const crossed = capture(ctx.bus, 'dragon:crossed');
+    ctx.bus.emit('dragon:cross_gate', { itemId, to: 'roothold' });
+
+    const roothold = ctx.state.worlds.get('roothold')!;
+    const paces = tilesFromDoor(roothold, 'emberkeep', crossed[0]!.at);
+    expect(paces).toBeGreaterThanOrEqual(GATE_LANDING.standoffCells);
+    expect(paces).toBeLessThanOrEqual(GATE_LANDING.standoffCells + GATE_LANDING.slackCells);
+  });
+
+  it('keeps a one-cell island beside its arch rather than fling him across the sky', () => {
+    // The Rune Way's door stands on a SINGLE cell: past two tiles the nearest
+    // legal ground is eight away over open sky. The standoff is a preference,
+    // and a door that cannot honour it keeps the old answer — otherwise the fix
+    // for "he stands in the door" would reintroduce "he came out miles away".
+    const ctx = createTestContext();
+    const borealis = ctx.state.worlds.get('borealis')!;
+    const runevault = ctx.state.worlds.get('runevault')!;
+    ctx.state.switchWorld('borealis');
+    const seat = firstCell(borealis);
+    const item = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, ...seat, kind: 'item' });
+    ctx.bus.emit('ui:dragon_named', { itemId: item.id, name: 'Ember' });
+
+    const crossed = capture(ctx.bus, 'dragon:crossed');
+    ctx.bus.emit('dragon:cross_gate', { itemId: item.id, to: 'runevault' });
+
+    expect(crossed).toHaveLength(1);
+    expect(tilesFromDoor(runevault, 'borealis', crossed[0]!.at)).toBeLessThan(
+      GATE_LANDING.standoffCells
+    );
   });
 
   it('refuses a world this build does not have, and its own', () => {
