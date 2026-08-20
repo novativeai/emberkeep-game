@@ -398,8 +398,11 @@ describe('a move beat that names its cell', () => {
     const stump = ctx.state.addItem({ chain: 'emberbark', tier: 1, col: 7, row: 3, kind: 'item' });
     const from = { col: 7, row: 3 };
 
-    // Same region, wrong tile: the lesson has not been performed.
-    ctx.bus.emit('item:moved', { itemId: stump.id, from, to: { col: 4, row: 4 } });
+    // Same region, wrong tile — and deliberately the tile NEAREST Eleanor, the
+    // one a player who misreads "out onto the field" would reach for first.
+    const near = { col: 6, row: 2 };
+    expect(near).not.toEqual({ col: at[0], row: at[1] });
+    ctx.bus.emit('item:moved', { itemId: stump.id, from, to: near });
     expect(ctx.state.tutorialIndex).toBe(idx);
 
     ctx.bus.emit('item:moved', { itemId: stump.id, from, to: { col: at[0], row: at[1] } });
@@ -419,7 +422,7 @@ describe('a move beat that names its cell', () => {
     ctx.bus.emit('item:moved', {
       itemId: stump.id,
       from: { col: 7, row: 3 },
-      to: { col: 4, row: 4 }
+      to: { col: 6, row: 2 }
     });
     expect(ctx.state.tutorialIndex).toBe(idx + 1);
   });
