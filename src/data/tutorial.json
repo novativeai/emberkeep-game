@@ -672,11 +672,15 @@
     {
       "id": "board_room",
       "speaker": "eleanor",
-      "text": "One habit before we go on: workers work ANYWHERE. When the hearthside gets crowded, drag the Emberbark Stump onto the new field — it drips moss just as well out there.",
+      "text": "One habit before we go on: workers work ANYWHERE. When the hearthside gets crowded, drag the Emberbark Stump onto the new field beside me — it drips moss just as well out there.",
       "gate": {
         "type": "move",
         "chain": "emberbark",
-        "region": "level_2"
+        "region": "level_2",
+        "at": [
+          6,
+          2
+        ]
       },
       "highlight": [
         {

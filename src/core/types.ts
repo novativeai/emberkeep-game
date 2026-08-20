@@ -871,10 +871,21 @@ export type TutorialGate =
   | { type: 'tap' }
   | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'ui:codex_closed' | 'ui:codex_dragon_opened' | 'ui:codex_evolution_opened' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number }
-  /** A piece of `chain` CARRIED into `region` — the board-hygiene lesson. The
-   *  gate is the drop landing inside the named region's tiles, so a wiggle on
-   *  the spot cannot satisfy it. Requires `allow.drag` to include the chain. */
-  | { type: 'move'; chain: string; region: string };
+  /**
+   * A piece of `chain` CARRIED into `region` — the board-hygiene lesson. The
+   * gate is the drop landing inside the named region's tiles, so a wiggle on
+   * the spot cannot satisfy it. Requires `allow.drag` to include the chain.
+   *
+   * `at` narrows it from the field to ONE CELL — the cell the beat's hand
+   * already points at. Without it the lesson said "beside me" and accepted the
+   * far corner of the same slab, so the gesture the player was shown and the
+   * gesture the game asked for were two different gestures. With it they are
+   * one, and a drop anywhere else simply leaves the hand pointing (the piece
+   * stays draggable, so there is nothing to be stuck in). A cell somebody else
+   * is standing on cannot be asked for, and the director falls back to the
+   * field there rather than to a dead beat.
+   */
+  | { type: 'move'; chain: string; region: string; at?: [number, number] };
 
 export interface TutorialAllow {
   /** Chain ids the player may drag ('*' = all). */

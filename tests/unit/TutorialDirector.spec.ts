@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import tutorial from '../../src/data/tutorial.json';
-import type { MarkerPoint, TutorialAllow, TutorialStepConfig } from '../../src/core/types';
-import { capture, createTestContext } from './helpers';
+import authoredMap from '../../src/data/map.json';
+import { GameContext } from '../../src/core/Context';
+import type { MapData, MarkerPoint, TutorialAllow, TutorialStepConfig } from '../../src/core/types';
+import { capture, createTestContext, MemoryStorage } from './helpers';
+
+/** The tutorial's own beats name cells of the AUTHORED isle, so a beat that is
+ *  about a particular tile has to be driven against that map, not the 8x8. */
+const onAuthoredIsle = (): GameContext =>
+  new GameContext(new MemoryStorage(), { map: authoredMap as unknown as MapData });
 
 const steps = tutorial.steps as unknown as TutorialStepConfig[];
 
@@ -342,5 +349,78 @@ describe('the tutorial pointer tracks live pieces', () => {
       }
     }
     expect(seen.length).toBe(0);
+  });
+});
+
+/**
+ * THE SHOWN GESTURE AND THE ASKED GESTURE ARE ONE GESTURE.
+ *
+ * The board-hygiene beat animates a hand from the Emberbark Stump to a cell
+ * beside Eleanor and then accepted a drop anywhere on the new field — so the
+ * player could be shown "just out here, beside me" and answer it from the far
+ * corner of the slab. `gate.at` closes that, and these two halves are what keep
+ * it closed: the data half (the cell is real, free and the one the hand points
+ * at) and the behaviour half (the field alone no longer answers).
+ */
+describe('a move beat that names its cell', () => {
+  const moveSteps = steps.filter(
+    (s): s is TutorialStepConfig & { gate: { type: 'move'; region: string; at?: [number, number] } } =>
+      s.gate.type === 'move'
+  );
+
+  it('points its hand at the very cell it asks for, inside the region, on free ground', () => {
+    const map = authoredMap as unknown as MapData;
+    const playable = new Set((map.playable ?? []).map(([c, r]) => `${c},${r}`));
+    for (const step of moveSteps) {
+      const at = step.gate.at;
+      if (!at) continue;
+      const key = `${at[0]},${at[1]}`;
+      const region = map.regions.find((r) => r.id === step.gate.region)!;
+      // In the field it belongs to — the lesson is still "out onto the new land".
+      expect(region.tiles.some(([c, r]) => c === at[0] && r === at[1])).toBe(true);
+      // Real ground, or the drop it demands cannot happen at all.
+      expect(playable.has(key)).toBe(true);
+      // Not a cell the region's own contents are dropped onto when it opens:
+      // the beat would then ask for a seat the map itself had already taken.
+      expect((region.contents ?? []).some((c) => c.at[0] === at[0] && c.at[1] === at[1])).toBe(false);
+      // And the same cell the hand flies to. Two numbers that must agree is the
+      // whole defect this gate exists to fix, so they are checked, not trusted.
+      const hand = step.hand;
+      expect(hand && 'to' in hand ? hand.to : undefined).toEqual(at);
+    }
+  });
+
+  it('is not answered by the rest of the field, and is answered by its own cell', () => {
+    const ctx = onAuthoredIsle();
+    const idx = stepAt('board_room');
+    ctx.state.tutorialIndex = idx;
+    const at = (steps[idx]!.gate as { at: [number, number] }).at;
+    const stump = ctx.state.addItem({ chain: 'emberbark', tier: 1, col: 7, row: 3, kind: 'item' });
+    const from = { col: 7, row: 3 };
+
+    // Same region, wrong tile: the lesson has not been performed.
+    ctx.bus.emit('item:moved', { itemId: stump.id, from, to: { col: 4, row: 4 } });
+    expect(ctx.state.tutorialIndex).toBe(idx);
+
+    ctx.bus.emit('item:moved', { itemId: stump.id, from, to: { col: at[0], row: at[1] } });
+    expect(ctx.state.tutorialIndex).toBe(idx + 1);
+  });
+
+  it('falls back to the field when its cell is under someone else', () => {
+    // A beat whose one answer is occupied is a dead save — and during this
+    // lesson only the stump may be dragged, so the player could not clear it.
+    const ctx = onAuthoredIsle();
+    const idx = stepAt('board_room');
+    ctx.state.tutorialIndex = idx;
+    const at = (steps[idx]!.gate as { at: [number, number] }).at;
+    ctx.state.addItem({ chain: 'lumber', tier: 1, col: at[0], row: at[1], kind: 'item' });
+    const stump = ctx.state.addItem({ chain: 'emberbark', tier: 1, col: 7, row: 3, kind: 'item' });
+
+    ctx.bus.emit('item:moved', {
+      itemId: stump.id,
+      from: { col: 7, row: 3 },
+      to: { col: 4, row: 4 }
+    });
+    expect(ctx.state.tutorialIndex).toBe(idx + 1);
   });
 });

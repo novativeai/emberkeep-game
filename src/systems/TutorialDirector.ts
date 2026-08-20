@@ -225,8 +225,10 @@ export class TutorialDirector {
       const step = this.currentStep;
       if (!step || step.gate.type !== 'move') return;
       if (this.state.items.get(itemId)?.chain !== step.gate.chain) return;
-      const region = this.state.map.regions.find((r) => r.id === (step.gate as { region: string }).region);
+      const gate = step.gate as { region: string; at?: [number, number] };
+      const region = this.state.map.regions.find((r) => r.id === gate.region);
       if (!region?.tiles.some(([c, r]) => c === to.col && r === to.row)) return;
+      if (!this.landedWhereAsked(gate.at, to)) return;
       this.advance();
     });
     bus.on('tutorial:advance_requested', ({ stepId }) => {
@@ -235,6 +237,23 @@ export class TutorialDirector {
         this.advance();
       }
     });
+  }
+
+  /**
+   * Did the drop land on the cell the beat POINTED at?
+   *
+   * True when the beat named no cell — the gate is then the whole region, as it
+   * always was. True as well when the named cell is OCCUPIED: a beat whose one
+   * answer is under someone else's feet is a dead save, and during this lesson
+   * only the lesson's own chain may be dragged, so the player would have no way
+   * to clear it. Falling back to the field is the honest failure — the lesson
+   * still happens, just without its exact seat.
+   */
+  private landedWhereAsked(at: [number, number] | undefined, to: TilePos): boolean {
+    if (!at) return true;
+    const [col, row] = at;
+    if (to.col === col && to.row === row) return true;
+    return this.state.itemAt(col, row) !== undefined;
   }
 
   get currentStep(): TutorialStepConfig | undefined {

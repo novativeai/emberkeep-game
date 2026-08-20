@@ -28,11 +28,25 @@ const FRAME_H = 520;
  * whatever is left: 2*230 - 412 = 48. The pair spans 872 inside a 980 frame,
  * which leaves 54 down each margin — the same air outside as in.
  */
-/* In portrait the prompt is the same 980-wide frame blown up to 94% of a
- * 2560-unit space, so the PLATES are already thumb-sized — it is only the type
- * on them that arrives at 6px. The pitch grows a little with the wider label. */
-const BTN_SCALE = IS_MOBILE ? 1.4 : 0.98;
-const BTN_DX = IS_MOBILE ? 354 : 230;
+/*
+ * PORTRAIT IS THE SAME PANEL, MAGNIFIED — not a second, louder layout.
+ *
+ * `panelMobileScale` already blows the whole frame up to fill the phone's
+ * width, and the previous numbers then magnified the contents A SECOND TIME on
+ * top of it: a 1.4x plate inside a 1.71x panel is 2.4x the desktop key, while
+ * FRAME_H never moved. Measured, that left 15.6 units under the keys, 15.6
+ * between them and the question, and 13 over the title, in a frame with 260 to
+ * spend — which is the "trop serré" exactly.
+ *
+ * So the portrait plate is 1.05: barely over the desktop 0.98, because the
+ * panel's own magnification is what makes it thumb-sized (441 x 160 units at
+ * 1.05 lands at 147 x 53 REAL px on a 390px handset, well past the 44px bar).
+ * 245 keeps 49 units of air between the two verbs — the pair used to sit 13
+ * units INSIDE each other, and that is the failure this pitch is measured
+ * against, not a taste.
+ */
+const BTN_SCALE = IS_MOBILE ? 1.05 : 0.98;
+const BTN_DX = IS_MOBILE ? 245 : 230;
 const BTN_Y = 138;
 /** Half the PLATE, from the texture's own painted size — not a guess that has
  *  to be re-guessed whenever the scale moves. */
@@ -43,10 +57,30 @@ const BTN_HALF_H = 76 * BTN_SCALE;
  *
  * 108 is chosen so the desktop case comes to 979.6 and the `max` keeps the
  * authored 980 EXACTLY — the landscape prompt does not move by a unit. In
- * portrait the keys are 1.4x, so the plate grows to 1404 to keep the same 60
- * units of margin down each side and the same 120 of air between the verbs.
+ * portrait the 1.05 plate takes it to 1039, so the pair spans 931 with the same
+ * 54 units of margin down each side the landscape frame has. That 1039 is then
+ * magnified to 89% of the screen's width, where 1404 used to be magnified to
+ * 94% of it and crush its own contents.
  */
 const FRAME_FIT_W = Math.max(FRAME_W, 2 * (BTN_DX + BTN_HALF_W) + 108);
+
+/**
+ * The panel's own magnification, and the reason the type has to divide by it.
+ *
+ * `px()` steps a size into the portrait space so that it LANDS at the same
+ * apparent size a desktop reader gets — that is the whole contract of
+ * TYPE_STEP. But every piece of type here is drawn inside something scaled by
+ * `panelMobileScale`, so `px(38)` was being multiplied a second time and
+ * arrived 2.2x over its own intent: 26 real px for a button label, against 19
+ * on a desktop, on the smaller screen.
+ *
+ * `fpx` divides that scale back out. The type is therefore stated ONCE, in the
+ * size it is meant to be READ at, and the panel's magnification stops leaking
+ * into it. Desktop is arithmetically untouched — PANEL_SCALE is 1 and `px` is
+ * the identity there, so `fpx(n) === n`.
+ */
+const PANEL_SCALE = panelMobileScale(FRAME_FIT_W);
+const fpx = (n: number): number => Math.max(1, Math.round(px(n) / PANEL_SCALE));
 
 /**
  * The travel prompt — a portal was tapped, and this asks before the world
@@ -155,13 +189,13 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
 
     this.title = scene.add
       .text(0, -FRAME_H / 2 + 88, 'THE EMBER GATE', {
-        fontFamily: FONT.display, fontSize: `${px(58)}px`, fontStyle: 'bold', color: PALETTE.goldAccent
+        fontFamily: FONT.display, fontSize: `${fpx(58)}px`, fontStyle: 'bold', color: PALETTE.goldAccent
       })
       .setOrigin(0.5);
     this.sub = scene.add
       .text(0, -34, '', {
         fontFamily: FONT.display,
-        fontSize: `${px(38)}px`,
+        fontSize: `${fpx(38)}px`,
         color: PALETTE.cream,
         wordWrap: { width: FRAME_FIT_W - 160 },
         align: 'center'
@@ -189,7 +223,7 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
         .setVisible(false);
       const label = scene.add
         .text(bx, by - 4 * scale, text, {
-          fontFamily: FONT.display, fontSize: `${px(38)}px`, fontStyle: 'bold', color: PALETTE.night
+          fontFamily: FONT.display, fontSize: `${fpx(38)}px`, fontStyle: 'bold', color: PALETTE.night
         })
         .setOrigin(0.5)
         .setScale(scale)

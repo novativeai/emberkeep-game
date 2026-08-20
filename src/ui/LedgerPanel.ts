@@ -110,12 +110,27 @@ const BLURB_Y = 440;
  * It is a PREFERRED size — `fitBlock` takes it down toward the floor below
  * when the paragraph will not fit its band.
  */
-/** 66 in portrait, not px(30)=78 — the owner read the quote as a step too
- *  loud on a phone. Still 18 real px through the panel's own magnification
- *  (66 x 0.278), well over the 10.5 readability bar, and two lines of it
- *  (2 x 82.5 + 6 = 171) sit inside the 212-unit band with room the 78 never
- *  had. Desktop is untouched. */
-const BLURB_PX = IS_MOBILE ? 66 : 30;
+/**
+ * 48 in portrait — down from 66, and 66 was down from px(30)=78.
+ *
+ * The quote is the ONLY line in this panel that steps for the phone: every
+ * other size here (card title 30, count 30, reward 28, Deliver 44) is the same
+ * number on both. So at 66 it was 2.2x the title of the card it belongs to and
+ * louder than the Deliver key, which is what reads as "too big" — not its size
+ * in the abstract but its size against everything beside it. 48 puts it just
+ * over the Deliver key's 44, which is the loudest thing on the plate and the
+ * right ceiling for a flavour line.
+ *
+ * Still readable, and that is the floor this cannot cross: a unit of PANEL
+ * space is 0.278 real px on a 390px handset (0.152 for the space, x1.823 for
+ * `panelMobileScale(1320)`), so 48 x 0.278 = 13.3 real px against the 10.5 bar
+ * — where the unstepped 30 would land at 8.3 and is why this constant exists.
+ *
+ * Three lines now fit whole where two did: 3 x 60 + 12 = 192 of the 212-unit
+ * band, against 259 at 66 — so `fitBlock` stops shrinking mid-paragraph on the
+ * longer orders. Desktop is untouched.
+ */
+const BLURB_PX = IS_MOBILE ? 48 : 30;
 /** 1100 of the plate's 1264 on desktop, exactly as authored — three lines of the
  *  longest order blurb at 30px. In portrait the type is 2.6x bigger and has to
  *  earn every unit back, so it takes 1200 of the 1264 instead (32 units of air
