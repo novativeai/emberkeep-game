@@ -85,14 +85,43 @@ Orders are the **primary XP/Gold faucet**; the sandbox is where supply is made.
 > roster live in **[merge-chains.md](merge-chains.md)**. The rules in §2.1–2.2
 > below still hold — they are the substrate that direction builds on.
 
-### 2.1 The base rule — merge-3, with the 5-merge bonus **[L1]**
-- **3 identical adjacent items → 1 of the next tier**, created on the drop tile.
-- **5 identical → 2 of the next tier** (consume 5, the "Great Merge"). This is
-  the genre's core optimisation hook: 5 in gives ~20% more than two 3-merges
-  would. Holding out for the 5th item is the skill expression.
-- Grouping is an **orthogonal flood-fill** from the drop tile (so only one
+### 2.1 The base rule — drop-to-merge-3, with the 5-merge bonus **[L1]**
+- **The drop is the verb.** A merge happens when, and only when, a piece is
+  **dropped ON a matching piece** (same chain + tier) and the dragged piece plus
+  the target's orthogonally-connected cluster reach the recipe — 3, or a
+  per-tier override of 2. The output is created on the drop tile. Adjacency
+  only *prepares* a merge; it never performs one (the Merge Dragons /
+  Fairyland grammar).
+- **Dropped on a match with too few → GATHER.** The piece is seated on a free
+  cell beside the target, nearest the side it came from; the pair is formed and
+  the next drop on either of them finishes it. Boxed in, or already touching
+  its target, the piece goes home and the board is left as it was.
+- **Dropped on free ground → a move, nothing more.** Three alike standing in a
+  row stay three pieces. A complete-but-unmerged cluster **leans**: every member
+  but its best-connected one strains toward that one together, art and ground
+  shadow, until the player drops one on another (`MERGE_READY` in
+  `Constants.ts`). **One cluster at a time** — the oldest ready cluster leans and
+  keeps leaning until it is finished; three Eggs and three Gems both complete
+  do not shiver at once. During the tutorial the current beat picks the cluster
+  (and picks none when the beat is about nothing on the board); once the hint's
+  hand is up (`MERGE_HINT.idleMs`, 10 s) the hand's own cluster takes the floor
+  and strains **louder** (`MERGE_READY.hint*`) until the offer is answered. The flood is
+  walked on the board as it stands, so any member dropped on any other fuses,
+  the middle of a row included.
+- **The drag reticle says which of the four it will be** before the finger
+  lifts — move (gold), merge (green), gather (ember), refuse (grey) — read off
+  `verdictOnto` and `gatherSeat`, the same two calls MergeSystem makes.
+- **5 identical → 2 of the next tier** (finish a cluster of 5+, the "Great
+  Merge"). This is the genre's core optimisation hook: 5 in gives ~20% more
+  than two 3-merges would. Holding out for the 5th item is the skill expression.
+- Grouping is an **orthogonal flood-fill** from the TARGET piece (so only one
   connected blob merges). Config in [`chains.json`](../src/data/chains.json):
-  `mergeRule: { minGroup: 3, fiveBonus: true, fiveGroup: 5, fiveOutputs: 2 }`.
+  `mergeRule: { minGroup: 3, fiveBonus: true, fiveGroup: 5, fiveOutputs: 2 }`;
+  the predicate itself is stated once, in
+  [`src/core/mergeRule.ts`](../src/core/mergeRule.ts) (`verdictOnto`), and
+  shared by MergeSystem, the hint planner, the tutorial's hand and the drag
+  reticle. *(Gone on purpose: the old free-tile flood — dropping BESIDE two
+  alike fused them — and the two-tile `MERGE_SNAP_RADIUS` "magnet".)*
 - **Per-tier overrides [L1].** A tier may carry its own `merge: { group, outputs }`
   which replaces the rule *for items of that tier* (and disables the 5-bonus for
   them). Shipped: **Red Dragon**, **Green Dragon** and **House** are all
@@ -106,9 +135,10 @@ Orders are the **primary XP/Gold faucet**; the sandbox is where supply is made.
 ### 2.2 Merge types (the verbs)
 | Type | Trigger | Result | Theme | Status |
 | --- | --- | --- | --- | --- |
-| **Merge** | drag 3+ alike together | next tier | the ground remembers | **[L1]** |
-| **Great Merge** | 5+ alike | 2 next tier + extra spark burst | a brighter bloom | **[L1]** |
-| **Pair merge** | drag 2 alike (tiers with a `merge` override) | next tier | the rare ones pair off | **[L1]** |
+| **Merge** | drop a piece ON a match, cluster reaches 3 | next tier | the ground remembers | **[L1]** |
+| **Gather** | drop a piece ON a match, cluster still short | the piece seats beside its mate — no fuse | the flock gathers first | **[L1]** |
+| **Great Merge** | finish a cluster of 5+ | 2 next tier + extra spark burst | a brighter bloom | **[L1]** |
+| **Pair merge** | drop one of 2 alike ON the other (tiers with a `merge` override) | next tier | the rare ones pair off | **[L1]** |
 | **Hatch merge** | a merge whose OUTPUT tier is `hatchAtTier` (3 eggs → dragon) | a **dragon** + shell-crack ceremony | a promise kept | **[L1]** |
 | **Harvest** | tap a ready dragon | its produce onto a free tile within 3 tiles (costs Warmth, starts a nap) | she digs you a pebble | **[L1]** |
 | **Passive gift** | wait — no tap, no Warmth | produce drops on its own every `passiveMs` | she works while you're away | **[L1]** |

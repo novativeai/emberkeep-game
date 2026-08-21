@@ -325,7 +325,8 @@ describe('zones — new ground beside the isle', () => {
     // well) got its second cell and Grille 28 — a 1×1 beside it, empty until
     // then — its first. Both sit on painted flagstone (audit:ground is clean on
     // them); the drawing shifted the derived editor→art fit by 1–3 px everywhere.
-    expect(checked).toBe(40 + 140 + 144 + 5);
+    // 40 → 36 on 2026-08-21, four cells taken back out of the emberkeep draw.
+    expect(checked).toBe(36 + 140 + 144 + 5);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {

@@ -53,7 +53,7 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | event | emitted by | handled by |
 |---|---|---|
 | item:spawned | BoardSystem, ChestSystem | BoardScene, OrderSystem, TutorialDirector, Save |
-| item:moved | BoardSystem, MergeSystem | BoardScene, Save |
+| item:moved | BoardSystem, MergeSystem (a plain move on free ground, AND a **gather** — a drop on a match with too few, whose `to` is the SEAT beside the target, not the drop cell) | BoardScene, UIScene, TutorialDirector (re-aims the hand; `move` gate), Save |
 | item:move_bounced | MergeSystem | BoardScene, AudioManager |
 | item:merged | MergeSystem | BoardScene, UIScene, AudioManager, OrderSystem, TutorialDirector (gate), TaskSystem, Save |
 | item:hatched | MergeSystem | BoardScene (hatch ceremony), AudioManager, TutorialDirector (gate), TaskSystem |
@@ -111,6 +111,20 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   authored 420×242 one looks perfectly plausible and is silently wrong; nothing would
   reveal it until the migration, by which point every save carries the error.*
 
+- **TOUCH `src/core/mergeRule.ts` → RULE** the merge predicate is stated ONCE there
+  (`verdictOnto`: drop ON a match → merge when the target's cluster + the dragged piece
+  reach the recipe, gather when short, never anything on free ground) and FOUR readers run
+  it: MergeSystem (decides), the hint planner (predicts), `TutorialDirector.aimMergeHand`
+  (aims the hand), BoardScene (reticle verb + `MERGE_READY` lean toward `readyClusters`'
+  centre — the oldest ready cluster only). Change the predicate in one reader's private copy and the
+  hand/reticle promise drops the board refuses — the exact bug the module exists to make
+  impossible. `verdictOnto` is only HALF the question for a gather: MergeSystem also needs
+  `gatherSeat` to find a free cell, so every reader that offers a gather (the hand, the
+  reticle) asks BOTH or it offers a drop that bounces — and a bounce changes nothing, so
+  the same refused offer is computed again forever. The old
+  free-tile flood and the `MERGE_SNAP_RADIUS` magnet are DELETED; do not reintroduce a
+  radius. **CHECK** `tests/unit/MergeRule.spec.ts`, `MergeSystem.spec.ts`,
+  `TutorialDirector.spec.ts` ("planned off the clusters").
 - **TOUCH chains.json tier order/ids → CHECK** texture keys `item_${chain}_${tier}` in
   assets.json + anchors.json + `ITEM_SCALE` keys (`chain_tier`), TextureFactory bespoke
   cases (keyed per tier), tutorial.json `{chain, nth, tier}` refs, `CHEST_GIFTS` tiers,

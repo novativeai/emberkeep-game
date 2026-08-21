@@ -97,7 +97,7 @@ function freeCells(ctx: GameContext, want: number): TilePos[] {
 }
 
 /** Put the piece down somewhere else the way a drag does — the move plus the
- *  fact that announces it — without the merge magnet joining in. */
+ *  fact that announces it — without asking MergeSystem to rule on the drop. */
 function relocate(ctx: GameContext, itemId: number, to: TilePos): void {
   const item = ctx.state.items.get(itemId)!;
   const from = { col: item.col, row: item.row };

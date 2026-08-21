@@ -1037,7 +1037,27 @@ const previous = new Map(
   ).map((w) => [w.id, w])
 );
 
+/**
+ * ONE WORLD'S FAILURE IS NOT EVERY WORLD'S.
+ *
+ * This loop used to throw straight out on the first world that would not
+ * build, which meant an authoring change to ONE island stopped `zones.json`
+ * being regenerated at all — every other world frozen at whatever the last
+ * good run left, with no way to ship a fix to any of them until the broken one
+ * was resolved. That is the same failure the deck-missing branch below already
+ * refuses to accept ("dropping a world on a re-run would silently delete
+ * ground the game ships with"); it just had no answer for a world whose source
+ * is present but no longer fits its plan.
+ *
+ * So a world that throws KEEPS ITS LAST GOOD OUTPUT and says so, loudly, in the
+ * report and on stderr. Nothing is silently degraded: the ground that shipped
+ * still ships, the seeds it shipped with are untouched, and the build carries
+ * on. The failure is a message to the author, not a wall in front of everyone.
+ */
+const failures = [];
+
 for (const spec of WORLDS) {
+ try {
   const deckPath = spec.deck ? `assets/map/${spec.deck}-deck.json` : null;
   const deckMissing = deckPath !== null && !existsSync(resolve(ROOT, deckPath));
   if (deckMissing) {
@@ -1148,18 +1168,30 @@ for (const spec of WORLDS) {
         // where being shut is the intent rather than an accident.
         status: lvl <= 1 ? 'active' : lvl <= LEVEL_CAP ? 'unlockable' : 'locked',
         unlock: lvl <= 1 ? undefined : { level: lvl },
-        // NO CLOUD on generated ground, whatever its level.
-        //
-        // Above the cap the reason is that it can never open: a cloud there is a
-        // promise the game cannot keep, laid over scenery the player should be
-        // looking at. Below the cap it turned out to be worse. These cells are the
-        // painted island the authored 46-tile isle does not cover — most of what
-        // is on screen — so fogging them buried the board under puffs from the
-        // first frame, on ground the player never asked about and cannot act on
-        // until level 2. The authored map's own clouds are AUTHORED, one per cell,
-        // placed where a cloud reads as a door; these are derived, and derived fog
-        // is scenery vandalism. The ground still opens on its level, silently.
-        fog: false,
+        /**
+         * A CLOUD ON EVERY LEVEL THIS GROUND IS NOT OPEN AT — and level 1 is
+         * open, so it never wears one.
+         *
+         * This was `fog: false` for all generated ground, for two reasons that
+         * were both about the cloud saying nothing. Above the cap it was a
+         * promise the game cannot keep; below it, a grey lid arriving on the
+         * first frame over ground the player never asked about, with no way to
+         * tell one bank from another — so the board just looked buried.
+         *
+         * What changed is that the bank now READS as one. The clouds follow the
+         * levels drawn in the map editor, so each one is a single coherent mass
+         * with its own edge rather than an even lid over everything — which is
+         * what makes it scenery you can see past instead of a grey ceiling.
+         *
+         * A floating "Niveau N" panel over each bank was tried on 2026-08-21 and
+         * taken straight back out: with several banks on screen the panels
+         * overlapped each other and the board, and reading the price mattered
+         * far less than seeing the island. The level stays in the data, and the
+         * refusal on tapping a cloud is where it gets said.
+         *
+         * Derived from the SAME per-cell `unlockLevel` the editor writes, so the
+         * grid and the weather cannot disagree: one level, one region, one bank.
+         */
         tiles
       };
     });
@@ -1264,6 +1296,23 @@ for (const spec of WORLDS) {
     regions: regions.map((r) => `${r.id}(${r.tiles.length})`).join(' '),
     extent: `${cols}x${rows}`
   });
+ } catch (err) {
+  const kept = previous.get(spec.id);
+  // Nothing built before AND nothing builds now: there is no world to ship and
+  // no last-good one to fall back on. That is still fatal.
+  if (!kept) throw err;
+  failures.push({ id: spec.id, why: err.message });
+  built.push(kept);
+  report.push({
+    id: spec.id,
+    zones: (kept.zones ?? []).length,
+    cells: (kept.zones ?? []).reduce((n, z) => n + (z.cells?.length ?? 0), 0),
+    dropped: 0,
+    extent: 'KEPT (build failed)',
+    portals: (kept.portals ?? []).map((p) => `→${p.to}`).join(' ') || '—',
+    regions: '(unchanged — see the failure below)'
+  });
+ }
 }
 
 // A door is dead input the moment it names a world this build cannot run, and a
@@ -1311,3 +1360,17 @@ for (const r of report) {
   );
 }
 console.log(`wrote ${OUT}`);
+
+// LOUD, and last, so it is the thing left on screen. A kept world is ground the
+// player still gets; it is also authoring that did not land, and the two must
+// never be confused with a clean run.
+if (failures.length) {
+  console.error('');
+  for (const f of failures) {
+    console.error(`build-zones: ${f.id} DID NOT REBUILD — kept the world already in zones.json.`);
+    console.error(`             ${f.why}`);
+  }
+  console.error(
+    `build-zones: ${failures.length} world(s) are stale in ${OUT}. Everything else was rebuilt.`
+  );
+}

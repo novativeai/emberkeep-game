@@ -59,8 +59,8 @@ describe('the Fir loop — a worked tree plants its own replacement', () => {
     ] as const) {
       ctx.systems.board.spawn('firgrain', 1, col, row, 'init');
     }
-    ctx.bus.emit('drag:dropped', { itemId: ctx.state.itemIdAt(1, 1)!, from: { col: 1, row: 1 }, to: { col: 2, row: 2 } });
-    // Dropping beside the pair snaps and fuses (the forgiving merge).
+    ctx.bus.emit('drag:dropped', { itemId: ctx.state.itemIdAt(1, 1)!, from: { col: 1, row: 1 }, to: { col: 2, row: 1 } });
+    // Dropped ON a member of the row: the drop is the merge.
     expect(ctx.state.countItems('firgrain', 2)).toBe(1);
 
     // …and the top of the chain is a WORKING tree, not a trophy.

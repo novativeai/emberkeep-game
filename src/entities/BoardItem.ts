@@ -1,10 +1,23 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
-import { DEPTHS, DRAG, HIT_FORGIVENESS_PX, SLEEP_BREATH, TIMINGS, num, PALETTE } from '../core/Constants';
+import {
+  DEPTHS,
+  DRAG,
+  HIT_FORGIVENESS_PX,
+  MERGE_READY,
+  SLEEP_BREATH,
+  TIMINGS,
+  num,
+  PALETTE
+} from '../core/Constants';
 import { gridToWorld } from '../core/iso';
 import type { AnchorsData, ItemSnapshot, SpinSheet } from '../core/types';
 
 const COOLING_TINT = 0x9d97a2;
+
+/** Where the soft ground shadow sits under an item at rest, in container
+ *  pixels. Named because the lean has to put it back exactly here. */
+const SHADOW_SEAT_Y = 8;
 
 /**
  * Pooled visual for one board item. The container carries position/depth and
@@ -47,6 +60,14 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** The art's own scale, so the breath can modulate it without drifting. */
   private artBaseX = 1;
   private artBaseY = 1;
+  /** Is this piece curled up in its sleep painting? The lean keeps its hands
+   *  off a sleeper: `applyBob` hands the art to the breath and never reaches
+   *  the seating code, so a lean started here would move nothing and then snap
+   *  the piece sideways the moment it woke. */
+  get asleep(): boolean {
+    return this.sleepBreath;
+  }
+
   /** Is the piece being carried over ground it could actually be put down on?
    *  Both shadows answer to this while dragging (see `setOverGround`). */
   private overGround = true;
@@ -57,6 +78,47 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** Art hidden behind a live rig — cooldown/ready visuals are suppressed
    *  (they'd render UNDER the rig); BoardScene floats a badge instead. */
   private artHidden = false;
+  /**
+   * THE LEAN — where the art stands relative to its seat, in container pixels.
+   *
+   * A complete-but-unmerged cluster shows it wants finishing by leaning its
+   * members toward the centre (BoardScene `syncReadyLeans`, `MERGE_READY`). The
+   * scene tweens THESE two numbers, never the container's x/y: the container
+   * is what every other motion owns — the drag return, the hint's hop, a
+   * dragon's wander flight, `reseatFixtures` — and a second writer on it would
+   * either fight those or be clobbered by them. The art inside the container is
+   * free: nothing else moves it while the piece is at rest, and `applyBob` is
+   * already the one place that seats it every frame, so the offset is applied
+   * there.
+   *
+   * THE SHADOW GOES WITH IT. This first shipped with the art leaning off a
+   * shadow that stayed put — the reasoning being that a fixed shadow keeps the
+   * piece visibly on its cell. Watched rather than reasoned about, that reads
+   * as the painting sliding off the object: the lean is a step ALONG the
+   * ground, not a lift off it, so the contact patch travels the whole offset.
+   * Only the art and its shadow move; the container stays on its cell, which
+   * is what keeps every other owner of the container's x/y out of this.
+   *
+   * A tween on the container's own properties dies with `release()`'s
+   * `killTweensOf(this)` — that is why the fields live on the container and not
+   * on the art — and `acquire()` zeroes them, so a pooled slot never wakes up
+   * already leaning toward a cluster the last tenant belonged to.
+   */
+  leanX = 0;
+  leanY = 0;
+  /**
+   * How far this lean reaches at full stretch, in container pixels — the capped
+   * `reach` the scene computed for this member. `applyBob` divides the live
+   * offset by it to recover a 0..1 progress, which is what drives the STRETCH:
+   * the art elongates along the line it is being pulled down, so the piece
+   * strains toward the centre instead of merely sliding at it. Zero means no
+   * lean is standing and the art keeps its plain scale.
+   */
+  leanReach = 0;
+  /** Whether the stretch above is currently written into the art's scale, so
+   *  the frame the lean ends restores the base scale exactly once and every
+   *  other frame leaves it alone. */
+  private leanStretched = false;
 
   constructor(scene: Phaser.Scene) {
     super(scene, 0, 0);
@@ -66,7 +128,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // the ONLY shadow an item has. Falls back to a flat tint if the texture
     // (built by BoardScene.ensureShadowTexture) isn't ready.
     this.groundShadow = scene.add
-      .image(0, 8, scene.textures.exists('fx_shadow') ? 'fx_shadow' : '__WHITE')
+      .image(0, SHADOW_SEAT_Y, scene.textures.exists('fx_shadow') ? 'fx_shadow' : '__WHITE')
       .setVisible(false);
     if (!scene.textures.exists('fx_shadow')) this.groundShadow.setTint(num(PALETTE.night)).setAlpha(0.24);
     this.sprite = scene.add.image(0, 0, '__DEFAULT');
@@ -120,7 +182,11 @@ export class BoardItem extends Phaser.GameObjects.Container {
       const [ax, ay] = anchors.byKey[textureKey] ?? anchors.default;
       this.sprite.setOrigin(ax, ay);
     }
-    const w = Math.max(64, this.sprite.displayWidth * 0.92);
+    // `shadowFitWidth`, not `displayWidth`: the live scale may be carrying the
+    // lean's stretch, and a re-fit taken during one bakes that stretch into the
+    // shadow for good — the piece stands still afterwards on an ellipse that is
+    // permanently 13% wide.
+    const w = this.shadowFitWidth();
     this.groundShadow.setDisplaySize(w, w * 0.42);
     this.refreshHitArea();
   }
@@ -138,7 +204,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.sprite.setScale(artScale);
     this.artBaseX = artScale;
     this.artBaseY = artScale;
-    const w = Math.max(64, this.sprite.displayWidth * 0.92);
+    const w = this.shadowFitWidth();
     this.groundShadow.setDisplaySize(w, w * 0.42);
     this.refreshHitArea();
   }
@@ -190,14 +256,24 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.artBaseY = artScale;
     this.sleepBreath = false;
     this.sleepGroundY = 0;
+    // The last tenant's lean died with its tween in `release()`; the offset it
+    // left behind must not seat this piece a few pixels off its cell.
+    this.leanX = 0;
+    this.leanY = 0;
+    this.leanReach = 0;
+    this.leanStretched = false;
     // A pooled item may have been the spinning crystal; `acquire` must hand back
     // a still one or the next piece in this slot inherits the sheet's frames.
     this.spin = null;
     this.sprite.setVisible(true); // a pooled item may have been a hidden rig host
     // Soft shadow scaled to the art's footprint (proportional to its size).
-    const w = Math.max(64, this.sprite.displayWidth * 0.92);
+    const w = this.shadowFitWidth();
     this.groundShadow.setDisplaySize(w, w * 0.42);
     this.groundShadow.setVisible(true);
+    // …and back on its seat: a slot released mid-lean (release() kills the
+    // tween, it does not undo the frame it left behind) would otherwise hand
+    // the next piece a shadow sitting a lean off centre.
+    this.groundShadow.setPosition(0, SHADOW_SEAT_Y);
     // A pooled item may have been released mid-flight over the void.
     this.overGround = true;
     this.poseProxy = null; // pooled reuse must never inherit another dragon's overlay
@@ -592,7 +668,98 @@ export class BoardItem extends Phaser.GameObjects.Container {
       this.sprite.setY(this.sleepGroundY + SLEEP_BREATH.lift * k);
       return;
     }
-    if (this.sprite.y !== 0) this.sprite.setY(0);
+    // At rest the art sits on its seat plus the lean (zero for every piece that
+    // is not in a complete cluster). Guarded writes: this runs for every item
+    // every frame, and a no-change set still dirties the transform.
+    const moved = this.sprite.x !== this.leanX || this.sprite.y !== this.leanY;
+    if (this.sprite.x !== this.leanX) this.sprite.setX(this.leanX);
+    if (this.sprite.y !== this.leanY) this.sprite.setY(this.leanY);
+    // The contact patch travels with the body (see THE LEAN): a piece stepping
+    // toward its neighbour drags its shadow along, and one that stayed behind
+    // read as the art coming unstuck from the object. Position only — the
+    // shadow's SCALE is the drag lift's (`liftForDrag`) and the art fit's
+    // (`setDisplaySize`), and a second writer on it would fight both.
+    const shadowY = SHADOW_SEAT_Y + this.leanY;
+    if (this.groundShadow.x !== this.leanX) this.groundShadow.setX(this.leanX);
+    if (this.groundShadow.y !== shadowY) this.groundShadow.setY(shadowY);
+    // THE STORED RECT IS A COPY, and it is what the input plugin tests.
+    // `artHitRect()` follows the art, but `input.hitArea` is a snapshot taken
+    // once at `acquire` with the art on (0,0), and the per-pixel test never
+    // runs because the rect check short-circuits first. So a leaning piece was
+    // drawn up to 30 px outside the box that gates its own taps, and the dead
+    // strip was the LEADING edge — the side facing the piece it is being pulled
+    // toward, which is precisely where a finger goes. Re-cut on any frame the
+    // lean moved or stretched the art; every piece that is not leaning pays two
+    // comparisons and nothing else.
+    if (this.applyLeanStretch() || moved) this.refreshHitArea();
+  }
+
+  /**
+   * The stretch half of the lean (`MERGE_READY.stretch`). The offset alone was
+   * read as nothing happening; a piece being PULLED also elongates along the
+   * pull, so the art is stretched down the lean's own axis and thinned a little
+   * across it. In iso a neighbour lies mostly sideways, so this is mostly a
+   * widening — which is exactly what a body leaning on a rope looks like from
+   * here.
+   *
+   * Derived from `leanX/leanY` rather than tweened on its own: one tween owns
+   * the whole gesture, so the stretch can never fall out of step with the
+   * offset, and killing that tween (a pick-up, `release()`) ends both.
+   *
+   * The scale is only written while a lean is standing, and restored on the one
+   * frame it ends — every other frame this costs a hypot and leaves the art
+   * alone, which matters because it runs for every item on the board.
+   */
+  private applyLeanStretch(): boolean {
+    const len = Math.hypot(this.leanX, this.leanY);
+    if (len < 0.01 || this.leanReach <= 0) {
+      if (!this.leanStretched) return false;
+      this.leanStretched = false;
+      this.sprite.setScale(this.artBaseX, this.artBaseY);
+      return true;
+    }
+    const k = Math.min(1, len / this.leanReach);
+    const ux = Math.abs(this.leanX) / len;
+    const uy = Math.abs(this.leanY) / len;
+    const amount = MERGE_READY.stretch * k;
+    // Along the pull it grows, across it it gives — half as much, so the piece
+    // reads as straining rather than as swelling.
+    this.sprite.setScale(
+      this.artBaseX * (1 + amount * ux - amount * 0.5 * uy),
+      this.artBaseY * (1 + amount * uy - amount * 0.5 * ux)
+    );
+    this.leanStretched = true;
+    return true;
+  }
+
+  /**
+   * Drop the lean outright — the art back on its seat THIS frame, not on the
+   * next `applyBob`. Needed wherever the bob is paused and would not re-seat it:
+   * a pick-up pauses the bob and then tweens the art's own y for the lift, so a
+   * lean still standing in `sprite.x` would be carried for the whole drag.
+   * The y is left to whoever owns it while the bob is paused (the lift tween);
+   * the x has no other writer and is cleared here.
+   */
+  clearLean(): void {
+    this.leanX = 0;
+    this.leanY = 0;
+    this.leanReach = 0;
+    this.sprite.setX(0);
+    if (!this.bobPaused && !this.sleepBreath) this.sprite.setY(0);
+    // The shadow is put back HERE and not left to the next `applyBob`: a
+    // pick-up pauses the bob, and the lift then swells a shadow that would
+    // otherwise still be sitting a lean off centre for the whole drag.
+    this.groundShadow.setPosition(0, SHADOW_SEAT_Y);
+    // The stretch goes with it, and here rather than on the next `applyBob`:
+    // the bob may be paused (a pick-up) or replaced (a sleeper's breath), and
+    // a piece left mid-stretch would carry it for the whole drag.
+    if (this.leanStretched) {
+      this.leanStretched = false;
+      if (!this.sleepBreath) this.sprite.setScale(this.artBaseX, this.artBaseY);
+    }
+    // And the rect with it: this re-seats the art OUTSIDE `applyBob` (the bob is
+    // paused on a pick-up), so nothing else would put the box back.
+    this.refreshHitArea();
   }
 
   /**
@@ -609,6 +776,13 @@ export class BoardItem extends Phaser.GameObjects.Container {
    * the feet used. The breath scales around the anchor, so it never moves.
    */
   setSleepBreath(on: boolean, phase = 0, groundY = 0): void {
+    // Falling asleep mid-lean froze the art wherever the offset had it, off its
+    // own shadow, for the whole nap: the breath takes over `applyBob` before the
+    // seating code and nothing puts the art back. Dropping the lean here is what
+    // makes the sleeper lie down on its own tile. (The scene stops the tween on
+    // its next sync — `leanExcluded` refuses a sleeper — but the frame it lies
+    // down on is this one.)
+    if (on && !this.sleepBreath) this.clearLean();
     this.sleepBreath = on;
     this.breathPhase = phase;
     this.sleepGroundY = on ? groundY : 0;
@@ -616,6 +790,20 @@ export class BoardItem extends Phaser.GameObjects.Container {
       this.sprite.setScale(this.artBaseX, this.artBaseY);
       this.sprite.setY(0);
     }
+  }
+
+  /**
+   * Is the ART itself mid-tween — the drop settle's slide home, the landing
+   * squash's scale?
+   *
+   * The scene's "hold still before you lean" gate asks `tweens.isTweening` on
+   * the CONTAINER, which is blind to these: they target the inner sprite, and
+   * both write the very properties the lean's offset and stretch write. A lean
+   * starting inside that window is two authors on one transform, and the loser
+   * is whichever ran first that frame.
+   */
+  artSettling(): boolean {
+    return this.scene.tweens.isTweening(this.sprite);
   }
 
   /** A quick squash-and-settle so a newly placed item reads as landing on the

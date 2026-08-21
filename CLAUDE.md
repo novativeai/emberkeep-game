@@ -113,6 +113,14 @@ silently drops `checklist` writes, so everything goes in `notes`.
 - Systems stay Phaser-free — unit tests construct a full `GameContext` in node,
   injecting the 8×8 fixture map (`new GameContext(storage, { map })`).
 - Everything tweens; nothing teleports. BoardItems and particles are pooled.
+- THE DROP IS THE VERB. A merge happens only when a piece is dropped ON a
+  matching piece (dragged + the target's orthogonal cluster reach the recipe);
+  dropped on a match with too few it GATHERS beside it; dropped on free ground
+  it only moves — three alike in a row stay three pieces and LEAN toward their
+  centre. The ONE predicate is `src/core/mergeRule.ts` (`verdictOnto`,
+  `gatherSeat`, `readyClusters`); MergeSystem, the hint planner, the tutorial
+  hand and the reticle all call it. Never re-derive it, never reintroduce a
+  free-tile flood or a magnet.
 
 ## Rendering & coordinates
 - Canvas renders at 2560×1600 (`RES = 2`) and FIT-scales; ALL coordinates/fonts are

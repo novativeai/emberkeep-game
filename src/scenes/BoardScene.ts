@@ -14,6 +14,7 @@ import {
   GATE_FLIGHT,
   decorClipCharacter,
   MERGE_HINT,
+  MERGE_READY,
   DRAGON_RIG_SCALE,
   CRYSTAL_3D,
   EMBER_MOTES,
@@ -80,6 +81,7 @@ import {
 } from '../core/characterAnims';
 import { type ClipRef, clipLoadTiers, planClipEviction } from '../core/dragonClips';
 import { type HintBoard, type MergeStep, nextMergePlan } from '../core/mergeHints';
+import { gatherSeat, matches, readyClusters, type ReadyCluster, verdictOnto } from '../core/mergeRule';
 import { LoadQueue } from '../core/LoadQueue';
 import { ensureTextures } from '../core/lazyTextures';
 import { plateScale } from '../core/artScale';
@@ -296,6 +298,29 @@ const NO_ALLOW: Required<TutorialAllow> = {
 };
 
 /**
+ * What letting go RIGHT NOW would do — the four looks of the drag reticle.
+ * `move` is a drop onto free ground and nothing else. `merge` and `gather` are
+ * `verdictOnto`'s own words. `refuse` is every drop MergeSystem answers with
+ * `item:move_bounced`: an occupied cell that is not a merge question (a
+ * stranger, or a chain at the top of its ladder), and a match with nowhere to
+ * seat the gathered piece. It exists because `move` used to cover those too,
+ * and a gold frame over a tile the piece cannot land on is the picture telling
+ * the player something the rule will not honour.
+ */
+type DropVerb = 'move' | 'merge' | 'gather' | 'refuse';
+
+/**
+ * Where a carried piece is over, resolved ONCE for both the reticle and the
+ * drop. `cell` is the address the drop will name; `target` is the matching
+ * piece standing there (by cell or by its art — see `resolveDrop`), or null
+ * when the cell is free or holds something else.
+ */
+interface DropHover {
+  cell: TilePos;
+  target: BoardItemState | null;
+}
+
+/**
  * Presentation of the isle: ground diamonds + cliff skirts, ash-fog over
  * locked regions, pooled BoardItems, drag/tap input (gated by the tutorial),
  * and every piece of merge/hatch/harvest/unlock juice. All game decisions
@@ -390,7 +415,44 @@ export class BoardScene extends Phaser.Scene {
   /** Live drag: the lifted sprite eases toward this pointer-tracked target. */
   private dragSprite: BoardItem | null = null;
   private dragTarget = { x: 0, y: 0 };
+  /** The reticle currently on screen — always one of `dragCells`. Everything
+   *  that shows or hides "the" reticle goes through this handle, so the verb
+   *  swap in `updateDrag` is the only place that knows there are three. */
   private dragCell!: Phaser.GameObjects.Graphics;
+  /** One reticle per drop verb, painted once in `buildDragCell`. Three graphics
+   *  and a visibility swap, rather than a redraw on every verb change: a drag
+   *  crosses a dozen cells a second, and a Graphics redraw is a command-buffer
+   *  rebuild each time, for something that only ever has three looks. */
+  private dragCells!: Record<DropVerb, Phaser.GameObjects.Graphics>;
+  /**
+   * THE LEAN's bookkeeping (see `syncReadyLeans`). `leans` is keyed by item id
+   * and holds the tween on that piece's `leanX`/`leanY` — or, once the cluster
+   * stops being ready, the short tween easing it back to its seat (`returning`),
+   * kept in the map so the next sync cannot lay a fresh lean over a return that
+   * is still writing the same two properties. `readyKeys` is the set of
+   * clusters leaning as of the last sync, by a key that names every member AND
+   * its cell, so a cluster whose pieces shuffled without changing membership is
+   * still seen as a different cluster and re-aimed at its new centre.
+   */
+  private leans = new Map<number, { sprite: BoardItem; tween: Phaser.Tweens.Tween; returning: boolean }>();
+
+  /** The governor has dozed the scene: the lean is ambience, and stops with the
+   *  rest of it. The clusters are re-read, and re-lean, on the first wake. */
+  private leanDozing = false;
+  /** Whether the leans standing right now are the hint's louder ones — see
+   *  `MERGE_READY.hintFraction`. Compared on every sync, because the answer
+   *  changes when a hand goes up or is taken back and the tweens have to be
+   *  rebuilt at the new size. */
+  private leanBoosted = false;
+  /**
+   * Items mid-crossing (`flyThroughGate`). The lean's stillness gate asks
+   * `tweens.isTweening(sprite)`, and a gate flight is driven from a proxy
+   * object whose `onUpdate` writes the sprite — invisible to that question. The
+   * piece's STATE cell also stays put until the crossing commits, so without
+   * this both the flyer and the partner it left behind go on leaning: one in
+   * mid-air, the other at a cell with nothing in it.
+   */
+  private crossing = new Set<number>();
   private burst!: Phaser.GameObjects.Particles.ParticleEmitter;
   private sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
   private shells!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -530,6 +592,13 @@ export class BoardScene extends Phaser.Scene {
     this.tutorialDone = this.ctx.state.tutorialDone;
     this.liveDragons.clear();
     this.busyDragons.clear();
+    // The lean's tweens died with the last run's TweenManager; the bookkeeping
+    // must go with them or the diff would believe last world's clusters are
+    // still leaning and never start this world's.
+    this.leans.clear();
+    this.leanDozing = false;
+    this.leanBoosted = false;
+    this.crossing.clear();
     // A restart reuses this scene INSTANCE (Title → Play after game:reset): the
     // last run's display objects are destroyed but these fields still point at
     // them. Stale refs block recreation — the Golden Egg vanished (its aura,
@@ -584,6 +653,7 @@ export class BoardScene extends Phaser.Scene {
     this.buildKeyBadges();
     this.buildPortals(); // the doors out — after buildFog, so a cloud covers one
     this.spawnExistingItems(); // before the camera frames — travel arrives on a populated board
+    this.syncReadyLeans(); // a board that arrives with a complete cluster leans from the first frame
     this.syncGoldenAltar();
     this.buildEmitters();
     this.buildDragCell();
@@ -698,6 +768,14 @@ export class BoardScene extends Phaser.Scene {
 
   private onPowerState(state: PowerState): void {
     const doze = state === 'doze';
+    // The merge-ready lean is ambience too: it eases home on doze (an empty
+    // ready-set routes every member through the graceful stop) and the same
+    // sync re-reads the clusters on wake. Gated on the edge so the initial
+    // active call in create() does not run a sync the build already did.
+    if (doze !== this.leanDozing) {
+      this.leanDozing = doze;
+      this.syncReadyLeans();
+    }
     for (const emitter of this.ambientEmitters) emitter.emitting = !doze;
     if (this.twinkleTimer) this.twinkleTimer.paused = doze;
     this.hubGlow?.setVisible(!doze);
@@ -941,6 +1019,18 @@ export class BoardScene extends Phaser.Scene {
     this.coolAccum += delta;
     if (this.coolAccum >= 240) {
       this.coolAccum = 0;
+      // The lean's healer (see syncReadyLeans): starts are gated on a sprite
+      // standing still, and this is where the gate is re-asked once landings,
+      // pop-ins and the tutorial hand have moved on. A no-change pass is a key
+      // diff over a handful of clusters — cheap enough for 4 Hz.
+      //
+      // FIRST in the tick, deliberately. Everything below it is bookkeeping for
+      // badges and pills, and this whole step runs inside one `guard`: a throw
+      // in any of it stops the rest of the callback every frame, in silence
+      // (the same trap that once ate the hint — see the note above `stepBoard`).
+      // The lean is the board's only explanation of the merge rule, so it does
+      // not queue behind a cooldown label.
+      this.syncReadyLeans();
       this.syncProduceBadges();
       for (const [id, badge] of this.restBadges) {
         const sp = this.itemSprites.get(id);
@@ -1279,11 +1369,14 @@ export class BoardScene extends Phaser.Scene {
   /**
    * A pulse on the ground the hand is pointing at.
    *
-   * The destination of a gathering step is now usually an EMPTY cell, and a
-   * hand travelling to bare stone says "somewhere over there" where the old
-   * one, landing on a piece, at least said "onto THAT". The marker is what
-   * makes it "here" — and it is drawn only for an empty target, because a
-   * diamond under the piece you are being told to drop onto is noise.
+   * Under drop-onto-only the plan's FINAL step always lands ON a piece — the
+   * drop is the verb — and it is the gathers on the way there that may aim at
+   * bare stone (and even those usually name a piece now, with MergeSystem
+   * choosing the seat beside it). A hand travelling to bare stone says
+   * "somewhere over there" where one landing on a piece says "onto THAT"; the
+   * marker is what makes the bare-stone case "here" — and it is drawn only for
+   * an empty target, because a diamond under the piece you are being told to
+   * drop onto is noise.
    */
   private markHintTarget(step: MergeStep): void {
     this.clearHintTarget();
@@ -1329,8 +1422,21 @@ export class BoardScene extends Phaser.Scene {
     this.playerFocus = { col: to.col, row: to.row };
     const asked = this.hintAsked;
     this.hintAsked = null;
-    this.hintFollowUp =
-      !!asked && asked.itemId === itemId && asked.to.col === to.col && asked.to.row === to.row;
+    // "Where it landed" is no longer always "where the hand pointed": a gather
+    // step drops the piece ON a matching piece, and MergeSystem then SEATS it
+    // on a free cell beside the target of its own choosing — `item:moved`
+    // reports the seat. An exact comparison read every obeyed gather as the
+    // player wandering off, and the follow-up clock fell back to the full ten
+    // seconds mid-plan. So a landing on the asked cell OR any of its in-zone
+    // neighbours (the ring a seat is chosen from) counts as the asked move.
+    const obeyed =
+      !!asked &&
+      asked.itemId === itemId &&
+      ((asked.to.col === to.col && asked.to.row === to.row) ||
+        this.ctx.state
+          .neighbors(asked.to.col, asked.to.row)
+          .some((p) => p.col === to.col && p.row === to.row));
+    this.hintFollowUp = obeyed;
     this.hintIdleMs = 0;
   }
 
@@ -1701,7 +1807,13 @@ export class BoardScene extends Phaser.Scene {
 
   /** Keep the rig glued to its (possibly bobbing/dragged) host + advance anim. */
   private syncDragon(ld: LiveDragon): void {
-    ld.player?.container.setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift);
+    // The host's ready-lean rides along: the lean offsets the host's ART, and a
+    // rig host's art is hidden — without carrying leanX/leanY here a pair of
+    // hatchlings one drop from a whelp would lean invisibly. Body, clip AND
+    // shadow: a rig host hides its own soft shadow, so `ld.shadow` is the only
+    // one this animal casts, and leaving it on the seat is the one piece type
+    // that would visibly come unstuck from its own dark patch.
+    ld.player?.container.setPosition(ld.host.x + ld.host.leanX, ld.host.y + ld.host.leanY - DRAGON_ANIM.groundLift);
     ld.player?.container.setDepth(ld.host.depth + 0.5);
     // Visibility, not just position: the rig's shadow is the ONLY one a dragon
     // shows (the host's own pair is hidden the moment the rig stands in for its
@@ -1709,7 +1821,10 @@ export class BoardScene extends Phaser.Scene {
     // is written every frame because the position beside it already is, and
     // because the host is the single owner of the answer — a second copy of
     // "is it over ground" kept here is a second thing to get wrong.
-    ld.shadow.setVisible(ld.host.onGround).setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth - 0.5);
+    ld.shadow
+      .setVisible(ld.host.onGround)
+      .setPosition(ld.host.x + ld.host.leanX, ld.host.y + ld.host.leanY)
+      .setDepth(ld.host.depth - 0.5);
     ld.zzz?.setPosition(ld.host.x, ld.host.y).setDepth(ld.host.depth + 4);
     if (ld.clipOverlay?.visible) {
       // The Align-Studio clip rides the host at the rig's own anchor and depth,
@@ -1720,7 +1835,7 @@ export class BoardScene extends Phaser.Scene {
       const clip = ld.clipOverlay.getData('clip') as CharacterClip | undefined;
       const flip = ld.facing < 0;
       ld.clipOverlay
-        .setPosition(ld.host.x, ld.host.y - DRAGON_ANIM.groundLift)
+        .setPosition(ld.host.x + ld.host.leanX, ld.host.y + ld.host.leanY - DRAGON_ANIM.groundLift)
         .setDepth(ld.host.depth + 0.5)
         .setFlipX(flip);
       if (clip) {
@@ -5265,6 +5380,9 @@ export class BoardScene extends Phaser.Scene {
   ): void {
     const sprite = this.itemSprites.get(itemId);
     if (!sprite?.active) return;
+    // Out of the lean's hands for the whole arc — see `crossing`.
+    this.crossing.add(itemId);
+    this.syncReadyLeans();
     const ld = this.liveDragons.get(itemId);
     const target = { x: door.zone.x, y: door.zone.y - 30 };
     if (ld) {
@@ -5308,6 +5426,9 @@ export class BoardScene extends Phaser.Scene {
               this.detachItemAura(itemId);
               this.itemSprites.delete(itemId);
               sprite.release();
+              // The arc is over and the piece is gone from this board; the veto
+              // it held goes with it, or the set grows by one every crossing.
+              this.crossing.delete(itemId);
               this.ctx.bus.emit('dragon:cross_gate', { itemId, to: door.to });
             }
           });
@@ -5557,33 +5678,56 @@ export class BoardScene extends Phaser.Scene {
    * an action game puts round a target, rather than the filled slab this used to
    * be (see `DRAG.cellHighlight*` for why). Drawn once at the authored tile's
    * size and re-scaled per zone by `updateDrag`, so it costs nothing per frame.
+   *
+   * THREE of them now, one per drop verb (`DRAG.mergeColor`/`gatherColor`):
+   * painted once each, and `updateDrag` swaps which is visible. The swap is the
+   * whole cost of the reticle knowing the verb — no per-frame redraw, and the
+   * frame keeps its geometry so only the COLOUR says what changed.
    */
   private buildDragCell(): void {
-    const g = this.add.graphics().setDepth(DEPTHS.tileHighlight).setVisible(false);
-    // The diamond's vertices, clockwise from the top.
-    const v = [
-      { x: 0, y: -TILE_H / 2 },
-      { x: TILE_W / 2, y: 0 },
-      { x: 0, y: TILE_H / 2 },
-      { x: -TILE_W / 2, y: 0 }
-    ];
-    g.fillStyle(DRAG.cellHighlightColor, DRAG.cellFillAlpha);
-    g.fillPoints(v.map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
-    // Each corner is TWO arms: one reaching along the edge to the previous
-    // vertex, one to the next. Drawn as separate strokes rather than one path so
-    // the round join sits at the vertex and the arms end square.
-    g.lineStyle(DRAG.cellBracketWidth, DRAG.cellHighlightColor, DRAG.cellHighlightAlpha);
-    const t = DRAG.cellBracketSpan;
-    for (let i = 0; i < v.length; i++) {
-      const c = v[i]!;
-      for (const n of [v[(i + 1) % v.length]!, v[(i + 3) % v.length]!]) {
-        g.beginPath();
-        g.moveTo(c.x, c.y);
-        g.lineTo(c.x + (n.x - c.x) * t, c.y + (n.y - c.y) * t);
-        g.strokePath();
+    const paint = (color: number, fillAlpha: number): Phaser.GameObjects.Graphics => {
+      const g = this.add.graphics().setDepth(DEPTHS.tileHighlight).setVisible(false);
+      // The diamond's vertices, clockwise from the top.
+      const v = [
+        { x: 0, y: -TILE_H / 2 },
+        { x: TILE_W / 2, y: 0 },
+        { x: 0, y: TILE_H / 2 },
+        { x: -TILE_W / 2, y: 0 }
+      ];
+      g.fillStyle(color, fillAlpha);
+      g.fillPoints(v.map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
+      // Each corner is TWO arms: one reaching along the edge to the previous
+      // vertex, one to the next. Drawn as separate strokes rather than one path so
+      // the round join sits at the vertex and the arms end square.
+      g.lineStyle(DRAG.cellBracketWidth, color, DRAG.cellHighlightAlpha);
+      const t = DRAG.cellBracketSpan;
+      for (let i = 0; i < v.length; i++) {
+        const c = v[i]!;
+        for (const n of [v[(i + 1) % v.length]!, v[(i + 3) % v.length]!]) {
+          g.beginPath();
+          g.moveTo(c.x, c.y);
+          g.lineTo(c.x + (n.x - c.x) * t, c.y + (n.y - c.y) * t);
+          g.strokePath();
+        }
       }
-    }
-    this.dragCell = g;
+      return g;
+    };
+    this.dragCells = {
+      move: paint(DRAG.cellHighlightColor, DRAG.cellFillAlpha),
+      merge: paint(DRAG.mergeColor, DRAG.verbFillAlpha),
+      gather: paint(DRAG.gatherColor, DRAG.verbFillAlpha),
+      refuse: paint(DRAG.refuseColor, DRAG.cellFillAlpha)
+    };
+    this.dragCell = this.dragCells.move;
+  }
+
+  /** Show the reticle that says `verb`, retiring whichever was up. Every other
+   *  reader keeps talking to `this.dragCell`, so the swap is invisible to them. */
+  private setDragVerb(verb: DropVerb): void {
+    const next = this.dragCells[verb];
+    if (next === this.dragCell) return;
+    this.dragCell.setVisible(false);
+    this.dragCell = next;
   }
 
   /* ----------------------------- input ------------------------------ */
@@ -5603,6 +5747,10 @@ export class BoardScene extends Phaser.Scene {
       (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
         if (!(obj instanceof BoardItem)) return;
         this.dragFrom = { col: obj.col, row: obj.row };
+        // A picked-up piece stops leaning THIS frame: the lift is about to tween
+        // the same art the lean offsets, and a lean carried into the player's
+        // hand reads as the piece pulling sideways against the finger.
+        this.stopLean(obj.itemId, true);
         obj.setData('dragged', true);
         obj.liftForDrag();
         // The sprite EASES toward this target in update() (Fairyland-style
@@ -5610,7 +5758,11 @@ export class BoardScene extends Phaser.Scene {
         this.dragSprite = obj;
         this.dragTarget.x = obj.x;
         this.dragTarget.y = obj.y;
-        this.dragCell.setVisible(true);
+        // Through the live resolver rather than a bare setVisible(true): the
+        // reticle must come up already knowing its cell AND its verb — shown
+        // blind it spends a frame at the last drag's cell in the last drag's
+        // colour.
+        this.updateDrag(0);
       }
     );
     this.input.on(
@@ -5648,17 +5800,21 @@ export class BoardScene extends Phaser.Scene {
         this.dragSprite = null;
         this.dragCell.setVisible(false);
         if (!this.dragFrom) return;
-        // WYSIWYG: drop into the cell the highlight diamond showed (the dragged
-        // item's tracked position), NOT the raw pointer — the two differ by the
+        // WYSIWYG: drop into the cell the reticle showed (the dragged item's
+        // tracked position), NOT the raw pointer — the two differ by the
         // grab offset, so pointer-based drops could land one tile off and
-        // bounce home even though the item hovered a free tile.
+        // bounce home even though the item hovered a free tile. `resolveDrop`
+        // is the SAME resolver the reticle reads every frame — feet cell first,
+        // then a MATCHING piece's art under the carry point — so a drop the
+        // frame just painted as a merge cannot quietly resolve to the free
+        // cell behind the tall piece it was painted on.
         // Open sky resolves to null, and a piece let go over the clouds goes
         // home: naming its OWN cell makes the dispatch below a same-tile drop,
         // which MergeSystem already answers with `item:move_bounced`. The
         // feed / hire / gate branches under this are unaffected — they match on
         // the dropped ART's bounds as well as on a cell, so a dragon released
         // on a House's roof is still a hire even when its feet are over air.
-        const to = this.dropCellUnderDrag() ?? this.dragFrom;
+        const to = this.resolveDrop(obj)?.cell ?? this.dragFrom;
 
         // Food dragged onto a DRAGON → feed it. The mirror of the gesture just
         // below (a dragon dragged onto a House), so the board has one verb for
@@ -5977,7 +6133,8 @@ export class BoardScene extends Phaser.Scene {
     const k = 1 - Math.exp(-delta / DRAG.followTau);
     s.x += (this.dragTarget.x - s.x) * k;
     s.y += (this.dragTarget.y - s.y) * k;
-    const cell = this.dropCellUnderDrag();
+    const hover = this.resolveDrop(s);
+    const cell = hover?.cell ?? null;
     // The piece's OWN shadows answer to the same question as the diamond: over
     // open sky there is no floor to darken, so it carries none (BoardItem
     // `setOverGround`). One test, one answer, three things obeying it.
@@ -5987,6 +6144,36 @@ export class BoardScene extends Phaser.Scene {
       this.dragCell.setVisible(false);
       return;
     }
+    // THE RETICLE KNOWS THE VERB. With the magnet gone, the one question
+    // mid-drag is "am I over a matching piece, and is its cluster enough?" —
+    // and the frame answers it with the SAME calls MergeSystem will make on the
+    // drop, `verdictOnto` and `gatherSeat`, so it can promise neither a fusion
+    // nor a landing the system would refuse.
+    //
+    // `gatherSeat` is in here for the same reason it is in the tutorial's hand:
+    // the verdict alone says a gather is a merge question, not that the board
+    // has room to answer it. A match walled in on all four sides bounces, and a
+    // pink frame over it would be an invitation to a gesture that does nothing.
+    let verb: DropVerb = 'move';
+    const held = this.ctx.state.items.get(s.itemId);
+    if (held) {
+      const target = hover?.target;
+      if (target) {
+        const verdict = verdictOnto(this.ctx.state, this.ctx.data.chains, held, target);
+        verb =
+          verdict.kind === 'merge'
+            ? 'merge'
+            : verdict.kind === 'gather' && gatherSeat(this.ctx.state, held, target)
+              ? 'gather'
+              : 'refuse';
+      } else {
+        // No match under the piece: the cell is either free (a plain move) or
+        // held by something this piece cannot stack on.
+        const standing = this.ctx.state.itemAt(cell.col, cell.row);
+        if (standing && standing.id !== held.id) verb = 'refuse';
+      }
+    }
+    this.setDragVerb(verb);
     const { x, y } = worldPointOf(this.ctx.state.world, cell.col, cell.row);
     this.dragCell
       .setPosition(x, y)
@@ -6010,17 +6197,367 @@ export class BoardScene extends Phaser.Scene {
    *
    * Read off the piece instead, so the bias means the same THING at every size
    * and no future art can inherit the bug by being short.
+   *
+   * The DRAGGED sprite is a parameter, not `this.dragSprite`: DRAG_END puts the
+   * drag furniture away (dragSprite included) before it resolves the drop, and
+   * reading the field here quietly swapped the height-scaled bias for the flat
+   * cap on the one call that decides where the piece lands — the reticle and
+   * the drop could disagree by a cell for exactly the short pieces the bias
+   * exists for.
    */
-  private dropCellUnderDrag(): TilePos | null {
-    const height = this.dragSprite?.artHitRect().height ?? 0;
-    const bias = height > 0 ? Math.min(DRAG.dropBiasMaxPx, height * DRAG.dropBiasOfHeight) : DRAG.dropBiasMaxPx;
+  private dragSamplePoint(dragged: BoardItem): { x: number; y: number } {
+    const height = dragged.artHitRect().height;
+    const bias =
+      height > 0 ? Math.min(DRAG.dropBiasMaxPx, height * DRAG.dropBiasOfHeight) : DRAG.dropBiasMaxPx;
+    return { x: this.dragTarget.x, y: this.dragTarget.y + bias };
+  }
+
+  private dropCellUnderDrag(dragged: BoardItem): TilePos | null {
+    const feet = this.dragSamplePoint(dragged);
     // `groundCellAtWorldPoint`, NOT `cellAtWorldPoint`: the latter falls back to
     // the authored Emberkeep lattice when no zone owns the point, and in every
     // other world that fallback lands on an index a real zone owns. A drag out
     // over the Borealis sky was therefore told it was standing on an island
     // 2700px away — which is what kept the piece's shadow lit over open cloud.
     // Null is the honest answer for open sky, and both callers below take it.
-    return groundCellAtWorldPoint(this.ctx.state.world, this.dragTarget.x, this.dragTarget.y + bias);
+    return groundCellAtWorldPoint(this.ctx.state.world, feet.x, feet.y);
+  }
+
+  /**
+   * Where the carried piece is over — the ONE answer the reticle and the drop
+   * both read, so whatever cell the reticle frames is the cell the drop names.
+   *
+   * Under drop-onto-only, "dropping on" a piece has to mean ON THE PIECE THE
+   * PLAYER SEES, and the feet-cell alone does not: a House is ~2.5 iso rows
+   * tall and an adult dragon taller, so a piece laid squarely on their picture
+   * resolves to the free cell BEHIND them and the drop that read as "onto"
+   * became a plain move. The feed/hire/door branches learnt this one by one
+   * (each matches by cell OR art bounds); this is the same leniency for the
+   * merge target itself.
+   *
+   * MATCHING pieces only, deliberately. A stranger's art must not pull the drop
+   * onto its cell — feeding, hiring and the gate keep their own pre-emption,
+   * and a plain drop on a stranger still resolves to the ground cell and
+   * bounces. Ties between overlapping matches go to the topmost by depth,
+   * which is the sprite the player actually sees (the same law the tap path
+   * follows). Opaque pixels only (`hitsOpaqueArt`), so a tall frame's empty
+   * corner never claims a drop that was aimed at the ground beside it.
+   */
+  private resolveDrop(dragged: BoardItem): DropHover | null {
+    const state = this.ctx.state;
+    const held = state.items.get(dragged.itemId);
+    const cell = this.dropCellUnderDrag(dragged);
+    if (cell && held) {
+      const standing = state.itemAt(cell.col, cell.row);
+      if (standing && standing.id !== held.id && matches(held, standing)) {
+        return { cell, target: standing };
+      }
+    }
+    if (held) {
+      const feet = this.dragSamplePoint(dragged);
+      let best: { sprite: BoardItem; state: BoardItemState } | null = null;
+      for (const s of this.itemSprites.values()) {
+        if (!s.active || s.itemId === dragged.itemId) continue;
+        if (best && s.depth <= best.sprite.depth) continue;
+        const other = state.items.get(s.itemId);
+        if (!other || !matches(held, other)) continue;
+        if (!this.artContainsWorldPoint(s, feet.x, feet.y)) continue;
+        best = { sprite: s, state: other };
+      }
+      if (best) {
+        return { cell: { col: best.state.col, row: best.state.row }, target: best.state };
+      }
+    }
+    return cell ? { cell, target: null } : null;
+  }
+
+  /** Does (wx,wy) land on this sprite's OPAQUE art? World point → hit-area
+   *  space by the same transform the input plugin uses (BoardItems have no
+   *  parent container and never rotate, so the inverse is two divides), then
+   *  the rect + per-pixel pair every tap already answers to. */
+  private artContainsWorldPoint(s: BoardItem, wx: number, wy: number): boolean {
+    if (s.scaleX === 0 || s.scaleY === 0) return false;
+    const hx = (wx - s.x) / s.scaleX + s.displayOriginX;
+    const hy = (wy - s.y) / s.scaleY + s.displayOriginY;
+    return Phaser.Geom.Rectangle.Contains(s.artHitRect(), hx, hy) && s.hitsOpaqueArt(hx, hy);
+  }
+
+  /* ---------------------- the lean (MERGE_READY) --------------------- */
+
+  /**
+   * THE LEAN — a complete cluster showing it wants finishing (`MERGE_READY`).
+   *
+   * The old board fused three-in-a-row by itself; this one waits for the drop,
+   * and the lean is how it says so: every member but the centre eases toward
+   * the centre and back. The clusters come from `readyClusters` — the same rule
+   * module MergeSystem decides with — so a leaning cluster is EXACTLY one that
+   * a single drop onto its centre would fuse, never a suggestion the system
+   * would refuse.
+   *
+   * ONE CLUSTER AT A TIME, IN TURN. Three Eggs and three Gems both complete is
+   * two things the board wants to say, and saying them at once is saying
+   * neither: the eye reads a board that shivers rather than a group that
+   * belongs together. So the ready clusters take turns — centre-id order, one
+   * pulse each, `MERGE_READY.periodMs` apart — and while it is the Eggs' turn
+   * the Gems stand perfectly still. With one cluster on the board this is
+   * indistinguishable from a steady pulse, which is what it should be.
+   *
+   * Called on every board change (moved/spawned/removed/merged, a load, wake
+   * from doze), on the 240 ms housekeeping tick, and when the turn passes. The
+   * tick is not a luxury: a merge's output sprite is acquired a beat AFTER
+   * `item:merged`, a landing piece is still mid-glide when `item:moved` fires,
+   * and the tutorial hand starts and stops without a board event — all three
+   * heal here, because starting a lean is gated on the sprite standing still
+   * and the gate is re-asked four times a second.
+   *
+   * The lean runs during the tutorial too (the board teaching is wanted from
+   * the first pair on screen) — except on the piece the tutorial hand is
+   * animating from, which already bounces under UIScene's hand.
+   */
+  private syncReadyLeans(): void {
+    // A pooled sprite reused under a stale entry: the tween died with
+    // `release()`, so only the bookkeeping is left to drop.
+    for (const [id, entry] of this.leans) {
+      if (this.itemSprites.get(id) !== entry.sprite || !entry.sprite.active) this.leans.delete(id);
+    }
+    // A standing lean on a piece the tutorial hand has since taken eases home;
+    // it does not stand the rest of its cluster down.
+    for (const [id, entry] of [...this.leans]) {
+      if (!entry.returning && this.leanExcluded(entry.sprite)) this.stopLean(id, false);
+    }
+    // In doze the board is a still painting — the lean stops with the rest of
+    // the ambience, and an empty ready-set is what routes every standing lean
+    // through the ease-home below. Unless a HAND is up: doze arrives at 45 s of
+    // stillness and the hint's first offer at 10 s, so the board would go quiet
+    // underneath its own standing invitation while the hand went on bouncing.
+    // The lean is ambience right up until it is the thing being said.
+    const clusters = this.leanDozing && !this.hintShown
+      ? []
+      : readyClusters(this.ctx.state, this.ctx.data.chains, this.ctx.state.items.values())
+          // A cluster with a member in the player's hand, in mid-crossing or
+          // asleep is not a cluster to point at: the board's state still lists
+          // it, but what is on screen is one piece somewhere else and the rest
+          // leaning at where it used to be. Vetoed WHOLE — half a gesture aimed
+          // at a piece that is not there is worse than none.
+          .filter((c) => !c.members.some((m) => this.leanVetoed(m.id)))
+          // Oldest first, and it KEEPS the floor: see below.
+          .sort((a, b) => a.centre.id - b.centre.id);
+    // DURING THE TUTORIAL THE BEAT DECIDES, and when the beat is about nothing
+    // on the board NOTHING leans — see `tutorialFocus`.
+    // Same gate as the idle hint's `lessonRunning`, and for the same reason: a
+    // player who left the isle mid-tutorial (the ruby teleport) still has
+    // `tutorialDone` false for the rest of the save, and the lean must behave
+    // like a free board's everywhere the walkthrough is not on screen.
+    const teaching =
+      !this.tutorialDone && this.ctx.state.worldId === WORLD_ID && !!this.tutorialStep;
+    // Outside it, a HAND that is up gets the floor for the same reason: the
+    // board must not strain at one cluster while the pointer names another.
+    const active = teaching
+      ? this.tutorialFocus(clusters)
+      : (clusters.find((c) => this.hintTouches(c)) ?? clusters[0] ?? null);
+    // The piece the hand is bouncing is NOT one of them: it is already moving,
+    // under a tween of its own, and it is the piece being asked to travel
+    // rather than one of the pieces waiting for it. The rest of its cluster
+    // strains toward the centre while it hops — the two halves of one sentence.
+    const leaders = active
+      ? active.members.filter((m) => m.id !== active.centre.id && m.id !== this.hintShown?.itemId)
+      : [];
+    const wanted = new Set(leaders.map((m) => m.id));
+    // Everyone else eases home. Gently — a cluster snapping upright the moment
+    // a neighbour moves reads as a glitch, not as the board standing down.
+    for (const id of [...this.leans.keys()]) if (!wanted.has(id)) this.stopLean(id, false);
+    if (leaders.length === 0) return;
+    const boosted = this.hintTouches(active);
+    // Already up at the right volume: leave the phase alone. Common case by far.
+    if (this.leanBoosted === boosted && leaders.every((m) => this.leans.has(m.id))) return;
+    // ALL OR NONE. Starting the members one at a time as each happened to come
+    // to rest is what left a row with one end straining and the other sitting
+    // there: two tweens begun a quarter-second apart do not read as one group
+    // being pulled together, they read as one piece being broken. So the whole
+    // set waits until every member of it can start, and the 240 ms heal asks
+    // again until that is true.
+    if (!leaders.every((m) => this.leanReady(m.id))) return;
+    for (const m of leaders) this.stopLean(m.id, true);
+    for (const m of leaders) this.startLean(m, active!, boosted);
+    this.leanBoosted = boosted;
+  }
+
+  /** Does the standing hint name a piece of this cluster — the one it asks the
+   *  player to carry, or the one it asks them to drop it on? That cluster is
+   *  what the hand is about, so it is what leans, and it leans louder. */
+  private hintTouches(cluster: ReadyCluster | null): boolean {
+    const step = this.hintShown;
+    if (!step || !cluster) return false;
+    const target = this.ctx.state.itemAt(step.to.col, step.to.row);
+    return cluster.members.some((m) => m.id === step.itemId || m.id === target?.id);
+  }
+
+  /**
+   * Can this member begin a lean this frame? Its sprite has to be on the board,
+   * not excluded, and standing still.
+   *
+   * Its OWN lean does not count as motion: the lean tween targets the container
+   * (it writes `leanX`/`leanY`), so `isTweening` is true for every leaning
+   * piece, and a gate that took that at face value could never restart a set
+   * once any part of it was up.
+   */
+  private leanReady(id: number): boolean {
+    const sprite = this.itemSprites.get(id);
+    if (!sprite || !sprite.active || sprite.itemId !== id) return false;
+    if (this.leanExcluded(sprite)) return false;
+    if (this.leans.has(id)) return true;
+    // Anything else mid-flight finishes first — the landing glide, the hint's
+    // hop, a pop-in and a wander on the container; the drop settle and the
+    // landing squash on the art (`artSettling`), which the container's own
+    // question cannot see. The lean writes to both.
+    return !this.tweens.isTweening(sprite) && !sprite.artSettling();
+  }
+
+  /**
+   * THE TUTORIAL OWNS THE ORDER while it is running.
+   *
+   * "Oldest cluster keeps the floor" is the right tie-break on a free board and
+   * exactly the wrong one during a lesson, because the lesson's own data makes
+   * the oldest cluster the LAST thing it will teach. `level_2` opens on the
+   * levelup beat and lays down three Dew Drops already touching; `level_2_gate`
+   * opens one beat later with three Cut Wood, also already touching. The Drops
+   * have the lower ids, so from that moment they held the lean for eleven
+   * beats — through the wood, the planks, the fir grain, the cracked stone —
+   * while the pieces the tutorial was actually asking for sat there dead. Their
+   * own beat is `moonwater_merge`, near the very end.
+   *
+   * So the cluster standing on the step's own highlight — or holding a piece
+   * its hand names — takes the floor, whatever its age. And when the step names
+   * nothing on the board, NOTHING leans: the caller does not fall back to age,
+   * because a board pointing somewhere the beat is not about is the board
+   * arguing with the thing it is teaching.
+   */
+  private tutorialFocus(clusters: readonly ReadyCluster[]): ReadyCluster | null {
+    const step = this.tutorialStep;
+    if (!step) return null;
+    const cells = new Set(step.highlight.map((p) => `${p.col},${p.row}`));
+    const named = new Set<number>();
+    const hand = step.hand;
+    if (hand && 'from' in hand) {
+      if (hand.from.item !== undefined) named.add(hand.from.item);
+      if (hand.to.item !== undefined) named.add(hand.to.item);
+    }
+    if (cells.size === 0 && named.size === 0) return null;
+    return (
+      clusters.find((c) =>
+        c.members.some((m) => named.has(m.id) || cells.has(`${m.col},${m.row}`))
+      ) ?? null
+    );
+  }
+
+  /** Pieces whose whole CLUSTER stands down: the board says they are side by
+   *  side, the screen says otherwise. */
+  private leanVetoed(itemId: number): boolean {
+    if (this.dragSprite?.itemId === itemId || this.crossing.has(itemId)) return true;
+    const sprite = this.itemSprites.get(itemId);
+    return !!sprite && (sprite.asleep || !!sprite.getData('dragged'));
+  }
+
+  /** Pieces the lean must keep its hands off: everything `leanVetoed` names,
+   *  and the one the tutorial hand is animating FROM (it already bounces
+   *  there — that one is personal, and does not stand its cluster down). */
+  private leanExcluded(sprite: BoardItem): boolean {
+    if (this.leanVetoed(sprite.itemId)) return true;
+    const hand = this.tutorialDone ? null : this.tutorialStep?.hand;
+    if (hand && 'from' in hand) {
+      if (hand.from.item === sprite.itemId) return true;
+      if (hand.from.col === sprite.col && hand.from.row === sprite.row) return true;
+    }
+    return false;
+  }
+
+  /** Begin one member's lean. The caller has already asked `leanReady` of the
+   *  whole set — this one just draws it. */
+  private startLean(member: BoardItemState, cluster: ReadyCluster, boosted = false): void {
+    const sprite = this.itemSprites.get(member.id);
+    if (!sprite || !sprite.active || sprite.itemId !== member.id) return;
+    const world = this.ctx.state.world;
+    const from = worldPointOf(world, member.col, member.row);
+    const to = worldPointOf(world, cluster.centre.col, cluster.centre.row);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1) return;
+    // A share of the gap, capped (see MERGE_READY): far enough to read as a
+    // pull from across the board, never far enough to leave the cell. The
+    // hint's pair of numbers is the same statement at a higher volume.
+    const reach = boosted
+      ? Math.min(MERGE_READY.hintAmplitudePx, dist * MERGE_READY.hintFraction)
+      : Math.min(MERGE_READY.amplitudePx, dist * MERGE_READY.fraction);
+    // The art stretches along the pull as well as sliding down it, and the
+    // stretch is derived from how far through this reach the offset currently
+    // stands — so the piece has to be told what full reach is for it.
+    sprite.leanReach = reach;
+    // The ART leans (BoardItem.leanX/leanY), never the container: the container
+    // belongs to the drag return, the hint's hop and `reseatFixtures`, and the
+    // tween dying with `release()` is what keeps the pool law — an acquired
+    // slot can never inherit a lean.
+    const tween = this.tweens.add({
+      targets: sprite,
+      leanX: (dx / dist) * reach,
+      leanY: (dy / dist) * reach,
+      // No delay and no per-member offset: the members of a cluster strain
+      // TOGETHER, because three pieces moving as one thing is the whole message.
+      // They are started in the same pass (see ALL OR NONE) so they stay in
+      // phase for as long as the cluster stands.
+      duration: MERGE_READY.leanMs,
+      yoyo: true,
+      repeat: -1,
+      repeatDelay: boosted
+        ? MERGE_READY.hintRestMs
+        : Math.max(0, MERGE_READY.periodMs - MERGE_READY.leanMs * 2),
+      ease: 'Sine.easeInOut'
+    });
+    this.leans.set(member.id, { sprite, tween, returning: false });
+  }
+
+  /**
+   * Stop a member's lean. `immediate` snaps the art back onto its seat this
+   * frame — for a pick-up (the lift is about to own the art) and a removal (the
+   * sprite is about to fly a gather or fade out). Anything gentler eases home
+   * over one lean-beat, because a whole cluster snapping upright the moment a
+   * neighbour moves reads as a glitch, not as the board standing down.
+   */
+  private stopLean(id: number, immediate: boolean): void {
+    const entry = this.leans.get(id);
+    if (!entry) return;
+    if (entry.returning && !immediate) return; // already on its way home
+    entry.tween.stop();
+    const { sprite } = entry;
+    const holds = sprite.active && sprite.itemId === id;
+    if (immediate || !holds || (sprite.leanX === 0 && sprite.leanY === 0)) {
+      this.leans.delete(id);
+      if (holds) sprite.clearLean();
+      return;
+    }
+    const back = this.tweens.add({
+      targets: sprite,
+      leanX: 0,
+      leanY: 0,
+      duration: MERGE_READY.leanMs,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        // Only clear OUR entry: a fresh lean may have replaced this one by the
+        // time a killed return's onComplete never fires (release kills tweens,
+        // and the prune in syncReadyLeans sweeps that case).
+        if (this.leans.get(id)?.tween === back) this.leans.delete(id);
+      }
+    });
+    this.leans.set(id, { sprite, tween: back, returning: true });
+  }
+
+  /** Every lean down at once — a full visual resync is about to rebuild the
+   *  sprites under them, so there is nothing to ease back gracefully TO. */
+  private stopAllLeans(): void {
+    for (const id of [...this.leans.keys()]) this.stopLean(id, true);
+    // A rebuild kills the flights too, and a crossing id left standing would
+    // veto a cluster on a board that no longer has that piece in the air.
+    this.crossing.clear();
   }
 
   /**
@@ -7537,8 +8074,13 @@ export class BoardScene extends Phaser.Scene {
       }),
       // Spawns, removals and merges all change what the best plan IS — a hand
       // left pointing through them is the same stale-pointer bug in a different
-      // costume. `refreshHint` is a no-op when no hand is up.
-      bus.on('item:spawned', () => this.refreshHint()),
+      // costume. `refreshHint` is a no-op when no hand is up. The ready-lean
+      // rides the same events for the same reason: what leans is a fact about
+      // the board, and every one of these changes the fact.
+      bus.on('item:spawned', () => {
+        this.refreshHint();
+        this.syncReadyLeans();
+      }),
       bus.on('item:removed', () => this.refreshHint()),
       bus.on('item:moved', ({ itemId, to }) => {
         // A landed move is the answer to the hand's question: if it is the move
@@ -7548,11 +8090,16 @@ export class BoardScene extends Phaser.Scene {
         // lives now instead of pointing at the cell the piece has left.
         this.refreshHint();
         const sprite = this.itemSprites.get(itemId);
-        if (!sprite) return;
-        sprite.col = to.col;
-        sprite.row = to.row;
-        const { x, y } = gridToWorld(to.col, to.row);
-        this.settleAfterDrag(sprite, x, y);
+        if (sprite) {
+          sprite.col = to.col;
+          sprite.row = to.row;
+          const { x, y } = gridToWorld(to.col, to.row);
+          this.settleAfterDrag(sprite, x, y);
+        }
+        // AFTER the settle is scheduled: broken clusters ease home right away,
+        // while a cluster this landing completes waits out the glide (the start
+        // gate sees the tween) and leans from the housekeeping tick.
+        this.syncReadyLeans();
       }),
       bus.on('order:progress', ({ orderId, have, need }) =>
         this.noteOrderWants(orderId, have, need)
@@ -7572,6 +8119,10 @@ export class BoardScene extends Phaser.Scene {
         this.hintFollowUp = false; // the plan is finished, not in progress
         this.hintIdleMs = MERGE_HINT.idleMs - MERGE_HINT.restMs;
         this.onMerged(payload);
+        // The consumed cluster stops existing and the output may complete a NEW
+        // one — its sprite pops in on a delayed call, so the start waits for
+        // the housekeeping tick; the stops take effect here and now.
+        this.syncReadyLeans();
       }),
       bus.on('item:hatched', ({ item }) => this.hatchSequence(item)),
       bus.on('item:harvested', ({ generatorId, output }) => this.onHarvested(generatorId, output)),
@@ -7638,6 +8189,9 @@ export class BoardScene extends Phaser.Scene {
         this.removeDragonRig(itemId);
         this.detachItemAura(itemId);
         this.itemSprites.delete(itemId);
+        // A leaning piece about to fade must not fade mid-lean and hand the
+        // pool a tilted slot — and its cluster-mates stand down with it.
+        this.stopLean(itemId, true);
         this.tweens.add({
           targets: sprite,
           alpha: 0,
@@ -7646,6 +8200,7 @@ export class BoardScene extends Phaser.Scene {
           ease: 'Sine.easeIn',
           onComplete: () => sprite.release()
         });
+        this.syncReadyLeans();
       }),
       bus.on('item:sold', ({ coins }) => {
         // Drift a "+N" toward the coin pill.
@@ -7664,11 +8219,16 @@ export class BoardScene extends Phaser.Scene {
       // THE SAME BEAT, RE-AIMED. The diamonds under the pieces a step names have
       // to move with them: a marker left on the tile a piece was dragged off is
       // pointing at bare ground, which is worse than pointing at nothing. Only
-      // the highlights — the hand and the arrow are UIScene's.
-      bus.on('tutorial:markers', ({ highlight }) => {
+      // the highlights — the hand and the arrow are UIScene's. The HAND is
+      // still remembered here, because the ready-lean keeps off the piece the
+      // hand animates from and a re-aim moves which piece that is.
+      bus.on('tutorial:markers', ({ highlight, hand }) => {
         if (this.tutorialDone) return;
         this.setHighlights(highlight);
-        if (this.tutorialStep) this.tutorialStep.highlight = highlight;
+        if (this.tutorialStep) {
+          this.tutorialStep.highlight = highlight;
+          this.tutorialStep.hand = hand;
+        }
       }),
       bus.on('tutorial:step', (step) => {
         this.allow = step.allow;
@@ -7758,6 +8318,11 @@ export class BoardScene extends Phaser.Scene {
       this.removeDragonRig(id); // hatchlings merging into a whelp
       this.detachItemAura(id);
       this.itemSprites.delete(id);
+      // The gather flight owns the sprite now — a lean still tweening the art
+      // underneath it would carry into the pool (release only kills tweens, it
+      // cannot un-write an offset the pool's next tenant resets anyway; this
+      // keeps the flight itself clean).
+      this.stopLean(id, true);
       this.tweens.add({
         targets: sprite,
         x: drop.x,
@@ -8160,6 +8725,9 @@ export class BoardScene extends Phaser.Scene {
 
   /** Rebuild everything visual from current state (after a save load). */
   private fullResync(): void {
+    // Before the sprites go: a release only kills the lean's tween, and the
+    // diff bookkeeping would otherwise still claim the pre-load clusters lean.
+    this.stopAllLeans();
     for (const ld of this.liveDragons.values()) {
       ld.clipOverlay?.destroy();
       ld.player?.destroy();
@@ -8179,6 +8747,7 @@ export class BoardScene extends Phaser.Scene {
       }
     }
     this.spawnExistingItems();
+    this.syncReadyLeans(); // the loaded board's complete clusters lean like any other's
     // Re-frame the camera on the loaded Keeper level (no glide).
     const frame = this.frameForLevel(this.ctx.state.level);
     this.cameras.main.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);

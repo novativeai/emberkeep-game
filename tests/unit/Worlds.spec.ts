@@ -33,10 +33,12 @@ describe('worlds registry — the ingest loses nothing', () => {
     // 366 → 367 when Runevault's Grille 16 — the 1×1 on the wooden landing — was
     // allocated so the Rune Stair door has ground under it; 367 → 369 on
     // 2026-08-20 when emberkeep's Grille 27 gained a cell and Grille 28 its
-    // first. Update it with the export; the number is here to catch a count
-    // that changed when NOTHING was drawn, which is what a lost grid or a
-    // half-loaded pager looks like.
-    expect(sourceCells.length).toBe(369);
+    // first; 369 → 371 on 2026-08-21 with the re-draw that also renumbered
+    // Borealis's unlock levels, and 371 → 367 later the same day when four of
+    // emberkeep's cells were taken back out. Update it with the export; the
+    // number is here to catch a count that changed when NOTHING was drawn,
+    // which is what a lost grid or a half-loaded pager looks like.
+    expect(sourceCells.length).toBe(367);
   });
 
   it('keeps each cell at the exact world point the editor placed it', () => {

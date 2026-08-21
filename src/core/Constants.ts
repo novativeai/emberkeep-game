@@ -2149,7 +2149,81 @@ export const DRAG = {
   cellBracketWidth: 5,
   cellBracketSpan: 0.32,
   /** A breath of wash inside, only enough to say WHICH side of the line is the cell. */
-  cellFillAlpha: 0.12
+  cellFillAlpha: 0.12,
+  /**
+   * THE RETICLE KNOWS WHAT THE DROP WILL DO, before the finger lets go.
+   *
+   * With the magnet gone, the only thing that fuses is a drop ON a matching
+   * piece — so the one question a player has mid-drag is "am I over one?".
+   * Hovering a matching piece whose cluster plus this one reaches the recipe
+   * paints the brackets in the merge green and swells the wash; hovering a
+   * match that falls short (the drop will GATHER, seating the piece beside it)
+   * paints them in the ember. Free ground keeps the neutral gold, and a drop the
+   * board will REFUSE — an occupied cell that is not a merge question, or a
+   * match walled in with nowhere to seat the piece — goes grey and quiet.
+   * Four colours, four verbs, read off the frame alone.
+   *
+   * The refusal is the one that had to be added rather than designed: the
+   * neutral gold means "it lands here", and painting it over a stranger's tile
+   * was the frame promising a landing that bounces. Grey is not a warning, it
+   * is an absence — the frame stops offering, which is the whole message.
+   */
+  mergeColor: 0x8fe8a0,
+  gatherColor: 0xff9ab0,
+  refuseColor: 0x8d8189,
+  verbFillAlpha: 0.28
+} as const;
+
+/**
+ * THE LEAN — a complete cluster showing it wants finishing.
+ *
+ * Three alike in a row no longer fuse by themselves; they are the board's way
+ * of saying "one drop, here". Every member but the centre STRAINS toward the
+ * centre and back, all of them together. A player who has not noticed the rule
+ * sees three things pulled toward one, which is the rule. The hint's hand takes
+ * over at `MERGE_HINT.idleMs` if the strain was not enough.
+ *
+ * ONE CLUSTER, AND IT KEEPS THE FLOOR. Three Eggs and three Gems both complete
+ * is two things the board wants to say, and saying them at once is saying
+ * neither: the eye reads a board that shivers rather than a group that belongs
+ * together. So only the OLDEST ready cluster leans, and it goes on leaning
+ * until the player finishes it or breaks it up — no rotation, nothing else
+ * moving in the corner of the eye. `periodMs` is that one cluster's pulse.
+ *
+ * TUNED BY EYE, TWICE. The first pass was a 14 px nudge over a 2.4 s cycle —
+ * correct, invisible, and reported as missing. What reads as a magnet is not a
+ * bigger translation on its own but translation PLUS stretch: the art elongates
+ * along the line it is being pulled down, the way a body leans into a rope.
+ * `stretch` is that elongation at full reach, spent along the lean's own axis
+ * (mostly horizontal in iso) and paid for by a little thinning across it, so
+ * the piece strains instead of merely swelling.
+ *
+ * `fraction` is the share of the gap between a member and the centre that the
+ * lean covers, capped by `amplitudePx` so a zone with big tiles does not get a
+ * bigger lean than one with small. The piece still never leaves its cell:
+ * a quarter of the way to its neighbour is as far as it goes.
+ */
+export const MERGE_READY = {
+  periodMs: 1500,
+  leanMs: 300,
+  fraction: 0.24,
+  amplitudePx: 30,
+  /**
+   * THE SAME STRAIN, SAID LOUDER, while the hint's hand is up on that cluster.
+   *
+   * The resting lean is an invitation you can ignore; ten seconds of not
+   * touching the board (`MERGE_HINT.idleMs`) is the game deciding you did.
+   * From there the hand and the board have to say ONE thing — the hand names
+   * the piece to carry, the rest of its cluster pulls visibly toward where it
+   * is going — so the pull reaches further, on a shorter rest, until the offer
+   * is answered or withdrawn. Same geometry, same direction; only the volume
+   * changes, because a second, different gesture would be a second message.
+   */
+  hintFraction: 0.38,
+  hintAmplitudePx: 48,
+  hintRestMs: 240,
+  /** Elongation along the lean axis at full reach (see above). */
+  stretch: 0.13
 } as const;
 
 /** The authored decor piece (zones.json `decor` name) that opens Selyna's
@@ -2302,23 +2376,6 @@ export const MERGE_HINT_WEIGHTS = {
    *  (first-completed, then the set's own ids) instead of to iteration order. */
   quantum: 1_000_000
 } as const;
-
-/**
- * HOW FAR THE MERGE MAGNET REACHES — in tiles, from where the piece was let go.
- *
- * A drop that lands beside a mergeable cluster fuses anyway (MergeSystem
- * `trySnapMerge`): the player aims at a group, not at the one exact tile that
- * completes it, and asking for that precision is asking them to do the board's
- * arithmetic. Two rings rather than one because a finger covers most of a tile
- * and an isometric grid reads a row off at a glance — one ring caught the near
- * miss, not the honest "I dropped it right there".
- *
- * It buys forgiveness, not guessing: the candidate tile still has to be free,
- * still has to be real ground, and the group is still counted by the exact
- * flood-fill the merge itself uses. Raising this makes pieces travel further to
- * a merge the player did mean; it can never conjure one they did not.
- */
-export const MERGE_SNAP_RADIUS = 2;
 
 /**
  * The travel wipe — the screen burns away into iso diamonds when the Keeper

@@ -91,6 +91,48 @@ async function dragTile(page: Page, from: [number, number], to: [number, number]
   await page.waitForTimeout(450);
 }
 
+/**
+ * MERGE THREE ALIKE THE WAY THE BOARD NOW WANTS IT: a drop ON a matching piece.
+ *
+ * Adjacency only prepares a merge; the drop performs it (src/core/mergeRule.ts).
+ * So the gesture is chosen from the shape: if two of the pieces already touch,
+ * the third goes ON one of them and fuses; if none touch, the first drop
+ * GATHERS (the board seats the piece beside its target) and the second drop,
+ * onto the pair that just formed, fuses. Index adjacency is the truth here:
+ * every tutorial trio stands on the dense isle, where the lattice IS the zone.
+ *
+ * `done` says when to stop (a tutorial step reached, a count landed) — the
+ * same retry shape the old sites used against a flaky 2560-wide drag.
+ */
+async function mergeTrio(
+  page: Page,
+  pred: (c: Cell) => boolean,
+  done: (state: GameText) => boolean
+): Promise<void> {
+  const touching = (a: [number, number], b: [number, number]): boolean =>
+    Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) === 1;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (done(await gameText(page))) return;
+    const pieces = await findCells(page, pred);
+    if (pieces.length < 2) return;
+    // A member of a touching pair, if there is one — the drop that fuses.
+    let target = pieces.find((a) => pieces.some((b) => b !== a && touching(a, b)));
+    let mover = target ? pieces.find((x) => x !== target && !touching(x, target!)) : undefined;
+    if (!target || !mover) {
+      // Nothing touches yet: gather the farthest onto the first.
+      target = pieces[0]!;
+      mover = pieces[pieces.length - 1]!;
+    }
+    await page.evaluate(
+      ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
+      [target[0], target[1]]
+    );
+    await page.waitForTimeout(400);
+    await dragTile(page, mover, target);
+    await page.waitForTimeout(500);
+  }
+}
+
 async function tapTile(page: Page, col: number, row: number): Promise<void> {
   const p = await itemToPage(page, col, row); // tap the item's ART
   await page.mouse.move(p.x, p.y);
@@ -183,7 +225,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
 
     const tufts = await findCells(page, (c) => c.chain === 'ashmoss' && c.tier === 1);
     expect(tufts.length).toBe(3);
-    await dragTile(page, tufts[2]!, tufts[0]!);
+    await mergeTrio(page, (c) => c.chain === 'ashmoss' && c.tier === 1, (st) => count(st, 'ashmoss', 2) >= 1);
 
     // ---------- "It answered you": her reaction to the player's FIRST merge ----------
     await waitStep(page, 'arrival_answered');
@@ -213,7 +255,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await page.screenshot({ path: shot('04d-rubies') });
     const rubies = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 1);
     expect(rubies.length).toBe(3);
-    await dragTile(page, rubies[2]!, rubies[0]!);
+    await mergeTrio(page, (c) => c.chain === 'ember_dragon' && c.tier === 1, (st) => count(st, 'ember_dragon', 1) === 0);
 
     await waitStep(page, 'dragon_hatch');
     await page.waitForTimeout(500);
@@ -225,7 +267,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // ---------- Dragon hatch: merge 3 Red Eggs → Red Dragon ----------
     const redEggs = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 2);
     expect(redEggs.length).toBe(3);
-    await dragTile(page, redEggs[2]!, redEggs[0]!);
+    await mergeTrio(page, (c) => c.chain === 'ember_dragon' && c.tier === 2, (st) => count(st, 'ember_dragon', 3) >= 1);
     await waitStep(page, 'emerald_tap');
     state = await gameText(page);
     expect(count(state, 'ember_dragon', 2)).toBe(0);
@@ -258,7 +300,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // ---------- Emerald merge: drag 3 Emeralds → 1 Green Egg ----------
     const emeralds = await findCells(page, (c) => c.chain === 'emerald' && c.tier === 1);
     expect(emeralds.length).toBe(3);
-    await dragTile(page, emeralds[2]!, emeralds[0]!);
+    await mergeTrio(page, (c) => c.chain === 'emerald' && c.tier === 1, (st) => count(st, 'emerald', 1) === 0);
     await waitStep(page, 'green_dragon_hatch');
     state = await gameText(page);
     expect(count(state, 'emerald', 1)).toBe(0);
@@ -268,7 +310,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // ---------- Green egg merge: drag 3 Green Eggs → Green Dragon ----------
     const greenEggs = await findCells(page, (c) => c.chain === 'emerald' && c.tier === 2);
     expect(greenEggs.length).toBe(3);
-    await dragTile(page, greenEggs[2]!, greenEggs[0]!);
+    await mergeTrio(page, (c) => c.chain === 'emerald' && c.tier === 2, (st) => count(st, 'emerald', 3) >= 1);
     await waitStep(page, 'chest');
     state = await gameText(page);
     expect(count(state, 'emerald', 2)).toBe(0);
@@ -358,18 +400,7 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await page.screenshot({ path: shot('12b-emberberries') });
 
     // ---------- Emberberry merge: 3 berries → an Emberberry Basket ----------
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const sprouts = await findCells(page, (c) => c.chain === 'emberberry' && c.tier === 1);
-      if (sprouts.length < 3) break;
-      await page.evaluate(
-        ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
-        [sprouts[0]![0], sprouts[0]![1]]
-      );
-      await page.waitForTimeout(400);
-      await dragTile(page, sprouts[2]!, sprouts[0]!);
-      await page.waitForTimeout(500);
-      if ((await gameText(page)).tutorial.step === 'wood_merge') break;
-    }
+    await mergeTrio(page, (c) => c.chain === 'emberberry' && c.tier === 1, (st) => st.tutorial.step === 'wood_merge');
     await waitStep(page, 'wood_merge');
     state = await gameText(page);
     expect(count(state, 'emberberry', 1)).toBe(0);
@@ -378,20 +409,8 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
 
     // ---------- Wood merge: 3 Cut Wood → a Plank Set, then 3 Plank Sets → the House ----------
     // The 2560×1600 drag is flaky under SwiftShader — retry until each merge lands.
-    const mergeLumber = async (tier: number, until: string): Promise<void> => {
-      for (let attempt = 0; attempt < 4; attempt++) {
-        const pieces = await findCells(page, (c) => c.chain === 'lumber' && c.tier === tier);
-        if (pieces.length < 3) break;
-        await page.evaluate(
-          ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
-          [pieces[0]![0], pieces[0]![1]]
-        );
-        await page.waitForTimeout(400);
-        await dragTile(page, pieces[2]!, pieces[0]!);
-        await page.waitForTimeout(500);
-        if ((await gameText(page)).tutorial.step === until) break;
-      }
-    };
+    const mergeLumber = async (tier: number, until: string): Promise<void> =>
+      mergeTrio(page, (c) => c.chain === 'lumber' && c.tier === tier, (st) => st.tutorial.step === until);
     await mergeLumber(1, 'plank_merge');
     await waitStep(page, 'plank_merge');
     state = await gameText(page);
@@ -505,21 +524,10 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // ---------- Moonwater merge: 3 Dew Drops → a Dew Vial ----------
     // Naming a chain and then never merging it left the lesson half-taught, so
     // she asks for the merge she just described. The three seeds straddle two
-    // regions ([5,6] in the gate, [4,5]/[4,6] in level_2) — the drop-onto path
-    // fuses them regardless of adjacency.
+    // regions ([5,6] in the gate, [4,5]/[4,6] in level_2) but stand in one
+    // row of touching cells, so a single drop onto the pair fuses them.
     await waitStep(page, 'moonwater_merge');
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const drops = await findCells(page, (c) => c.chain === 'moonwater' && c.tier === 1);
-      if (drops.length < 3) break;
-      await page.evaluate(
-        ([c, r]) => window.__emberkeep.centerCell(c as number, r as number),
-        [drops[0]![0], drops[0]![1]]
-      );
-      await page.waitForTimeout(400);
-      await dragTile(page, drops[2]!, drops[0]!);
-      await page.waitForTimeout(500);
-      if ((await gameText(page)).tutorial.step !== 'moonwater_merge') break;
-    }
+    await mergeTrio(page, (c) => c.chain === 'moonwater' && c.tier === 1, (st) => st.tutorial.step !== 'moonwater_merge');
     const merged = await gameText(page);
     expect(count(merged, 'moonwater', 1)).toBe(0);
     expect(count(merged, 'moonwater', 2)).toBe(1); // Dew Vial

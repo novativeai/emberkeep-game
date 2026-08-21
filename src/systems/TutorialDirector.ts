@@ -1,8 +1,19 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
+import {
+  clusterOf,
+  gatherSeat,
+  readyClusters,
+  recipeFor,
+  verdictOnto,
+  type ReadyCluster,
+  type RuleBoard
+} from '../core/mergeRule';
+import chainsJson from '../data/chains.json';
 import type {
   BoardItemState,
+  ChainsData,
   MarkerPoint,
   ResolvedArrow,
   ResolvedHand,
@@ -114,6 +125,83 @@ export function markerPointCell(state: GameState, point: MarkerPoint): TilePos |
   return item ? { col: item.col, row: item.row } : null;
 }
 
+/* --------------------------------------------------------------------------
+ * MERGE HANDS — the plan a "drag them together" beat actually shows.
+ *
+ * Every merge beat in the script is authored the same way: `from` is "the third
+ * piece of this kind", `to` is "the first", and rank is read off the board's own
+ * order (col+row, then col). That was enough while standing BESIDE two alike
+ * fused them: whichever two pieces the hand happened to join, the third was
+ * never more than a neighbouring cell away. Under the drop rule it is not
+ * enough, because the rule has a direction. Dropping the outsider ON a member
+ * of the pair merges; dropping a member of the pair ON the outsider merely
+ * GATHERS (the target's flood is the lone piece, and one plus one is not
+ * three). Rank knows nothing about pairs, so "the first" was as likely to be the
+ * lone tuft as a member of the pair — and then the hand demonstrated a drop the
+ * board answered with a shuffle, the gate kept waiting for `item:merged`, and
+ * nothing on screen said a second gesture was wanted.
+ *
+ * So a hand whose two ends name the SAME KIND of piece is not resolved by rank
+ * at all. It is planned off the board's clusters, through the very predicate
+ * MergeSystem will run on the drop (`verdictOnto`), and checked against it
+ * before it is shown: the hand never asks for a drop the board would refuse.
+ * ----------------------------------------------------------------------- */
+
+/** The `{chain, nth, tier?}` form of a ref — the one that names a PIECE. */
+type PieceRef = { chain: string; nth: number; tier?: number };
+
+function isPieceRef(ref: TileRef): ref is PieceRef {
+  return typeof ref === 'object' && !Array.isArray(ref) && 'chain' in ref;
+}
+
+/** Both ends name one kind of piece: this hand is "drag them together". */
+function sameKind(a: TileRef, b: TileRef): boolean {
+  return isPieceRef(a) && isPieceRef(b) && a.chain === b.chain && a.tier === b.tier;
+}
+
+const stepsApart = (a: TilePos, b: TilePos): number =>
+  Math.abs(a.col - b.col) + Math.abs(a.row - b.row);
+
+/** Oldest piece first — the one tie-break the rule itself uses, so the hand
+ *  and the scene's lean agree whenever the geometry leaves a choice. */
+const byAge = (a: BoardItemState, b: BoardItemState): number => a.id - b.id;
+
+/**
+ * The member of a complete cluster the hand should LIFT: one whose removal
+ * leaves the rest a single flood, so the player sees a piece carried in from
+ * the edge of the group, not the group broken in two and stitched back. The
+ * farthest such member from the centre, for the longest and clearest gesture;
+ * ties go to the oldest. A cluster of two has exactly one candidate.
+ *
+ * Any member dropped on the centre fuses — the flood is walked with the lifted
+ * piece still counted on its cell — so this is a choice about what the gesture
+ * LOOKS like, never about whether it works.
+ */
+function leafOf(board: RuleBoard, cluster: ReadyCluster): BoardItemState {
+  const { members, centre } = cluster;
+  const inCluster = new Set(members.map((m) => m.id));
+  const holdsTogetherWithout = (gone: number): boolean => {
+    const seen = new Set<number>([centre.id]);
+    const queue: BoardItemState[] = [centre];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      for (const pos of board.neighbors(current.col, current.row)) {
+        const nearby = board.itemAt(pos.col, pos.row);
+        if (!nearby || !inCluster.has(nearby.id) || nearby.id === gone || seen.has(nearby.id)) continue;
+        seen.add(nearby.id);
+        queue.push(nearby);
+      }
+    }
+    return seen.size === members.length - 1;
+  };
+  const leaves = members
+    .filter((m) => m.id !== centre.id && holdsTogetherWithout(m.id))
+    .sort((a, b) => stepsApart(b, centre) - stepsApart(a, centre) || byAge(a, b));
+  // Every finite connected group has a leaf that is not the centre; the
+  // fallback is for a board the rule would never hand us, not a real branch.
+  return leaves[0] ?? members.find((m) => m.id !== centre.id) ?? centre;
+}
+
 /**
  * Drives the scripted Level-1 tutorial from data (tutorial.json). Each step
  * gates on a tap, a bus event, or a board count; the emitted
@@ -135,6 +223,19 @@ export class TutorialDirector {
    * following that id, is what makes the pointer track the piece the player is
    * actually moving. Cleared whenever the step changes, and re-resolved if the
    * piece it named is gone (merged into the next tier, eaten, sold).
+   *
+   * MERGE HANDS ARE NEVER PINNED — and that is a decision, not an omission. A
+   * pin protects the player from a hand that swaps pieces under their finger
+   * when the RANKING re-sorts; a merge hand is not a ranking, it is a plan read
+   * off the clusters (`aimMergeHand`), and the plan is SUPPOSED to change when
+   * the board does. After a gather the piece the hand pointed at has been
+   * seated beside its mate and the next gesture is a different one: the lone
+   * piece onto the pair. A pinned `from` would go on asking for the piece that
+   * just moved — dropped on the outsider, a member of the pair only gathers —
+   * which is exactly the wrong-direction drop this planning exists to prevent.
+   * What a pin bought is kept another way: every choice the plan makes is
+   * deterministic (ties go to the oldest piece), and between two drops the
+   * board does not change, so the hand holds still while the player acts.
    */
   private pinned = new Map<string, number>();
   /** The step the pins belong to — the pins are per BEAT, not per session. */
@@ -147,7 +248,13 @@ export class TutorialDirector {
     private state: GameState,
     private bus: EventBus,
     private clock: GameClock,
-    private data: TutorialData
+    private data: TutorialData,
+    // The recipes the merge hand plans against — the SAME `ChainsData` the
+    // MergeSystem decides with, or the hand could promise a drop the board
+    // refuses. Defaults to the shipped file so the composition root needs no
+    // change to keep working; `GameContext` should hand it `this.data.chains`
+    // so a test that overrides the recipes sees the hand follow them.
+    private chains: ChainsData = chainsJson as unknown as ChainsData
   ) {
     bus.on('item:hatched', ({ item }) => {
       this.lastHatched = { col: item.col, row: item.row };
@@ -428,6 +535,12 @@ export class TutorialDirector {
    * the codex hold and replay the opening — and it only fires when the answer
    * has actually CHANGED, so a move somewhere else on the board does not
    * restart the hand's animation for nothing.
+   *
+   * This is also how a merge beat's SECOND gesture gets pointed at. A gather is
+   * announced as an ordinary `item:moved` whose `to` is the seat beside the
+   * mate, and the resolve it triggers re-plans the hand off the new clusters
+   * (`aimMergeHand`, which pins nothing): the pair now exists, so the hand
+   * turns to the lone piece and aims it at the pair.
    */
   private refreshMarkers(): void {
     const step = this.currentStep;
@@ -472,8 +585,20 @@ export class TutorialDirector {
     let hand: ResolvedHand | null = null;
     if (step.hand) {
       if ('from' in step.hand) {
-        const from = this.resolveTileRef(step.hand.from);
-        let to = this.resolveTileRef(step.hand.to);
+        // "Drag them together": both ends name one kind of piece, so the pair
+        // is PLANNED off the clusters rather than read off the ranking — see
+        // `aimMergeHand`. Null means the plan could not be made (too few pieces
+        // on the board yet, a chain that cannot merge, or a plan the rule
+        // contradicted), and the rank order below answers as it always did.
+        const planned = sameKind(step.hand.from, step.hand.to)
+          ? this.aimMergeHand(step, step.hand.from as PieceRef)
+          : null;
+        const from = planned
+          ? { col: planned.from.col, row: planned.from.row, item: planned.from.id }
+          : this.resolveTileRef(step.hand.from);
+        let to = planned
+          ? { col: planned.to.col, row: planned.to.row, item: planned.to.id }
+          : this.resolveTileRef(step.hand.to);
         // A DRAG HAS TWO ENDS AND THEY CANNOT BE THE SAME PIECE.
         //
         // Both ends follow their piece, which is what makes "drag that tuft
@@ -522,6 +647,157 @@ export class TutorialDirector {
       arrowThen,
       allow: { ...ALLOW_NOTHING, ...(step.allow ?? {}) }
     };
+  }
+
+  /**
+   * THE GESTURE THAT FINISHES A MERGE BEAT, read off the board as it stands.
+   *
+   * Three depths, and the hand shows the one the board is at:
+   *
+   *   depth 0 — a cluster already holds enough. Lift a LEAF of it and drop it
+   *             on the cluster's CENTRE — the same centre `readyClusters` gives
+   *             the scene, so the lean and the hand point at one piece.
+   *   depth 1 — the largest cluster is one short. Bring the nearest piece
+   *             outside it and drop it on the member nearest to it. The drop
+   *             fuses: the outsider plus the target's flood reach the recipe.
+   *   depth 2 — nothing is within one of the recipe. Take the outlier (the
+   *             piece farthest from all the others) to the piece nearest it.
+   *             That drop GATHERS — the pair forms — and the next `item:moved`
+   *             re-aims this same plan at depth 1, so the second gesture is
+   *             pointed at as plainly as the first.
+   *
+   * (A largest cluster of two or more that is still short by more than one —
+   * a recipe of four or more, which nothing shipped has — is gathered onto the
+   * way depth 1 is, rather than treated as scattered.)
+   *
+   * Every answer is CHECKED against what MergeSystem will really do, and the
+   * plan moves on to its next candidate when the first one will not do it —
+   * `verdictOnto` alone is only half the test for a gather. The system also
+   * has to find the piece a SEAT, and a target boxed in on all four sides
+   * gives it none: the drop bounces, the board is unchanged, so the identical
+   * refused hand is computed again and pointed at again, forever. A hand the
+   * player cannot obey is worse than no hand, and one that cannot be obeyed
+   * TWICE is a dead beat.
+   *
+   * Only when no candidate at all is performable does it say so in the console
+   * with the step named and yield null, so the caller falls back to rank order
+   * and the beat still has a hand.
+   *
+   * Null without complaint when there is no plan to make: fewer than two
+   * pieces on the board (the beat's spawns are still landing — this runs on
+   * every `item:spawned`), or a kind that cannot merge at this tier.
+   */
+  private aimMergeHand(
+    step: TutorialStepConfig,
+    ref: PieceRef
+  ): { from: BoardItemState; to: BoardItemState } | null {
+    const pieces = this.piecesOfKind(ref);
+    if (pieces.length < 2) return null;
+    const recipe = recipeFor(this.chains, ref.chain, pieces[0]!.tier);
+    if (!recipe.mergeable) return null;
+    const board = this.state;
+
+    /** Will MergeSystem actually perform this drop? A merge needs the verdict
+     *  and nothing else; a gather needs the verdict AND a free seat (see the
+     *  note above — a seatless gather bounces, and a bounce re-offers itself). */
+    const performable = (from: BoardItemState, to: BoardItemState, expect: 'merge' | 'gather'): boolean => {
+      const verdict = verdictOnto(board, this.chains, from, to).kind;
+      if (verdict === 'merge') return true; // better than asked for, never worse
+      if (expect === 'merge' || verdict === 'none') return false;
+      return gatherSeat(board, from, to) !== null;
+    };
+
+    /** The first pair the rule will perform, walking the candidates in the
+     *  order the depth wants them. Null — with the step named — only once every
+     *  candidate has been refused, which is a board the hand genuinely cannot
+     *  speak about rather than a mistake in one guess. */
+    const firstPerformable = (
+      froms: readonly BoardItemState[],
+      targetsFor: (from: BoardItemState) => BoardItemState[],
+      expect: 'merge' | 'gather'
+    ): { from: BoardItemState; to: BoardItemState } | null => {
+      for (const from of froms) {
+        const to = targetsFor(from).find((t) => performable(from, t, expect));
+        if (to) return { from, to };
+      }
+      const from = froms[0];
+      const to = from ? targetsFor(from)[0] : undefined;
+      const said = from && to ? verdictOnto(board, this.chains, from, to).kind : 'nothing to try';
+      console.error(
+        `[tutorial] step '${step.id}': no ${expect} of ${ref.chain} the rule will perform ` +
+          `(${froms.length} candidate${froms.length === 1 ? '' : 's'}; the first says ${said}); ` +
+          `falling back to rank order`
+      );
+      return null;
+    };
+
+    // Depth 0: the board is only waiting for the gesture.
+    const ready = readyClusters(board, this.chains, pieces)[0];
+    if (ready) {
+      const centre = ready.centre;
+      return firstPerformable([leafOf(board, ready)], () => [centre], 'merge');
+    }
+
+    // The clusters, largest first; among equals the one holding the oldest
+    // piece, so two lone tufts do not trade places as the target between one
+    // resolve and the next.
+    const claimed = new Set<number>();
+    const clusters: BoardItemState[][] = [];
+    for (const piece of [...pieces].sort(byAge)) {
+      if (claimed.has(piece.id)) continue;
+      const cluster = clusterOf(board, piece);
+      for (const member of cluster) claimed.add(member.id);
+      clusters.push(cluster);
+    }
+    clusters.sort((a, b) => b.length - a.length || byAge(a[0]!, b[0]!));
+    const largest = clusters[0]!;
+    const inside = new Set(largest.map((m) => m.id));
+    const outside = pieces.filter((p) => !inside.has(p.id));
+    if (outside.length === 0) return null; // everything is in one group and it is still short
+
+    const oneShort = largest.length >= recipe.need - 1;
+    if (oneShort || largest.length >= 2) {
+      // Depth 1 (or a bigger recipe's gather onto the group that has begun).
+      // Nearest piece first, nearest member of the group first — and on to the
+      // next of each when the rule refuses the pair.
+      const toCluster = (p: BoardItemState): number => Math.min(...largest.map((m) => stepsApart(p, m)));
+      return firstPerformable(
+        [...outside].sort((a, b) => toCluster(a) - toCluster(b) || byAge(a, b)),
+        (from) => [...largest].sort((a, b) => stepsApart(a, from) - stepsApart(b, from) || byAge(a, b)),
+        oneShort ? 'merge' : 'gather'
+      );
+    }
+
+    // Depth 2: all of them alone. The outlier travels; the pair forms where
+    // the rest already are — unless that one is walled in, in which case the
+    // next-nearest piece is just as good a place for the pair to form.
+    const spread = (p: BoardItemState): number => pieces.reduce((sum, q) => sum + stepsApart(p, q), 0);
+    return firstPerformable(
+      [...pieces].sort((a, b) => spread(b) - spread(a) || byAge(a, b)),
+      (from) =>
+        pieces
+          .filter((p) => p.id !== from.id)
+          .sort((a, b) => stepsApart(a, from) - stepsApart(b, from) || byAge(a, b)),
+      'gather'
+    );
+  }
+
+  /**
+   * The pieces a merge hand's ref can mean: the chain's, at the ref's tier. A
+   * ref with NO tier (the ruby and egg beats are written that way) takes the
+   * tier with the most pieces on the board — ties to the lowest, which is the
+   * one that merges first — because a cluster is one tier by definition and a
+   * plan across two tiers is not a plan.
+   */
+  private piecesOfKind(ref: PieceRef): BoardItemState[] {
+    const ofChain = [...this.state.items.values()].filter(
+      (i) => i.kind === 'item' && i.chain === ref.chain && (ref.tier === undefined || i.tier === ref.tier)
+    );
+    if (ref.tier !== undefined || ofChain.length === 0) return ofChain;
+    const count = new Map<number, number>();
+    for (const piece of ofChain) count.set(piece.tier, (count.get(piece.tier) ?? 0) + 1);
+    const tier = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]![0];
+    return ofChain.filter((i) => i.tier === tier);
   }
 
   /**

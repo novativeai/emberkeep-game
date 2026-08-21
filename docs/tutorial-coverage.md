@@ -14,7 +14,8 @@ Eleanor herself are all rows: they are live from the first frame.
 | Concept | First on screen | Taught at | Note |
 |---|---|---|---|
 | Emberbark Stump — the moss farm | the Stump, from the first frame | `moss_stump` | the game's FIRST interaction: she names the burned tree, the player taps it, a Moss Tuft drops. "it will always grow more" says renewable out loud |
-| Drag three alike to merge | first scripted spawn | `ash_green` | the harvested tuft plus two spawned at the stump; the hand demonstrates the exact drag |
+| Drop a piece ON a match to merge | first scripted spawn | `ash_green` | the harvested tuft plus two spawned at the stump; the hand demonstrates the exact drop — planned off the live clusters (`aimMergeHand`), it lifts the piece OUTSIDE the group and lands it ON a member, the one direction the rule fuses. Free ground never merges, so the demonstration cannot be answered by parking three in a row |
+| Drop on a match with too few — they gather | any merge beat whose pieces stand apart | `ash_green` | the same beats teach it, unscripted: when no pair exists yet the hand's first drop is a GATHER — the piece seats itself beside its mate (an ordinary `item:moved` whose `to` is the seat) — and the hand re-aims on that move to show the finishing drop, so the two-gesture case points at both gestures. The `item:merged` gate waits through the gather; nothing advances early |
 | Merging climbs tiers | after the first merge | `dragon_hatch` | egg → dragon |
 | The Cookbook records recipes | after the first merge | `cookbook_intro` | button appears for this beat, then permanently |
 | Closing a panel | cookbook open | `cookbook_close` | the player closes it, not the script |

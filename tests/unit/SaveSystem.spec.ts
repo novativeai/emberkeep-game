@@ -9,7 +9,7 @@ describe('SaveSystem', () => {
     ctx1.beginRun(); // fresh board from map.json
 
     // Play a little: merge the tutorial weeds, spend some energy.
-    drag(ctx1, [3, 4], [1, 4]);
+    drag(ctx1, [3, 4], [1, 3]); // ON the fixture's pair — the drop is the merge
     ctx1.bus.emit('energy:spend', { amount: 4, reason: 'test' });
     ctx1.bus.emit('economy:add', { coins: 7, reason: 'test' });
     ctx1.state.tutorialIndex = 3;
@@ -21,8 +21,8 @@ describe('SaveSystem', () => {
 
     expect(loadedEvents).toHaveLength(1);
     expect(ctx2.state.items.size).toBe(ctx1.state.items.size);
-    expect(ctx2.state.itemAt(1, 4)?.chain).toBe('sparkweed');
-    expect(ctx2.state.itemAt(1, 4)?.tier).toBe(2);
+    expect(ctx2.state.itemAt(1, 3)?.chain).toBe('sparkweed');
+    expect(ctx2.state.itemAt(1, 3)?.tier).toBe(2);
     expect(ctx2.state.coins).toBe(7);
     expect(ctx2.state.xp).toBe(ctx1.state.xp);
     expect(ctx2.state.tutorialIndex).toBe(3);
@@ -78,7 +78,7 @@ describe('SaveSystem', () => {
     ctx.beginRun();
     const before = storage.getItem(SAVE_KEY);
 
-    drag(ctx, [3, 4], [1, 4]);
+    drag(ctx, [3, 4], [1, 3]); // ON the pair
 
     const after = storage.getItem(SAVE_KEY);
     expect(after).not.toBeNull();

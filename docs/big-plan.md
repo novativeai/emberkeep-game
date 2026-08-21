@@ -63,6 +63,7 @@
 ## PART B — MECHANISM
 
 ### B1 · Merge sensibility
+> **SUPERSEDED (2026-08).** The mechanism below no longer exists: the free-tile flood and `trySnapMerge` were deleted when the rule became drop-ONTO-a-match (merge when the target's cluster + the dragged piece reach the recipe, gather beside it when short, free ground never merges) — stated once in [`src/core/mergeRule.ts`](../src/core/mergeRule.ts) `verdictOnto`; see `MECHANICS.md` §2.1. Kept as history of what "sensibility" used to mean.
 - **Current:** `MergeSystem` flood-fills the orthogonally-connected same-chain+tier group at the drop cell; `minGroup` (3) merges; a **snap-merge** lets a drop NEXT-TO a mergeable cluster fuse onto the completing tile — [MergeSystem.ts `trySnapMerge`:83](../src/systems/MergeSystem.ts), `minGroup` from `chains.json mergeRule`.
 - **Goal:** tune how "forgiving" merging feels (currently 8-/ortho-connected + snap-to-nearest-free). Likely make it more forgiving (bigger snap reach) or more precise per the user's taste.
 - **Surgical steps:**

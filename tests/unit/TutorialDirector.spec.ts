@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import tutorial from '../../src/data/tutorial.json';
 import authoredMap from '../../src/data/map.json';
 import { GameContext } from '../../src/core/Context';
+import { verdictOnto } from '../../src/core/mergeRule';
 import { buildWorlds, zoneAt } from '../../src/core/world';
 import type { MapData, MarkerPoint, TutorialAllow, TutorialStepConfig } from '../../src/core/types';
-import { capture, createTestContext, MemoryStorage } from './helpers';
+import { capture, createTestContext, drag, MemoryStorage } from './helpers';
 
 /** The tutorial's own beats name cells of the AUTHORED isle, so a beat that is
  *  about a particular tile has to be driven against that map, not the 8x8. */
@@ -290,28 +291,12 @@ describe('the tutorial pointer tracks live pieces', () => {
 
     const moved = capture(ctx.bus, 'tutorial:markers');
     // Pick up the piece the hand is asking for and put it somewhere else.
+    // Anywhere free that does not TOUCH the pair: a drop on free ground is
+    // only ever a move now (the magnet is gone), but landing adjacent would
+    // complete the cluster and turn the hand into the finish-it gesture — a
+    // different (and also correct) answer, not the one under test.
     const itemId = ctx.state.itemIdAt(before.from.col, before.from.row)!;
-    // Free ground WELL CLEAR of the other two tufts: land it beside them and
-    // the magnet completes the merge, which ends the beat instead of re-aiming
-    // it — a different (and also correct) outcome, but not the one under test.
-    const others = [...ctx.state.items.values()].filter(
-      (i) => i.chain === 'ashmoss' && i.id !== ctx.state.itemIdAt(before.from.col, before.from.row)
-    );
-    const free = (() => {
-      for (let col = 0; col < 8; col++) {
-        for (let row = 0; row < 8; row++) {
-          if (!ctx.state.isTileActive(col, row) || ctx.state.itemIdAt(col, row) !== null) continue;
-          // > 3, not > 2: the magnet searches two rings out from the drop and
-          // fuses from a cell adjacent to the pair, so three tiles away still
-          // merges. Four is the first distance that is genuinely "elsewhere".
-          const clear = others.every(
-            (o) => Math.max(Math.abs(o.col - col), Math.abs(o.row - row)) > 3
-          );
-          if (clear) return { col, row };
-        }
-      }
-      throw new Error('the fixture board has no free cell clear of the pair');
-    })();
+    const free = { col: 5, row: 5 };
     ctx.bus.emit('drag:dropped', { itemId, from: before.from, to: free });
 
     // The hand followed the piece rather than staying on the tile it left.
@@ -350,6 +335,115 @@ describe('the tutorial pointer tracks live pieces', () => {
       }
     }
     expect(seen.length).toBe(0);
+  });
+});
+
+/**
+ * THE HAND DEMONSTRATES A DROP THE BOARD WILL HONOUR.
+ *
+ * A merge beat's refs name ranks, and rank knows nothing about clusters — so
+ * "the first Ash Moss" could be the LONE tuft, and under the drop rule the
+ * direction matters: the outsider dropped ON the pair merges, a member of the
+ * pair dropped on the outsider only gathers. A hand resolved by rank could
+ * demonstrate the second gesture, the gate would sit waiting for `item:merged`,
+ * and nothing on screen would say a further drop was wanted.
+ *
+ * So a hand whose two ends name the same kind of piece is planned off the
+ * clusters and checked against `verdictOnto` — the very predicate MergeSystem
+ * runs on the drop. These tests hold the plan to that promise at each depth:
+ * one drop from done, two drops from done, and already complete.
+ */
+describe('the merge hand is planned off the clusters', () => {
+  const openWith = (spots: Array<[number, number]>): GameContext => {
+    const ctx = createTestContext();
+    for (const [col, row] of spots) {
+      ctx.state.addItem({ chain: 'ashmoss', tier: 1, col, row, kind: 'item' });
+    }
+    ctx.state.tutorialIndex = stepAt('ash_green');
+    return ctx;
+  };
+
+  type DragHand = { from: MarkerPoint; to: MarkerPoint };
+  const handOf = (ctx: GameContext): DragHand => {
+    const seen = capture(ctx.bus, 'tutorial:step');
+    ctx.systems.tutorial.begin();
+    return seen.at(-1)!.hand as DragHand;
+  };
+  /** What the board would DO with the drop the hand is demonstrating. */
+  const verdict = (ctx: GameContext, hand: DragHand): string =>
+    verdictOnto(
+      ctx.state,
+      ctx.data.chains,
+      ctx.state.items.get(hand.from.item!)!,
+      ctx.state.items.get(hand.to.item!)!
+    ).kind;
+
+  it('aims the lone piece AT the pair, and the rule calls that drop a merge', () => {
+    const ctx = openWith([[1, 1], [2, 1], [5, 4]]);
+    const hand = handOf(ctx);
+
+    // The outsider is what travels; either member of the pair is the target.
+    expect(hand.from.item).toBe(ctx.state.itemAt(5, 4)!.id);
+    expect([ctx.state.itemAt(1, 1)!.id, ctx.state.itemAt(2, 1)!.id]).toContain(hand.to.item);
+    expect(verdict(ctx, hand)).toBe('merge');
+  });
+
+  it('shows the gather first when all three stand apart, then the merge once the pair exists', () => {
+    const ctx = openWith([[1, 1], [3, 3], [5, 4]]);
+    const first = handOf(ctx);
+
+    // Nothing touches anything: the demonstrated drop can only PREPARE the
+    // merge. The target is a piece, not ground, and the rule calls it a gather.
+    expect(first.to.item).toBeDefined();
+    expect(verdict(ctx, first)).toBe('gather');
+
+    // Answer the hand through the REAL system: the piece is seated beside its
+    // mate, announced as an ordinary item:moved, and the beat does not end.
+    const merges = capture(ctx.bus, 'item:merged');
+    const markers = capture(ctx.bus, 'tutorial:markers');
+    drag(ctx, [first.from.col, first.from.row], [first.to.col, first.to.row]);
+    expect(merges).toHaveLength(0);
+    expect(ctx.state.tutorialIndex).toBe(stepAt('ash_green'));
+
+    // The plan changed with the board: the hand turned to the piece still
+    // alone and now demonstrates the drop that fuses.
+    const second = markers.at(-1)?.hand as DragHand | undefined;
+    expect(second, 'the hand was never re-aimed after the gather').toBeTruthy();
+    expect(second!.from.item).toBe(ctx.state.itemAt(5, 4)!.id);
+    expect(verdict(ctx, second!)).toBe('merge');
+  });
+
+  it('never points at a piece the board would refuse to seat beside — a walled-in target is skipped', () => {
+    // (3,3) is the nearest tuft to (1,1), and it is boxed in on all four sides.
+    // `verdictOnto` still calls a drop onto it a gather; MergeSystem then finds
+    // no seat and BOUNCES — and because a bounce leaves the board untouched,
+    // the same refused hand would be planned again on the next resolve, and
+    // again, with the beat unfinishable. The hand has to try the next target.
+    const ctx = openWith([[1, 1], [3, 3], [5, 5]]);
+    for (const [col, row] of [[2, 3], [4, 3], [3, 2], [3, 4]] as const) {
+      ctx.state.addItem({ chain: 'flame_gem', tier: 1, col, row, kind: 'item' });
+    }
+    const hand = handOf(ctx);
+    expect(hand.to.item).not.toBe(ctx.state.itemAt(3, 3)!.id);
+
+    // And the demonstrated drop really is one the player can perform.
+    const bounces = capture(ctx.bus, 'item:move_bounced');
+    const moves = capture(ctx.bus, 'item:moved');
+    drag(ctx, [hand.from.col, hand.from.row], [hand.to.col, hand.to.row]);
+    expect(bounces).toHaveLength(0);
+    expect(moves).toHaveLength(1);
+  });
+
+  it('aims a LEAF of a complete row at its centre, where the lean already points', () => {
+    const ctx = openWith([[1, 1], [2, 1], [3, 1]]);
+    const hand = handOf(ctx);
+
+    // The centre is the best-connected member (readyClusters' own answer), so
+    // the hand and the scene's lean name one piece. What travels is an END —
+    // lifting the middle would show the group broken in two and stitched back.
+    expect(hand.to.item).toBe(ctx.state.itemAt(2, 1)!.id);
+    expect([ctx.state.itemAt(1, 1)!.id, ctx.state.itemAt(3, 1)!.id]).toContain(hand.from.item);
+    expect(verdict(ctx, hand)).toBe('merge');
   });
 });
 

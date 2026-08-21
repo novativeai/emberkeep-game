@@ -59,9 +59,9 @@ describe('brewed eggs → board → dragon (the whole road)', () => {
       const hatched = capture(ctx.bus, 'item:hatched');
       const revealed = capture(ctx.bus, 'dragon:revealed');
 
-      drag(ctx, [3, 3], [1, 3]);
+      drag(ctx, [3, 3], [1, 2]); // ON a member of the pair
 
-      const result = ctx.state.itemAt(1, 3);
+      const result = ctx.state.itemAt(1, 2);
       expect(result?.chain).toBe(egg.chain);
       expect(result?.tier).toBe(egg.tier + 1);
       // Every egg in the roster sits exactly one merge under its animal —

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MERGE_HINT_WEIGHTS } from '../../src/core/Constants';
 import {
   type HintBoard,
   type MergePlan,
@@ -7,6 +8,7 @@ import {
   nextMergePlan,
   planFor
 } from '../../src/core/mergeHints';
+import { verdictOnto, type DropVerdict, type RuleBoard } from '../../src/core/mergeRule';
 import type { BoardItemState, ChainsData, TilePos } from '../../src/core/types';
 
 const CHAINS = {
@@ -177,10 +179,16 @@ describe('mergeHints', () => {
 /* ========================================================================= *
  * THE PLAN — how the merge actually gets made.
  *
- * The rule above says WHICH merge. These say how, and the difference is the
- * whole bug they exist for: the hand used to ask the player to drop a piece
- * onto another one, which MergeSystem REFUSES when the pair is short of
- * `minGroup` — the piece bounced home and the hint looked broken.
+ * The rule above says WHICH merge. These say how, and "how" is now the rule
+ * in mergeRule.ts: a merge happens when, and only when, a piece is dropped ON
+ * a matching piece and the target's cluster reaches the recipe. Dropped on
+ * free ground a piece MOVES — three alike in a row stay three pieces. So a
+ * plan is gathers onto free seats beside a growing cluster, then ONE drop ON
+ * it, and these specs hold the planner to the same predicate the board runs
+ * (`verdictOnto`). A hand running its own arithmetic can promise a fusion
+ * MergeSystem refuses — which is exactly the planner this one replaced: it
+ * parked the last piece on free ground beside the pair and waited for a
+ * free-tile flood that no longer exists.
  * ========================================================================= */
 
 /** A rectangular test isle. `holes` are cells the map does not paint, `zones`
@@ -211,7 +219,43 @@ const isle = (
   };
 };
 
+/** The RULE's view of the fixture board, with some of a plan's drags already
+ *  made — how a test asks the board's own predicate about a promised drop. */
+const ruleView = (items: BoardItemState[], grid: HintBoard, moved: Map<number, TilePos>): RuleBoard => ({
+  itemAt: (c, r) => {
+    for (const p of items) {
+      const at = moved.get(p.id) ?? p;
+      if (at.col === c && at.row === r) return { ...p, col: at.col, row: at.row };
+    }
+    return undefined;
+  },
+  neighbors: (c, r) => grid.neighbors(c, r),
+  isTileActive: (c, r) => grid.isActive(c, r)
+});
+
+/** Carry out every gather of `plan` on an overlay and ask `verdictOnto` — the
+ *  predicate MergeSystem runs — what the final drop would do. */
+const finalVerdict = (plan: MergePlan, items: BoardItemState[], grid: HintBoard): DropVerdict => {
+  const moved = new Map<number, TilePos>();
+  for (const step of plan.steps.slice(0, -1)) moved.set(step.itemId, step.to);
+  const view = ruleView(items, grid, moved);
+  const last = plan.steps.at(-1)!;
+  const raw = items.find((i) => i.id === last.itemId)!;
+  const at = moved.get(raw.id) ?? raw;
+  const dragged = { ...raw, col: at.col, row: at.row };
+  const target = view.itemAt(last.to.col, last.to.row);
+  if (!target || target.id === dragged.id) return { kind: 'none' };
+  return verdictOnto(view, CHAINS, dragged, target);
+};
+
 describe('the plan', () => {
+  it('prices a drag above every other weight put together — the invariant the ranking stands on', () => {
+    // `nextMergePlan` breaks its walk on drag count alone (`dragFloor`), and
+    // that is only sound while no pile of merit can buy an extra drag.
+    const w = MERGE_HINT_WEIGHTS;
+    expect(w.drag).toBeGreaterThan(w.near + w.haul + w.frame + w.tier + w.order + w.orderSpend + w.declined);
+  });
+
   it('never asks for a drop that the board would bounce', () => {
     nextId = 1;
     // Three pieces, none adjacent to another. Every step but the last must
@@ -232,7 +276,7 @@ describe('the plan', () => {
     expect(plan.steps.filter((s) => s.completes).length).toBe(1);
   });
 
-  it('gathers onto CONNECTED ground, so the last drop really fuses', () => {
+  it('gathers beside the cluster, and the last drop lands ON it and really fuses', () => {
     nextId = 1;
     const board = [
       item('moonwater', 1, { col: 1, row: 1 }),
@@ -241,11 +285,13 @@ describe('the plan', () => {
     ];
     const grid = isle(board);
     const plan = nextMergePlan(board, CHAINS, grid)!;
-    // Where every piece ends up: movers on their target, the rest where they are.
-    const moved = new Map(plan.steps.map((s) => [s.itemId, s.to]));
-    const seats = board.map((p) => moved.get(p.id) ?? { col: p.col, row: p.row });
-    // The three seats must form ONE orthogonally connected group — that is
-    // exactly what MergeSystem's flood walks.
+    // Once the gathers are made, the pieces still standing are ONE flood —
+    // gathers seat a piece BESIDE the cluster, never merely near it…
+    const last = plan.steps.at(-1)!;
+    const moved = new Map(plan.steps.slice(0, -1).map((s) => [s.itemId, s.to] as const));
+    const seats = board
+      .filter((p) => p.id !== last.itemId)
+      .map((p) => moved.get(p.id) ?? { col: p.col, row: p.row });
     const seen = new Set<string>([`${seats[0]!.col},${seats[0]!.row}`]);
     const queue = [seats[0]!];
     while (queue.length) {
@@ -258,22 +304,29 @@ describe('the plan', () => {
         queue.push(n);
       }
     }
-    expect(seen.size).toBe(3);
+    expect(seen.size).toBe(seats.length);
+    // …and the final drop lands ON one of them, and the SAME predicate the
+    // board runs on the drop says merge. Not our arithmetic — the rule's.
+    expect(seats.some((s) => s.col === last.to.col && s.row === last.to.row)).toBe(true);
+    expect(finalVerdict(plan, board, grid).kind).toBe('merge');
   });
 
-  it('asks for ONE drag when two pieces are already side by side', () => {
+  it('asks for ONE drag when two pieces are already side by side — dropped ON the pair', () => {
     nextId = 1;
     const board = [
       item('moonwater', 1, { col: 2, row: 2 }),
       item('moonwater', 1, { col: 3, row: 2 }),
       item('moonwater', 1, { col: 7, row: 7 })
     ];
-    const plan = nextMergePlan(board, CHAINS, isle(board))!;
+    const grid = isle(board);
+    const plan = nextMergePlan(board, CHAINS, grid)!;
     expect(plan.steps.length).toBe(1);
     expect(plan.steps[0]!.itemId).toBe(3); // the one standing apart
     expect(plan.steps[0]!.completes).toBe(true);
-    // Onto free ground beside the pair, never onto one of them.
-    expect(isle(board).itemIdAt(plan.steps[0]!.to.col, plan.steps[0]!.to.row)).toBeNull();
+    // ONTO a member of the pair, never onto free ground beside them: a drop on
+    // free ground is a plain move now, and the merge would simply not happen.
+    expect([1, 2]).toContain(grid.itemIdAt(plan.steps[0]!.to.col, plan.steps[0]!.to.row));
+    expect(finalVerdict(plan, board, grid).kind).toBe('merge');
   });
 
   it('finishes a set the board built by itself', () => {
@@ -297,12 +350,11 @@ describe('the plan', () => {
   it('picks a LEAF to finish with, never the piece holding the set together', () => {
     nextId = 1;
     // The same three-in-a-row, but the MIDDLE piece is the oldest — which is
-    // the order the pieces get walked in. Moving it is the one gesture that
-    // cannot work: picking it up takes its cell out of the flood, so the drop
-    // lands beside one piece with the other now touching nothing, MergeSystem
-    // counts two, `performMerge` refuses, and the piece bounces home. It is the
-    // shape a real board hit first — the exported Emberkeep zone graph has sets
-    // standing in a star, centre on the youngest id — and it is the same defect.
+    // the order the pieces get walked in. The flood is walked on the board as
+    // it stands now, so even the middle dropped on an end fuses — but the hand
+    // still lifts a piece from the END: the pile is not pulled apart to reach
+    // the piece that joins it, and the scene's lean (readyClusters) points the
+    // leaves at the centre, so the hand and the lean must agree.
     const board = [
       item('moonwater', 1, { col: 3, row: 2 }), // id 1 — the middle
       item('moonwater', 1, { col: 2, row: 2 }),
@@ -313,7 +365,7 @@ describe('the plan', () => {
     expect(plan.steps.length).toBe(1);
     expect(plan.steps[0]!.itemId).not.toBe(1);
     // And the proof rather than the proxy: with the mover lifted, the pieces
-    // left standing plus the cell it lands on are still one flood.
+    // left standing are still one flood, and the drop lands on one of them.
     const mover = plan.steps[0]!.itemId;
     const staying = board.filter((p) => p.id !== mover).map((p) => ({ col: p.col, row: p.row }));
     const seen = new Set([`${staying[0]!.col},${staying[0]!.row}`]);
@@ -346,9 +398,9 @@ describe('the plan', () => {
     const twoZones = isle(split, { zoneAt: (c) => (c < 4 ? 'main' : 'far') });
     const plan = nextMergePlan(split, CHAINS, twoZones)!;
     expect(plan).not.toBeNull();
-    // …and EVERY cell it gathers onto lies in ONE zone, because the shape is
-    // grown through the board's own adjacency. That is where the zone rule
-    // lives, and it is the half that must never be relaxed.
+    // …and EVERY cell it asks a drop onto lies in ONE zone, because the
+    // cluster grows through the board's own adjacency. That is where the zone
+    // rule lives, and it is the half that must never be relaxed.
     const zones = new Set(plan.steps.map((st) => twoZones.zoneOf(st.to.col, st.to.row)));
     expect(zones.size).toBe(1);
     // The last step is the one that fuses; every other lands on free ground.
@@ -358,10 +410,11 @@ describe('the plan', () => {
 
   it('still refuses when no single slab can hold the set', () => {
     nextId = 1;
-    // Three pieces, and a world cut into one-cell slabs: there is nowhere for
-    // three of a kind to stand connected, so there is no gesture to suggest.
-    // Silence here is the CORRECT answer, and the reason the zone rule has to
-    // survive on the shape even though it left the bucket.
+    // Three pieces, and a world cut into one-cell slabs: no piece has a free
+    // neighbour to gather onto, so no cluster of two can ever stand and no
+    // drop can ever fuse. Silence here is the CORRECT answer, and the reason
+    // the zone rule has to survive on the cluster even though it left the
+    // bucket.
     const scattered = [
       item('moonwater', 1, { col: 0, row: 0 }),
       item('moonwater', 1, { col: 2, row: 2 }),
@@ -374,7 +427,7 @@ describe('the plan', () => {
   it('plans around holes in the ground', () => {
     nextId = 1;
     // The obvious gathering spot is missing from the map. The plan has to find
-    // three cells that are painted AND connected, not three that look near.
+    // seats that are painted AND connected, not seats that look near.
     const board = [
       item('moonwater', 1, { col: 1, row: 1 }),
       item('moonwater', 1, { col: 1, row: 3 }),
@@ -385,11 +438,12 @@ describe('the plan', () => {
     for (const step of plan.steps) {
       expect(grid.isActive(step.to.col, step.to.row)).toBe(true);
     }
+    expect(finalVerdict(plan, board, grid).kind).toBe('merge');
   });
 
   it('says nothing rather than something wrong when there is no room', () => {
     nextId = 1;
-    // A one-cell islet each: no three cells anywhere are connected.
+    // A one-cell islet each: nothing can ever stand beside anything.
     const board = [
       item('moonwater', 1, { col: 0, row: 0 }),
       item('moonwater', 1, { col: 2, row: 0 }),
@@ -424,7 +478,7 @@ describe('the plan', () => {
       item('moonwater', 1, { col: 4, row: 2 })
     ];
     // Each lumber cell is a one-cell islet: no active neighbour in any
-    // direction, so no three of them can ever stand connected.
+    // direction, so no two of them can ever stand connected.
     const grid = isle(board, { cols: 5, rows: 3, holes: ['1,0', '3,0', '0,1', '2,1', '4,1'] });
     const plan = nextMergePlan(board, CHAINS, grid)!;
     expect(plan.chain).toBe('moonwater');
@@ -518,29 +572,22 @@ describe('the plan', () => {
   });
 
   /* ----------------------------------------------------------------------- *
-   * THE GAP BRIDGE — the shape that broke the drag bound.
+   * THE GAP BRIDGE — the shape that keeps breaking drag arithmetic.
    *
-   * `nextMergePlan` does not plan every hint blindly; it walks them in
-   * ascending order of a FLOOR on what each can cost and stops once the plan in
-   * hand is cheaper than anything left could be. The floor that shipped was
-   * `need − largestCluster(pieces)`, on the premise that "at most one of the
-   * set's existing connected clusters can stay standing". That premise is
-   * false. Pieces that stay put do not have to touch EACH OTHER — they have to
-   * fit inside one connected `need`-cell shape, and the piece that moves is
-   * allowed to land in the gap between them.
-   *
-   * These two boards are the counter-example, kept as fixtures because they are
-   * small enough to check by hand and because the world spec's version of them
-   * takes a zone graph to explain. The FIRST pins the arithmetic the old
-   * premise denied — it passes on the old bound, because `planFor` was never
-   * the broken half; the SECOND is the regression guard, and it fails on the
-   * old bound because there the floor gets a chance to prune.
+   * Three pieces touching nothing, one free hub joining them. Under the old
+   * free-flood rule this was ONE drag — drop any piece into the hub — and the
+   * planner's drag floor famously over-stated it as two and pruned the best
+   * plan away. The drop-on rule prices it at TWO honestly: the hub drop is a
+   * plain MOVE now, so the bridge has to be built first and dropped on
+   * second. `dragFloor` is re-derived to match — one drag exists only when a
+   * cluster of `need − 1` is already standing — and the decoy that used to
+   * lose, the touching pair with the long haul, is now the win.
    * ----------------------------------------------------------------------- */
-  it('sees the ONE drag in a set whose pieces are touching nothing', () => {
+  it('prices the gap bridge at TWO drags — the hub drop is a move, not a merge', () => {
     nextId = 1;
-    // (0,0), (2,0) and (1,1): three clusters of one, so the old floor said two
-    // drags. It is one — drop any of them on (1,0) and the other two are its
-    // neighbours. This is the arithmetic the floor got wrong, on its own.
+    // (0,0), (2,0) and (1,1): pairwise non-adjacent, one hub at (1,0) joining
+    // all three. One gather builds the bridge (the seat touches the other two,
+    // so the cluster completes in a single move); the second drag drops ON it.
     const board = [
       item('lumber', 1, { col: 0, row: 0 }),
       item('lumber', 1, { col: 2, row: 0 }),
@@ -555,36 +602,24 @@ describe('the plan', () => {
       }
     }
     const plan = nextMergePlan(board, CHAINS, grid)!;
-    expect(plan.steps.length).toBe(1);
-    expect(plan.travel).toBe(1); // one tile, into the gap
-    // And it really fuses: the cells they end on are one flood.
-    const finals = new Map(board.map((p) => [p.id, { col: p.col, row: p.row }]));
-    for (const st of plan.steps) finals.set(st.itemId, st.to);
-    const seats = [...finals.values()];
-    const seen = new Set([`${seats[0]!.col},${seats[0]!.row}`]);
-    const queue = [seats[0]!];
-    while (queue.length) {
-      const at = queue.shift()!;
-      for (const n of grid.neighbors(at.col, at.row)) {
-        const k = `${n.col},${n.row}`;
-        if (seen.has(k) || !seats.some((sp) => sp.col === n.col && sp.row === n.row)) continue;
-        seen.add(k);
-        queue.push(n);
-      }
-    }
-    expect(seen.size).toBe(3);
+    expect(plan.steps.length).toBe(2);
+    expect(plan.travel).toBe(1); // one tile into the hub; the fuse is a free flick
+    // The gather lands on FREE ground — under the drop-on rule it fuses
+    // nothing on its own, however the three then stand…
+    expect(plan.steps[0]!.completes).toBe(false);
+    expect(grid.itemIdAt(plan.steps[0]!.to.col, plan.steps[0]!.to.row)).toBeNull();
+    // …and the second drag lands ON the cluster and the RULE calls it a merge.
+    expect(finalVerdict(plan, board, grid).kind).toBe('merge');
   });
 
-  it('offers the gap bridge over a touching pair whose third piece is across the isle', () => {
+  it('offers the touching pair over the gap bridge, which now costs a second drag', () => {
     nextId = 1;
-    // The board the bound actually cost the player. Lumber is the gap bridge:
-    // one drag, one tile of swipe. Moonwater has a pair already touching and
-    // its third five tiles away: one drag, five tiles of swipe.
-    //
-    // The old floors were lumber 3 − 1 = 2 and moonwater 3 − 2 = 1, so the walk
-    // took moonwater first, set the incumbent at one drag, hit lumber's floor of
-    // two and BROKE — handing out the five-tile haul with the one-tile nudge
-    // sitting on the board.
+    // The mirror of the board that broke the OLD floor. Lumber is the gap
+    // bridge: two drags now, one tile of swipe. Moonwater has a pair already
+    // touching and its third six tiles away: one drag, six tiles of swipe.
+    // Under the free-flood rule lumber won; under the drop-on rule a drag
+    // outweighs any haul, so the pair must — and the floors (pair 1, bridge 2)
+    // let the walk prove it without planning the bridge at all.
     const board = [
       item('lumber', 1, { col: 0, row: 0 }),
       item('lumber', 1, { col: 2, row: 0 }),
@@ -595,20 +630,22 @@ describe('the plan', () => {
     ];
     const grid = isle(board);
     const plan = nextMergePlan(board, CHAINS, grid)!;
-    expect(plan.chain).toBe('lumber');
+    expect(plan.chain).toBe('moonwater');
     expect(plan.steps.length).toBe(1);
-    expect(plan.travel).toBe(1);
+    expect(plan.travel).toBe(6);
 
-    // Against the WHOLE field, not a hand-picked answer: both merges cost one
-    // drag, so the haul decides, and the offer has to be the head of the list.
+    // Against the WHOLE field, not a hand-picked answer: the pair costs one
+    // drag, the bridge two, and the offer has to be the head of the list —
+    // and every plan in the field has to end in a drop the rule would fuse.
     const field = mergeHints(board, CHAINS, grid)
-      .map((h) => planFor(h, board, grid))
+      .map((h) => planFor(h, board, grid, CHAINS))
       .filter((p): p is MergePlan => !!p)
       .sort((a, b) => a.steps.length - b.steps.length || a.travel - b.travel || a.completedBy - b.completedBy);
     expect(field.map((p) => [p.chain, p.steps.length, p.travel])).toEqual([
-      ['lumber', 1, 1],
-      ['moonwater', 1, 5]
+      ['moonwater', 1, 6],
+      ['lumber', 2, 1]
     ]);
+    for (const p of field) expect(finalVerdict(p, board, grid).kind).toBe('merge');
     expect([plan.steps.length, plan.travel, plan.completedBy]).toEqual([
       field[0]!.steps.length,
       field[0]!.travel,

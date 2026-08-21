@@ -115,7 +115,7 @@ describe('map space — what the save carries', () => {
     const storage = new MemoryStorage();
     const ctx = createTestContext(storage);
     ctx.beginRun();
-    drag(ctx, [3, 4], [1, 4]);
+    drag(ctx, [3, 4], [1, 3]);
     ctx.systems.save.save();
 
     const save = JSON.parse(storage.getItem(SAVE_KEY)!) as SaveDataV1;
@@ -136,7 +136,7 @@ describe('map space — what the save carries', () => {
     const storage = new MemoryStorage();
     const ctx1 = createTestContext(storage);
     ctx1.beginRun();
-    drag(ctx1, [3, 4], [1, 4]);
+    drag(ctx1, [3, 4], [1, 3]);
     ctx1.systems.save.save();
 
     // Strip everything map space added, exactly as a save written before it looks.
@@ -153,7 +153,7 @@ describe('map space — what the save carries', () => {
     const ctx2 = createTestContext(storage);
     expect(ctx2.systems.save.load()).toBe(true);
     expect(ctx2.state.items.size).toBe(ctx1.state.items.size);
-    expect(ctx2.state.itemAt(1, 4)?.tier).toBe(2);
+    expect(ctx2.state.itemAt(1, 3)?.tier).toBe(2);
     expect(ctx2.state.relocated).toEqual([]);
     for (const [id, item] of ctx1.state.items) {
       expect(ctx2.state.items.get(id)).toMatchObject({ col: item.col, row: item.row });

@@ -22,13 +22,37 @@
  * first made it mergeable — IS its completion order. Sorting by that is exact,
  * survives a save/load, and costs nothing to keep up to date.
  *
- * The OFFER (`nextMergePlan`) is not that queue, and has not been for two
- * revisions. First it became the CHEAPEST plannable merge — fewest drags, then
- * the shortest haul — because first-completed is a fact about the board and
- * not a claim about what is easy, and a hand that sends the player on a
- * two-drag gather while a pair sits touching reads as broken rather than as
- * old-fashioned. That fixed the arithmetic. It did not make the hand look like
- * it was thinking, and this revision is about the difference.
+ * The OFFER (`nextMergePlan`) is not that queue. It is the highest-SCORING
+ * plannable merge — fewest drags first, then the shortest haul, then a handful
+ * of merits about the player's situation — because first-completed is a fact
+ * about the board and not a claim about what is easy, and a hand that sends
+ * the player on a two-drag gather while a pair sits touching reads as broken
+ * rather than as old-fashioned.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * THE RULE THE PLAN OBEYS — and why this file imports it instead of owning it.
+ *
+ * A merge happens when, and only when, a piece is dropped ON a matching piece
+ * and the two of them plus the target's connected cluster reach the recipe
+ * (`mergeRule.verdictOnto`). Dropped on free ground a piece simply MOVES, however
+ * many of its kind now stand beside it. That is the whole rule, and it is not
+ * restated here: the planner builds a `RuleBoard` over the same items the
+ * scene hands it, replays its own earlier drags on an overlay, and asks the
+ * SAME predicate MergeSystem will ask when the finger lets go. A hand that ran
+ * its own copy of the predicate could promise a fusion the board refuses, and
+ * that is precisely the bug the previous planner shipped — see THE PLAN below.
+ *
+ * So every plan has the same shape:
+ *
+ *     gather, gather, …, DROP ON.
+ *
+ * Each gather moves one piece onto a FREE cell beside the growing cluster — a
+ * drop on free ground, which always succeeds and never fuses, so no step the
+ * hand asks for can bounce and none can fire early. The last step lands ON a
+ * member of that cluster, and it is only emitted once `verdictOnto` on the
+ * replayed board says `merge`. A set already standing complete (three in a row
+ * a producer built, a pair of Houses) is the zero-gather case: one leaf dropped
+ * on the cluster's centre, the same centre the scene leans the pieces toward.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * WHY EFFORT ALONE IS NOT ENOUGH — measured, not guessed.
@@ -68,7 +92,7 @@
  *     for each chain:tier bucket on the WHOLE WORLD (a move is not zone-bound):
  *       for each piece in the bucket, take the `need` pieces nearest to it
  *       → dedupe → keep the `groupsPerBucket` with the lowest proven drag floor
- *     for each candidate: plan ← planFor(candidate)   (unchanged, still exact)
+ *     for each candidate: plan ← planFor(candidate)   (exact, see THE PLAN)
  *
  *   SCORE(plan), in merit points, higher is better:
  *       − W.drag        × (drags − 1)                    the work it asks for
@@ -104,10 +128,11 @@
  * couple of lines pointing it.
  */
 import { MERGE_HINT_WEIGHTS as W } from './Constants';
-import type { BoardItemState, ChainConfig, ChainsData, TilePos } from './types';
+import { clusterOf, readyClusters, recipeFor, type RuleBoard, verdictOnto } from './mergeRule';
+import type { BoardItemState, ChainsData, TilePos } from './types';
 
 /**
- * THE BOARD THE PLANNER REASONS ABOUT — and, now, the PLAYER as well.
+ * THE BOARD THE PLANNER REASONS ABOUT — and the PLAYER as well.
  *
  * Injected rather than imported, for the same reason this whole file is
  * Phaser-free: what the hand should ask for is a rule, and a rule is worth
@@ -116,8 +141,8 @@ import type { BoardItemState, ChainConfig, ChainsData, TilePos } from './types';
  *
  * The first four members are the BOARD and are required. `neighbors` is the one
  * that matters. A merge is an ORTHOGONALLY-CONNECTED flood
- * (MergeSystem.collectGroup) and adjacency never leaves a zone (world.ts
- * `neighborsOf`), so the SHAPE a plan gathers onto can never span two slabs.
+ * (`mergeRule.clusterOf`) and adjacency never leaves a zone (world.ts
+ * `neighborsOf`), so the cluster a plan gathers onto can never span two slabs.
  *
  * A MOVE, however, can. MergeSystem's drop validation asks `isTileActive` and
  * nothing else — no zone test — so a piece may be carried from any slab to any
@@ -141,7 +166,7 @@ export interface HintBoard {
   /** Orthogonal neighbours; never crosses into another zone. */
   neighbors(col: number, row: number): TilePos[];
   /** Which zone owns this cell. Kept for callers that need it; the planner no
-   *  longer buckets on it (see above) — the SHAPE carries the zone rule. */
+   *  longer buckets on it (see above) — the CLUSTER carries the zone rule. */
   zoneOf(col: number, row: number): string | undefined;
   /**
    * How far apart two cells really are, for RANKING only.
@@ -216,13 +241,23 @@ export interface HintBoard {
 /** One drag: pick up `itemId`, drop it on `to`. */
 export interface MergeStep {
   itemId: number;
+  /**
+   * The CELL to drop on. For a gather that is a free seat beside the cluster —
+   * named explicitly so the hand has somewhere to point, the ground diamond
+   * has somewhere to pulse, and `BoardScene.notePlayerMove` can recognise the
+   * landing and bring the next step straight back. For the last step it is the
+   * cell of the piece being dropped ON.
+   */
   to: TilePos;
   /**
    * True on the LAST step only — the drop that actually fuses.
    *
-   * Every other step lands on a FREE cell, which is the whole safety property
-   * of a plan: a drop on free ground always succeeds, so no step the hand asks
-   * for can bounce. Only the final one is allowed to land on a piece.
+   * Every other step is a GATHER onto a FREE cell, which is the whole safety
+   * property of a plan: a drop on free ground always succeeds and never merges,
+   * so no step the hand asks for can bounce and none can fire before its turn.
+   * The final step MUST land on a piece — under the rule in mergeRule.ts there
+   * is no other way to merge — and it is only emitted once `verdictOnto` on the
+   * replayed board has said so.
    */
   completes: boolean;
 }
@@ -239,7 +274,7 @@ export interface MergePlan extends MergeHint {
    * matters because the score puts it through a saturating curve — a number
    * that is squared on one board and linear on another cannot share a weight.
    *
-   * Zero for a set that is already standing connected: nothing has to travel,
+   * Zero for a set that is already standing complete: nothing has to travel,
    * only the one flick that fuses it.
    */
   travel: number;
@@ -427,12 +462,6 @@ function outlier(group: BoardItemState[], board?: HintBoard): BoardItemState {
   return worst;
 }
 
-/** The merge size for a chain+tier: the tier's own override, else the chain's,
- *  else the global rule — the same precedence MergeSystem applies. */
-function needFor(config: ChainConfig, tier: number, data: ChainsData): number {
-  return config.tiers.find((t) => t.tier === tier)?.merge?.group ?? config.merge?.group ?? data.mergeRule.minGroup;
-}
-
 /** Build the hint record for one already-chosen set of pieces. */
 function hintOf(chain: string, tier: number, need: number, group: BoardItemState[], board?: HintBoard): MergeHint {
   const ids = group.map((i) => i.id).sort((a, b) => a - b);
@@ -458,9 +487,9 @@ interface Bucket {
 function bucketsOf(items: Iterable<BoardItemState>, data: ChainsData): Bucket[] {
   // BUCKETED BY CHAIN+TIER, across the whole world — because a MOVE is not
   // zone-bound even though a MERGE is. The zone rule is enforced where it
-  // belongs, in `shapesFrom`: the destination shape is grown through the
-  // board's own adjacency and therefore always lies on one slab. What may
-  // travel onto it is anything the player owns, from anywhere.
+  // belongs, in the plan: the cluster is grown through the board's own
+  // adjacency and therefore always lies on one slab. What may travel onto it
+  // is anything the player owns, from anywhere.
   const byKey = new Map<string, { chain: string; tier: number; items: BoardItemState[] }>();
   for (const item of items) {
     if (item.kind !== 'item') continue; // decor never merges
@@ -472,14 +501,14 @@ function bucketsOf(items: Iterable<BoardItemState>, data: ChainsData): Bucket[] 
 
   const out: Bucket[] = [];
   for (const { chain, tier, items: bucket } of byKey.values()) {
-    const config = data.chains.find((c) => c.id === chain);
-    if (!config) continue;
-    // The top of a chain has nowhere to go. Merging it is not a move the player
-    // is failing to notice — it is not a move at all.
-    if (!config.tiers.some((t) => t.tier === tier + 1)) continue;
-    const need = needFor(config, tier, data);
-    if (bucket.length < need) continue;
-    out.push({ chain, tier, need, items: bucket });
+    // The recipe comes from mergeRule.ts — the same precedence MergeSystem
+    // applies (tier override, then chain, then the global rule), and the same
+    // "the top of a chain has nowhere to go": merging it is not a move the
+    // player is failing to notice, it is not a move at all.
+    const recipe = recipeFor(data, chain, tier);
+    if (!recipe.mergeable) continue;
+    if (bucket.length < recipe.need) continue;
+    out.push({ chain, tier, need: recipe.need, items: bucket });
   }
   return out;
 }
@@ -534,35 +563,116 @@ export function nextMergeHint(
  * A hint says WHICH merge. A plan says HOW, and on a spread board those are
  * not the same thing at all.
  *
- * The hand used to be told "drag this piece onto that one", and with three
- * pieces standing apart that is a gesture the game REFUSES: dropping onto an
- * occupied cell goes through MergeSystem's `tryMergeOnto`, whose `performMerge`
- * returns false when the group is short of `minGroup` — so the piece bounces
- * straight home. The player followed the hand exactly and the board undid it.
+ * WHAT THE PREVIOUS PLAN PROMISED, AND WHY IT STOPPED BEING TRUE. It gathered
+ * the set onto a connected shape of `need` FREE cells and relied on the last
+ * drop — onto the last free cell of the shape — fusing by flood: three
+ * standing connected used to merge the moment the third arrived beside the
+ * other two. MergeSystem no longer does that. Under the rule in mergeRule.ts a
+ * drop on free ground is a MOVE, whatever stands beside it, and the only drop
+ * that fuses is a drop ON a matching piece. So the old plan's final step was a
+ * gesture the board accepts and does nothing with: the player followed the
+ * hand exactly, three pieces stood in a row, and nothing happened. Its drag
+ * floor was wrong the same way — it counted the "gap bridge" (three pieces
+ * touching nothing, one of them dropped into the free hub between the others)
+ * as one drag, which under the drop-on rule is two.
  *
- * A plan is a sequence of drags with ONE invariant that makes every step safe:
+ * A plan is now a sequence of drags with ONE invariant:
  *
- *      every step but the last lands on FREE ground; only the last lands on,
- *      or completes, a cluster.
+ *      every step but the last is a GATHER — the piece lands on a FREE cell
+ *      beside the cluster being built; the last step lands ON a member of
+ *      that cluster, and `verdictOnto` on the replayed board says `merge`.
  *
- * A drop on free active ground always succeeds, so nothing the hand asks for
- * can be refused, and the final drop is guaranteed to fuse by construction:
- * the cells were chosen as a CONNECTED shape, so once the others are standing
- * on it the flood from the last cell walks the whole set.
+ * A drop on free active ground always succeeds and never fuses, so nothing the
+ * hand asks for can bounce and nothing can fire early. The final drop is not
+ * guaranteed by construction — it is CHECKED, with the same predicate the
+ * board uses, on an overlay where the earlier gathers have been made. The
+ * cluster grows through the board's own `neighbors`, so it never crosses a
+ * zone, and the zone rule needs no second statement here.
  *
- * The shape is the other half. A merge does not need pieces "near" each other,
- * it needs them orthogonally adjacent — so the planner does not look for an
- * empty cell, it looks for `need` connected empty-or-ours cells, and then asks
- * which assignment of pieces to that shape costs the fewest DRAGS. Drags, not
- * distance: a drag crosses the isle as easily as it crosses one tile, so the
- * player's real cost is how many times they have to pick something up.
+ * Drags, not distance, are the first cost: a drag crosses the isle as easily
+ * as it crosses one tile, so the player's real cost is how many times they
+ * have to pick something up. A set with a pair already touching costs ONE
+ * (the third dropped on either of them); three pieces touching nothing cost
+ * TWO (one gathered beside another, the third dropped on); a set already
+ * standing complete costs one flick and no travel at all.
  * ========================================================================= */
 
 const cellKey = (col: number, row: number): string => `${col},${row}`;
 
 /**
- * The biggest clump these pieces already form, walked through the BOARD'S OWN
- * adjacency — which is the only adjacency that means anything.
+ * THE BOARD AS THE RULE SEES IT, with the plan's earlier drags already made.
+ *
+ * `RuleBoard` wants pieces, not ids, and it wants them where the PLAN has put
+ * them — a gather seated two steps ago has to count as standing on its seat
+ * when the final verdict is asked. So the overlay indexes the items the
+ * planner was handed by cell, and lays a small map of moves over it. Nothing
+ * here touches `GameState`: a plan is a prediction, and a prediction that
+ * mutated the board to find out what it predicts would be a move.
+ *
+ * Immutable on purpose — `with` returns a new overlay — so two candidate plans
+ * explored from the same base never see each other's seats, and a rejected
+ * branch leaves nothing to undo.
+ */
+class Overlay implements RuleBoard {
+  private constructor(
+    private readonly board: HintBoard,
+    private readonly home: ReadonlyMap<string, BoardItemState>,
+    private readonly moved: ReadonlyMap<number, TilePos>,
+    private readonly seated: ReadonlyMap<string, BoardItemState>
+  ) {}
+
+  static of(board: HintBoard, items: readonly BoardItemState[]): Overlay {
+    const home = new Map<string, BoardItemState>();
+    for (const item of items) home.set(cellKey(item.col, item.row), item);
+    return new Overlay(board, home, new Map(), new Map());
+  }
+
+  /** This board with `piece` standing on `to`, its old cell left empty. */
+  with(piece: BoardItemState, to: TilePos): Overlay {
+    const moved = new Map(this.moved).set(piece.id, to);
+    const seated = new Map<string, BoardItemState>();
+    for (const [key, p] of this.seated) if (p.id !== piece.id) seated.set(key, p);
+    seated.set(cellKey(to.col, to.row), { ...piece, col: to.col, row: to.row });
+    return new Overlay(this.board, this.home, moved, seated);
+  }
+
+  /** Where `piece` stands on THIS board — its seat if the plan moved it. */
+  place(piece: BoardItemState): BoardItemState {
+    const to = this.moved.get(piece.id);
+    return to ? { ...piece, col: to.col, row: to.row } : piece;
+  }
+
+  itemAt(col: number, row: number): BoardItemState | undefined {
+    const seat = this.seated.get(cellKey(col, row));
+    if (seat) return seat;
+    const piece = this.home.get(cellKey(col, row));
+    return piece && !this.moved.has(piece.id) ? piece : undefined;
+  }
+
+  neighbors(col: number, row: number): TilePos[] {
+    return this.board.neighbors(col, row);
+  }
+
+  isTileActive(col: number, row: number): boolean {
+    return this.board.isActive(col, row);
+  }
+
+  /**
+   * Free to land on: painted, and nobody standing there. Asked of the items
+   * index AND of the board's own occupancy — they are the same source in the
+   * game and in every fixture, and the second test costs nothing; a stranger
+   * the caller's item list did not mention must still keep its cell.
+   */
+  isFree(col: number, row: number): boolean {
+    if (!this.board.isActive(col, row) || this.itemAt(col, row)) return false;
+    const occupant = this.board.itemIdAt(col, row);
+    return occupant === null || this.moved.has(occupant);
+  }
+}
+
+/**
+ * The connected groups these pieces form among THEMSELVES, walked through the
+ * board's own adjacency — which is the only adjacency that means anything.
  *
  * Not `|Δcol| + |Δrow| === 1`. On the exported worlds a cell's neighbours are
  * whatever the zone graph says they are — Emberkeep as exported today is
@@ -571,29 +681,23 @@ const cellKey = (col: number, row: number): string => `${col},${row}`;
  * together" from index arithmetic is reasoning about a lattice the game
  * stopped having, and it will be wrong in exactly the cases that matter.
  *
- * ONE caller, and it is a question about the board as it STANDS: `planOnShape`
- * asking whether the pieces left behind by a pick-up are still one flood. It
- * used to answer a second question too — how many pieces a plan could leave
- * standing, and therefore how few drags a hint could cost — and that reading
- * was simply false. Pieces that stay put do not have to be touching each other;
- * they have to fit inside one connected `need`-cell shape, and the piece that
- * moves may land in the GAP between them. What a set is already touching is not
- * what a set can be gathered onto. The full retraction, and the bound that
- * replaced it, are on `dragFloor`.
+ * Largest first, then by oldest member, and every group sorted by id — so the
+ * anchors a plan is tried from come out the same whichever way the caller
+ * iterated the board.
  */
-function largestCluster(pieces: BoardItemState[], board: HintBoard): number {
+function groupsAmong(pieces: readonly BoardItemState[], board: Pick<RuleBoard, 'neighbors'>): BoardItemState[][] {
   const spots = new Map<string, BoardItemState>();
-  for (const p of pieces) spots.set(cellKey(p.col, p.row), p);
+  for (const p of [...pieces].sort((a, b) => a.id - b.id)) spots.set(cellKey(p.col, p.row), p);
   const seen = new Set<string>();
-  let biggest = 0;
+  const out: BoardItemState[][] = [];
   for (const [key, start] of spots) {
     if (seen.has(key)) continue;
     seen.add(key);
-    let size = 0;
+    const group: BoardItemState[] = [];
     const queue = [start];
     while (queue.length) {
       const cur = queue.shift()!;
-      size++;
+      group.push(cur);
       for (const n of board.neighbors(cur.col, cur.row)) {
         const k = cellKey(n.col, n.row);
         const mate = spots.get(k);
@@ -602,277 +706,190 @@ function largestCluster(pieces: BoardItemState[], board: HintBoard): number {
         queue.push(mate);
       }
     }
-    if (size > biggest) biggest = size;
+    out.push(group.sort((a, b) => a.id - b.id));
   }
-  return biggest;
-}
-
-/** A gathering spot: `need` connected cells, plus the identity that names it.
- *  The key is its sorted cells — the shape's own address, which is what breaks
- *  a tie between two equally cheap plans without appealing to iteration order. */
-interface Shape {
-  key: string;
-  cells: TilePos[];
+  return out.sort((a, b) => b.length - a.length || a[0]!.id - b[0]!.id);
 }
 
 /**
- * Every connected shape of `size` usable cells that contains at least one seed
- * — each one enumerated EXACTLY ONCE.
+ * ONE FLICK FINISHES A COMPLETE CLUSTER.
  *
- * Grown one neighbour at a time through the board's OWN adjacency, so a shape
- * can never span two zones and can never include a cell the flood would not
- * walk.
+ * Three pieces can stand connected without ever merging — a producer drops one
+ * beside two, or the player's last gather bridged a gap — because a merge only
+ * ever happens on a DROP. `readyClusters` is the board's own list of those, and
+ * the gesture that finishes one is a member dropped on the cluster's CENTRE:
+ * the same centre the scene leans the pieces toward, so the hand and the lean
+ * agree about where the drop goes.
  *
- * "Exactly once" is the only thing that changed, and it is worth stating why,
- * because the obvious version is quadratic in the answer: a 3-cell shape is
- * reached from each of its own cells, and the seeds handed in here are the
- * pieces PLUS the ground around them, so the same shape used to come back — and
- * get planned — up to three times. Two guards remove that. `spent` holds the
- * seeds already walked, and growth refuses them, so a shape containing several
- * seeds is only ever built from the first of them; `seen` catches what is left,
- * the same shape reached twice from one seed by different orders of growth.
- * Measured on a half-full Borealis that is 9.3ms of planning down to 6.0ms,
- * before any pruning at all.
+ * WHICH member moves is not free, and "any of them" used to be wrong. The
+ * flood is now walked on the board as it stands, so even the middle of a row
+ * dropped on an end fuses (see mergeRule.ts) — but the piece the hand lifts is
+ * still chosen to be a LEAF, one whose removal leaves the rest one flood. That
+ * is what a person does: the piece on the end goes onto the pile, the pile
+ * does not get pulled apart to reach it. Among the leaves, one of the hint's
+ * own pieces is preferred (so the hand points at what it named), then one
+ * touching the centre (the shortest flick), then the oldest.
  *
- * Bounded and small either way: `size` is 2..5 and a cell has at most four
- * neighbours, so this is a few dozen shapes per hint, once per hint, never per
- * frame.
+ * The drop is CHECKED with `verdictOnto` before it is promised. On a cluster
+ * of five that verdict is the five-bonus — the plan never sets out to make
+ * one, but a board that has one standing still gets its one-drop answer.
  */
-function shapesAround(
-  seeds: TilePos[],
-  size: number,
-  board: HintBoard,
-  usable: (cell: TilePos) => boolean
-): Shape[] {
-  const found: Shape[] = [];
-  const seen = new Set<string>();
-  const spent = new Set<string>();
-  for (const seed of seeds) {
-    const seedKey = cellKey(seed.col, seed.row);
-    if (!spent.has(seedKey) && usable(seed)) {
-      const shape: TilePos[] = [seed];
-      const held = new Set<string>([seedKey]);
-      const grow = (): void => {
-        if (shape.length === size) {
-          const key = [...held].sort().join('|');
-          if (!seen.has(key)) {
-            seen.add(key);
-            found.push({ key, cells: shape.map((c) => ({ col: c.col, row: c.row })) });
-          }
-          return;
-        }
-        for (const cell of [...shape]) {
-          for (const n of board.neighbors(cell.col, cell.row)) {
-            const k = cellKey(n.col, n.row);
-            if (held.has(k) || spent.has(k) || !usable(n)) continue;
-            held.add(k);
-            shape.push(n);
-            grow();
-            shape.pop();
-            held.delete(k);
-          }
-        }
-      };
-      grow();
-    }
-    spent.add(seedKey);
-  }
-  return found;
-}
-
-/**
- * GROUND A PLAN MAY USE: painted, and either empty or holding one of our own.
- *
- * Our own pieces count as usable because they are the ones being gathered — a
- * shape drawn over a piece of the set is a piece that stays standing. Anything
- * else on it is a stranger the plan cannot move, so the cell is out.
- *
- * Shared by the planner and the floor below on purpose: a bound that reasoned
- * about ground the planner cannot use would not be a bound on the planner.
- */
-function usableGround(pieces: BoardItemState[], board: HintBoard): (cell: TilePos) => boolean {
-  const ours = new Set(pieces.map((p) => p.id));
-  return (cell) => {
-    if (!board.isActive(cell.col, cell.row)) return false;
-    const occupant = board.itemIdAt(cell.col, cell.row);
-    return occupant === null || ours.has(occupant);
-  };
-}
-
-/** Every cell reachable from `from` in at most `steps` hops of usable ground,
- *  walked through the board's own adjacency. Keyed, because the only question
- *  ever asked of it is whether some other cell is in there. */
-function withinSteps(
-  from: TilePos,
-  steps: number,
-  board: HintBoard,
-  usable: (cell: TilePos) => boolean
-): Set<string> {
-  const seen = new Set<string>([cellKey(from.col, from.row)]);
-  let frontier: TilePos[] = [{ col: from.col, row: from.row }];
-  for (let step = 0; step < steps && frontier.length; step++) {
-    const next: TilePos[] = [];
-    for (const cur of frontier) {
-      for (const n of board.neighbors(cur.col, cur.row)) {
-        const k = cellKey(n.col, n.row);
-        if (seen.has(k) || !usable(n)) continue;
-        seen.add(k);
-        next.push(n);
-      }
-    }
-    frontier = next;
-  }
-  return seen;
-}
-
-/** Permutations of a small list — the movers over the shape's free cells.
- *  `need` never exceeds a handful, so this is at most 24 arrangements. */
-function permutations<T>(list: T[]): T[][] {
-  if (list.length <= 1) return [list];
-  const out: T[][] = [];
-  list.forEach((item, i) => {
-    const rest = [...list.slice(0, i), ...list.slice(i + 1)];
-    for (const tail of permutations(rest)) out.push([item, ...tail]);
-  });
-  return out;
+function finishingFlick(
+  overlay: Overlay,
+  chains: ChainsData,
+  pieces: readonly BoardItemState[]
+): MergeStep | null {
+  const ready = readyClusters(overlay, chains, pieces)[0];
+  if (!ready) return null;
+  const { members, centre } = ready;
+  const named = new Set(pieces.map((p) => p.id));
+  const touchesCentre = (m: BoardItemState): boolean =>
+    overlay.neighbors(centre.col, centre.row).some((n) => n.col === m.col && n.row === m.row);
+  const leaves = members
+    .filter((m) => m.id !== centre.id && groupsAmong(members.filter((q) => q.id !== m.id), overlay).length === 1)
+    .sort(
+      (a, b) =>
+        Number(named.has(b.id)) - Number(named.has(a.id)) ||
+        Number(touchesCentre(b)) - Number(touchesCentre(a)) ||
+        a.id - b.id
+    );
+  const leaf = leaves[0];
+  if (!leaf || verdictOnto(overlay, chains, leaf, centre).kind !== 'merge') return null;
+  return { itemId: leaf.id, to: { col: centre.col, row: centre.row }, completes: true };
 }
 
 interface Candidate {
   moves: number;
   travel: number;
+  /** The plan's own address — its steps, serialised — which is what breaks a
+   *  tie between two equally cheap plans without appealing to iteration order. */
   key: string;
   steps: MergeStep[];
 }
 
 /**
- * The cheapest way to bring one set of pieces onto one shape.
+ * The cheapest way to bring one set of pieces together STARTING FROM `anchor`,
+ * one of the connected groups the set already forms. The anchor stays where
+ * it stands; every other piece is a mover.
  *
- * A piece whose own cell is part of the shape STAYS THERE — it is not assigned
- * a target, which is what keeps a plan free of swaps. (Two pieces trading
- * cells would need an intermediate drop onto an occupied tile, and that is the
- * one move that bounces.) Every other piece is a mover, and the shape's free
- * cells are exactly as many as there are movers.
- *
- * Order: the LONGEST haul first, the fuse last. The awkward journey happens
+ * ORDER: the LONGEST haul first, the fuse last. The awkward journey happens
  * while the player is still reading the board, and the gesture that pays off —
- * the one that turns three into one — is a short flick. That is how a merge
- * game feels, and it costs nothing to arrange because any order is legal:
- * after k < need pieces are standing on the shape, the connected group is k,
- * so no intermediate drop can fuse early.
+ * the one that turns three into one — is the short flick. That is how a merge
+ * game feels, and it is a policy rather than a search: the total swipe of the
+ * two orders of a two-mover plan differs by a fraction of a tile on most
+ * boards, and a planner that flipped between them on that fraction would read
+ * as a hand changing its mind.
+ *
+ * EACH GATHER seats its mover on the free cell beside the cluster nearest to
+ * where the mover stands — `gatherSeat`'s own "ring one" logic, so a player
+ * who drops the piece ON the cluster instead of beside it ends up on the same
+ * cell the hand pointed at. The cluster is then RE-READ from the overlay,
+ * because a seat can bridge: the gap-bridge board ((0,0), (2,0), (1,1)) puts
+ * its first mover on (1,0), and the third piece is now touching it and needs
+ * no drag of its own. When that re-read finds the cluster complete, the plan
+ * ends with the flick a complete cluster always gets.
+ *
+ * Null when the cluster is boxed in with a gather still to make: the board
+ * has nowhere for the piece to sit, and a plan that cannot be carried out is
+ * not a plan. The caller tries the next anchor, or says nothing.
  */
-function planOnShape(
-  pieces: BoardItemState[],
-  shape: Shape,
-  board: HintBoard,
-  ruler: Ruler
+function planFromAnchor(
+  anchor: readonly BoardItemState[],
+  pieces: readonly BoardItemState[],
+  need: number,
+  base: Overlay,
+  ruler: Ruler,
+  chains: ChainsData
 ): Candidate | null {
-  // The haul is measured in TILES through the board's own metric — a leg that
-  // crosses from one slab to another is a real distance on screen and a
-  // meaningless one in index space, and this number decides both which plan
-  // asks the shorter swipe and how much the score docks it for asking.
-  const haul = (a: TilePos, b: TilePos): number => ruler.tiles(a, b);
-  const shapeKeys = new Set(shape.cells.map((c) => cellKey(c.col, c.row)));
-  const movers = pieces.filter((p) => !shapeKeys.has(cellKey(p.col, p.row)));
-  const free = shape.cells.filter((c) => board.itemIdAt(c.col, c.row) === null);
-  // Belt and braces on the caller's `usableGround` filter: every cell of the
-  // shape is empty or one of ours, so the free cells and the movers are the
-  // same count by construction. If that ever stops being true a stranger is
-  // standing on the gathering spot and the plan is not a plan.
-  if (free.length !== movers.length) return null;
-  const key = shape.key;
+  const anchored = new Set(anchor.map((p) => p.id));
+  const gapToGroup = (p: TilePos, group: readonly BoardItemState[]): number =>
+    Math.min(...group.map((m) => ruler.tiles(p, m)));
+  // The order is fixed once, against the anchor as it stands: longest first.
+  const movers = pieces
+    .filter((p) => !anchored.has(p.id))
+    .sort((a, b) => gapToGroup(b, anchor) - gapToGroup(a, anchor) || a.id - b.id);
 
-  // ALREADY IN SHAPE. Three pieces can end up connected without ever merging —
-  // a producer drops one beside two — because a merge only ever happens on a
-  // DROP. One gesture still finishes it: pick one of them up and put it on a
-  // neighbour of its own set, which is the plain merge-game move.
-  //
-  // WHICH one is not free, and "any of them" was wrong. Picking a piece up
-  // takes its cell out of the flood, so moving the one in the MIDDLE cuts the
-  // set in two: three cells in a row, move the centre onto the left, and the
-  // right-hand piece is now touching nothing — the flood MergeSystem walks from
-  // the drop reaches two, `performMerge` returns false, and the piece the hand
-  // asked for bounces straight home. It survived this long because the pieces
-  // are walked in id order and the middle one is usually not the oldest; the
-  // exported Emberkeep board is where it finally came up, on a set standing at
-  // (23,0)-(25,0)-(20,0) whose centre by adjacency is the YOUNGEST of the three.
-  //
-  // So the piece that moves has to be a LEAF: the ones left behind must still
-  // be one flood by themselves, and the cell it lands on is one of them.
-  if (movers.length === 0) {
-    for (const p of pieces) {
-      const rest = pieces.filter((q) => q.id !== p.id);
-      if (largestCluster(rest, board) !== rest.length) continue;
-      const mate = rest.find((q) =>
-        board.neighbors(p.col, p.row).some((n) => n.col === q.col && n.row === q.row)
-      );
-      if (mate) {
-        return {
-          moves: 1,
-          travel: 0,
-          key,
-          steps: [{ itemId: p.id, to: { col: mate.col, row: mate.row }, completes: true }]
-        };
+  let overlay = base;
+  let travel = 0;
+  const steps: MergeStep[] = [];
+  const done = (): Candidate => ({
+    moves: steps.length,
+    travel,
+    key: steps.map((s) => `${s.itemId}>${s.to.col},${s.to.row}`).join('|'),
+    steps
+  });
+
+  for (;;) {
+    const placed = pieces.map((p) => overlay.place(p));
+    const cluster = groupsAmong(placed, overlay).find((g) => g.some((m) => anchored.has(m.id)))!;
+    if (cluster.length >= need) {
+      const flick = finishingFlick(overlay, chains, placed);
+      if (!flick) return null;
+      steps.push(flick);
+      return done();
+    }
+    const inCluster = new Set(cluster.map((m) => m.id));
+    const remaining = movers.map((m) => overlay.place(m)).filter((m) => !inCluster.has(m.id));
+    const mover = remaining[0];
+    if (!mover) return null; // cannot happen: the set is `need` pieces and the cluster is short of it
+
+    if (remaining.length === 1) {
+      // THE DROP ON. The cluster holds `need − 1`; this piece on any member
+      // reaches the recipe. Nearest member, so the fuse is the short flick —
+      // and the board's own verdict, never our arithmetic, is what promises it.
+      const target = [...cluster].sort((a, b) => ruler.tiles(mover, a) - ruler.tiles(mover, b) || a.id - b.id)[0]!;
+      if (verdictOnto(overlay, chains, mover, target).kind !== 'merge') return null;
+      travel += ruler.tiles(mover, target);
+      steps.push({ itemId: mover.id, to: { col: target.col, row: target.row }, completes: true });
+      return done();
+    }
+
+    // A GATHER. Free ground touching the cluster, nearest to the mover; ties
+    // by the cell's own name so two equidistant seats never fall to iteration.
+    const seats = new Map<string, TilePos>();
+    for (const member of cluster) {
+      for (const n of overlay.neighbors(member.col, member.row)) {
+        if (overlay.isFree(n.col, n.row)) seats.set(cellKey(n.col, n.row), { col: n.col, row: n.row });
       }
     }
-    return null;
+    const seat = [...seats.entries()].sort(
+      ([ka, a], [kb, b]) => ruler.tiles(mover, a) - ruler.tiles(mover, b) || (ka < kb ? -1 : ka > kb ? 1 : 0)
+    )[0]?.[1];
+    if (!seat) return null;
+    travel += ruler.tiles(mover, seat);
+    steps.push({ itemId: mover.id, to: seat, completes: false });
+    overlay = overlay.with(mover, seat);
   }
-  // A shape holding none of the pieces is a plan that moves ALL of them, and it
-  // is deliberately left in: on a crowded board where the only clear ground is
-  // away from every piece, three drags is the move. It can never win by
-  // accident — `moves` is the first thing candidates are ranked on, so any plan
-  // that keeps a piece standing beats it outright.
-  let best: { travel: number; order: MergeStep[] } | null = null;
-  for (const arrangement of permutations(free)) {
-    const legs = movers.map((p, i) => ({ piece: p, to: arrangement[i]!, cost: haul(p, arrangement[i]!) }));
-    const travel = legs.reduce((sum, leg) => sum + leg.cost, 0);
-    if (best && travel >= best.travel) continue;
-    legs.sort((a, b) => b.cost - a.cost || a.piece.id - b.piece.id);
-    best = {
-      travel,
-      order: legs.map((leg, i) => ({
-        itemId: leg.piece.id,
-        to: { col: leg.to.col, row: leg.to.row },
-        completes: i === legs.length - 1
-      }))
-    };
-  }
-  return best ? { moves: movers.length, travel: best.travel, key, steps: best.order } : null;
 }
 
 /**
  * How to make this particular merge happen, or null if the board cannot.
  *
- * Seeds every shape search from the pieces themselves and from the ground one
- * step around them: the cheapest plan always keeps at least one piece where it
- * stands (a stayer is a drag saved), so a shape that touches none of them is
- * not worth enumerating.
- *
- * Ties break on drags, then on swipe length, then on the shape's own cells —
- * in that order and never on iteration order, so the same board always answers
- * the same way and the hand does not flicker between two equal plans. This is
- * the plan for ONE set of pieces; which SET to ask for is `nextMergePlan`'s
- * question and is decided by score, not here.
+ * DEPTH 0 FIRST: if the board's own `readyClusters` already lists a complete
+ * cluster among these pieces, the plan is the one flick and no search is run.
+ * Otherwise every connected group the set already forms is tried as the
+ * anchor, and the cheapest plan wins — by drags, then by swipe length, then by
+ * the plan's own steps; in that order and never on iteration order, so the
+ * same board always answers the same way and the hand does not flicker between
+ * two equal plans. This is the plan for ONE set of pieces; which SET to ask for
+ * is `nextMergePlan`'s question and is decided by score, not here.
  */
 function planWith(
   hint: MergeHint,
   byId: Map<number, BoardItemState>,
-  board: HintBoard,
-  ruler: Ruler
+  overlay: Overlay,
+  ruler: Ruler,
+  chains: ChainsData
 ): MergePlan | null {
   const pieces = hint.ids.map((id) => byId.get(id)).filter((p): p is BoardItemState => !!p);
   if (pieces.length !== hint.need) return null;
 
-  const usable = usableGround(pieces, board);
-
-  const seeds = new Map<string, TilePos>();
-  for (const p of pieces) {
-    seeds.set(cellKey(p.col, p.row), { col: p.col, row: p.row });
-    for (const n of board.neighbors(p.col, p.row)) seeds.set(cellKey(n.col, n.row), n);
-  }
+  const flick = finishingFlick(overlay, chains, pieces);
+  if (flick) return { ...hint, steps: [flick], travel: 0 };
 
   let best: Candidate | null = null;
-  for (const shape of shapesAround([...seeds.values()], hint.need, board, usable)) {
-    const candidate = planOnShape(pieces, shape, board, ruler);
+  for (const anchor of groupsAmong(pieces, overlay)) {
+    const candidate = planFromAnchor(anchor, pieces, hint.need, overlay, ruler, chains);
     if (!candidate) continue;
     if (
       !best ||
@@ -890,102 +907,65 @@ function planWith(
  *  board's step size itself, so a plan costed here reads the same as one costed
  *  inside `nextMergePlan` — the two must agree or the tests are checking a
  *  different ruler from the game. */
-export function planFor(hint: MergeHint, items: Iterable<BoardItemState>, board: HintBoard): MergePlan | null {
+export function planFor(
+  hint: MergeHint,
+  items: Iterable<BoardItemState>,
+  board: HintBoard,
+  data: ChainsData
+): MergePlan | null {
   const all = [...items];
   const byId = new Map<number, BoardItemState>();
   for (const item of all) byId.set(item.id, item);
-  return planWith(hint, byId, board, rulerFor(all, board));
+  return planWith(hint, byId, Overlay.of(board, all), rulerFor(all, board), data);
 }
 
 /**
  * A PROVEN FLOOR ON THE DRAGS a hint can cost, worked out without planning it.
  *
- * WHAT THIS USED TO CLAIM, AND WHY IT WAS FALSE — written out because the wrong
- * version shipped, and a bound nobody re-derives is a bound nobody catches.
- * The floor was `need − largestCluster(pieces)`, argued as: "the destination is
- * ONE connected shape, so at most one of the set's existing connected clusters
- * can stay standing". The premise does not hold. Pieces that stay put do not
- * have to be adjacent TO EACH OTHER — they have to fit inside the same
- * connected `need`-cell shape, and the piece that moves is allowed to land in
- * the gap between them. Three lumber standing at (0,0), (2,0) and (1,1) are
- * three clusters of one, so the old floor said 3 − 1 = 2 drags; the real plan
- * is ONE drag, (1,1) → (1,0), which bridges (0,0) and (2,0) into a straight
- * triomino. `largestCluster` counts adjacency the board already has. A plan is
- * allowed to BUILD adjacency, and usually that is the whole point of it.
+ * The walk in `nextMergePlan` BREAKS on this, so an over-stated floor is not a
+ * rounding error: the cheap plan is never enumerated at all and the hand
+ * offers a costlier merge instead. That is how the previous floor failed —
+ * it was derived for a plan shape the board no longer fuses (see THE PLAN) —
+ * and it is why the argument is written out here rather than trusted.
  *
- * An over-stated floor is not a rounding error here, because the walk in
- * `nextMergePlan` BREAKS on it: the cheap plan is never enumerated at all and
- * the hand offers a costlier merge instead. Fuzzed over the three exported
- * worlds that can host a 3-merge — 400 random 18-piece boards each, the offer
- * compared against the fully enumerated field ranked by this file's own triple
- * — the old floor mis-ranked 3.8% of Emberkeep boards, 9.3% of Borealis and
- * 10.0% of Roothold. Never the drag count (`need` is 2 or 3 in chains.json,
- * which caps the over-statement at one drag and the fuzz never spent it):
- * always the haul tie-break, and on every single mis-ranked board both plans
- * cost ONE drag — so `travel` there is one leg's distance and a real swipe
- * length. A median 206–420 world units of extra swipe, 1485 at the worst. That
- * is the same defect class the effort ranking exists to remove, arriving
- * through the optimisation instead of through the ordering.
+ * THE BOUND. Let k be the largest cluster, AS THE BOARD WALKS IT, that any of
+ * the set's pieces stands in — `clusterOf` on the live board, so an outside
+ * piece of the same kind touching one of ours counts, exactly as it will count
+ * in the verdict. A ONE-drag plan is a drop with no gather before it, and the
+ * rule says that drop fuses only if the dragged piece plus the target's
+ * cluster, as it stands, reach `need`: so one drag needs k ≥ need − 1, and
+ * without it every plan is at least two. That is the whole proof, and it is
+ * tight for every recipe the game ships (2 and 3): with need 3, a touching
+ * pair is one drag and anything else is two, which is also what the planner
+ * produces.
  *
- * WHAT IS ACTUALLY TRUE. A plan gathers onto ONE connected shape S of exactly
- * `need` usable cells (`shapesAround`); the pieces that stay standing are
- * exactly the ones already on S, and every other piece costs a drag:
+ * WHY IT STOPS AT TWO. The natural guess is `need − min(k, need − 1)`, and it
+ * is what the bound reads for need ≤ 3; for a larger recipe it would
+ * over-state. One gather can bridge: a piece seated on a free hub joins every
+ * cluster touching that hub at once, so a recipe of four with three lone
+ * pieces around a hub is two drags, not three. Nothing above two can be proven
+ * without enumerating seats — which is planning — so the floor says 1 or 2
+ * and is honest about the rest.
  *
- *     drags = need − |pieces ∩ S|, minimised over legal S, and never below 1
- *     (a set already standing connected still needs the flick that fuses it,
- *     because a merge only ever happens on a drop).
- *
- * Any two pieces of `pieces ∩ S` are joined by a path lying INSIDE S, and S is
- * `need` cells, so that path is at most `need − 1` hops and every cell on it is
- * usable. Contrapositive — and this is the whole bound: two pieces further
- * apart than `need − 1` hops of usable ground can never stay standing together.
- * So the largest subset of the set that is PAIRWISE within `need − 1` usable
- * hops is an upper bound on `|pieces ∩ S|`, and `need − that` is a true lower
- * bound on the drags.
- *
- * It holds on the shape that broke the old one: (0,0) and (1,1) are two usable
- * hops apart, `need − 1` is 2, so the bound keeps two, floors the hint at one
- * drag, and the one-drag plan gets enumerated.
- *
- * It is a BOUND, not the answer, and it is loose in the safe direction only:
- * pairwise closeness does not prove a subset fits one shape — (0,0), (1,1) and
- * (2,0) are pairwise two hops apart and no triomino holds all three — so the
- * floor can read 1 where the truth is 2. That costs a plan that was not needed.
- * The other direction, reading 2 where the truth is 1, is the bug above, and
- * the proof is what rules it out.
+ * It is a BOUND, not the answer, and loose only in the safe direction: k is
+ * measured on the live board, and a plan that names a set whose mate is an
+ * outside piece may still cost two because the planner moves the pieces the
+ * hint NAMED. That costs a plan that was not needed. The other direction,
+ * reading 2 where the truth is 1, is the bug above, and the proof rules it out.
  *
  * It survives the scoring model unchanged, and only because of the dominance
  * rule: `W.drag` is larger than every other weight together, so a plan costing
  * more drags can never out-score one costing fewer, and a floor above the
  * incumbent's drag count still proves nothing left can win.
  */
-function dragFloor(hint: MergeHint, byId: Map<number, BoardItemState>, board: HintBoard): number {
+function dragFloor(hint: MergeHint, byId: Map<number, BoardItemState>, overlay: Overlay): number {
   const pieces = hint.ids.map((id) => byId.get(id)).filter((p): p is BoardItemState => !!p);
-  // A hint whose pieces have gone missing is one `planFor` will refuse anyway;
+  // A hint whose pieces have gone missing is one `planWith` will refuse anyway;
   // 1 is the floor that assumes nothing, so it can never break the walk early.
   if (pieces.length !== hint.need) return 1;
-
-  const usable = usableGround(pieces, board);
-  const reachOf = pieces.map((p) => withinSteps(p, hint.need - 1, board, usable));
-
-  // The largest pairwise-close subset, by brute force over subsets. `need` is 2
-  // or 3 in chains.json and the grammar tops out at a handful, so this is
-  // 2^need ≤ 32 masks of at most 10 pair tests — cheaper than one shape.
-  let keep = 1;
-  for (let mask = 1; mask < 1 << pieces.length; mask++) {
-    const members: number[] = [];
-    for (let i = 0; i < pieces.length; i++) if (mask & (1 << i)) members.push(i);
-    if (members.length <= keep) continue; // cannot improve on what we have
-    let together = true;
-    for (let a = 0; a < members.length && together; a++) {
-      for (let b = a + 1; b < members.length && together; b++) {
-        const far = pieces[members[b]!]!;
-        if (!reachOf[members[a]!]!.has(cellKey(far.col, far.row))) together = false;
-      }
-    }
-    if (together) keep = members.length;
-  }
-  return Math.max(1, hint.need - keep);
+  let k = 0;
+  for (const p of pieces) k = Math.max(k, clusterOf(overlay, p).length);
+  return k >= hint.need - 1 ? 1 : 2;
 }
 
 /* ========================================================================= *
@@ -1146,20 +1126,9 @@ export function scorePlan(
  * floor first and the walk breaks the moment the plan in hand costs fewer drags
  * than anything left could. The break is only legitimate because that floor is a
  * PROVEN lower bound AND because `W.drag` dominates — a plan with more drags can
- * never out-score one with fewer, however much merit it carries.
- *
- * WHAT CORRECTNESS COSTS, measured on the densest hint list a world can hold: a
- * half-full board carrying exactly three of every chain, which is 23 mergeable
- * sets on Borealis and 24 on Roothold, averaged over 60 calls.
- *
- *     plan every hint, no prune, shapes enumerated per seed   9.3ms / 9.3ms
- *     ... with each shape enumerated once (`shapesAround`)    6.0ms / 6.3ms
- *     ... and the proven floor pruning the walk               2.1ms / 1.3ms
- *
- * (One machine, the rows timed against each other in one process, so read the
- * ratios and not the absolutes.) That budget matters because `refreshHint`
- * re-plans on every board change while a hand is up, and four of those can land
- * in one frame when a merge fires.
+ * never out-score one with fewer, however much merit it carries. The budget
+ * matters because `refreshHint` re-plans on every board change while a hand is
+ * up, and four of those can land in one frame when a merge fires.
  *
  * A merge with no plan is not skipped for ever, it is skipped for NOW: the
  * board changes, and the set that had nowhere to gather this minute may have
@@ -1175,6 +1144,10 @@ export function nextMergePlan(
   const byId = new Map<number, BoardItemState>();
   for (const item of all) byId.set(item.id, item);
   const situation = situationOf(all, data, board);
+  // ONE overlay of the live board for every candidate — each plan lays its own
+  // seats over it and never writes back, so the candidates cannot see each
+  // other and the board the verdicts are asked of is the one the scene holds.
+  const live = Overlay.of(board, all);
 
   // CANDIDATES. Several sets per bucket, not one — the tightest trio on the
   // board is not always the trio the player is standing beside. Ranked by the
@@ -1186,7 +1159,7 @@ export function nextMergePlan(
     const graded = groupsIn(bucket, need, board)
       .map((group) => hintOf(chain, tier, need, group, board))
       .filter((hint) => !skip.has(hint.completedBy))
-      .map((hint) => ({ hint, floor: dragFloor(hint, byId, board) }))
+      .map((hint) => ({ hint, floor: dragFloor(hint, byId, live) }))
       .sort((a, b) => a.floor - b.floor || (a.hint.key < b.hint.key ? -1 : a.hint.key > b.hint.key ? 1 : 0));
     candidates.push(...graded.slice(0, W.groupsPerBucket));
     spare.push(...graded.slice(W.groupsPerBucket));
@@ -1206,7 +1179,7 @@ export function nextMergePlan(
       // drag too high here does not cost time, it silently deletes the best
       // answer.
       if (best && best.steps.length < floor) break;
-      const plan = planWith(hint, byId, board, situation.ruler);
+      const plan = planWith(hint, byId, live, situation.ruler, data);
       if (!plan) continue;
       const rank = Math.round(meritOf(withCells(plan, all), situation) * W.quantum);
       if (
