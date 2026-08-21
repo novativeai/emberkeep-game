@@ -1073,8 +1073,56 @@ export interface TutorialStepConfig {
   effects?: TutorialEffect[];
 }
 
-export interface TutorialData {
+/**
+ * What starts a tutorial SCRIPT other than the main one (the main script's
+ * trigger is always `start`). Every trigger is answered from saved state —
+ * a stat latch, a quest latch, the level, the world, or another script's
+ * progress — so a reload finds a lesson exactly as armed as it was.
+ *
+ *   start         — the main script only: the game's first frame.
+ *   step_done     — another script's step has been passed ("step 1 done").
+ *   tutorial_done — another script has finished entirely.
+ *   event         — a bus fact was observed once (latched into stats by the
+ *                   director the moment it fires, so it survives a reload).
+ *   quest_done    — the `q:done:<quest>` latch.
+ *   level         — the Keeper's level has reached `min`.
+ *   world         — the Keeper is standing in `world` (checked on arrival).
+ *   stat          — any stats counter has reached `min`.
+ */
+export type TutorialTrigger =
+  | { type: 'start' }
+  | { type: 'step_done'; tutorial: string; step: string }
+  | { type: 'tutorial_done'; tutorial: string }
+  | { type: 'event'; event: string; chain?: string }
+  | { type: 'quest_done'; quest: string }
+  | { type: 'level'; min: number }
+  | { type: 'world'; world: string }
+  | { type: 'stat'; key: string; min: number };
+
+/**
+ * A tutorial SCRIPT: a sequence of steps that plays once its trigger is met.
+ * The main Chapter One script is the `steps` array of TutorialData and is
+ * presented everywhere (editor, API, director) as the script `main` with the
+ * trigger `start`; every other script lives in `tutorials` and plays mid-game.
+ *
+ * `allowBase` is what a step's `allow` is merged ONTO: the main script locks
+ * the board and opens one verb at a time (`nothing`); a mid-game lesson
+ * defaults to `everything`, so a tip never takes the game away unless its
+ * author lists what to hold back.
+ */
+export interface TutorialScriptConfig {
+  id: string;
+  title?: string;
+  trigger: TutorialTrigger;
+  allowBase?: 'nothing' | 'everything';
   steps: TutorialStepConfig[];
+}
+
+export interface TutorialData {
+  /** The main script (`main`, trigger `start`). */
+  steps: TutorialStepConfig[];
+  /** Mid-game scripts, each started by its trigger once the main script is done. */
+  tutorials?: TutorialScriptConfig[];
 }
 
 /**
@@ -1922,6 +1970,8 @@ export type ResolvedArrow =
 
 export interface TutorialStepEvent {
   id: string;
+  /** The script this step belongs to (`main`, or a mid-game script id). */
+  tutorial: string;
   index: number;
   total: number;
   done: boolean;
