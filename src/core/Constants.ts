@@ -2211,8 +2211,12 @@ export const DRAG = {
  * a quarter of the way to its neighbour is as far as it goes.
  */
 export const MERGE_READY = {
-  periodMs: 1500,
-  leanMs: 300,
+  // The whole rhythm, 15% slower than it first shipped (owner's call, watched
+  // rather than reasoned about: 300/1500/240 read as a twitch rather than as a
+  // pull). Scaled together on purpose — slowing the stroke while keeping the
+  // cadence would only have eaten the rest between pulses.
+  periodMs: 1765,
+  leanMs: 353,
   fraction: 0.24,
   amplitudePx: 30,
   /**
@@ -2228,7 +2232,7 @@ export const MERGE_READY = {
    */
   hintFraction: 0.38,
   hintAmplitudePx: 48,
-  hintRestMs: 240,
+  hintRestMs: 282,
   /** Elongation along the lean axis at full reach (see above). */
   stretch: 0.13
 } as const;
