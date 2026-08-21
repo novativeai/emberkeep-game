@@ -53,6 +53,8 @@ declare global {
       /** Why the merge hint is or is not on screen. */
       hint: () => unknown;
       characterToPage: (characterId: string) => { x: number; y: number } | null;
+      /** Page point of a tutorial UI target (the cookbook button, the Codex card…) — what the lesson's arrow aims at. */
+      uiToPage: (ui: string) => { x: number; y: number } | null;
       centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
       /** Run an authored event by id (guards and latches apply) — the editor's Run button. */
@@ -413,6 +415,21 @@ window.__emberkeep = {
       | undefined;
     const at = board?.characterAimWorldPoint?.(characterId);
     return at ? worldToPage(at) : null;
+  },
+  /** Where a tutorial UI target is on the page — the same resolver the arrow
+   *  uses, so a test taps exactly what the player is shown. UIScene's camera
+   *  is fixed, so its coordinates map straight through the live space. */
+  uiToPage: (ui: string) => {
+    const uiScene = game.scene.getScene(SCENES.ui) as
+      | (Phaser.Scene & { uiTarget?: (ref: { ui: string }) => { x: number; y: number } | null })
+      | undefined;
+    const at = uiScene?.uiTarget?.({ ui });
+    if (!at) return null;
+    const rect = game.canvas.getBoundingClientRect();
+    return {
+      x: rect.left + (at.x / LIVE_GAME_WIDTH) * rect.width,
+      y: rect.top + (at.y / LIVE_GAME_HEIGHT) * rect.height
+    };
   },
   /** Centre the board camera on a cell (test hook; the closer camera can leave
    *  off-zone targets like the fog gate out of view). */

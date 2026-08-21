@@ -101,6 +101,14 @@ async function tapTile(page: Page, col: number, row: number): Promise<void> {
 }
 
 /** The bubble sits at game coords ≈ (1280, 1368); CSS is ÷2. */
+/** Tap a tutorial UI target where the lesson's own arrow would point. */
+async function tapUi(page: Page, ui: string): Promise<void> {
+  const p = await page.evaluate((u) => window.__emberkeep.uiToPage(u), ui);
+  expect(p, `ui target ${ui} is on screen`).not.toBeNull();
+  await page.mouse.click(p!.x, p!.y);
+  await page.waitForTimeout(120);
+}
+
 async function tapBubble(page: Page): Promise<void> {
   await page.mouse.click(750, 725); // bubble centre (game (GAME_WIDTH/2+220, LIVE-150) ÷ RES)
 }
@@ -176,6 +184,11 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     // green is what the isle gives back first, so the game's opening merge is
     // moss rather than rubies.
     await tapBubble(page);
+    await waitStep(page, 'moss_stump');
+    // The Mossy Stump is the first generator: tap it and the first puff is picked.
+    const [stump] = await findCells(page, (c) => c.chain === 'emberbark');
+    expect(stump).toBeDefined();
+    await tapTile(page, stump![0], stump![1]);
     await waitStep(page, 'ash_green');
     state = await gameText(page);
     expect(count(state, 'ashmoss', 1)).toBe(3);
@@ -198,13 +211,13 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     await page.screenshot({ path: shot('04b-cookbook-intro') });
     // Tap the Cookbook button — slot 2 of the bottom-right column, HUD_COLUMN_X /
     // hudColumnY(2) = game (2404,1032) → CSS ÷2. Opening it is the gate.
-    await page.mouse.click(1202, 516);
+    await tapUi(page, 'cookbook');
     await waitStep(page, 'cookbook_close');
     await page.screenshot({ path: shot('04c-cookbook-open') });
     // Close the book YOURSELF — that's the gate. The ✕ sits at panel-local
     // (578,-352) (CookbookPanel's CLOSE_X/CLOSE_Y), i.e. game (1858,448) at
     // scale 1 → CSS ÷2.
-    await page.mouse.click(929, 224);
+    await tapUi(page, 'cookbook_close');
 
     // ---------- Ruby merge: the WARMTH, and now contiguous with the hatch ----------
     await waitStep(page, 'ruby_merge');

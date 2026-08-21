@@ -2484,7 +2484,7 @@ export class UIScene extends Phaser.Scene {
     playNext();
   }
 
-  private uiTarget(
+  uiTarget(
     ref: { ui: TutorialUiTarget } | { fogRegion: string } | { character: string }
   ): { x: number; y: number; height?: number } | null {
     if ('character' in ref) {
@@ -2710,12 +2710,40 @@ export class UIScene extends Phaser.Scene {
     }
     const target = this.arrowAnchor();
     if (!target) {
-      this.arrowAnchor = null;
+      // A PIECE that is not there is not coming. A UI control that is not
+      // there yet usually is: the Codex opens a breath after the beat that
+      // points into it, and turns its page after the beat that points at
+      // EVOLUTION. Keep the anchor and let update() show the arrow the frame
+      // the control exists — the lesson's pointer must not depend on the
+      // panel's animation being faster than the bubble.
+      if (this.arrowOnPiece || 'tile' in arrow) this.arrowAnchor = null;
+      else this.armArrowLater();
       return;
     }
+    this.showArrowAt(target);
+  }
+
+  /** The arrow's first frame: visible, and bobbing. */
+  private showArrowAt(target: { x: number; y: number }): void {
     this.arrow.setVisible(true);
     this.arrow.setAlpha(1);
     this.arrow.setPosition(target.x, target.y - this.arrowLift);
+    this.startArrowBob();
+  }
+
+  /** Poll a UI anchor that answered null until it answers; `clearMarkers`
+   *  retires the poll by dropping `arrowAnchor`. */
+  private armArrowLater(): void {
+    const anchor = this.arrowAnchor;
+    this.time.delayedCall(80, () => {
+      if (this.arrowAnchor !== anchor || this.arrow.visible) return;
+      const t = anchor!();
+      if (t) this.showArrowAt(t);
+      else this.armArrowLater();
+    });
+  }
+
+  private startArrowBob(): void {
     // Bob via a proxy so update() can re-anchor the arrow to its cell each frame
     // while it bobs (a tween writing arrow.y directly would fight re-projection).
     // Puppet-style cycle: rise, then DROP toward the target with a tiny impact

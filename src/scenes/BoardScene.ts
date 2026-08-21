@@ -4003,7 +4003,7 @@ export class BoardScene extends Phaser.Scene {
             })
           : b;
       sprite.setData('bodyBox', box);
-      sprite.setInteractive(characterHitRect(box, false), Phaser.Geom.Rectangle.Contains);
+      sprite.setInteractive(characterHitRect(box, this.standeeWhole()), Phaser.Geom.Rectangle.Contains);
       this.input.setDraggable(sprite, false);
       // Identity is the WARDROBE key: Eleanor-at-home is Eleanor — one Regard
       // gauge, one dialogue bank, one action cooldown, wherever she stands.
@@ -4367,6 +4367,30 @@ export class BoardScene extends Phaser.Scene {
    * this says WHERE for as long as it is true. Everyone who can be handed
    * something pulses; nothing else on the board does.
    */
+  /**
+   * Is a standee something the player may TAP right now? Then her whole body
+   * listens. The lower-body rect exists so her two-tile frame cannot swallow
+   * taps meant for the cells behind her while she is only scenery — but when a
+   * tap on her means something (her action, a give, every post-tutorial
+   * moment) the bubble's arrow points at her head, and a head that does not
+   * answer reads as a broken button. The body box already excludes the
+   * scepter blaze and the bolt, so "whole" is still her and nothing else.
+   */
+  private standeeWhole(): boolean {
+    return this.tutorialDone || this.allow.character;
+  }
+
+  private reshapeStandees(): void {
+    const whole = this.standeeWhole() || this.giveTweens.length > 0;
+    for (const sprite of this.characterSprites.values()) {
+      const box = sprite.getData('bodyBox') as HitBox | undefined;
+      const area = sprite.input?.hitArea as Phaser.Geom.Rectangle | undefined;
+      if (!box || !area) continue;
+      const r = characterHitRect(box, whole);
+      area.setTo(r.x, r.y, r.width, r.height);
+    }
+  }
+
   private pulseGiveTargets(on: boolean): void {
     for (const tween of this.giveTweens) tween.remove();
     this.giveTweens = [];
@@ -4394,7 +4418,7 @@ export class BoardScene extends Phaser.Scene {
       const box = sprite.getData('bodyBox') as HitBox | undefined;
       const area = sprite.input?.hitArea as Phaser.Geom.Rectangle | undefined;
       if (!box || !area) continue;
-      const r = characterHitRect(box, on);
+      const r = characterHitRect(box, on || this.standeeWhole());
       area.setTo(r.x, r.y, r.width, r.height);
     }
     for (const target of targets) {
@@ -7675,6 +7699,7 @@ export class BoardScene extends Phaser.Scene {
         this.tutorialDone = step.done;
         this.tutorialStepId = step.id;
         this.refreshAllDraggable();
+        this.reshapeStandees();
         // Travel is barred for the whole tutorial, so the doors come alive on
         // the step that ends it — not on a later reload. Order 1 was delivered
         // MID-tutorial, so the Ember Gate blooms right here, as the game hands
@@ -8184,6 +8209,7 @@ export class BoardScene extends Phaser.Scene {
     this.cameras.main.setZoom(Math.max(frame.zoom, this.minZoom) * renderScale.value);
     this.cameras.main.centerOn(frame.x, frame.y);
     this.tutorialDone = this.ctx.state.tutorialDone;
+    this.reshapeStandees();
     this.syncKeyBadges(false); // a load restores a STATE — no cinematic replay
     // The doors, for the same reason the badges are here: `buildPortals` runs
     // in create(), which is BEFORE UIScene calls beginRun, so every story gate
