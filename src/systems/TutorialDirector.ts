@@ -634,9 +634,22 @@ export class TutorialDirector {
     const mover = leg ? state.items.get(leg.itemId) : undefined;
     if (!leg || !mover) return null;
     const target = state.itemIdAt(leg.to.col, leg.to.row);
+    const partner = target && target !== mover.id ? state.items.get(target) : undefined;
+    // The hand must START on a piece the player can grab, and a mover tucked
+    // behind the House is not one. The fusing drop is symmetric — any member of
+    // the set dropped onto a member it touches fuses it — so when the planned
+    // mover is hidden, ask for the first member standing clear instead.
+    if (leg.completes && this.shadowed(mover)) {
+      const members = hint.ids.map((id) => state.items.get(id)).filter((m): m is BoardItemState => m !== undefined);
+      for (const alt of members) {
+        if (this.shadowed(alt)) continue;
+        const touching = members.find((m) => m.id !== alt.id && state.neighbors(alt.col, alt.row).some((n) => n.col === m.col && n.row === m.row));
+        if (touching) return { from: { col: alt.col, row: alt.row, item: alt.id }, to: { col: touching.col, row: touching.row, item: touching.id } };
+      }
+    }
     return {
       from: { col: mover.col, row: mover.row, item: mover.id },
-      to: target && target !== mover.id ? { col: leg.to.col, row: leg.to.row, item: target } : { col: leg.to.col, row: leg.to.row }
+      to: partner ? { col: leg.to.col, row: leg.to.row, item: partner.id } : { col: leg.to.col, row: leg.to.row }
     };
   }
 
@@ -731,7 +744,8 @@ export class TutorialDirector {
   private shadowed(item: BoardItemState): boolean {
     for (const [dc, dr] of [[1, 0], [0, 1], [1, 1]] as const) {
       const front = this.state.itemAt(item.col + dc, item.row + dr);
-      if (front && front.id !== item.id && front.kind === 'item') return true;
+      // Any piece in front hides it — a House or a dragon more than most.
+      if (front && front.id !== item.id) return true;
     }
     return false;
   }

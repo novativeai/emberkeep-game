@@ -26,7 +26,8 @@
     "verify:lane": "node scripts/verify-lane.mjs",
     "beats:record": "node scripts/beats.mjs record",
     "beat": "node scripts/beats.mjs at",
-    "beats": "node scripts/beats.mjs list"
+    "beats": "node scripts/beats.mjs list",
+    "beats:check": "node scripts/beats.mjs check"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.1",
