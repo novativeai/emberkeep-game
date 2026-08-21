@@ -1354,7 +1354,12 @@ export class BoardScene extends Phaser.Scene {
     this.hintShown = step;
     this.hintAsked = step;
     this.hintPulseMs = 0;
-    this.bounceHintPiece(from.id);
+    // The piece STRAINS toward where it is being asked to go (`syncReadyLeans`
+    // reads `hintShown`). It used to HOP — straight up, 18 px, one piece — and
+    // that was the whole vocabulary before the lean existed: it says "this one"
+    // and nothing about WHERE, which is the half that matters. Asked here so
+    // the answer is on screen with the hand rather than up to a tick later.
+    this.syncReadyLeans();
     // Through the WORLD's projection, never the ambient `gridToWorld`: a zoned
     // world places its cells per zone, so the authored lattice would aim the
     // camera at open sky anywhere but the opening isle.
@@ -1485,44 +1490,6 @@ export class BoardScene extends Phaser.Scene {
     this.showHintStep(step, from, false, plan?.key ?? null);
   }
 
-  /**
-   * A small hop under the piece the hand is asking for.
-   *
-   * The hand is drawn by UIScene on its own fixed camera, so on a board scrolled
-   * away from the pair it is the only thing the player sees — and it says
-   * "drag", not "drag THIS ONE". The hop is what makes the far piece findable
-   * without lighting up half the isle: the destination sits still, and the thing
-   * that has to move is the thing that moves.
-   */
-  private bounceHintPiece(itemId: number): void {
-    const sprite = this.itemSprites.get(itemId);
-    if (!sprite) return;
-    this.stopHintBounce();
-    this.hintBounce = this.tweens.add({
-      targets: sprite,
-      y: sprite.y - 18,
-      duration: 320,
-      yoyo: true,
-      repeat: -1,
-      repeatDelay: 900,
-      ease: 'Sine.easeOut'
-    });
-  }
-
-  private stopHintBounce(): void {
-    if (!this.hintBounce) return;
-    // Restore the seat rather than trusting the tween to land: a hop stopped
-    // mid-flight would leave the piece hovering a few pixels off its tile for
-    // the rest of the session, which is the same class of bug as the drag
-    // furniture left behind above.
-    const target = this.hintBounce.targets?.[0] as BoardItem | undefined;
-    const home = target ? gridToWorld(target.col, target.row) : null;
-    this.hintBounce.stop();
-    this.hintBounce = undefined;
-    if (target && home) target.y = home.y;
-  }
-
-  private hintBounce?: Phaser.Tweens.Tween;
 
   /**
    * "CARRY HIM TO THE ARCH" — the one gesture world travel is taught with.
@@ -1593,7 +1560,6 @@ export class BoardScene extends Phaser.Scene {
 
   /** Take the hand back — after a merge, on a drag, or when the board goes. */
   private takeBackHint(): void {
-    this.stopHintBounce();
     this.clearHintTarget();
     // Whatever comes next starts its own heartbeat: a half-spent pulse carried
     // across a withdrawal would have the next offer re-pose itself seconds
@@ -6355,31 +6321,84 @@ export class BoardScene extends Phaser.Scene {
     const active = teaching
       ? this.tutorialFocus(clusters)
       : (clusters.find((c) => this.hintTouches(c)) ?? clusters[0] ?? null);
+    // THE ASKED MOVE. Whatever the game is currently asking the player to carry
+    // — the tutorial beat's own hand, or the idle hint's first step — strains
+    // toward the cell it is being sent to. It is the same gesture as a
+    // cluster's lean and it is deliberately not a different one: one board, one
+    // way of saying "there".
+    const asked = this.askedMove();
     // The piece the hand is bouncing is NOT one of them: it is already moving,
     // under a tween of its own, and it is the piece being asked to travel
     // rather than one of the pieces waiting for it. The rest of its cluster
     // strains toward the centre while it hops — the two halves of one sentence.
+    // The asked piece leans toward ITS destination, not toward the centre, so
+    // it is taken out of the cluster's set and given its own ask. (Usually the
+    // two agree — a finished cluster's hint drops a leaf on the centre — but
+    // when the plan's first step is a gather onto free ground they do not, and
+    // the piece must point where it is actually going.)
     const leaders = active
-      ? active.members.filter((m) => m.id !== active.centre.id && m.id !== this.hintShown?.itemId)
+      ? active.members.filter((m) => m.id !== active.centre.id && m.id !== asked?.id)
       : [];
-    const wanted = new Set(leaders.map((m) => m.id));
+    const asks: { id: number; to: TilePos; boosted: boolean }[] = [];
+    if (asked) asks.push({ id: asked.id, to: asked.to, boosted: true });
+    const boostedCluster = this.hintTouches(active) || (teaching && !!active);
+    for (const m of leaders) {
+      asks.push({
+        id: m.id,
+        to: { col: active!.centre.col, row: active!.centre.row },
+        boosted: boostedCluster
+      });
+    }
+    const wanted = new Set(asks.map((a) => a.id));
     // Everyone else eases home. Gently — a cluster snapping upright the moment
     // a neighbour moves reads as a glitch, not as the board standing down.
     for (const id of [...this.leans.keys()]) if (!wanted.has(id)) this.stopLean(id, false);
-    if (leaders.length === 0) return;
-    const boosted = this.hintTouches(active);
+    if (asks.length === 0) return;
+    const boosted = asks.some((a) => a.boosted);
     // Already up at the right volume: leave the phase alone. Common case by far.
-    if (this.leanBoosted === boosted && leaders.every((m) => this.leans.has(m.id))) return;
+    if (this.leanBoosted === boosted && asks.every((a) => this.leans.has(a.id))) return;
     // ALL OR NONE. Starting the members one at a time as each happened to come
     // to rest is what left a row with one end straining and the other sitting
     // there: two tweens begun a quarter-second apart do not read as one group
     // being pulled together, they read as one piece being broken. So the whole
     // set waits until every member of it can start, and the 240 ms heal asks
     // again until that is true.
-    if (!leaders.every((m) => this.leanReady(m.id))) return;
-    for (const m of leaders) this.stopLean(m.id, true);
-    for (const m of leaders) this.startLean(m, active!, boosted);
+    if (!asks.every((a) => this.leanReady(a.id))) return;
+    for (const a of asks) this.stopLean(a.id, true);
+    for (const a of asks) this.startLean(a.id, a.to, a.boosted);
     this.leanBoosted = boosted;
+  }
+
+  /**
+   * THE MOVE THE GAME IS CURRENTLY ASKING FOR, as a piece and a destination
+   * cell — the tutorial beat's hand while a lesson is on screen, otherwise the
+   * idle hint's first step. Null when nothing is being asked, or when the ask
+   * is not a board drag at all (a UI target, a fog region, a tap beat with only
+   * an arrow).
+   *
+   * This is what replaced the hop. A piece the player is being told to carry
+   * leans toward where it is going, exactly like a cluster member leans toward
+   * its centre, so the board has ONE way of pointing and the first lesson —
+   * where no cluster is complete yet and nothing used to lean at all — gets the
+   * same magnet as everything after it.
+   */
+  private askedMove(): { id: number; to: TilePos } | null {
+    const step = this.tutorialDone ? null : this.tutorialStep;
+    const hand = step?.hand;
+    if (hand && 'from' in hand) {
+      // `itemIdAt` answers null for an empty cell; a hand may name one (the
+      // move beats point at ground), and there is nothing to lean there.
+      const id = hand.from.item ?? this.ctx.state.itemIdAt(hand.from.col, hand.from.row) ?? undefined;
+      if (id !== undefined && this.itemSprites.has(id)) {
+        return { id, to: { col: hand.to.col, row: hand.to.row } };
+      }
+      return null;
+    }
+    const hint = this.hintShown;
+    if (hint && this.itemSprites.has(hint.itemId)) {
+      return { id: hint.itemId, to: { col: hint.to.col, row: hint.to.row } };
+    }
+    return null;
   }
 
   /** Does the standing hint name a piece of this cluster — the one it asks the
@@ -6458,27 +6477,22 @@ export class BoardScene extends Phaser.Scene {
     return !!sprite && (sprite.asleep || !!sprite.getData('dragged'));
   }
 
-  /** Pieces the lean must keep its hands off: everything `leanVetoed` names,
-   *  and the one the tutorial hand is animating FROM (it already bounces
-   *  there — that one is personal, and does not stand its cluster down). */
+  /** Pieces the lean must keep its hands off. Only what `leanVetoed` names:
+   *  the tutorial hand's own piece used to be barred here — because the board
+   *  answered it with a vertical hop that the lean would have fought — and it
+   *  is now the FIRST thing that leans (see `askedMove`). */
   private leanExcluded(sprite: BoardItem): boolean {
-    if (this.leanVetoed(sprite.itemId)) return true;
-    const hand = this.tutorialDone ? null : this.tutorialStep?.hand;
-    if (hand && 'from' in hand) {
-      if (hand.from.item === sprite.itemId) return true;
-      if (hand.from.col === sprite.col && hand.from.row === sprite.row) return true;
-    }
-    return false;
+    return this.leanVetoed(sprite.itemId);
   }
 
   /** Begin one member's lean. The caller has already asked `leanReady` of the
    *  whole set — this one just draws it. */
-  private startLean(member: BoardItemState, cluster: ReadyCluster, boosted = false): void {
-    const sprite = this.itemSprites.get(member.id);
-    if (!sprite || !sprite.active || sprite.itemId !== member.id) return;
+  private startLean(itemId: number, target: TilePos, boosted = false): void {
+    const sprite = this.itemSprites.get(itemId);
+    if (!sprite || !sprite.active || sprite.itemId !== itemId) return;
     const world = this.ctx.state.world;
-    const from = worldPointOf(world, member.col, member.row);
-    const to = worldPointOf(world, cluster.centre.col, cluster.centre.row);
+    const from = worldPointOf(world, sprite.col, sprite.row);
+    const to = worldPointOf(world, target.col, target.row);
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const dist = Math.hypot(dx, dy);
@@ -6494,17 +6508,17 @@ export class BoardScene extends Phaser.Scene {
     // stands — so the piece has to be told what full reach is for it.
     sprite.leanReach = reach;
     // The ART leans (BoardItem.leanX/leanY), never the container: the container
-    // belongs to the drag return, the hint's hop and `reseatFixtures`, and the
+    // belongs to the drag return, the landing glide and `reseatFixtures`, and the
     // tween dying with `release()` is what keeps the pool law — an acquired
     // slot can never inherit a lean.
     const tween = this.tweens.add({
       targets: sprite,
       leanX: (dx / dist) * reach,
       leanY: (dy / dist) * reach,
-      // No delay and no per-member offset: the members of a cluster strain
-      // TOGETHER, because three pieces moving as one thing is the whole message.
-      // They are started in the same pass (see ALL OR NONE) so they stay in
-      // phase for as long as the cluster stands.
+      // No delay and no per-piece offset: everything the board is pointing at
+      // strains TOGETHER, because a group moving as one thing is the whole
+      // message. They are started in the same pass (see ALL OR NONE) so they
+      // stay in phase for as long as the ask stands.
       duration: MERGE_READY.leanMs,
       yoyo: true,
       repeat: -1,
@@ -6513,7 +6527,7 @@ export class BoardScene extends Phaser.Scene {
         : Math.max(0, MERGE_READY.periodMs - MERGE_READY.leanMs * 2),
       ease: 'Sine.easeInOut'
     });
-    this.leans.set(member.id, { sprite, tween, returning: false });
+    this.leans.set(itemId, { sprite, tween, returning: false });
   }
 
   /**

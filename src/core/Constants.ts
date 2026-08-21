@@ -2183,6 +2183,13 @@ export const DRAG = {
  * sees three things pulled toward one, which is the rule. The hint's hand takes
  * over at `MERGE_HINT.idleMs` if the strain was not enough.
  *
+ * IT IS ALSO HOW THE GAME POINTS. Whatever the player is being ASKED to carry
+ * — the tutorial beat's hand, the idle hint's first step — strains toward the
+ * cell it is being sent to, on these same numbers at the hint volume. That
+ * replaced a vertical hop on the single named piece, which said "this one" and
+ * nothing about where; and it is why the very first lesson, where no cluster is
+ * complete yet, now has a magnet at all.
+ *
  * ONE CLUSTER, AND IT KEEPS THE FLOOR. Three Eggs and three Gems both complete
  * is two things the board wants to say, and saying them at once is saying
  * neither: the eye reads a board that shivers rather than a group that belongs

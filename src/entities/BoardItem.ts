@@ -84,7 +84,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
    * A complete-but-unmerged cluster shows it wants finishing by leaning its
    * members toward the centre (BoardScene `syncReadyLeans`, `MERGE_READY`). The
    * scene tweens THESE two numbers, never the container's x/y: the container
-   * is what every other motion owns — the drag return, the hint's hop, a
+   * is what every other motion owns — the drag return, the landing glide, a
    * dragon's wander flight, `reseatFixtures` — and a second writer on it would
    * either fight those or be clobbered by them. The art inside the container is
    * free: nothing else moves it while the piece is at rest, and `applyBob` is
