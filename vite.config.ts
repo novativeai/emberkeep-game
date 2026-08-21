@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
+import { createEventsApi } from './tools/events-api/server';
 import { createTutorialApi } from './tools/tutorial-api/server';
 
 /**
@@ -240,6 +241,14 @@ const snowLabEndpoint = (): Plugin => ({
  * Routes, ops and validation live in tools/tutorial-api/server.ts (pure,
  * unit-tested); this is only the mount.
  */
+/** `/__events` — the Event Creator's API (docs/event-creator.md). */
+const eventsEndpoint = (): Plugin => ({
+  name: 'events-endpoint',
+  configureServer(server) {
+    server.middlewares.use('/__events', createEventsApi(__dirname));
+  }
+});
+
 const tutorialEndpoint = (): Plugin => ({
   name: 'emberkeep-tutorial-api',
   configureServer(server: ViteDevServer) {
@@ -1336,6 +1345,7 @@ export default defineConfig({
     worldbuilderMergeEndpoint(),
     worldbuilderEmittersEndpoint(),
     tutorialEndpoint(),
+    eventsEndpoint(),
     worldbuilderCharactersEndpoint(),
     worldbuilderMapEndpoint(),
     worldbuilderZonesEndpoint(),

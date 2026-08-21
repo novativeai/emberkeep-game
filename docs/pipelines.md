@@ -616,6 +616,31 @@ common shapes (speaker, gate, allow, drag list) and raw JSON for the rest;
 Save PUTs the file, Validate runs the audit. Inserting or reordering MAIN beats
 still shifts every persisted `tutorialIndex` — bump `SAVE_VERSION`.
 
+## Event Creator (⚡ tab → src/data/events.json)
+
+The structured event system — every authored "when the player…, then…" moment
+as an input → output block. `docs/event-creator.md` is the law (vocabularies,
+lifecycle, nesting, what the validator refuses); the `event-creator` skill
+(`.claude/skills/event-creator/`, `scripts/evt.py`) is the shell; the World
+Builder's ⚡ Events tab is the visual editor. All three go through the dev
+server's `/__events` API (`tools/events-api/server.ts`, mounted in
+`vite.config.ts`): `GET /` (the tree), `GET /context` (pickers: bus facts +
+payload keys, the property catalogue, speakers, panels, commands, chains,
+quests, characters, regions, worlds, tutorial scripts), `PUT /`, `POST /op`
+(`add_event | update_event | remove_event | move_event | reorder`), `POST
+/validate`. Every write runs `validateEventsData` (`src/core/gameEvents.ts`)
+first; the unit suite holds the committed file to the same rule.
+
+At runtime `EventSystem` (`src/systems/EventSystem.ts`) is a scheduler of
+intents: it subscribes to the facts the events name, reads properties through
+`PropertyFacts`, and emits the owning systems' commands (`economy:add`,
+`regard:add`, `board:spawn`, `event:say`, `event:prompt`, `ui:panel_open_requested`,
+`tutorial:start_requested`, …). Its only state is `evt:<id>:*` and `flag:*` in
+`stats`. UIScene plays `event:say` through the bubble and `event:prompt`
+through `ChoicePrompt` (`src/ui/ChoicePrompt.ts`), both queued behind a running
+tutorial script. `__emberkeep.fireEvent(id)` / `__emberkeep.events()` and
+`render_game_to_text().events` are the dev bridge.
+
 ## Multi-world authoring (🧩 Worlds & grids → src/data/zones.json)
 
 The builder is the authoring surface for everything `src/core/world.ts` can

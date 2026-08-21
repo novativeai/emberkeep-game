@@ -74,6 +74,11 @@ silently drops `checklist` writes, so everything goes in `notes`.
   the concept ledger (what appears when → which beat teaches it). The
   `tutorial-design` skill audits it; its `ftuecheck.py` parses the table, so a
   concept with no teach-point fails the build of the audit, not silently.
+- `docs/event-creator.md` — REQUIRED before touching `src/data/events.json`,
+  `src/core/gameEvents.ts` or `EventSystem`: the input → output event model
+  (WHEN triggers / IF properties / THEN actions, nested children, latches in
+  stats). New moments are JSON-only edits through the ⚡ Events tab or the
+  `event-creator` skill — never a new bus handler in a scene.
 - `docs/GDD-L1.md` — the SHIPPED Chapter One (cast, chains, timers, regions,
   finale) mirrored from Constants.ts + `src/data/*.json`; read it before any
   design/lore/tuning discussion. `docs/MECHANICS.md` — the full ruleset, `[L1]`

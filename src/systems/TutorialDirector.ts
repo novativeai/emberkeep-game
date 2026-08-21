@@ -193,6 +193,9 @@ export class TutorialDirector {
     bus.on('quest:completed', () => this.evaluateTriggers());
     bus.on('keeper:leveled', () => this.evaluateTriggers());
     bus.on('world:ready', () => this.evaluateTriggers());
+    // An authored event asking for a lesson by id (docs/event-creator.md). It
+    // starts only when a trigger-met script would: main done, nothing playing.
+    bus.on('tutorial:start_requested', ({ tutorial }) => this.startScript(tutorial));
     bus.on('item:hatched', ({ item }) => {
       this.lastHatched = { col: item.col, row: item.row };
       this.onGateEvent('item:hatched', item.chain);
@@ -371,21 +374,34 @@ export class TutorialDirector {
     const facts = this.facts;
     for (const script of this.scripts) {
       if (script.id === MAIN_SCRIPT_ID || script.steps.length === 0) continue; // an empty script is still being written
-      const keys = scriptStatKeys(script.id);
-      if (this.state.stat(keys.done) > 0) continue;
+      if (this.state.stat(scriptStatKeys(script.id).done) > 0) continue;
       if (!triggerMet(this.scripts, facts, script)) continue;
-      this.activeId = script.id;
-      // The first step's effects fire once, on the start — the same
-      // once-on-entry rule `advance` keeps for every later step.
-      if (this.state.stat(keys.started) === 0) {
-        this.state.addStat(keys.started, 1);
-        this.applyEffects(script.steps[0]);
-      }
-      this.emitStep();
-      this.replayPrompts(this.currentStep);
-      this.checkCountGate();
+      this.start(script);
       return;
     }
+  }
+
+  /** Start a mid-game script BY ID, as an event asks — its own trigger is not
+   *  consulted, but everything else that would stop it still does. */
+  private startScript(id: string): void {
+    if (this.activeScript || !this.facts.mainDone) return;
+    const script = this.scripts.find((s) => s.id === id && s.id !== MAIN_SCRIPT_ID);
+    if (!script || script.steps.length === 0 || this.state.stat(scriptStatKeys(script.id).done) > 0) return;
+    this.start(script);
+  }
+
+  private start(script: TutorialScriptConfig): void {
+    const keys = scriptStatKeys(script.id);
+    this.activeId = script.id;
+    // The first step's effects fire once, on the start — the same
+    // once-on-entry rule `advance` keeps for every later step.
+    if (this.state.stat(keys.started) === 0) {
+      this.state.addStat(keys.started, 1);
+      this.applyEffects(script.steps[0]);
+    }
+    this.emitStep();
+    this.replayPrompts(this.currentStep);
+    this.checkCountGate();
   }
 
   /**

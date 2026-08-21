@@ -22,6 +22,8 @@ interface RenderedGame {
   scene: string;
   fps: number;
   tutorial: { step: string; index: number; total: number; done: boolean; lesson: string | null };
+  /** Authored events that have fired, as `id×count`. */
+  events: string[];
   energy: { current: number; max: number };
   coins: number;
   keys: number;
@@ -53,6 +55,10 @@ declare global {
       characterToPage: (characterId: string) => { x: number; y: number } | null;
       centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
+      /** Run an authored event by id (guards and latches apply) — the editor's Run button. */
+      fireEvent: (id: string) => boolean;
+      /** Every authored event with its live armed/fired status. */
+      events: () => Array<{ id: string; armed: boolean; fired: number; depth: number }>;
       errors: () => RecordedError[];
       reset: () => void;
       saveKey: string;
@@ -297,6 +303,7 @@ window.render_game_to_text = (): RenderedGame => {
       done: state.tutorialDone,
       lesson: ctx.systems.tutorial.activeScriptId
     },
+    events: ctx.systems.events.status().filter((e) => e.fired > 0).map((e) => `${e.id}×${e.fired}`),
     energy: { current: state.energyCurrent, max: state.energyMax },
     coins: state.coins,
     keys: state.keys,
@@ -343,6 +350,8 @@ window.__emberkeep = {
   // Test/diagnostic: award XP so a level-up (and its camera fly) can be driven
   // deterministically without grinding merges.
   grantXp: (xp: number) => ctx.bus.emit('economy:add', { xp, reason: 'debug:grantXp' }),
+  fireEvent: (id: string) => ctx.systems.events.fire(id),
+  events: () => ctx.systems.events.status(),
   /** Everything the game caught rather than let end the RAF chain — see
    *  `src/core/crash.ts`. Empty is the healthy answer. */
   errors: () => recordedErrors(),
