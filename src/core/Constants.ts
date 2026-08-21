@@ -1153,36 +1153,36 @@ export const TYPEWRITER = {
 export const DRAGON_REVEAL: Record<string, { art: string; name: string; epithet: string }> = {
   'ember_dragon:3': {
     art: 'reveal_ember',
-    name: 'Ember Whelp',
-    epithet: 'the first fire the isle has kept in four hundred years'
+    name: 'Red Dragon',
+    epithet: 'the first fire to come back to Emberkeep'
   },
   'ember_dragon:4': {
     art: 'reveal_ember_adult',
-    name: 'Ember Dragon',
-    epithet: 'grown, and loud about it'
+    name: 'Big Red Dragon',
+    epithet: 'all grown up, and very loud about it'
   },
   'emerald:3': {
     art: 'reveal_emerald',
-    name: 'Emerald Whelp',
-    epithet: 'hatched green, which the old books said was lucky'
+    name: 'Green Dragon',
+    epithet: 'hatched green, which the old books say is lucky'
   },
   'emerald:4': {
     art: 'reveal_emerald_adult',
-    name: 'Emerald Dragon',
-    epithet: 'the moss and the ash both answer to her now'
+    name: 'Big Green Dragon',
+    epithet: 'the moss and the ash both listen to her now'
   },
   // The legendary breeds hatch AT tier 2 — egg to animal in one merge — so
   // their one card is the young form. Brewed at Selyna's Cauldron or paid out
   // by the ladder's egg arc; either road ends on this same screen.
   'ashdrake:2': {
     art: 'reveal_ashdrake',
-    name: 'Ashdrake',
-    epithet: 'what the fire keeps when everything else has burned away'
+    name: 'Ash Dragon',
+    epithet: 'what the fire keeps when everything else has burned'
   },
   'rimewyrm:2': {
     art: 'reveal_rimewyrm',
-    name: 'Rimewyrm',
-    epithet: 'the cold come back curious, and glad to be held'
+    name: 'Ice Dragon',
+    epithet: 'the cold came back curious, and glad to be held'
   },
   // Present since the Cauldron made the Golden Egg brewable: a player can now
   // MERGE three into an Elder outside the finale, and that hatch deserves the
@@ -1191,7 +1191,7 @@ export const DRAGON_REVEAL: Record<string, { art: string; name: string; epithet:
   'golden_egg:2': {
     art: 'reveal_golden',
     name: 'Golden Elder',
-    epithet: 'older than the isle, and awake because you insisted'
+    epithet: 'older than the island, and awake because you asked'
   },
   /*
    * FROST AND STORM — the two breeds whose cards were painted and never hung.
@@ -1207,22 +1207,22 @@ export const DRAGON_REVEAL: Record<string, { art: string; name: string; epithet:
   'frost:2': {
     art: 'reveal_frost',
     name: 'Frost Dragon',
-    epithet: 'hatched out of weather, and in no hurry to warm up'
+    epithet: 'hatched out of a snowstorm, and in no hurry to warm up'
   },
   'frost:3': {
     art: 'reveal_frost_adult',
-    name: 'Adult Frost Dragon',
-    epithet: 'grown; the air around her keeps its distance now'
+    name: 'Big Frost Dragon',
+    epithet: 'all grown up; the air around her stays cool'
   },
   'storm:2': {
     art: 'reveal_storm',
     name: 'Storm Dragon',
-    epithet: 'the first quiet one, and the sky has not stopped watching'
+    epithet: 'the quiet one, and the sky has not stopped watching'
   },
   'storm:3': {
     art: 'reveal_storm_adult',
-    name: 'Adult Storm Dragon',
-    epithet: 'grown, and the weather asks HER permission'
+    name: 'Big Storm Dragon',
+    epithet: 'all grown up, and the weather asks HER first'
   }
 };
 
@@ -1758,9 +1758,9 @@ export const CHEST_GIFTS_BY_WORLD: Readonly<Record<string, ReadonlyArray<ChestGi
     // driftwood → seaglass, rimebloom → orrery, keel → warhelm. The northern
     // chest still pays northern stock, which is the whole point of it being a
     // per-world table.
-    { kind: 'item', chain: 'seaglass', tier: 1, count: 3, label: '3 Glass Floats!' },
-    { kind: 'item', chain: 'orrery', tier: 1, count: 3, label: '3 Ground Lenses!' },
-    { kind: 'item', chain: 'warhelm', tier: 1, count: 2, label: '2 Iron Caps!' }
+    { kind: 'item', chain: 'seaglass', tier: 1, count: 3, label: '3 Glass Balls!' },
+    { kind: 'item', chain: 'orrery', tier: 1, count: 3, label: '3 Glass Lenses!' },
+    { kind: 'item', chain: 'warhelm', tier: 1, count: 2, label: '2 Iron Hats!' }
   ]
 };
 

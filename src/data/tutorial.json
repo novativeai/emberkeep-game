@@ -3,7 +3,7 @@
     {
       "id": "arrival_miss",
       "speaker": "eleanor",
-      "text": "You're not where I meant to put you.",
+      "text": "Oh! You landed in the wrong spot.",
       "gate": {
         "type": "tap"
       },
@@ -12,7 +12,7 @@
     {
       "id": "arrival_place",
       "speaker": "eleanor",
-      "text": "This is Emberkeep. I aimed for the hall — the spell was clean, I've cast it a hundred times. Something set you down here instead.",
+      "text": "Welcome to Emberkeep. I tried to bring you to the big hall, but my spell dropped you here instead.",
       "gate": {
         "type": "tap"
       },
@@ -21,7 +21,7 @@
     {
       "id": "arrival_ash",
       "speaker": "eleanor",
-      "text": "Mind your footing. That grey isn't soil. Fires die slowly, from the edges in — this one went out all at once, everywhere, in a single night.",
+      "text": "Careful where you step. That grey stuff is ash. Long ago, a huge fire went out here all at once.",
       "gate": {
         "type": "tap"
       },
@@ -30,7 +30,7 @@
     {
       "id": "arrival_slip",
       "speaker": "eleanor",
-      "text": "You'll want to know what did that. So did I, once. I read every account there is. I crossed half the world for the rest. I was—",
+      "text": "What put the fire out? I have wondered for years. I read every book about it. I was—",
       "gate": {
         "type": "tap"
       },
@@ -39,7 +39,7 @@
     {
       "id": "arrival_hold",
       "speaker": "eleanor",
-      "text": "…Later. You'll hear it better when you're not standing in it.",
+      "text": "…Never mind. I will tell you that story later.",
       "gate": {
         "type": "tap"
       },
@@ -48,7 +48,7 @@
     {
       "id": "arrival_why",
       "speaker": "eleanor",
-      "text": "And why you: when you landed, the ash under your hands went warm. It hasn't done that for anyone in sixty years. I watched it happen and I still don't believe it.",
+      "text": "Here is why I called YOU: when you landed, the ash under your hands got warm. That has not happened in sixty years.",
       "gate": {
         "type": "tap"
       },
@@ -57,7 +57,7 @@
     {
       "id": "arrival_ask",
       "speaker": "eleanor",
-      "text": "So I'll ask instead of explaining. Bring this place back — the warmth, the green, and whatever's still asleep beneath the ash. I can't wake any of it. You can, Keeper.",
+      "text": "So I need your help. Let's bring Emberkeep back to life: the warmth, the plants, and the dragons sleeping under the ash. You can do it, Keeper.",
       "gate": {
         "type": "tap"
       },
@@ -66,7 +66,7 @@
     {
       "id": "moss_stump",
       "speaker": "eleanor",
-      "text": "See that charred stump? The first tree the fire took — and the first thing the isle is dressing in moss again. Tap it and gather a tuft; it will always grow more.",
+      "text": "See that old burnt stump? Moss is growing on it. Tap the stump to pick a Moss Puff. It will always grow more.",
       "gate": {
         "type": "event",
         "event": "item:harvested",
@@ -98,7 +98,7 @@
     {
       "id": "ash_green",
       "speaker": "eleanor",
-      "text": "…Look down. The grey is going green where your hands were. Ash Moss — the isle's first answer. Three tufts make a bundle; drag them together.",
+      "text": "Look, the ash turns green where you touched it! Now you have 3 Moss Puffs. Drag them together to MERGE them.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -155,7 +155,7 @@
     {
       "id": "arrival_answered",
       "speaker": "eleanor",
-      "text": "…It answered you. Sixty years I've stood outside this place, and it answers you in the first minute. …Good. Again.",
+      "text": "You did it! Merging 3 of the same thing makes 1 better thing. That is how everything works here.",
       "gate": {
         "type": "tap"
       },
@@ -164,7 +164,7 @@
     {
       "id": "cookbook_intro",
       "speaker": "eleanor",
-      "text": "Your first recipe! Every merge you discover is inscribed in the Emberkeep Cookbook. Tap the book to see your first page.",
+      "text": "Your first recipe! Every merge you discover is written in your Cookbook. Tap the book to see it.",
       "gate": {
         "type": "event",
         "event": "ui:cookbook_opened"
@@ -179,7 +179,7 @@
     {
       "id": "cookbook_close",
       "speaker": "eleanor",
-      "text": "The Moss Bundle — your first page, and the book keeps every recipe you find. Tap the ✕ to close it, and let us wake that egg.",
+      "text": "There is your Moss Bunch page. Tap the ✕ to close the book. Now let's hatch a dragon!",
       "gate": {
         "type": "event",
         "event": "ui:cookbook_closed"
@@ -194,7 +194,7 @@
     {
       "id": "ruby_merge",
       "speaker": "eleanor",
-      "text": "Three Dragon Rubies — seeds of fire! Drag them together to hatch a Red Egg.",
+      "text": "Three red Rubies! Drag them together to make a Red Dragon Egg.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -246,7 +246,7 @@
     {
       "id": "dragon_hatch",
       "speaker": "eleanor",
-      "text": "A Red Egg! Two more have appeared. Drag all three together — the Red Dragon stirs inside!",
+      "text": "A Red Dragon Egg! Two more appeared. Drag all three eggs together to hatch your dragon!",
       "gate": {
         "type": "event",
         "event": "item:hatched",
@@ -295,7 +295,7 @@
     {
       "id": "name_intro",
       "speaker": "eleanor",
-      "text": "Look at her. She has picked you out of everything on this isle and she is waiting. Give her a name, Keeper. I'll not have her called 'the dragon'.",
+      "text": "Look at her! She is your very first dragon. Let's give her a name.",
       "gate": {
         "type": "tap"
       },
@@ -311,7 +311,7 @@
     {
       "id": "name_choose",
       "speaker": "eleanor",
-      "text": "Go on. Whatever you settle on, she will answer to it for the rest of her life.",
+      "text": "Type a name and tap OK. She will keep it forever.",
       "gate": {
         "type": "event",
         "event": "dragon:named",
@@ -330,7 +330,7 @@
     {
       "id": "name_said",
       "speaker": "eleanor",
-      "text": "{dragon}. …Yes. That will do. Sixty years I have not said a dragon's name out loud, and I find I am not ready for how it feels.",
+      "text": "{dragon}. I love it. It has been sixty years since anyone named a dragon here.",
       "gate": {
         "type": "tap"
       },
@@ -346,7 +346,7 @@
     {
       "id": "moss_feed",
       "speaker": "eleanor",
-      "text": "She came out of that shell starving, and greens are what a Red cools on. Your moss has cured into a bale — drag it onto {dragon}.",
+      "text": "{dragon} is hungry! Red dragons love moss. Your Moss Bunch grew into a Moss Pile. Drag it onto {dragon} to feed her.",
       "gate": {
         "type": "event",
         "event": "dragon:fed",
@@ -395,7 +395,7 @@
     {
       "id": "crystal_tap",
       "speaker": "eleanor",
-      "text": "That Crystal is mine, Keeper — the one thing of my own I brought here. It sheds Quartz as it turns. Tap it and take a pebble; two more shook loose already.",
+      "text": "See my purple Crystal? It makes Crystal Chips. Tap the Crystal to take one. Two more already fell off.",
       "gate": {
         "type": "event",
         "event": "item:harvested",
@@ -423,7 +423,7 @@
     {
       "id": "quartz_merge",
       "speaker": "eleanor",
-      "text": "Three pebbles press into a Cut Crystal. Quartz is what my work is MADE of — no dragon will touch it, and no dragon should. Leave that chain to me.",
+      "text": "Drag the three Crystal Chips together to make a Crystal. Dragons don't eat crystals. These are for me.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -467,7 +467,7 @@
     {
       "id": "quartz_ball",
       "speaker": "eleanor",
-      "text": "Two more, cut and waiting. Three of those make a Crystal Ball, and through one of those I can see past this isle. That is why I will keep asking you for them.",
+      "text": "Two more Crystals appeared. Merge all three into a Crystal Ball. I use Crystal Balls for my magic.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -522,7 +522,7 @@
     {
       "id": "ball_pocket",
       "speaker": "eleanor",
-      "text": "Before you hand me anything — that is not a thing to carry loose. Tap the Crystal Ball. Your satchel takes it, and the board stays clear for what merges.",
+      "text": "Let's put the Crystal Ball away. Tap it, and it goes into your Bag. That keeps the board clear.",
       "gate": {
         "type": "event",
         "event": "bag:stored",
@@ -549,7 +549,7 @@
     {
       "id": "ball_give",
       "speaker": "eleanor",
-      "text": "Now open the satchel and tap it. Three things a pocketed piece can be: Drop puts it back, Sell turns it to gold, Give hands it to somebody. Give.",
+      "text": "Now open your Bag and tap the Crystal Ball. You can Drop it, Sell it, or Give it. Tap GIVE.",
       "gate": {
         "type": "event",
         "event": "bag:give_armed",
@@ -566,7 +566,7 @@
     {
       "id": "eleanor_gift",
       "speaker": "eleanor",
-      "text": "Good. Now tap me, and it is mine.",
+      "text": "Now tap me to give me the Crystal Ball.",
       "gate": {
         "type": "event",
         "event": "regard:gift_accepted",
@@ -595,7 +595,7 @@
     {
       "id": "eleanor_hearts",
       "speaker": "eleanor",
-      "text": "Thank you. Those hearts under your quest list — that is me, and how far I have come round to you. They only move for things you actually do.",
+      "text": "Thank you! See the hearts under your quest list? Those are MY hearts. They fill up when you help me.",
       "gate": {
         "type": "tap"
       },
@@ -607,7 +607,7 @@
     {
       "id": "chest",
       "speaker": "eleanor",
-      "text": "A Treasure Chest! The isle rewards brave Keepers. Tap it to claim what is inside.",
+      "text": "A Treasure Chest! Tap it to open it and get your prize.",
       "gate": {
         "type": "event",
         "event": "chest:open"
@@ -638,7 +638,7 @@
     {
       "id": "levelup",
       "speaker": "eleanor",
-      "text": "Keeper Level 2! The isle stirs — a new stretch of land has woken to the west. Tap to see!",
+      "text": "You reached Level 2! New land opened up to the west. Tap to take a look!",
       "gate": {
         "type": "tap"
       },
@@ -652,7 +652,7 @@
     {
       "id": "key_unlock",
       "speaker": "eleanor",
-      "text": "Your dragons gifted you a Stone Key! See that clouded strip? Tap it to burn the fog away.",
+      "text": "Your dragon found a Gold Key! See the cloudy land? Tap the clouds to clear them away.",
       "gate": {
         "type": "event",
         "event": "region:unlocked"
@@ -672,7 +672,7 @@
     {
       "id": "board_room",
       "speaker": "eleanor",
-      "text": "One habit before we go on: workers work ANYWHERE. When the hearthside crowds, carry the Emberbark Stump over to the lava-well isle, past the gate — it drips moss out there too.",
+      "text": "One more trick: the Mossy Stump can work anywhere. Drag it to the glowing spot on the far island. It will grow moss there too.",
       "gate": {
         "type": "move",
         "chain": "emberbark",
@@ -708,7 +708,7 @@
     {
       "id": "emberberry_tap",
       "speaker": "eleanor",
-      "text": "A wild Emberberry patch grew in the opened land! It feeds you for FREE — tapping it never costs Warmth. Tap the patch to pick a berry.",
+      "text": "A Berry Bush grew in the new land! Tap it to pick an Emberberry. Picking berries is FREE — it never costs Warmth.",
       "gate": {
         "type": "event",
         "event": "item:harvested",
@@ -738,7 +738,7 @@
     {
       "id": "emberberry_merge",
       "speaker": "eleanor",
-      "text": "Two more berries dropped beside yours — merge all three into a basket. The patch regrows forever, and now and then it throws you a sprout; nine of those grow a second patch.",
+      "text": "Two more berries! Merge the three Emberberries into a Berry Basket. The bush grows new berries forever.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -793,7 +793,7 @@
     {
       "id": "wood_merge",
       "speaker": "eleanor",
-      "text": "Cut Wood, where the fog lifted — the isle still gives timber. Nobody builds out of raw logs, though. Merge the three piles into a Set of Planks.",
+      "text": "Look, Logs! Drag the three piles of Logs together to make Planks.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -840,7 +840,7 @@
     {
       "id": "plank_merge",
       "speaker": "eleanor",
-      "text": "Planks! Two more sets were milled while you worked. Merge all three and raise a House — it earns coins while you rest.",
+      "text": "Two more Planks appeared. Merge all three Planks to build a House. A House makes Gold Coins while you play!",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -898,7 +898,7 @@
     {
       "id": "tree_grain",
       "speaker": "eleanor",
-      "text": "Look at what came out with the planks. Every tenth log the isle gives up has a Fir Grain caught in the bark — a tree that never got planted. Three of them, there by your House.",
+      "text": "Three Tree Seeds came out with the wood. They are right next to your House.",
       "gate": {
         "type": "tap"
       },
@@ -935,7 +935,7 @@
     {
       "id": "grain_merge",
       "speaker": "eleanor",
-      "text": "A Grain is a tree that hasn't decided yet. Put the three together and let it decide.",
+      "text": "Drag the three Tree Seeds together to grow a Small Tree.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -979,7 +979,7 @@
     {
       "id": "fir_grow",
       "speaker": "eleanor",
-      "text": "A Small Fir — and two more came up where the ash thinned. Merge three and you'll have a grown tree of your own. Everything here can be made to give again.",
+      "text": "Two more Small Trees grew! Merge all three to get a Big Tree. Big Trees drop Logs for you.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -1034,7 +1034,7 @@
     {
       "id": "pocket_it",
       "speaker": "eleanor",
-      "text": "That Cracked Stone will never merge — two of a kind and nothing to make. Pocket it; I will show you the other thing a satchel is for.",
+      "text": "That Cracked Rock has nothing to merge with right now. Tap it to put it in your Bag.",
       "gate": {
         "type": "event",
         "event": "bag:stored",
@@ -1061,7 +1061,7 @@
     {
       "id": "sell_it",
       "speaker": "eleanor",
-      "text": "A pocketed stone is a choice, Keeper. Open your satchel and tap it — Drop sets it back down, Sell turns it to gold. Gold buys Warmth, and hurries what keeps you waiting.",
+      "text": "Now open your Bag and tap the rock. Tap SELL to turn it into Gold. Gold buys Warmth and speeds things up.",
       "gate": {
         "type": "event",
         "event": "item:sold"
@@ -1077,7 +1077,7 @@
     {
       "id": "isle_materials",
       "speaker": "eleanor",
-      "text": "Those Dew Drops are caught moonlight — Moonwater, the one thing my craft spends. A Dew Basin sleeps under the southern fog; open that land and the drops never run out.",
+      "text": "See those Dew Drops? They make Moonwater, which I need for my magic. A Dew Fountain in the south makes more.",
       "gate": {
         "type": "tap"
       },
@@ -1103,7 +1103,7 @@
     {
       "id": "moonwater_merge",
       "speaker": "eleanor",
-      "text": "Gather the three Dew Drops into one Dew Vial — drag them together, the same as the rubies. Three vials make true Moonwater, and that is what I will ask you for.",
+      "text": "Drag the three Dew Drops together to make a Dew Bottle. Three Dew Bottles make Moonwater.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -1147,7 +1147,7 @@
     {
       "id": "dragon_work",
       "speaker": "eleanor",
-      "text": "Dragons can speed the House! Drag your dragon and drop it directly onto the House tile. Each working dragon doubles the speed — ×2 with one, ×4 with two!",
+      "text": "Dragons can make your House work faster! Drag {dragon} and drop her on the House. One dragon = 2× speed. Two = 4×!",
       "gate": {
         "type": "event",
         "event": "dragon:working"
@@ -1187,7 +1187,7 @@
     {
       "id": "dragon_rest",
       "speaker": "eleanor",
-      "text": "Hard work tires even dragons! After 3 minutes your dragon flies home — and needs a few minutes on its feet before it will take another shift.",
+      "text": "Working makes dragons tired. After 3 minutes {dragon} flies home to rest. Then she is ready to work again.",
       "gate": {
         "type": "tap"
       },
@@ -1201,7 +1201,7 @@
     {
       "id": "resin_find",
       "speaker": "eleanor",
-      "text": "Let her catch her breath. While she does — look low on your Fir's trunk. Resin. It weeps out where the heat got into the bark and sets hard as amber. Three beads of it.",
+      "text": "While she rests, look at the Big Tree. Sticky Sap Drops are on its trunk. Three of them!",
       "gate": {
         "type": "tap"
       },
@@ -1238,7 +1238,7 @@
     {
       "id": "resin_merge",
       "speaker": "eleanor",
-      "text": "Work them together while they're still soft enough to take it.",
+      "text": "Drag the three Sap Drops together to make a Sap Ball.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -1282,7 +1282,7 @@
     {
       "id": "hearth_cake",
       "speaker": "eleanor",
-      "text": "A Lump. Two more set hard overnight — press three of them together and you have a Hearth Cake, which is the thing I was actually steering you towards.",
+      "text": "Two more Sap Balls! Merge all three to make a Sap Cookie. Dragons LOVE Sap Cookies.",
       "gate": {
         "type": "event",
         "event": "item:merged",
@@ -1337,7 +1337,7 @@
     {
       "id": "feed_dragon",
       "speaker": "eleanor",
-      "text": "Every dragon has one thing it would cross the isle for, and for {dragon} it is resin. Drag the Hearth Cake to her — straight off the board, no satchel.",
+      "text": "Sap Cookies are {dragon}'s favourite food. Drag the Sap Cookie onto her.",
       "gate": {
         "type": "event",
         "event": "dragon:fed",
@@ -1377,7 +1377,7 @@
     {
       "id": "codex_meal",
       "speaker": "eleanor",
-      "text": "The Codex felt that! Every dragon you name keeps a page in here. Tap {dragon}'s card to open hers.",
+      "text": "The Dragon Codex noticed! Every dragon you name gets a page in it. Tap {dragon}'s card to open her page.",
       "gate": {
         "type": "event",
         "event": "ui:codex_dragon_opened"
@@ -1400,7 +1400,7 @@
     {
       "id": "codex_taste",
       "speaker": "eleanor",
-      "text": "There — FAVOURITE MEAL, written the moment she ate it. This book only records what you have tested. Now tap EVOLUTION.",
+      "text": "See FAVOURITE MEAL? It shows what she loves to eat. Now tap EVOLUTION.",
       "gate": {
         "type": "event",
         "event": "ui:codex_evolution_opened"
@@ -1422,7 +1422,7 @@
     {
       "id": "codex_evolution",
       "speaker": "eleanor",
-      "text": "That shadow is what she grows into. The Codex keeps her true colours hidden until you have earned the sight of them.",
+      "text": "That dark shape is what {dragon} will grow into! It stays hidden until she is big.",
       "gate": {
         "type": "tap"
       },
@@ -1440,7 +1440,7 @@
     {
       "id": "codex_cycles",
       "speaker": "eleanor",
-      "text": "Under her is the count. Fill her hunger gauge inside one cycle and that cycle is banked — and a banked cycle never slips away.",
+      "text": "See the counter under her? Fill her food bar all the way, and you earn one point. Points never go away.",
       "gate": {
         "type": "tap"
       },
@@ -1458,7 +1458,7 @@
     {
       "id": "codex_reward",
       "speaker": "eleanor",
-      "text": "Six banked and the shadow lifts: her grown form, her true name, in full colour. It is the longest promise this book keeps.",
+      "text": "Get 6 points and she grows into a Big Red Dragon! Then you see her in full colour.",
       "gate": {
         "type": "tap"
       },
@@ -1476,7 +1476,7 @@
     {
       "id": "codex_shut",
       "speaker": "eleanor",
-      "text": "That is the book, and it is yours to open whenever you like. Tap ✕ to close it.",
+      "text": "That is the Dragon Codex. It is yours whenever you need it. Tap ✕ to close it.",
       "gate": {
         "type": "event",
         "event": "ui:codex_closed"
@@ -1496,7 +1496,7 @@
     {
       "id": "cake_loved",
       "speaker": "eleanor",
-      "text": "Look at her. Resin is a Red's one favourite, and a favourite moves her twice as far in a day as anything else you could have given her.",
+      "text": "Look how happy she is! A favourite food fills her up twice as fast as other food.",
       "gate": {
         "type": "tap"
       },
@@ -1514,7 +1514,7 @@
     {
       "id": "dragon_status",
       "speaker": "eleanor",
-      "text": "Under your quest list — that's {dragon}. Five hearts for how far she trusts you, and a line for what she is still owed today. Tap her to read it. Tap me for mine.",
+      "text": "Under your quest list is {dragon}'s card. Her hearts show how much she trusts you. Tap her card to read it. Tap mine to see my hearts.",
       "gate": {
         "type": "tap"
       },
@@ -1525,7 +1525,7 @@
     {
       "id": "resin_pocket",
       "speaker": "eleanor",
-      "text": "One thing before your resin runs out — and it will. A bead rolled clear when you worked the others. Tap it into your satchel.",
+      "text": "One Sap Drop rolled away. Tap it to put it in your Bag. You will need it in a moment.",
       "gate": {
         "type": "event",
         "event": "bag:stored",
@@ -1564,7 +1564,7 @@
     {
       "id": "house_commission",
       "speaker": "eleanor",
-      "text": "Tap your House, pick from your satchel — it makes that forever. Take the Resin Bead. A House works simple pieces; a Manor takes finer too. A second thing needs a second House.",
+      "text": "Tap your House, then pick the Sap Drop from your Bag. Now your House makes Sap Drops forever!",
       "gate": {
         "type": "event",
         "event": "generator:produce_set"
@@ -1589,7 +1589,7 @@
     {
       "id": "house_skip",
       "speaker": "eleanor",
-      "text": "Even a House with its orders keeps you waiting. Tap it, then spend Warmth (⚡) to skip the wait — and watch your Warmth drop for it.",
+      "text": "The House needs time to make things. Tap the House, then spend Warmth ⚡ to skip the wait.",
       "gate": {
         "type": "event",
         "event": "generator:skipped",
@@ -1623,7 +1623,7 @@
     {
       "id": "eleanor_helps",
       "speaker": "eleanor",
-      "text": "I can't wake anything on this isle — that is your hands, not mine. But I can stand over a slow thing and hurry it. Tap me, then tap the House.",
+      "text": "I can help too! Tap me, then tap the House. I will make it finish faster.",
       "gate": {
         "type": "event",
         "event": "character:action_used"
@@ -1661,7 +1661,7 @@
     {
       "id": "buy_energy",
       "speaker": "eleanor",
-      "text": "Low on Warmth? It creeps back on its own, a little each minute — but your first Ember Spark is free. Tap the ⚡ + to open the Emporium and claim it.",
+      "text": "Out of Warmth? It comes back slowly by itself. Your first Ember Spark is FREE. Tap the ⚡ + button to get it.",
       "gate": {
         "type": "event",
         "event": "marketplace:purchased"
@@ -1676,7 +1676,7 @@
     {
       "id": "gem_harvest",
       "speaker": "eleanor",
-      "text": "{dragon} hoards fire and coughs the excess back up. Tap her and take a Gem Shard — a dragon's tap costs one Warmth.",
+      "text": "{dragon} makes Gem Chips! Tap her to take one. Tapping a dragon costs 1 Warmth.",
       "gate": {
         "type": "event",
         "event": "item:harvested",
@@ -1718,7 +1718,7 @@
     {
       "id": "ledger_open",
       "speaker": "eleanor",
-      "text": "Shards enough — and that is precisely what my Ledger has been asking for since before you landed. Open it.",
+      "text": "You have enough Gem Chips! Tap the Orders button to open my order list. I have been waiting for those.",
       "gate": {
         "type": "event",
         "event": "ui:ledger_opened"
@@ -1733,7 +1733,7 @@
     {
       "id": "ledger_deliver",
       "speaker": "eleanor",
-      "text": "Rekindle the Brazier. Press Deliver and the shards are mine — I pay in gold, in standing, and in something I have kept far too long.",
+      "text": "My first order: Light the Fire Bowl. Tap DELIVER to give me the Gem Chips. You get Gold, and a surprise!",
       "gate": {
         "type": "event",
         "event": "order:completed"
@@ -1749,7 +1749,7 @@
     {
       "id": "golden_tease",
       "speaker": "eleanor",
-      "text": "This is what I kept. Look west — a GOLDEN egg on the old altar, asleep since the Great Flame went out. See how it stirs at your coming. I know its story. Not yet.",
+      "text": "Here is my surprise. Look west: a GOLDEN EGG sleeps on the old altar. It moved when you arrived! I will tell you its story soon.",
       "gate": {
         "type": "tap"
       },
@@ -1758,7 +1758,7 @@
     {
       "id": "free_play",
       "speaker": "eleanor",
-      "text": "Emberkeep is yours now, Keeper. Keep my Ledger full and reach Keeper Level 3 — and that egg on the altar will have waited long enough.",
+      "text": "Emberkeep is yours now, Keeper! Finish my orders and reach Level 3. Then the Golden Egg will be ready to wake.",
       "gate": {
         "type": "tap"
       },

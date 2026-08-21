@@ -41,7 +41,7 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
       'brazier_shards',
       'brazier_deliver'
     ]);
-    expect(ctx.systems.quests.titleFor(quest)).toBe('Light the Brazier');
+    expect(ctx.systems.quests.titleFor(quest)).toBe('Light the Fire Bowl');
   });
 
   it('a `have` goal reads the live board and LATCHES, so delivering cannot un-do it', () => {
@@ -136,7 +136,7 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
     // order list is retuned — and it says the verb, the count and the recipient.
     const live = ctx.systems.order.activeOrders[0]!;
     expect(ctx.systems.quests.progressFor(tail.steps[0]!).label).toBe(
-      `Deliver ${live.requires[0]!.count} × Gem Shard to Eleanor`
+      `Deliver ${live.requires[0]!.count} × Gem Chip to Eleanor`
     );
     expect(ctx.systems.quests.progressFor(tail.steps[0]!).done).toBe(false);
   });
@@ -316,6 +316,6 @@ describe('brew goals — the cauldron as a quest driver', () => {
         id: 'unlabelled',
         goal: { kind: 'brew', recipeId: 'iron_cap', count: 2 }
       }).label
-    ).toBe('Brew 2 × Iron Cap');
+    ).toBe('Brew 2 × Iron Hat');
   });
 });

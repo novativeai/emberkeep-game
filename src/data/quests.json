@@ -4,7 +4,7 @@
       "id": "rekindle_brazier",
       "chapter": 1,
       "giver": "eleanor",
-      "title": "Light the Brazier",
+      "title": "Light the Fire Bowl",
       "orderId": "eleanor_brazier",
       "steps": [
         {
@@ -18,7 +18,7 @@
         },
         {
           "id": "brazier_shards",
-          "label": "Collect 6 Gem Shards",
+          "label": "Collect 6 Gem Chips",
           "goal": {
             "kind": "have",
             "chain": "flame_gem",
@@ -28,7 +28,7 @@
         },
         {
           "id": "brazier_deliver",
-          "label": "Deliver 6 Gem Shards to Eleanor",
+          "label": "Deliver 6 Gem Chips to Eleanor",
           "goal": {
             "kind": "order",
             "orderId": "eleanor_brazier"
@@ -43,7 +43,7 @@
       "id": "fill_the_larder",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Fill the Larder",
+      "title": "Make Emberberry Jam",
       "rewards": {
         "coins": 145,
         "spawn": {
@@ -55,7 +55,7 @@
       "steps": [
         {
           "id": "larder_preserve",
-          "label": "Make 1 Emberberry Preserve",
+          "label": "Make 1 Emberberry Jam",
           "goal": {
             "kind": "have",
             "chain": "emberberry",
@@ -69,12 +69,12 @@
       "id": "warm_the_hearth",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Warm the Long Hearth",
+      "title": "Warm the Fireplace",
       "orderId": "eleanor_hearth",
       "steps": [
         {
           "id": "hearth_gems",
-          "label": "Make 2 Flame Gems",
+          "label": "Make 2 Fire Gems",
           "goal": {
             "kind": "have",
             "chain": "flame_gem",
@@ -84,7 +84,7 @@
         },
         {
           "id": "hearth_deliver",
-          "label": "Deliver 2 Flame Gems to Eleanor",
+          "label": "Deliver 2 Fire Gems to Eleanor",
           "goal": {
             "kind": "order",
             "orderId": "eleanor_hearth"
@@ -99,7 +99,7 @@
       "id": "raise_the_roofs",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Raise the Roofs",
+      "title": "Build Two Houses",
       "rewards": {
         "coins": 105
       },
@@ -116,7 +116,7 @@
         },
         {
           "id": "roofs_thatch",
-          "label": "Thatch them with 2 Moss Bundles",
+          "label": "Make 2 Moss Bunches for the roofs",
           "goal": {
             "kind": "have",
             "chain": "ashmoss",
@@ -130,14 +130,14 @@
       "id": "the_long_gallery",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Light the Long Gallery",
+      "title": "Light the Hallway",
       "rewards": {
         "coins": 130
       },
       "steps": [
         {
           "id": "gallery_crystals",
-          "label": "Make 2 Cut Crystals",
+          "label": "Make 2 Crystals",
           "goal": {
             "kind": "have",
             "chain": "quartz",
@@ -151,7 +151,7 @@
       "id": "catch_the_moonwater",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Catch the Moonwater",
+      "title": "Make Moonwater",
       "orderId": "eleanor_moonwater",
       "steps": [
         {
@@ -186,7 +186,7 @@
       "id": "radiant_centerpiece",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Craft the Radiant Centerpiece",
+      "title": "Make a Sun Gem",
       "orderId": "eleanor_centerpiece",
       "expects": {
         "levelAtEnd": 3
@@ -194,7 +194,7 @@
       "steps": [
         {
           "id": "centerpiece_radiant",
-          "label": "Make 1 Radiant Gem",
+          "label": "Make 1 Sun Gem",
           "goal": {
             "kind": "have",
             "chain": "flame_gem",
@@ -204,7 +204,7 @@
         },
         {
           "id": "centerpiece_deliver",
-          "label": "Deliver 1 Radiant Gem to Eleanor",
+          "label": "Deliver 1 Sun Gem to Eleanor",
           "goal": {
             "kind": "order",
             "orderId": "eleanor_centerpiece"
@@ -219,11 +219,11 @@
       "id": "what_she_keeps",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "What She Keeps",
+      "title": "A Gift for Eleanor",
       "steps": [
         {
           "id": "keeps_basket",
-          "label": "Make 2 Emberberry Baskets",
+          "label": "Make 2 Berry Baskets",
           "goal": {
             "kind": "have",
             "chain": "emberberry",
@@ -233,7 +233,7 @@
         },
         {
           "id": "keeps_deliver",
-          "label": "Deliver 2 Baskets to Eleanor",
+          "label": "Deliver 2 Berry Baskets to Eleanor",
           "goal": {
             "kind": "order",
             "orderId": "eleanor_keeps"
@@ -241,7 +241,7 @@
         },
         {
           "id": "keeps_preserve",
-          "label": "Give Eleanor 1 Emberberry Preserve",
+          "label": "Give Eleanor 1 Emberberry Jam from your Bag",
           "goal": {
             "kind": "gift",
             "characterId": "eleanor",
@@ -267,12 +267,12 @@
       "id": "keepers_hoard",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Fill the Keeper's Hoard",
+      "title": "Fill the Treasure Room",
       "orderId": "eleanor_hoard",
       "steps": [
         {
           "id": "hoard_manor",
-          "label": "Merge 2 Houses into a Manor",
+          "label": "Merge 2 Houses into a Mansion",
           "goal": {
             "kind": "have",
             "chain": "lumber",
@@ -282,7 +282,7 @@
         },
         {
           "id": "hoard_radiant",
-          "label": "Make 3 Radiant Gems",
+          "label": "Make 3 Sun Gems",
           "goal": {
             "kind": "have",
             "chain": "flame_gem",
@@ -292,7 +292,7 @@
         },
         {
           "id": "hoard_deliver",
-          "label": "Deliver 3 Radiant Gems to Eleanor",
+          "label": "Deliver 3 Sun Gems to Eleanor",
           "goal": {
             "kind": "order",
             "orderId": "eleanor_hoard"
@@ -365,14 +365,14 @@
       "id": "the_ashdrake_wakes",
       "chapter": 2,
       "giver": "eleanor",
-      "title": "Wake the Ashdrake",
+      "title": "Wake the Ash Dragon",
       "rewards": {
         "coins": 325
       },
       "steps": [
         {
           "id": "ashdrake_hatch",
-          "label": "Merge 3 Ashdrake Eggs into the Ashdrake",
+          "label": "Merge 3 Ash Dragon Eggs into the Ash Dragon",
           "goal": {
             "kind": "have",
             "chain": "ashdrake",
@@ -406,7 +406,7 @@
       "steps": [
         {
           "id": "landing_faggot",
-          "label": "Merge 3 Glass Floats into a Glass Buoy",
+          "label": "Merge 3 Glass Balls into a Glass Float",
           "goal": {
             "kind": "have",
             "chain": "seaglass",
@@ -416,7 +416,7 @@
         },
         {
           "id": "landing_deliver",
-          "label": "Deliver 2 Glass Buoys to Selyna",
+          "label": "Deliver 2 Glass Floats to Selyna",
           "goal": {
             "kind": "order",
             "orderId": "selyna_signal"
@@ -432,11 +432,11 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Open the Wrack Coast",
+      "title": "Open the Shipwreck Coast",
       "steps": [
         {
           "id": "coast_open",
-          "label": "Spend 1 Gold Key on the fog along the coast",
+          "label": "Use 1 Gold Key on the clouds by the coast",
           "goal": {
             "kind": "region",
             "regionId": "borealis_coast"
@@ -452,11 +452,11 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Caps from Glass",
+      "title": "Brew Iron Hats",
       "steps": [
         {
           "id": "strakes_brew",
-          "label": "Brew 4 Iron Caps from Glass Buoys",
+          "label": "Brew 4 Iron Hats in the Cauldron",
           "goal": {
             "kind": "brew",
             "recipeId": "iron_cap",
@@ -478,7 +478,7 @@
       "steps": [
         {
           "id": "fuel_stack",
-          "label": "Gather 3 Pitch Beads from the Tar Kiln",
+          "label": "Get 3 Tar Drops from the Tar Oven",
           "goal": {
             "kind": "have",
             "chain": "emberheart",
@@ -488,7 +488,7 @@
         },
         {
           "id": "fuel_cakes",
-          "label": "Make 3 Pitch Loaves",
+          "label": "Make 3 Tar Loaves",
           "goal": {
             "kind": "have",
             "chain": "emberheart",
@@ -498,7 +498,7 @@
         },
         {
           "id": "fuel_deliver",
-          "label": "Deliver 3 Pitch Loaves to Selyna",
+          "label": "Deliver 3 Tar Loaves to Selyna",
           "goal": {
             "kind": "order",
             "orderId": "selyna_pitch"
@@ -514,7 +514,7 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Thread from the Frost",
+      "title": "Brew Light Thread",
       "steps": [
         {
           "id": "thread_brew",
@@ -535,12 +535,12 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Salvage the Wrecks",
+      "title": "Search the Shipwrecks",
       "orderId": "selyna_frames",
       "steps": [
         {
           "id": "salvage_frames",
-          "label": "Forge 2 Banded Helms at the Wreck Forge",
+          "label": "Make 2 Iron Helmets at the Shipwreck Forge",
           "goal": {
             "kind": "have",
             "chain": "warhelm",
@@ -550,7 +550,7 @@
         },
         {
           "id": "salvage_deliver",
-          "label": "Deliver 2 Banded Helms to Selyna",
+          "label": "Deliver 2 Iron Helmets to Selyna",
           "goal": {
             "kind": "order",
             "orderId": "selyna_frames"
@@ -566,7 +566,7 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Bricks for a Second Kiln",
+      "title": "Bricks for a New Oven",
       "steps": [
         {
           "id": "pitchpot_brew",
@@ -587,11 +587,11 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Open Selyna's Keep",
+      "title": "Open Selyna's Castle",
       "steps": [
         {
           "id": "door_open",
-          "label": "Spend 2 Gold Keys on the fog around the keep",
+          "label": "Use 2 Gold Keys on the clouds around the castle",
           "goal": {
             "kind": "region",
             "regionId": "borealis_keep"
@@ -612,7 +612,7 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Light for the Long Dark",
+      "title": "Lamps for the Long Night",
       "steps": [
         {
           "id": "lamplight_brew",
@@ -633,11 +633,11 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "What She Will Take",
+      "title": "A Gift for Selyna",
       "steps": [
         {
           "id": "take_faggot",
-          "label": "Make 2 Glass Buoys",
+          "label": "Make 2 Glass Floats",
           "goal": {
             "kind": "have",
             "chain": "seaglass",
@@ -647,7 +647,7 @@
         },
         {
           "id": "take_deliver",
-          "label": "Deliver 2 Glass Buoys to Selyna",
+          "label": "Deliver 2 Glass Floats to Selyna",
           "goal": {
             "kind": "order",
             "orderId": "selyna_buoys"
@@ -655,7 +655,7 @@
         },
         {
           "id": "take_flowers",
-          "label": "Give Selyna 3 Ground Lenses",
+          "label": "Give Selyna 3 Glass Lenses from your Bag",
           "goal": {
             "kind": "gift",
             "characterId": "selyna",
@@ -675,11 +675,11 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Something That Points",
+      "title": "Make Magnet Rocks",
       "steps": [
         {
           "id": "lodestones_brew",
-          "label": "Brew 3 Lodestones",
+          "label": "Brew 3 Magnet Rocks",
           "goal": {
             "kind": "brew",
             "recipeId": "lodestone",
@@ -696,7 +696,7 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Forge Two Helms",
+      "title": "Make Two Horned Helmets",
       "rewards": {
         "coins": 160,
         "spawn": {
@@ -708,7 +708,7 @@
       "steps": [
         {
           "id": "hulls_pair",
-          "label": "Forge 2 Horned Helms",
+          "label": "Make 2 Horned Helmets",
           "goal": {
             "kind": "have",
             "chain": "warhelm",
@@ -723,11 +723,11 @@
       "chapter": 12,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Spin It Fine",
+      "title": "Weave Light Cloth",
       "steps": [
         {
           "id": "skeins_brew",
-          "label": "Brew 3 Woven Bolts",
+          "label": "Brew 3 Light Cloths",
           "goal": {
             "kind": "brew",
             "recipeId": "woven_bolt",
@@ -744,14 +744,14 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Stock the Pitchworks",
+      "title": "Make an Ember Heart",
       "rewards": {
         "coins": 130
       },
       "steps": [
         {
           "id": "pitchworks_ember",
-          "label": "Render 1 Ember Heart",
+          "label": "Make 1 Ember Heart",
           "goal": {
             "kind": "have",
             "chain": "emberheart",
@@ -766,11 +766,11 @@
       "chapter": 12,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Split the Nodule",
+      "title": "Make Rune Chips",
       "steps": [
         {
           "id": "runeshards_brew",
-          "label": "Fire an Ember Heart into Rune Shards",
+          "label": "Brew Rune Chips from an Ember Heart",
           "goal": {
             "kind": "brew",
             "recipeId": "rune_shard",
@@ -787,11 +787,11 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Raise a Second Forge",
+      "title": "Build a Second Forge",
       "steps": [
         {
           "id": "longhall_hull",
-          "label": "Merge 3 Banded Helms into a Horned Helm",
+          "label": "Merge 3 Iron Helmets into a Horned Helmet",
           "goal": {
             "kind": "have",
             "chain": "warhelm",
@@ -801,7 +801,7 @@
         },
         {
           "id": "longhall_build",
-          "label": "Raise a 2nd Wreck Forge from 3 Bellows",
+          "label": "Build a second Shipwreck Forge from 3 Bellows",
           "goal": {
             "kind": "have",
             "chain": "wreckforge",
@@ -824,7 +824,7 @@
       "steps": [
         {
           "id": "terms_regard",
-          "label": "Earn a place at Selyna's fire",
+          "label": "Fill 1 of Selyna's hearts",
           "goal": {
             "kind": "regard",
             "characterId": "selyna",
@@ -833,7 +833,7 @@
         },
         {
           "id": "terms_bloom",
-          "label": "Build an Orrery from 9 Ground Lenses",
+          "label": "Build a Star Machine from 9 Glass Lenses",
           "goal": {
             "kind": "have",
             "chain": "orrery",
@@ -843,7 +843,7 @@
         },
         {
           "id": "terms_spindle",
-          "label": "Weave 2 Aurora Cloaks",
+          "label": "Make 2 Aurora Cloaks",
           "goal": {
             "kind": "have",
             "chain": "auroraweave",
@@ -874,14 +874,14 @@
       "chapter": 12,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Wake the Rimewyrm",
+      "title": "Wake the Ice Dragon",
       "rewards": {
         "coins": 280
       },
       "steps": [
         {
           "id": "rimewyrm_hatch",
-          "label": "Merge 3 Rimewyrm Eggs into the Rimewyrm",
+          "label": "Merge 3 Ice Dragon Eggs into the Ice Dragon",
           "goal": {
             "kind": "have",
             "chain": "rimewyrm",
@@ -914,11 +914,11 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "The Seeing Stones",
+      "title": "Make Two Crystals",
       "steps": [
         {
           "id": "elder_stones",
-          "label": "Make 2 Cut Crystals",
+          "label": "Make 2 Crystals",
           "goal": {
             "kind": "have",
             "chain": "quartz",
@@ -940,11 +940,11 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "Green Over the Ash",
+      "title": "Make Two Moss Piles",
       "steps": [
         {
           "id": "elder_bales",
-          "label": "Make 2 Green Bales",
+          "label": "Make 2 Moss Piles",
           "goal": {
             "kind": "have",
             "chain": "ashmoss",
@@ -966,11 +966,11 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "The Old Forest",
+      "title": "Grow Two Big Trees",
       "steps": [
         {
           "id": "elder_firs",
-          "label": "Grow 2 Fir Trees",
+          "label": "Grow 2 Big Trees",
           "goal": {
             "kind": "have",
             "chain": "firgrain",
@@ -992,7 +992,7 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "Kindle the Brood",
+      "title": "Raise Two Red Dragons",
       "steps": [
         {
           "id": "elder_dragons",
@@ -1018,11 +1018,11 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "Gold in Hand",
+      "title": "Fill Two Bags of Gold",
       "steps": [
         {
           "id": "elder_pouches",
-          "label": "Make 2 Gold Pouches",
+          "label": "Make 2 Bags of Gold",
           "goal": {
             "kind": "have",
             "chain": "coin",
@@ -1044,7 +1044,7 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "Grow, Keeper",
+      "title": "Reach Level 4",
       "steps": [
         {
           "id": "elder_level4",
@@ -1067,11 +1067,11 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "The Berry Mothers",
+      "title": "Grow Two Big Berry Bushes",
       "steps": [
         {
           "id": "elder_berries",
-          "label": "Grow 2 Ripe Emberberry Plants",
+          "label": "Grow 2 Big Berry Bushes",
           "goal": {
             "kind": "have",
             "chain": "strawberry",
@@ -1093,11 +1093,11 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "The Cold Light",
+      "title": "Fill Three Dew Bottles",
       "steps": [
         {
           "id": "elder_vials",
-          "label": "Make 3 Dew Vials",
+          "label": "Make 3 Dew Bottles",
           "goal": {
             "kind": "have",
             "chain": "moonwater",
@@ -1119,7 +1119,7 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "The Far-Sight",
+      "title": "Make a Crystal Ball",
       "steps": [
         {
           "id": "elder_ball",
@@ -1145,7 +1145,7 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "Rise Higher Still",
+      "title": "Reach Level 5",
       "steps": [
         {
           "id": "elder_level5",
@@ -1168,11 +1168,11 @@
       "lockedUntil": {
         "quest": "keepers_hoard"
       },
-      "title": "Two Flames, One Crown",
+      "title": "Raise a Big Red Dragon",
       "steps": [
         {
           "id": "elder_adult",
-          "label": "Merge 2 Red Dragons into an Adult",
+          "label": "Merge 2 Red Dragons into a Big Red Dragon",
           "goal": {
             "kind": "have",
             "chain": "ember_dragon",

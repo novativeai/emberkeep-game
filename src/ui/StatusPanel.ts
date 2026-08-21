@@ -375,7 +375,7 @@ export class StatusPanel extends Phaser.GameObjects.Container {
     const want =
       meals > 0
         ? green >= DAILY_GREEN
-          ? ' · hungry, and wants greens'
+          ? ' · hungry, wants moss'
           : ' · still hungry'
         : green >= DAILY_GREEN
           ? ' · wants greens'

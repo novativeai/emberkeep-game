@@ -4355,7 +4355,7 @@ export class BoardScene extends Phaser.Scene {
     // Say it. The piece goes back to the satchel either way, but a held thing
     // that leaves the hand with no word for it reads as the game ignoring taps.
     const cam = this.cameras.main;
-    this.floatText(cam.midPoint.x, cam.midPoint.y - 260, 'Back in the satchel', PALETTE.cream);
+    this.floatText(cam.midPoint.x, cam.midPoint.y - 260, 'Back in your Bag', PALETTE.cream);
     this.ctx.bus.emit('bag:give_cancelled', {});
   }
 
@@ -5903,7 +5903,7 @@ export class BoardScene extends Phaser.Scene {
       // It turned its head away. Bounce the piece home and say so where the
       // player is looking, rather than in a corner of the HUD.
       obj.settleFromDrag();
-      this.floatText(target.x, target.y - 190, 'It turns its head away', PALETTE.cream);
+      this.floatText(target.x, target.y - 190, 'No thanks!', PALETTE.cream);
       return false;
     }
     obj.settleFromDrag();
@@ -7151,7 +7151,7 @@ export class BoardScene extends Phaser.Scene {
             Phaser.Math.Distance.Between(b.x, b.y, sprite.x, sprite.y)
         )[0];
     if (!house) {
-      this.floatText(sprite.x, sprite.y - 150, 'Nothing to work yet', PALETTE.cream);
+      this.floatText(sprite.x, sprite.y - 150, 'Nothing to do here yet', PALETTE.cream);
       return;
     }
     this.busyDragons.add(sprite.itemId);

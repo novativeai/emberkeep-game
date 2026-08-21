@@ -272,8 +272,8 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     // choice is made, not only in the refusal.
     this.helper.setText(
       cap <= 1
-        ? 'Choose one — this house will make it, and only it, from now on.\nA House works simple pieces: tier one. A Manor takes tier two.'
-        : 'Choose one — this manor will make it, and only it, from now on.\nA Manor works pieces of tier one and two.'
+        ? 'Pick one thing. This House will make it from now on.\nA House makes small things (level 1). A Mansion can make level 2 things too.'
+        : 'Pick one thing. This Mansion will make it from now on.\nA Mansion makes level 1 and level 2 things.'
     );
     // The PURSE is the first thing a building can be pointed at, at the rank it
     // can work: a House sees Gold Coins, a Manor sees Gold Pouches. It is the

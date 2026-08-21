@@ -118,7 +118,7 @@ export class NamePanel extends Phaser.GameObjects.Container {
       })
       .setOrigin(0.5);
     const sub = scene.add
-      .text(0, -FRAME_H / 2 + 168, 'Say it out loud. Names don’t take unless something hears them.', {
+      .text(0, -FRAME_H / 2 + 168, 'Pick a name she will love. She will keep it forever.', {
         fontFamily: FONT.display, fontSize: '34px', color: PALETTE.cream, wordWrap: { width: FRAME_W - 160 }, align: 'center'
       })
       .setOrigin(0.5)

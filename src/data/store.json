@@ -2,22 +2,22 @@
   "sections": [
     {
       "id": "skins",
-      "title": "Manor Skins",
-      "blurb": "Rebuild the Manor as something else entirely. Cosmetic only — it earns exactly what it earned before.",
+      "title": "Mansion Looks",
+      "blurb": "Give your Mansion a brand new look. It still makes the same Gold.",
       "kind": "skin",
       "items": [
         {
           "id": "manor_mushroom",
           "name": "Mushroom Cottage",
-          "blurb": "Grown, not built. The cap sheds ash the way a roof sheds rain.",
+          "blurb": "Grown, not built. The big cap keeps the ash off like a roof keeps off rain.",
           "art": "skin_manor_mushroom",
           "gold": 250,
           "world": "emberkeep"
         },
         {
           "id": "manor_windmill",
-          "name": "The Old Windmill",
-          "blurb": "It ground grain before the ash. The sails still catch the updraft.",
+          "name": "Old Windmill",
+          "blurb": "It ground flour before the fire. The sails still turn in the wind.",
           "art": "skin_manor_windmill",
           "gold": 400,
           "world": "emberkeep"
@@ -25,15 +25,15 @@
         {
           "id": "manor_treehouse",
           "name": "Great Tree House",
-          "blurb": "The isle kept one tree through the burning. Someone moved in.",
+          "blurb": "One tree survived the fire. Someone built a house in it.",
           "art": "skin_manor_treehouse",
           "gold": 600,
           "world": "emberkeep"
         },
         {
           "id": "manor_igloo",
-          "name": "The Igloo",
-          "blurb": "Cut from Borealis ice, hauled south, and still not melting.",
+          "name": "Igloo",
+          "blurb": "Cut from Borealis ice and carried south. It still has not melted.",
           "art": "skin_manor_igloo",
           "gold": 750,
           "world": "borealis"
@@ -43,13 +43,13 @@
     {
       "id": "decor",
       "title": "Decorations",
-      "blurb": "Placed on the first free tile when you buy it. Purely yours — nothing merges with it. The landmarks at the end are monuments: they are meant to be seen from across the isle.",
+      "blurb": "Placed on a free tile when you buy it. Just for fun — nothing merges with it. The big ones at the end can be seen from across the island.",
       "kind": "decor",
       "items": [
         {
           "id": "ash_urn",
-          "name": "Ash Urn",
-          "blurb": "The isle went to ash. Keeping some is how the line remembered.",
+          "name": "Ash Pot",
+          "blurb": "The island turned to ash. Keeping a little of it helps us remember.",
           "art": "decor_ash_urn",
           "gold": 120,
           "world": "emberkeep"
@@ -57,15 +57,15 @@
         {
           "id": "watch_bell",
           "name": "Watch Bell",
-          "blurb": "How a keeper called the dragons home. There were dragons then.",
+          "blurb": "Keepers rang this bell to call the dragons home.",
           "art": "decor_watch_bell",
           "gold": 160,
           "world": "emberkeep"
         },
         {
           "id": "rekindled_step",
-          "name": "Rekindled Step",
-          "blurb": "Moss through a cracked stair, gold in the fracture.",
+          "name": "Mossy Step",
+          "blurb": "Moss growing through a cracked step, with gold in the crack.",
           "art": "decor_rekindled_step",
           "gold": 200,
           "world": "emberkeep"
@@ -73,7 +73,7 @@
         {
           "id": "chain_anchor",
           "name": "Chain Anchor",
-          "blurb": "One cleat, one chain, one island held up. There are thousands.",
+          "blurb": "One hook, one chain, one island held up. There are thousands of them.",
           "art": "decor_chain_anchor",
           "gold": 240,
           "world": "emberkeep"
@@ -81,31 +81,31 @@
         {
           "id": "ice_lantern",
           "name": "Ice Lantern",
-          "blurb": "A flame kept inside ice. Someone north of here does this.",
+          "blurb": "A flame kept inside ice. Someone up north knows how to do this.",
           "art": "decor_ice_lantern",
           "gold": 300,
           "world": "borealis"
         },
         {
           "id": "frozen_spill",
-          "name": "Frozen Spill",
-          "blurb": "A waterfall that stopped mid-fall and has not moved since.",
+          "name": "Frozen Waterfall",
+          "blurb": "A waterfall that froze in the middle of falling.",
           "art": "decor_frozen_spill",
           "gold": 340,
           "world": "borealis"
         },
         {
           "id": "rune_pad",
-          "name": "Rune Pad",
-          "blurb": "Moon-order line-work under snow. It still glows. Nobody lit it.",
+          "name": "Rune Stone",
+          "blurb": "Glowing lines under the snow. Nobody lit them, but they still glow.",
           "art": "decor_rune_pad",
           "gold": 380,
           "world": "borealis"
         },
         {
           "id": "drift_cairn",
-          "name": "Drift Cairn",
-          "blurb": "Stones, a float of green glass, a ribbon of woven light. A greeting.",
+          "name": "Stone Pile",
+          "blurb": "Stones, a green glass ball and a ribbon of light. A way of saying hello.",
           "art": "decor_drift_cairn",
           "gold": 420,
           "world": "borealis"
@@ -113,7 +113,7 @@
         {
           "id": "keeper_statue",
           "name": "The First Keeper",
-          "blurb": "Carved while she was still alive, which she never forgave. The whelp at her feet is nobody anyone can name.",
+          "blurb": "A statue of the very first Keeper. The little dragon at her feet is a mystery.",
           "art": "decor_keeper_statue",
           "gold": 900,
           "world": "emberkeep"
@@ -121,7 +121,7 @@
         {
           "id": "broken_arch",
           "name": "The Broken Gate",
-          "blurb": "Everything that ever came home came through here. It has not closed since the burning, because it cannot.",
+          "blurb": "Everyone who ever came home walked through this gate. It has been open since the fire.",
           "art": "decor_broken_arch",
           "gold": 1100,
           "world": "emberkeep"
@@ -129,7 +129,7 @@
         {
           "id": "ember_beacon",
           "name": "The Ember Beacon",
-          "blurb": "Lit at dusk, every dusk, for four hundred years. Nobody alive remembers what answered it.",
+          "blurb": "Lit every evening for four hundred years. Nobody remembers what answered it.",
           "art": "decor_ember_beacon",
           "gold": 1300,
           "world": "emberkeep"
@@ -137,15 +137,15 @@
         {
           "id": "elder_bones",
           "name": "The Elder's Rest",
-          "blurb": "She came down here on purpose and let the ash take her. The moss got to her first.",
+          "blurb": "A very old dragon fell asleep here long ago. The moss covered her gently.",
           "art": "decor_elder_bones",
           "gold": 1500,
           "world": "emberkeep"
         },
         {
           "id": "tethered_isle",
-          "name": "The Tethered Isle",
-          "blurb": "A stray the keepers caught and moored before it drifted off. One tree came with it.",
+          "name": "The Tied Island",
+          "blurb": "A little island the Keepers caught with chains before it floated away. One tree came with it.",
           "art": "decor_tethered_isle",
           "gold": 1800,
           "world": "emberkeep"
@@ -154,14 +154,14 @@
     },
     {
       "id": "dragons",
-      "title": "Dragons",
-      "blurb": "A dragon is still coaxed, never bought — but the ones already yours can be dressed in any breed the sanctuary has met. Cosmetic only: same eggs, same gifts, same wait.",
+      "title": "Dragon Looks",
+      "blurb": "You cannot buy a dragon — but your own dragons can wear a new look. Same eggs, same food, same friends.",
       "kind": "dragon_skin",
       "items": [
         {
           "id": "frost",
           "name": "Frost",
-          "blurb": "Nested on the Borealis floes, scaled in clear ice, with the aurora burning through its wings.",
+          "blurb": "From the ice of Borealis, with the northern lights shining through its wings.",
           "art": "card_frost",
           "gold": 2400,
           "chain": "frost",
@@ -172,7 +172,7 @@
         {
           "id": "storm",
           "name": "Storm",
-          "blurb": "It does not shelter from the thunderheads. It climbs the spire and answers them.",
+          "blurb": "It does not hide from thunder. It flies up and roars back.",
           "art": "card_storm",
           "gold": 1600,
           "chain": "storm",
@@ -182,7 +182,7 @@
         {
           "id": "moonwhisker",
           "name": "Moonwhisker",
-          "blurb": "The Moonhold's own — all trailing ribbons and starlight, and far too shy to land near you.",
+          "blurb": "Ribbons and starlight, and far too shy to land near you.",
           "art": "card_moonwhisker",
           "gold": 900,
           "dragon": "emerald",
@@ -192,7 +192,7 @@
         {
           "id": "ashglass",
           "name": "Ashglass",
-          "blurb": "A night down in the caldera. Its scales cooled to black glass and the fire never went out.",
+          "blurb": "It spent a night in the volcano. Its scales turned to black glass, and the fire never went out.",
           "art": "card_ashglass",
           "gold": 900,
           "dragon": "ember_dragon",
@@ -202,7 +202,7 @@
         {
           "id": "porcelain",
           "name": "Porcelain",
-          "blurb": "Glazed like a temple vase, painted in cobalt, and mended with gold where it once broke.",
+          "blurb": "Shiny like a painted vase, with gold where it once cracked.",
           "art": "card_porcelain",
           "gold": 900,
           "dragon": "emerald",
