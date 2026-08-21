@@ -5339,7 +5339,7 @@ const TUT = (() => {
     switch (g.type) {
       case 'tap': return 'Tap to continue';
       case 'count': return `Board holds ${g.count}× ${chainName(g.chain, g.tier)}`;
-      case 'move': return `Carry ${chainName(g.chain)} into region ${g.region}`;
+      case 'move': return `Carry ${chainName(g.chain)}` + (g.region ? ` into region ${g.region}` : '') + (g.at ? ` to cell [${g.at[0]}, ${g.at[1]}]` : '');
       case 'event': {
         const ev = g.event.replace(/^ui:|^item:|^dragon:|^bag:|^regard:|^generator:|^character:|^marketplace:|^order:|^region:|^chest:/, '').replace(/_/g, ' ');
         const what = g.chain ? ` — ${chainName(g.chain)}` : '';
@@ -5587,10 +5587,19 @@ const TUT = (() => {
         el('input', { type: 'number', min: 1, value: g.count ?? 1, style: 'width:70px', oninput: (e) => { g.count = Number(e.target.value); mark(); } }))));
     } else if (g.type === 'move') {
       ed.append(el('label', {}, 'chain', el('input', { value: g.chain ?? '', list: 'tuChains', oninput: (e) => { g.chain = e.target.value; mark(); } })));
-      const rs = el('select', { onchange: (e) => { g.region = e.target.value; mark(); } });
+      const rs = el('select', { onchange: (e) => { if (e.target.value) g.region = e.target.value; else delete g.region; mark(); } });
+      rs.append(el('option', { value: '' }, '— any (cell only) —'));
       for (const r of st.ctx?.regions ?? []) rs.append(el('option', { value: r.id }, r.id));
-      rs.value = g.region;
+      rs.value = g.region ?? '';
       ed.append(el('label', {}, 'region', rs));
+      // The exact seat, optional: the director falls back to the region (or
+      // any drop) when the named cell is occupied, so this is a preference.
+      const atCell = (i) => el('input', { type: 'number', value: g.at?.[i] ?? '', placeholder: i ? 'row' : 'col', style: 'width:70px', oninput: (e) => {
+        const v = e.target.value;
+        if (v === '') { delete g.at; } else { g.at = [Number(g.at?.[0] ?? 0), Number(g.at?.[1] ?? 0)]; g.at[i] = Number(v); }
+        mark();
+      } });
+      ed.append(el('label', {}, 'at cell (optional)', el('div', { style: 'display:flex;gap:6px' }, atCell(0), atCell(1))));
     }
     ed.append(el('datalist', { id: 'tuChains' }, ...(st.ctx?.chains ?? []).map((c) => el('option', { value: c.id }, c.name))));
     // allow

@@ -84,6 +84,17 @@ describe('tutorialScripts (the file, read once)', () => {
     expect(errors.some((e) => e.includes('unknown tutorial "ghost"'))).toBe(true);
   });
 
+  it('a move gate needs a chain and a region and/or an [col,row] cell', () => {
+    const withGate = (gate: unknown): TutorialData => ({
+      steps: [{ ...tap('m1'), gate: gate as TutorialStepConfig['gate'] }]
+    });
+    expect(validateTutorialData(withGate({ type: 'move', chain: 'emberbark', at: [32, 0] }))).toEqual([]);
+    expect(validateTutorialData(withGate({ type: 'move', chain: 'emberbark', region: 'home' }))).toEqual([]);
+    expect(validateTutorialData(withGate({ type: 'move', chain: 'emberbark' })).join(';')).toMatch(/region and\/or/);
+    expect(validateTutorialData(withGate({ type: 'move', region: 'home' })).join(';')).toMatch(/needs a chain/);
+    expect(validateTutorialData(withGate({ type: 'move', chain: 'emberbark', at: [1] })).join(';')).toMatch(/\[col, row\]/);
+  });
+
   it('no mid-game trigger is met before the main script is done', () => {
     const scripts = scriptsOf(fixture);
     const pots = scripts[1]!;

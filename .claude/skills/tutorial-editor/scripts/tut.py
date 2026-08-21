@@ -73,7 +73,8 @@ def describe_gate(g):
     if t == "count":
         return f"board holds {g['count']}x {g['chain']} t{g['tier']}"
     if t == "move":
-        return f"carry {g['chain']} into {g['region']}"
+        where = (f" into {g['region']}" if g.get("region") else "") + (f" to cell {g['at']}" if g.get("at") else "")
+        return f"carry {g['chain']}{where}"
     if t == "event":
         return f"event {g['event']}" + (f" ({g['chain']})" if g.get("chain") else "") + (f" pay {g['currency']}" if g.get("currency") else "")
     return json.dumps(g)

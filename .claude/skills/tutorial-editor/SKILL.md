@@ -43,7 +43,7 @@ A **script** is a sequence of **steps** (beats). The main script plays from the 
 **A step's four facets** — what the editor shows per card, and what `tut show` prints:
 
 - **Elements** — what it highlights (`highlight`), what the hand carries (`hand.from → to`) or points at (`hand.ui` / `fogRegion`), what the arrow points at (`arrow`, `arrowThen` after a character is armed), what its gate names, what it spawns, who speaks.
-- **Actions** — the **gate** (what the player must do: `tap`, `event` + chain/currency, `count`, `move`), then the **effects** fired once on entry (`spawn`, `retier`, `grantKeys`, `grantXp`, `nameDragon`, `wantGift`, `openCodex`, `sleepDragon`).
+- **Actions** — the **gate** (what the player must do: `tap`, `event` + chain/currency, `count`, `move` = carry a chain into a `region` and/or onto an `at` `[col,row]` cell), then the **effects** fired once on entry (`spawn`, `retier`, `grantKeys`, `grantXp`, `nameDragon`, `wantGift`, `openCodex`, `sleepDragon`).
 - **Dialogue** — `speaker` + `text`. Eleanor's voice rules in `docs/story-bible.md` §5; names in `docs/naming.md`.
 - **States** — the `allow` contract (chips on/off over the base), panels the beat holds or opens (`codexHold`, `openCodex`), whether it is the last beat (hands the game back).
 

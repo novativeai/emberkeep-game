@@ -213,8 +213,13 @@ function validateStep(scriptId: string, step: TutorialStepConfig, i: number, ste
     const g = step.gate as { chain?: string; tier?: number; count?: number };
     if (!g.chain || !Number.isInteger(g.tier) || !Number.isInteger(g.count)) errors.push(`${at}: count gate needs chain, tier, count`);
   } else if (gate.type === 'move') {
-    const g = step.gate as { chain?: string; region?: string };
-    if (!g.chain || !g.region) errors.push(`${at}: move gate needs chain and region`);
+    // A carry lands in a REGION, on a CELL, or both; with neither the gate is
+    // "dropped anywhere", which a wiggle on the spot satisfies — refused.
+    const g = step.gate as { chain?: string; region?: string; at?: unknown };
+    const cell = Array.isArray(g.at) && g.at.length === 2 && g.at.every((n) => Number.isInteger(n));
+    if (!g.chain) errors.push(`${at}: move gate needs a chain`);
+    if (g.at !== undefined && !cell) errors.push(`${at}: move gate 'at' must be [col, row]`);
+    if (!g.region && g.at === undefined) errors.push(`${at}: move gate needs a region and/or an 'at' cell`);
   }
   if (step.effects !== undefined && !Array.isArray(step.effects)) errors.push(`${at}: effects must be an array`);
   if (step.highlight !== undefined && !Array.isArray(step.highlight)) errors.push(`${at}: highlight must be an array`);
