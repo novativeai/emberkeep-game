@@ -876,16 +876,21 @@ export type TutorialGate =
    * gate is the drop landing inside the named region's tiles, so a wiggle on
    * the spot cannot satisfy it. Requires `allow.drag` to include the chain.
    *
-   * `at` narrows it from the field to ONE CELL — the cell the beat's hand
-   * already points at. Without it the lesson said "beside me" and accepted the
-   * far corner of the same slab, so the gesture the player was shown and the
-   * gesture the game asked for were two different gestures. With it they are
-   * one, and a drop anywhere else simply leaves the hand pointing (the piece
-   * stays draggable, so there is nothing to be stuck in). A cell somebody else
-   * is standing on cannot be asked for, and the director falls back to the
-   * field there rather than to a dead beat.
+   * `at` narrows it to ONE CELL — the cell the beat's hand already points at.
+   * Without it the lesson said "out there" and accepted any tile of a field, so
+   * the gesture the player was shown and the gesture the game asked for were
+   * two different gestures. With it they are one, and a drop anywhere else
+   * simply leaves the hand pointing (the piece stays draggable, so there is
+   * nothing to be stuck in). A cell somebody else is standing on cannot be
+   * asked for, and the director falls back to the field (or to any drop, when
+   * no field is named) rather than to a dead beat.
+   *
+   * `region` is optional once `at` is given: the lesson's seat is on one of
+   * the small islands, and those belong to NO region — they are open ground
+   * from the first frame, with no authored cloud over them. A gate names at
+   * least one of the two.
    */
-  | { type: 'move'; chain: string; region: string; at?: [number, number] };
+  | { type: 'move'; chain: string; region?: string; at?: [number, number] };
 
 export interface TutorialAllow {
   /** Chain ids the player may drag ('*' = all). */

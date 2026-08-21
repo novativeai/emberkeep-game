@@ -726,6 +726,18 @@ function applyTutorialEffects(
   }
 }
 
+/**
+ * Is this cell standing in the open right now? A cell some region owns is open
+ * when that region's fog is lifted; a cell NO region owns is open by
+ * construction — every fogged cell is an authored cloud (the build asserts it),
+ * so ground nobody clouded was never covered. The small islands are all such
+ * cells, which is why a move gate may name one without naming a region.
+ */
+function cellOpen(world: WorldModel, map: MapData, [col, row]: [number, number]): boolean {
+  const owner = map.regions.find((r) => r.tiles.some(([c, rr]) => c === col && rr === row));
+  return !owner || world.regions.has(owner.id);
+}
+
 function satisfyGate(
   world: WorldModel,
   data: AuditData,
@@ -747,14 +759,22 @@ function satisfyGate(
         at,
         message: `move gate wants a '${gate.chain}' carried, but none is on the board`
       });
-    } else if (!world.regions.has(gate.region)) {
+    } else if (gate.region && !world.regions.has(gate.region)) {
       findings.push({
         severity: 'error',
         at,
         message: `move gate wants '${gate.chain}' carried into region '${gate.region}', which is not open yet — the tutorial deadlocks here`
       });
+    } else if (gate.at && !cellOpen(world, data.map, gate.at)) {
+      findings.push({
+        severity: 'error',
+        at,
+        message: `move gate wants '${gate.chain}' carried onto [${gate.at}], which is still under fog — the tutorial deadlocks here`
+      });
     } else {
-      actions.push(`carry ${key} into region '${gate.region}'`);
+      actions.push(
+        gate.at ? `carry ${key} onto [${gate.at}]` : `carry ${key} into region '${gate.region}'`
+      );
     }
     return;
   }

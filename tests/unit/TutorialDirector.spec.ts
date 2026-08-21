@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import tutorial from '../../src/data/tutorial.json';
 import authoredMap from '../../src/data/map.json';
 import { GameContext } from '../../src/core/Context';
+import { buildWorlds, zoneAt } from '../../src/core/world';
 import type { MapData, MarkerPoint, TutorialAllow, TutorialStepConfig } from '../../src/core/types';
 import { capture, createTestContext, MemoryStorage } from './helpers';
 
@@ -364,25 +365,32 @@ describe('the tutorial pointer tracks live pieces', () => {
  */
 describe('a move beat that names its cell', () => {
   const moveSteps = steps.filter(
-    (s): s is TutorialStepConfig & { gate: { type: 'move'; region: string; at?: [number, number] } } =>
+    (s): s is TutorialStepConfig & { gate: { type: 'move'; region?: string; at?: [number, number] } } =>
       s.gate.type === 'move'
   );
 
-  it('points its hand at the very cell it asks for, inside the region, on free ground', () => {
+  it('points its hand at the very cell it asks for, on real open ground', () => {
     const map = authoredMap as unknown as MapData;
-    const playable = new Set((map.playable ?? []).map(([c, r]) => `${c},${r}`));
+    // The WORLD's playable set, not map.json's: the seat is on one of the small
+    // islands, which live in zones.json and never in the authored list. Asking
+    // the authored list would call every island "not ground".
+    const world = buildWorlds(map).get('emberkeep')!;
     for (const step of moveSteps) {
       const at = step.gate.at;
       if (!at) continue;
       const key = `${at[0]},${at[1]}`;
-      const region = map.regions.find((r) => r.id === step.gate.region)!;
-      // In the field it belongs to — the lesson is still "out onto the new land".
-      expect(region.tiles.some(([c, r]) => c === at[0] && r === at[1])).toBe(true);
       // Real ground, or the drop it demands cannot happen at all.
-      expect(playable.has(key)).toBe(true);
-      // Not a cell the region's own contents are dropped onto when it opens:
-      // the beat would then ask for a seat the map itself had already taken.
-      expect((region.contents ?? []).some((c) => c.at[0] === at[0] && c.at[1] === at[1])).toBe(false);
+      expect(world.playable.has(key)).toBe(true);
+      const owner = map.regions.find((r) => r.tiles.some(([c, r2]) => c === at[0] && r2 === at[1]));
+      if (step.gate.region) {
+        // A gate that names a field asks for a cell IN that field.
+        expect(owner?.id).toBe(step.gate.region);
+      }
+      // Not a cell a region's own contents drop onto when it opens: the beat
+      // would then ask for a seat the map itself had already taken.
+      expect((owner?.contents ?? []).some((c) => c.at[0] === at[0] && c.at[1] === at[1])).toBe(false);
+      // Not a cell anything is seeded on at the start, either.
+      expect((map.startingItems ?? []).some((p) => p.at[0] === at[0] && p.at[1] === at[1])).toBe(false);
       // And the same cell the hand flies to. Two numbers that must agree is the
       // whole defect this gate exists to fix, so they are checked, not trusted.
       const hand = step.hand;
@@ -390,7 +398,20 @@ describe('a move beat that names its cell', () => {
     }
   });
 
-  it('is not answered by the rest of the field, and is answered by its own cell', () => {
+  it('sends the stump to the lava-well isle — the ZONE, not merely the address', () => {
+    // A zone's (col,row) block is assigned by build-zones in id order, so
+    // allocating cells to an older, still-empty grid renumbers every zone after
+    // it. The address [29,0] would then still be playable — on a different
+    // island. The zone id is the thing that does not move, so it is what the
+    // lesson's seat is pinned to: g1785784158634 is the 2x1 ledge at the LEFT
+    // of the lava well, east of the Ember Gate (Grille 21 in the editor) — the
+    // owner placed the stump there by hand and asked for exactly that spot.
+    const world = buildWorlds(authoredMap as unknown as MapData).get('emberkeep')!;
+    const at = (steps[stepAt('board_room')]!.gate as { at: [number, number] }).at;
+    expect(zoneAt(world, at[0], at[1])?.id).toBe('g1785784158634');
+  });
+
+  it('is not answered by the next tile over, and is answered by its own cell', () => {
     const ctx = onAuthoredIsle();
     const idx = stepAt('board_room');
     ctx.state.tutorialIndex = idx;
@@ -398,10 +419,8 @@ describe('a move beat that names its cell', () => {
     const stump = ctx.state.addItem({ chain: 'emberbark', tier: 1, col: 7, row: 3, kind: 'item' });
     const from = { col: 7, row: 3 };
 
-    // Same region, wrong tile — and deliberately the tile NEAREST Eleanor, the
-    // one a player who misreads "out onto the field" would reach for first.
-    const near = { col: 6, row: 2 };
-    expect(near).not.toEqual({ col: at[0], row: at[1] });
+    // The same island, one tile over: close, and not the lesson.
+    const near = { col: at[0] + 1, row: at[1] };
     ctx.bus.emit('item:moved', { itemId: stump.id, from, to: near });
     expect(ctx.state.tutorialIndex).toBe(idx);
 
@@ -409,7 +428,7 @@ describe('a move beat that names its cell', () => {
     expect(ctx.state.tutorialIndex).toBe(idx + 1);
   });
 
-  it('falls back to the field when its cell is under someone else', () => {
+  it('accepts the drop anyway when its cell is under someone else', () => {
     // A beat whose one answer is occupied is a dead save — and during this
     // lesson only the stump may be dragged, so the player could not clear it.
     const ctx = onAuthoredIsle();
@@ -422,7 +441,7 @@ describe('a move beat that names its cell', () => {
     ctx.bus.emit('item:moved', {
       itemId: stump.id,
       from: { col: 7, row: 3 },
-      to: { col: 6, row: 2 }
+      to: { col: at[0] + 1, row: at[1] }
     });
     expect(ctx.state.tutorialIndex).toBe(idx + 1);
   });

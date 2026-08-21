@@ -5044,8 +5044,44 @@ export class BoardScene extends Phaser.Scene {
    */
   private followTutorialPointer(step: TutorialStepEvent): void {
     if (step.done) return; // the hand-over step: the board is the player's again
-    const at = this.pointerWorldPoint(step.hand ?? step.arrow);
+    const hand = step.hand;
+    if (hand && 'from' in hand) {
+      // A CARRY HAS TWO ENDS, and the player has to see both. Following the
+      // piece alone was right while every drop landed a tile or two away; the
+      // board-hygiene beat now carries the stump to another island, and a
+      // camera parked on the piece left the destination off the edge of the
+      // frame — the player dragged toward a place they could not see, and the
+      // hand flew out of view on every loop. Framing the pair shows the whole
+      // gesture; `bringPairIntoView` still moves nothing when both ends are
+      // already comfortably in frame.
+      const from = worldPointOf(this.ctx.state.world, hand.from.col, hand.from.row);
+      const to = worldPointOf(this.ctx.state.world, hand.to.col, hand.to.row);
+      this.bringPairIntoView(from, to);
+      return;
+    }
+    const at = this.pointerWorldPoint(hand ?? step.arrow);
     if (at) this.bringIntoView(at);
+  }
+
+  /**
+   * Both ends of a carry, comfortably in frame — centred on their midpoint
+   * when either one is not.
+   *
+   * The midpoint, not the destination: a player's finger has to START on the
+   * piece, so a camera that jumps to the drop leaves them hunting for what to
+   * pick up. Every shipped carry spans far less than the frame at any zoom
+   * this board reaches (the longest, 447 world px, against a comfortable inner
+   * box of 1219 at the tightest zoom), so the midpoint always shows both; a
+   * future carry longer than the frame would need a zoom, not a pan.
+   */
+  private bringPairIntoView(a: { x: number; y: number }, b: { x: number; y: number }): void {
+    const view = this.cameras.main.worldView;
+    const insetX = view.width * TUTORIAL_FOLLOW_INSET;
+    const insetY = view.height * TUTORIAL_FOLLOW_INSET;
+    const comfortable = (p: { x: number; y: number }): boolean =>
+      p.x >= view.x + insetX && p.x <= view.right - insetX && p.y >= view.y + insetY && p.y <= view.bottom - insetY;
+    if (comfortable(a) && comfortable(b)) return;
+    this.glideToWorld((a.x + b.x) / 2, (a.y + b.y) / 2, TUTORIAL_FOLLOW_MS);
   }
 
   /**

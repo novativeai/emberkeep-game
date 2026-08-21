@@ -225,9 +225,11 @@ export class TutorialDirector {
       const step = this.currentStep;
       if (!step || step.gate.type !== 'move') return;
       if (this.state.items.get(itemId)?.chain !== step.gate.chain) return;
-      const gate = step.gate as { region: string; at?: [number, number] };
-      const region = this.state.map.regions.find((r) => r.id === gate.region);
-      if (!region?.tiles.some(([c, r]) => c === to.col && r === to.row)) return;
+      const gate = step.gate as { region?: string; at?: [number, number] };
+      if (gate.region) {
+        const region = this.state.map.regions.find((r) => r.id === gate.region);
+        if (!region?.tiles.some(([c, r]) => c === to.col && r === to.row)) return;
+      }
       if (!this.landedWhereAsked(gate.at, to)) return;
       this.advance();
     });
@@ -246,8 +248,9 @@ export class TutorialDirector {
    * always was. True as well when the named cell is OCCUPIED: a beat whose one
    * answer is under someone else's feet is a dead save, and during this lesson
    * only the lesson's own chain may be dragged, so the player would have no way
-   * to clear it. Falling back to the field is the honest failure — the lesson
-   * still happens, just without its exact seat.
+   * to clear it. Falling back to the field — or, with no field named, to any
+   * drop at all — is the honest failure: the lesson still happens, just without
+   * its exact seat.
    */
   private landedWhereAsked(at: [number, number] | undefined, to: TilePos): boolean {
     if (!at) return true;
