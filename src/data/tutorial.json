@@ -311,7 +311,7 @@
     {
       "id": "name_choose",
       "speaker": "eleanor",
-      "text": "Type a name and tap OK. She will keep it forever.",
+      "text": "Type a name for your Red Dragon and tap OK. She will keep it forever.",
       "gate": {
         "type": "event",
         "event": "dragon:named",
@@ -1525,7 +1525,7 @@
     {
       "id": "resin_pocket",
       "speaker": "eleanor",
-      "text": "One Sap Drop rolled away. Tap it to put it in your Bag. You will need it in a moment.",
+      "text": "One Sap Drop rolled away. Tap it to put it in your Bag.",
       "gate": {
         "type": "event",
         "event": "bag:stored",
@@ -1564,7 +1564,7 @@
     {
       "id": "house_commission",
       "speaker": "eleanor",
-      "text": "Tap your House, then pick the Sap Drop from your Bag. Now your House makes Sap Drops forever!",
+      "text": "Tap your House, then pick what it should make. Pick the Gold Coin — your House will make coins forever!",
       "gate": {
         "type": "event",
         "event": "generator:produce_set"
