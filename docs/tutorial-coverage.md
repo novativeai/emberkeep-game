@@ -98,6 +98,19 @@ Eleanor herself are all rows: they are live from the first frame.
 | **Well-fed cycles** — the currency evolution is priced in | the segmented gauge under the dragon's art, and again under the silhouette | `codex_cycles`, `codex_reward` | one bubble for the rule (fill the hunger gauge inside a single `DRAGON_CYCLE_MS` window and that cycle banks, permanently), one for the payoff at six. The player has just banked meals toward their first, so the gauge they are reading is their own |
 | **Closing a panel** | every panel the tutorial opens | `codex_shut` | the last beat of the lesson drops `codexHold`, which is what puts the ✕ back on the page for the arrow to point at — the book is never dismissed out from under a beat, and it is never left open across the hand-off either |
 
+## Mid-game scripts (triggered tutorials)
+
+`tutorial.json` can carry scripts beyond the main one (`tutorials[]`, see
+`docs/pipelines.md` → Tutorial editor). Each plays once its trigger is met and
+the main script is done — "step 1 done", a quest latch, a level, arriving in a
+world, an observed bus event. They use the same beats, gates, hands and arrows
+as Chapter One, so the laws above apply to them unchanged, with one difference:
+a mid-game script's `allow` merges onto `everything` by default (a tip never
+takes the game away unless it says so), where the main script merges onto
+`nothing`. A concept a mid-game beat puts on screen needs its row in the ledger
+like any other; its teach-point is the beat's id. None ship yet — the
+machinery is in place for the first one.
+
 ## Deliberately not in Chapter One
 
 **The husbandry roster is HELD, not merely out of reach** — all of it but two.

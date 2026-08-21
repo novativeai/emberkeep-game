@@ -18,7 +18,7 @@ interface BoardCellText {
 interface RenderedGame {
   scene: string;
   fps: number;
-  tutorial: { step: string; index: number; total: number; done: boolean };
+  tutorial: { step: string; index: number; total: number; done: boolean; lesson: string | null };
   energy: { current: number; max: number };
   coins: number;
   keys: number;
@@ -207,10 +207,13 @@ window.render_game_to_text = (): RenderedGame => {
     scene,
     fps: Math.round(game.loop.actualFps),
     tutorial: {
-      step: state.tutorialDone ? 'done' : tutorialStep?.id ?? 'none',
+      // `currentStep` is the live beat of WHICHEVER script holds the board —
+      // the main one, or a mid-game lesson playing after it (tutorialScripts).
+      step: tutorialStep?.id ?? (state.tutorialDone ? 'done' : 'none'),
       index: state.tutorialIndex,
       total: ctx.data.tutorial.steps.length,
-      done: state.tutorialDone
+      done: state.tutorialDone,
+      lesson: ctx.systems.tutorial.activeScriptId
     },
     energy: { current: state.energyCurrent, max: state.energyMax },
     coins: state.coins,

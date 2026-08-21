@@ -27,6 +27,7 @@ const ALLOW_NOTHING: Required<TutorialAllow> = {
 function tutorialStep(ctx: GameContext, done: boolean): void {
   ctx.bus.emit('tutorial:step', {
     id: done ? 'done' : 'emberberry_merge',
+    tutorial: 'main',
     index: 0,
     total: 1,
     done,

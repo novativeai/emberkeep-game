@@ -621,6 +621,45 @@ never silently resize a piece on the board.
   need `pnpm dev` (that is where FAL_KEY and the python toolchain are); the
   session auto-save keeps the shapes and settings but not the images.
 
+## Tutorial editor (📜 tab → src/data/tutorial.json)
+
+The World Builder's 📜 Tutorial tab is the visual editor for the scripted
+tutorials; the `tutorial-editor` skill (`.claude/skills/tutorial-editor/`) is
+the same editor from the shell. Both go through ONE door, the dev server's
+`/__tutorial` API (`tools/tutorial-api/server.ts`, mounted in `vite.config.ts`):
+
+| route | does |
+|---|---|
+| `GET /__tutorial` | every script, main first — `{ scripts }` |
+| `GET /__tutorial/context` | picker data: chains + tiers, speakers, regions, quests, ui targets, gate events, allow keys, effect kinds, item art |
+| `PUT /__tutorial` | replace the file from `{ scripts }` |
+| `POST /__tutorial/op` | one atomic edit (`add_step`, `update_step`, `move_step`, `reorder`, `add_script`, …) |
+| `POST /__tutorial/validate` | shape check + `ftuecheck.py` |
+
+The MODEL (`src/core/tutorialScripts.ts`): the file's `steps` are the main
+script — `id: main`, trigger `start`, allowBase `nothing` — and `tutorials[]`
+are mid-game scripts, each `{ id, title?, trigger, allowBase?, steps }`.
+Triggers are all save-derivable (`step_done`, `tutorial_done`, `event`,
+`quest_done`, `level`, `world`, `stat`); a mid-game script also waits for the
+main one to finish, and only one script holds the board at a time. The
+director keeps mid-game progress in stats (`tut:<id>:step|done|started`), so
+it survives reload without a SAVE_VERSION bump; the main script keeps its
+persisted `tutorialIndex` exactly as before.
+
+Every write is validated BEFORE it lands (`validateTutorialData`: ids, trigger
+references, gate shapes) and the unit suite holds the committed file to the
+same rule. The per-beat laws (gate↔allow, bubble length, one verb) run over
+every script's beats in `ftuecheck.py`; the XP tune and the `levelup` beat
+remain the main script's alone.
+
+Each card on the tab shows a beat's four facets — **Elements** (highlights,
+hand, arrow, spawns, speaker), **Actions** (the gate as a sentence, then the
+on-entry effects), **Dialogue**, **States** (the allow contract over its base,
+held/opened panels, hand-back on the last beat). Editing is structured for the
+common shapes (speaker, gate, allow, drag list) and raw JSON for the rest;
+Save PUTs the file, Validate runs the audit. Inserting or reordering MAIN beats
+still shifts every persisted `tutorialIndex` — bump `SAVE_VERSION`.
+
 ## Multi-world authoring (🧩 Worlds & grids → src/data/zones.json)
 
 The builder is the authoring surface for everything `src/core/world.ts` can

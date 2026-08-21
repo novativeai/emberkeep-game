@@ -84,7 +84,13 @@ def skip_warmth_cost(remaining: float, total: float, max_gold: float, mult: floa
 # --------------------------------------------------------------------------- #
 # corpus
 # --------------------------------------------------------------------------- #
-steps = load("src", "data", "tutorial.json")["steps"]
+tutorial_doc = load("src", "data", "tutorial.json")
+steps = tutorial_doc["steps"]  # the MAIN script — the XP tune and the levelup beat are its alone
+# Every script's beats: the main one plus the mid-game `tutorials` (each plays
+# on its trigger once the main script is done). Per-beat laws — gate↔allow,
+# skip affordability, bubble length, one verb — hold for all of them.
+scripts = [("main", steps)] + [(t["id"], t.get("steps", [])) for t in tutorial_doc.get("tutorials", [])]
+all_steps = [s for _, ss in scripts for s in ss]
 chains = {c["id"]: c for c in load("src", "data", "chains.json")["chains"]}
 game_map = load("src", "data", "map.json")
 orders = load("src", "data", "orders.json")
@@ -117,7 +123,7 @@ def chains_in(ref) -> set[str]:
     return set()
 
 
-for step in steps:
+for step in all_steps:
     sid = f"step {step['id']}"
     gate = step.get("gate", {})
     allow = step.get("allow", {}) or {}
@@ -179,7 +185,7 @@ revealable = with_produce(
     {c["chain"] for r in game_map.get("regions", []) for c in r.get("contents", [])}
 )
 
-for step in steps:
+for step in all_steps:
     sid = f"step {step['id']}"
     # A step's own effects fire on the advance INTO it, before its pointers are
     # resolved (TutorialDirector.advance) — so they count for this step too.
@@ -213,7 +219,7 @@ for step in steps:
 # 3. dead stock: a region reveals a merge set the player cannot finish
 # --------------------------------------------------------------------------- #
 touched_by_tutorial: set[str] = set()
-for step in steps:
+for step in all_steps:
     gate = step.get("gate", {})
     if gate.get("chain"):
         touched_by_tutorial.add(gate["chain"])
@@ -257,6 +263,30 @@ for region in game_map.get("regions", []):
 # 4. the XP tune (law 7)
 # --------------------------------------------------------------------------- #
 order_ids = [o["id"] for o in orders["orders"]]
+# --------------------------------------------------------------------------- #
+# 4b. mid-game triggers point at things that exist (tutorialScripts.ts holds the
+#     same rule at write time; this is the commit-time copy)
+# --------------------------------------------------------------------------- #
+script_ids = {sid for sid, _ in scripts}
+step_owner = {s["id"]: sid for sid, ss in scripts for s in ss}
+for t in tutorial_doc.get("tutorials", []):
+    trig = t.get("trigger") or {}
+    where = f"tutorial {t.get('id')}"
+    kind = trig.get("type")
+    if kind == "start":
+        add("ERROR", "4", where, "only the main script starts at 'start'", "a second script claiming the opening never runs, or runs over Chapter One")
+    elif kind in ("step_done", "tutorial_done"):
+        if trig.get("tutorial") not in script_ids:
+            add("ERROR", "4", where, f"trigger names unknown tutorial '{trig.get('tutorial')}'", "the lesson can never start")
+        elif kind == "step_done" and step_owner.get(trig.get("step")) != trig.get("tutorial"):
+            add("ERROR", "4", where, f"trigger names step '{trig.get('step')}' which is not in '{trig.get('tutorial')}'", "the lesson can never start")
+    elif kind == "event" and not str(trig.get("event", "")).count(":"):
+        add("ERROR", "4", where, f"event trigger '{trig.get('event')}' is not a bus event", "never observed, never started")
+    elif kind not in ("step_done", "tutorial_done", "event", "quest_done", "level", "world", "stat"):
+        add("ERROR", "4", where, f"unknown trigger type '{kind}'", "the director cannot evaluate it")
+    if not t.get("steps"):
+        add("WARN", "4", where, "has no beats — a draft that never plays", "the trigger fires into nothing")
+
 levelup_at = next((i for i, s in enumerate(steps) if s["id"] == "levelup"), None)
 delivered = 0
 for i, step in enumerate(steps):
@@ -280,7 +310,7 @@ if granted and levelup_at is not None:
 # --------------------------------------------------------------------------- #
 # 5. can the player afford a scripted skip?
 # --------------------------------------------------------------------------- #
-for step in steps:
+for step in all_steps:
     gate = step.get("gate", {})
     if gate.get("type") != "event" or gate.get("event") != "generator:skipped":
         continue
@@ -307,7 +337,7 @@ for step in steps:
 # --------------------------------------------------------------------------- #
 # 6. bubble budget and one-verb-per-beat
 # --------------------------------------------------------------------------- #
-for step in steps:
+for step in all_steps:
     sid = f"step {step['id']}"
     text = step.get("text", "")
     if len(text) > BUBBLE_MAX:
@@ -328,7 +358,7 @@ LEDGER = os.path.join(ROOT, "docs", "tutorial-coverage.md")
 if not os.path.exists(LEDGER):
     add("ERROR", "1", "docs/tutorial-coverage.md", "the concept ledger is missing — coverage cannot be checked")
 else:
-    taught_ids = {s["id"] for s in steps} | set(load("src", "data", "dialogue.json").get("hints", {}))
+    taught_ids = {s["id"] for s in all_steps} | set(load("src", "data", "dialogue.json").get("hints", {}))
     rows = 0
     for line in read("docs", "tutorial-coverage.md").splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")] if line.strip().startswith("|") else []
