@@ -321,7 +321,11 @@ describe('zones — new ground beside the isle', () => {
     // drawn in the editor (Runevault replaced the measured Hatchery deck).
     // Runevault's fifth is the wooden landing at the foot of the stair: the Rune
     // Stair door stands on it, and a door needs ground under it to be reachable.
-    expect(checked).toBe(38 + 140 + 144 + 5);
+    // Emberkeep 38 → 40 on 2026-08-20: Grille 27 (the 2×1 south-east of the lava
+    // well) got its second cell and Grille 28 — a 1×1 beside it, empty until
+    // then — its first. Both sit on painted flagstone (audit:ground is clean on
+    // them); the drawing shifted the derived editor→art fit by 1–3 px everywhere.
+    expect(checked).toBe(40 + 140 + 144 + 5);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {

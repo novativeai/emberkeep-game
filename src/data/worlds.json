@@ -2,7 +2,7 @@
   "format": "emberkeep-worlds",
   "version": 1,
   "source": "assets/map/nionja-worlds.json",
-  "generatedBy": "scripts/export-editor-worlds.mjs (from the editor project on disk)",
+  "generatedBy": "Emberkeep Map Editor",
   "primary": "nb2",
   "teleport": {
     "trigger": "hatch",
@@ -905,42 +905,42 @@
               "j": 1,
               "x": 2747,
               "y": 1006,
-              "unlock": 3
+              "unlock": 1
             },
             {
               "i": 0,
               "j": 2,
               "x": 2615,
               "y": 1079,
-              "unlock": 3
+              "unlock": 1
             },
             {
               "i": 0,
               "j": 0,
               "x": 2879,
               "y": 933,
-              "unlock": 3
+              "unlock": 1
             },
             {
               "i": 1,
               "j": 0,
               "x": 3010,
               "y": 1006,
-              "unlock": 3
+              "unlock": 1
             },
             {
               "i": 1,
               "j": 1,
               "x": 2879,
               "y": 1079,
-              "unlock": 3
+              "unlock": 1
             },
             {
               "i": 1,
               "j": 2,
               "x": 2747,
               "y": 1152,
-              "unlock": 3
+              "unlock": 1
             }
           ]
         },
@@ -973,14 +973,14 @@
               "j": 0,
               "x": 2367,
               "y": 932,
-              "unlock": 3
+              "unlock": 1
             },
             {
               "i": 1,
               "j": 0,
               "x": 2494,
               "y": 1001,
-              "unlock": 3
+              "unlock": 1
             }
           ]
         },
@@ -1013,7 +1013,7 @@
               "j": 0,
               "x": 2861,
               "y": 760,
-              "unlock": 3
+              "unlock": 1
             }
           ]
         },
@@ -1227,7 +1227,14 @@
               "j": 0,
               "x": 2745,
               "y": 1293,
-              "unlock": 3
+              "unlock": 1
+            },
+            {
+              "i": 0,
+              "j": 0,
+              "x": 2608,
+              "y": 1220,
+              "unlock": 1
             }
           ]
         },
@@ -1254,7 +1261,15 @@
             "w": 303,
             "h": 143
           },
-          "cells": []
+          "cells": [
+            {
+              "i": 0,
+              "j": 0,
+              "x": 2473,
+              "y": 1292,
+              "unlock": 1
+            }
+          ]
         },
         {
           "id": "g1785784456558",
@@ -1285,7 +1300,7 @@
               "j": 0,
               "x": 2614,
               "y": 1371,
-              "unlock": 3
+              "unlock": 1
             }
           ]
         },
