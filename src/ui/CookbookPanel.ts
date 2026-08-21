@@ -276,10 +276,14 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
    * tier, whose Dew Basin belongs to a later chapter. The book counts what is
    * reachable, and now it computes that instead of assuming it.
    */
-  private enumerateRecipes(chains: ChainsData, discoverable: Set<string>): Recipe[] {
+  private enumerateRecipes(
+    chains: ChainsData,
+    discoverable: Set<string>,
+    worldId: string
+  ): Recipe[] {
     const out: Recipe[] = [];
     for (const chain of chains.chains) {
-      if (chain.id === 'golden_egg' || chainHiddenIn(chain, this.viewWorld)) continue;
+      if (chain.id === 'golden_egg' || chainHiddenIn(chain, worldId)) continue;
       for (const tier of chain.tiers) {
         const next = chain.tiers.find((t) => t.tier === tier.tier + 1);
         if (!next) continue;
@@ -435,6 +439,34 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   }
 
   /**
+   * THE AUDIT FOR ONE WORLD — and the whole reason a page can be wrong.
+   *
+   * `reachableRecipeKeys` answers "what can be got here", and it works it out
+   * by walking a MAP: the seeds it holds, the generators standing on it, the
+   * regions that open. The panel used to hand it `ctx.data.map`, which is the
+   * AUTHORED isle and nothing else, and only swap the world's NAME. So every
+   * page was really the same question — "what can Emberkeep produce?" — asked
+   * under four different labels. Borealis printed Quartz Pebble → Cut Crystal,
+   * a chain that does not exist in the north; Roothold, which merges nothing at
+   * all, printed the same southern recipes as if it did.
+   *
+   * The world's own map is the fix, and it comes from the world registry rather
+   * than from `ctx.data` for exactly the reason the architecture law gives:
+   * `data.map` is always the authored one, `state.worlds` is where the rest
+   * live.
+   */
+  private auditFor(worldId: string): AuditData {
+    const map = this.gameState.worlds.get(worldId)?.map;
+    return { ...this.audit, worldId, ...(map ? { map } : {}) };
+  }
+
+  /** The recipes a world's page would print — empty for a world that merges
+   *  nothing, which is what decides whether it gets a tab at all. */
+  private recipesFor(worldId: string): Recipe[] {
+    return this.enumerateRecipes(this.chains, reachableRecipeKeys(this.auditFor(worldId)), worldId);
+  }
+
+  /**
    * Rebuild the page for `viewWorld`: its reachable recipe list, laid out
    * row-major, two columns. Called at construction and on every tab change.
    * `reachableRecipeKeys` caches per (chains, world), so flipping tabs costs
@@ -443,10 +475,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   private buildRows(): void {
     this.rowsGroup.removeAll(true);
     this.rows = [];
-    const recipes = this.enumerateRecipes(
-      this.chains,
-      reachableRecipeKeys({ ...this.audit, worldId: this.viewWorld })
-    );
+    const recipes = this.recipesFor(this.viewWorld);
     // Row-major, left then right: scrolling then reveals recipes IN ORDER.
     // Filling column one before column two put recipe 1 beside recipe 13, and
     // a scroll moved both by twelve places at once.
@@ -461,13 +490,20 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
   }
 
   /**
-   * The little navbar the owner asked for: one pill per VISITED world, the
-   * open page's pill lit. Hidden entirely while only one world has been seen
-   * — a navbar with one destination is furniture.
+   * The little navbar the owner asked for: one pill per VISITED world THAT HAS
+   * A PAGE, the open page's pill lit. Hidden entirely while only one such world
+   * has been seen — a navbar with one destination is furniture.
+   *
+   * A world that merges nothing gets no tab. Roothold is the lair: you carry a
+   * dragon there, it has no producers and no seeds, and its page was a blank
+   * sheet offering to hold recipes it can never see. An empty chapter in a
+   * recipe book is not modesty, it reads as something failing to load.
    */
   private buildTabs(): void {
     this.tabsRow.removeAll(true);
-    const visited = [...this.gameState.worlds.keys()].filter((id) => this.gameState.visited(id));
+    const visited = [...this.gameState.worlds.keys()].filter(
+      (id) => this.gameState.visited(id) && this.recipesFor(id).length > 0
+    );
     if (visited.length < 2) return;
     const PILL_H = 60;
     const PAD = 34;
@@ -533,8 +569,16 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
     this.isOpen = true;
     // The book opens on the page of the world the Keeper is STANDING in —
     // the tabs are for looking back, not a preference to remember.
-    if (this.viewWorld !== this.gameState.worldId) {
-      this.viewWorld = this.gameState.worldId;
+    // The book opens where the Keeper stands — unless that world has no page
+    // at all (Roothold merges nothing), in which case it opens on the first
+    // world that does rather than on a blank sheet.
+    const here = this.recipesFor(this.gameState.worldId).length > 0
+      ? this.gameState.worldId
+      : ([...this.gameState.worlds.keys()].find(
+          (id) => this.gameState.visited(id) && this.recipesFor(id).length > 0
+        ) ?? this.gameState.worldId);
+    if (this.viewWorld !== here) {
+      this.viewWorld = here;
       this.buildRows();
     }
     this.buildTabs();
