@@ -51,15 +51,29 @@ export async function listAsset3dFiles(): Promise<string[] | null> {
 
 /** Save the Map Editor's default design (allocations + asset metadata) to disk
  *  (`asset3d/editor-map.json`) so it survives a cookie/localStorage wipe. */
-export async function saveEditorMap(data: unknown): Promise<void> {
+export async function saveEditorMap(data: unknown): Promise<boolean> {
   try {
-    await fetch('/__editor/map', {
+    const r = await fetch('/__editor/map', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+    // A RESOLVED fetch is not a saved file. Served through a host that does
+    // not forward `/__editor/*` (the hub without its live rewrite), the POST
+    // comes back as a 404 page and this used to return as if the project had
+    // been baked — the edits lived in one browser's localStorage and nowhere
+    // else. Say so, loudly, where the person editing will see it.
+    if (!r.ok) {
+      console.error(
+        `[MapEditor] disk save REFUSED (HTTP ${r.status}) — the project is NOT on disk. ` +
+          'Open the game on the Vite dev server (localhost:5173) or through a hub with EMBERKEEP_LIVE=1.'
+      );
+      return false;
+    }
+    return true;
   } catch {
     /* no dev endpoint — localStorage still holds it in-session */
+    return false;
   }
 }
 
