@@ -395,7 +395,7 @@
     {
       "id": "crystal_tap",
       "speaker": "eleanor",
-      "text": "See my purple Crystal? It makes Crystal Chips. Tap the Crystal to take one. Two more already fell off.",
+      "text": "See my green Crystal? It makes Crystal Chips. Tap the Crystal to take one. Two more already fell off.",
       "gate": {
         "type": "event",
         "event": "item:harvested",

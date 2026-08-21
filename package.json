@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Emberkeep: The Dragon Hatchery — Level 1 (Cinder Hollow). Isometric 2D merge game.",
+  "description": "Emberkeep: The Dragon Hatchery \u2014 Level 1 (Cinder Hollow). Isometric 2D merge game.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && python3 scripts/shrink-dist.py",
@@ -23,7 +23,10 @@
     "map:import": "node scripts/import-map.mjs",
     "worlds:export": "node scripts/export-editor-worlds.mjs && node scripts/ingest-worlds.mjs && node scripts/build-zones.mjs",
     "optimize:dist": "python3 scripts/shrink-dist.py",
-    "verify:lane": "node scripts/verify-lane.mjs"
+    "verify:lane": "node scripts/verify-lane.mjs",
+    "beats:record": "node scripts/beats.mjs record",
+    "beat": "node scripts/beats.mjs at",
+    "beats": "node scripts/beats.mjs list"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.1",

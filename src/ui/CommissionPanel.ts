@@ -67,6 +67,9 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
   private emptyText: Phaser.GameObjects.Text;
   private helper: Phaser.GameObjects.Text;
   private chooser: Phaser.GameObjects.Container | null = null;
+  /** The chooser's YES plate — what the lesson's arrow points at once the
+   *  question is up. The question itself is not a thing to tap. */
+  private chooserYes: Phaser.GameObjects.Container | null = null;
   private baseScale = 1;
 
   constructor(
@@ -212,7 +215,7 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
    */
   getMarkerPos(): { x: number; y: number } | null {
     if (!this.isOpen) return null;
-    const target = this.chooser ?? (this.gameState.bag.length ? this.slots[0] : null);
+    const target = this.chooserYes ?? this.chooser ?? (this.gameState.bag.length ? this.slots[0] : null);
     if (!target) return null;
     const m = target.getWorldTransformMatrix();
     return { x: m.tx, y: m.ty };
@@ -428,6 +431,7 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     slot.add(chooser);
     slot.parentContainer.bringToTop(slot);
     this.chooser = chooser;
+    this.chooserYes = confirm;
     this.dimOthers(slot);
 
     chooser.setAlpha(0).setScale(0.92);
@@ -534,6 +538,7 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
   private closeChooser(): void {
     this.chooser?.destroy();
     this.chooser = null;
+    this.chooserYes = null;
     this.dimOthers(null);
   }
 }

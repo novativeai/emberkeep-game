@@ -616,6 +616,31 @@ common shapes (speaker, gate, allow, drag list) and raw JSON for the rest;
 Save PUTs the file, Validate runs the audit. Inserting or reordering MAIN beats
 still shifts every persisted `tutorialIndex` — bump `SAVE_VERSION`.
 
+## Beat checkpoints (scripts/beats.mjs → tests/e2e/checkpoints)
+
+Every tutorial beat, as a save you can boot straight into.
+
+- `pnpm beats:record` — plays the whole script ONCE against the dev server by
+  FOLLOWING THE LESSON'S OWN POINTERS (`__emberkeep.pointers()`: the hand's
+  from→to, the arrow's target, re-read after every action until the beat
+  advances), and writes `NN-<step>.json` (the raw save blob) + `NN-<step>.png`
+  per beat. It knows nothing of the script: edit the tutorial in the 📜 tab and
+  it still plays it. `--from <step>` resumes from a checkpoint.
+- `pnpm beat <step>` — boots INTO that beat and screenshots it (`--shot path`).
+  A loaded save rebases the game clock to its `savedAt`, so the restore is the
+  beat frozen at the instant it was recorded. Seconds, not a playthrough.
+- `pnpm beats` — the checkpoints on disk. Specs start at a beat with
+  `bootAtBeat(page, 'codex_taste')` from `tests/e2e/beats.ts`.
+- The blobs are committed; the PNGs are ignored and regenerated. Re-record
+  after any change to the main script's beats or spawns (the blobs carry the
+  board the old script made).
+
+The recorder is also an audit: a beat whose pointer cannot be followed is a
+beat the player cannot follow either. Recording this the first time found four
+of those (a hand asking for an impossible merge, an arrow on a piece hidden
+behind the House, a chooser arrow on the question instead of YES, a tile
+pointer under the dialogue) — all fixed in the game, not in the harness.
+
 ## Event Creator (⚡ tab → src/data/events.json)
 
 The structured event system — every authored "when the player…, then…" moment

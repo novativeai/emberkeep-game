@@ -200,7 +200,7 @@ TUTORIAL = {
   'name_choose': "Type a name for your Red Dragon and tap OK. She will keep it forever.",
   'name_said': "{dragon}. I love it. It has been sixty years since anyone named a dragon here.",
   'moss_feed': "{dragon} is hungry! Red dragons love moss. Your Moss Bunch grew into a Moss Pile. Drag it onto {dragon} to feed her.",
-  'crystal_tap': "See my purple Crystal? It makes Crystal Chips. Tap the Crystal to take one. Two more already fell off.",
+  'crystal_tap': "See my green Crystal? It makes Crystal Chips. Tap the Crystal to take one. Two more already fell off.",
   'quartz_merge': "Drag the three Crystal Chips together to make a Crystal. Dragons don't eat crystals. These are for me.",
   'quartz_ball': "Two more Crystals appeared. Merge all three into a Crystal Ball. I use Crystal Balls for my magic.",
   'ball_pocket': "Let's put the Crystal Ball away. Tap it, and it goes into your Bag. That keeps the board clear.",

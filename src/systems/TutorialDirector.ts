@@ -1,8 +1,11 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
+import { mergeHints, planFor, type HintBoard } from '../core/mergeHints';
+import { zoneAt } from '../core/world';
 import type {
   BoardItemState,
+  ChainsData,
   MarkerPoint,
   ResolvedArrow,
   ResolvedHand,
@@ -170,7 +173,9 @@ export class TutorialDirector {
     private state: GameState,
     private bus: EventBus,
     private clock: GameClock,
-    private data: TutorialData
+    private data: TutorialData,
+    /** The merge rules — a merge beat's hand is PLANNED against them, not guessed. */
+    private chains: ChainsData | null = null
   ) {
     this.scripts = scriptsOf(data);
     // An `event` trigger is an OBSERVATION: the fact is latched into stats the
@@ -607,6 +612,34 @@ export class TutorialDirector {
     this.bus.emit('tutorial:step', payload);
   }
 
+  /** The first drag of a real merge plan for the hand's own piece, or null. */
+  private plannedMergeLeg(step: TutorialStepConfig, from: MarkerPoint): ResolvedHand | null {
+    if (!this.chains || from.item === undefined) return null;
+    const gate = step.gate;
+    if (gate.type !== 'event' || gate.event !== 'item:merged') return null;
+    const piece = this.state.items.get(from.item);
+    if (!piece || (gate.chain && piece.chain !== gate.chain)) return null;
+    const state = this.state;
+    const board: HintBoard = {
+      isActive: (c, r) => state.isTileActive(c, r),
+      itemIdAt: (c, r) => state.itemIdAt(c, r),
+      neighbors: (c, r) => state.neighbors(c, r),
+      zoneOf: (c, r) => zoneAt(state.world, c, r)?.id
+    };
+    const items = [...state.items.values()];
+    const hint = mergeHints(items, this.chains, board).find((h) => h.chain === piece.chain && h.tier === piece.tier);
+    if (!hint) return null;
+    const plan = planFor(hint, items, board);
+    const leg = plan?.steps[0];
+    const mover = leg ? state.items.get(leg.itemId) : undefined;
+    if (!leg || !mover) return null;
+    const target = state.itemIdAt(leg.to.col, leg.to.row);
+    return {
+      from: { col: mover.col, row: mover.row, item: mover.id },
+      to: target && target !== mover.id ? { col: leg.to.col, row: leg.to.row, item: target } : { col: leg.to.col, row: leg.to.row }
+    };
+  }
+
   private resolveStep(step: TutorialStepConfig): TutorialStepEvent {
     // Highlights stay CELLS: a glow is painted on the ground, and the board
     // repaints it whenever this view is re-emitted (which a move does).
@@ -634,7 +667,17 @@ export class TutorialDirector {
         if (from?.item !== undefined && to?.item === from.item) {
           to = { col: to.col, row: to.row };
         }
-        if (from && to) hand = { from, to };
+        // A MERGE BEAT'S HAND IS A PLAN, NOT A PAIR. The refs name ranks —
+        // "the third tree onto the first" — and on a board where those two are
+        // not orthogonal neighbours of the third, that exact drop BOUNCES
+        // (MergeSystem floods the connected group; a diagonal is not in it).
+        // The planner already solves this for the idle hint: every leg but the
+        // last lands on free ground, and the last lands on a piece it can fuse
+        // with. Use its first leg whenever the beat is a merge of the pieces
+        // the hand names; fall back to the refs when there is nothing to plan.
+        const planned = from && to ? this.plannedMergeLeg(step, from) : null;
+        if (planned) hand = planned;
+        else if (from && to) hand = { from, to };
       } else {
         hand = step.hand;
       }
@@ -683,6 +726,16 @@ export class TutorialDirector {
    * that names ground: an authored cell nobody is standing on stays exactly the
    * frozen tile it was authored as, because that is what it means.
    */
+  /** Is there an item on a cell drawn directly IN FRONT of this one? Depth
+   *  grows with col+row, so the three cells ahead are (+1,0), (0,+1), (+1,+1). */
+  private shadowed(item: BoardItemState): boolean {
+    for (const [dc, dr] of [[1, 0], [0, 1], [1, 1]] as const) {
+      const front = this.state.itemAt(item.col + dc, item.row + dr);
+      if (front && front.id !== item.id && front.kind === 'item') return true;
+    }
+    return false;
+  }
+
   private resolveTileRef(ref: TileRef): MarkerPoint | null {
     const item = this.resolveRefItem(ref);
     if (item) return { col: item.col, row: item.row, item: item.id };
@@ -739,7 +792,19 @@ export class TutorialDirector {
     // "from the third to the first" must be two pieces, not one twice.
     const taken = new Set(this.pinned.values());
     const pick = ranked[ref.nth] ?? ranked[ranked.length - 1] ?? null;
-    const chosen = pick && taken.has(pick.id) ? (ranked.find((i) => !taken.has(i.id)) ?? pick) : pick;
+    let chosen = pick && taken.has(pick.id) ? (ranked.find((i) => !taken.has(i.id)) ?? pick) : pick;
+    // POINT AT A PIECE THE PLAYER CAN SEE. Ranks run back to front, so the
+    // first rank is the piece most likely to stand BEHIND something tall — a
+    // Cracked Rock with the House drawn over it is a pointer at the House.
+    // The director cannot see art, but it can see the board: a piece with
+    // another item on a cell directly in front of it is shadowed, and when an
+    // unshadowed rank exists it is the better answer to "that one".
+    if (chosen && this.shadowed(chosen)) {
+      const free = ranked.filter((i) => !taken.has(i.id));
+      // An unshadowed rank first; failing that the FRONT-most, which nothing
+      // on the board can stand in front of.
+      chosen = free.find((i) => !this.shadowed(i)) ?? free[free.length - 1] ?? chosen;
+    }
     if (chosen) this.pinned.set(key, chosen.id);
     return chosen;
   }

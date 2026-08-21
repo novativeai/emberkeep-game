@@ -10,6 +10,10 @@ is throwaway.
 ## Commands
 - `pnpm dev` — dev server · `pnpm verify` — typecheck → unit → build → e2e (run before calling anything done)
 - `pnpm test` (Vitest, node, `tests/unit/`) · `pnpm e2e` (Playwright, drives the whole tutorial)
+- `pnpm beat <step>` boots INTO any recorded tutorial beat in seconds (screenshot
+  included); `pnpm beats:record` re-records all 64 by following the lesson's own
+  pointers. Use a checkpoint for any tutorial-UI check — never a full playthrough.
+  Details: `docs/pipelines.md` → Beat checkpoints.
 - e2e serves the PRODUCTION build via `vite preview` — `pnpm build` first if invoking `playwright test` directly.
 - **NEVER start Playwright unprompted** — not `pnpm e2e`, not `pnpm verify` (it
   chains e2e), not `playwright test`, not the Playwright MCP browser tools. Each
