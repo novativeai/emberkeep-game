@@ -1,40 +1,40 @@
 {
   "orderComplete": {
     "1": [
-      "“Delivered, and early. I'd ask how, but I've decided not to look a gift Keeper in the mouth.” — Eleanor",
-      "“Warmer. Not warm. But warmer, and I'll take the comparative.” — Eleanor",
-      "“That's the ledger square for today. Rest — it doesn't run off if you stop.” — Eleanor",
-      "“Good. Do that again tomorrow and I'll start believing it.” — Eleanor"
+      "“Done already? Great job! Rest a bit — the next order will be here soon.” — Eleanor",
+      "“It is getting warmer here. You did that.” — Eleanor",
+      "“That is today's work done. Thank you, Keeper.” — Eleanor",
+      "“Wonderful! Do that again tomorrow and Emberkeep will be back in no time.” — Eleanor"
     ],
     "2": [
-      "“Something upslope lifted its head just then. I don't know which one. It felt that.” — Eleanor",
-      "“Another one down. The isle is keeping count even if you aren't.” — Eleanor",
-      "“You work like someone who's done this before. You haven't — I checked.” — Eleanor"
+      "“Something on the hill just woke up a little. It felt what you did.” — Eleanor",
+      "“Another order done! The island is counting, even if you are not.” — Eleanor",
+      "“You are really good at this. Keep going!” — Eleanor"
     ],
     "3": [
-      "“Thank you. Genuinely. I'm short of things to say today that aren't hedged.” — Eleanor",
-      "“Take the gold and buy something pointless with it. That's an instruction.” — Eleanor",
-      "“It's going faster than it should. Not a complaint — it's true, and it frightens me slightly.” — Eleanor"
+      "“Thank you. I mean it.” — Eleanor",
+      "“Take the Gold and buy something fun. That is an order!” — Eleanor",
+      "“Things are going faster than I ever dreamed.” — Eleanor"
     ],
     "4": [
-      "“Delivered. And you're still here, which I notice every single time.” — Eleanor",
-      "“I keep expecting to look up and find you gone. Ignore that. Next one's on the shelf.” — Eleanor",
-      "“You have a better hand for this than I ever did. That isn't modesty, it's arithmetic. I've watched you do it.” — Eleanor"
+      "“Done! And you are still here. I notice that every time.” — Eleanor",
+      "“The next order is ready when you are.” — Eleanor",
+      "“You are better at this than I ever was. Truly.” — Eleanor"
     ],
     "5": [
-      "“She watches you work, you know. She doesn't watch me.” — Eleanor",
-      "“Whatever you decided about me, you're still filling my ledger. I've stopped trying to work out what that means.” — Eleanor",
-      "“Thank you, Keeper. I've started being able to say the word.” — Eleanor"
+      "“The Golden Elder watches you work, you know. She does not watch me.” — Eleanor",
+      "“You keep helping, every single day. Thank you.” — Eleanor",
+      "“Thank you, Keeper. I am so glad you came.” — Eleanor"
     ],
     "6": [
-      "“My sister will call this inefficient. My sister says that about weather.” — Eleanor",
-      "“Cold work. Different craft up here — hold it, don't hand it back. I'm out of my depth and enjoying it, which is new.” — Eleanor"
+      "“My sister will say we are doing this the slow way. She says that about everything.” — Eleanor",
+      "“It is cold up north. Her magic holds things; mine gives them back. I am learning, and I like it.” — Eleanor"
     ]
   },
   "goldenEgg": {
     "early": [
       "It's warm…",
-      "Something ANCIENT stirs within…",
+      "Something very old is inside…",
       "It hums an old, old song."
     ],
     "mid": [
@@ -43,244 +43,244 @@
       "It remembers the Great Flame…"
     ],
     "near": [
-      "It's trembling!",
-      "The gold burns bright — she is almost awake!"
+      "It's shaking!",
+      "The gold glows bright — she is almost awake!"
     ]
   },
   "finaleElder": [
-    "…Keeper. I have slept an age, and I woke to YOUR hands. So hear it from the only one still living who SAW: the Great Flame did not die. It was TAKEN. And it was carried NORTH.",
-    "There is a woman on that ice who kept a light burning while the rest of us slept — she will not be glad to see you. Go anyway."
+    "…Keeper. I slept for a very long time, and YOU woke me. So hear the truth: the Great Flame did not die. It was TAKEN. Someone carried it NORTH.",
+    "A woman lives on the ice up north. She kept a light burning while the rest of us slept. She will not be happy to see you. Go anyway."
   ],
   "finaleElderProphecy": [
-    "…Keeper. I stir, but I do not rise — the altar is still cold, and Eleanor's first request goes unanswered.",
-    "Finish it, and I will tell you what no one else living can: the Great Flame did not die. It was TAKEN."
+    "…Keeper. I am waking up, but I cannot rise yet. The altar is still cold, and Eleanor's first order is not done.",
+    "Finish it, and I will tell you a secret: the Great Flame did not die. It was TAKEN."
   ],
-  "goldenArrival": "“The old altar ANSWERS you, Keeper. So the stories about that egg were true.” — Eleanor",
+  "goldenArrival": "“The old altar is answering you, Keeper! So the stories about that egg were true.” — Eleanor",
   "gateOpens": {
     "speaker": "eleanor",
     "lines": [
-      "…Do you feel that? Beside her altar — the air is standing open. She woke, and the way north woke with her.",
-      "It goes to the ice. My sister keeps that shore. Selyna. Sharper than me, and alone far longer than sixty years.",
-      "Her fire opened it, so it is yours to walk through. Whenever you are ready, Keeper — I will keep the isle warm."
+      "Do you feel that? Next to her altar, a door opened in the air. She woke up, and the way north opened with her.",
+      "It leads to the ice. My sister lives there. Her name is Selyna. She is sharper than me, and she has been alone a very long time.",
+      "Tap the door whenever you are ready, Keeper. I will keep Emberkeep warm while you are gone."
     ]
   },
   "tours": {
     "roothold": {
       "intro": [
-        "So this is what I could not show you before. Roothold — my home, and the last roof the fire never reached.",
-        "Sixty years I kept shop up here alone. From today, the door stands open for you."
+        "This is Roothold — my home! The fire never reached this roof.",
+        "I ran my shop up here alone for sixty years. From today, it is open for you."
       ],
-      "house": "That house is my Emporium — everything I kept safe from the old court. Tap it.",
+      "house": "That house is my shop, the Emporium. Tap it.",
       "sections": [
-        "Manor skins. The Keep wears what you choose — walls remember being looked after.",
-        "Decorations. Small things, but small things are how ground becomes yours.",
-        "Dragon skins. My needle, their scales. They do preen, you know."
+        "Mansion looks. Dress up your Mansion any way you like.",
+        "Decorations. Small things that make the island feel like yours.",
+        "Dragon looks. New colours for your dragons. They love to show off!"
       ],
-      "close": "That is the whole of it. The ✕ up there closes the shop — go on.",
-      "outro": "And now it travels with you: the shop button, bottom right, wherever you stand. My shelves are always open, Keeper."
+      "close": "That is the whole shop. Tap the ✕ to close it.",
+      "outro": "The shop button is now at the bottom right, wherever you are. My shelves are always open, Keeper."
     },
     "runevault": {
       "intro": [
-        "The Runevault. Mine before it was anyone's — every dragon the north still has hatched inside that circle.",
-        "You will not be shown all of it today. One thing first."
+        "This is the Runevault. Every dragon in the north hatched inside that circle.",
+        "I will show you one thing today."
       ],
-      "cauldron": "The cauldron, on the rune. Tap it.",
-      "explain": "It trades from your satchel: the right things in, and it gives back what no board can grow. The circle decides what is right.",
-      "close": "The ✕ shuts it. That is all I am showing you until I trust you with more."
+      "cauldron": "See the Cauldron on the rune? Tap it.",
+      "explain": "The Cauldron uses things from your Bag. Put the right things in, and it makes something new. Each recipe tells you what it needs.",
+      "close": "Tap the ✕ to close it. That is all for today."
     }
   },
-  "lateAwakening": "…At last. I waited for YOU, Keeper — not for her. The Elder rises, just as the stories promised.",
+  "lateAwakening": "…At last. I waited for YOU, Keeper. The Golden Elder rises, just like the stories said.",
   "eggGift": {
     "ashdrake": {
       "speaker": "eleanor",
       "lines": [
-        "An Ashdrake egg — for you, Keeper. The old nests never truly cooled, whatever the books say. Keep it close; it takes three to wake what sleeps inside.",
-        "Another Ashdrake egg! Set it beside the first — eggs hatch braver in company. One more and you will hear wings in the ash.",
-        "The last Ashdrake egg. Bring all three together and merge them — this isle has not seen a drake break its shell in a hundred years."
+        "An Ash Dragon Egg, for you, Keeper! Keep it safe. You need 3 eggs to hatch an Ash Dragon.",
+        "Another Ash Dragon Egg! Put it next to the first one. One more to go.",
+        "The last Ash Dragon Egg! Drag all three together to hatch the Ash Dragon."
       ]
     },
     "rimewyrm": {
       "speaker": "selyna",
       "lines": [
-        "A Rimewyrm egg, out of the deep ice. It has waited down there longer than this harbour has had a name. It takes three to wake it.",
-        "The ice gives up a second Rimewyrm egg. Set them close together — frost remembers company. One more.",
-        "The last Rimewyrm egg. Merge the three and let the north meet what it froze — gently, Keeper."
+        "An Ice Dragon Egg, from deep under the ice. It waited down there for ages. You need 3 eggs to hatch it.",
+        "A second Ice Dragon Egg. Keep them close together. One more.",
+        "The last Ice Dragon Egg. Merge all three, and meet the Ice Dragon. Gently, Keeper."
       ]
     }
   },
   "hints": {
-    "zeroWarmth": "Out of Warmth? Rest by the fire — it returns on its own. The emberberry patch never needs any!",
-    "boardFull": "The board is crowded! Sell a spare piece, or deliver to my Ledger to make room.",
-    "eggTrembles": "Keeper — the egg! Look at the egg on the old altar, it's TREMBLING!",
-    "twoDragons": "TWO grown Red Dragons?! Keeper, bring them together — when two flames meet, an ELDER rises!",
-    "twoHouses": "Two Houses standing… join them! Emberkeep folk raise a MANOR when hearths unite — grander gold within.",
-    "goldSkip": "Two ways past a wait, Keeper: gold or Warmth. Gold is the cheaper of the two — and patience is cheaper still, for both prices fall as the timer runs down.",
-    "houseCommission": "A House is a workshop, Keeper — pick ONE thing from your bag and it will make that, and only that, forever. Want a second? Build a second House.",
-    "glassKiln": "That is the Glass Kiln. Wrack sand in, glass floats out — and every twelfth firing it drops a Fire Brick. Keep those. Nine of them is a second kiln.",
-    "starBench": "The Starwright's Bench. It grinds lenses. Three to a Spyglass, nine to an Orrery — and I will be asking for an Orrery before we are done.",
-    "wreckForge": "The Wreck Forge. Iron off the hulls in, caps out. Iron is the one thing the ice does not eat, so it is the one thing worth carrying.",
-    "tarKiln": "The Tar Kiln. It digs the fire out of the ground in beads. Mine eat pitch, not berries — you will be running this one for the dragons.",
-    "auroraLoom": "The Aurora Loom. It catches the lights on a warp and holds them there. Slowest thing on this shore. Set it going and leave it be."
+    "zeroWarmth": "Out of Warmth? Wait a little — it comes back by itself. Picking berries never costs Warmth!",
+    "boardFull": "The board is full! Sell a spare piece from your Bag, or deliver an order to make room.",
+    "eggTrembles": "Keeper, look at the egg on the old altar! It is SHAKING!",
+    "twoDragons": "TWO Red Dragons! Drag them together to make a Big Red Dragon!",
+    "twoHouses": "Two Houses! Drag them together to build a Mansion. A Mansion makes even more Gold.",
+    "goldSkip": "Tired of waiting? You can skip with Gold or with Warmth. The longer you wait, the cheaper it gets.",
+    "houseCommission": "Tap a House and pick ONE thing from your Bag. The House will make that thing forever. Want a second thing? Build a second House.",
+    "glassKiln": "That is the Glass Oven. It makes Glass Balls. Every 12th time, it also drops a Fire Brick. Keep them! 9 Fire Bricks build a second oven.",
+    "starBench": "That is the Star Workbench. It makes Glass Lenses. 3 Lenses make a Spyglass. 9 make a Star Machine — I will ask you for one.",
+    "wreckForge": "That is the Shipwreck Forge. It makes Iron Hats from old ship iron. Iron is the best thing to find up here.",
+    "tarKiln": "That is the Tar Oven. It digs up Tar Drops. My dragons eat tar, not berries — you will use this one a lot.",
+    "auroraLoom": "That is the Aurora Loom. It catches the northern lights and makes Light Thread. It is slow, so start it and let it work."
   },
-  "tasksComplete": "“Every task, done. The Keep hasn't been this warm in an age… you've earned your rest, Keeper.” — Eleanor",
+  "tasksComplete": "“Every task is done! Emberkeep has not been this warm in ages. You earned a rest, Keeper.” — Eleanor",
   "elder": {
     "greeting": [
-      "You stayed. Good. An age of sleep teaches patience — sixty years of ash teach who is worth waking for.",
-      "Eleanor keeps her ledger. I keep something older: the MEASURE of a Keeper. From today, my asks stand beside hers.",
-      "Look to your quests, top right — the small arrow beside them turns the page between her work and mine. Begin."
+      "You stayed. Good. I slept for a very long time, and I know who is worth waking up for.",
+      "Eleanor has her orders. I have something older: the Keeper's Tasks. From today, my tasks sit next to hers.",
+      "Look at your quest list, top right. Tap the small arrow next to it to switch between her quests and mine. Let's begin."
     ],
     "quests": {
       "elder_seeing_stones": {
-        "start": "First, eyes. Cut me two crystals from the old quartz — I have slept an age, and I would SEE this isle again.",
-        "done": "Clear. Sharp. The isle looks smaller than I remember, and better kept."
+        "start": "First, eyes. Make me 2 Crystals. I slept so long — I want to SEE the island again.",
+        "done": "Clear and sharp. The island looks smaller than I remember, and better cared for."
       },
       "elder_green_over_ash": {
-        "start": "The ash took the green first. Bale the moss that dares grow back — two bales, Keeper. Proof the ground forgives.",
-        "done": "Green over ash. The oldest trade there is."
+        "start": "The fire took the green first. Make 2 Moss Piles, Keeper. Show me the ground is alive.",
+        "done": "Green over ash. The oldest kind of magic there is."
       },
       "elder_old_forest": {
-        "start": "Before the court, before even the flame — the firs. Grow two tall again, and the wind will have something to speak through.",
-        "done": "They creak the way the old ones did. Close enough that I stopped to listen."
+        "start": "Before the castle, before the Flame, there were the trees. Grow 2 Big Trees, and the wind will sing again.",
+        "done": "They creak just like the old ones did. I stopped to listen."
       },
       "elder_kindle_brood": {
-        "start": "One dragon is a survivor. TWO are a brood. Raise a second Red Dragon, and the sky starts owing us again.",
-        "done": "Two fires in the air at once. I had forgotten how that sounds."
+        "start": "One dragon is a survivor. TWO are a family. Raise a second Red Dragon.",
+        "done": "Two fires in the sky at once. I had forgotten how that sounds."
       },
       "elder_gold_in_hand": {
-        "start": "Gold is patience made metal. Do not spend what the houses mint — HOLD it. Two full pouches, untouched.",
-        "done": "You can hold gold without spending it. Rarer than any dragon, that."
+        "start": "Gold is patience you can hold. Do not spend it all — keep 2 Bags of Gold.",
+        "done": "You can hold Gold without spending it. That is rarer than any dragon."
       },
       "elder_grow_keeper": {
-        "start": "Enough errands. Grow, Keeper — reach the fourth rank, and the land past the old fence will answer you.",
-        "done": "The fourth rank. The ground felt it — more of the isle stands open to you now."
+        "start": "Enough small jobs. Grow, Keeper. Reach Level 4, and the land past the old fence will open.",
+        "done": "Level 4! The ground felt it. More of the island is yours now."
       },
       "elder_berry_mother": {
-        "start": "The berry line fed the court through the last winter of the age. Grow two mother plants — we will want winters' worth.",
-        "done": "The line endures. Sweetness is also a supply, Keeper. The court knew it."
+        "start": "The berry bushes fed the castle through the last winter. Grow 2 Big Berry Bushes.",
+        "done": "Sweet things are supplies too, Keeper. The castle knew that."
       },
       "elder_cold_light": {
-        "start": "Eleanor catches the moon's water; I ask for the step before the miracle. Three vials of dew, cold and honest.",
-        "done": "Cold and honest. She will make wonders of these — that is HER craft, and it deserves feeding."
+        "start": "Eleanor makes Moonwater. I ask for the step before: 3 Dew Bottles, cold and clear.",
+        "done": "Cold and clear. She will make wonders with these."
       },
       "elder_far_sight": {
-        "start": "Now the far-sight. A full Crystal Ball, Keeper — I would look NORTH, where the Flame was carried.",
-        "done": "…Ice. A shore. A woman who does not sleep. It is as I told you — the north keeps what we lost."
+        "start": "Now, far sight. Make 1 Crystal Ball, Keeper. I want to look NORTH, where the Flame was taken.",
+        "done": "…Ice. A beach. A woman who does not sleep. The north keeps what we lost."
       },
       "elder_rise_higher": {
-        "start": "Higher, Keeper. The fifth rank. The last of the fenced land waits on it — and so, in my way, do I.",
-        "done": "The fifth rank, and the isle whole beneath you. Nearly there now."
+        "start": "Higher, Keeper. Reach Level 5. The last fenced land waits for it, and so do I.",
+        "done": "Level 5, and the whole island is yours. Nearly there now."
       },
       "elder_two_flames": {
-        "start": "Two grown flames, made one crown. Merge your Red Dragons into an Adult — this isle needs an heir to my watch.",
-        "done": "An Adult of the old blood. My watch has an heir; Emberkeep will not go dark again."
+        "start": "Merge your 2 Red Dragons into a Big Red Dragon. Emberkeep needs a big dragon to watch over it.",
+        "done": "A Big Red Dragon! Emberkeep will not go dark again."
       },
       "elder_true_keeper": {
-        "start": "One thing remains, and it is nothing I can hand you. The sixth rank. Become what the stories call a TRUE Keeper.",
+        "start": "One thing is left, and I cannot give it to you. Reach Level 6. Become a TRUE Keeper.",
         "done": "It is done."
       }
     },
-    "allDone": "It is done. A true Keeper stands on Emberkeep, and I saw it with waking eyes. Whatever the north asks of you now — you are ready. My watch is yours."
+    "allDone": "It is done. A true Keeper stands on Emberkeep, and I saw it with my own eyes. Whatever the north asks of you now, you are ready."
   },
   "regard": {
     "eleanor": {
       "giftAccepted": [
-        "Oh — for me? I'll find somewhere to put it. Somewhere I can see it from the desk.",
-        "Thank you. I'm keeping this one, so don't ask for it back in a fortnight.",
-        "You didn't have to. I've written that down, which is what I do instead of saying it.",
-        "Right. Yes. Good. …I'm going to stop talking now, before I say something sincere."
+        "Oh, for me? Thank you! I will put it where I can see it.",
+        "Thank you. I am keeping this one!",
+        "You did not have to. I wrote it down in my book, so I will never forget.",
+        "Oh! Thank you. That was very kind."
       ],
       "giftDeclined": [
-        "That's kind, but it isn't what I need. Ask me — I'll tell you plainly.",
-        "Hold on to that one. I've nowhere to put it and nothing to do with it.",
-        "No. Not because I don't want it — because you'll want it more than I will."
+        "That is kind, but I do not need it right now. Check my quest list — it says what I need.",
+        "Keep that one. I have nowhere to put it.",
+        "No thank you. You will need it more than I do."
       ],
       "hearts": {
         "1": {
           "speaker": "eleanor",
           "lines": [
-            "Stop a moment. You've been at this longer than most people last on this isle.",
-            "The last three came for the stories, saw the ash, and went home before the second morning. I'm not saying that to be grim. I'm saying I'd stopped counting, and I've started again."
+            "Wait a moment. You have already stayed longer than most people do here.",
+            "The last three visitors saw the ash and went home the next morning. You stayed. That means a lot to me."
           ]
         },
         "2": {
           "speaker": "eleanor",
           "lines": [
-            "I've been keeping the ledger since I was eleven. That isn't a boast, it's an accident — there was nobody else, and the book doesn't care how old you are.",
-            "So when I hand you a page, understand what I'm handing over. It's the only thing I've ever been allowed to be in charge of."
+            "I have kept the order book since I was eleven years old. There was nobody else to do it.",
+            "So when I hand you an order, I am handing you the most important thing I have."
           ]
         },
         "3": {
           "speaker": "eleanor",
           "lines": [
-            "I caught myself saying our ledger this morning. To a goat. There was nobody else awake.",
-            "I'm not going to correct it. It's been mine for thirty years and I have not enjoyed a single one of them, and now it's ours and I find I do."
+            "This morning I said 'our order book' by mistake. Then I thought about it.",
+            "It was MY book for thirty years. Now it is OURS. I like that much better."
           ]
         },
         "4": {
           "speaker": "eleanor",
           "lines": [
-            "I want to say a true thing and then not discuss it.",
-            "I wasn't keeping this place warm. I was keeping it *ready*. For somebody. I didn't know who, and I'd have denied it if you'd asked me last spring.",
-            "That's the whole confession. Don't be kind about it, I'll come apart."
+            "I want to tell you something true.",
+            "I was not just keeping this place warm. I was keeping it READY. For someone. I did not know who.",
+            "Now I know. It was you. That is all. Let's get back to work before I cry."
           ]
         },
         "5": {
           "speaker": "eleanor",
           "lines": [
-            "There you are. And your dragons — I know all their names now, which I did not intend to learn and could not now forget.",
-            "Whatever comes south of here, and something is coming, you should know you're not doing it as a stranger. Not to me.",
-            "That's all. Go on. The book will keep."
+            "There you are. I know all your dragons' names now. I did not mean to learn them, but I did.",
+            "Something is coming from the north. Whatever it is, you will not face it alone. Not while I am here.",
+            "That is all. Go on. The order book will wait."
           ]
         }
       }
     },
     "selyna": {
       "giftAccepted": [
-        "…Fine. I'll take it. Don't make a thing of it.",
-        "Useful. That's the highest word I have and you've had it now, so don't wait for another.",
-        "You bring what I ask for and nothing else. That is rarer up here than you'd think.",
-        "Set it down. …Thank you. There. It didn't kill me."
+        "…Fine. I will take it. Don't make a fuss.",
+        "Useful. That is the nicest word I have, so don't expect another.",
+        "You bring what I ask for, and nothing else. I like that.",
+        "Put it down. …Thank you. There, I said it."
       ],
       "giftDeclined": [
-        "I didn't ask for that. I ask for exactly what I want, southerner, and never more.",
+        "I did not ask for that. I ask for exactly what I need, and nothing more.",
         "No. Take it back before the cold gets into it.",
-        "That's a gift, and I don't know what to do with those. Bring me what's on the list."
+        "That is a gift, and I do not know what to do with gifts. Bring me what is on the list."
       ],
       "hearts": {
         "1": {
           "speaker": "selyna",
           "lines": [
-            "You came back. People don't, usually. The crossing sorts them out.",
-            "I'm not warming to you. I'm noting a pattern. There's a difference and I intend to keep it."
+            "You came back. Most people don't. The crossing scares them off.",
+            "I am not saying I like you. I am saying I noticed. There is a difference."
           ]
         },
         "2": {
           "speaker": "selyna",
           "lines": [
-            "You can walk the shingle without me watching you do it. That's not affection. It's that I've other things to watch.",
-            "The animals decided about you first, incidentally. They usually do. I've been told it's the one thing I trust more than my own judgement, and I've never found the argument against it."
+            "You can walk the beach without me watching you now. I have other things to watch.",
+            "The dragons decided about you first, by the way. They usually do. I trust them more than I trust myself."
           ]
         },
         "3": {
           "speaker": "selyna",
           "lines": [
-            "She sends you with the good rope and the careful instructions and she never once writes to ask how I am.",
-            "I'm not asking you to take a side. I'm telling you there's a shape to it, and you've been standing inside the shape for a while now without noticing."
+            "My sister sends you with good rope and careful instructions. She never once writes to ask how I am.",
+            "I am not asking you to pick a side. I am just telling you how it is."
           ]
         },
         "4": {
           "speaker": "selyna",
           "lines": [
-            "You're being careful with me.",
-            "Nobody's careful with me who hasn't been told to be. So either she told you — and I don't think she did — or you worked it out, which is worse, because it means it shows."
+            "You are being careful with me.",
+            "Nobody is careful with me unless someone told them to be. So either she told you, or you worked it out yourself."
           ]
         },
         "5": {
           "speaker": "selyna",
           "lines": [
-            "Sit down. I'm going to say this once and at the speed I say things.",
-            "I have spent my life holding a thing nobody came for. You came. That is the entire difference between this year and the last forty, and I would like it on the record that I noticed.",
-            "…Right. That's enough of that. The dragons want feeding."
+            "Sit down. I will say this once.",
+            "I spent my whole life guarding something nobody came for. Then you came. That changes everything, and I want you to know I noticed.",
+            "…Right. That is enough of that. The dragons need feeding."
           ]
         }
       }
@@ -290,10 +290,10 @@
     "2": {
       "speaker": "eleanor",
       "lines": [
-        "That's the first thing anyone has given back to this place in sixty years. I would like to be composed about it. I'm not going to manage it.",
-        "You should know what you're working for. My craft isn't a large one. I can catch a thing, hold it, and give it back. That's the whole of it.",
-        "The moon does the same trick every night. Takes light it was never given, hands it back cooler. Nobody calls that a miracle. They call it evening.",
-        "So when I ask you for moonwater, understand that I'm not making anything. Everything I do, somebody else lit first."
+        "That is the first thing anyone has given back to this place in sixty years. I am trying not to cry. It is not working.",
+        "You should know what my magic does. I can catch a thing, hold it, and give it back. That is all.",
+        "The moon does the same trick every night. It borrows light from the sun and gives it back, softer. That is a kind of magic too.",
+        "So when I ask you for Moonwater, remember: I never make anything new. I only give back what someone else lit first."
       ]
     }
   },
@@ -301,12 +301,12 @@
     "borealis": {
       "speaker": "selyna",
       "lines": [
-        "So you're the one she found.",
-        "Don't come any closer yet — the ice between us is thinner than it looks, and I have not decided anything about you.",
-        "You'll want to know what I have. Don't ask me that yet.",
-        "Nine feet of shingle and whatever the tide left on it. That is the whole of your holding, Keeper.",
-        "Nothing grows here — so nothing here was grown. It was made, or it was salvaged off somebody's wreck.",
-        "That kiln behind you still draws. Melt two floats out of it and I'll hang them where the light carries. That buys you the coast, Keeper — the door comes when I say it does."
+        "So you are the one she found.",
+        "Don't come closer yet. The ice between us is thin, and I have not decided about you.",
+        "You want to know what I am guarding. Don't ask me yet.",
+        "This little beach is all you get for now, Keeper. Only what the sea washes up.",
+        "Nothing grows here. Everything up here was made, or saved from a shipwreck.",
+        "That Glass Oven behind you still works. Make 2 Glass Floats and bring them to me. Then you can explore the coast."
       ]
     }
   }

@@ -866,11 +866,22 @@ export class TutorialDirector {
       targetsFor: (from: BoardItemState) => BoardItemState[],
       expect: 'merge' | 'gather'
     ): { from: BoardItemState; to: BoardItemState } | null => {
-      for (const from of froms) {
+      // THE HAND MUST START ON A PIECE THE PLAYER CAN SEE. Depth grows with
+      // col+row, so a piece with the House drawn in front of it is on the board
+      // but not findable, and a lesson that points at what it hides teaches
+      // nothing. Candidates keep their order within each half, so this only
+      // ever chooses between drops the rule already performs — it never makes
+      // a refused one legal.
+      const clear = froms.filter((f) => !this.shadowed(f));
+      const ordered =
+        clear.length > 0 && clear.length < froms.length
+          ? [...clear, ...froms.filter((f) => this.shadowed(f))]
+          : froms;
+      for (const from of ordered) {
         const to = targetsFor(from).find((t) => performable(from, t, expect));
         if (to) return { from, to };
       }
-      const from = froms[0];
+      const from = ordered[0];
       const to = from ? targetsFor(from)[0] : undefined;
       const said = from && to ? verdictOnto(board, this.chains, from, to).kind : 'nothing to try';
       console.error(
@@ -885,7 +896,13 @@ export class TutorialDirector {
     const ready = readyClusters(board, this.chains, pieces)[0];
     if (ready) {
       const centre = ready.centre;
-      return firstPerformable([leafOf(board, ready)], () => [centre], 'merge');
+      const leaf = leafOf(board, ready);
+      // The leaf leads — it is the member whose leaving cannot break the group
+      // — but every other member is offered behind it, because the drop is
+      // symmetric here: any member dropped on the centre finishes the set. That
+      // is what lets a leaf standing behind the House hand the gesture on.
+      const rest = ready.members.filter((m) => m.id !== centre.id && m.id !== leaf.id);
+      return firstPerformable([leaf, ...rest], () => [centre], 'merge');
     }
 
     // The clusters, largest first; among equals the one holding the oldest
@@ -959,6 +976,17 @@ export class TutorialDirector {
    * that names ground: an authored cell nobody is standing on stays exactly the
    * frozen tile it was authored as, because that is what it means.
    */
+  /** Is there an item on a cell drawn directly IN FRONT of this one? Depth
+   *  grows with col+row, so the three cells ahead are (+1,0), (0,+1), (+1,+1). */
+  private shadowed(item: BoardItemState): boolean {
+    for (const [dc, dr] of [[1, 0], [0, 1], [1, 1]] as const) {
+      const front = this.state.itemAt(item.col + dc, item.row + dr);
+      // Any piece in front hides it — a House or a dragon more than most.
+      if (front && front.id !== item.id) return true;
+    }
+    return false;
+  }
+
   private resolveTileRef(ref: TileRef): MarkerPoint | null {
     const item = this.resolveRefItem(ref);
     if (item) return { col: item.col, row: item.row, item: item.id };
@@ -1015,7 +1043,19 @@ export class TutorialDirector {
     // "from the third to the first" must be two pieces, not one twice.
     const taken = new Set(this.pinned.values());
     const pick = ranked[ref.nth] ?? ranked[ranked.length - 1] ?? null;
-    const chosen = pick && taken.has(pick.id) ? (ranked.find((i) => !taken.has(i.id)) ?? pick) : pick;
+    let chosen = pick && taken.has(pick.id) ? (ranked.find((i) => !taken.has(i.id)) ?? pick) : pick;
+    // POINT AT A PIECE THE PLAYER CAN SEE. Ranks run back to front, so the
+    // first rank is the piece most likely to stand BEHIND something tall — a
+    // Cracked Rock with the House drawn over it is a pointer at the House.
+    // The director cannot see art, but it can see the board: a piece with
+    // another item on a cell directly in front of it is shadowed, and when an
+    // unshadowed rank exists it is the better answer to "that one".
+    if (chosen && this.shadowed(chosen)) {
+      const free = ranked.filter((i) => !taken.has(i.id));
+      // An unshadowed rank first; failing that the FRONT-most, which nothing
+      // on the board can stand in front of.
+      chosen = free.find((i) => !this.shadowed(i)) ?? free[free.length - 1] ?? chosen;
+    }
     if (chosen) this.pinned.set(key, chosen.id);
     return chosen;
   }

@@ -616,6 +616,48 @@ common shapes (speaker, gate, allow, drag list) and raw JSON for the rest;
 Save PUTs the file, Validate runs the audit. Inserting or reordering MAIN beats
 still shifts every persisted `tutorialIndex` — bump `SAVE_VERSION`.
 
+## Beat checkpoints (scripts/beats.mjs → tests/e2e/checkpoints)
+
+Every tutorial beat, as a save you can boot straight into. Headless, and
+self-contained: nothing has to be running first.
+
+- `pnpm beats:record` — plays the whole script ONCE by FOLLOWING THE LESSON'S
+  OWN POINTERS (`__emberkeep.pointers()`: the hand's from→to, the arrow's
+  target, re-read after every action until the beat advances) and writes
+  `NN-<step>.json` (the raw save blob) + `NN-<step>.png` per beat. It knows
+  nothing of the script: edit the tutorial in the 📜 tab and it still plays it.
+  The two gates no pointer can express (typing a name, paying a skip) live in
+  its `PLAYS` table. A beat that stalls is booted clean from the checkpoint
+  just written and played once more; a beat that fails twice from a clean boot
+  is a real bug and is reported with a screenshot. `--from <step>` resumes.
+- `pnpm beat <step>` — boots INTO that beat (~13 s cold) and screenshots it
+  (`--shot path`). A loaded save rebases the game clock to its `savedAt`, so
+  the restore is the beat frozen at the instant it was recorded.
+- `pnpm beats` — the checkpoints on disk, fresh or stale · `pnpm beats:check`
+  — exit 1 if any is missing or stale. Specs start at a beat with
+  `bootAtBeat(page, 'codex_taste')` from `tests/e2e/beats.ts`.
+- **Server**: `--url` if you have one; otherwise the dev server on 5173 when it
+  answers; otherwise the script builds (only if `dist/` is older than `src/`)
+  and serves `dist` itself with `vite preview` on `EMBERKEEP_BEATS_PORT`
+  (4180 — never the e2e lane's 4173), and stops it when done. Headless by
+  default; `--headed` to watch.
+- **Staleness is a test failure, not a surprise.** Every checkpoint carries
+  the fingerprint from `scripts/beats-fingerprint.cjs` — the tutorial's step
+  list, `SAVE_VERSION`, chain ids + tier ids, `map.json`, `zones.json`: the
+  things a save blob silently depends on. `pnpm beat`, `bootAtBeat` and
+  `tests/unit/Beats.spec.ts` all refuse a checkpoint recorded for another
+  fingerprint, so changing any of them fails `pnpm test` until
+  `pnpm beats:record` is run again (~3 min). Display strings, dialogue,
+  `events.json`, art and tuning never enter the fingerprint — edit those freely.
+  The blobs are committed; the PNGs are ignored and regenerated.
+
+The recorder is also an audit: a beat whose pointer cannot be followed is a
+beat the player cannot follow either. Recording found five of those (a hand
+asking for an impossible merge, an arrow on a piece hidden behind the House, a
+merge hand starting on a Dew Drop behind the House, a chooser arrow on the
+question instead of YES, a tile pointer under the dialogue) — all fixed in the
+game (`TutorialDirector.shadowed` / `plannedMergeLeg`), not in the harness.
+
 ## Event Creator (⚡ tab → src/data/events.json)
 
 The structured event system — every authored "when the player…, then…" moment

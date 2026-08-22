@@ -199,12 +199,12 @@ describe('the Borealis roster', () => {
     expect(new Set(t3).size, 'two northern tier-3s share a name').toBe(t3.length);
     expect(new Set(t3)).toEqual(
       new Set([
-        'The Glass Kiln', 'The Bottled Ship',
-        "The Starwright's Bench", 'The Orrery',
-        'The Wreck Forge', 'The Horned Helm',
-        'The Tar Kiln', 'The Ember Heart',
-        'The Aurora Loom', 'The Aurora Cloak',
-        'Runestone', 'Cordial Cask', 'Hearthlamp', 'Manastone Cairn', 'The Wayfinder',
+        'Glass Oven', 'Ship in a Bottle',
+        'Star Workbench', 'Star Machine',
+        'Shipwreck Forge', 'Horned Helmet',
+        'Tar Oven', 'Ember Heart',
+        'Aurora Loom', 'Aurora Cloak',
+        'Runestone', 'Juice Barrel', 'Warm Lamp', 'Magic Stone Tower', 'Treasure Compass',
       ])
     );
   });

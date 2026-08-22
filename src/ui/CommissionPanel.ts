@@ -67,6 +67,9 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
   private emptyText: Phaser.GameObjects.Text;
   private helper: Phaser.GameObjects.Text;
   private chooser: Phaser.GameObjects.Container | null = null;
+  /** The chooser's YES plate — what the lesson's arrow points at once the
+   *  question is up. The question itself is not a thing to tap. */
+  private chooserYes: Phaser.GameObjects.Container | null = null;
   private baseScale = 1;
 
   constructor(
@@ -212,7 +215,7 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
    */
   getMarkerPos(): { x: number; y: number } | null {
     if (!this.isOpen) return null;
-    const target = this.chooser ?? (this.gameState.bag.length ? this.slots[0] : null);
+    const target = this.chooserYes ?? this.chooser ?? (this.gameState.bag.length ? this.slots[0] : null);
     if (!target) return null;
     const m = target.getWorldTransformMatrix();
     return { x: m.tx, y: m.ty };
@@ -272,8 +275,8 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     // choice is made, not only in the refusal.
     this.helper.setText(
       cap <= 1
-        ? 'Choose one — this house will make it, and only it, from now on.\nA House works simple pieces: tier one. A Manor takes tier two.'
-        : 'Choose one — this manor will make it, and only it, from now on.\nA Manor works pieces of tier one and two.'
+        ? 'Pick one thing. This House will make it from now on.\nA House makes small things (level 1). A Mansion can make level 2 things too.'
+        : 'Pick one thing. This Mansion will make it from now on.\nA Mansion makes level 1 and level 2 things.'
     );
     // The PURSE is the first thing a building can be pointed at, at the rank it
     // can work: a House sees Gold Coins, a Manor sees Gold Pouches. It is the
@@ -428,6 +431,7 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     slot.add(chooser);
     slot.parentContainer.bringToTop(slot);
     this.chooser = chooser;
+    this.chooserYes = confirm;
     this.dimOthers(slot);
 
     chooser.setAlpha(0).setScale(0.92);
@@ -534,6 +538,7 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
   private closeChooser(): void {
     this.chooser?.destroy();
     this.chooser = null;
+    this.chooserYes = null;
     this.dimOthers(null);
   }
 }

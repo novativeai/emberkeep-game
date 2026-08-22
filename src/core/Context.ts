@@ -194,7 +194,7 @@ export class GameContext {
       dragonLife: new DragonLifeSystem(this.state, this.bus, this.clock, dragons, jobs),
       worlds: new WorldSystem(this.state, this.bus, this.data.characters),
       save,
-      tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial),
+      tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial, this.data.chains),
       events: new EventSystem(this.state, this.bus, this.clock, this.data.events, dragons, regard)
     };
     this.bus.on('game:reset_requested', () => this.resetGame());

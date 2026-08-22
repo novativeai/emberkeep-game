@@ -43,7 +43,7 @@ const SHOP: Record<Currency, { title: string; tab: string; icon: string; iconSca
     iconScale: 1.4,
     items: [
       { amount: 5, price: '', gold: 20, name: 'Ember Spark' },
-      { amount: 20, price: '', gold: 60, best: true, name: 'Hearth Bundle' },
+      { amount: 20, price: '', gold: 60, best: true, name: 'Warmth Pack' },
       { amount: 50, price: '', gold: 130, name: 'Keeper’s Blaze' }
     ]
     // A hub Warmth pack, when the hub sells one, is APPENDED to these by

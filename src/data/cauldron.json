@@ -19,8 +19,8 @@
           "count": 1
         }
       ],
-      "flavor": "Selyna's everyday brew — berries baked over gem-heat until they hold together.",
-      "use": "A full meal for any dragon, and Eleanor never refuses one."
+      "flavor": "Selyna's everyday recipe: berries baked with a Fire Gem until they stick together.",
+      "use": "A full meal for any dragon. Eleanor loves one too."
     },
     {
       "id": "iron_cap",
@@ -36,8 +36,8 @@
           "count": 1
         }
       ],
-      "flavor": "Two glass floats, cracked back down and the metal off their nets drawn out of the melt.",
-      "use": "The wrecks give up iron far too slowly to arm anyone.",
+      "flavor": "Melt a Glass Float, and the iron from its net comes out.",
+      "use": "Iron Hats are hard to find. This makes them faster.",
       "unlock": {
         "quest": "north_coast"
       }
@@ -56,8 +56,8 @@
           "count": 1
         }
       ],
-      "flavor": "A spyglass broken back to its lenses and held against the lights until the colour comes off in a strand.",
-      "use": "Thread without waiting on a whole Orrery to be built.",
+      "flavor": "Break a Spyglass into lenses, hold them up to the northern lights, and a strand of colour comes off.",
+      "use": "Makes Light Thread without building a whole Star Machine.",
       "unlock": {
         "quest": "north_fuel"
       }
@@ -81,8 +81,8 @@
           "count": 2
         }
       ],
-      "flavor": "Two beads of pitch and two floats of glass: the glass is what makes it burn slow.",
-      "use": "The north's fuel. Dragons eat it; hulls are sealed with it.",
+      "flavor": "Two Tar Drops and two Glass Balls. The glass makes it burn slowly.",
+      "use": "Dragon food in the north. Dragons eat it, and it seals boats too.",
       "unlock": {
         "quest": "north_strakes"
       }
@@ -106,8 +106,8 @@
           "count": 2
         }
       ],
-      "flavor": "Pitch for the burning, spirit for the light, and a wick of anything to hand.",
-      "use": "Three make a Storm Lantern. Only a handful were ever left on the ice.",
+      "flavor": "Tar to burn, Fire Juice for the light, and a wick.",
+      "use": "3 Oil Lamps make a Big Lantern. Only a few were ever left on the ice.",
       "unlock": {
         "quest": "north_door"
       }
@@ -131,8 +131,8 @@
           "count": 1
         }
       ],
-      "flavor": "Two mana pebbles quarrelling over one iron cap, until one of them wins and points.",
-      "use": "The road to a Wayfinder, which pays in helms forever.",
+      "flavor": "Two Magic Pebbles fight over one Iron Hat until one wins and points north.",
+      "use": "The first step to a Treasure Compass, which makes Gold forever.",
       "unlock": {
         "quest": "north_lamplight"
       }
@@ -156,8 +156,8 @@
           "count": 1
         }
       ],
-      "flavor": "Two threads and a lens to hold them apart while they set.",
-      "use": "Three make an Aurora Cloak — what Selyna's last order asks for.",
+      "flavor": "Two Light Threads and a Spyglass to hold them apart while they set.",
+      "use": "3 Light Cloths make an Aurora Cloak. Selyna's last order needs those.",
       "unlock": {
         "quest": "north_lodestones"
       }
@@ -181,8 +181,8 @@
           "count": 1
         }
       ],
-      "flavor": "An Ember Heart burns hot enough to split a nodule clean, and clean is the whole art.",
-      "use": "Three shards begin a second Runestone — and a Runestone makes fuel forever.",
+      "flavor": "An Ember Heart burns hot enough to split a Magic Rock into clean pieces.",
+      "use": "3 Rune Chips start a new Runestone. A Runestone makes Tar Drops forever.",
       "unlock": {
         "quest": "north_pitchworks"
       }
@@ -206,8 +206,8 @@
           "count": 1
         }
       ],
-      "flavor": "Clay is nothing without a fire under it and an iron collar to hold its shape.",
-      "use": "Nine bricks raise a second Glass Kiln.",
+      "flavor": "Clay needs a fire under it and an iron ring to hold its shape.",
+      "use": "9 Fire Bricks build a second Glass Oven.",
       "unlock": {
         "quest": "north_salvage"
       }
@@ -231,8 +231,8 @@
           "count": 1
         }
       ],
-      "flavor": "A glass throat and an iron tooth. That is the whole of a spile, and the glass is the part that matters.",
-      "use": "Nine spiles raise a second Tar Kiln.",
+      "flavor": "A glass tube and an iron tip. That is all a Tar Scoop is.",
+      "use": "9 Tar Scoops build a second Tar Oven.",
       "unlock": {
         "quest": "north_door"
       }
@@ -256,8 +256,8 @@
           "count": 1
         }
       ],
-      "flavor": "Three caps back into the melt, and pitch enough to keep it honest — the forge eats its own work to grow.",
-      "use": "Nine billets raise a second Wreck Forge.",
+      "flavor": "Three Iron Hats melted down, with a little tar to keep the fire honest.",
+      "use": "9 Iron Bars build a second Shipwreck Forge.",
       "unlock": {
         "quest": "north_hulls"
       }
@@ -281,8 +281,8 @@
           "count": 1
         }
       ],
-      "flavor": "Helms melted down and poured fine. A tooth this small will not cast unless the crucible stays angry.",
-      "use": "Nine cogs raise a second Starwright's Bench.",
+      "flavor": "Iron Hats melted and poured into a tiny gear shape.",
+      "use": "9 Gears build a second Star Workbench.",
       "unlock": {
         "quest": "north_skeins"
       }
@@ -306,8 +306,8 @@
           "count": 1
         }
       ],
-      "flavor": "Iron drawn out to a thread's width and set in a collar cut from two lenses.",
-      "use": "Nine spindles raise a second Aurora Loom.",
+      "flavor": "Iron pulled out as thin as thread, with a ring made from two lenses.",
+      "use": "9 Silver Spools build a second Aurora Loom.",
       "unlock": {
         "quest": "north_pitchworks"
       }
@@ -331,8 +331,8 @@
           "count": 1
         }
       ],
-      "flavor": "Board the wood, seal it with a warm gem, and the isle fills it on its own.",
-      "use": "Opens into coins, rubies, or a rare find."
+      "flavor": "Build a box from Logs and seal it with a warm gem. The island fills it on its own.",
+      "use": "Opens into Gold, Rubies, or a rare find."
     },
     {
       "id": "red_egg",
@@ -358,8 +358,8 @@
           "count": 1
         }
       ],
-      "flavor": "Two rubies remember being one heart. The preserve is for the first thing it asks.",
-      "use": "Three Red Eggs merge into a Red Dragon."
+      "flavor": "Two Rubies remember being one heart. The jam is for the first thing it asks for.",
+      "use": "3 Red Dragon Eggs make a Red Dragon."
     },
     {
       "id": "green_egg",
@@ -380,8 +380,8 @@
           "count": 2
         }
       ],
-      "flavor": "Moonwater poured over sweetness until something green agrees to grow a shell.",
-      "use": "Three Green Eggs merge into a Green Dragon."
+      "flavor": "Moonwater poured over sweet jam until something green grows a shell.",
+      "use": "3 Green Dragon Eggs make a Green Dragon."
     },
     {
       "id": "ashdrake_egg",
@@ -407,8 +407,8 @@
           "count": 1
         }
       ],
-      "flavor": "Ash wants tar, tar wants fire, and a Radiant Gem is the only fire that burns slow enough.",
-      "use": "Legendary. Three Ashdrake Eggs wake the Ashdrake.",
+      "flavor": "Ash wants tar, tar wants fire, and a Sun Gem is the only fire slow enough.",
+      "use": "Legendary! 3 Ash Dragon Eggs hatch the Ash Dragon.",
       "unlock": {
         "quest": "keepers_tasks"
       }
@@ -437,8 +437,8 @@
           "count": 2
         }
       ],
-      "flavor": "Wind the bolt, sink it in moonwater, and let the frost do the remembering.",
-      "use": "Legendary. Three Rimewyrm Eggs wake the Rimewyrm.",
+      "flavor": "Roll up the cloth, sink it in Moonwater, and let the frost do the rest.",
+      "use": "Legendary! 3 Ice Dragon Eggs hatch the Ice Dragon.",
       "unlock": {
         "quest": "north_terms"
       }
@@ -472,8 +472,8 @@
           "count": 3
         }
       ],
-      "flavor": "Fire that keeps, frost that keeps, and enough moonlight to make them agree. Gold is what agreement looks like.",
-      "use": "Mythic. The rarest shell the cauldron knows.",
+      "flavor": "Fire that lasts, frost that lasts, and enough moonlight to make them agree.",
+      "use": "Mythic! The rarest egg the Cauldron knows.",
       "unlock": {
         "quest": "the_rimewyrm_wakes"
       }

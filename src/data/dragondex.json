@@ -2,75 +2,75 @@
   "dragons": {
     "ember_dragon": {
       "title": "Red Dragon",
-      "story": "Hatched from a ruby the ash kept warm for sixty years — the first flame to come back to Emberkeep.",
-      "personality": "Highly energetic and endlessly curious. He loves roaming — no corner of the isle stays unexplored for long.",
-      "ability": "Reshapes his wings to catch the high thermals and fly higher than any other hatchling — and wraps his tail around himself to stay warm through the cold nights.",
+      "story": "She hatched from a Ruby that the ash kept warm for sixty years. She is the first fire to come back to Emberkeep.",
+      "personality": "Full of energy and always curious. She loves to explore every corner of the island.",
+      "ability": "She can fly higher than any other young dragon, and wraps her tail around herself to stay warm at night.",
       "evolution": {
         "wellFedCycles": 6,
-        "into": "Adult Red Dragon",
+        "into": "Big Red Dragon",
         "reveal": "reveal_ember_adult",
-        "condition": "Fully fed for 6 cycles"
+        "condition": "Fully fed for 6 days"
       }
     },
     "emerald": {
       "title": "Green Dragon",
-      "story": "Hatched from an emerald the deep roots grew warm — where the Red Dragon is the isle's returning fire, she is its patient garden.",
-      "personality": "Gentle and unhurried. She tends things: a wilting sprout, a cold nest, a Keeper who forgot to rest — all get the same careful attention.",
-      "ability": "Her breath quickens growth — berries ripen early under it, and green things lean toward her the way they lean toward morning sun.",
+      "story": "She hatched from an Emerald that the deep roots kept warm. The Red Dragon is the island's fire; she is its garden.",
+      "personality": "Gentle and calm. She looks after things: a wilting plant, a cold nest, a tired Keeper.",
+      "ability": "Her breath makes plants grow faster. Berries ripen early when she is near.",
       "evolution": {
         "wellFedCycles": 6,
-        "into": "Adult Emerald Dragon",
+        "into": "Big Green Dragon",
         "reveal": "reveal_emerald_adult",
-        "condition": "Fully fed for 6 cycles"
+        "condition": "Fully fed for 6 days"
       }
     },
     "frost": {
       "title": "Frost Dragon",
-      "story": "Winter-born, from an egg that arrived on the Emporium's coldest shelf and never quite melted. Even in Emberkeep's warmth she carries her own quiet of snow.",
-      "personality": "Calm and precise. She watches a long time before she moves, and her landings never make a sound.",
-      "ability": "Breathes a fine hoarfrost that cools whatever runs too hot — a forge, a fever, a temper — without ever putting the fire out.",
+      "story": "She was born in winter, from an egg that never melted. Even in warm Emberkeep she carries a little snow with her.",
+      "personality": "Calm and careful. She watches for a long time before she moves, and her landings never make a sound.",
+      "ability": "She breathes a cool frost that calms anything that gets too hot, without putting the fire out.",
       "evolution": {
         "wellFedCycles": 6,
-        "into": "Adult Frost Dragon",
+        "into": "Big Frost Dragon",
         "reveal": "reveal_frost_adult",
-        "condition": "Fully fed for 6 cycles"
+        "condition": "Fully fed for 6 days"
       }
     },
     "storm": {
       "title": "Storm Dragon",
-      "story": "Cracked his shell in a thunderhead and rode the same storm down to the isle. The weather has followed him around like a loyal dog ever since.",
-      "personality": "Restless and crackling — he naps in high places, wakes with the wind, and cannot resist a chase.",
-      "ability": "His wingbeats charge the air; he can call a small, polite thunder that rattles shutters and delights him every single time.",
+      "story": "He cracked his shell inside a thundercloud and rode the storm down to the island. The weather follows him like a puppy.",
+      "personality": "Restless and crackly. He naps in high places, wakes with the wind, and loves a chase.",
+      "ability": "His wings charge the air. He can call a small, polite thunder that rattles the windows and makes him very proud.",
       "evolution": {
         "wellFedCycles": 6,
-        "into": "Adult Storm Dragon",
+        "into": "Big Storm Dragon",
         "reveal": "reveal_storm_adult",
-        "condition": "Fully fed for 6 cycles"
+        "condition": "Fully fed for 6 days"
       }
     },
     "moonwhisker": {
       "title": "Moonwhisker",
-      "story": "Nobody saw her arrive — one night the moon came up and she was simply there, as if she had stepped out of it and pulled the light shut behind her.",
-      "personality": "Secretive and moon-led. She keeps her own hours, appears exactly where she is thinking of, and pretends none of it is remarkable.",
-      "ability": "Her whiskers read moonlight the way fingers read braille — in full dark she sees the isle as clearly as noon, and finds what was lost in it.",
+      "story": "Nobody saw her arrive. One night the moon came up, and she was just there.",
+      "personality": "Secretive and moon-led. She keeps her own hours and appears exactly where she wants to be.",
+      "ability": "Her whiskers can read moonlight. In the dark she sees the island as clearly as at noon, and finds lost things.",
       "evolution": {
         "wellFedCycles": 6,
-        "into": "Adult Moonwhisker",
+        "into": "Big Moonwhisker",
         "reveal": "reveal_moonwhisker_adult",
-        "condition": "Fully fed for 6 cycles"
+        "condition": "Fully fed for 6 days"
       }
     },
     "ashdrake": {
-      "title": "Ashdrake",
-      "story": "The old nests never truly cooled. Three eggs kept warm under a hundred years of ash — and the Keeper who gathered them woke the first drake Emberkeep has seen in living memory.",
-      "personality": "Patient and watchful, the way embers are. She remembers every hand that fed her, and settles nowhere the wind hasn't told her about first.",
-      "ability": "Breathes a slow ember-glow that rekindles anything the cold has taken — a hearth, a lantern, a heart. Cracked stone is a meal to her; she eats the cinder right out of the seam."
+      "title": "Ash Dragon",
+      "story": "The old nests never got cold. Three eggs stayed warm under the ash for a hundred years, until a Keeper found them.",
+      "personality": "Patient and watchful, like glowing embers. She remembers every hand that fed her.",
+      "ability": "She breathes a slow, warm glow that brings cold things back to life. Cracked Rocks are her favourite snack."
     },
     "rimewyrm": {
-      "title": "Rimewyrm",
-      "story": "It waited in the deep ice under Borealis longer than the harbour has had a name. Three eggs, given up one by one — and what the north froze finally met the Keeper it was keeping itself for.",
-      "personality": "Quiet and deliberate. He moves the way glaciers do — slowly, then all at once — and keeps to the cold light where the ice shows him what it remembers.",
-      "ability": "Breathes rime-mist that holds a moment perfectly still — frost that preserves rather than kills. A cold thing at heart, he craves the one drop of fire the north distils."
+      "title": "Ice Dragon",
+      "story": "He waited deep under the ice of Borealis for a very long time. Three eggs, found one by one, finally met their Keeper.",
+      "personality": "Quiet and slow to decide. He moves like a glacier: slowly, then all at once.",
+      "ability": "He breathes a frosty mist that freezes a moment in place. Frost that keeps things safe, not frost that hurts."
     }
   }
 }

@@ -37,7 +37,7 @@ unsubscribed gate events, coverage against the ledger, teach-order, bubble
 length, and one-verb-per-beat. It exits non-zero on any ERROR. **The judgement
 checks below are not in it** — never stop at a clean script run.
 
-## The seven laws
+## The eight laws
 
 ### 1. Every concept is taught where it appears
 A concept is *available* the moment its object is on screen and can be touched.
@@ -110,6 +110,17 @@ that pays XP, and place XP-paying beats after `levelup` unless you retune.
 
 Inserting or removing a step also shifts `tutorialIndex`, which is **persisted**.
 Bump `SAVE_VERSION` or mid-tutorial saves resume on the wrong beat.
+
+### 8. The words match the beat
+What a line NAMES must be what the beat POINTS AT. The checker derives each
+beat's subjects (gate chain, effect chains incl. `nearChain`, highlight/arrow/
+hand refs, the ui target's own vocabulary — a `commission` arrow is the Gold
+purse first) and reads the item names in the text against `chains.json`:
+- **ERROR** — a chain-gated beat whose line names none of that chain's pieces.
+- **WARN** — a line naming a piece from a chain the beat, its neighbours and
+  its subjects' producers never touch ("pick the Sap Drop" under an arrow on
+  the coin — the archetype).
+- **NOTE** — naming what a subject makes (House → coins) is explanation.
 
 ## Judgement checks the script cannot do
 

@@ -641,7 +641,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
 
     this.emptyText = scene.add
-      .text(0, 20, 'The brazier roars again!\nEleanor will have new work for you soon.', {
+      .text(0, 20, 'The Fire Bowl is burning again!\nEleanor will have a new order for you soon.', {
         fontFamily: FONT.ui,
         fontSize: '38px',
         fontStyle: 'bold',
@@ -1238,7 +1238,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     const host = this.orderSystem.giverHere;
     this.ordersTab.label.setText(`${speakerName(host)}’s Orders`);
     this.emptyText.setText(
-      `The brazier roars again!\n${speakerName(host)} will have new work for you soon.`
+      `All orders done!\n${speakerName(host)} will have a new order for you soon.`
     );
 
     this.cards.forEach((card, i) => {

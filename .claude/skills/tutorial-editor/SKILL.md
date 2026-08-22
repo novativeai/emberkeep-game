@@ -98,6 +98,7 @@ Raw HTTP, when not using the CLI: `GET /__tutorial` → `{scripts}`; `GET /__tut
 ## The laws you are editing under (non-negotiable)
 
 1. **Run the audit after every change**: `tut validate` (or `python3 .claude/skills/tutorial-design/scripts/ftuecheck.py`), then `pnpm test`. The `tutorial-design` skill holds the seven laws; the two that bite most when editing:
+   - **words ↔ beat** (law 8): the line must name the piece its gate waits for, and must not name a piece the beat does not point at — `ftuecheck` errors/warns; the 📜 tab's Validate shows it.
    - **gate ↔ allow**: a step's own `allow` must contain the verb its gate needs (`item:merged` → `drag` includes the chain; `item:harvested` → `tapGenerators`; `ui:codex_*` → `codexHold`; …). ftuecheck enforces the table.
    - **XP tune**: the main script pays EXACTLY 60 XP by `levelup` (`LEVEL_XP`). Any beat that adds XP before it moves Level 2 off its scripted beat.
 2. **Inserting, removing or reordering MAIN beats shifts every persisted `tutorialIndex`** → bump `SAVE_VERSION` in `src/core/Constants.ts` with a ledger line, or mid-tutorial saves resume on the wrong beat. Mid-game scripts do NOT need this (their progress is keyed by script id in stats).

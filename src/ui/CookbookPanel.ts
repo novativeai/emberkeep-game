@@ -169,7 +169,7 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
 
     this.add(
       scene.add
-        .text(0, -302, 'Every merge you discover is inscribed here', {
+        .text(0, -302, 'Every merge you discover is written here', {
           fontFamily: FONT.ui,
           fontSize: '26px',
           fontStyle: 'italic',

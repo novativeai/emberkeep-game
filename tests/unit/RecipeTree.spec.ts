@@ -26,14 +26,14 @@ const help = (
  * are the numbers the merge really uses, and a fixture would let the two drift.
  */
 describe('recipeHelp — how do I make that?', () => {
-  it("answers the owner's own example: one Radiant Gem is nine Gem Shards and a Red Dragon", () => {
+  it("answers the owner's own example: one Sun Gem is nine Gem Chips and a Red Dragon", () => {
     const answer = help({ chain: 'flame_gem', tier: 3, count: 1 })!;
     expect(answer).toBeTruthy();
-    expect(answer.goal.name).toBe('Radiant Gem');
+    expect(answer.goal.name).toBe('Sun Gem');
     expect(answer.rungs.map((r) => [r.tier, r.need, r.missing])).toEqual([
-      [3, 1, 1], // the Radiant Gem itself
-      [2, 3, 3], // three Flame Gems
-      [1, 9, 9] // nine Gem Shards
+      [3, 1, 1], // the Sun Gem itself
+      [2, 3, 3], // three Fire Gems
+      [1, 9, 9] // nine Gem Chips
     ]);
     // Each rung says how many of the tier below make one of it; the base rung
     // is not made by merging and says nothing.
@@ -49,7 +49,7 @@ describe('recipeHelp — how do I make that?', () => {
   });
 
   it('subtracts what is already in the pocket, and the subtraction CASCADES', () => {
-    // Two Flame Gems held: one more is wanted, so the shards owed are three,
+    // Two Fire Gems held: one more is wanted, so the shards owed are three,
     // not nine. This is the whole difference between the help and a recipe book.
     const answer = help({ chain: 'flame_gem', tier: 3, count: 1 }, { 'flame_gem:2': 2 })!;
     expect(answer.rungs.map((r) => [r.tier, r.need, r.have, r.missing])).toEqual([
@@ -67,14 +67,14 @@ describe('recipeHelp — how do I make that?', () => {
   });
 
   it('reads the merge count from the recipe, so a group-2 tier is not called three', () => {
-    // Two Houses make a Manor — the per-tier override in chains.json. A help
+    // Two Houses make a Mansion — the per-tier override in chains.json. A help
     // that hard-coded 3 would send the player to fell twice the forest.
     const answer = help({ chain: 'lumber', tier: 4, count: 1 })!;
     expect(answer.rungs.map((r) => [r.tier, r.need])).toEqual([
       [4, 1],
       [3, 2], // two Houses
       [2, 6], // three Planks each
-      [1, 18] // three Cut Wood each
+      [1, 18] // three Logs each
     ]);
     expect(answer.rungs.map((r) => r.fromCount)).toEqual([2, 3, 3, undefined]);
   });
@@ -87,7 +87,7 @@ describe('recipeHelp — how do I make that?', () => {
   });
 
   it('names a producer the Keeper actually owns over one they do not', () => {
-    // Eight dragons make Gem Shards. Telling a player who keeps a Green Dragon
+    // Eight dragons make Gem Chips. Telling a player who keeps a Green Dragon
     // to go and find a Red one is worse than saying nothing.
     const green = help({ chain: 'flame_gem', tier: 3, count: 1 }, { 'emerald:3': 1 })!;
     expect(green.source.label).toBe('Green Dragon');
@@ -98,16 +98,16 @@ describe('recipeHelp — how do I make that?', () => {
     // Glass Floats are the north's, and `chainHiddenIn` is the same gate the
     // Cookbook's pages use — the help cannot point somewhere the player is not.
     const north = help({ chain: 'seaglass', tier: 3, count: 1 }, {}, 'borealis');
-    expect(north?.source.label).toBe('The Glass Kiln');
+    expect(north?.source.label).toBe('Glass Oven');
     const south = help({ chain: 'seaglass', tier: 3, count: 1 }, {}, WORLD_ID);
     expect(south?.source.kind).toBe('none');
   });
 
   it('stops at a piece a producer hands over, rather than descending past it', () => {
-    // Moonwater: the Dew Basin pours Dew Drops, so the ladder ends there.
+    // Moonwater: the Dew Fountain pours Dew Drops, so the ladder ends there.
     const answer = help({ chain: 'moonwater', tier: 3, count: 1 })!;
     expect(answer.rungs.map((r) => r.tier)).toEqual([3, 2, 1]);
-    expect(answer.source).toMatchObject({ kind: 'tap', label: 'Dew Basin' });
+    expect(answer.source).toMatchObject({ kind: 'tap', label: 'Dew Fountain' });
   });
 
   it('still answers a tier-1 goal, because "tap the Red Dragon" is help', () => {
@@ -118,12 +118,12 @@ describe('recipeHelp — how do I make that?', () => {
   });
 
   it('stops early at a producer the Keeper HAS, rather than sending them to tier one', () => {
-    // An Ashdrake pours Flame Gems. Somebody who keeps one does not need to be
-    // told about Gem Shards — but somebody who has never seen one must never be
+    // An Ash Dragon pours Fire Gems. Somebody who keeps one does not need to be
+    // told about Gem Chips — but somebody who has never seen one must never be
     // sent to find it, which is why the stop is gated on holding it.
     const withDrake = help({ chain: 'flame_gem', tier: 3, count: 1 }, { 'ashdrake:2': 1 })!;
     expect(withDrake.rungs.map((r) => r.tier)).toEqual([3, 2]);
-    expect(withDrake.source).toMatchObject({ kind: 'tap', label: 'Ashdrake' });
+    expect(withDrake.source).toMatchObject({ kind: 'tap', label: 'Ash Dragon' });
     // Without one, the ladder goes all the way down.
     expect(help({ chain: 'flame_gem', tier: 3, count: 1 })!.rungs.map((r) => r.tier)).toEqual([3, 2, 1]);
   });

@@ -93,3 +93,6 @@ __pycache__/
 
 # Spotlight exclusion markers (mds_stores re-indexes multi-GB build/workspace trees)
 .metadata_never_index
+
+# beat checkpoints: the save blobs are committed, the screenshots are regenerated
+tests/e2e/checkpoints/*.png

@@ -344,6 +344,97 @@ for step in all_steps:
 
 
 # --------------------------------------------------------------------------- #
+# 8. the words match the beat — what a line NAMES must be what the beat POINTS AT
+# --------------------------------------------------------------------------- #
+# A beat's SUBJECTS are the chains its gate, effects and markers reference. A
+# line that names a piece from a chain the beat never touches is a mismatch the
+# player meets as "the bubble says Sap Drop, the arrow points at the coin".
+# UI-driven beats carry their own vocabulary (the panel's nouns), so a named
+# ui target widens the allowed words.
+TIER_NAMES = {}  # "Moss Puff" -> ("ashmoss", 1)
+for _cid, _c in chains.items():
+    for _t in _c["tiers"]:
+        TIER_NAMES[_t["name"].lower()] = (_cid, _t["tier"])
+# The chooser's first slot is the Gold purse whenever the player has coins, so a
+# commission beat is about coins unless the hand says otherwise.
+UI_VOCAB = {
+    "commission": {"coin", "lumber"},
+    "bag": set(), "bag_give": set(), "ledger": set(), "deliver": set(), "marketplace": set(),
+    "cookbook": set(), "cookbook_close": set(), "codex_card": set(), "codex_evolution": set(), "codex_close": set(),
+}
+PRODUCES = {}  # chain -> chains any of its tiers produce
+for _cid, _c in chains.items():
+    for _t in _c["tiers"]:
+        _g = _t.get("generator") or {}
+        for _p in [_g.get("produces"), (_g.get("bonus") or {}).get("produces")]:
+            if _p and _p.get("chain"): PRODUCES.setdefault(_cid, set()).add(_p["chain"])
+def _ref_chain(ref):
+    if isinstance(ref, dict):
+        if "chain" in ref: return {ref["chain"]}
+        if "tile" in ref: return _ref_chain(ref["tile"])
+    return set()
+def step_subjects(step):
+    subj = set()
+    gate = step.get("gate", {})
+    if gate.get("chain"): subj.add(gate["chain"])
+    if gate.get("type") == "count": subj.add(gate["chain"])
+    if gate.get("type") == "move": subj.add(gate["chain"])
+    for e in step.get("effects") or []:
+        for k in ("spawn", "retier", "setTimer", "wantGift", "nameDragon", "sleepDragon"):
+            if k in e and isinstance(e[k], dict) and e[k].get("chain"): subj.add(e[k]["chain"])
+        if "spawn" in e and e["spawn"].get("nearChain"): subj.add(e["spawn"]["nearChain"])
+    for h in step.get("highlight") or []: subj |= _ref_chain(h)
+    for k in ("arrow", "arrowThen"):
+        ref = step.get(k)
+        if isinstance(ref, dict):
+            subj |= _ref_chain(ref)
+            if ref.get("ui") in UI_VOCAB: subj |= UI_VOCAB[ref["ui"]]
+    hand = step.get("hand") or {}
+    for k in ("from", "to"): subj |= _ref_chain(hand.get(k))
+    if hand.get("ui") in UI_VOCAB: subj |= UI_VOCAB[hand["ui"]]
+    return subj
+
+def named_items(text):
+    low = text.lower()
+    found = {}
+    # longest names first so "Big Red Dragon" is not read as "Red Dragon"
+    for name in sorted(TIER_NAMES, key=len, reverse=True):
+        if name in low:
+            found[name] = TIER_NAMES[name]
+            low = low.replace(name, " ")
+    # plurals: "Moss Puffs", "Logs" already singular-in-plural, "Crystals"
+    for name in sorted(TIER_NAMES, key=len, reverse=True):
+        if name + "s" in low:
+            found[name] = TIER_NAMES[name]
+            low = low.replace(name + "s", " ")
+    return found
+
+for i, step in enumerate(all_steps):
+    sid = f"step {step['id']}"
+    subj = step_subjects(step)
+    gate = step.get("gate", {})
+    named = named_items(step.get("text", ""))
+    gate_chain = gate.get("chain") if gate.get("type") in ("event", "count", "move") else None
+    # (a) a chain-gated beat must name the thing it is waiting for
+    if gate_chain and gate_chain not in {c for c, _ in named.values()}:
+        fam = ", ".join(t["name"] for t in chains[gate_chain]["tiers"][:3])
+        add("ERROR", "8", sid, f"gate waits for {gate_chain} but the line names none of its pieces ({fam}…)")
+    # (b) a line that names a piece the beat does not touch is a mismatch —
+    # unless the piece is the NEXT beat's subject (a one-beat look-ahead is how
+    # "three Dew Bottles make Moonwater" legitimately reads).
+    nxt = step_subjects(all_steps[i + 1]) if i + 1 < len(all_steps) else set()
+    prev = step_subjects(all_steps[i - 1]) if i > 0 else set()
+    for name, (chain, tier) in named.items():
+        if chain in subj or chain in nxt or chain in prev: continue
+        if not subj: continue  # a UI or narration beat points at nothing; it may name what it talks about
+        # "merge these and it makes X" / "X is made by the thing you are merging" — a producer
+        # relation in either direction is explanation, not a mismatch.
+        related = any(chain in PRODUCES.get(c, set()) or c in PRODUCES.get(chain, set()) for c in subj)
+        sev = "NOTE" if related else "WARN"
+        add(sev, "8", sid, f'names "{name}" ({chain}) but the beat points at {sorted(subj)} — ' + ("what a subject makes" if related else "is the line about this beat?"))
+
+
+# --------------------------------------------------------------------------- #
 # 7. coverage against the ledger
 # --------------------------------------------------------------------------- #
 LEDGER = os.path.join(ROOT, "docs", "tutorial-coverage.md")

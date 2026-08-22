@@ -8,26 +8,26 @@
   "chains": [
     {
       "id": "sparkweed",
-      "name": "Sparkweed",
+      "name": "Spark Flowers",
       "tiers": [
         {
           "tier": 1,
           "id": "sparkweed_1",
-          "name": "Spark Weed",
+          "name": "Spark Sprout",
           "sell": 1,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "sparkweed_2",
-          "name": "Ember Bloom",
+          "name": "Spark Flower",
           "sell": 3,
           "xp": 6
         },
         {
           "tier": 3,
           "id": "sparkweed_3",
-          "name": "Flame Lily",
+          "name": "Fire Flower",
           "sell": 8,
           "xp": 14
         }
@@ -35,26 +35,26 @@
     },
     {
       "id": "strawberry",
-      "name": "Emberberry Plants",
+      "name": "Berry Bushes",
       "tiers": [
         {
           "tier": 1,
           "id": "strawberry_1",
-          "name": "Emberberry Sprout",
+          "name": "Berry Sprout",
           "sell": 1,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "strawberry_2",
-          "name": "Emberberry Bush",
+          "name": "Berry Bush",
           "sell": 3,
           "xp": 6
         },
         {
           "tier": 3,
           "id": "strawberry_3",
-          "name": "Ripe Emberberry Plant",
+          "name": "Big Berry Bush",
           "sell": 8,
           "xp": 14,
           "generator": {
@@ -78,20 +78,20 @@
     },
     {
       "id": "ember_dragon",
-      "name": "Ember Dragons",
+      "name": "Red Dragons",
       "hatchAtTier": 3,
       "tiers": [
         {
           "tier": 1,
           "id": "ember_dragon_1",
-          "name": "Dragon Ruby",
+          "name": "Ruby",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "ember_dragon_2",
-          "name": "Red Egg",
+          "name": "Red Dragon Egg",
           "sell": 10,
           "xp": 0
         },
@@ -125,7 +125,7 @@
         {
           "tier": 4,
           "id": "ember_dragon_4",
-          "name": "Adult Red Dragon",
+          "name": "Big Red Dragon",
           "sell": 60,
           "xp": 40,
           "generator": {
@@ -149,26 +149,26 @@
     },
     {
       "id": "flame_gem",
-      "name": "Flame Gems",
+      "name": "Fire Gems",
       "tiers": [
         {
           "tier": 1,
           "id": "flame_gem_1",
-          "name": "Gem Shard",
+          "name": "Gem Chip",
           "sell": 1,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "flame_gem_2",
-          "name": "Flame Gem",
+          "name": "Fire Gem",
           "sell": 5,
           "xp": 8
         },
         {
           "tier": 3,
           "id": "flame_gem_3",
-          "name": "Radiant Gem",
+          "name": "Sun Gem",
           "sell": 15,
           "xp": 18
         }
@@ -176,19 +176,19 @@
     },
     {
       "id": "lumber",
-      "name": "Timber",
+      "name": "Wood & Houses",
       "tiers": [
         {
           "tier": 1,
           "id": "lumber_1",
-          "name": "Cut Wood",
+          "name": "Logs",
           "sell": 1,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "lumber_2",
-          "name": "Plank Set",
+          "name": "Planks",
           "sell": 3,
           "xp": 4
         },
@@ -218,7 +218,7 @@
         {
           "tier": 4,
           "id": "lumber_4",
-          "name": "Manor",
+          "name": "Mansion",
           "sell": 0,
           "xp": 20,
           "generator": {
@@ -238,12 +238,12 @@
     },
     {
       "id": "bigtree",
-      "name": "Ancient Tree",
+      "name": "Old Tree",
       "tiers": [
         {
           "tier": 1,
           "id": "bigtree_1",
-          "name": "Ancient Tree",
+          "name": "Old Tree",
           "sell": 0,
           "xp": 0,
           "generator": {
@@ -268,26 +268,26 @@
     },
     {
       "id": "firgrain",
-      "name": "Fir",
+      "name": "Trees",
       "tiers": [
         {
           "tier": 1,
           "id": "firgrain_1",
-          "name": "Fir Grain",
+          "name": "Tree Seed",
           "sell": 2,
           "xp": 3
         },
         {
           "tier": 2,
           "id": "firgrain_2",
-          "name": "Small Fir Tree",
+          "name": "Small Tree",
           "sell": 7,
           "xp": 8
         },
         {
           "tier": 3,
           "id": "firgrain_3",
-          "name": "Fir Tree",
+          "name": "Big Tree",
           "sell": 0,
           "xp": 24,
           "generator": {
@@ -312,12 +312,12 @@
     },
     {
       "id": "crystal",
-      "name": "Theme Crystal",
+      "name": "Eleanor's Crystal",
       "tiers": [
         {
           "tier": 1,
           "id": "crystal_1",
-          "name": "Theme Crystal",
+          "name": "Eleanor's Crystal",
           "sell": 0,
           "xp": 0,
           "generator": {
@@ -347,7 +347,7 @@
         {
           "tier": 2,
           "id": "coin_2",
-          "name": "Gold Pouch",
+          "name": "Bag of Gold",
           "sell": 15,
           "xp": 60
         }
@@ -355,7 +355,7 @@
     },
     {
       "id": "emerald",
-      "name": "Emerald Dragons",
+      "name": "Green Dragons",
       "hatchAtTier": 3,
       "tiers": [
         {
@@ -368,7 +368,7 @@
         {
           "tier": 2,
           "id": "emerald_2",
-          "name": "Green Egg",
+          "name": "Green Dragon Egg",
           "sell": 10,
           "xp": 0
         },
@@ -395,7 +395,7 @@
         {
           "tier": 4,
           "id": "emerald_4",
-          "name": "Adult Emerald Dragon",
+          "name": "Big Green Dragon",
           "sell": 50,
           "xp": 36,
           "generator": {
@@ -419,7 +419,7 @@
         {
           "tier": 1,
           "id": "frost_1",
-          "name": "Frost Egg",
+          "name": "Frost Dragon Egg",
           "sell": 10,
           "xp": 0
         },
@@ -453,7 +453,7 @@
         {
           "tier": 3,
           "id": "frost_3",
-          "name": "Adult Frost Dragon",
+          "name": "Big Frost Dragon",
           "sell": 60,
           "xp": 40,
           "generator": {
@@ -483,7 +483,7 @@
         {
           "tier": 1,
           "id": "storm_1",
-          "name": "Storm Egg",
+          "name": "Storm Dragon Egg",
           "sell": 10,
           "xp": 0
         },
@@ -517,7 +517,7 @@
         {
           "tier": 3,
           "id": "storm_3",
-          "name": "Adult Storm Dragon",
+          "name": "Big Storm Dragon",
           "sell": 60,
           "xp": 40,
           "generator": {
@@ -541,7 +541,7 @@
     },
     {
       "id": "golden_egg",
-      "name": "Golden Dragons",
+      "name": "Golden Dragon",
       "hatchAtTier": 2,
       "tiers": [
         {
@@ -577,26 +577,26 @@
     },
     {
       "id": "firepine",
-      "name": "Firepine",
+      "name": "Fire Pines",
       "tiers": [
         {
           "tier": 1,
           "id": "firepine_1",
-          "name": "Firepine Seedling",
+          "name": "Fire Pine Sprout",
           "sell": 3,
           "xp": 4
         },
         {
           "tier": 2,
           "id": "firepine_2",
-          "name": "Firepine Sapling",
+          "name": "Small Fire Pine",
           "sell": 9,
           "xp": 8
         },
         {
           "tier": 3,
           "id": "firepine_3",
-          "name": "Firepine",
+          "name": "Fire Pine",
           "sell": 0,
           "xp": 16,
           "generator": {
@@ -613,26 +613,26 @@
     },
     {
       "id": "cinder_vein",
-      "name": "Cinder Vein",
+      "name": "Crystal Rocks",
       "tiers": [
         {
           "tier": 1,
           "id": "cinder_vein_1",
-          "name": "Cracked Stone",
+          "name": "Cracked Rock",
           "sell": 3,
           "xp": 4
         },
         {
           "tier": 2,
           "id": "cinder_vein_2",
-          "name": "Cinder Seam",
+          "name": "Glowing Rock",
           "sell": 9,
           "xp": 8
         },
         {
           "tier": 3,
           "id": "cinder_vein_3",
-          "name": "Cinder Vein",
+          "name": "Crystal Rock",
           "sell": 0,
           "xp": 16,
           "generator": {
@@ -649,7 +649,7 @@
     },
     {
       "id": "dew_basin",
-      "name": "Dew Basin",
+      "name": "Dew Fountain",
       "tiers": [
         {
           "tier": 1,
@@ -661,14 +661,14 @@
         {
           "tier": 2,
           "id": "dew_basin_2",
-          "name": "Dew Hollow",
+          "name": "Dew Bowl",
           "sell": 9,
           "xp": 8
         },
         {
           "tier": 3,
           "id": "dew_basin_3",
-          "name": "Dew Basin",
+          "name": "Dew Fountain",
           "sell": 0,
           "xp": 16,
           "generator": {
@@ -685,7 +685,7 @@
     },
     {
       "id": "emberberry",
-      "name": "Emberberry",
+      "name": "Emberberries",
       "tiers": [
         {
           "tier": 1,
@@ -697,14 +697,14 @@
         {
           "tier": 2,
           "id": "emberberry_2",
-          "name": "Emberberry Basket",
+          "name": "Berry Basket",
           "sell": 7,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "emberberry_3",
-          "name": "Emberberry Preserve",
+          "name": "Emberberry Jam",
           "sell": 22,
           "xp": 15
         }
@@ -712,26 +712,26 @@
     },
     {
       "id": "resin",
-      "name": "Resin",
+      "name": "Tree Sap",
       "tiers": [
         {
           "tier": 1,
           "id": "resin_1",
-          "name": "Resin Bead",
+          "name": "Sap Drop",
           "sell": 2,
           "xp": 3
         },
         {
           "tier": 2,
           "id": "resin_2",
-          "name": "Resin Lump",
+          "name": "Sap Ball",
           "sell": 7,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "resin_3",
-          "name": "Hearth Cake",
+          "name": "Sap Cookie",
           "sell": 22,
           "xp": 15
         }
@@ -739,26 +739,26 @@
     },
     {
       "id": "ashmoss",
-      "name": "Ash Moss",
+      "name": "Moss",
       "tiers": [
         {
           "tier": 1,
           "id": "ashmoss_1",
-          "name": "Moss Tuft",
+          "name": "Moss Puff",
           "sell": 2,
           "xp": 3
         },
         {
           "tier": 2,
           "id": "ashmoss_2",
-          "name": "Moss Bundle",
+          "name": "Moss Bunch",
           "sell": 7,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "ashmoss_3",
-          "name": "Green Bale",
+          "name": "Moss Pile",
           "sell": 22,
           "xp": 15
         }
@@ -766,12 +766,12 @@
     },
     {
       "id": "emberbark",
-      "name": "Emberbark Stump",
+      "name": "Mossy Stump",
       "tiers": [
         {
           "tier": 1,
           "id": "emberbark_1",
-          "name": "Emberbark Stump",
+          "name": "Mossy Stump",
           "sell": 0,
           "xp": 0,
           "generator": {
@@ -789,26 +789,26 @@
     },
     {
       "id": "stormcap",
-      "name": "Stormcap",
+      "name": "Storm Mushrooms",
       "tiers": [
         {
           "tier": 1,
           "id": "stormcap_1",
-          "name": "Storm Cap",
+          "name": "Storm Mushroom",
           "sell": 2,
           "xp": 3
         },
         {
           "tier": 2,
           "id": "stormcap_2",
-          "name": "Cap Cluster",
+          "name": "Mushroom Bunch",
           "sell": 7,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "stormcap_3",
-          "name": "Charged Cap",
+          "name": "Lightning Mushroom",
           "sell": 22,
           "xp": 15
         }
@@ -816,7 +816,7 @@
     },
     {
       "id": "nightbloom",
-      "name": "Nightbloom",
+      "name": "Night Flowers",
       "tiers": [
         {
           "tier": 1,
@@ -828,14 +828,14 @@
         {
           "tier": 2,
           "id": "nightbloom_2",
-          "name": "Night Bloom",
+          "name": "Night Flower",
           "sell": 7,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "nightbloom_3",
-          "name": "Cooling Wreath",
+          "name": "Flower Crown",
           "sell": 22,
           "xp": 15
         }
@@ -843,19 +843,19 @@
     },
     {
       "id": "quartz",
-      "name": "Quartz",
+      "name": "Crystals",
       "tiers": [
         {
           "tier": 1,
           "id": "quartz_1",
-          "name": "Quartz Pebble",
+          "name": "Crystal Chip",
           "sell": 2,
           "xp": 3
         },
         {
           "tier": 2,
           "id": "quartz_2",
-          "name": "Cut Crystal",
+          "name": "Crystal",
           "sell": 7,
           "xp": 7
         },
@@ -882,7 +882,7 @@
         {
           "tier": 2,
           "id": "moonwater_2",
-          "name": "Dew Vial",
+          "name": "Dew Bottle",
           "sell": 7,
           "xp": 7
         },
@@ -911,7 +911,7 @@
     },
     {
       "id": "glasskiln",
-      "name": "Glass Kiln",
+      "name": "Glass Oven",
       "world": "borealis",
       "tiers": [
         {
@@ -924,14 +924,14 @@
         {
           "tier": 2,
           "id": "glasskiln_2",
-          "name": "Kiln Grate",
+          "name": "Oven Rack",
           "sell": 6,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "glasskiln_3",
-          "name": "The Glass Kiln",
+          "name": "Glass Oven",
           "sell": 0,
           "xp": 18,
           "generator": {
@@ -962,21 +962,21 @@
         {
           "tier": 1,
           "id": "seaglass_1",
-          "name": "Glass Float",
+          "name": "Glass Ball",
           "sell": 1,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "seaglass_2",
-          "name": "Glass Buoy",
+          "name": "Glass Float",
           "sell": 4,
           "xp": 6
         },
         {
           "tier": 3,
           "id": "seaglass_3",
-          "name": "The Bottled Ship",
+          "name": "Ship in a Bottle",
           "sell": 14,
           "xp": 16
         }
@@ -984,27 +984,27 @@
     },
     {
       "id": "starbench",
-      "name": "Starwright's Bench",
+      "name": "Star Workbench",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "starbench_1",
-          "name": "Brass Cog",
+          "name": "Gear",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "starbench_2",
-          "name": "Gear Ring",
+          "name": "Gear Wheel",
           "sell": 6,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "starbench_3",
-          "name": "The Starwright's Bench",
+          "name": "Star Workbench",
           "sell": 0,
           "xp": 18,
           "generator": {
@@ -1029,13 +1029,13 @@
     },
     {
       "id": "orrery",
-      "name": "Orrery",
+      "name": "Spyglasses",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "orrery_1",
-          "name": "Ground Lens",
+          "name": "Glass Lens",
           "sell": 2,
           "xp": 0
         },
@@ -1049,7 +1049,7 @@
         {
           "tier": 3,
           "id": "orrery_3",
-          "name": "The Orrery",
+          "name": "Star Machine",
           "sell": 18,
           "xp": 18
         }
@@ -1057,27 +1057,27 @@
     },
     {
       "id": "wreckforge",
-      "name": "Wreck Forge",
+      "name": "Shipwreck Forge",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "wreckforge_1",
-          "name": "Iron Billet",
+          "name": "Iron Bar",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "wreckforge_2",
-          "name": "Forge Bellows",
+          "name": "Bellows",
           "sell": 6,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "wreckforge_3",
-          "name": "The Wreck Forge",
+          "name": "Shipwreck Forge",
           "sell": 0,
           "xp": 18,
           "generator": {
@@ -1102,27 +1102,27 @@
     },
     {
       "id": "warhelm",
-      "name": "War Helm",
+      "name": "Iron Helmets",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "warhelm_1",
-          "name": "Iron Cap",
+          "name": "Iron Hat",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "warhelm_2",
-          "name": "Banded Helm",
+          "name": "Iron Helmet",
           "sell": 6,
           "xp": 6
         },
         {
           "tier": 3,
           "id": "warhelm_3",
-          "name": "The Horned Helm",
+          "name": "Horned Helmet",
           "sell": 18,
           "xp": 18
         }
@@ -1130,13 +1130,13 @@
     },
     {
       "id": "tarkiln",
-      "name": "Tar Kiln",
+      "name": "Tar Oven",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "tarkiln_1",
-          "name": "Tar Spile",
+          "name": "Tar Scoop",
           "sell": 2,
           "xp": 0
         },
@@ -1150,7 +1150,7 @@
         {
           "tier": 3,
           "id": "tarkiln_3",
-          "name": "The Tar Kiln",
+          "name": "Tar Oven",
           "sell": 0,
           "xp": 18,
           "generator": {
@@ -1175,27 +1175,27 @@
     },
     {
       "id": "emberheart",
-      "name": "Ember Heart",
+      "name": "Tar & Ember Hearts",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "emberheart_1",
-          "name": "Pitch Bead",
+          "name": "Tar Drop",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "emberheart_2",
-          "name": "Pitch Loaf",
+          "name": "Tar Loaf",
           "sell": 7,
           "xp": 9
         },
         {
           "tier": 3,
           "id": "emberheart_3",
-          "name": "The Ember Heart",
+          "name": "Ember Heart",
           "sell": 20,
           "xp": 20
         }
@@ -1209,21 +1209,21 @@
         {
           "tier": 1,
           "id": "auroraloom_1",
-          "name": "Silver Spindle",
+          "name": "Silver Spool",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "auroraloom_2",
-          "name": "Loom Comb",
+          "name": "Spinning Wheel",
           "sell": 6,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "auroraloom_3",
-          "name": "The Aurora Loom",
+          "name": "Aurora Loom",
           "sell": 0,
           "xp": 18,
           "generator": {
@@ -1248,7 +1248,7 @@
     },
     {
       "id": "auroraweave",
-      "name": "Aurora Weave",
+      "name": "Light Cloth",
       "world": "borealis",
       "tiers": [
         {
@@ -1261,14 +1261,14 @@
         {
           "tier": 2,
           "id": "auroraweave_2",
-          "name": "Woven Bolt",
+          "name": "Light Cloth",
           "sell": 8,
           "xp": 10
         },
         {
           "tier": 3,
           "id": "auroraweave_3",
-          "name": "The Aurora Cloak",
+          "name": "Aurora Cloak",
           "sell": 24,
           "xp": 22
         }
@@ -1276,20 +1276,20 @@
     },
     {
       "id": "runestone",
-      "name": "Runestone",
+      "name": "Runestones",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "runestone_1",
-          "name": "Rune Shard",
+          "name": "Rune Chip",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "runestone_2",
-          "name": "Carved Stone",
+          "name": "Carved Rune",
           "sell": 6,
           "xp": 7
         },
@@ -1321,27 +1321,27 @@
     },
     {
       "id": "emberdram",
-      "name": "Emberdram",
+      "name": "Fire Juice",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "emberdram_1",
-          "name": "Dram Vial",
+          "name": "Fire Juice",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "emberdram_2",
-          "name": "Cordial Flask",
+          "name": "Juice Jug",
           "sell": 7,
           "xp": 8
         },
         {
           "tier": 3,
           "id": "emberdram_3",
-          "name": "Cordial Cask",
+          "name": "Juice Barrel",
           "sell": 18,
           "xp": 18,
           "generator": {
@@ -1366,7 +1366,7 @@
     },
     {
       "id": "hearthlamp",
-      "name": "Hearthlamp",
+      "name": "Lamps",
       "world": "borealis",
       "tiers": [
         {
@@ -1379,14 +1379,14 @@
         {
           "tier": 2,
           "id": "hearthlamp_2",
-          "name": "Storm Lantern",
+          "name": "Big Lantern",
           "sell": 4,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "hearthlamp_3",
-          "name": "Hearthlamp",
+          "name": "Warm Lamp",
           "sell": 0,
           "xp": 18,
           "sellable": false,
@@ -1411,27 +1411,27 @@
     },
     {
       "id": "manastone",
-      "name": "Manastone",
+      "name": "Magic Stones",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "manastone_1",
-          "name": "Mana Pebble",
+          "name": "Magic Pebble",
           "sell": 3,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "manastone_2",
-          "name": "Mana Nodule",
+          "name": "Magic Rock",
           "sell": 10,
           "xp": 9
         },
         {
           "tier": 3,
           "id": "manastone_3",
-          "name": "Manastone Cairn",
+          "name": "Magic Stone Tower",
           "sell": 26,
           "xp": 20,
           "generator": {
@@ -1456,27 +1456,27 @@
     },
     {
       "id": "wayfinder",
-      "name": "Wayfinder",
+      "name": "Compasses",
       "world": "borealis",
       "tiers": [
         {
           "tier": 1,
           "id": "wayfinder_1",
-          "name": "Lodestone",
+          "name": "Magnet Rock",
           "sell": 2,
           "xp": 0
         },
         {
           "tier": 2,
           "id": "wayfinder_2",
-          "name": "Boxed Needle",
+          "name": "Compass Needle",
           "sell": 6,
           "xp": 7
         },
         {
           "tier": 3,
           "id": "wayfinder_3",
-          "name": "The Wayfinder",
+          "name": "Treasure Compass",
           "sell": 0,
           "xp": 18,
           "sellable": false,
@@ -1502,7 +1502,7 @@
     },
     {
       "id": "ashdrake",
-      "name": "Ashdrake",
+      "name": "Ash Dragon",
       "world": "emberkeep",
       "legendary": true,
       "hatchAtTier": 2,
@@ -1510,7 +1510,7 @@
         {
           "tier": 1,
           "id": "ashdrake_1",
-          "name": "Ashdrake Egg",
+          "name": "Ash Dragon Egg",
           "sell": 0,
           "xp": 0,
           "sellable": false
@@ -1518,7 +1518,7 @@
         {
           "tier": 2,
           "id": "ashdrake_2",
-          "name": "Ashdrake",
+          "name": "Ash Dragon",
           "sell": 0,
           "xp": 60,
           "sellable": false,
@@ -1537,7 +1537,7 @@
     },
     {
       "id": "rimewyrm",
-      "name": "Rimewyrm",
+      "name": "Ice Dragon",
       "world": "borealis",
       "legendary": true,
       "hatchAtTier": 2,
@@ -1545,7 +1545,7 @@
         {
           "tier": 1,
           "id": "rimewyrm_1",
-          "name": "Rimewyrm Egg",
+          "name": "Ice Dragon Egg",
           "sell": 0,
           "xp": 0,
           "sellable": false
@@ -1553,7 +1553,7 @@
         {
           "tier": 2,
           "id": "rimewyrm_2",
-          "name": "Rimewyrm",
+          "name": "Ice Dragon",
           "sell": 0,
           "xp": 60,
           "sellable": false,

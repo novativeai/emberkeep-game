@@ -325,6 +325,12 @@ export class UIScene extends Phaser.Scene {
   /** `height` = how far the target extends below the anchor point (0 for a
    *  button, a full standee for a world character) — see update(). */
   private arrowAnchor: (() => { x: number; y: number; height?: number } | null) | null = null;
+  /** The tile a tile-anchored arrow names (null for UI/character/fog arrows). */
+  private arrowTile: MarkerPoint | null = null;
+  /** The character a character-anchored arrow names. */
+  private arrowCharacter: string | null = null;
+  /** The UI target a ui-anchored arrow names. */
+  private arrowUi: TutorialUiTarget | null = null;
   /** True while the arrow is anchored to a board PIECE — see update(): only
    *  those go quiet when their anchor stops answering. */
   private arrowOnPiece = false;
@@ -2278,6 +2284,43 @@ export class UIScene extends Phaser.Scene {
    * through the board camera's worldView. All board-anchored markers (hand,
    * arrow, tooltip) go through here so they track wherever the camera sits.
    */
+  /**
+   * What the lesson's markers point at RIGHT NOW — the test bridge's
+   * `pointers()` reads this so a harness can literally follow the pointer.
+   * Board targets come back as CELLS (the bridge maps them to the piece's art,
+   * which is what a player taps); UI targets come back as screen points.
+   */
+  markerTargets(): {
+    hand:
+      | { fromCell: TilePos | null; toCell: TilePos | null }
+      | { at: { x: number; y: number } }
+      | null;
+    arrowCell: TilePos | null;
+    arrowCharacter: string | null;
+    arrow: { x: number; y: number } | null;
+  } {
+    let hand: ReturnType<UIScene['markerTargets']>['hand'] = null;
+    if (this.hand.visible && this.handDrag) {
+      hand = {
+        fromCell: markerPointCell(this.ctx.state, this.handDrag.from),
+        toCell: markerPointCell(this.ctx.state, this.handDrag.to)
+      };
+    } else if (this.hand.visible && this.handPoint) {
+      const p = this.handPoint();
+      if (p) hand = { at: { x: p.x - 28, y: p.y - 32 } };
+    }
+    let arrowCell = this.arrowAnchor && this.arrowTile ? markerPointCell(this.ctx.state, this.arrowTile) : null;
+    // The commission arrow sits on the House until its panel opens — answer
+    // with the House's CELL so the bridge aims at its art, not its tile centre
+    // (which a tree in front may be standing on).
+    if (!arrowCell && this.arrowAnchor && this.arrowUi === 'commission' && !this.commission.isOpen) {
+      const house = [...this.ctx.state.items.values()].find((i) => i.kind === 'item' && i.chain === 'lumber' && i.tier === 3);
+      if (house) arrowCell = { col: house.col, row: house.row };
+    }
+    const arrow = this.arrowAnchor && !arrowCell ? this.arrowAnchor() : null;
+    return { hand, arrowCell, arrowCharacter: this.arrowAnchor ? this.arrowCharacter : null, arrow: arrow ? { x: arrow.x, y: arrow.y } : null };
+  }
+
   private cellToScreen(col: number, row: number): { x: number; y: number } {
     const w = gridToWorld(col, row);
     return this.worldToScreen(w.x, w.y);
@@ -2365,6 +2408,9 @@ export class UIScene extends Phaser.Scene {
     this.handDrag = null;
     this.handPoint = null;
     this.arrowAnchor = null;
+    this.arrowTile = null;
+    this.arrowCharacter = null;
+    this.arrowUi = null;
     this.arrowOnPiece = false;
     this.hintHand = false;
     this.handOwner = null;
@@ -2498,7 +2544,7 @@ export class UIScene extends Phaser.Scene {
     playNext();
   }
 
-  private uiTarget(
+  uiTarget(
     ref: { ui: TutorialUiTarget } | { fogRegion: string } | { character: string }
   ): { x: number; y: number; height?: number } | null {
     if ('character' in ref) {
@@ -2710,6 +2756,7 @@ export class UIScene extends Phaser.Scene {
       // it, and go quiet when the thing it names is carried off.
       const end = this.anchorEnd(arrow.tile);
       this.arrowOnPiece = end.item !== undefined;
+      this.arrowTile = end;
       this.arrowAnchor = () => {
         const at = markerPointCell(this.ctx.state, end);
         return at ? this.cellToScreen(at.col, at.row) : null;
@@ -2717,6 +2764,8 @@ export class UIScene extends Phaser.Scene {
       this.arrowLift = 156;
     } else {
       this.arrowAnchor = () => this.uiTarget(arrow);
+      this.arrowCharacter = 'character' in arrow ? arrow.character : null;
+      this.arrowUi = 'ui' in arrow ? arrow.ui : null;
       // A character anchor is already the top of her head, so it wants the
       // smallest gap of the three; a fog region resolves to the middle of a
       // whole strip and wants the largest.
@@ -2724,12 +2773,40 @@ export class UIScene extends Phaser.Scene {
     }
     const target = this.arrowAnchor();
     if (!target) {
-      this.arrowAnchor = null;
+      // A PIECE that is not there is not coming. A UI control that is not
+      // there yet usually is: the Codex opens a breath after the beat that
+      // points into it, and turns its page after the beat that points at
+      // EVOLUTION. Keep the anchor and let update() show the arrow the frame
+      // the control exists — the lesson's pointer must not depend on the
+      // panel's animation being faster than the bubble.
+      if (this.arrowOnPiece || 'tile' in arrow) this.arrowAnchor = null;
+      else this.armArrowLater();
       return;
     }
+    this.showArrowAt(target);
+  }
+
+  /** The arrow's first frame: visible, and bobbing. */
+  private showArrowAt(target: { x: number; y: number }): void {
     this.arrow.setVisible(true);
     this.arrow.setAlpha(1);
     this.arrow.setPosition(target.x, target.y - this.arrowLift);
+    this.startArrowBob();
+  }
+
+  /** Poll a UI anchor that answered null until it answers; `clearMarkers`
+   *  retires the poll by dropping `arrowAnchor`. */
+  private armArrowLater(): void {
+    const anchor = this.arrowAnchor;
+    this.time.delayedCall(80, () => {
+      if (this.arrowAnchor !== anchor || this.arrow.visible) return;
+      const t = anchor!();
+      if (t) this.showArrowAt(t);
+      else this.armArrowLater();
+    });
+  }
+
+  private startArrowBob(): void {
     // Bob via a proxy so update() can re-anchor the arrow to its cell each frame
     // while it bobs (a tween writing arrow.y directly would fight re-projection).
     // Puppet-style cycle: rise, then DROP toward the target with a tiny impact

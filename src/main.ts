@@ -9,6 +9,7 @@ import { createGameConfig } from './core/GameConfig';
 import { PowerGovernor } from './core/PowerGovernor';
 import { iapBridge } from './core/iapBridge';
 import { gridToWorld } from './core/iso';
+import type { TilePos } from './core/types';
 
 interface BoardCellText {
   chain?: string;
@@ -53,6 +54,18 @@ declare global {
       /** Why the merge hint is or is not on screen. */
       hint: () => unknown;
       characterToPage: (characterId: string) => { x: number; y: number } | null;
+      /** Page point of a tutorial UI target (the cookbook button, the Codex card…) — what the lesson's arrow aims at. */
+      uiToPage: (ui: string) => { x: number; y: number } | null;
+      /** The live tutorial markers as page points — a harness follows these. Board
+       *  targets resolve to the piece's ART (what a player taps), UI targets to the control. */
+      pointers: () => {
+        hand: { from: { x: number; y: number } | null; to: { x: number; y: number } | null } | { at: { x: number; y: number } } | null;
+        arrow: { x: number; y: number } | null;
+      };
+      /** Force a save and return the raw blob — a checkpoint of this exact beat. */
+      snapshot: () => string | null;
+      /** Install a save blob and reload: the game boots INTO that checkpoint. */
+      restore: (blob: string) => void;
       centerCell: (col: number, row: number) => void;
       grantXp: (xp: number) => void;
       /** Run an authored event by id (guards and latches apply) — the editor's Run button. */
@@ -413,6 +426,50 @@ window.__emberkeep = {
       | undefined;
     const at = board?.characterAimWorldPoint?.(characterId);
     return at ? worldToPage(at) : null;
+  },
+  /** Where a tutorial UI target is on the page — the same resolver the arrow
+   *  uses, so a test taps exactly what the player is shown. UIScene's camera
+   *  is fixed, so its coordinates map straight through the live space. */
+  uiToPage: (ui: string) => {
+    const uiScene = game.scene.getScene(SCENES.ui) as
+      | (Phaser.Scene & { uiTarget?: (ref: { ui: string }) => { x: number; y: number } | null })
+      | undefined;
+    const at = uiScene?.uiTarget?.({ ui });
+    if (!at) return null;
+    const rect = game.canvas.getBoundingClientRect();
+    return {
+      x: rect.left + (at.x / LIVE_GAME_WIDTH) * rect.width,
+      y: rect.top + (at.y / LIVE_GAME_HEIGHT) * rect.height
+    };
+  },
+  pointers: () => {
+    const uiScene = game.scene.getScene(SCENES.ui) as
+      | (Phaser.Scene & {
+          markerTargets?: () => {
+            hand: { fromCell: TilePos | null; toCell: TilePos | null } | { at: { x: number; y: number } } | null;
+            arrowCell: TilePos | null;
+            arrowCharacter: string | null;
+            arrow: { x: number; y: number } | null;
+          };
+        })
+      | undefined;
+    const m = uiScene?.markerTargets?.();
+    const rect = game.canvas.getBoundingClientRect();
+    const page = (p: { x: number; y: number } | null | undefined): { x: number; y: number } | null =>
+      p ? { x: rect.left + (p.x / LIVE_GAME_WIDTH) * rect.width, y: rect.top + (p.y / LIVE_GAME_HEIGHT) * rect.height } : null;
+    const cell = (c: TilePos | null): { x: number; y: number } | null => (c ? window.__emberkeep.itemToPage(c.col, c.row) : null);
+    if (!m) return { hand: null, arrow: null };
+    const hand = !m.hand ? null : 'at' in m.hand ? { at: page(m.hand.at)! } : { from: cell(m.hand.fromCell), to: cell(m.hand.toCell) };
+    const arrow = m.arrowCell ? cell(m.arrowCell) : m.arrowCharacter ? window.__emberkeep.characterToPage(m.arrowCharacter) : page(m.arrow);
+    return { hand, arrow };
+  },
+  snapshot: () => {
+    ctx.systems.save.save();
+    return localStorage.getItem(SAVE_KEY);
+  },
+  restore: (blob: string) => {
+    localStorage.setItem(SAVE_KEY, blob);
+    location.reload();
   },
   /** Centre the board camera on a cell (test hook; the closer camera can leave
    *  off-zone targets like the fog gate out of view). */
