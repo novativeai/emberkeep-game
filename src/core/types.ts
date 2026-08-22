@@ -1370,6 +1370,15 @@ export interface EventMap {
   'dragon:rest': { dragonId: number };
   'dragon:rested': { dragonId: number };
   'ui:ledger_toggled': { open: boolean };
+  /**
+   * Intent: the `?` on a quest card was tapped — "how do I make that?".
+   *
+   * The card names the piece it is SHOWING at that moment, not the quest, so a
+   * card reused for the next order asks about the next order. UIScene owns the
+   * sheet that answers (src/ui/RecipeHelpPanel.ts); the card knows nothing
+   * about it, which is the whole reason this is an event.
+   */
+  'ui:recipe_help': { chain: string; tier: number; count: number };
   /** The Keeper's Store opened/closed. */
   'ui:store_toggled': { open: boolean };
   /** The Ember Emporium opened/closed, and on which shelf. The shortfall

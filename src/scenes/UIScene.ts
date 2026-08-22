@@ -69,6 +69,7 @@ import { Hud } from '../ui/Hud';
 import { NamePanel } from '../ui/NamePanel';
 import { TravelPrompt } from '../ui/TravelPrompt';
 import { LedgerPanel } from '../ui/LedgerPanel';
+import { RecipeHelpPanel } from '../ui/RecipeHelpPanel';
 import { QuestTracker } from '../ui/QuestTracker';
 import { StatusPanel } from '../ui/StatusPanel';
 import { ShopPanel } from '../ui/ShopPanel';
@@ -187,6 +188,7 @@ export class UIScene extends Phaser.Scene {
   private reveal!: DragonReveal;
   private tooltip!: Tooltip;
   private ledger!: LedgerPanel;
+  private recipeHelp!: RecipeHelpPanel;
   private shop!: ShopPanel;
   private bag!: BagPanel;
   /** "What shall it make?" — a finished House's one-time commission. */
@@ -378,8 +380,19 @@ export class UIScene extends Phaser.Scene {
     this.tooltip = new Tooltip(this, this.ctx.data.chains);
     this.tooltip.setDepth(DEPTH_PANEL - 5);
 
-    this.ledger = new LedgerPanel(this, this.ctx.bus, this.ctx.systems.order, this.ctx.systems.tasks, this.ctx.state);
+    this.ledger = new LedgerPanel(
+      this,
+      this.ctx.bus,
+      this.ctx.systems.order,
+      this.ctx.systems.tasks,
+      this.ctx.state,
+      this.ctx.data.chains
+    );
     this.ledger.setDepth(DEPTH_PANEL);
+    // The `?` sheet stands OVER the Ledger that opened it — the card it explains
+    // has to still be there behind it when it closes.
+    this.recipeHelp = new RecipeHelpPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
+    this.recipeHelp.setDepth(DEPTH_PANEL + 9);
 
     this.bag = new BagPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
     // Opens on nest:hatched and cannot be dismissed — the dragon is waiting.
@@ -546,6 +559,7 @@ export class UIScene extends Phaser.Scene {
       // Clean up UI-class bus subscriptions (not tracked in offBus above).
       this.hud.teardown();
       this.ledger.teardown();
+      this.recipeHelp.teardown();
       this.cookbook.teardown();
       this.codex.teardown();
       this.shop.teardown();

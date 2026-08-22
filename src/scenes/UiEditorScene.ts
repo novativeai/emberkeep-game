@@ -6,6 +6,7 @@ import { CharacterBubble } from '../entities/CharacterBubble';
 import { CustomUiManager } from '../ui/customUi';
 import { Hud } from '../ui/Hud';
 import { LedgerPanel } from '../ui/LedgerPanel';
+import { RecipeHelpPanel } from '../ui/RecipeHelpPanel';
 import { ShopPanel } from '../ui/ShopPanel';
 import { Tooltip } from '../ui/Tooltip';
 import { initUiEdit } from '../ui/uiEdit';
@@ -46,8 +47,20 @@ export class UiEditorScene extends Phaser.Scene {
     const tooltip = new Tooltip(this, ctx.data.chains);
     tooltip.setDepth(55);
 
-    const ledger = new LedgerPanel(this, ctx.bus, ctx.systems.order, ctx.systems.tasks, ctx.state);
+    const ledger = new LedgerPanel(
+      this,
+      ctx.bus,
+      ctx.systems.order,
+      ctx.systems.tasks,
+      ctx.state,
+      ctx.data.chains
+    );
     ledger.setDepth(60);
+
+    // The `?` sheet is chrome like the rest — the UI Builder has to be able to
+    // theme it, so it is built here too.
+    const recipeHelp = new RecipeHelpPanel(this, ctx.bus, ctx.state, ctx.data.chains);
+    recipeHelp.setDepth(69);
 
     const shop = new ShopPanel(this, ctx.bus, ctx.state);
     shop.setDepth(68);

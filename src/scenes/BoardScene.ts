@@ -309,6 +309,14 @@ const NO_ALLOW: Required<TutorialAllow> = {
  */
 type DropVerb = 'move' | 'merge' | 'gather' | 'refuse';
 
+/** One thing the board is pointing at: a piece, the cell it strains toward, and
+ *  whether it does so at the hint's louder volume. See `syncReadyLeans`. */
+interface LeanAsk {
+  id: number;
+  to: TilePos;
+  boosted: boolean;
+}
+
 /**
  * Where a carried piece is over, resolved ONCE for both the reticle and the
  * drop. `cell` is the address the drop will name; `target` is the matching
@@ -429,21 +437,28 @@ export class BoardScene extends Phaser.Scene {
    * and holds the tween on that piece's `leanX`/`leanY` — or, once the cluster
    * stops being ready, the short tween easing it back to its seat (`returning`),
    * kept in the map so the next sync cannot lay a fresh lean over a return that
-   * is still writing the same two properties. `readyKeys` is the set of
-   * clusters leaning as of the last sync, by a key that names every member AND
-   * its cell, so a cluster whose pieces shuffled without changing membership is
-   * still seen as a different cluster and re-aimed at its new centre.
+   * is still writing the same two properties.
+   *
+   * `aim` IS THE WHOLE FRESHNESS TEST. A lean's direction is computed ONCE, in
+   * `startLean`, from where the piece stands and where it is being sent, and
+   * the tween then repeats for ever — so a sync that decides "already up" from
+   * the ids alone can never re-aim it. That is not hypothetical: a tutorial
+   * hand re-resolves its target every time the board moves, and the idle hint
+   * re-plans on every spawn; both keep the same piece and change only the
+   * DESTINATION, and the piece went on straining at ground the target had left
+   * while the hand pointed somewhere else. So the entry records the origin
+   * cell, the destination cell and the volume it was drawn at, and a standing
+   * lean counts as fresh only when all three still match the ask.
    */
-  private leans = new Map<number, { sprite: BoardItem; tween: Phaser.Tweens.Tween; returning: boolean }>();
+  private leans = new Map<
+    number,
+    { sprite: BoardItem; tween: Phaser.Tweens.Tween; returning: boolean; aim: string }
+  >();
 
   /** The governor has dozed the scene: the lean is ambience, and stops with the
    *  rest of it. The clusters are re-read, and re-lean, on the first wake. */
   private leanDozing = false;
-  /** Whether the leans standing right now are the hint's louder ones — see
-   *  `MERGE_READY.hintFraction`. Compared on every sync, because the answer
-   *  changes when a hand goes up or is taken back and the tweens have to be
-   *  rebuilt at the new size. */
-  private leanBoosted = false;
+
   /**
    * Items mid-crossing (`flyThroughGate`). The lean's stillness gate asks
    * `tweens.isTweening(sprite)`, and a gate flight is driven from a proxy
@@ -597,7 +612,6 @@ export class BoardScene extends Phaser.Scene {
     // still leaning and never start this world's.
     this.leans.clear();
     this.leanDozing = false;
-    this.leanBoosted = false;
     this.crossing.clear();
     // A restart reuses this scene INSTANCE (Title → Play after game:reset): the
     // last run's display objects are destroyed but these fields still point at
@@ -6327,46 +6341,65 @@ export class BoardScene extends Phaser.Scene {
     // cluster's lean and it is deliberately not a different one: one board, one
     // way of saying "there".
     const asked = this.askedMove();
-    // The piece the hand is bouncing is NOT one of them: it is already moving,
-    // under a tween of its own, and it is the piece being asked to travel
-    // rather than one of the pieces waiting for it. The rest of its cluster
-    // strains toward the centre while it hops — the two halves of one sentence.
     // The asked piece leans toward ITS destination, not toward the centre, so
     // it is taken out of the cluster's set and given its own ask. (Usually the
     // two agree — a finished cluster's hint drops a leaf on the centre — but
     // when the plan's first step is a gather onto free ground they do not, and
     // the piece must point where it is actually going.)
+    // The asked piece leans toward ITS destination, not toward the centre, so it
+    // is taken out of the cluster's set and given an ask of its own. (Usually
+    // the two agree — a finished cluster's hint drops a leaf on the centre —
+    // but when the plan's first step is a gather onto free ground they do not,
+    // and the piece must point where it is actually going.)
     const leaders = active
       ? active.members.filter((m) => m.id !== active.centre.id && m.id !== asked?.id)
       : [];
-    const asks: { id: number; to: TilePos; boosted: boolean }[] = [];
-    if (asked) asks.push({ id: asked.id, to: asked.to, boosted: true });
+    // TWO ASKS, NOT ONE SET. They are separate sentences: "carry this one
+    // there" and "these are pulling together". Each starts as a unit — a
+    // cluster's members must be in phase with each other or three pieces read
+    // as three fidgets — but neither waits on the other. Joined, one asleep or
+    // half-landed piece on either side silenced the whole board.
+    const centre = active ? { col: active.centre.col, row: active.centre.row } : null;
     const boostedCluster = this.hintTouches(active) || (teaching && !!active);
-    for (const m of leaders) {
-      asks.push({
-        id: m.id,
-        to: { col: active!.centre.col, row: active!.centre.row },
-        boosted: boostedCluster
-      });
+    const groups: LeanAsk[][] = [];
+    if (asked) groups.push([{ id: asked.id, to: asked.to, boosted: true }]);
+    if (centre && leaders.length > 0) {
+      groups.push(leaders.map((m) => ({ id: m.id, to: centre, boosted: boostedCluster })));
     }
-    const wanted = new Set(asks.map((a) => a.id));
+
+    const wanted = new Set(groups.flat().map((a) => a.id));
     // Everyone else eases home. Gently — a cluster snapping upright the moment
     // a neighbour moves reads as a glitch, not as the board standing down.
     for (const id of [...this.leans.keys()]) if (!wanted.has(id)) this.stopLean(id, false);
-    if (asks.length === 0) return;
-    const boosted = asks.some((a) => a.boosted);
-    // Already up at the right volume: leave the phase alone. Common case by far.
-    if (this.leanBoosted === boosted && asks.every((a) => this.leans.has(a.id))) return;
-    // ALL OR NONE. Starting the members one at a time as each happened to come
-    // to rest is what left a row with one end straining and the other sitting
-    // there: two tweens begun a quarter-second apart do not read as one group
-    // being pulled together, they read as one piece being broken. So the whole
-    // set waits until every member of it can start, and the 240 ms heal asks
-    // again until that is true.
-    if (!asks.every((a) => this.leanReady(a.id))) return;
-    for (const a of asks) this.stopLean(a.id, true);
-    for (const a of asks) this.startLean(a.id, a.to, a.boosted);
-    this.leanBoosted = boosted;
+
+    for (const group of groups) {
+      // Already up, pointing where the ask points, at the volume it asks for.
+      if (group.every((a) => this.leanFresh(a))) continue;
+      // ALL OR NONE, within the group. Starting members one at a time as each
+      // happened to come to rest is what left a row with one end straining and
+      // the other sitting there; the 240 ms heal asks again until every member
+      // can go together.
+      if (!group.every((a) => this.leanReady(a.id))) continue;
+      for (const a of group) this.stopLean(a.id, true);
+      for (const a of group) this.startLean(a.id, a.to, a.boosted);
+    }
+  }
+
+  /** The identity of a lean as DRAWN: where the piece stood, where it was sent,
+   *  and how loudly. Everything `startLean` reads to compute the vector, and so
+   *  exactly what has to match for a standing lean to still be the right one. */
+  private leanAimOf(col: number, row: number, ask: LeanAsk): string {
+    return `${col},${row}>${ask.to.col},${ask.to.row}@${ask.boosted ? 1 : 0}`;
+  }
+
+  /** Is this ask already on screen, correctly? A lean easing home is never
+   *  fresh — it is on its way to zero, and an ask that still wants it needs it
+   *  drawn again rather than left to finish dying. */
+  private leanFresh(ask: LeanAsk): boolean {
+    const entry = this.leans.get(ask.id);
+    const sprite = this.itemSprites.get(ask.id);
+    if (!entry || !sprite || entry.returning) return false;
+    return entry.aim === this.leanAimOf(sprite.col, sprite.row, ask);
   }
 
   /**
@@ -6527,7 +6560,12 @@ export class BoardScene extends Phaser.Scene {
         : Math.max(0, MERGE_READY.periodMs - MERGE_READY.leanMs * 2),
       ease: 'Sine.easeInOut'
     });
-    this.leans.set(itemId, { sprite, tween, returning: false });
+    this.leans.set(itemId, {
+      sprite,
+      tween,
+      returning: false,
+      aim: this.leanAimOf(sprite.col, sprite.row, { id: itemId, to: target, boosted })
+    });
   }
 
   /**
@@ -6562,7 +6600,7 @@ export class BoardScene extends Phaser.Scene {
         if (this.leans.get(id)?.tween === back) this.leans.delete(id);
       }
     });
-    this.leans.set(id, { sprite, tween: back, returning: true });
+    this.leans.set(id, { sprite, tween: back, returning: true, aim: entry.aim });
   }
 
   /** Every lean down at once — a full visual resync is about to rebuild the

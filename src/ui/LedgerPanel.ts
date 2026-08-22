@@ -13,7 +13,8 @@ import type { EventBus } from '../core/EventBus';
 import { speakerName } from '../entities/CharacterBubble';
 import { discTextureFor } from '../entities/PortraitAnimator';
 import type { GameState } from '../core/GameState';
-import type { OrderConfig } from '../core/types';
+import { recipeHelp } from '../core/recipeTree';
+import type { ChainsData, OrderConfig } from '../core/types';
 import type { OrderSystem } from '../systems/OrderSystem';
 import type { TaskSystem } from '../systems/TaskSystem';
 import { uiRegistry } from './theme';
@@ -408,6 +409,22 @@ const CARD_COUNT_AIR = 10;
 const CARD_COUNT_BUDGET_W =
   2 * Math.min(CARD_COUNT_X, CARD_PLATE_HALF_W - CARD_COUNT_AIR - CARD_COUNT_X);
 
+// ---- The "how do I make that?" key ----
+/**
+ * The `?` sits LEFT of the requirement slot, opposite the count badge.
+ *
+ * The slot spans x ±72 about the card's middle and the badge already owns the
+ * right, so the left of the slot is the only free ground on a card the owner
+ * has twice asked to make LESS crowded. It is clear of the title band above
+ * (which ends at the slot's top edge) and of the Deliver key below, and it
+ * reaches x -132 against a plate that runs to -277.
+ */
+const CARD_HELP_X = -SLOT_ART / 2 - 30;
+const CARD_HELP_Y = SLOT_Y - 46;
+const CARD_HELP_SCALE = 0.34;
+/** A THUMB, NOT A CURSOR: the disc is small on purpose, the hit box is not. */
+const CARD_HELP_HIT = 92 * TAP_SCALE;
+
 // ---- The reward line ----
 const CARD_REWARD_Y = 148;
 const CARD_REWARD_PX = 28;
@@ -452,6 +469,12 @@ interface OrderCard {
    *  Gold, and re-seated on every refresh because the line's width changes. */
   rewardCoin: Phaser.GameObjects.Image;
   deliverButton: Phaser.GameObjects.Container;
+  /** The `?` key and the piece it is currently asking about. The goal is stored
+   *  rather than read off the order at tap time because a card is REUSED: the
+   *  button must name what the card is showing now, not what it showed when it
+   *  was built. Null hides the key. */
+  helpButton: Phaser.GameObjects.Container;
+  helpGoal: { chain: string; tier: number; count: number } | null;
   order: OrderConfig | null;
   deliverable: boolean;
 }
@@ -516,7 +539,8 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     private bus: EventBus,
     private orderSystem: OrderSystem,
     private taskSystem: TaskSystem,
-    private gameState: GameState
+    private gameState: GameState,
+    private chains: ChainsData
   ) {
     super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
     this.owner = scene;
@@ -894,6 +918,27 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     deliverBg.setInteractive({ useHandCursor: true });
     deliverButton.setSize(360, 124);
 
+    // THE `?` — "how do I make that?". It asks; it does not answer. The sheet
+    // that answers lives in UIScene, and this card knows nothing about it,
+    // which is why the tap is an event and not a call.
+    const helpButton = scene.add.container(CARD_HELP_X, CARD_HELP_Y);
+    const helpBg = scene.add.image(0, 0, 'ui_btn_round').setScale(CARD_HELP_SCALE);
+    const helpMark = scene.add
+      .text(0, -2, '?', {
+        fontFamily: FONT.ui,
+        fontSize: '34px',
+        fontStyle: 'bold',
+        color: INK.onPlate
+      })
+      .setOrigin(0.5);
+    helpButton.add([helpBg, helpMark]);
+    helpButton.setSize(CARD_HELP_HIT, CARD_HELP_HIT);
+    helpButton.setInteractive({ useHandCursor: true });
+    // Dark until the first refresh has decided there is something to explain: a
+    // key that is visible before it means anything is a key that can be pressed
+    // for nothing.
+    helpButton.setVisible(false);
+
     const card: OrderCard = {
       root,
       medallion: portrait,
@@ -903,11 +948,27 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       rewardText,
       rewardCoin,
       deliverButton,
+      helpButton,
+      helpGoal: null,
       order: null,
       deliverable: false
     };
     deliverBg.on('pointerup', () => this.onDeliverPressed(card));
-    root.add([cardBg, ...medallion, title, slot, slotIcon, slotCount, rewardCoin, rewardText, deliverButton]);
+    helpButton.on('pointerup', () => {
+      if (card.helpGoal) this.bus.emit('ui:recipe_help', { ...card.helpGoal });
+    });
+    root.add([
+      cardBg,
+      ...medallion,
+      title,
+      slot,
+      slotIcon,
+      slotCount,
+      rewardCoin,
+      rewardText,
+      deliverButton,
+      helpButton
+    ]);
     return card;
   }
 
@@ -1186,11 +1247,17 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       card.root.setVisible(order !== null);
       if (!order) {
         card.deliverable = false;
+        card.helpGoal = null;
+        card.helpButton.setVisible(false);
         return;
       }
       this.setMedallionGiver(card, order.giver ?? host);
       const requirement = order.requires[0];
-      if (!requirement) return;
+      if (!requirement) {
+        card.helpGoal = null;
+        card.helpButton.setVisible(false);
+        return;
+      }
       const { have, deliverable } = this.orderSystem.progressFor(order);
       card.deliverable = deliverable;
       // The title, fitted into its band (see CARD_TITLE_*): preferred size back
@@ -1244,6 +1311,18 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       } else {
         card.rewardText.setX(0);
       }
+      // THE `?` NAMES WHAT THIS CARD IS SHOWING, and is hidden when there is
+      // nothing to explain — `recipeHelp` returning null is the same answer the
+      // sheet would give, asked here so the key never opens an empty panel.
+      card.helpGoal = { chain: requirement.chain, tier: requirement.tier, count: requirement.count };
+      const explainable = !!recipeHelp(
+        this.chains,
+        card.helpGoal,
+        (chain, tier) => this.gameState.countItemsAnywhere(chain, tier),
+        this.gameState.worldId
+      );
+      if (!explainable) card.helpGoal = null;
+      card.helpButton.setVisible(explainable);
       card.slotIcon.setAlpha(deliverable ? 1 : 0.75);
       card.deliverButton.setAlpha(deliverable ? 1 : 0.55);
     });
