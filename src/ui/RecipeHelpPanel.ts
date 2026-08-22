@@ -319,9 +319,12 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
 
     const base = help.rungs[help.rungs.length - 1]!;
     this.foot.setText(
+      // The kid register (docs/naming.md law 3: verb + number + item; law 4
+      // keeps "gather" out of the player's words — it is our merge verb, and a
+      // panel that borrows it teaches the wrong thing).
       help.baseMissing > 0
-        ? `Still to gather: ${help.baseMissing} × ${base.name}`
-        : 'You already have everything this needs.'
+        ? `You still need: ${help.baseMissing} × ${base.name}`
+        : 'You have everything you need!'
     );
     this.foot.setColor(help.baseMissing > 0 ? INK.onFieldGold : INK.gain);
   }

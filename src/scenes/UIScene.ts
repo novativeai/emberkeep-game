@@ -2300,6 +2300,13 @@ export class UIScene extends Phaser.Scene {
     arrow: { x: number; y: number } | null;
   } {
     let hand: ReturnType<UIScene['markerTargets']>['hand'] = null;
+    // ASKED BEFORE THE MARKERS EXIST. The scene is in `scene.keys` from the
+    // moment it is added, but `this.hand` is only built partway through
+    // `create()` — and the bridge is POLLED, by a harness that reads it many
+    // times a second across a scene restart. Throwing there is not a game bug
+    // but it makes every check flaky, and a pointer nobody has put up yet has
+    // an honest answer: nothing is being pointed at.
+    if (!this.hand) return { hand: null, arrowCell: null, arrowCharacter: null, arrow: null };
     if (this.hand.visible && this.handDrag) {
       hand = {
         fromCell: markerPointCell(this.ctx.state, this.handDrag.from),

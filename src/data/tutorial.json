@@ -1056,7 +1056,19 @@
       ],
       "allow": {
         "bag": true
-      }
+      },
+      "effects": [
+        {
+          "move": {
+            "chain": "cinder_vein",
+            "tier": 1,
+            "to": [
+              6,
+              6
+            ]
+          }
+        }
+      ]
     },
     {
       "id": "sell_it",
