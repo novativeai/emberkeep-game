@@ -43,6 +43,7 @@ import { iapBridge } from '../core/iapBridge';
 import { gridToWorld } from '../core/iso';
 import type {
   EventMap,
+  EventPanel,
   MarkerPoint,
   ResolvedArrow,
   ResolvedHand,
@@ -80,6 +81,7 @@ import { GRAPHICS_EVENT, GRAPHICS_PROFILES, graphics } from '../core/graphicsSta
 import { getMusicMuted, setMusicMuted } from '../audio/musicPref';
 import { CustomUiManager } from '../ui/customUi';
 import { uiRegistry } from '../ui/theme';
+import { ChoicePrompt } from '../ui/ChoicePrompt';
 import { DragonReveal } from '../ui/DragonReveal';
 import { Tooltip } from '../ui/Tooltip';
 
@@ -251,6 +253,10 @@ export class UIScene extends Phaser.Scene {
   /** Beats held because their speaker does not stand in the world the player is
    *  in (see `speakHere`). Flushed on `world:switched`. */
   private pendingAway: Array<{ speaker: SpeakerId; lines: string[] }> = [];
+  /** Authored-event beats (`event:say` / `event:prompt`) held while a tutorial
+   *  script owns the bubble — played, in order, the moment it hands back. */
+  private pendingEvents: Array<{ say?: EventMap['event:say']; prompt?: EventMap['event:prompt'] }> = [];
+  private choice!: ChoicePrompt;
   /** The opening's held silence is a one-shot: only the very first step of a
    *  run waits, and a resumed save never re-holds. */
   private openingHeld = false;
@@ -401,6 +407,7 @@ export class UIScene extends Phaser.Scene {
     void this.naming;
     // Answers `ui:travel_requested` from a portal tap; owns its own bus release.
     new TravelPrompt(this, this.ctx.bus);
+    this.choice = new ChoicePrompt(this, this.ctx.bus);
     this.bag.setDepth(DEPTH_PANEL + 6);
     this.commission = new CommissionPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
     // Above the Bag: it is asked ABOUT the bag's contents, and the two are never
@@ -715,6 +722,11 @@ export class UIScene extends Phaser.Scene {
       }),
       bus.on('dragon:revealed', (card) => this.reveal.play(card)),
       bus.on('story:chapter', ({ chapter }) => this.playChapterBeats(chapter)),
+      // The event system's outputs (docs/event-creator.md). Queued behind a
+      // running tutorial script like every other unscripted beat.
+      bus.on('event:say', (say) => this.playEventBeat({ say })),
+      bus.on('event:prompt', (prompt) => this.playEventBeat({ prompt })),
+      bus.on('ui:panel_open_requested', ({ panel }) => this.openPanel(panel)),
       bus.on('story:arrival', ({ worldId }) => this.playArrivalBeats(worldId)),
       // The House's commission. The board decides WHEN to ask; the panel is the
       // UI's, so neither reaches into the other.
@@ -1915,6 +1927,9 @@ export class UIScene extends Phaser.Scene {
         this.playRegardBeats(beat.characterId, beat.hearts);
       }
     }
+    if (step.done && this.pendingEvents.length) {
+      for (const beat of this.pendingEvents.splice(0)) this.playEventBeat(beat);
+    }
     this.hud.setLedgerEnabled(step.done || step.allow.ledger);
     // The tracker is a readout of the Ledger, so BOTH halves ride the same gate
     // as the Ledger button.
@@ -2015,6 +2030,34 @@ export class UIScene extends Phaser.Scene {
     this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
       this.bubble.sequence(next.speaker, next.lines, () => this.flushAwayBeats());
     });
+  }
+
+  /**
+   * An authored event spoke or asked. While a tutorial script is on the bubble
+   * the beat waits — `say()` would wipe the gate the beat is standing on — and
+   * plays on the handover, in the order it arrived. A prompt is one at a time:
+   * a second question while one is open waits for the answer.
+   */
+  private playEventBeat(beat: { say?: EventMap['event:say']; prompt?: EventMap['event:prompt'] }): void {
+    const tutorialHolds = !(this.lastStep?.done ?? this.ctx.state.tutorialDone);
+    if (tutorialHolds || (beat.prompt && this.choice.isOpen)) {
+      this.pendingEvents.push(beat);
+      return;
+    }
+    if (beat.say) this.speakHere(beat.say.speaker, beat.say.lines);
+    if (beat.prompt) this.choice.open(beat.prompt);
+  }
+
+  /** The `open` action — every panel UIScene owns, by name. */
+  private openPanel(panel: EventPanel): void {
+    switch (panel) {
+      case 'ledger': return this.ledger.open();
+      case 'store': return this.store.open();
+      case 'bag': return this.bag.open();
+      case 'cauldron': return this.cauldron.open();
+      case 'codex': return this.codex.open();
+      case 'cookbook': return this.cookbook.open();
+    }
   }
 
   /** A chapter turned: play its beats, tap by tap. Fires once per chapter — the

@@ -74,6 +74,13 @@ export class RegardSystem {
     bus.on('ui:gift_deliver_requested', ({ characterId, chain, tier }) =>
       this.deliverFromBoard(characterId, chain, tier)
     );
+    // An authored event paying Regard (docs/event-creator.md). Same cap, same
+    // heart milestones as a quest award — the event system never writes the
+    // stat itself. Unknown people are refused; a negative amount is not a thing.
+    bus.on('regard:add', ({ characterId, points }) => {
+      if (!this.ids.includes(characterId) || points <= 0) return;
+      this.award(characterId, points, 'quest', true);
+    });
     // The gift-ask "order" announcements (Hud dot + Ledger card): a gift step's
     // deliverability is a property of the BOARD, so it re-announces on the same
     // facts the real Ledger does — plus quest movement, which is what retires an

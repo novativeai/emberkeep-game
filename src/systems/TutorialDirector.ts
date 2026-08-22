@@ -23,9 +23,18 @@ import type {
   TutorialAllow,
   TutorialData,
   TutorialEffect,
+  TutorialScriptConfig,
   TutorialStepConfig,
   TutorialStepEvent
 } from '../core/types';
+import {
+  MAIN_SCRIPT_ID,
+  scriptStatKeys,
+  scriptsOf,
+  triggerEvents,
+  triggerMet,
+  type TriggerFacts
+} from '../core/tutorialScripts';
 
 const ALLOW_NOTHING: Required<TutorialAllow> = {
   drag: [],
@@ -203,11 +212,20 @@ function leafOf(board: RuleBoard, cluster: ReadyCluster): BoardItemState {
 }
 
 /**
- * Drives the scripted Level-1 tutorial from data (tutorial.json). Each step
- * gates on a tap, a bus event, or a board count; the emitted
- * 'tutorial:step' payload carries everything the scenes need (bubble text,
- * speaker, highlights, hand/arrow targets and the input allow-list), so the
- * UI only ever subscribes.
+ * Drives the scripted tutorials from data (tutorial.json). Each step gates on
+ * a tap, a bus event, or a board count; the emitted 'tutorial:step' payload
+ * carries everything the scenes need (bubble text, speaker, highlights,
+ * hand/arrow targets and the input allow-list), so the UI only ever subscribes.
+ *
+ * TWO KINDS OF SCRIPT, ONE ENGINE. The main Chapter One script runs first and
+ * keeps its persisted `tutorialIndex`/`tutorialDone`. Every other script
+ * (`tutorials` in the file — see tutorialScripts.ts) waits for its TRIGGER
+ * once the main script is done, then plays through the same gate machinery;
+ * its progress lives in stats (`tut:<id>:step`, `:done`, `:started`), which
+ * are saved, monotonic and need no SAVE_VERSION — a reload resumes a mid-game
+ * lesson on the beat it left, exactly as the main script always has. One
+ * script holds the board at a time; a trigger met while another plays is
+ * re-checked the moment that one hands back.
  */
 export class TutorialDirector {
   private lastHatched: TilePos | null = null;
@@ -238,11 +256,16 @@ export class TutorialDirector {
    * board does not change, so the hand holds still while the player acts.
    */
   private pinned = new Map<string, number>();
-  /** The step the pins belong to — the pins are per BEAT, not per session. */
-  private pinnedFor = -1;
+  /** The beat the pins belong to (`<script>:<index>`) — the pins are per
+   *  BEAT, not per session, and a mid-game script's beats are not counted by
+   *  `tutorialIndex`. */
+  private pinnedFor = '';
   /** The last markers put on screen, so a re-resolve that changes nothing does
    *  not restart the hand's animation for no reason. */
   private lastMarkers = '';
+  private readonly scripts: TutorialScriptConfig[];
+  /** The mid-game script currently playing (never `main`, which has its own latch). */
+  private activeId: string | null = null;
 
   constructor(
     private state: GameState,
@@ -256,6 +279,30 @@ export class TutorialDirector {
     // so a test that overrides the recipes sees the hand follow them.
     private chains: ChainsData = chainsJson as unknown as ChainsData
   ) {
+    this.scripts = scriptsOf(data);
+    // An `event` trigger is an OBSERVATION: the fact is latched into stats the
+    // moment it fires so a reload still knows it happened, then evaluated like
+    // every other trigger. Subscribed per distinct event named by any script.
+    for (const event of triggerEvents(this.scripts)) {
+      bus.on(event as 'item:merged', (payload: unknown) => {
+        const chain = (payload as { chain?: string } | undefined)?.chain;
+        for (const script of this.scripts) {
+          const t = script.trigger;
+          if (t.type !== 'event' || t.event !== event) continue;
+          if (t.chain && t.chain !== chain) continue;
+          const key = scriptStatKeys(script.id).trigger;
+          if (this.state.stat(key) === 0) this.state.addStat(key, 1);
+        }
+        this.evaluateTriggers();
+      });
+    }
+    // Facts the state-read triggers depend on change on these.
+    bus.on('quest:completed', () => this.evaluateTriggers());
+    bus.on('keeper:leveled', () => this.evaluateTriggers());
+    bus.on('world:ready', () => this.evaluateTriggers());
+    // An authored event asking for a lesson by id (docs/event-creator.md). It
+    // starts only when a trigger-met script would: main done, nothing playing.
+    bus.on('tutorial:start_requested', ({ tutorial }) => this.startScript(tutorial));
     bus.on('item:hatched', ({ item }) => {
       this.lastHatched = { col: item.col, row: item.row };
       this.onGateEvent('item:hatched', item.chain);
@@ -367,15 +414,97 @@ export class TutorialDirector {
   }
 
   get currentStep(): TutorialStepConfig | undefined {
-    if (this.state.tutorialDone) return undefined;
-    return this.data.steps[this.state.tutorialIndex];
+    if (!this.state.tutorialDone) return this.data.steps[this.state.tutorialIndex];
+    const script = this.activeScript;
+    if (!script) return undefined;
+    return script.steps[this.activeIndex(script)];
+  }
+
+  /** The script holding the board right now — `main`, a mid-game lesson's id, or null. */
+  get activeScriptId(): string | null {
+    return this.activeScript?.id ?? null;
+  }
+
+  /** The script whose step is on screen: main while it runs, else the active mid-game one. */
+  private get activeScript(): TutorialScriptConfig | undefined {
+    if (!this.state.tutorialDone) return this.scripts[0];
+    return this.activeId ? this.scripts.find((s) => s.id === this.activeId) : undefined;
+  }
+
+  private activeIndex(script: TutorialScriptConfig): number {
+    return script.id === MAIN_SCRIPT_ID ? this.state.tutorialIndex : this.state.stat(scriptStatKeys(script.id).step);
+  }
+
+  private get facts(): TriggerFacts {
+    return {
+      stat: (k) => this.state.stat(k),
+      level: this.state.level,
+      worldId: this.state.worldId,
+      mainDone: this.state.tutorialDone,
+      mainIndex: this.state.tutorialIndex
+    };
   }
 
   /** Emit the current step (fresh game or resume after load). */
   begin(): void {
-    if (this.state.tutorialDone) {
-      this.emitDone();
+    if (!this.state.tutorialDone) {
+      this.emitStep();
+      this.replayPrompts(this.currentStep);
+      this.checkCountGate();
       return;
+    }
+    // A mid-game lesson left mid-way resumes on its beat; otherwise the board
+    // is the player's and any trigger that is already met starts its script.
+    const resumed = this.scripts.find((s) => {
+      if (s.id === MAIN_SCRIPT_ID || s.steps.length === 0) return false;
+      const keys = scriptStatKeys(s.id);
+      return this.state.stat(keys.started) > 0 && this.state.stat(keys.done) === 0;
+    });
+    if (resumed) {
+      this.activeId = resumed.id;
+      this.emitStep();
+      this.replayPrompts(this.currentStep);
+      this.checkCountGate();
+      return;
+    }
+    this.emitDone();
+    this.evaluateTriggers();
+  }
+
+  /**
+   * Start the first mid-game script whose trigger is met — if nothing is on
+   * the board already. Called on every fact that could have changed an answer
+   * and whenever a script hands back.
+   */
+  private evaluateTriggers(): void {
+    if (this.activeScript) return;
+    const facts = this.facts;
+    for (const script of this.scripts) {
+      if (script.id === MAIN_SCRIPT_ID || script.steps.length === 0) continue; // an empty script is still being written
+      if (this.state.stat(scriptStatKeys(script.id).done) > 0) continue;
+      if (!triggerMet(this.scripts, facts, script)) continue;
+      this.start(script);
+      return;
+    }
+  }
+
+  /** Start a mid-game script BY ID, as an event asks — its own trigger is not
+   *  consulted, but everything else that would stop it still does. */
+  private startScript(id: string): void {
+    if (this.activeScript || !this.facts.mainDone) return;
+    const script = this.scripts.find((s) => s.id === id && s.id !== MAIN_SCRIPT_ID);
+    if (!script || script.steps.length === 0 || this.state.stat(scriptStatKeys(script.id).done) > 0) return;
+    this.start(script);
+  }
+
+  private start(script: TutorialScriptConfig): void {
+    const keys = scriptStatKeys(script.id);
+    this.activeId = script.id;
+    // The first step's effects fire once, on the start — the same
+    // once-on-entry rule `advance` keeps for every later step.
+    if (this.state.stat(keys.started) === 0) {
+      this.state.addStat(keys.started, 1);
+      this.applyEffects(script.steps[0]);
     }
     this.emitStep();
     this.replayPrompts(this.currentStep);
@@ -423,7 +552,7 @@ export class TutorialDirector {
 
   private checkCountGate(): void {
     // Loop: consecutive count gates could already be satisfied.
-    for (let guard = 0; guard < this.data.steps.length; guard++) {
+    for (let guard = 0; guard < (this.activeScript?.steps.length ?? 0); guard++) {
       const step = this.currentStep;
       if (!step || step.gate.type !== 'count') return;
       const { chain, tier, count } = step.gate;
@@ -433,17 +562,31 @@ export class TutorialDirector {
   }
 
   private advance(): void {
-    if (this.state.tutorialDone) return;
-    this.state.tutorialIndex++;
-    if (this.state.tutorialIndex >= this.data.steps.length) {
-      this.state.tutorialDone = true;
-      this.emitDone();
+    const script = this.activeScript;
+    if (!script) return;
+    if (script.id === MAIN_SCRIPT_ID) {
+      this.state.tutorialIndex++;
+      if (this.state.tutorialIndex >= this.data.steps.length) {
+        this.state.tutorialDone = true;
+        this.emitDone();
+        this.evaluateTriggers(); // a lesson waiting on "main done" may start now
+        return;
+      }
     } else {
-      // Effects fire on the advance INTO a step (once), never on resume — their
-      // results live in saved state, so emitStep() on reload must not re-run them.
-      this.applyEffects(this.currentStep);
-      this.emitStep();
+      const keys = scriptStatKeys(script.id);
+      this.state.addStat(keys.step, 1);
+      if (this.state.stat(keys.step) >= script.steps.length) {
+        this.state.addStat(keys.done, 1);
+        this.activeId = null;
+        this.emitDone();
+        this.evaluateTriggers(); // the next met trigger takes the board
+        return;
+      }
     }
+    // Effects fire on the advance INTO a step (once), never on resume — their
+    // results live in saved state, so emitStep() on reload must not re-run them.
+    this.applyEffects(this.currentStep);
+    this.emitStep();
   }
 
   /**
@@ -512,9 +655,11 @@ export class TutorialDirector {
     const step = this.currentStep;
     if (!step) return;
     // A new beat: the pins belong to the beat that made them.
-    if (this.pinnedFor !== this.state.tutorialIndex) {
+    const script = this.activeScript;
+    const beat = script ? `${script.id}:${this.activeIndex(script)}` : '';
+    if (this.pinnedFor !== beat) {
       this.pinned.clear();
-      this.pinnedFor = this.state.tutorialIndex;
+      this.pinnedFor = beat;
     }
     const view = this.resolveStep(step);
     this.lastMarkers = markerKey(view);
@@ -559,6 +704,7 @@ export class TutorialDirector {
   private emitDone(): void {
     const payload: TutorialStepEvent = {
       id: 'done',
+      tutorial: MAIN_SCRIPT_ID,
       index: this.data.steps.length,
       total: this.data.steps.length,
       done: true,
@@ -633,10 +779,12 @@ export class TutorialDirector {
     // the time she is armed the board may hold a second one.
     const arrowThen = resolveArrow(step.arrowThen);
 
+    const script = this.activeScript ?? this.scripts[0]!;
     return {
       id: step.id,
-      index: this.state.tutorialIndex,
-      total: this.data.steps.length,
+      tutorial: script.id,
+      index: this.activeIndex(script),
+      total: script.steps.length,
       done: false,
       speaker: step.speaker,
       text: step.text,
@@ -645,7 +793,9 @@ export class TutorialDirector {
       hand,
       arrow,
       arrowThen,
-      allow: { ...ALLOW_NOTHING, ...(step.allow ?? {}) }
+      // The main script opens one verb at a time; a mid-game lesson takes
+      // nothing away unless its author lists what to hold back (allowBase).
+      allow: { ...(script.allowBase === 'everything' ? ALLOW_EVERYTHING : ALLOW_NOTHING), ...(step.allow ?? {}) }
     };
   }
 

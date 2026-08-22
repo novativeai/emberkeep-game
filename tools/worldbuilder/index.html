@@ -159,6 +159,104 @@
     #mergePage .mpHead { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
     #mergePage .mpHead h2 { margin:0 12px 0 0; font-size:16px; }
     #mergePage .mpRule { color:var(--dim); font-size:12px; margin-right:auto; }
+
+    /* ------------------------------ 📜 Tutorial editor ------------------------------ */
+    :is(#tutorialPage, #eventsPage) { position:absolute; inset:0; display:none; overflow:hidden; background:var(--bg); z-index:5; grid-template-columns:260px 1fr; }
+    :is(#tutorialPage, #eventsPage) .tuRail { border-right:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column; min-height:0; }
+    :is(#tutorialPage, #eventsPage) .tuRailHead { padding:12px 12px 8px; border-bottom:1px solid var(--line); }
+    :is(#tutorialPage, #eventsPage) .tuRailHead h2 { font-size:15px; margin-bottom:4px; }
+    :is(#tutorialPage, #eventsPage) .tuRailHead .hint { color:var(--dim); font-size:11px; line-height:1.4; }
+    :is(#tutorialPage, #eventsPage) .tuScripts { flex:1; overflow:auto; padding:6px; }
+    :is(#tutorialPage, #eventsPage) .tuScript { padding:8px 10px; border-radius:8px; cursor:pointer; border:1px solid transparent; margin-bottom:4px; }
+    :is(#tutorialPage, #eventsPage) .tuScript:hover { background:var(--panel2); }
+    :is(#tutorialPage, #eventsPage) .tuScript.active { background:var(--panel2); border-color:var(--gold); }
+    :is(#tutorialPage, #eventsPage) .tuScript .t { font-weight:600; font-size:13px; display:flex; justify-content:space-between; gap:6px; }
+    :is(#tutorialPage, #eventsPage) .tuScript .t .n { color:var(--dim); font-weight:400; font-size:11px; }
+    :is(#tutorialPage, #eventsPage) .tuScript .trig { color:var(--dim); font-size:11px; margin-top:2px; }
+    :is(#tutorialPage, #eventsPage) .tuScript .trig b { color:var(--teal); font-weight:600; }
+    :is(#tutorialPage, #eventsPage) .tuRailFoot { padding:8px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:6px; }
+    :is(#tutorialPage, #eventsPage) .tuMain { display:flex; flex-direction:column; min-height:0; }
+    :is(#tutorialPage, #eventsPage) .tuBar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); background:var(--panel); }
+    :is(#tutorialPage, #eventsPage) .tuBar .status { color:var(--dim); font-size:12px; margin-left:auto; }
+    :is(#tutorialPage, #eventsPage) .tuBar .status.dirty { color:var(--gold2); }
+    :is(#tutorialPage, #eventsPage) .tuBar .status.err { color:var(--lava); }
+    :is(#tutorialPage, #eventsPage) .tuBody { flex:1; overflow:auto; padding:14px 18px 60px; }
+    :is(#tutorialPage, #eventsPage) .tuHead { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:16px; display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; max-width:980px; }
+    :is(#tutorialPage, #eventsPage) .tuHead label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+    :is(#tutorialPage, #eventsPage) .tuHead input, :is(#tutorialPage, #eventsPage) .tuHead select, :is(#tutorialPage, #eventsPage) .tuCard input, :is(#tutorialPage, #eventsPage) .tuCard select, :is(#tutorialPage, #eventsPage) .tuCard textarea {
+      background:var(--bg); color:var(--cream); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; font-size:13px; }
+    :is(#tutorialPage, #eventsPage) .tuHead .trigRow { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
+    :is(#tutorialPage, #eventsPage) .tuHead .trigRow label { min-width:140px; }
+    :is(#tutorialPage, #eventsPage) .tuSeq { max-width:980px; }
+    :is(#tutorialPage, #eventsPage) .tuCard { position:relative; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px 12px 54px; margin:0 0 10px; }
+    :is(#tutorialPage, #eventsPage) .tuCard.sel { border-color:var(--gold); box-shadow:0 0 0 1px var(--gold) inset; }
+    :is(#tutorialPage, #eventsPage) .tuCard .num { position:absolute; left:0; top:0; bottom:0; width:42px; display:flex; align-items:flex-start; justify-content:center; padding-top:12px; color:var(--gold); font-weight:700; font-size:14px; border-right:1px dashed var(--line); }
+    :is(#tutorialPage, #eventsPage) .tuCard .num.last { color:var(--moss); }
+    :is(#tutorialPage, #eventsPage) .tuCardHead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+    :is(#tutorialPage, #eventsPage) .tuCardHead .id { font-weight:700; font-size:13px; }
+    :is(#tutorialPage, #eventsPage) .tuCardHead .gate { font-size:11px; padding:2px 8px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--dim); }
+    :is(#tutorialPage, #eventsPage) .tuCardHead .tools { margin-left:auto; display:flex; gap:4px; }
+    :is(#tutorialPage, #eventsPage) .tuCardHead .tools button { padding:2px 7px; font-size:11px; }
+    :is(#tutorialPage, #eventsPage) .facets { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
+    :is(#tutorialPage, #eventsPage) .facet { min-width:0; }
+    :is(#tutorialPage, #eventsPage) .facet h4 { font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:5px; }
+    :is(#tutorialPage, #eventsPage) .facet.dialogue { grid-column:1 / -1; }
+    :is(#tutorialPage, #eventsPage) .chips { display:flex; flex-wrap:wrap; gap:5px; }
+    :is(#tutorialPage, #eventsPage) .chip { display:inline-flex; align-items:center; gap:5px; font-size:11.5px; padding:3px 8px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); }
+    :is(#tutorialPage, #eventsPage) .chip img { width:18px; height:18px; object-fit:contain; }
+    :is(#tutorialPage, #eventsPage) .chip.on { border-color:var(--moss); color:var(--moss); }
+    :is(#tutorialPage, #eventsPage) .chip.off { opacity:.45; text-decoration:line-through; }
+    :is(#tutorialPage, #eventsPage) .chip.hold { border-color:var(--gold); color:var(--gold2); }
+    :is(#tutorialPage, #eventsPage) .chip.ui { border-color:var(--teal); }
+    :is(#tutorialPage, #eventsPage) .chip .k { color:var(--dim); }
+    :is(#tutorialPage, #eventsPage) .actions li { font-size:12.5px; line-height:1.45; list-style:none; padding-left:14px; position:relative; }
+    :is(#tutorialPage, #eventsPage) .actions li::before { content:'▸'; position:absolute; left:0; color:var(--gold); }
+    :is(#tutorialPage, #eventsPage) .actions li.fx::before { content:'✦'; color:var(--teal); }
+    :is(#tutorialPage, #eventsPage) .say { display:flex; gap:10px; align-items:flex-start; }
+    :is(#tutorialPage, #eventsPage) .say .who { font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; background:var(--panel2); border:1px solid var(--line); white-space:nowrap; margin-top:3px; }
+    :is(#tutorialPage, #eventsPage) .say .who.selyna { color:var(--teal); }
+    :is(#tutorialPage, #eventsPage) .say .who.golden_elder { color:var(--gold2); }
+    :is(#tutorialPage, #eventsPage) .say .text { font-size:13.5px; line-height:1.5; flex:1; }
+    :is(#tutorialPage, #eventsPage) .say textarea { width:100%; min-height:58px; resize:vertical; line-height:1.45; }
+    :is(#tutorialPage, #eventsPage) .tuInsert { display:flex; justify-content:center; margin:-4px 0 6px; }
+    :is(#tutorialPage, #eventsPage) .tuInsert button { font-size:11px; padding:2px 10px; opacity:.55; }
+    :is(#tutorialPage, #eventsPage) .tuInsert button:hover { opacity:1; }
+    :is(#tutorialPage, #eventsPage) .tuEdit { border-top:1px dashed var(--line); margin-top:10px; padding-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
+    :is(#tutorialPage, #eventsPage) .tuEdit label { display:flex; flex-direction:column; gap:3px; font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+    :is(#tutorialPage, #eventsPage) .tuEdit label.wide { grid-column:1 / -1; }
+    :is(#tutorialPage, #eventsPage) .tuEdit textarea { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11.5px; min-height:54px; resize:vertical; }
+    :is(#tutorialPage, #eventsPage) .tuEdit .allowGrid { display:flex; flex-wrap:wrap; gap:4px 10px; }
+    :is(#tutorialPage, #eventsPage) .tuEdit .allowGrid label { flex-direction:row; align-items:center; gap:5px; text-transform:none; letter-spacing:0; font-size:12px; color:var(--cream); }
+    :is(#tutorialPage, #eventsPage) .tuEdit .bad { color:var(--lava); font-size:11px; }
+    :is(#tutorialPage, #eventsPage) .tuOut { background:#120d13; border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11.5px; white-space:pre-wrap; max-height:260px; overflow:auto; margin:0 0 14px; max-width:980px; }
+    :is(#tutorialPage, #eventsPage) .tuOut.ok { border-color:var(--moss); }
+    :is(#tutorialPage, #eventsPage) .tuOut.fail { border-color:var(--lava); }
+    #eventsPage .evTree .tuScript { margin-bottom:2px; }
+    #eventsPage .evTree .tuScript.child { border-left:2px solid var(--line); border-radius:0 8px 8px 0; }
+    #eventsPage .evCols { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.7fr); gap:12px; max-width:1400px; align-items:start; }
+    #eventsPage .evCol { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; min-width:0; }
+    #eventsPage .evCol h3 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+    #eventsPage .evCol.when h3 { color:var(--teal); } #eventsPage .evCol.if h3 { color:var(--gold2); } #eventsPage .evCol.then h3 { color:var(--moss); }
+    #eventsPage .evCol h3 button { margin-left:auto; font-size:11px; padding:1px 8px; }
+    #eventsPage .evRow { border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:8px; background:var(--panel2); }
+    #eventsPage .evRow .sent { font-size:12.5px; margin-bottom:6px; display:flex; gap:6px; align-items:flex-start; }
+    #eventsPage .evRow .sent .x { margin-left:auto; font-size:11px; padding:0 6px; opacity:.6; } #eventsPage .evRow .sent .x:hover { opacity:1; }
+    #eventsPage .evFields { display:flex; flex-wrap:wrap; gap:6px 8px; align-items:flex-end; }
+    #eventsPage .evFields label { display:flex; flex-direction:column; gap:2px; font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; min-width:0; }
+    #eventsPage .evFields input, #eventsPage .evFields select, #eventsPage .evFields textarea { background:#120d13; border:1px solid var(--line); color:var(--ink); border-radius:6px; padding:4px 6px; font:inherit; font-size:12px; }
+    #eventsPage .evFields input[type=number] { width:84px; } #eventsPage .evFields input.wide { width:100%; min-width:220px; } #eventsPage .evFields textarea { width:100%; min-height:48px; resize:vertical; }
+    #eventsPage .evFields label.grow { flex:1 1 180px; }
+    #eventsPage .evBranch { margin:6px 0 0 10px; padding-left:10px; border-left:2px dashed var(--line); }
+    #eventsPage .evBranch { min-width:0; }
+    #eventsPage .evBranch > .t { font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin:4px 0; display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; }
+    #eventsPage .evRow { min-width:0; } #eventsPage .evFields input.wide { min-width:140px; }
+    #eventsPage .evHead { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:14px; max-width:1280px; display:flex; flex-wrap:wrap; gap:10px 18px; align-items:flex-end; }
+    #eventsPage .evHead label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+    #eventsPage .evHead input, #eventsPage .evHead select { background:#120d13; border:1px solid var(--line); color:var(--ink); border-radius:6px; padding:5px 8px; font:inherit; font-size:12.5px; }
+    #eventsPage .evHead label.chk { flex-direction:row; align-items:center; gap:6px; text-transform:none; font-size:12.5px; color:var(--ink); }
+    #eventsPage .evHead .arrow { font-size:22px; color:var(--gold); margin:0 4px 2px; }
+    #eventsPage .evRaw { width:100%; min-height:220px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11.5px; background:#120d13; border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:8px; }
+    :is(#tutorialPage, #eventsPage) .empty { color:var(--dim); font-size:13px; padding:30px; text-align:center; border:1px dashed var(--line); border-radius:10px; max-width:980px; }
     .mpChain { border:1px solid var(--line); border-radius:10px; margin-bottom:14px; background:rgba(255,255,255,0.02); }
     .mpChain > .hd { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); }
     .mpChain > .hd .nm { font-weight:700; }
@@ -257,6 +355,8 @@
   </style>
   <div id="stageWrap"><canvas id="stage"></canvas><canvas id="fxStage" class="hidden"></canvas>
     <div id="mergePage"></div>
+    <div id="tutorialPage"></div>
+    <div id="eventsPage"></div>
     <div id="mergeModal"><div class="box"></div></div>
 
     <div id="islandPage">
@@ -329,6 +429,8 @@
       <button id="tabFx">🔥 FX <span class="count" id="fxCount">(0)</span></button>
       <button id="tabMerge">🔮 Merge <span class="count" id="mergeCount">(0)</span></button>
       <button id="tabIsland">🏝 Island <span class="count" id="islandCount">(0)</span></button>
+      <button id="tabTutorial">📜 Tutorial <span class="count" id="tutorialCount">(0)</span></button>
+      <button id="tabEvents">⚡ Events <span class="count" id="eventsCount">(0)</span></button>
     </div>
     <div class="hint" id="catHint">Tiles are the floor — one per cell. Click a card to select, then Paint.</div>
     <div id="uploadRow" style="padding:0 8px 6px"><button id="uploadBtn" style="width:100%">＋ Upload <span id="uploadCat">tile</span> PNGs…</button>
@@ -2110,15 +2212,19 @@ function setCategory(cat) {
   document.getElementById('tabFx').classList.toggle('active', cat === 'fx');
   document.getElementById('tabMerge').classList.toggle('active', cat === 'merge');
   document.getElementById('tabIsland').classList.toggle('active', cat === 'island');
+  document.getElementById('tabTutorial').classList.toggle('active', cat === 'tutorial');
+  document.getElementById('tabEvents').classList.toggle('active', cat === 'events');
   // The merge page, island page, 3D section + character roster are catalogues,
   // not upload palettes.
   const isMerge = cat === 'merge';
   const isIsland = cat === 'island';
   const isZones = cat === 'zones';
+  const isTutorial = cat === 'tutorial';
+  const isEvents = cat === 'events';
   const isBg = cat === 'background';
   const isChar = cat === 'character';
   const isFxTab = cat === 'fx';
-  document.getElementById('uploadRow').style.display = (isMerge || isIsland || isZones || isChar || isFxTab || cat === '3d') ? 'none' : '';
+  document.getElementById('uploadRow').style.display = (isMerge || isIsland || isZones || isChar || isFxTab || isTutorial || isEvents || cat === '3d') ? 'none' : '';
   document.getElementById('fxActions').style.display = isFxTab ? 'flex' : 'none';
   document.getElementById('mergeActions').style.display = isMerge ? 'flex' : 'none';
   document.getElementById('characterActions').style.display = isChar ? 'flex' : 'none';
@@ -2126,6 +2232,10 @@ function setCategory(cat) {
   // Full-page editors over the canvas.
   document.getElementById('mergePage').style.display = isMerge ? 'block' : 'none';
   document.getElementById('islandPage').style.display = isIsland ? 'grid' : 'none';
+  document.getElementById('tutorialPage').style.display = isTutorial ? 'grid' : 'none';
+  if (isTutorial) TUT.show();
+  document.getElementById('eventsPage').style.display = isEvents ? 'grid' : 'none';
+  if (isEvents) EVT.show();
   if (isMerge) renderMergePage();
   if (isIsland) ipShow();
   renderWorldsPage();
@@ -2144,6 +2254,7 @@ function setCategory(cat) {
     island: 'The ISLAND GENERATOR — trace an island reference, draw the deck outline, and the tile lattice is fitted into it while the rock skirt is hung underneath. Preview the mask, then render it with Seedream v5 Pro. Needs the game dev server (pnpm dev) for both steps.',
     '3d': 'Animated 3D decor (Three.js) — a cell-shaded emerald crystal spinning on itself in the grid’s top-down view. Pick it and paint; every placement spins live. Calibrate scale/anchor like any decor. (Procedural — the export carries a model3d spec.)',
     fx: '<b>Drag an emitter onto the map</b> — it starts burning where you let go, running the game\'s real effect (docs/vfx-textures.md §7). Pick one and the inspector shapes THIS instance: base width, height, tilt, ground rotation, rate, colour, mirror. <b>✥ Move</b> (M) drags it anywhere, no snapping. ⤒ Apply writes <code>src/data/emitters.json</code>.',
+    events: 'The <b>Event Creator</b> — every authored moment as an input → output block: WHEN a trigger fires, IF the properties hold, THEN the actions run. Nest an event under another to arm it only after its parent fired; a prompt\'s choices branch inline. Save validates against the game\'s own rules (<code>docs/event-creator.md</code>).',
     character: '<b>Drag Eleanor or Selyna onto the map</b> — she lands exactly where you let go, and that is where she stands in the game (<code>characters.json</code>: a cell plus a free offset). One each, drawn at the size the game draws her. To move her afterwards: <b>✥ Move</b> (M) and drag her anywhere — no snapping. Paint her card onto a cell to re-centre her on it. ⤒ Apply sends it to the running game.'
   }[cat];
   // keep selection if it belongs to this category
@@ -2903,6 +3014,8 @@ document.getElementById('tabCharacters').onclick = () => setCategory('character'
 document.getElementById('tabFx').onclick = () => setCategory('fx');
 document.getElementById('tabMerge').onclick = () => setCategory('merge');
 document.getElementById('tabIsland').onclick = () => setCategory('island');
+document.getElementById('tabTutorial').onclick = () => setCategory('tutorial');
+document.getElementById('tabEvents').onclick = () => setCategory('events');
 
 /* --------------------------- background fill --------------------------- */
 // Bounding box of the actual world content (everything that isn't a background).
@@ -5206,6 +5319,800 @@ setCategory('tile');
 // Reopen the last LOCAL session if one exists; otherwise load the bundled
 // current world (the deployed default) — so anyone arriving fresh sees it —
 // and only fall back to the bare starter tiles if no default-world.json ships.
+/* =============================== 📜 Tutorial editor =============================== *
+ * The scripted tutorials, beat by beat. Reads and writes through the dev server's
+ * /__tutorial API (tools/tutorial-api/server.ts) — the same door the
+ * `tutorial-editor` Claude skill uses, so what this page shows is what the game
+ * runs. A script is a SEQUENCE of steps; the main script plays at the start and
+ * every other one waits for its TRIGGER. Each card shows a beat's four facets:
+ * the ELEMENTS it points at, the ACTIONS it asks for and performs, its DIALOGUE,
+ * and the STATES it leaves the UI in (allow flags, held panels, hand-back).
+ * ----------------------------------------------------------------------------- */
+const TUT = (() => {
+  const st = { scripts: null, ctx: null, sel: 'main', editing: null, dirty: false, loading: false, lastOut: null };
+  const api = (path, method = 'GET', body) => devEndpoint(`/__tutorial${path}`, method, body);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') n.className = v;
+      else if (k === 'html') n.innerHTML = v;
+      else if (k.startsWith('on')) n[k] = v;
+      else if (v !== undefined && v !== null) n.setAttribute(k, v);
+    }
+    for (const kid of kids.flat()) if (kid !== null && kid !== undefined) n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    return n;
+  };
+  const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  /* ------------------------------- data helpers ------------------------------- */
+  const script = () => st.scripts?.find((s) => s.id === st.sel) ?? st.scripts?.[0];
+  const chainName = (chain, tier) => {
+    const c = st.ctx?.chains.find((x) => x.id === chain);
+    if (!c) return tier ? `${chain} t${tier}` : chain;
+    const t = tier ? c.tiers.find((x) => x.tier === tier) : null;
+    return t ? t.name : tier ? `${c.name} t${tier}` : c.name;
+  };
+  const artOf = (chain, tier) => (st.ctx?.art ?? {})[`item_${chain}_${tier ?? 1}`];
+  const artBase = location.protocol === 'file:' ? 'http://localhost:5173/' : location.origin.includes(':5173') ? '/' : 'http://localhost:5173/';
+  const chip = (label, cls = '', art) => el('span', { class: `chip ${cls}` }, art ? el('img', { src: artBase + art, alt: '' }) : null, label);
+  const refLabel = (ref) => {
+    if (ref === 'last_hatched') return 'the last hatchling';
+    if (Array.isArray(ref)) return `tile (${ref[0]},${ref[1]})`;
+    if (ref && typeof ref === 'object' && ref.chain) return `${chainName(ref.chain, ref.tier)}${ref.nth ? ` #${ref.nth + 1}` : ''}`;
+    return JSON.stringify(ref);
+  };
+  const refChip = (ref, kind = '') => {
+    const art = ref && typeof ref === 'object' && !Array.isArray(ref) && ref.chain ? artOf(ref.chain, ref.tier) : null;
+    return chip(refLabel(ref), kind, art);
+  };
+
+  /* ------------------------------- describing ------------------------------- */
+  function gateSentence(g) {
+    if (!g) return 'no gate';
+    switch (g.type) {
+      case 'tap': return 'Tap to continue';
+      case 'count': return `Board holds ${g.count}× ${chainName(g.chain, g.tier)}`;
+      case 'move': return `Carry ${chainName(g.chain)}` + (g.region ? ` into region ${g.region}` : '') + (g.at ? ` to cell [${g.at[0]}, ${g.at[1]}]` : '');
+      case 'event': {
+        const ev = g.event.replace(/^ui:|^item:|^dragon:|^bag:|^regard:|^generator:|^character:|^marketplace:|^order:|^region:|^chest:/, '').replace(/_/g, ' ');
+        const what = g.chain ? ` — ${chainName(g.chain)}` : '';
+        const cur = g.currency ? ` (pay in ${g.currency})` : '';
+        return `Player ${ev}${what}${cur}`;
+      }
+      default: return JSON.stringify(g);
+    }
+  }
+  function effectSentence(e) {
+    const k = Object.keys(e)[0];
+    const v = e[k];
+    switch (k) {
+      case 'spawn': return `spawn ${v.count}× ${chainName(v.chain, v.tier)}${v.at ? ` at (${v.at[0]},${v.at[1]})` : v.nearChain ? ` near ${chainName(v.nearChain, v.nearTier)}` : ''}`;
+      case 'retier': return `ripen ${chainName(v.chain, v.fromTier)} → ${chainName(v.chain, v.toTier)}`;
+      case 'grantKeys': return `grant ${v} Gold Key${v === 1 ? '' : 's'}`;
+      case 'grantXp': return `grant ${v} XP`;
+      case 'nameDragon': return 'open the naming prompt';
+      case 'wantGift': return `she wants ${typeof v === 'object' ? chainName(v.chain, v.tier) : v}`;
+      case 'openCodex': return `open the Codex${typeof v === 'object' && v.page ? ` on ${v.page}` : ''}`;
+      case 'sleepDragon': return 'put the dragon to sleep';
+      default: return `${k}: ${JSON.stringify(v)}`;
+    }
+  }
+  function triggerSentence(t) {
+    if (!t) return 'no trigger';
+    switch (t.type) {
+      case 'start': return 'plays at the start of the game';
+      case 'step_done': return `after step ${t.step} of ${t.tutorial}`;
+      case 'tutorial_done': return `after ${t.tutorial} is done`;
+      case 'event': return `when ${t.event}${t.chain ? ` (${chainName(t.chain)})` : ''} is observed`;
+      case 'quest_done': return `when quest ${t.quest} is done`;
+      case 'level': return `at Keeper level ${t.min}`;
+      case 'world': return `on arriving in ${t.world}`;
+      case 'stat': return `when stat ${t.key} ≥ ${t.min}`;
+      default: return JSON.stringify(t);
+    }
+  }
+  /** Every element a beat involves: what it highlights, points at, spawns, asks for. */
+  function elementsOf(step) {
+    const out = [];
+    for (const h of step.highlight ?? []) out.push(refChip(h, 'on'));
+    if (step.hand) {
+      if (step.hand.from) { out.push(refChip(step.hand.from, 'hand')); out.push(chip(`→ ${refLabel(step.hand.to)}`, 'hand')); }
+      else if (step.hand.ui) out.push(chip(`hand → UI ${step.hand.ui}`, 'ui'));
+      else if (step.hand.fogRegion) out.push(chip(`hand → fog ${step.hand.fogRegion}`, 'ui'));
+    }
+    const arrow = (a, tag) => {
+      if (!a) return;
+      if (a.tile) out.push(refChip(a.tile, 'on'));
+      else if (a.ui) out.push(chip(`${tag} → UI ${a.ui}`, 'ui'));
+      else if (a.fogRegion) out.push(chip(`${tag} → fog ${a.fogRegion}`, 'ui'));
+      else if (a.character) out.push(chip(`${tag} → ${a.character}`, 'ui'));
+    };
+    arrow(step.arrow, 'arrow'); arrow(step.arrowThen, 'then arrow');
+    const g = step.gate ?? {};
+    if (g.chain) out.push(refChip({ chain: g.chain, tier: g.tier, nth: 0 }, ''));
+    if (g.region) out.push(chip(`region ${g.region}`, 'ui'));
+    for (const e of step.effects ?? []) if (e.spawn) out.push(refChip({ chain: e.spawn.chain, tier: e.spawn.tier, nth: 0 }, 'fx'));
+    out.push(chip(step.speaker, 'ui'));
+    return out;
+  }
+  /** The states a beat leaves the UI in: the allow contract, held panels, hand-back. */
+  function statesOf(sc, step, isLast) {
+    const out = [];
+    const base = sc.allowBase === 'everything';
+    out.push(chip(`base: allow ${base ? 'everything' : 'nothing'}`, 'ui'));
+    const allow = step.allow ?? {};
+    for (const k of st.ctx?.allowKeys ?? []) {
+      if (!(k in allow)) continue;
+      const v = allow[k];
+      if (k === 'drag') out.push(chip(`drag: ${Array.isArray(v) && v.length ? v.join(', ') : 'none'}`, Array.isArray(v) && v.length ? 'on' : 'off'));
+      else if (k === 'codexHold') out.push(chip(v ? 'Codex HELD open' : 'Codex released', v ? 'hold' : 'off'));
+      else out.push(chip(k, v ? 'on' : 'off'));
+    }
+    for (const e of step.effects ?? []) {
+      if (e.openCodex) out.push(chip('popup: Codex showing', 'hold'));
+      if (e.nameDragon) out.push(chip('popup: naming prompt', 'hold'));
+      if (e.sleepDragon) out.push(chip('dragon asleep', 'hold'));
+    }
+    if (isLast) out.push(chip(sc.id === 'main' ? 'then: hand the game over' : 'then: hand back (lesson done)', 'on'));
+    return out;
+  }
+
+  /* ------------------------------- rendering ------------------------------- */
+  function render() {
+    const root = document.getElementById('tutorialPage');
+    root.innerHTML = '';
+    if (!st.scripts) {
+      root.append(el('div', { class: 'tuRail' }), el('div', { class: 'tuMain' }, el('div', { class: 'empty' }, st.loading ? 'Loading the tutorial…' : 'Dev server unreachable — start `pnpm dev` (port 5173) and reopen this tab.')));
+      return;
+    }
+    document.getElementById('tutorialCount').textContent = `(${st.scripts.reduce((a, s) => a + s.steps.length, 0)})`;
+    const sc = script();
+    // ---- rail
+    const rail = el('div', { class: 'tuRail' },
+      el('div', { class: 'tuRailHead' }, el('h2', {}, '📜 Tutorials'), el('div', { class: 'hint' }, 'One script plays at the start; every other waits for its trigger and plays mid-game. Select one to edit its beats.')),
+      el('div', { class: 'tuScripts' }, ...st.scripts.map((s) => el('div', { class: `tuScript${s.id === sc.id ? ' active' : ''}`, onclick: () => { st.sel = s.id; st.editing = null; render(); } },
+        el('div', { class: 't' }, el('span', {}, s.title || s.id), el('span', { class: 'n' }, `${s.steps.length} beat${s.steps.length === 1 ? '' : 's'}`)),
+        el('div', { class: 'trig', html: `<b>${s.id}</b> · ${esc(triggerSentence(s.trigger))}` })))),
+      el('div', { class: 'tuRailFoot' },
+        el('button', { onclick: addScript }, '＋ New mid-game tutorial'),
+        sc.id !== 'main' ? el('button', { onclick: () => removeScript(sc.id) }, '🗑 Delete this tutorial') : null)
+    );
+    // ---- main
+    const status = el('span', { class: `status${st.dirty ? ' dirty' : ''}` }, st.dirty ? 'unsaved changes' : 'saved');
+    const bar = el('div', { class: 'tuBar' },
+      el('button', { onclick: save, title: 'PUT /__tutorial — validated before it lands on disk' }, '💾 Save to game'),
+      el('button', { onclick: validate, title: 'POST /__tutorial/validate — shape check + ftuecheck.py' }, '✓ Validate'),
+      el('button', { onclick: () => load(true) }, '↻ Reload from disk'),
+      el('button', { onclick: () => addStep(sc, sc.steps.length) }, '＋ Add beat at end'),
+      status);
+    const body = el('div', { class: 'tuBody' });
+    if (st.lastOut) body.append(el('pre', { class: `tuOut ${st.lastOut.ok ? 'ok' : 'fail'}` }, st.lastOut.text));
+    body.append(scriptHead(sc));
+    const seq = el('div', { class: 'tuSeq' });
+    if (!sc.steps.length) seq.append(el('div', { class: 'empty' }, 'No beats yet — add the first one. A mid-game tutorial with no beats never plays.'));
+    sc.steps.forEach((step, i) => {
+      seq.append(insertRow(sc, i));
+      seq.append(card(sc, step, i));
+    });
+    if (sc.steps.length) seq.append(insertRow(sc, sc.steps.length));
+    body.append(seq);
+    root.append(rail, el('div', { class: 'tuMain' }, bar, body));
+  }
+
+  function scriptHead(sc) {
+    const main = sc.id === 'main';
+    const head = el('div', { class: 'tuHead' });
+    head.append(
+      el('label', {}, 'id', el('input', { value: sc.id, disabled: 'disabled' })),
+      el('label', {}, 'title', el('input', { value: sc.title ?? '', placeholder: 'shown in this rail only', oninput: (e) => { sc.title = e.target.value; mark(); } })),
+      el('label', {}, 'allow base', (() => {
+        const s = el('select', { disabled: main ? 'disabled' : null, onchange: (e) => { sc.allowBase = e.target.value; mark(); render(); } },
+          el('option', { value: 'everything' }, 'everything — a tip that takes nothing away'),
+          el('option', { value: 'nothing' }, 'nothing — a lesson that opens one verb at a time'));
+        s.value = sc.allowBase ?? (main ? 'nothing' : 'everything');
+        return s;
+      })()),
+      el('label', {}, 'beats', el('input', { value: String(sc.steps.length), disabled: 'disabled' }))
+    );
+    // trigger
+    const trig = el('div', { class: 'trigRow' });
+    const t = sc.trigger ?? { type: 'start' };
+    const setT = (next) => { sc.trigger = next; mark(); render(); };
+    const typeSel = el('select', { disabled: main ? 'disabled' : null, onchange: (e) => setT(defaultTrigger(e.target.value)) });
+    for (const ty of main ? ['start'] : (st.ctx?.triggerTypes ?? [])) typeSel.append(el('option', { value: ty }, ty));
+    typeSel.value = t.type;
+    trig.append(el('label', {}, 'trigger', typeSel));
+    const field = (label, input) => trig.append(el('label', {}, label, input));
+    const scriptSel = (val, on) => { const s = el('select', { onchange: (e) => on(e.target.value) }); for (const x of st.scripts) if (x.id !== sc.id) s.append(el('option', { value: x.id }, x.id)); s.value = val; return s; };
+    if (t.type === 'step_done') {
+      field('tutorial', scriptSel(t.tutorial, (v) => setT({ ...t, tutorial: v, step: (st.scripts.find((x) => x.id === v)?.steps[0]?.id) ?? '' })));
+      const steps = st.scripts.find((x) => x.id === t.tutorial)?.steps ?? [];
+      const ss = el('select', { onchange: (e) => setT({ ...t, step: e.target.value }) }); for (const x of steps) ss.append(el('option', { value: x.id }, x.id)); ss.value = t.step;
+      field('step done', ss);
+    } else if (t.type === 'tutorial_done') field('tutorial', scriptSel(t.tutorial, (v) => setT({ ...t, tutorial: v })));
+    else if (t.type === 'event') {
+      const evs = el('input', { list: 'tuEvents', value: t.event ?? '', oninput: (e) => { t.event = e.target.value; mark(); } });
+      field('bus event', evs);
+      field('chain (optional)', el('input', { value: t.chain ?? '', oninput: (e) => { if (e.target.value) t.chain = e.target.value; else delete t.chain; mark(); } }));
+      trig.append(el('datalist', { id: 'tuEvents' }, ...(st.ctx?.gateEvents ?? []).concat(['quest:completed', 'keeper:leveled', 'world:ready', 'dragon:mood']).map((v) => el('option', { value: v }))));
+    } else if (t.type === 'quest_done') {
+      const qs = el('select', { onchange: (e) => setT({ ...t, quest: e.target.value }) }); for (const q of st.ctx?.quests ?? []) qs.append(el('option', { value: q.id }, `${q.id} — ${q.title ?? ''}`)); qs.value = t.quest;
+      field('quest', qs);
+    } else if (t.type === 'level') field('min level', el('input', { type: 'number', min: 1, value: t.min ?? 2, oninput: (e) => { t.min = Number(e.target.value); mark(); } }));
+    else if (t.type === 'world') { const ws = el('select', { onchange: (e) => setT({ ...t, world: e.target.value }) }); for (const w of st.ctx?.worlds ?? []) ws.append(el('option', { value: w }, w)); ws.value = t.world; field('world', ws); }
+    else if (t.type === 'stat') { field('stat key', el('input', { value: t.key ?? '', oninput: (e) => { t.key = e.target.value; mark(); } })); field('min', el('input', { type: 'number', value: t.min ?? 1, oninput: (e) => { t.min = Number(e.target.value); mark(); } })); }
+    trig.append(el('span', { class: 'hint', style: 'color:var(--dim);font-size:12px;align-self:center' }, `→ ${triggerSentence(t)}${main ? '' : ' (and the main script is done)'}`));
+    head.append(trig);
+    return head;
+  }
+  function defaultTrigger(type) {
+    const other = st.scripts.find((x) => x.id !== st.sel) ?? st.scripts[0];
+    switch (type) {
+      case 'step_done': return { type, tutorial: other.id, step: other.steps[0]?.id ?? '' };
+      case 'tutorial_done': return { type, tutorial: other.id };
+      case 'event': return { type, event: 'item:merged' };
+      case 'quest_done': return { type, quest: st.ctx?.quests?.[0]?.id ?? '' };
+      case 'level': return { type, min: 2 };
+      case 'world': return { type, world: st.ctx?.worlds?.[0] ?? 'emberkeep' };
+      case 'stat': return { type, key: '', min: 1 };
+      default: return { type: 'start' };
+    }
+  }
+
+  function insertRow(sc, at) {
+    return el('div', { class: 'tuInsert' }, el('button', { onclick: () => addStep(sc, at), title: 'Insert a beat here' }, '＋ insert beat'));
+  }
+
+  function card(sc, step, i) {
+    const isLast = i === sc.steps.length - 1;
+    const editing = st.editing === step.id;
+    const c = el('div', { class: `tuCard${editing ? ' sel' : ''}` });
+    c.append(el('div', { class: `num${isLast ? ' last' : ''}`, title: isLast ? 'last beat — hands back' : '' }, String(i + 1)));
+    c.append(el('div', { class: 'tuCardHead' },
+      el('span', { class: 'id' }, step.id),
+      el('span', { class: 'gate' }, `gate · ${step.gate?.type ?? '?'}`),
+      el('div', { class: 'tools' },
+        el('button', { onclick: () => moveStep(sc, i, i - 1), disabled: i === 0 ? 'disabled' : null, title: 'move up' }, '↑'),
+        el('button', { onclick: () => moveStep(sc, i, i + 1), disabled: isLast ? 'disabled' : null, title: 'move down' }, '↓'),
+        el('button', { onclick: () => dupStep(sc, i) }, '⧉ dup'),
+        el('button', { onclick: () => { st.editing = editing ? null : step.id; render(); } }, editing ? '✓ done' : '✎ edit'),
+        el('button', { onclick: () => removeStep(sc, i) }, '🗑'))));
+    const facets = el('div', { class: 'facets' });
+    facets.append(el('div', { class: 'facet' }, el('h4', {}, 'Elements involved'), el('div', { class: 'chips' }, ...elementsOf(step))));
+    const acts = el('ul', { class: 'actions' }, el('li', {}, gateSentence(step.gate)));
+    for (const e of step.effects ?? []) acts.append(el('li', { class: 'fx' }, `on entry: ${effectSentence(e)}`));
+    facets.append(el('div', { class: 'facet' }, el('h4', {}, 'Actions'), acts));
+    const textNode = editing
+      ? el('textarea', { value: step.text, oninput: (e) => { step.text = e.target.value; mark(); } })
+      : el('div', { class: 'text' }, step.text);
+    if (editing) textNode.value = step.text;
+    facets.append(el('div', { class: 'facet dialogue' }, el('h4', {}, 'Dialogue'), el('div', { class: 'say' }, el('span', { class: `who ${step.speaker}` }, step.speaker), textNode)));
+    facets.append(el('div', { class: 'facet' }, el('h4', {}, 'States'), el('div', { class: 'chips' }, ...statesOf(sc, step, isLast))));
+    c.append(facets);
+    if (editing) c.append(editor(sc, step));
+    return c;
+  }
+
+  /** The structured editor under a card: pickers for the common shapes, raw JSON for the rest. */
+  function editor(sc, step) {
+    const ed = el('div', { class: 'tuEdit' });
+    ed.append(el('label', {}, 'id', el('input', { value: step.id, onchange: (e) => renameStep(sc, step, e.target.value.trim()) })));
+    const sp = el('select', { onchange: (e) => { step.speaker = e.target.value; mark(); render(); } });
+    for (const s of st.ctx?.speakers ?? ['eleanor']) sp.append(el('option', { value: s }, s));
+    sp.value = step.speaker;
+    ed.append(el('label', {}, 'speaker', sp));
+    // gate
+    const g = step.gate ?? { type: 'tap' };
+    const gt = el('select', { onchange: (e) => { step.gate = defaultGate(e.target.value); mark(); render(); } });
+    for (const ty of st.ctx?.gateTypes ?? ['tap']) gt.append(el('option', { value: ty }, ty));
+    gt.value = g.type;
+    ed.append(el('label', {}, 'gate', gt));
+    if (g.type === 'event') {
+      const ev = el('select', { onchange: (e) => { g.event = e.target.value; mark(); render(); } });
+      for (const x of st.ctx?.gateEvents ?? []) ev.append(el('option', { value: x }, x));
+      ev.value = g.event;
+      ed.append(el('label', {}, 'event', ev));
+      ed.append(el('label', {}, 'chain (optional)', el('input', { value: g.chain ?? '', list: 'tuChains', oninput: (e) => { if (e.target.value) g.chain = e.target.value; else delete g.chain; mark(); } })));
+    } else if (g.type === 'count') {
+      ed.append(el('label', {}, 'chain', el('input', { value: g.chain ?? '', list: 'tuChains', oninput: (e) => { g.chain = e.target.value; mark(); } })));
+      ed.append(el('label', {}, 'tier / count', el('div', { style: 'display:flex;gap:6px' },
+        el('input', { type: 'number', min: 1, value: g.tier ?? 1, style: 'width:70px', oninput: (e) => { g.tier = Number(e.target.value); mark(); } }),
+        el('input', { type: 'number', min: 1, value: g.count ?? 1, style: 'width:70px', oninput: (e) => { g.count = Number(e.target.value); mark(); } }))));
+    } else if (g.type === 'move') {
+      ed.append(el('label', {}, 'chain', el('input', { value: g.chain ?? '', list: 'tuChains', oninput: (e) => { g.chain = e.target.value; mark(); } })));
+      const rs = el('select', { onchange: (e) => { if (e.target.value) g.region = e.target.value; else delete g.region; mark(); } });
+      rs.append(el('option', { value: '' }, '— any (cell only) —'));
+      for (const r of st.ctx?.regions ?? []) rs.append(el('option', { value: r.id }, r.id));
+      rs.value = g.region ?? '';
+      ed.append(el('label', {}, 'region', rs));
+      // The exact seat, optional: the director falls back to the region (or
+      // any drop) when the named cell is occupied, so this is a preference.
+      const atCell = (i) => el('input', { type: 'number', value: g.at?.[i] ?? '', placeholder: i ? 'row' : 'col', style: 'width:70px', oninput: (e) => {
+        const v = e.target.value;
+        if (v === '') { delete g.at; } else { g.at = [Number(g.at?.[0] ?? 0), Number(g.at?.[1] ?? 0)]; g.at[i] = Number(v); }
+        mark();
+      } });
+      ed.append(el('label', {}, 'at cell (optional)', el('div', { style: 'display:flex;gap:6px' }, atCell(0), atCell(1))));
+    }
+    ed.append(el('datalist', { id: 'tuChains' }, ...(st.ctx?.chains ?? []).map((c) => el('option', { value: c.id }, c.name))));
+    // allow
+    const allowGrid = el('div', { class: 'allowGrid' });
+    const allow = step.allow ?? {};
+    for (const k of st.ctx?.allowKeys ?? []) {
+      if (k === 'drag') continue;
+      const cb = el('input', { type: 'checkbox', onchange: (e) => { step.allow = step.allow ?? {}; if (e.target.checked) step.allow[k] = true; else delete step.allow[k]; if (!Object.keys(step.allow).length) delete step.allow; mark(); render(); } });
+      cb.checked = allow[k] === true;
+      allowGrid.append(el('label', {}, cb, k));
+    }
+    ed.append(el('label', { class: 'wide' }, `allow (merged onto base: ${sc.allowBase === 'everything' ? 'everything' : 'nothing'})`, allowGrid));
+    ed.append(el('label', { class: 'wide' }, 'allow.drag — chain ids, comma-separated, * for all',
+      el('input', { value: (allow.drag ?? []).join(', '), oninput: (e) => { const v = e.target.value.split(',').map((x) => x.trim()).filter(Boolean); step.allow = step.allow ?? {}; if (v.length) step.allow.drag = v; else delete step.allow.drag; if (!Object.keys(step.allow).length) delete step.allow; mark(); } })));
+    // raw JSON facets
+    for (const key of ['highlight', 'hand', 'arrow', 'arrowThen', 'effects']) {
+      const ta = el('textarea', { spellcheck: 'false' });
+      ta.value = step[key] === undefined ? '' : JSON.stringify(step[key]);
+      const bad = el('span', { class: 'bad' });
+      ta.oninput = () => {
+        const v = ta.value.trim();
+        if (!v) { delete step[key]; bad.textContent = ''; mark(); return; }
+        try { step[key] = JSON.parse(v); bad.textContent = ''; mark(); } catch (e) { bad.textContent = `invalid JSON: ${e.message}`; }
+      };
+      ta.onblur = () => { if (!bad.textContent) render(); };
+      ed.append(el('label', { class: key === 'effects' ? 'wide' : '' }, `${key} (JSON; empty = none)`, ta, bad));
+    }
+    return ed;
+  }
+  function defaultGate(type) {
+    switch (type) {
+      case 'event': return { type, event: st.ctx?.gateEvents?.[0] ?? 'item:merged' };
+      case 'count': return { type, chain: st.ctx?.chains?.[0]?.id ?? '', tier: 1, count: 3 };
+      case 'move': return { type, chain: st.ctx?.chains?.[0]?.id ?? '', region: st.ctx?.regions?.[0]?.id ?? '' };
+      default: return { type: 'tap' };
+    }
+  }
+
+  /* ------------------------------- mutations ------------------------------- */
+  const mark = () => { st.dirty = true; const s = document.querySelector('#tutorialPage .tuBar .status'); if (s) { s.textContent = 'unsaved changes'; s.className = 'status dirty'; } };
+  const uniqueId = (base) => { const all = new Set(st.scripts.flatMap((s) => s.steps.map((x) => x.id)).concat(st.scripts.map((s) => s.id))); let id = base, n = 2; while (all.has(id)) id = `${base}_${n++}`; return id; };
+  function addStep(sc, at) {
+    const step = { id: uniqueId(`${sc.id === 'main' ? 'beat' : sc.id}_${at + 1}`), speaker: 'eleanor', text: '', gate: { type: 'tap' } };
+    sc.steps.splice(at, 0, step);
+    st.editing = step.id; mark(); render();
+    document.querySelectorAll('#tutorialPage .tuCard.sel')[0]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  function dupStep(sc, i) { const copy = JSON.parse(JSON.stringify(sc.steps[i])); copy.id = uniqueId(`${copy.id}_copy`); sc.steps.splice(i + 1, 0, copy); mark(); render(); }
+  function removeStep(sc, i) { if (!confirm(`Delete beat "${sc.steps[i].id}"?`)) return; sc.steps.splice(i, 1); mark(); render(); }
+  function moveStep(sc, from, to) { if (to < 0 || to >= sc.steps.length) return; const [s] = sc.steps.splice(from, 1); sc.steps.splice(to, 0, s); mark(); render(); }
+  function renameStep(sc, step, id) {
+    if (!id || id === step.id) return;
+    if (st.scripts.some((s) => s.steps.some((x) => x.id === id))) { alert(`A beat called "${id}" already exists.`); render(); return; }
+    // Triggers that name this step follow it.
+    for (const s of st.scripts) if (s.trigger?.type === 'step_done' && s.trigger.tutorial === sc.id && s.trigger.step === step.id) s.trigger.step = id;
+    step.id = id; st.editing = id; mark(); render();
+  }
+  function addScript() {
+    const id = prompt('Id for the new mid-game tutorial (snake_case):', uniqueId('lesson'));
+    if (!id) return;
+    if (!/^[a-z][a-z0-9_]*$/.test(id) || st.scripts.some((s) => s.id === id)) { alert('Use a unique snake_case id.'); return; }
+    st.scripts.push({ id, title: '', trigger: defaultTrigger('quest_done'), allowBase: 'everything', steps: [] });
+    st.sel = id; st.editing = null; mark(); render();
+  }
+  function removeScript(id) {
+    const users = st.scripts.filter((s) => (s.trigger?.type === 'step_done' || s.trigger?.type === 'tutorial_done') && s.trigger.tutorial === id);
+    if (users.length) { alert(`${users.map((s) => s.id).join(', ')} trigger off "${id}" — repoint them first.`); return; }
+    if (!confirm(`Delete tutorial "${id}" and its beats?`)) return;
+    st.scripts = st.scripts.filter((s) => s.id !== id); st.sel = 'main'; mark(); render();
+  }
+
+  /* ------------------------------- I/O ------------------------------- */
+  async function load(force) {
+    if (st.scripts && !force) { render(); return; }
+    if (st.dirty && force && !confirm('Discard unsaved changes and reload from disk?')) return;
+    st.loading = true; render();
+    try {
+      const [doc, ctx] = await Promise.all([api(''), st.ctx ? Promise.resolve(st.ctx) : api('/context')]);
+      st.scripts = doc.scripts; st.ctx = ctx; st.dirty = false; st.lastOut = null;
+      if (!st.scripts.some((s) => s.id === st.sel)) st.sel = 'main';
+    } catch (e) { st.scripts = null; console.warn('[tutorial editor]', e); }
+    st.loading = false; render();
+  }
+  async function save() {
+    try {
+      const res = await api('', 'PUT', { scripts: st.scripts });
+      if (!res.ok) { st.lastOut = { ok: false, text: `NOT SAVED — the file would be broken:\n• ${(res.errors ?? [res.error]).join('\n• ')}` }; render(); return; }
+      st.scripts = res.scripts; st.dirty = false; st.lastOut = { ok: true, text: 'Saved to src/data/tutorial.json. The running game picks it up on its next reload.' };
+    } catch (e) { st.lastOut = { ok: false, text: `Save failed: ${e.message}` }; }
+    render();
+  }
+  async function validate() {
+    try {
+      if (st.dirty) await save();
+      const r = await api('/validate', 'POST', {});
+      const lines = [];
+      if (r.structural?.length) lines.push('SHAPE:', ...r.structural.map((x) => `  ✗ ${x}`));
+      lines.push(`ftuecheck.py (exit ${r.ftue?.code}):`, r.ftue?.output?.trim() || '(no output)');
+      st.lastOut = { ok: !!r.ok, text: lines.join('\n') };
+    } catch (e) { st.lastOut = { ok: false, text: `Validate failed: ${e.message}` }; }
+    render();
+  }
+  return { show: () => load(false), reload: () => load(true), state: st };
+})();
+
+/* ============================================================================
+ * ⚡ EVENT CREATOR — events.json as an input → output system.
+ *
+ * Left: the event TREE (children indented under the parent that arms them).
+ * Right: the selected event as three columns — WHEN (triggers, any of),
+ * IF (conditions on element properties, all of), THEN (actions, in order) —
+ * plus its latch (once / limit / cooldown). A prompt's choices carry their own
+ * THEN branch, rendered inline. Pickers come from GET /__events/context, and
+ * every save is validated by the same code the game ships
+ * (src/core/gameEvents.ts) before it lands on disk. docs/event-creator.md.
+ * ========================================================================== */
+const EVT = (() => {
+  const st = { events: null, ctx: null, sel: null, raw: false, dirty: false, loading: false, lastOut: null };
+  const api = (path, method = 'GET', body) => devEndpoint(`/__events${path}`, method, body);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') n.className = v;
+      else if (k === 'html') n.innerHTML = v;
+      else if (k.startsWith('on')) n[k] = v;
+      else if (v !== undefined && v !== null && v !== false) n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    return n;
+  };
+  const mark = () => { st.dirty = true; };
+
+  /* ------------------------------- tree helpers ------------------------------- */
+  function flat(list = st.events ?? [], parent = null, depth = 0, out = []) {
+    for (const e of list) { out.push({ e, parent, depth }); flat(e.children ?? [], e, depth + 1, out); }
+    return out;
+  }
+  const find = (id) => flat().find((f) => f.e.id === id);
+  const selected = () => (st.sel && find(st.sel)?.e) || st.events?.[0] || null;
+  const ids = () => flat().map((f) => f.e.id);
+  function uniqueId(base) { let id = base, n = 2; while (ids().includes(id)) id = `${base}_${n++}`; return id; }
+  const chainName = (chain, tier) => {
+    const c = st.ctx?.chains.find((x) => x.id === chain);
+    if (!c) return tier ? `${chain} t${tier}` : chain;
+    const t = tier ? c.tiers.find((x) => x.tier === tier) : null;
+    return t ? t.name : tier ? `${c.name} t${tier}` : c.name;
+  };
+
+  /* ------------------------------- sentences ------------------------------- */
+  function triggerText(t) {
+    switch (t?.type) {
+      case 'event': return `on ${t.event}` + (t.match && Object.keys(t.match).length ? ' where ' + Object.entries(t.match).map(([k, v]) => `${k} = ${v}`).join(', ') : '');
+      case 'tap': return `tap ${t.target}`;
+      case 'property': return `when ${t.prop} becomes ${t.op} ${t.value}`;
+      case 'time': return `${t.afterMs} ms after armed`;
+      case 'manual': return 'manual — fire / Run only';
+    }
+    return JSON.stringify(t);
+  }
+  function actionText(a) {
+    if ('add' in a) return `${a.add} ${a.amount >= 0 ? '+' : ''}${a.amount}`;
+    if ('set' in a) return `${a.set} = ${a.value}`;
+    if ('say' in a) return `${a.say.speaker} says ${a.say.lines.length} line${a.say.lines.length === 1 ? '' : 's'}`;
+    if ('prompt' in a) return `${a.prompt.speaker} asks — ${a.prompt.choices.map((c) => c.label || c.id).join(' / ')}`;
+    if ('spawn' in a) return `spawn ${a.spawn.count}× ${chainName(a.spawn.chain, a.spawn.tier)}${a.spawn.at ? ` at [${a.spawn.at}]` : ''}`;
+    if ('retier' in a) return `retier ${a.retier.chain} t${a.retier.fromTier} → t${a.retier.toTier}`;
+    if ('open' in a) return `open ${a.open}`;
+    if ('tutorial' in a) return `start tutorial ${a.tutorial}`;
+    if ('fire' in a) return `fire ${a.fire}`;
+    if ('emit' in a) return `emit ${a.emit}`;
+    return JSON.stringify(a);
+  }
+  const kindOf = (a) => (st.ctx?.actionKinds ?? []).find((k) => k in a) ?? 'emit';
+
+  /* ------------------------------- defaults ------------------------------- */
+  const defaultTrigger = (type) => ({
+    event: { type, event: 'item:merged', match: {} },
+    tap: { type, target: `character:${st.ctx?.characters?.[0] ?? 'eleanor'}` },
+    property: { type, prop: 'keeper.coins', op: '>=', value: 100 },
+    time: { type, afterMs: 60000 },
+    manual: { type }
+  })[type];
+  const defaultCondition = () => ({ prop: 'keeper.tutorialDone', op: '==', value: 1 });
+  const defaultAction = (kind) => ({
+    add: { add: 'keeper.coins', amount: 10 },
+    set: { set: 'flag.done', value: 1 },
+    say: { say: { speaker: 'eleanor', lines: ['…'] } },
+    prompt: { prompt: { id: 'ask', speaker: 'eleanor', text: '…?', choices: [{ id: 'yes', label: 'Yes', then: [{ set: 'flag.answer', value: 1 }] }, { id: 'no', label: 'No', then: [{ set: 'flag.answer', value: 0 }] }] } },
+    spawn: { spawn: { chain: st.ctx?.chains?.[0]?.id ?? '', tier: 1, count: 1 } },
+    retier: { retier: { chain: st.ctx?.chains?.[0]?.id ?? '', fromTier: 1, toTier: 2 } },
+    open: { open: 'ledger' },
+    tutorial: { tutorial: st.ctx?.tutorials?.[0] ?? '' },
+    fire: { fire: ids()[0] ?? '' },
+    emit: { emit: 'tutorial:nudge', payload: {} }
+  })[kind];
+
+  /** Concrete property suggestions: the catalogue with its <ids> filled from the context. */
+  function propertyOptions(writable) {
+    const out = [];
+    for (const p of st.ctx?.properties ?? []) {
+      if (writable === 'add' && p.write === 'none') continue;
+      if (writable === 'set' && p.write !== 'add+set') continue;
+      const pat = p.pattern;
+      if (pat.includes('<id>') && pat.startsWith('character.')) for (const c of st.ctx.characters ?? []) out.push(pat.replace('<id>', c));
+      else if (pat.includes('<chain>') && pat.startsWith('dragon.')) for (const c of st.ctx.chains.filter((x) => x.hatchAtTier)) out.push(pat.replace('<chain>', c.id));
+      else if (pat.startsWith('board.')) for (const c of st.ctx.chains) for (const t of c.tiers) out.push(`board.${c.id}.${t.tier}`);
+      else if (pat.startsWith('quest.')) for (const q of st.ctx.quests ?? []) out.push(pat.replace('<id>', q.id));
+      else if (pat.startsWith('keeper.world.')) for (const w of st.ctx.worlds ?? []) out.push(pat.replace('<worldId>', w));
+      else if (pat.startsWith('event.')) for (const id of ids()) out.push(pat.replace('<id>', id));
+      else out.push(pat);
+    }
+    return out;
+  }
+  const datalist = (id, values) => el('datalist', { id }, ...values.map((v) => el('option', { value: v })));
+
+  /* ------------------------------- rendering ------------------------------- */
+  function render() {
+    const root = document.getElementById('eventsPage');
+    root.innerHTML = '';
+    if (!st.events) {
+      root.append(el('div', { class: 'tuRail' }), el('div', { class: 'tuMain' }, el('div', { class: 'empty' }, st.loading ? 'Loading the events…' : 'Dev server unreachable — start `pnpm dev` (port 5173) and reopen this tab.')));
+      return;
+    }
+    const all = flat();
+    document.getElementById('eventsCount').textContent = `(${all.length})`;
+    const ev = selected();
+    if (ev && st.sel !== ev.id) st.sel = ev.id;
+    // ---- rail: the tree
+    const rail = el('div', { class: 'tuRail' },
+      el('div', { class: 'tuRailHead' }, el('h2', {}, '⚡ Events'), el('div', { class: 'hint' }, 'WHEN a trigger fires and IF every condition holds, THEN the actions run. An event nested under another is armed only once its parent has fired.')),
+      el('div', { class: 'tuScripts evTree' }, all.length ? all.map(({ e, depth }) => el('div', {
+        class: `tuScript${e.id === ev?.id ? ' active' : ''}${depth ? ' child' : ''}`,
+        style: `margin-left:${depth * 14}px`,
+        onclick: () => { st.sel = e.id; st.raw = false; render(); }
+      },
+        el('div', { class: 't' }, el('span', {}, e.title || e.id), el('span', { class: 'n' }, e.once ? 'once' : e.limit ? `×${e.limit}` : '∞')),
+        el('div', { class: 'trig', html: `<b>${e.id}</b> · ${(e.when ?? []).map(triggerText).join(' · ') || 'no trigger'}` })
+      )) : el('div', { class: 'empty' }, 'No events yet.')),
+      el('div', { class: 'tuRailFoot' },
+        el('button', { onclick: () => addEvent(null) }, '＋ New event'),
+        ev ? el('button', { onclick: () => addEvent(ev.id) }, `＋ Child of ${ev.id}`) : null,
+        ev ? el('button', { onclick: () => removeEvent(ev.id) }, '🗑 Delete this event') : null)
+    );
+    // ---- main
+    const status = el('span', { class: `status${st.dirty ? ' dirty' : ''}` }, st.dirty ? 'unsaved changes' : 'saved');
+    const bar = el('div', { class: 'tuBar' },
+      el('button', { onclick: save, title: 'PUT /__events — validated before it lands on disk' }, '💾 Save to game'),
+      el('button', { onclick: validate, title: 'POST /__events/validate' }, '✓ Validate'),
+      el('button', { onclick: () => load(true) }, '↻ Reload from disk'),
+      ev ? el('button', { onclick: () => runInGame(ev.id), title: 'Copies __emberkeep.fireEvent(id) — paste it in the running game\'s console. Guards and latches still apply.' }, '▶ Run in game') : null,
+      ev ? el('button', { onclick: () => { st.raw = !st.raw; render(); } }, st.raw ? '☰ Columns' : '{} Raw JSON') : null,
+      status);
+    const body = el('div', { class: 'tuBody' });
+    if (st.lastOut) body.append(el('pre', { class: `tuOut ${st.lastOut.ok ? 'ok' : 'fail'}` }, st.lastOut.text));
+    if (!ev) body.append(el('div', { class: 'empty' }, 'Add the first event — or build one with the event-creator skill through the API.'));
+    else if (st.raw) body.append(rawEditor(ev));
+    else body.append(head(ev), columns(ev));
+    root.append(rail, el('div', { class: 'tuMain' }, bar, body));
+  }
+
+  function head(ev) {
+    const parent = find(ev.id)?.parent;
+    return el('div', { class: 'evHead' },
+      el('label', {}, 'id', el('input', { value: ev.id, onchange: (e) => renameEvent(ev, e.target.value.trim()) })),
+      el('label', {}, 'title', el('input', { value: ev.title ?? '', placeholder: 'what this moment is', onchange: (e) => { if (e.target.value) ev.title = e.target.value; else delete ev.title; mark(); render(); } })),
+      el('span', { class: 'arrow', title: 'input → output' }, '⇢'),
+      el('label', { class: 'chk' }, el('input', { type: 'checkbox', checked: !!ev.once, onchange: (e) => { if (e.target.checked) { ev.once = true; delete ev.limit; delete ev.cooldownMs; } else delete ev.once; mark(); render(); } }), 'once per save'),
+      !ev.once ? el('label', {}, 'limit (0 = ∞)', el('input', { type: 'number', min: 0, value: ev.limit ?? 0, style: 'width:80px', onchange: (e) => { const v = Number(e.target.value); if (v > 0) ev.limit = v; else delete ev.limit; mark(); render(); } })) : null,
+      !ev.once ? el('label', {}, 'cooldown ms', el('input', { type: 'number', min: 0, value: ev.cooldownMs ?? 0, style: 'width:100px', onchange: (e) => { const v = Number(e.target.value); if (v > 0) ev.cooldownMs = v; else delete ev.cooldownMs; mark(); render(); } })) : null,
+      el('span', { class: 'hint', style: 'color:var(--dim);font-size:11px;margin-left:auto' }, parent ? `armed when "${parent.id}" fires · ${(ev.children ?? []).length} child${(ev.children ?? []).length === 1 ? '' : 'ren'}` : `armed at boot · ${(ev.children ?? []).length} child${(ev.children ?? []).length === 1 ? '' : 'ren'}`)
+    );
+  }
+
+  function columns(ev) {
+    ev.when ??= []; ev.then ??= [];
+    const when = el('div', { class: 'evCol when' },
+      el('h3', {}, 'WHEN — any of', el('button', { onclick: () => { ev.when.push(defaultTrigger('event')); mark(); render(); } }, '＋ trigger')),
+      ...ev.when.map((t, i) => triggerRow(ev, t, i)),
+      !ev.when.length ? el('div', { class: 'empty' }, 'No trigger: the event can never start.') : null);
+    const cond = el('div', { class: 'evCol if' },
+      el('h3', {}, 'IF — all of', el('button', { onclick: () => { (ev.if ??= []).push(defaultCondition()); mark(); render(); } }, '＋ condition')),
+      ...(ev.if ?? []).map((c, i) => conditionRow(ev, c, i)),
+      !(ev.if ?? []).length ? el('div', { class: 'empty' }, 'No guard — fires whenever a trigger does.') : null);
+    const then = el('div', { class: 'evCol then' },
+      el('h3', {}, 'THEN — in order', addActionMenu(ev.then)),
+      ...actionRows(ev.then),
+      !ev.then.length ? el('div', { class: 'empty' }, 'No action: the event does nothing.') : null);
+    return el('div', { class: 'evCols' }, when, cond, then);
+  }
+
+  /* ---- WHEN ---- */
+  function triggerRow(ev, t, i) {
+    const fields = el('div', { class: 'evFields' });
+    const typeSel = el('select', { onchange: (e) => { ev.when[i] = defaultTrigger(e.target.value); mark(); render(); } },
+      ...(st.ctx.triggerTypes ?? []).map((k) => el('option', { value: k, selected: k === t.type }, k)));
+    fields.append(el('label', {}, 'type', typeSel));
+    if (t.type === 'event') {
+      const keys = st.ctx.triggerEvents?.[t.event] ?? [];
+      fields.append(el('label', { class: 'grow' }, 'bus fact', el('select', { onchange: (e) => { t.event = e.target.value; t.match = {}; mark(); render(); } },
+        ...Object.keys(st.ctx.triggerEvents ?? {}).map((k) => el('option', { value: k, selected: k === t.event }, k)))));
+      t.match ??= {};
+      for (const [k, v] of Object.entries(t.match)) {
+        fields.append(el('label', {}, k, el('div', { style: 'display:flex;gap:4px' },
+          el('input', { value: String(v), style: 'width:110px', onchange: (e) => { const raw = e.target.value.trim(); t.match[k] = raw === 'true' ? true : raw === 'false' ? false : raw !== '' && !isNaN(Number(raw)) ? Number(raw) : raw; mark(); render(); } }),
+          el('button', { class: 'x', onclick: () => { delete t.match[k]; mark(); render(); } }, '✕'))));
+      }
+      const free = keys.filter((k) => !(k in t.match));
+      if (free.length) fields.append(el('label', {}, 'narrow by', el('select', { onchange: (e) => { if (e.target.value) { t.match[e.target.value] = ''; mark(); render(); } } },
+        el('option', { value: '' }, '— payload key —'), ...free.map((k) => el('option', { value: k }, k)))));
+    } else if (t.type === 'tap') {
+      const [kind, id] = (t.target ?? 'character:').split(':');
+      const kinds = ['character', 'item', 'fog', 'elder'];
+      fields.append(el('label', {}, 'what', el('select', { onchange: (e) => { const k = e.target.value; t.target = k === 'elder' ? 'elder' : `${k}:${k === 'character' ? st.ctx.characters?.[0] ?? '' : k === 'item' ? st.ctx.chains?.[0]?.id ?? '' : st.ctx.regions?.[0] ?? ''}`; mark(); render(); } },
+        ...kinds.map((k) => el('option', { value: k, selected: k === kind }, k)))));
+      if (kind !== 'elder') {
+        const opts = kind === 'character' ? st.ctx.characters ?? [] : kind === 'item' ? (st.ctx.chains ?? []).map((c) => c.id) : st.ctx.regions ?? [];
+        fields.append(el('label', { class: 'grow' }, kind, el('select', { onchange: (e) => { t.target = `${kind}:${e.target.value}`; mark(); render(); } },
+          ...opts.map((o) => el('option', { value: o, selected: o === id }, kind === 'item' ? chainName(o) : o)))));
+      }
+    } else if (t.type === 'property') {
+      fields.append(...conditionFields(t));
+    } else if (t.type === 'time') {
+      fields.append(el('label', {}, 'after ms', el('input', { type: 'number', min: 0, value: t.afterMs ?? 0, onchange: (e) => { t.afterMs = Number(e.target.value); mark(); render(); } })),
+        el('span', { style: 'font-size:11px;color:var(--dim)' }, find(ev.id)?.parent ? 'counted from the parent firing' : 'counted from boot (game time)'));
+    }
+    return el('div', { class: 'evRow' },
+      el('div', { class: 'sent' }, el('span', {}, triggerText(t)), el('button', { class: 'x', onclick: () => { ev.when.splice(i, 1); mark(); render(); } }, '✕')),
+      fields);
+  }
+
+  /* ---- IF ---- */
+  function conditionFields(c) {
+    const listId = `evProps_${Math.random().toString(36).slice(2, 8)}`;
+    return [
+      el('label', { class: 'grow' }, 'property', el('input', { class: 'wide', value: c.prop ?? '', list: listId, placeholder: 'element.property', onchange: (e) => { c.prop = e.target.value.trim(); mark(); render(); } }), datalist(listId, propertyOptions())),
+      el('label', {}, 'op', el('select', { onchange: (e) => { c.op = e.target.value; mark(); render(); } }, ...(st.ctx.ops ?? []).map((o) => el('option', { value: o, selected: o === c.op }, o)))),
+      el('label', {}, 'value', el('input', { type: 'number', value: c.value ?? 0, onchange: (e) => { c.value = Number(e.target.value); mark(); render(); } }))
+    ];
+  }
+  function conditionRow(ev, c, i) {
+    return el('div', { class: 'evRow' },
+      el('div', { class: 'sent' }, el('span', {}, `${c.prop} ${c.op} ${c.value}`), el('button', { class: 'x', onclick: () => { ev.if.splice(i, 1); if (!ev.if.length) delete ev.if; mark(); render(); } }, '✕')),
+      el('div', { class: 'evFields' }, ...conditionFields(c)));
+  }
+
+  /* ---- THEN ---- */
+  function addActionMenu(list) {
+    return el('select', { onchange: (e) => { if (e.target.value) { list.push(defaultAction(e.target.value)); mark(); render(); } e.target.value = ''; } },
+      el('option', { value: '' }, '＋ action'), ...(st.ctx.actionKinds ?? []).map((k) => el('option', { value: k }, k)));
+  }
+  function actionRows(list) {
+    return list.map((a, i) => el('div', { class: 'evRow' },
+      el('div', { class: 'sent' }, el('span', {}, actionText(a)),
+        i > 0 ? el('button', { class: 'x', title: 'earlier', onclick: () => { list.splice(i - 1, 2, list[i], list[i - 1]); mark(); render(); } }, '↑') : null,
+        i < list.length - 1 ? el('button', { class: 'x', title: 'later', onclick: () => { list.splice(i, 2, list[i + 1], list[i]); mark(); render(); } }, '↓') : null,
+        el('button', { class: 'x', onclick: () => { list.splice(i, 1); mark(); render(); } }, '✕')),
+      actionFields(list, a, i)));
+  }
+  function actionFields(list, a, i) {
+    const f = el('div', { class: 'evFields' });
+    const kind = kindOf(a);
+    f.append(el('label', {}, 'kind', el('select', { onchange: (e) => { list[i] = defaultAction(e.target.value); mark(); render(); } },
+      ...(st.ctx.actionKinds ?? []).map((k) => el('option', { value: k, selected: k === kind }, k)))));
+    const propInput = (key, obj, writable) => {
+      const listId = `evW_${Math.random().toString(36).slice(2, 8)}`;
+      return el('label', { class: 'grow' }, 'property', el('input', { class: 'wide', value: obj[key] ?? '', list: listId, onchange: (e) => { obj[key] = e.target.value.trim(); mark(); render(); } }), datalist(listId, propertyOptions(writable)));
+    };
+    const speakerSel = (obj) => el('label', {}, 'speaker', el('select', { onchange: (e) => { obj.speaker = e.target.value; mark(); render(); } }, ...(st.ctx.speakers ?? []).map((s) => el('option', { value: s, selected: s === obj.speaker }, s))));
+    const chainSel = (obj) => el('label', { class: 'grow' }, 'chain', el('select', { onchange: (e) => { obj.chain = e.target.value; mark(); render(); } }, ...(st.ctx.chains ?? []).map((c) => el('option', { value: c.id, selected: c.id === obj.chain }, c.name))));
+    const num = (label, obj, key, min) => el('label', {}, label, el('input', { type: 'number', min, value: obj[key] ?? '', onchange: (e) => { obj[key] = Number(e.target.value); mark(); render(); } }));
+    if (kind === 'add') f.append(propInput('add', a, 'add'), num('amount', a, 'amount'), el('label', { class: 'grow' }, 'reason', el('input', { value: a.reason ?? '', placeholder: 'optional', onchange: (e) => { if (e.target.value) a.reason = e.target.value; else delete a.reason; mark(); } })));
+    else if (kind === 'set') f.append(propInput('set', a, 'set'), num('value', a, 'value'));
+    else if (kind === 'say') f.append(speakerSel(a.say), el('label', { class: 'grow', style: 'flex-basis:100%' }, 'lines (one per line)', el('textarea', { onchange: (e) => { a.say.lines = e.target.value.split('\n').map((l) => l.trim()).filter(Boolean); mark(); render(); } }, a.say.lines.join('\n'))));
+    else if (kind === 'prompt') {
+      const p = a.prompt;
+      f.append(el('label', {}, 'prompt id', el('input', { value: p.id, style: 'width:110px', onchange: (e) => { p.id = e.target.value.trim(); mark(); render(); } })), speakerSel(p),
+        el('label', { class: 'grow', style: 'flex-basis:100%' }, 'question', el('input', { class: 'wide', value: p.text, onchange: (e) => { p.text = e.target.value; mark(); render(); } })));
+      const choices = el('div', { style: 'flex-basis:100%' });
+      p.choices.forEach((c, ci) => {
+        c.then ??= [];
+        choices.append(el('div', { class: 'evBranch' },
+          el('div', { class: 't' }, `choice ${ci + 1}`,
+            el('input', { value: c.id, style: 'width:90px', title: 'id', onchange: (e) => { c.id = e.target.value.trim(); mark(); render(); } }),
+            el('input', { value: c.label, style: 'width:150px', title: 'button label', onchange: (e) => { c.label = e.target.value; mark(); render(); } }),
+            addActionMenu(c.then),
+            p.choices.length > 1 ? el('button', { class: 'x', onclick: () => { p.choices.splice(ci, 1); mark(); render(); } }, '✕') : null),
+          ...actionRows(c.then),
+          !c.then.length ? el('div', { class: 'empty' }, 'A choice needs at least one action.') : null));
+      });
+      if (p.choices.length < 4) choices.append(el('button', { style: 'font-size:11px;margin-top:4px', onclick: () => { p.choices.push({ id: uniqueChoice(p), label: 'Maybe', then: [{ set: 'flag.answer', value: p.choices.length }] }); mark(); render(); } }, '＋ choice'));
+      f.append(choices);
+    }
+    else if (kind === 'spawn') f.append(chainSel(a.spawn), num('tier', a.spawn, 'tier', 1), num('count', a.spawn, 'count', 1),
+      el('label', {}, 'at col,row (opt.)', el('input', { value: a.spawn.at ? a.spawn.at.join(',') : '', style: 'width:100px', placeholder: 'anywhere', onchange: (e) => { const m = e.target.value.match(/^\s*(-?\d+)\s*,\s*(-?\d+)\s*$/); if (m) a.spawn.at = [Number(m[1]), Number(m[2])]; else delete a.spawn.at; mark(); render(); } })));
+    else if (kind === 'retier') f.append(chainSel(a.retier), num('from tier', a.retier, 'fromTier', 1), num('to tier', a.retier, 'toTier', 1));
+    else if (kind === 'open') f.append(el('label', {}, 'panel', el('select', { onchange: (e) => { a.open = e.target.value; mark(); render(); } }, ...(st.ctx.panels ?? []).map((p) => el('option', { value: p, selected: p === a.open }, p)))));
+    else if (kind === 'tutorial') f.append(el('label', { class: 'grow' }, 'script', (st.ctx.tutorials ?? []).length
+      ? el('select', { onchange: (e) => { a.tutorial = e.target.value; mark(); render(); } }, ...(st.ctx.tutorials).map((t) => el('option', { value: t, selected: t === a.tutorial }, t)))
+      : el('input', { value: a.tutorial, placeholder: 'no mid-game scripts yet — add one in 📜', onchange: (e) => { a.tutorial = e.target.value.trim(); mark(); render(); } })));
+    else if (kind === 'fire') f.append(el('label', { class: 'grow' }, 'event', el('select', { onchange: (e) => { a.fire = e.target.value; mark(); render(); } }, ...ids().map((id) => el('option', { value: id, selected: id === a.fire }, id)))));
+    else if (kind === 'emit') f.append(el('label', { class: 'grow' }, 'command', el('select', { onchange: (e) => { a.emit = e.target.value; mark(); render(); } }, ...(st.ctx.commands ?? []).map((c) => el('option', { value: c, selected: c === a.emit }, c)))),
+      el('label', { class: 'grow', style: 'flex-basis:100%' }, 'payload (JSON)', el('input', { class: 'wide', value: JSON.stringify(a.payload ?? {}), onchange: (e) => { try { a.payload = JSON.parse(e.target.value || '{}'); mark(); render(); } catch { alert('payload must be JSON'); } } })));
+    return f;
+  }
+  function uniqueChoice(p) { let n = p.choices.length + 1, id = `c${n}`; while (p.choices.some((c) => c.id === id)) id = `c${++n}`; return id; }
+
+  /* ---- raw ---- */
+  function rawEditor(ev) {
+    const ta = el('textarea', { class: 'evRaw' }, JSON.stringify(ev, null, 2));
+    return el('div', {}, ta, el('div', { style: 'margin-top:8px;display:flex;gap:8px' },
+      el('button', { onclick: () => { try { const next = JSON.parse(ta.value); if (!next.id) throw new Error('needs an id'); const list = siblings(ev.id); list[list.indexOf(ev)] = next; st.sel = next.id; st.raw = false; mark(); render(); } catch (e) { alert(`Not applied: ${e.message}`); } } }, 'Apply JSON'),
+      el('span', { style: 'color:var(--dim);font-size:11px;align-self:center' }, 'Children travel with the JSON. Validation happens on Save.')));
+  }
+
+  /* ------------------------------- edits ------------------------------- */
+  function siblings(id) { const f = find(id); return f?.parent ? f.parent.children : st.events; }
+  function addEvent(parentId) {
+    const id = prompt(parentId ? `Id for the new child of "${parentId}" (snake_case):` : 'Id for the new event (snake_case):', uniqueId(parentId ? `${parentId}_next` : 'moment'));
+    if (!id) return;
+    if (!/^[a-z][a-z0-9_]*$/.test(id) || ids().includes(id)) { alert('Use a unique snake_case id.'); return; }
+    const ev = { id, title: '', when: [parentId ? defaultTrigger('tap') : defaultTrigger('event')], if: [], then: [defaultAction('say')], once: true };
+    delete ev.title; delete ev.if;
+    if (parentId) (find(parentId).e.children ??= []).push(ev); else st.events.push(ev);
+    st.sel = id; st.raw = false; mark(); render();
+  }
+  function removeEvent(id) {
+    const f = find(id);
+    const inside = new Set(flat([f.e]).map((x) => x.e.id));
+    const users = flat().filter((x) => !inside.has(x.e.id) && allActions(x.e).some((a) => a.fire === id));
+    if (users.length) { alert(`${users.map((x) => x.e.id).join(', ')} fire "${id}" — repoint them first.`); return; }
+    const n = flat([f.e]).length;
+    if (!confirm(`Delete "${id}"${n > 1 ? ` and its ${n - 1} nested event${n > 2 ? 's' : ''}` : ''}?`)) return;
+    const list = siblings(id); list.splice(list.indexOf(f.e), 1);
+    st.sel = f.parent?.id ?? null; mark(); render();
+  }
+  function renameEvent(ev, id) {
+    if (!id || id === ev.id) return;
+    if (!/^[a-z][a-z0-9_]*$/.test(id) || ids().includes(id)) { alert('Use a unique snake_case id.'); render(); return; }
+    for (const { e } of flat()) for (const a of allActions(e)) if (a.fire === ev.id) a.fire = id;
+    ev.id = id; st.sel = id; mark(); render();
+  }
+  function allActions(e, out = []) { const walk = (l) => { for (const a of l ?? []) { out.push(a); if (a.prompt) for (const c of a.prompt.choices ?? []) walk(c.then); } }; walk(e.then); return out; }
+  async function runInGame(id) {
+    const cmd = `__emberkeep.fireEvent(${JSON.stringify(id)})`;
+    try { await navigator.clipboard.writeText(cmd); st.lastOut = { ok: true, text: `Copied: ${cmd}\nPaste it in the running game's console (http://localhost:5173). Guards and latches still apply — a once-event that already fired will answer false.` }; }
+    catch { st.lastOut = { ok: true, text: `Run in the game's console:\n${cmd}` }; }
+    render();
+  }
+
+  /* ------------------------------- I/O ------------------------------- */
+  async function load(force) {
+    if (st.events && !force) { render(); return; }
+    if (st.dirty && force && !confirm('Discard unsaved changes and reload from disk?')) return;
+    st.loading = true; render();
+    try {
+      const [doc, ctx] = await Promise.all([api(''), st.ctx ? Promise.resolve(st.ctx) : api('/context')]);
+      st.events = doc.events; st.ctx = ctx; st.dirty = false; st.lastOut = null;
+      if (!find(st.sel)) st.sel = st.events[0]?.id ?? null;
+    } catch (e) { st.events = null; console.warn('[event creator]', e); }
+    st.loading = false; render();
+  }
+  async function save() {
+    try {
+      const res = await api('', 'PUT', { events: st.events });
+      if (!res.ok) { st.lastOut = { ok: false, text: `NOT SAVED — the file would be broken:\n• ${(res.errors ?? [res.error]).join('\n• ')}` }; render(); return; }
+      st.events = res.events; st.dirty = false; st.lastOut = { ok: true, text: 'Saved to src/data/events.json. The running game picks it up on its next reload.' };
+    } catch (e) { st.lastOut = { ok: false, text: `Save failed: ${e.message}` }; }
+    render();
+  }
+  async function validate() {
+    try {
+      if (st.dirty) await save();
+      const r = await api('/validate', 'POST', {});
+      st.lastOut = { ok: !!r.ok, text: r.ok ? 'events.json is valid.' : ['INVALID:', ...(r.errors ?? []).map((x) => `  ✗ ${x}`)].join('\n') };
+    } catch (e) { st.lastOut = { ok: false, text: `Validate failed: ${e.message}` }; }
+    render();
+  }
+  return { show: () => load(false), reload: () => load(true), state: st };
+})();
+
 if (!restoreSession()) {
   loadDefaultWorld(true).then((ok) => { if (!ok) { fitView(); loadStarterTiles(); } });
 }

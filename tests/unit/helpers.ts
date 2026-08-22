@@ -1,4 +1,4 @@
-import { GameContext } from '../../src/core/Context';
+import { GameContext, type GameData } from '../../src/core/Context';
 import type { EventBus } from '../../src/core/EventBus';
 import type { EventKey, EventMap, MapData } from '../../src/core/types';
 import type { StorageLike } from '../../src/systems/SaveSystem';
@@ -20,11 +20,14 @@ export class MemoryStorage implements StorageLike {
   }
 }
 
-export function createTestContext(storage: StorageLike = new MemoryStorage()): GameContext {
+export function createTestContext(
+  storage: StorageLike = new MemoryStorage(),
+  overrides: Partial<GameData> = {}
+): GameContext {
   // Unit tests assert against the compact 8×8 layout; the shipped map.json is
   // now the full authored 51×24 world. Inject the fixture so system tests stay
   // decoupled from level design.
-  return new GameContext(storage, { map: map8x8 as unknown as MapData });
+  return new GameContext(storage, { map: map8x8 as unknown as MapData, ...overrides });
 }
 
 /** Collect every payload emitted for `event` into the returned array. */

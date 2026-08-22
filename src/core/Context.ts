@@ -8,6 +8,7 @@ import { DragonLifeSystem } from '../systems/DragonLifeSystem';
 import { DragonSystem } from '../systems/DragonSystem';
 import { EconomySystem } from '../systems/EconomySystem';
 import { EnergySystem } from '../systems/EnergySystem';
+import { EventSystem } from '../systems/EventSystem';
 import { GeneratorSystem } from '../systems/GeneratorSystem';
 import { IapSystem } from '../systems/IapSystem';
 import { MergeSystem } from '../systems/MergeSystem';
@@ -34,6 +35,7 @@ import type {
   CharactersData,
   DialogueData,
   DragondexData,
+  EventsData,
   MapData,
   OrdersData,
   QuestsData,
@@ -53,6 +55,7 @@ import ordersJson from '../data/orders.json';
 import questsJson from '../data/quests.json';
 import storeJson from '../data/store.json';
 import tasksJson from '../data/tasks.json';
+import eventsJson from '../data/events.json';
 import tutorialJson from '../data/tutorial.json';
 
 export interface GameData {
@@ -61,6 +64,7 @@ export interface GameData {
   orders: OrdersData;
   map: MapData;
   tutorial: TutorialData;
+  events: EventsData;
   assets: AssetsManifest;
   anchors: AnchorsData;
   dialogue: DialogueData;
@@ -97,6 +101,7 @@ export interface GameSystems {
   dragonLife: DragonLifeSystem;
   save: SaveSystem;
   tutorial: TutorialDirector;
+  events: EventSystem;
 }
 
 /**
@@ -119,6 +124,7 @@ export class GameContext {
       orders: ordersJson as unknown as OrdersData,
       map: mapJson as unknown as MapData,
       tutorial: tutorialJson as unknown as TutorialData,
+      events: eventsJson as unknown as EventsData,
       assets: assetsJson as unknown as AssetsManifest,
       anchors: anchorsJson as unknown as AnchorsData,
       dialogue: dialogueJson as unknown as DialogueData,
@@ -156,6 +162,7 @@ export class GameContext {
     // than keeping a second hunger clock of its own.
     const jobs = new DragonJobSystem(this.state, this.bus, this.clock, this.data.chains);
     const dragons = new DragonSystem(this.state, this.bus, this.clock, this.data.chains);
+    const regard = new RegardSystem(this.state, this.bus, this.data.characters, quests, order);
     this.systems = {
       board: new BoardSystem(this.state, this.bus, this.clock, this.data.chains),
       cauldron: new CauldronSystem(this.state, this.bus, this.data.cauldron),
@@ -172,7 +179,7 @@ export class GameContext {
       unlock: new UnlockSystem(this.state, this.bus, this.clock, this.data.chains),
       tasks,
       quests,
-      regard: new RegardSystem(this.state, this.bus, this.data.characters, quests, order),
+      regard,
       bag: new BagSystem(this.state, this.bus, this.data.chains),
       store: new StoreSystem(this.state, this.bus, this.data.store),
       story: new StorySystem(this.state, this.bus, this.data.dialogue),
@@ -187,7 +194,8 @@ export class GameContext {
       dragonLife: new DragonLifeSystem(this.state, this.bus, this.clock, dragons, jobs),
       worlds: new WorldSystem(this.state, this.bus, this.data.characters),
       save,
-      tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial)
+      tutorial: new TutorialDirector(this.state, this.bus, this.clock, this.data.tutorial),
+      events: new EventSystem(this.state, this.bus, this.clock, this.data.events, dragons, regard)
     };
     this.bus.on('game:reset_requested', () => this.resetGame());
 
@@ -237,6 +245,7 @@ export class GameContext {
       }
     }
     this.systems.tutorial.begin();
+    this.systems.events.begin();
   }
 
   hasSave(): boolean {

@@ -56,16 +56,23 @@
   label.row{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:11px}
   label.row input[type=range]{flex:1;accent-color:var(--gold);cursor:pointer}
   label.row span{min-width:28px;text-align:right;color:var(--cream)}
+  /* ── shape toggle ── */
+  .btn-shape{background:var(--panel2);color:var(--dim);border:1px solid var(--line);
+    border-radius:6px;padding:5px 11px;font:inherit;cursor:pointer;font-size:12px}
+  .btn-shape.active{background:var(--gold);color:#1a0f14;font-weight:bold;border-color:var(--gold)}
 </style>
 </head>
 <body>
 
 <div id="toolbar">
   <span class="brand">🎲 Iso3D</span>
-  <span class="sub">2D isometric sprite → 3D textured cube</span>
+  <span class="sub">2D sprite → 3D textured shape</span>
+  <div class="sep"></div>
+  <button class="btn-shape active" id="btnCube">⬜ Cube</button>
+  <button class="btn-shape" id="btnSphere">⬤ Sphere / Egg</button>
   <div class="spacer"></div>
   <button id="btnAuto">⟳ Auto-detect</button>
-  <button id="btnReset">↺ Reset handles</button>
+  <button id="btnReset" style="display:none">↺ Reset handles</button>
   <div class="sep"></div>
   <button id="btnUpload" class="primary">Upload sprite…</button>
   <input type="file" id="fileInput" accept="image/*" style="display:none"/>
@@ -100,6 +107,11 @@
           <input type="range" id="cubeH" min="0.3" max="3" step="0.05" value="1" style="width:70px">
           <span id="cubeHVal">1.0</span>
         </label>
+        <label class="row" id="bevelRow" style="gap:6px">
+          Bevel
+          <input type="range" id="bevelSlider" min="0" max="0.44" step="0.01" value="0" style="width:70px">
+          <span id="bevelVal">0.00</span>
+        </label>
         <label class="row" style="gap:6px">
           Face size
           <input type="range" id="faceSize" min="64" max="512" step="64" value="256" style="width:70px">
@@ -112,21 +124,33 @@
 </div>
 
 <div id="footer">
-  <div style="color:var(--dim);font-size:11px;flex-shrink:0">Extracted faces:</div>
-  <div class="face-group">
-    <canvas id="faceTop" width="128" height="128" title="Top (+Y)"></canvas>
-    <div class="label">Top<br>+Y</div>
+  <!-- cube footer -->
+  <div id="cubeFooter" style="display:flex;align-items:center;gap:14px;flex:1">
+    <div style="color:var(--dim);font-size:11px;flex-shrink:0">Extracted faces:</div>
+    <div class="face-group">
+      <canvas id="faceTop" width="128" height="128" title="Top (+Y)"></canvas>
+      <div class="label">Top<br>+Y</div>
+    </div>
+    <div class="face-group">
+      <canvas id="faceLeft" width="128" height="128" title="Left (+Z front)"></canvas>
+      <div class="label">Left<br>+Z</div>
+    </div>
+    <div class="face-group">
+      <canvas id="faceRight" width="128" height="128" title="Right (+X)"></canvas>
+      <div class="label">Right<br>+X</div>
+    </div>
+    <div class="sep"></div>
+    <button id="btnExport">⤓ Export face PNGs</button>
   </div>
-  <div class="face-group">
-    <canvas id="faceLeft" width="128" height="128" title="Left (+Z front)"></canvas>
-    <div class="label">Left<br>+Z</div>
+  <!-- sphere footer -->
+  <div id="sphereFooter" style="display:none;align-items:center;gap:14px;flex:1">
+    <div style="color:var(--dim);font-size:11px;flex-shrink:0">Equirectangular map:</div>
+    <canvas id="equiPreview" width="256" height="128"
+      style="border:1px solid var(--line);border-radius:3px;width:256px;height:128px" title="Equirectangular texture"></canvas>
+    <div style="font-size:10px;color:var(--dim);max-width:180px;line-height:1.5">
+      Front hemisphere sampled from sprite.<br>Back hemisphere: darkened mirror.
+    </div>
   </div>
-  <div class="face-group">
-    <canvas id="faceRight" width="128" height="128" title="Right (+X)"></canvas>
-    <div class="label">Right<br>+X</div>
-  </div>
-  <div class="sep"></div>
-  <button id="btnExport">⤓ Export face PNGs</button>
   <button id="btnExportGLB">⤓ Export GLB</button>
   <span id="status">Upload a sprite to begin</span>
 </div>
@@ -219,6 +243,16 @@ function extractFace(srcCanvas, quad, size) {
 const FACE_SIZE = { value: 256 };
 let srcCanvas = null;   // original sprite, full resolution
 let imgW = 1, imgH = 1;
+let shapeMode = 'cube'; // 'cube' | 'sphere'
+
+/* Sphere / egg mode: 3 handles defining the bounding ellipse (normalised 0..1).
+   C = centre, R = right-edge (defines rx), T = top-edge (defines ry). */
+let sC = {x:.50, y:.50};
+let sR = {x:.85, y:.50};
+let sT = {x:.50, y:.05};
+let equiCanvas = null;   // equirectangular texture canvas
+let sphereMesh = null;   // Three.js Mesh
+let sphGeo = null, sphMat = null;
 
 /* 7 handle positions (normalised 0..1 relative to image).
    T=top apex, TL=top-left diamond, TR=top-right diamond,
@@ -247,28 +281,41 @@ const COLORS = { top:'#7ECB4F', left:'#3FA8D9', right:'#F7A437' };
 
 /* ═══════════════════════ AUTO DETECT ═══════════════════════ */
 
-function autoDetect() {
-  if (!srcCanvas) return;
+function bboxAlpha() {
+  if (!srcCanvas) return null;
   const {width:w, height:h} = srcCanvas;
   const data = srcCanvas.getContext('2d').getImageData(0,0,w,h).data;
-  let x0=w, y0=h, x1=0, y1=0;
+  let x0=w,y0=h,x1=0,y1=0;
   for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
-    const a = data[(y*w+x)*4+3];
-    if (a > 12) { x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); }
+    if (data[(y*w+x)*4+3] > 12) {
+      x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y);
+    }
   }
-  if (x1 <= x0 || y1 <= y0) return; // no non-transparent region → use full bounds
-  // Convert bounding box to normalised positions
-  const norm = (px, py) => ({x: px/w, y: py/h});
-  const bW = x1-x0, bH = y1-y0;
-  const cx = (x0+x1)/2;
-  // Apply 2:1 iso formula within the bounding box
-  H.T  = norm(cx,       y0);
-  H.TL = norm(x0,       y0 + bH*0.25);
-  H.TR = norm(x1,       y0 + bH*0.25);
-  H.C  = norm(cx,       y0 + bH*0.5);
-  H.BL = norm(x0,       y0 + bH*0.75);
-  H.BR = norm(x1,       y0 + bH*0.75);
-  H.B  = norm(cx,       y1);
+  return x1>x0 && y1>y0 ? {x0,y0,x1,y1,w,h} : null;
+}
+
+function autoDetect() {
+  if (shapeMode === 'sphere') { autoDetectSphere(); return; }
+  const bb = bboxAlpha(); if (!bb) return;
+  const {x0,y0,x1,y1,w,h} = bb;
+  const norm = (px,py) => ({x:px/w, y:py/h});
+  const bH = y1-y0, cx = (x0+x1)/2;
+  H.T  = norm(cx,  y0);
+  H.TL = norm(x0,  y0+bH*0.25);
+  H.TR = norm(x1,  y0+bH*0.25);
+  H.C  = norm(cx,  y0+bH*0.5);
+  H.BL = norm(x0,  y0+bH*0.75);
+  H.BR = norm(x1,  y0+bH*0.75);
+  H.B  = norm(cx,  y1);
+  rebuildAll();
+}
+
+function autoDetectSphere() {
+  const bb = bboxAlpha(); if (!bb) return;
+  const {x0,y0,x1,y1,w,h} = bb;
+  const cx=(x0+x1)/(2*w), cy=(y0+y1)/(2*h);
+  const rx=(x1-x0)/(2*w), ry=(y1-y0)/(2*h);
+  sC={x:cx,y:cy}; sR={x:cx+rx,y:cy}; sT={x:cx,y:cy-ry};
   rebuildAll();
 }
 
@@ -303,6 +350,37 @@ function drawOverlay() {
   ctx.clearRect(0,0,W,SH);
   if (!srcCanvas) return;
 
+  if (shapeMode === 'sphere') {
+    // Draw bounding ellipse
+    const cx = displayOX + sC.x*imgW*displayScale;
+    const cy = displayOY + sC.y*imgH*displayScale;
+    const rx = Math.abs(sR.x-sC.x)*imgW*displayScale;
+    const ry = Math.abs(sT.y-sC.y)*imgH*displayScale;
+    ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+    ctx.fillStyle='#7ECB4F22'; ctx.fill();
+    ctx.strokeStyle='#7ECB4Faa'; ctx.lineWidth=1.5; ctx.stroke();
+    // Equator guide (dotted)
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry*0.2,0,0,Math.PI*2);
+    ctx.strokeStyle='#7ECB4F55'; ctx.stroke();
+    ctx.setLineDash([]);
+    // Handles
+    const sHandles = {C:sC, R:sR, T:sT};
+    const sColors  = {C:'#ccc', R:'#F7A437', T:'#7ECB4F'};
+    for (const [k,h] of Object.entries(sHandles)) {
+      const x = displayOX+h.x*imgW*displayScale;
+      const y = displayOY+h.y*imgH*displayScale;
+      ctx.beginPath(); ctx.arc(x,y,hoveredHandle===k?8:6,0,Math.PI*2);
+      ctx.fillStyle=sColors[k]; ctx.fill();
+      ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle='#000'; ctx.font='bold 8px monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(k,x,y);
+    }
+    return;
+  }
+
+  // ── cube mode ──
   const drawFace = (keys, color) => {
     const pts = keys.map(k => pt(k));
     ctx.beginPath();
@@ -347,10 +425,14 @@ function screenToNorm(ex, ey) {
 
 function nearestHandle(ex, ey) {
   let best = null, bestD = 20;
-  for (const [k] of Object.entries(H)) {
-    const [hx,hy] = pt(k);
-    const wrap = document.getElementById('spriteWrap');
-    const rect = wrap.getBoundingClientRect();
+  const wrap = document.getElementById('spriteWrap');
+  const rect = wrap.getBoundingClientRect();
+  const candidates = shapeMode === 'sphere'
+    ? [['C',sC],['R',sR],['T',sT]]
+    : Object.entries(H).map(([k]) => [k, H[k]]);
+  for (const [k, h] of candidates) {
+    const hx = displayOX + h.x*imgW*displayScale;
+    const hy = displayOY + h.y*imgH*displayScale;
     const d = Math.hypot(ex-rect.left-hx, ey-rect.top-hy);
     if (d < bestD) { bestD = d; best = k; }
   }
@@ -364,7 +446,14 @@ overlayCanvas.addEventListener('mousedown', e => {
 });
 window.addEventListener('mousemove', e => {
   if (draggingHandle) {
-    H[draggingHandle] = screenToNorm(e.clientX, e.clientY);
+    const norm = screenToNorm(e.clientX, e.clientY);
+    if (shapeMode === 'sphere') {
+      if (draggingHandle === 'C') sC = norm;
+      else if (draggingHandle === 'R') sR = norm;
+      else if (draggingHandle === 'T') sT = norm;
+    } else {
+      H[draggingHandle] = norm;
+    }
     rebuildAll();
   } else {
     const h = nearestHandle(e.clientX, e.clientY);
@@ -403,7 +492,7 @@ function rebuildFaces() {
 /* ═══════════════════════ THREE.JS ═══════════════════════ */
 
 const threeWrap = document.getElementById('threeWrap');
-const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true, preserveDrawingBuffer:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -433,18 +522,13 @@ fill.position.set(-4,-2,-4); scene.add(fill);
 const grid = new THREE.GridHelper(6, 12, 0x3d2e38, 0x3d2e38);
 grid.position.y = -0.5; scene.add(grid);
 
-// Cube geometry: 6 materials, one per face
-// BoxGeometry face order: +X, -X, +Y, -Y, +Z, -Z
-// Iso mapping:
-//   top face (iso diamond)  → +Y (idx 2)
-//   left face (lower-left)  → +Z (idx 4, front)
-//   right face (lower-right) → +X (idx 0, right)
-//   hidden faces reuse nearest visible texture
-const geo = new THREE.BoxGeometry(1, 1, 1);
-let mats = Array.from({length:6}, () =>
+// 7 materials: 0-5 = cube faces, 6 = bevel edges+corners
+// BoxGeometry face order: +X(0), -X(1), +Y(2), -Y(3), +Z(4), -Z(5)
+// Iso mapping: top→+Y(2), left→+Z(4,front), right→+X(0)
+let mats = Array.from({length:7}, () =>
   new THREE.MeshStandardMaterial({color:0x888888, roughness:0.7, metalness:0.05})
 );
-let cube = new THREE.Mesh(geo, mats);
+let cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mats);
 cube.castShadow = true; cube.receiveShadow = true;
 scene.add(cube);
 
@@ -459,6 +543,204 @@ catcher.receiveShadow = true;
 scene.add(catcher);
 
 let cubeHeight = 1;
+let bevelSize = 0; // world-space bevel on the 1×1 base (0 = no bevel, up to 0.44)
+
+/* ═══════════════════════ CHAMFERED BOX GEOMETRY ═══════════════════════ */
+
+/* Builds a BufferGeometry for a box with planar (flat) chamfered edges.
+   6 inset rectangular main faces + 12 edge strips + 8 corner triangles.
+   Each main face uses its own material group (mat 0–5, matching BoxGeometry).
+   All bevel geometry shares mat 6. */
+function buildChamferedGeo(W, H, D, b) {
+  b = Math.max(0, Math.min(b, W * 0.45, H * 0.45, D * 0.45));
+  const hw = W/2, hh = H/2, hd = D/2;
+  const pos = [], nor = [], uvArr = [];
+  const grps = [];
+  let gS = 0;
+
+  const vn = (x,y,z) => { const l = Math.hypot(x,y,z) || 1; return [x/l,y/l,z/l]; };
+  const sG = () => { gS = pos.length/3; };
+  const eG = m => { const e = pos.length/3; if (e > gS) grps.push({s:gS,c:e-gS,m}); };
+
+  const addQ = (p0,p1,p2,p3,nm,u0,v0,u1,v1,u2,v2,u3,v3) => {
+    pos.push(...p0,...p1,...p2,...p0,...p2,...p3);
+    nor.push(...nm,...nm,...nm,...nm,...nm,...nm);
+    uvArr.push(u0,v0,u1,v1,u2,v2, u0,v0,u2,v2,u3,v3);
+  };
+  const addT = (p0,p1,p2,nm) => {
+    pos.push(...p0,...p1,...p2);
+    nor.push(...nm,...nm,...nm);
+    uvArr.push(0,0,1,0,0.5,1);
+  };
+
+  // ── main faces ──
+  sG(); addQ([-hw+b,hh,-hd+b],[hw-b,hh,-hd+b],[hw-b,hh,hd-b],[-hw+b,hh,hd-b],   vn(0,1,0),  0,0,1,0,1,1,0,1); eG(2); // +Y top
+  sG(); addQ([-hw+b,-hh,hd-b],[hw-b,-hh,hd-b],[hw-b,-hh,-hd+b],[-hw+b,-hh,-hd+b],vn(0,-1,0), 0,0,1,0,1,1,0,1); eG(3); // -Y bot
+  sG(); addQ([-hw+b,-hh+b,hd],[hw-b,-hh+b,hd],[hw-b,hh-b,hd],[-hw+b,hh-b,hd],    vn(0,0,1),  0,0,1,0,1,1,0,1); eG(4); // +Z front (left tex)
+  sG(); addQ([hw-b,-hh+b,-hd],[-hw+b,-hh+b,-hd],[-hw+b,hh-b,-hd],[hw-b,hh-b,-hd],vn(0,0,-1), 0,0,1,0,1,1,0,1); eG(5); // -Z back
+  sG(); addQ([hw,-hh+b,hd-b],[hw,-hh+b,-hd+b],[hw,hh-b,-hd+b],[hw,hh-b,hd-b],    vn(1,0,0),  0,0,1,0,1,1,0,1); eG(0); // +X right
+  sG(); addQ([-hw,-hh+b,-hd+b],[-hw,-hh+b,hd-b],[-hw,hh-b,hd-b],[-hw,hh-b,-hd+b],vn(-1,0,0),0,0,1,0,1,1,0,1); eG(1); // -X left
+
+  // ── bevel edges (12) + corners (8), all mat 6 ──
+  sG();
+  // top edges
+  addQ([-hw+b,hh-b,hd],[hw-b,hh-b,hd],[hw-b,hh,hd-b],[-hw+b,hh,hd-b],              vn(0,1,1),   0,0,1,0,1,1,0,1);
+  addQ([-hw+b,hh,-hd+b],[hw-b,hh,-hd+b],[hw-b,hh-b,-hd],[-hw+b,hh-b,-hd],          vn(0,1,-1),  0,0,1,0,1,1,0,1);
+  addQ([hw-b,hh,-hd+b],[hw-b,hh,hd-b],[hw,hh-b,hd-b],[hw,hh-b,-hd+b],              vn(1,1,0),   0,0,1,0,1,1,0,1);
+  addQ([-hw+b,hh,hd-b],[-hw+b,hh,-hd+b],[-hw,hh-b,-hd+b],[-hw,hh-b,hd-b],         vn(-1,1,0),  0,0,1,0,1,1,0,1);
+  // bottom edges
+  addQ([-hw+b,-hh,hd-b],[hw-b,-hh,hd-b],[hw-b,-hh+b,hd],[-hw+b,-hh+b,hd],          vn(0,-1,1),  0,0,1,0,1,1,0,1);
+  addQ([hw-b,-hh,-hd+b],[-hw+b,-hh,-hd+b],[-hw+b,-hh+b,-hd],[hw-b,-hh+b,-hd],      vn(0,-1,-1), 0,0,1,0,1,1,0,1);
+  addQ([hw-b,-hh,hd-b],[hw-b,-hh,-hd+b],[hw,-hh+b,-hd+b],[hw,-hh+b,hd-b],          vn(1,-1,0),  0,0,1,0,1,1,0,1);
+  addQ([-hw+b,-hh,-hd+b],[-hw+b,-hh,hd-b],[-hw,-hh+b,hd-b],[-hw,-hh+b,-hd+b],     vn(-1,-1,0), 0,0,1,0,1,1,0,1);
+  // vertical edges
+  addQ([hw,-hh+b,hd-b],[hw,hh-b,hd-b],[hw-b,hh-b,hd],[hw-b,-hh+b,hd],              vn(1,0,1),   0,0,1,0,1,1,0,1);
+  addQ([hw,hh-b,-hd+b],[hw,-hh+b,-hd+b],[hw-b,-hh+b,-hd],[hw-b,hh-b,-hd],          vn(1,0,-1),  0,0,1,0,1,1,0,1);
+  addQ([-hw,hh-b,hd-b],[-hw,-hh+b,hd-b],[-hw+b,-hh+b,hd],[-hw+b,hh-b,hd],         vn(-1,0,1),  0,0,1,0,1,1,0,1);
+  addQ([-hw,-hh+b,-hd+b],[-hw,hh-b,-hd+b],[-hw+b,hh-b,-hd],[-hw+b,-hh+b,-hd],     vn(-1,0,-1), 0,0,1,0,1,1,0,1);
+  // corners (winding verified by cross-product)
+  addT([hw-b,hh,hd-b],    [hw-b,hh-b,hd],    [hw,hh-b,hd-b],         vn(1,1,1));
+  addT([hw-b,hh,-hd+b],   [hw,hh-b,-hd+b],   [hw-b,hh-b,-hd],        vn(1,1,-1));
+  addT([-hw+b,hh-b,hd],   [-hw+b,hh,hd-b],   [-hw,hh-b,hd-b],        vn(-1,1,1));
+  addT([-hw+b,hh-b,-hd],  [-hw,hh-b,-hd+b],  [-hw+b,hh,-hd+b],       vn(-1,1,-1));
+  addT([hw-b,-hh,hd-b],   [hw,-hh+b,hd-b],   [hw-b,-hh+b,hd],        vn(1,-1,1));
+  addT([hw-b,-hh,-hd+b],  [hw-b,-hh+b,-hd],  [hw,-hh+b,-hd+b],       vn(1,-1,-1));
+  addT([-hw+b,-hh,hd-b],  [-hw+b,-hh+b,hd],  [-hw,-hh+b,hd-b],       vn(-1,-1,1));
+  addT([-hw+b,-hh,-hd+b], [-hw,-hh+b,-hd+b], [-hw+b,-hh+b,-hd],      vn(-1,-1,-1));
+  eG(6);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal',   new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvArr, 2));
+  grps.forEach(g => geo.addGroup(g.s, g.c, g.m));
+  return geo;
+}
+
+/* Sample average opaque colour from a canvas (for bevel material). */
+function avgColorHex(canvas) {
+  const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  let r=0,g=0,b=0,n=0;
+  for (let i=0; i<d.length; i+=4) {
+    if (d[i+3] > 32) { r+=d[i]; g+=d[i+1]; b+=d[i+2]; n++; }
+  }
+  if (!n) return 0xaaaaaa;
+  const f = 1.4; // brightness boost for the bevel (catches more light)
+  const R = Math.min(255, (r/n*f)|0);
+  const G = Math.min(255, (g/n*f)|0);
+  const B = Math.min(255, (b/n*f)|0);
+  return (R<<16)|(G<<8)|B;
+}
+
+/* ═══════════════════════ SPHERE / EGG ═══════════════════════ */
+
+/* Build a full equirectangular (2:1) texture by orthographic back-projection.
+   Uses Three.js SphereGeometry's own parameterisation so UV aligns perfectly:
+     x = -cos(phi)*sin(theta),  y = cos(theta),  z = -sin(phi)*sin(theta)
+   The FRONT of the sphere (z>0) is at phi = 3π/2 → u = 0.75 in Three.js UV.
+   Front hemisphere samples the sprite directly; back hemisphere gets a
+   darkened mirror of the opposite point (plausible back-lighting approximation).
+*/
+function buildEquirectangular(SW, SH, srcData, cx, cy, rx, ry, texW) {
+  const texH = texW >> 1; // 2:1 ratio
+  const out = document.createElement('canvas');
+  out.width = texW; out.height = texH;
+  const ctx = out.getContext('2d');
+  const dst = ctx.createImageData(texW, texH);
+  const dd = dst.data;
+
+  const sample = (px, py) => {
+    px = Math.max(0, Math.min(SW-1.001, px));
+    py = Math.max(0, Math.min(SH-1.001, py));
+    const x0=px|0, y0=py|0, fx=px-x0, fy=py-y0;
+    const S = (x,y) => { const i=(y*SW+x)*4; return [srcData[i],srcData[i+1],srcData[i+2],srcData[i+3]]; };
+    const c00=S(x0,y0),c10=S(x0+1,y0),c01=S(x0,y0+1),c11=S(x0+1,y0+1);
+    return [0,1,2,3].map(c=>(c00[c]*(1-fx)*(1-fy)+c10[c]*fx*(1-fy)+c01[c]*(1-fx)*fy+c11[c]*fx*fy)|0);
+  };
+
+  for (let vp = 0; vp < texH; vp++) {
+    const theta = (vp / texH) * Math.PI;               // 0 (north) → π (south)
+    const sinT = Math.sin(theta), cosT = Math.cos(theta);
+    for (let up = 0; up < texW; up++) {
+      const phi = (up / texW) * 2 * Math.PI;           // 0 → 2π
+      // Three.js SphereGeometry convention:
+      const x3 = -Math.cos(phi) * sinT;                // maps to sprite horizontal
+      const y3 =  cosT;                                 // maps to sprite vertical
+      const z3 = -Math.sin(phi) * sinT;                // depth: z3>0 = front (faces +Z camera)
+      const di = (vp * texW + up) * 4;
+
+      if (z3 >= 0) {
+        // Front hemisphere — sample sprite directly
+        const p = sample(cx + x3*rx,  cy - y3*ry);
+        dd[di]=p[0]; dd[di+1]=p[1]; dd[di+2]=p[2]; dd[di+3]=p[3];
+      } else {
+        // Back hemisphere — mirror through centre + darken
+        // t ranges from 0.78 at silhouette (z3≈0) down to 0.25 at back pole (z3=-1)
+        const t = 0.25 + 0.53 * (1 + z3);
+        const p = sample(cx - x3*rx,  cy + y3*ry);
+        dd[di]=(p[0]*t)|0; dd[di+1]=(p[1]*t)|0; dd[di+2]=(p[2]*t)|0; dd[di+3]=p[3];
+      }
+    }
+  }
+  ctx.putImageData(dst, 0, 0);
+  return out;
+}
+
+function rebuildSphere() {
+  if (!srcCanvas) return;
+
+  // Dispose old sphere
+  if (sphereMesh) {
+    scene.remove(sphereMesh);
+    sphGeo.dispose();
+    if (sphMat.map) sphMat.map.dispose();
+    sphMat.dispose();
+    sphereMesh = null;
+  }
+
+  const CX = sC.x*imgW, CY = sC.y*imgH;
+  const RX = Math.abs(sR.x-sC.x)*imgW;
+  const RY = Math.abs(sT.y-sC.y)*imgH;
+
+  const srcData = srcCanvas.getContext('2d',{willReadFrequently:true})
+    .getImageData(0,0,imgW,imgH).data;
+
+  equiCanvas = buildEquirectangular(imgW,imgH,srcData, CX,CY, RX,RY, 512);
+
+  // Update equi preview in footer
+  const prev = document.getElementById('equiPreview');
+  if (prev) { prev.width=256; prev.height=128; prev.getContext('2d').drawImage(equiCanvas,0,0,256,128); }
+
+  // Three.js sphere — scale.y = RY/RX for egg elongation
+  sphGeo = new THREE.SphereGeometry(1, 64, 64);
+  sphMat = new THREE.MeshStandardMaterial({map:makeCanvasTex(equiCanvas), roughness:0.7, metalness:0.05});
+  sphereMesh = new THREE.Mesh(sphGeo, sphMat);
+  sphereMesh.scale.set(1, RY/RX, 1);
+  sphereMesh.castShadow = true; sphereMesh.receiveShadow = true;
+  scene.add(sphereMesh);
+
+  document.getElementById('status').textContent =
+    `Sphere ${(RX*2)|0}×${(RY*2)|0}px · equi 512×256`;
+}
+
+/* Switch between cube and sphere modes. */
+function switchMode(mode) {
+  shapeMode = mode;
+  cube.visible         = (mode === 'cube');
+  if (sphereMesh) sphereMesh.visible = (mode === 'sphere');
+
+  document.getElementById('cubeFooter').style.display  = mode==='cube'   ? 'flex'  : 'none';
+  document.getElementById('sphereFooter').style.display = mode==='sphere' ? 'flex'  : 'none';
+  document.getElementById('bevelRow').style.display     = mode==='cube'   ? 'flex'  : 'none';
+  document.getElementById('btnReset').style.display     = mode==='cube'   ? ''      : 'none';
+  document.getElementById('btnCube').classList.toggle('active', mode==='cube');
+  document.getElementById('btnSphere').classList.toggle('active', mode==='sphere');
+
+  if (srcCanvas) {
+    if (mode === 'sphere') autoDetectSphere();
+    else rebuildAll();
+  }
+}
 
 function makeCanvasTex(canvas) {
   const t = new THREE.CanvasTexture(canvas);
@@ -469,40 +751,43 @@ function makeCanvasTex(canvas) {
 
 function updateCubeTextures() {
   if (!faceCanvases.top) return;
-  // Dispose old textures
   mats.forEach(m => { if (m.map) m.map.dispose(); });
-  // Map iso faces to Three.js material slots
   const topT   = makeCanvasTex(faceCanvases.top);
   const leftT  = makeCanvasTex(faceCanvases.left);
   const rightT = makeCanvasTex(faceCanvases.right);
-  // +X right, -X, +Y top, -Y bottom, +Z front, -Z back
-  mats[0].map = rightT; // +X → iso right
-  mats[1].map = leftT;  // -X → iso left (other side, reuse)
-  mats[2].map = topT;   // +Y → iso top
-  mats[3].map = topT;   // -Y → darkened top
-  mats[3].color.set(0x666666);
-  mats[4].map = leftT;  // +Z → iso left face (front in 3D)
-  mats[5].map = rightT; // -Z → iso right face (back in 3D)
-  mats.forEach((m,i) => { if(i!==3) m.color.set(0xffffff); m.needsUpdate = true; });
+  mats[0].map = rightT; mats[0].color.set(0xffffff); // +X → iso right
+  mats[1].map = leftT;  mats[1].color.set(0xffffff); // -X → iso left (back)
+  mats[2].map = topT;   mats[2].color.set(0xffffff); // +Y → iso top
+  mats[3].map = topT;   mats[3].color.set(0x666666); // -Y → darkened
+  mats[4].map = leftT;  mats[4].color.set(0xffffff); // +Z → iso left (front)
+  mats[5].map = rightT; mats[5].color.set(0xffffff); // -Z → iso right (back)
+  // Bevel: no texture, derived colour (avg top face × 1.4 brightness)
+  mats[6].map = null;
+  mats[6].color.set(avgColorHex(faceCanvases.top));
+  mats[6].roughness = 0.45;
+  mats.forEach(m => { m.needsUpdate = true; });
 }
 
 function rebuildCube() {
   scene.remove(cube);
   cube.geometry.dispose();
-  cube.geometry = new THREE.BoxGeometry(1, cubeHeight, 1);
-  // scale UV Y on side faces to match cube height (prevent vertical stretch)
-  const pos = cube.geometry.getAttribute('position');
-  const uv  = cube.geometry.getAttribute('uv');
-  // BoxGeometry face order in attribute: +X(0..5), -X(6..11), +Y(12..17), -Y(18..23), +Z(24..29), -Z(30..35)
-  // No need to hand-edit UV — the default UV is fine for now.
+  const maxB = Math.min(0.44, cubeHeight * 0.44);
+  const b = Math.min(bevelSize, maxB);
+  cube.geometry = b > 0.005
+    ? buildChamferedGeo(1, cubeHeight, 1, b)
+    : new THREE.BoxGeometry(1, cubeHeight, 1);
   scene.add(cube);
   updateCubeTextures();
 }
 
 function rebuildAll() {
   updateSpriteDisplay();
-  rebuildFaces();
-  updateCubeTextures();
+  if (shapeMode === 'sphere') {
+    rebuildSphere();
+  } else {
+    rebuildFaces();
+    updateCubeTextures();
+  }
   drawOverlay();
 }
 
@@ -574,11 +859,20 @@ spriteWrap.addEventListener('drop', e => {
 /* ── toolbar buttons ── */
 document.getElementById('btnAuto').onclick = autoDetect;
 document.getElementById('btnReset').onclick = resetHandles;
+document.getElementById('btnCube').onclick   = () => switchMode('cube');
+document.getElementById('btnSphere').onclick = () => switchMode('sphere');
 
 /* ── cube height slider ── */
 document.getElementById('cubeH').oninput = function() {
   cubeHeight = +this.value;
   document.getElementById('cubeHVal').textContent = cubeHeight.toFixed(2);
+  rebuildCube();
+};
+
+/* ── bevel slider ── */
+document.getElementById('bevelSlider').oninput = function() {
+  bevelSize = +this.value;
+  document.getElementById('bevelVal').textContent = bevelSize.toFixed(2);
   rebuildCube();
 };
 
@@ -605,13 +899,14 @@ document.getElementById('btnExport').onclick = () => {
 };
 
 document.getElementById('btnExportGLB').onclick = () => {
-  if (!faceCanvases.top) { alert('Load a sprite first.'); return; }
+  const mesh = shapeMode === 'sphere' ? sphereMesh : cube;
+  if (!mesh) { alert('Load a sprite first.'); return; }
   const exporter = new GLTFExporter();
-  exporter.parse(cube, glb => {
+  exporter.parse(mesh, glb => {
     const blob = new Blob([glb], {type:'application/octet-stream'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'iso3d-cube.glb'; a.click();
+    a.download = `iso3d-${shapeMode}.glb`; a.click();
   }, err => console.error(err), {binary:true});
 };
 

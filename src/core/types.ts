@@ -1073,8 +1073,138 @@ export interface TutorialStepConfig {
   effects?: TutorialEffect[];
 }
 
-export interface TutorialData {
+/**
+ * What starts a tutorial SCRIPT other than the main one (the main script's
+ * trigger is always `start`). Every trigger is answered from saved state —
+ * a stat latch, a quest latch, the level, the world, or another script's
+ * progress — so a reload finds a lesson exactly as armed as it was.
+ *
+ *   start         — the main script only: the game's first frame.
+ *   step_done     — another script's step has been passed ("step 1 done").
+ *   tutorial_done — another script has finished entirely.
+ *   event         — a bus fact was observed once (latched into stats by the
+ *                   director the moment it fires, so it survives a reload).
+ *   quest_done    — the `q:done:<quest>` latch.
+ *   level         — the Keeper's level has reached `min`.
+ *   world         — the Keeper is standing in `world` (checked on arrival).
+ *   stat          — any stats counter has reached `min`.
+ */
+export type TutorialTrigger =
+  | { type: 'start' }
+  | { type: 'step_done'; tutorial: string; step: string }
+  | { type: 'tutorial_done'; tutorial: string }
+  | { type: 'event'; event: string; chain?: string }
+  | { type: 'quest_done'; quest: string }
+  | { type: 'level'; min: number }
+  | { type: 'world'; world: string }
+  | { type: 'stat'; key: string; min: number };
+
+/**
+ * A tutorial SCRIPT: a sequence of steps that plays once its trigger is met.
+ * The main Chapter One script is the `steps` array of TutorialData and is
+ * presented everywhere (editor, API, director) as the script `main` with the
+ * trigger `start`; every other script lives in `tutorials` and plays mid-game.
+ *
+ * `allowBase` is what a step's `allow` is merged ONTO: the main script locks
+ * the board and opens one verb at a time (`nothing`); a mid-game lesson
+ * defaults to `everything`, so a tip never takes the game away unless its
+ * author lists what to hold back.
+ */
+export interface TutorialScriptConfig {
+  id: string;
+  title?: string;
+  trigger: TutorialTrigger;
+  allowBase?: 'nothing' | 'everything';
   steps: TutorialStepConfig[];
+}
+
+export interface TutorialData {
+  /** The main script (`main`, trigger `start`). */
+  steps: TutorialStepConfig[];
+  /** Mid-game scripts, each started by its trigger once the main script is done. */
+  tutorials?: TutorialScriptConfig[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Events — src/data/events.json (docs/event-creator.md)               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A PROPERTY PATH — `element.property`, the one grammar every event reads
+ * through (`keeper.coins`, `character.eleanor.hearts`, `board.ash_moss.2`,
+ * `flag.kept_chest`). The closed catalogue, and what each path means, lives in
+ * `gameEvents.ts` (`PROPERTY_CATALOG`); every value reads as a number.
+ */
+export type EventPropertyPath = string;
+
+export type EventCompareOp = '==' | '!=' | '>' | '>=' | '<' | '<=';
+
+/** INPUT — one of the ways an event is set off. */
+export type EventTrigger =
+  /** A bus fact, optionally narrowed by payload keys that must equal. */
+  | { type: 'event'; event: string; match?: Record<string, string | number | boolean> }
+  /** Sugar over the tap facts: `character:<id>`, `item:<chain>`, `fog:<region>`, `elder`. */
+  | { type: 'tap'; target: string }
+  /** An EDGE on a property: false on the last look, true now. */
+  | { type: 'property'; prop: EventPropertyPath; op: EventCompareOp; value: number }
+  /** Game time since the event was ARMED (boot, or the parent's firing). */
+  | { type: 'time'; afterMs: number }
+  /** Only `fire`, the dev bridge, or the API ever runs it. */
+  | { type: 'manual' };
+
+/** GUARD — read when a trigger fires; all must hold. */
+export interface EventCondition {
+  prop: EventPropertyPath;
+  op: EventCompareOp;
+  value: number;
+}
+
+/** A clickable answer inside a `prompt` — its own output branch. */
+export interface EventChoice {
+  id: string;
+  label: string;
+  then: EventAction[];
+}
+
+/** OUTPUT — one intent, handed to the system that owns it. */
+export type EventAction =
+  | { add: EventPropertyPath; amount: number; reason?: string }
+  | { set: EventPropertyPath; value: number }
+  | { say: { speaker: SpeakerId; lines: string[] } }
+  | { prompt: { id: string; speaker: SpeakerId; text: string; choices: EventChoice[] } }
+  | { spawn: { chain: string; tier: number; count: number; at?: [number, number] } }
+  | { retier: { chain: string; fromTier: number; toTier: number } }
+  | { open: EventPanel }
+  | { tutorial: string }
+  | { fire: string }
+  | { emit: string; payload?: Record<string, unknown> };
+
+export type EventPanel = 'ledger' | 'store' | 'bag' | 'cauldron' | 'codex' | 'cookbook';
+
+/**
+ * ONE EVENT — an input → output block. `children` are events INSIDE it: the
+ * same shape, armed by this event's firing rather than by boot.
+ */
+export interface GameEventConfig {
+  id: string;
+  title?: string;
+  /** Inputs — any of. */
+  when: EventTrigger[];
+  /** Guards — all of. */
+  if?: EventCondition[];
+  /** Outputs — in order. */
+  then: EventAction[];
+  /** Fire once per save (`stats["evt:<id>:fired"]` is the latch). */
+  once?: boolean;
+  /** Max firings (0/absent = unlimited). Not with `once`. */
+  limit?: number;
+  /** Min game-time between firings. Not with `once`. */
+  cooldownMs?: number;
+  children?: GameEventConfig[];
+}
+
+export interface EventsData {
+  events: GameEventConfig[];
 }
 
 /**
@@ -1877,6 +2007,23 @@ export interface EventMap {
   'ui:travel_requested': { to: string; label: string; world: string };
   /** Fact: the Ember Gate ceremony finished (Eleanor's lines after the finale).
    *  BoardScene blooms the portal FX and re-enables its door on this. */
+  /* -- the event system (EventSystem owns; docs/event-creator.md) -- */
+  /** Fact: an authored event ran its actions. `count` is the lifetime total. */
+  'event:fired': { id: string; count: number };
+  /** Intent: speak these lines through the dialogue bubble, tap by tap. */
+  'event:say': { eventId: string; speaker: SpeakerId; lines: string[] };
+  /** Intent: a clickable dialogue — UIScene shows it, the player answers with
+   *  `ui:event_choice`, and EventSystem runs the chosen branch. */
+  'event:prompt': { eventId: string; promptId: string; speaker: SpeakerId; text: string; choices: { id: string; label: string }[] };
+  /** Intent: the player picked a prompt's answer. */
+  'ui:event_choice': { eventId: string; promptId: string; choice: string };
+  /** Intent: open one of the named panels (UIScene owns them all). */
+  'ui:panel_open_requested': { panel: EventPanel };
+  /** Command: pay Regard points to a person (RegardSystem applies the cap and
+   *  speaks the heart milestones exactly as a quest award would). */
+  'regard:add': { characterId: string; points: number; reason: string };
+  /** Command: start a mid-game tutorial script by id, if it may start now. */
+  'tutorial:start_requested': { tutorial: string };
   'gate:opened': Record<string, never>;
   /** Intent: open the Emporium — the Roothold house is its physical storefront. */
   'ui:emporium_requested': Record<string, never>;
@@ -1931,6 +2078,8 @@ export type ResolvedArrow =
 
 export interface TutorialStepEvent {
   id: string;
+  /** The script this step belongs to (`main`, or a mid-game script id). */
+  tutorial: string;
   index: number;
   total: number;
   done: boolean;

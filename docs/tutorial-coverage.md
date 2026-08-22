@@ -91,6 +91,19 @@ Eleanor herself are all rows: they are live from the first frame.
 | **Selyna's Cauldron** — brew from the Bag | the pot decor in the Runevault hub, post-tutorial | self-teaching on first tap | unreachable during the tutorial (the hub opens off borealis, worlds after Chapter One), so it carries no beat. The panel is its own lesson: recipe ledger left, the selected formula's ingredient cards right, have-counts in red when the Bag falls short, and the BREW button asleep until they don't |
 | The egg stirs near Level 3 | post-tutorial | `eggTrembles` | requires `eleanor_brazier` delivered — which the tutorial now does |
 
+## Mid-game scripts (triggered tutorials)
+
+`tutorial.json` can carry scripts beyond the main one (`tutorials[]`, see
+`docs/pipelines.md` → Tutorial editor). Each plays once its trigger is met and
+the main script is done — "step 1 done", a quest latch, a level, arriving in a
+world, an observed bus event. They use the same beats, gates, hands and arrows
+as Chapter One, so the laws above apply to them unchanged, with one difference:
+a mid-game script's `allow` merges onto `everything` by default (a tip never
+takes the game away unless it says so), where the main script merges onto
+`nothing`. A concept a mid-game beat puts on screen needs its row in the ledger
+like any other; its teach-point is the beat's id. None ship yet — the
+machinery is in place for the first one.
+
 ## Deliberately not in Chapter One
 
 **The husbandry roster is HELD, not merely out of reach** — all of it but two.
