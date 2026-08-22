@@ -438,6 +438,43 @@
       },
       "board": "golden_egg:2"
     },
+    "golden_elder": {
+      "clips": {
+        "blinking": {
+          "file": "sprites/anims/golden_elder/blinking.webp",
+          "frames": 25,
+          "frameWidth": 353,
+          "frameHeight": 440,
+          "fps": 10,
+          "loop": true,
+          "stage": "portrait",
+          "scale": 1.00583,
+          "dx": 0,
+          "dy": 224.4,
+          "srcFrameWidth": 353,
+          "srcFrameHeight": 440
+        },
+        "talking": {
+          "file": "sprites/anims/golden_elder/talking.webp",
+          "frames": 40,
+          "frameWidth": 353,
+          "frameHeight": 440,
+          "fps": 12,
+          "loop": true,
+          "stage": "portrait",
+          "scale": 1.00583,
+          "dx": 0,
+          "dy": 224.4,
+          "srcFrameWidth": 353,
+          "srcFrameHeight": 440
+        }
+      },
+      "portrait": {
+        "height": 420,
+        "dy": -190,
+        "headCrop": 0.58
+      }
+    },
     "moonwhisker_adult": {
       "clips": {
         "idle": {

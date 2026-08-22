@@ -32,6 +32,7 @@ import {
   WORLD_ID
 } from '../core/Constants';
 import { FONT } from '../art/design';
+import { clipKey, clipsFor } from '../core/characterAnims';
 import { guard } from '../core/crash';
 import {
   ensureTravelWipePipeline,
@@ -1600,6 +1601,26 @@ export class UIScene extends Phaser.Scene {
     if (this.finaleActive) return;
     this.finaleActive = true;
     this.finaleReleased = false;
+    // HER BUSTS ARRIVE HERE, AND NOWHERE EARLIER.
+    //
+    // She was the only speaker in the game who did not move while she talked:
+    // Eleanor and Selyna have `stage:'portrait'` talking/blinking clips, so the
+    // ring's split treatment falls out for them with no branch, and the Elder
+    // had none — a still bust under a voice. Her clips are two big sheets, and
+    // she cannot say a word before this very ceremony, so preloading them would
+    // spend that decode on every session that never reaches the finale. The
+    // camera pan covers the fetch; a line that outruns the network still reads,
+    // because the ring degrades to `portrait_golden_elder`, her own still bust.
+    let elderQueued = 0;
+    for (const [clipId, clip] of Object.entries(clipsFor('golden_elder'))) {
+      if (this.textures.exists(clipKey('golden_elder', clipId))) continue;
+      this.load.spritesheet(clipKey('golden_elder', clipId), clip.file, {
+        frameWidth: clip.frameWidth,
+        frameHeight: clip.frameHeight
+      });
+      elderQueued += 1;
+    }
+    if (elderQueued > 0) this.load.start();
     this.clearRecipeHint(); // the finale owns the stage — no competing pointers
     this.ledger.requestClose();
     this.shop.requestClose('system'); // clearing the stage is not the player leaving
