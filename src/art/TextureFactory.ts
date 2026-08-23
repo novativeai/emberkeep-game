@@ -137,6 +137,23 @@ export const UI_TEXTURE_PARAMS: Record<string, Record<string, string>> = {
     edge: darken(PALETTE.plumShade, 0.28),
     rim: PALETTE.gold
   },
+  /**
+   * The Emporium's CLAIM key — the one-time Ember Spark, and nothing else.
+   *
+   * It wears the game's GO green rather than the buy key's plum, at exactly the
+   * buy key's geometry so the shelf's rhythm is unbroken. The plum plate reads
+   * as "priced", and a plum plate with no coin on it and the word FREE reads as
+   * priced-and-greyed-out — a disabled button, which is the one thing this is
+   * not. Green is the colour every other take-it-now key in the game already
+   * uses (deliver, confirm, brew), so the affordance is taught before the
+   * player ever opens the shop.
+   */
+  ui_shop_price_free: {
+    highlight: lighten(PALETTE.moss, 0.3),
+    base: PALETTE.moss,
+    edge: darken(PALETTE.mossShade, 0.16),
+    rim: PALETTE.gold
+  },
   ui_shop_panel: { rim: PALETTE.lava, rimShade: PALETTE.lavaShade, fill: PALETTE.cream },
   ui_shop_card: { rim: PALETTE.gold, rimShade: PALETTE.goldShade, fill: '#FFFDF6' },
   ui_shop_ribbon: { base: PALETTE.gold, edge: PALETTE.goldShade },
@@ -241,7 +258,9 @@ export class TextureFactory {
       case 'ui_shop_panel': return this.shopPanel(key);
       case 'ui_shop_card': return this.shopCard(key, false);
       case 'ui_shop_card_hot': return this.shopCard(key, true);
-      case 'ui_shop_price': return this.shopPricePill(key);
+      case 'ui_shop_price':
+      case 'ui_shop_price_free':
+        return this.shopPricePill(key);
       case 'ui_shop_tab': return this.shopTab(key, false);
       case 'ui_shop_tab_on': return this.shopTab(key, true);
       case 'ui_shop_plaque': return this.shopPlaque(key);
@@ -2108,14 +2127,59 @@ export class TextureFactory {
    * Painted with its own left fold, so the caller still anchors at x=0 and the
    * body still runs to 214 game units — the label placement is unchanged.
    */
-  private shopRibbon(key: string): void {
-    this.paint(key, 122, 46, (g) => {
-      g.save();
-      g.translate(4, 10);
-      g.rotate(-0.11);
+  /** The sash's fixed geometry — everything but how long the cloth is. */
+  private static readonly SASH = { tilt: -0.11, h: 26, padX: 13, minW: 62, x0: 4, y0: 10 };
 
-      const H = 26;
-      const W = 104;
+  /**
+   * A sash cut to fit its own label, plus where that label has to sit.
+   *
+   * The tag used to be ONE texture at a fixed 104-unit body, so the two long
+   * labels the shelf actually uses — MOST POPULAR, BEST VALUE — ran off both
+   * ends of the cloth and printed over the fold and the swallowtail, while
+   * GIFT floated in a sash three times its width. A ribbon is a piece of cloth
+   * cut to what is written on it; this measures the words and cuts it.
+   *
+   * The label position is RETURNED rather than guessed at the call site,
+   * because the cloth is tilted: the body's centre is not the texture's centre,
+   * and hand-tuned offsets are exactly what drifted the old label low and left.
+   * Both come out of the same transform the painter uses, so they cannot
+   * disagree.
+   *
+   * @param labelW the label's width in GAME units.
+   */
+  shopRibbonFor(labelW: number): { key: string; cx: number; cy: number; angle: number } {
+    const { tilt, h, padX, minW, x0, y0 } = TextureFactory.SASH;
+    const W = Math.max(minW, Math.ceil(labelW / RES) + padX * 2);
+    const key = `ui_shop_ribbon_${W}`;
+    // Tall enough for the lift the tilt gives the far end, wide enough for the
+    // fold that tucks behind the near one and the tail that overhangs the far.
+    const canvasH = Math.ceil(h + 14 + W * Math.abs(Math.sin(tilt)));
+    this.paint(key, W + 18, canvasH, (g) => this.drawSash(g, W));
+    const c = Math.cos(tilt);
+    const sn = Math.sin(tilt);
+    const lx = W / 2;
+    const ly = h / 2;
+    return {
+      key,
+      cx: (x0 + lx * c - ly * sn) * RES,
+      cy: (y0 + lx * sn + ly * c - canvasH / 2) * RES,
+      angle: (tilt * 180) / Math.PI
+    };
+  }
+
+  private shopRibbon(key: string): void {
+    // The UI Builder's element list wants the key to resolve to something; the
+    // shelf itself asks for a cut length through `shopRibbonFor`.
+    this.paint(key, 122, 46, (g) => this.drawSash(g, 104));
+  }
+
+  private drawSash(g: Ctx2D, W: number): void {
+    {
+      g.save();
+      g.translate(TextureFactory.SASH.x0, TextureFactory.SASH.y0);
+      g.rotate(TextureFactory.SASH.tilt);
+
+      const H = TextureFactory.SASH.h;
       const ink = '#6E2E14';
 
       // 1 — the FOLD: a small tab tucked behind the left end, in the sash's own
@@ -2172,7 +2236,7 @@ export class TextureFactory {
       g.restore();
 
       g.restore();
-    });
+    }
   }
 
   /** Kept for the UI Builder's element list — the shop no longer hangs a sash

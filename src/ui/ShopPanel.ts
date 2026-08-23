@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
 import { FONT, INK } from '../art/design';
+import type { TextureFactory } from '../art/TextureFactory';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import { coinOffers, priceOf } from '../core/coinPacks';
@@ -628,20 +629,37 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     return row;
   }
 
-  /** The parchment tag, sitting in the row's flow rather than on its edge. */
+  /**
+   * The sash tag, CUT TO ITS LABEL — measure the words, then ask the factory
+   * for that much cloth.
+   *
+   * It used to be one fixed 104-unit texture with the label pinned at a
+   * hand-tuned (112, 2): GIFT floated in a sash three times its width, while
+   * MOST POPULAR and BEST VALUE ran off both ends and printed over the fold and
+   * the swallowtail. The cloth is tilted, so its body's centre is not the
+   * texture's centre — that offset is why the label also sat low and left. Both
+   * the length and the centre come back from the painter now, off the same
+   * transform, so they cannot drift apart again.
+   */
   private ribbon(x: number, y: number, label: string): Phaser.GameObjects.Container {
     const tag = this.scene.add.container(x, y);
-    tag.add(this.scene.add.image(0, 0, 'ui_shop_ribbon').setOrigin(0, 0.5));
-    // The sash body runs x 8..216 in game units; its text rides the same
-    // -0.11rad tilt the painter gave the cloth. Cream ink with a dark shadow,
-    // because the sash is ember now — brown on orange was unreadable.
-    tag.add(
-      this.scene.add
-        .text(112, 2, label, { fontFamily: FONT.ui, fontSize: '24px', fontStyle: 'bold', color: '#FFF3DC' })
-        .setOrigin(0.5)
-        .setAngle(-6.3)
-        .setShadow(0, 2, 'rgba(94,36,10,0.75)', 3)
-    );
+    // Cream ink with a dark shadow, because the sash is ember now — brown on
+    // orange was unreadable. Built FIRST: its width is what the cloth is cut to.
+    const text = this.scene.add
+      .text(0, 0, label, { fontFamily: FONT.ui, fontSize: '24px', fontStyle: 'bold', color: '#FFF3DC' })
+      .setOrigin(0.5)
+      .setShadow(0, 2, 'rgba(94,36,10,0.75)', 3);
+    const factory = this.scene.registry.get('textureFactory') as TextureFactory | undefined;
+    const sash = factory?.shopRibbonFor(text.width);
+    if (!sash) {
+      // No factory (a bare harness scene): the label still reads, unribboned —
+      // art failures degrade, they never blank a row.
+      tag.add(text);
+      return tag;
+    }
+    tag.add(this.scene.add.image(0, 0, sash.key).setOrigin(0, 0.5));
+    text.setPosition(sash.cx, sash.cy).setAngle(sash.angle);
+    tag.add(text);
     return tag;
   }
 
@@ -657,7 +675,10 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     scale: number
   ): Phaser.GameObjects.Container {
     const btn = this.scene.add.container(x, y).setScale(scale);
-    const bg = this.scene.add.image(0, 0, 'ui_shop_price');
+    // The CLAIM key is green, the buy key is plum. A plum plate with no coin on
+    // it and the word FREE on it read as a priced button greyed out — a
+    // disabled control, which is the one thing this is not.
+    const bg = this.scene.add.image(0, 0, isFree ? 'ui_shop_price_free' : 'ui_shop_price');
     btn.add(bg);
 
     const label = isFree ? 'FREE' : item.gold !== undefined ? `${item.gold}` : item.price;
@@ -673,7 +694,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
         fontFamily: FONT.ui,
         fontSize: '46px',
         fontStyle: 'bold',
-        color: INK.onFieldGold
+        color: isFree ? INK.onField : INK.onFieldGold
       })
       .setOrigin(0.5)
       .setShadow(0, 3, 'rgba(24,16,22,0.5)', 4);
