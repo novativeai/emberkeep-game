@@ -23,7 +23,9 @@ export class UnlockSystem {
     bus.on('keeper:leveled', ({ level }) => this.unlockForLevel(level));
     bus.on('region:reveal', ({ regionId }) => {
       const region = this.map.regions.find((r) => r.id === regionId);
-      if (region) this.reveal(region);
+      if (!region) return;
+      this.reveal(region);
+      this.unlockForLevel(this.state.level); // anything that was waiting behind it
     });
   }
 
@@ -54,20 +56,41 @@ export class UnlockSystem {
     }
     this.bus.emit('economy:spend_keys', { keys: region.unlock.keys, reason: `unlock:${regionId}` });
     this.reveal(region);
+    // A door can be the last thing a rank-gated wave was waiting for: the
+    // mainland's inner bands name this region in `unlock.after`, and a Keeper
+    // who banked the rank before the key would otherwise hold both halves of
+    // the condition and see nothing move. Sweep again now that it is open.
+    this.unlockForLevel(this.state.level);
   }
 
-  /** On reaching `level`, lift every still-fogged zone gated at or below it. */
+  /**
+   * On reaching `level`, lift every still-fogged zone gated at or below it.
+   *
+   * Runs to a FIXED POINT, because a band may be waiting on another band rather
+   * than on the Keeper (`unlock.after` — see MapRegionConfig). One pass would
+   * lift the door and leave the wave behind it fogged until the next level-up,
+   * which for the last rank on the curve means for ever. Looping until a pass
+   * changes nothing costs one extra sweep of a handful of regions and removes
+   * the ordering question entirely.
+   */
   private unlockForLevel(level: number): void {
-    for (const region of this.map.regions) {
-      if (
-        region.unlock?.level !== undefined &&
-        region.unlock.keys === undefined && // key-gated regions unlock via fog:tapped, not level
-        region.unlock.level <= level &&
-        this.state.regionStatus.get(region.id) === 'unlockable'
-      ) {
-        this.reveal(region);
-      }
+    for (let pass = 0; pass < this.map.regions.length + 1; pass++) {
+      const opened = this.map.regions.filter((region) => {
+        if (region.unlock?.level === undefined) return false;
+        if (region.unlock.keys !== undefined) return false; // keys unlock via fog:tapped
+        if (region.unlock.level > level) return false;
+        if (this.state.regionStatus.get(region.id) !== 'unlockable') return false;
+        return this.preconditionMet(region);
+      });
+      if (!opened.length) return;
+      for (const region of opened) this.reveal(region);
     }
+  }
+
+  /** Has the region this one waits behind already opened? */
+  private preconditionMet(region: MapRegionConfig): boolean {
+    const after = region.unlock?.after;
+    return after === undefined || this.state.regionStatus.get(after) === 'active';
   }
 
   private reveal(region: MapRegionConfig): void {
@@ -79,8 +102,13 @@ export class UnlockSystem {
       const config = this.chains.chains.find((c) => c.id === placement.chain);
       // Withheld either because it is a later chapter's chain or because it
       // belongs to another world — a region in the north may seed frozen goods,
-      // and the same region data must not seed them here.
-      if (chainHiddenIn(config ?? { id: placement.chain }, this.state.worldId)) continue;
+      // and the same region data must not seed them here. A KEEPSAKE is the
+      // author saying this particular piece is not that accident.
+      if (
+        chainHiddenIn(config ?? { id: placement.chain }, this.state.worldId, placement.keepsake === true)
+      ) {
+        continue;
+      }
       const generator = config?.tiers.find((t) => t.tier === placement.tier)?.generator;
       const item = this.state.addItem({
         chain: placement.chain,

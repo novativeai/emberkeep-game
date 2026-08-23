@@ -173,7 +173,37 @@ const dragTo = async (page, a, b) => {
   for (let i = 1; i <= steps; i++) { await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps); await sleep(16); }
   await sleep(80); await page.mouse.up(); await sleep(450);
 };
-const tapBubble = (page) => tapAt(page, { x: 750, y: 725 });
+/**
+ * Tap the dialogue card — but WAIT FOR IT FIRST.
+ *
+ * A tap aimed at a bubble that has not opened yet is not an action, and the
+ * beat loop was counting it as one: fourteen taps at a quarter-second each is
+ * three and a half seconds of patience, and on a loaded machine the tutorial's
+ * very first line takes twenty (measured: 21.5 s to `arrival_miss`, and the
+ * same 23 s on the previous build — it is the boot, not any one change). The
+ * recorder therefore spent its whole budget swinging at an empty screen and
+ * reported the game as stuck on the first beat of the script.
+ *
+ * So ask the page for the object instead of guessing a delay. Returns false
+ * when no card ever appears, which is a real failure worth reporting rather
+ * than a slow one worth retrying.
+ */
+async function tapBubble(page, maxMs = 45000) {
+  try {
+    await page.waitForFunction(
+      () => {
+        const b = window.__emberkeep?.game?.scene?.getScene('UIScene')?.bubble;
+        return !!(b && b.visible);
+      },
+      null,
+      { timeout: maxMs }
+    );
+  } catch {
+    return false;
+  }
+  await tapAt(page, { x: 750, y: 725 });
+  return true;
+}
 
 /**
  * Gates the pointers cannot express, keyed by gate event. Each returns what it
@@ -215,7 +245,7 @@ async function act(page, step) {
   if (ptr.hand && 'from' in ptr.hand && ptr.hand.from && ptr.hand.to) { await dragTo(page, ptr.hand.from, ptr.hand.to); return 'drag'; }
   if (ptr.hand && 'at' in ptr.hand) { await tapAt(page, ptr.hand.at); return 'hand-tap'; }
   if (ptr.arrow) { await tapAt(page, ptr.arrow); return 'arrow-tap'; }
-  if (gate.type === 'tap') { await tapBubble(page); return 'bubble'; }
+  if (gate.type === 'tap') return (await tapBubble(page)) ? 'bubble' : null;
   return null;
 }
 

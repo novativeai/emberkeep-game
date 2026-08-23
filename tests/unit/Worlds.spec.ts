@@ -38,7 +38,9 @@ describe('worlds registry — the ingest loses nothing', () => {
     // emberkeep's cells were taken back out. Update it with the export; the
     // number is here to catch a count that changed when NOTHING was drawn,
     // which is what a lost grid or a half-loaded pager looks like.
-    expect(sourceCells.length).toBe(367);
+    // 367 → 368 on 2026-08-23, the pass that re-levelled both maps so each
+    // fog bank lifts on its own Keeper rank; one cell was drawn along the way.
+    expect(sourceCells.length).toBe(368);
   });
 
   it('keeps each cell at the exact world point the editor placed it', () => {

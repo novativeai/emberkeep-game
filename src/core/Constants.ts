@@ -264,11 +264,11 @@ export const QUEST_ROW_H = 68; // follows the tracker's 32px sub-row type
  * readout's foot and the top seat of the HUD column is 3771 units — fifty-five
  * rows' worth. Six is simply as many as a quest ever has.
  *
- * LANDSCAPE HAS 15.4 UNITS, and a row costs 68. That is not a number anyone
- * chose; it is what is left after the settings gear (bottom edge y 180.6) sets
+ * LANDSCAPE HAS 14.2 UNITS, and a row costs 68. That is not a number anyone
+ * chose; it is what is left after the settings gear (bottom edge ~y 172) sets
  * the tracker's ceiling at 196 and the five-door column sets its floor at
- * 673.4. A fourth row overruns the Dragon Codex button by 52.6 units and prints
- * a subquest across it — the exact collision `HudColumn.spec` exists to catch.
+ * 674.2. A fourth row overruns the Dragon Codex button and prints a subquest
+ * across it — the exact collision `HudColumn.spec` exists to catch.
  * Making it fit means moving the gear or re-cutting the column, which is a
  * different job than this one; until then the landscape list scrolls, and the
  * peek row below is what says so.
@@ -281,11 +281,42 @@ export const QUEST_VIEW_H = QUEST_ROW_H * QUEST_VISIBLE_ROWS + QUEST_PEEK_H;
 /** The tracker's own height in LOCAL units — where the list's viewport ends,
  *  and therefore the first free y under the whole tracker. */
 export const QUEST_TRACKER_BOTTOM = QUEST_LIST_TOP_Y + QUEST_VIEW_H;
-/** Air between the tracker's last row and the name line under it. */
-export const STATUS_READOUT_GAP = 44;
-/** The readout's own height in LOCAL units: the name at 0, the hearts at 58,
- *  the line at 96, and that line's own type under it. */
-export const STATUS_READOUT_H = 140;
+/**
+ * Air between the tracker's last row and the name line under it.
+ *
+ * 44 → 18 when the caption came down on the Dragon Codex plate. The gap was
+ * never the culprit — the two numbers below were — but once they told the truth
+ * there was no longer room for 44, and this is the one dial that lifts the
+ * READOUT rather than moving a button. What it is really air between is the
+ * VIEWPORT's floor and the name: with fewer than four subquests the list does
+ * not reach that floor and the visible gap is much larger.
+ */
+export const STATUS_READOUT_GAP = 18;
+
+/* THE READOUT'S OWN ROWS — declared here, drawn by StatusPanel.
+ *
+ * They lived in StatusPanel and STATUS_READOUT_H was a hand-typed summary of
+ * them. So when the heart row moved down 14 units to stop the name's descenders
+ * touching the meter, the summary stayed at 140 and the guard below went to
+ * zero margin without failing — and the caption came down on the Codex plate,
+ * which is the EXACT collision this constant exists to prevent. A summary that
+ * can disagree with what it summarises is not a guard, so the rows are the
+ * declaration now and the height is derived from them. */
+export const STATUS_NAME_Y = 0;
+export const STATUS_HEARTS_Y = 72;
+export const STATUS_LINE_Y = 110;
+/**
+ * What the caption actually OCCUPIES, not what its font is called.
+ *
+ * The old height took the caption to be 30 units tall because `TYPE.label` is
+ * 30 — but a 30px bold face renders 38 units of ink, and this readout wears a
+ * 5-unit stroke for legibility over bright cloud. Measured on the live HUD at
+ * 2560×1600: box top 642, ink bottom 680. 44 is that, rounded up past the
+ * stroke.
+ */
+export const STATUS_LINE_INK = 44;
+/** The readout's own height in LOCAL units — derived, never retyped. */
+export const STATUS_READOUT_H = STATUS_LINE_Y + STATUS_LINE_INK;
 /** Where the readout ENDS on screen — the ceiling the HUD column may not cross. */
 export const STATUS_READOUT_BOTTOM_Y: number =
   QUEST_TRACKER_TOP_Y + (QUEST_TRACKER_BOTTOM + STATUS_READOUT_GAP + STATUS_READOUT_H) * UI_SCALE;
@@ -298,22 +329,24 @@ export const HUD_COLUMN_X: number = LIVE_GAME_WIDTH - (IS_MOBILE ? 190 : 156);
  * The column grew a fifth seat when the Dragon Codex arrived, and a fifth seat
  * at the old 200-unit pitch landed the top button INSIDE the status readout —
  * the who-am-I-looking-at line that hangs under the quest tracker and reaches
- * to about y 622 on desktop (StatusPanel: seated at QUEST_TRACKER_TOP_Y +
- * QUEST_TRACKER_BOTTOM + 44, and 126 units tall). A dragon's name printed
- * across the Codex button is what that looks like.
+ * to y 660 on desktop (StatusPanel: seated at QUEST_TRACKER_TOP_Y +
+ * QUEST_TRACKER_BOTTOM + STATUS_READOUT_GAP, and STATUS_READOUT_H tall). A
+ * dragon's name printed across the Codex button is what that looks like — and
+ * it came back in 2026-08 when both of those numbers turned out to be
+ * under-declared, which is why they are derived now rather than typed.
  *
  * So the column was re-fitted rather than extended. Two dials moved together:
  *
- *   • the base seat drops (168 → 120), which is free — the bottom-right corner
- *     holds nothing else, and the disc's own 87-unit reach still clears the
- *     canvas edge at 1567 of 1600.
+ *   • the base seat drops, which is nearly free — the bottom-right corner holds
+ *     nothing else, and the plate's 89.8-unit reach still clears the canvas
+ *     edge at 1597.8 of 1600. There is no third step here: that is the floor.
  *   • the pitch tightens (200 → 186), which is the most that can come off: the
- *     visible disc is ~174 units, so anything under that has the plates
- *     touching.
+ *     painted plate is 179.5 units, so anything under that has them touching.
  *
- * Which puts the top seat at 1480 − 4×186 = 736, its disc starting at 649 —
- * clear of the readout with 27 units of air. `HudColumn.spec` does that
- * arithmetic so a sixth door, or a taller readout, fails in node.
+ * Which puts the top seat at 1508 − 4×186 = 764, its plate starting at 674.2 —
+ * clear of the readout (660) with 14.2 units of air, and 28 units between the
+ * caption's ink and the plate's. `HudColumn.spec` does that arithmetic so a
+ * sixth door, or a taller readout, fails in node.
  *
  * `ui_btn_round` is painted 68 logical units wide around a disc of radius 29,
  * so at the column's 1.5× plate scale the VISIBLE disc is ~174 units across.
@@ -331,9 +364,17 @@ export const HUD_COLUMN_SLOTS = 5;
  * leaves 33 units of air between neighbours, and the icons scale with it.
  */
 export const HUD_COLUMN_PLATE = 1.32;
-/** `ui_btn_round` is a disc of radius 29 LOGICAL units — 116 game units across
- *  at plate scale 1 — so the visible plate follows the scale above. */
-export const HUD_COLUMN_DISC: number = 116 * HUD_COLUMN_PLATE * UI_SCALE;
+/**
+ * WHAT THE BUTTON ACTUALLY OCCUPIES — the painted TEXTURE, not the disc in it.
+ *
+ * `ui_btn_round` is painted 68×68 LOGICAL units (TextureFactory paints ×RES, so
+ * a 136-unit texture) around a disc of radius 29. This used to be 116 — the
+ * disc alone — which made every clearance computed from it 13.2 units
+ * optimistic per seat, and `HudColumn.spec` green while the Codex plate and the
+ * status caption visibly overlapped on screen. What Phaser lays out and bounds
+ * is the texture, so the texture is what the arithmetic gets.
+ */
+export const HUD_COLUMN_DISC: number = 136 * HUD_COLUMN_PLATE * UI_SCALE;
 /** What an icon is fitted to on one of those plates. Icons arrive at two
  *  resolutions (painted at 44 logical units, file-backed at whatever the PNG
  *  is), so both are fitted to this rather than multiplied by a shared factor. */
@@ -349,8 +390,15 @@ export const HUD_COLUMN_PITCH: number = 186 * UI_SCALE;
  * than the tracker giving back the legibility it just gained. HudColumn.spec
  * holds both ends: the top seat still clears the readout, the bottom seat is
  * still inside the canvas.
+ *
+ * 106 → 92 for the same reason a second time, once `HUD_COLUMN_DISC` and
+ * `STATUS_READOUT_H` stopped under-declaring. Between them they had hidden 21
+ * units of overlap behind 1.44 units of declared air, and no single dial could
+ * absorb that: the readout gave 26 (`STATUS_READOUT_GAP` 44 → 18) and the
+ * column takes the last 14 out of the canvas floor it was never using. The
+ * pitch could not give any — 186 is already inside 6.5 units of the plate.
  */
-export const HUD_COLUMN_BASE_Y: number = LIVE_GAME_HEIGHT - (IS_MOBILE ? 186 : 106);
+export const HUD_COLUMN_BASE_Y: number = LIVE_GAME_HEIGHT - (IS_MOBILE ? 186 : 92);
 export const hudColumnY = (slot: number): number =>
   HUD_COLUMN_BASE_Y - slot * HUD_COLUMN_PITCH;
 
@@ -859,8 +907,15 @@ export const HIDDEN_CHAINS = new Set<string>([
  *
  * Structurally typed on purpose so this file stays free of chains.json.
  */
-export function chainHiddenIn(chain: { id: string; world?: string }, worldId: string): boolean {
-  if (chain.world !== undefined && chain.world !== worldId) return true;
+export function chainHiddenIn(
+  chain: { id: string; world?: string },
+  worldId: string,
+  /** Let a foreign chain through — an authored KEEPSAKE (MapItemPlacement),
+   *  never a general spawn. The chapter half of the rule below still applies:
+   *  a later chapter's chain is not made shippable by being a gift. */
+  allowForeign = false
+): boolean {
+  if (!allowForeign && chain.world !== undefined && chain.world !== worldId) return true;
   return HIDDEN_CHAINS.has(chain.id);
 }
 
@@ -1462,6 +1517,28 @@ export const DRAGON_RARITY: Record<string, DragonRarity> = {
  * breeds shared a taste. A favourite the player has to discover is only worth
  * discovering if it tells one dragon apart from another.
  */
+/**
+ * A QUEST-REWARD EGG NEVER LANDS SILENTLY — the shared timeline for the two
+ * halves of its arrival, so the camera and the voice cannot drift apart.
+ *
+ * BoardScene flies the camera and flares; UIScene speaks the giver's line off
+ * the same numbers. They live here rather than in either scene because a beat
+ * split across two scenes is exactly the kind of thing that gets re-tuned in
+ * one of them.
+ */
+export const EGG_GIFT = {
+  /** After `item:spawned` — the quest-complete banner gets its beat first. */
+  glideDelayMs: 700,
+  glideMs: 900,
+  /** glideDelayMs + glideMs: the flash lands exactly as the camera arrives. */
+  flareDelayMs: 1600,
+  /** The giver starts speaking over the flare. */
+  sayDelayMs: 1600,
+  sayHoldMs: 5600,
+  /** Long enough to read the float text, short enough to hand the board back. */
+  homeDelayMs: 3600
+} as const;
+
 export const DRAGON_DIET: Record<string, { favourite: string; refuses: string }> = {
   ember_dragon: { favourite: 'resin', refuses: 'emberheart' },
   emerald: { favourite: 'emberberry', refuses: 'emberheart' },
@@ -1470,7 +1547,16 @@ export const DRAGON_DIET: Record<string, { favourite: string; refuses: string }>
   // not ashmoss, which grows a world away and would price its adult at 4x.
   frost: { favourite: 'emberheart', refuses: 'resin' },
   storm: { favourite: 'stormcap', refuses: 'emberberry' },
-  moonwhisker: { favourite: 'nightbloom', refuses: 'emberheart' }
+  moonwhisker: { favourite: 'nightbloom', refuses: 'emberheart' },
+  // THE LEGENDARIES, and they are not optional: three quests hand out an
+  // ashdrake egg and three a rimewyrm's, and a dragon absent from this record
+  // is not a dragon `DragonSystem.isBoardDragon` can see — it hatches, stands
+  // on the board and can never be fed, named or read about. Each favours a food
+  // of its HOME world (the ashdrake eats the isle's cinders; the rimewyrm, a
+  // cold thing, craves the one warm drop the north distils) and refuses what
+  // the other side of the map grows.
+  ashdrake: { favourite: 'cinder_vein', refuses: 'emberberry' },
+  rimewyrm: { favourite: 'emberdram', refuses: 'resin' }
 };
 /* ---------------- Ambient life: what a dragon does when nobody asks --------
  *

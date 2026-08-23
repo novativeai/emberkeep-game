@@ -47,6 +47,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => JSON.parse(readFileSync(resolve(ROOT, p), 'utf8'));
+const readText = (p) => readFileSync(resolve(ROOT, p), 'utf8');
 
 const SOURCE = 'assets/map/nionja-worlds.json';
 /** The world the game boots into (src/core/Constants.ts WORLD_ID). */
@@ -81,8 +82,22 @@ const BEYOND_BASE_LEVEL = 2;
  *  ±1 step fall in the gap, so adjacency can never leak between zones even
  *  before the same-zone rule in world.ts. */
 const BLOCK_GUTTER = 1;
-/** Highest Keeper level the shipped campaign reaches (Constants' LEVEL_XP). */
-const LEVEL_CAP = 3;
+/**
+ * Highest Keeper level the campaign can reach — READ from Constants, never typed.
+ *
+ * It was `3`, which was true when `LEVEL_XP` was `[0, 60, 220]`. The ladder went
+ * to six on 2026-08-13 and this did not follow, so every band the editor drew at
+ * 4, 5 or 6 shipped `'locked'` — and `UnlockSystem.unlockForLevel` only ever
+ * lifts a region already at `'unlockable'`. The clouds were therefore permanent
+ * over ground the player earns the right to stand on. A cap that can disagree
+ * with the curve it describes is not a cap, so it is derived.
+ */
+const LEVEL_CAP = (() => {
+  const src = readText('src/core/Constants.ts');
+  const m = src.match(/export const LEVEL_XP = \[([^\]]*)\]/);
+  if (!m) throw new Error('build-zones: LEVEL_XP not found in src/core/Constants.ts');
+  return m[1].split(',').filter((n) => n.trim().length).length;
+})();
 
 const source = read(SOURCE);
 const authored = read('src/data/map.json');
@@ -470,9 +485,88 @@ function editorCellWorld(grid, i, j) {
 /* 4. build each world                                                   */
 /* ------------------------------------------------------------------ */
 
-/** Chapter One owns the isle; new emberkeep ground waits until after it. */
+/** Chapter One owns the isle; new emberkeep ground waits until after it.
+ *  RETIRED as emberkeep's rule on 2026-08-23 — see `plainLevel` — and kept for
+ *  the next world that extends the authored map and wants its ground held back. */
 const emberkeepLevel = (editorUnlock) => BEYOND_BASE_LEVEL + Math.max(0, (editorUnlock ?? 1) - 2);
+/** The level the editor drew, verbatim. */
 const plainLevel = (editorUnlock) => Math.max(1, editorUnlock ?? 1);
+
+/* ------------------------------------------------------------------ */
+/* 4b. ISLANDS — measured, so a level number never has to name one       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * THE ONE NUMBER THAT WAS DOING TWO JOBS.
+ *
+ * A cell's editor `unlockLevel` used to mean both "which island is this" and
+ * "when does it open". That held only while the two happened to coincide: the
+ * editor had drawn Borealis's three islands at levels 1, 2 and 3, so
+ * `BOREALIS_PLAN` could be keyed by level and still be talking about islands.
+ *
+ * The moment the owner re-levelled the map to stage the fog — the mainland cut
+ * into four waves at 2, 4, 5 and 6 — the plan matched nothing. Not "matched
+ * badly": `spec.plan?.[lvl]` returned undefined for every band, so the north
+ * would have shipped with no active region, no seeds on any island, and a
+ * player landing on a world where nothing can be merged.
+ *
+ * So the two jobs are separated. WHICH ISLAND is measured here, from the art
+ * the player can see — the same question `world.ts:buildAdjacency` asks, and
+ * for the same reason: what a player may merge across is what visibly touches,
+ * never what a data file grouped together. WHEN IT OPENS stays the editor's
+ * number, untouched.
+ *
+ * The test is nearest-neighbour, not a fixed pixel threshold: island spacing is
+ * a property of each backdrop's own tile pitch, and a constant tuned on
+ * Borealis would mis-cut the next world. Two cells belong to the same island if
+ * they sit within `ISLAND_REACH` medians of each other, which on the north
+ * recovers exactly the three components the shipped world has always had
+ * (9 / 103 / 29 cells) and is stable against re-export drift.
+ */
+const ISLAND_REACH = 1.45;
+
+function islandsOf(cells) {
+  const n = cells.length;
+  if (!n) return [];
+  const gap = (a, b) => Math.hypot(a.at.x - b.at.x, a.at.y - b.at.y);
+  // Median nearest-neighbour distance = this world's own idea of "touching".
+  const nearest = cells.map((c, i) => {
+    let best = Infinity;
+    for (let j = 0; j < n; j++) if (j !== i) best = Math.min(best, gap(c, cells[j]));
+    return best;
+  });
+  const sorted = [...nearest].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+  const reach = median * ISLAND_REACH;
+
+  const comp = new Array(n).fill(-1);
+  let next = 0;
+  for (let i = 0; i < n; i++) {
+    if (comp[i] !== -1) continue;
+    const queue = [i];
+    comp[i] = next;
+    while (queue.length) {
+      const k = queue.pop();
+      for (let j = 0; j < n; j++) {
+        if (comp[j] === -1 && gap(cells[k], cells[j]) <= reach) {
+          comp[j] = next;
+          queue.push(j);
+        }
+      }
+    }
+    next++;
+  }
+
+  const groups = Array.from({ length: next }, () => []);
+  cells.forEach((c, i) => groups[comp[i]].push(c));
+  // SOUTH TO NORTH — the march the plan is written in ("shore cy≈1509 →
+  // coast cy≈884 → keep cy≈652"). Ordering by geography rather than by size
+  // means the plan keeps naming the same island when one of them grows.
+  return groups.sort(
+    (a, b) =>
+      b.reduce((n2, c) => n2 + c.at.y, 0) / b.length - a.reduce((n2, c) => n2 + c.at.y, 0) / a.length
+  );
+}
 
 const authoredPlayable = new Set((authored.playable ?? []).map(([c, r]) => `${c},${r}`));
 
@@ -515,8 +609,13 @@ const standingIn = (worldId) =>
  * the player to the Ledger for the key.
  */
 const BOREALIS_PLAN = {
-  // editor unlock level → the island it names
-  1: {
+  // ISLAND INDEX, south → north (`islandsOf`), NOT the editor's level.
+  //
+  // It was keyed by unlock level, which worked only while the editor happened
+  // to have drawn one level per island. Re-levelling the map to stage the fog
+  // broke that silently — see the note on `islandsOf`. An island is measured
+  // now; the level says WHEN, this table says WHAT STANDS THERE.
+  0: {
     id: 'borealis_shore',
     status: 'active',
     // 9 cells. One landmark and five spars leaves three free — enough to merge
@@ -528,7 +627,7 @@ const BOREALIS_PLAN = {
       ['seaglass', 1, 5]
     ]
   },
-  3: {
+  2: {
     id: 'borealis_keep',
     status: 'unlockable',
     unlock: { keys: 2 },
@@ -565,7 +664,7 @@ const BOREALIS_PLAN = {
       ['chest', 1, 1]
     ]
   },
-  2: {
+  1: {
     id: 'borealis_coast',
     status: 'unlockable',
     unlock: { keys: 1 },
@@ -969,8 +1068,42 @@ const WORLDS = [
     /** Drop editor cells that land on ground the authored isle already owns —
      *  two lattices over one slab is how a save loses its board. */
     skipOnAuthoredIsle: true,
-    levelOf: emberkeepLevel,
-    regionPrefix: 'beyond'
+    /**
+     * THE EDITOR'S LEVEL, VERBATIM — was `emberkeepLevel`, which added 2.
+     *
+     * The rebase existed because the drawn ground had no schedule of its own:
+     * whatever the editor said, it had to land somewhere the campaign reached,
+     * so `+BEYOND_BASE_LEVEL` slid all of it up. The owner now levels every
+     * cell by hand to stage the weather — 31 cells at 1, 12 at 2, 20 at 3, 15
+     * at 4 — and an offset applied on top of that means the cloud he cleared at
+     * level 2 lifts at level 4. A schedule the author writes must be the
+     * schedule the game plays.
+     *
+     * The cost, stated: his level-1 cells are open from the first frame instead
+     * of arriving at the tutorial's level-up beat. That is the authored intent
+     * (level 1 IS "open"), and the tutorial is unaffected — the one extension
+     * cell it names, `board_room`'s (32,0), sits at editor level 1, so it is
+     * open earlier than before and never later.
+     */
+    levelOf: plainLevel,
+    regionPrefix: 'beyond',
+    /**
+     * WHAT IS UNDER THE CLOUD — one Frost Dragon Egg on the north-west island,
+     * revealed the moment its level-4 band lifts.
+     *
+     * A keepsake, not a supply: frost is Borealis vocabulary (`chains.json`
+     * `world`), so the egg cannot be farmed, cooked or hinted at here, and one
+     * egg is short of the three a Frost Dragon takes. That is the whole point —
+     * what the cloud hands over is a question about the north, not a dragon.
+     *
+     * ADDRESSED BY ISLAND AND LEVEL, never by the band's name: names are
+     * derived (see `bandName`) and a re-export can rewrite them. The cell
+     * inside the band is derived too, by `seedRegion`, for the same reason a
+     * hand-written [col,row] would be a hole in the sky after the next export.
+     * If the address ever stops resolving the BUILD FAILS — a gift that
+     * silently stops being placed is worse than no gift.
+     */
+    gifts: [{ island: 3, level: 4, seeds: [['frost', 1, 1]] }]
   },
   {
     id: 'borealis',
@@ -1141,11 +1274,88 @@ for (const spec of WORLDS) {
     nextCol += grid.matrix.cols + BLOCK_GUTTER;
   }
 
-  const regions = [...byLevel.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([lvl, cells]) => {
+  /**
+   * ONE ISLAND, SEVERAL WAVES — the fog bands, and which of them is the door.
+   *
+   * The editor's level per cell is the whole schedule: a band is every cell of
+   * ONE island drawn at ONE level, so re-levelling a corner in the editor moves
+   * exactly that corner's cloud and nothing else. That is the property the
+   * owner is authoring against, and it is why the level is never rewritten here.
+   *
+   * An island's FIRST band — its lowest level, the ground the player reaches
+   * first — inherits the plan: its name, its gate and its seeds. Every later
+   * band on the same island is a plain level gate suffixed `_l<N>`. Three
+   * things fall out of that, all of them wanted:
+   *
+   *   · `borealis_coast` and `borealis_keep` still exist and still cost the
+   *     keys their quests name ("Use 1 Gold Key on the clouds by the coast").
+   *     A door bought with a key stays bought with a key.
+   *   · the SEEDS land on the band that opens first, so an island's farms are
+   *     standing the moment the player can reach it — a generator sealed under
+   *     a later band would be an island with nothing to do on it.
+   *   · everything past the door opens on RANK. The mainland is four waves
+   *     now: the key lets you in, and the island keeps giving ground back as
+   *     the Keeper grows.
+   */
+  const islands = islandsOf([...byLevel.values()].flat());
+  const islandOf = new Map();
+  islands.forEach((cells, idx) => cells.forEach((c) => islandOf.set(`${c.col},${c.row}`, idx)));
+
+  const bands = new Map(); // `${island}:${level}` → { island, lvl, cells }
+  for (const [lvl, cells] of byLevel) {
+    for (const c of cells) {
+      const island = islandOf.get(`${c.col},${c.row}`) ?? 0;
+      const k = `${island}:${lvl}`;
+      const band = bands.get(k) ?? { island, lvl, cells: [] };
+      band.cells.push(c);
+      bands.set(k, band);
+    }
+  }
+  /** The first wave of each island — the one the plan is about. */
+  const firstWave = new Map();
+  for (const b of bands.values()) {
+    const seen = firstWave.get(b.island);
+    if (seen === undefined || b.lvl < seen) firstWave.set(b.island, b.lvl);
+  }
+
+  /**
+   * ONE NAME PER BAND, AND NEVER TWICE.
+   *
+   * `regionStatus` is one flat Map keyed by region id (GameState), so two bands
+   * sharing a name are one region as far as the game is concerned: opening
+   * either opens both, and the save persists a single entry for the pair. That
+   * is not hypothetical — emberkeep's drawn ground is eight separate islets and
+   * four of them are at level 3, so the plain `<prefix>_l<N>` scheme minted
+   * `beyond_l3` four times over.
+   *
+   * So a band is named for its island as well as its level whenever the level
+   * alone does not identify it. Islands are numbered south → north, which is
+   * the order the player meets them.
+   */
+  const bandName = new Map();
+  {
+    const byName = new Map();
+    for (const b of bands.values()) {
+      const stem = spec.plan?.[b.island]?.id ?? spec.regionPrefix;
+      const plain = firstWave.get(b.island) === b.lvl && spec.plan?.[b.island] ? stem : `${stem}_l${b.lvl}`;
+      byName.set(plain, (byName.get(plain) ?? 0) + 1);
+    }
+    for (const b of bands.values()) {
+      const stem = spec.plan?.[b.island]?.id ?? spec.regionPrefix;
+      const planned = firstWave.get(b.island) === b.lvl && spec.plan?.[b.island];
+      const plain = planned ? stem : `${stem}_l${b.lvl}`;
+      bandName.set(
+        `${b.island}:${b.lvl}`,
+        byName.get(plain) === 1 ? plain : `${stem}_i${b.island}_l${b.lvl}`
+      );
+    }
+  }
+
+  const regions = [...bands.values()]
+    .sort((a, b) => a.island - b.island || a.lvl - b.lvl)
+    .map(({ island, lvl, cells }) => {
       const tiles = cells.map((c) => [c.col, c.row]);
-      const planned = spec.plan?.[lvl];
+      const planned = firstWave.get(island) === lvl ? spec.plan?.[island] : undefined;
       if (planned) {
         const contents = seedRegion(cells, planned.seeds, standing);
         return {
@@ -1156,8 +1366,30 @@ for (const spec of WORLDS) {
           ...(contents.length ? { contents } : {})
         };
       }
+      /**
+       * A LATER WAVE MAY NOT OPEN BEFORE ITS ISLAND'S DOOR.
+       *
+       * The mainland's door costs a Gold Key and its three inner waves lift on
+       * rank. Those are independent conditions, so a Keeper who banks the rank
+       * first would clear twenty-five tiles in the middle of an island still
+       * ringed by cloud, reachable by nothing. `after` names the door: the wave
+       * still opens on its own level, it simply may not do so first.
+       *
+       * Only where the island HAS a door — an island whose first wave is plain
+       * ground needs no precondition, because its later waves are behind
+       * nothing but the rank they name.
+       */
+      const door = spec.plan?.[island];
+      const gated = door?.unlock?.keys !== undefined;
+      // An authored keepsake for THIS band — laid out by the same rule every
+      // other seed is, and marked so the reveal lets a foreign chain through.
+      const gift = (spec.gifts ?? []).find((g) => g.island === island && g.level === lvl);
+      if (gift) gift.placed = true;
+      const giftContents = gift
+        ? seedRegion(cells, gift.seeds, standing).map((c) => ({ ...c, keepsake: true }))
+        : [];
       return {
-        id: `${spec.regionPrefix}_l${lvl}`,
+        id: bandName.get(`${island}:${lvl}`),
         // `unlockable`, not `locked`, for anything the campaign can actually reach.
         // UnlockSystem.unlockForLevel only lifts regions already standing at
         // `unlockable` — a `locked` one is not yet offered and no level-up touches
@@ -1167,7 +1399,7 @@ for (const spec of WORLDS) {
         // map.json's `level_2` and `level_5`. Ground above the cap keeps `locked`,
         // where being shut is the intent rather than an accident.
         status: lvl <= 1 ? 'active' : lvl <= LEVEL_CAP ? 'unlockable' : 'locked',
-        unlock: lvl <= 1 ? undefined : { level: lvl },
+        unlock: lvl <= 1 ? undefined : { level: lvl, ...(gated ? { after: door.id } : {}) },
         /**
          * A CLOUD ON EVERY LEVEL THIS GROUND IS NOT OPEN AT — and level 1 is
          * open, so it never wears one.
@@ -1192,9 +1424,22 @@ for (const spec of WORLDS) {
          * Derived from the SAME per-cell `unlockLevel` the editor writes, so the
          * grid and the weather cannot disagree: one level, one region, one bank.
          */
-        tiles
+        tiles,
+        ...(giftContents.length ? { contents: giftContents } : {})
       };
     });
+
+  // A GIFT THAT STOPPED BEING PLACED MUST SAY SO. Islands are numbered from the
+  // ground the editor drew, so a redrawn map can renumber them — and a keepsake
+  // whose band no longer exists would quietly never be found again.
+  for (const g of spec.gifts ?? []) {
+    if (!g.placed) {
+      throw new Error(
+        `build-zones: ${spec.id} gift ${g.seeds.map(([c, t]) => `${c}:${t}`).join(', ')} names island ` +
+          `${g.island} level ${g.level}, and this export has no such band — re-address it`
+      );
+    }
+  }
 
   // Decor: art px → the cell it stands on, plus the leftover as a free nudge.
   // Nearest cell rather than "the cell containing the point" because the anchor

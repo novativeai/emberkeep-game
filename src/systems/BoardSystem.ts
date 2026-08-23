@@ -1,7 +1,7 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
-import type { ChainsData, GeneratorConfig, MapData, SpawnCause } from '../core/types';
+import type { ChainsData, GeneratorConfig, MapData, SpawnCause, TilePos } from '../core/types';
 
 /**
  * Owns board lifecycle: initial population and removal commands.
@@ -57,7 +57,14 @@ export class BoardSystem {
     nearChain,
     nearTier,
     at,
-    overflow
+    overflow,
+    // WHY THE PIECE ARRIVED, carried through to the board fact rather than
+    // flattened to 'unlock'. A quest reward is not fog lifting: the ceremony
+    // that greets one — the camera, the flare, the giver's line — has this one
+    // field to key off, and stamping every arrival 'unlock' made a gifted egg
+    // land as silently as a revealed rock. Defaulted, so every existing caller
+    // keeps the meaning it had.
+    cause = 'unlock'
   }: {
     chain: string;
     tier: number;
@@ -66,6 +73,7 @@ export class BoardSystem {
     nearTier?: number;
     at?: [number, number];
     overflow?: 'bag';
+    cause?: SpawnCause;
   }): void {
     /** Whatever would not fit. Dropped by default (a generator pays again);
      *  banked when the caller says the piece is too scarce to lose. */
@@ -77,7 +85,7 @@ export class BoardSystem {
     // tile to it), regardless of where other items sit.
     if (at) {
       const cells = this.freeBlobNear(at[0], at[1], count);
-      for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, 'unlock');
+      for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, cause);
       spill(cells.length);
       return;
     }
@@ -93,12 +101,25 @@ export class BoardSystem {
     let anchorCol = anchor?.col ?? 0;
     let anchorRow = anchor?.row ?? 0;
     if (!anchor) {
-      // When the board is empty the default [0,0] may resolve to an isolated active
-      // tile with no active neighbours (unable to grow a connected blob). Prefer the
-      // nearest active tile that has at least one active free neighbour instead.
-      const connected = this.state.freeActiveTilesNear(0, 0)
-        .find((p) => this.state.freeActiveNeighbors(p.col, p.row).length > 0);
-      if (connected) { anchorCol = connected.col; anchorRow = connected.row; }
+      // AN EMPTY BOARD HAS NO (0,0) TO SEARCH FROM.
+      //
+      // This used to hop outward from cell [0,0] looking for a free tile with a
+      // free neighbour. On the authored isle — one dense lattice starting at
+      // the origin — that is the whole board. On a world made of ISLANDS it is
+      // not: `freeActiveTilesNear` walks by ADJACENCY, and adjacency never
+      // crosses open water, so hopping from [0,0] reaches only whatever island
+      // happens to own [0,0] — and on Borealis, whose ground begins in the
+      // sixties, that is nothing at all. A frost egg taken out of the bag on
+      // the northern shore found no cell and silently stayed in the bag.
+      //
+      // So sweep the world instead of hopping across it. Deterministic (first
+      // in address order), and it costs one pass over a board that is empty by
+      // definition at this point.
+      const connected = this.firstFreePocket();
+      if (connected) {
+        anchorCol = connected.col;
+        anchorRow = connected.row;
+      }
     }
     // For a `nearChain` spawn the blob is grown from the ANCHOR'S OWN CELL, not
     // from a free tile picked out in advance. `freeActiveTilesNear` is sorted by
@@ -111,8 +132,22 @@ export class BoardSystem {
     // No else: for non-nearChain spawns with an anchor the start col/row is the
     // anchor's own tile (offset=0) — freeBlobNear resolves adjacency from there.
     const cells = this.freeBlobNear(anchorCol, anchorRow, count);
-    for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, 'unlock');
+    for (const cell of cells) this.spawn(chain, tier, cell.col, cell.row, cause);
     spill(cells.length);
+  }
+
+  /** The first free active cell in the whole world that has a free active
+   *  neighbour — a seed a connected blob can actually grow from, whichever
+   *  island it lives on. Address order, so a rebuild lands in the same place. */
+  private firstFreePocket(): TilePos | null {
+    for (let row = 0; row < this.state.rows; row++) {
+      for (let col = 0; col < this.state.cols; col++) {
+        if (!this.state.isTileActive(col, row)) continue;
+        if (this.state.itemIdAt(col, row) !== null) continue;
+        if (this.state.freeActiveNeighbors(col, row).length > 0) return { col, row };
+      }
+    }
+    return null;
   }
 
   /** How many nearby free tiles are tried as a blob SEED before giving up on a

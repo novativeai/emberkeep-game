@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import realMap from '../../src/data/map.json';
 import {
   CAULDRON_DECOR,
+  chainHiddenIn,
   DECOR_SCALE,
   decorClipCharacter,
   LEVEL_XP,
@@ -130,47 +131,50 @@ describe('zones — new ground beside the isle', () => {
   });
 
   /**
-   * The new ground OPENS during Chapter One — a product decision (2026-08-11),
-   * taken with its cost known, and the reason this test changed shape.
+   * THE EDITOR'S SCHEDULE IS THE GAME'S SCHEDULE (2026-08-23).
    *
-   * It used to assert the opposite: every added region had to unlock ABOVE
-   * `LEVEL_XP.length`, so that no tile could pop onto the shipped board
-   * mid-campaign and the tutorial would keep teaching the game it was written
-   * for. The cost of that safety was total — `LEVEL_XP` ends at 3 and
-   * `UnlockSystem` only lifts a level region when the Keeper reaches its level,
-   * so 36 cells drawn in the map editor were ground no player could ever stand
-   * on. The editor showed them; the game did not; "my grid doesn't match" was
-   * exactly that gap. `BEYOND_BASE_LEVEL` now lands them on 2 and 3.
+   * This test has changed shape twice, and both times because the question
+   * underneath it changed.
    *
-   * What still has to hold, and is what this test now pins:
-   *   - `unlockable`, never `active` — the ground is offered under cloud, not
-   *     standing on the board at boot;
-   *   - and never `locked` either, which is the trap this whole change was:
-   *     `UnlockSystem.unlockForLevel` only lifts a region already at
-   *     `unlockable`, so a locked one ignores every level-up for ever no matter
-   *     what its `unlock.level` says;
-   *   - none opens below level 2 — the isle the tutorial is written against is
-   *     the board the player is handed;
-   *   - none opens above the cap either, or it is unreachable ground again.
-   * The tutorial's own level-up beat IS level 2, so the first region surfaces
-   * while the tutorial still runs: the full-tutorial e2e is the check that
-   * matters here, not this test.
+   * First it asserted that every added region unlocked ABOVE `LEVEL_XP.length`,
+   * so no tile could pop onto the shipped board mid-campaign. The cost was
+   * total: the ladder ended at 3 and `UnlockSystem` only lifts a level region
+   * when the Keeper reaches its level, so 36 cells drawn in the map editor were
+   * ground nobody could ever stand on. Then `BEYOND_BASE_LEVEL` rebased them
+   * onto 2 and 3 — reachable, but still not what the editor said.
+   *
+   * Now the owner levels every cell BY HAND to stage the weather, so an offset
+   * on top of his numbers is a bug wearing a policy's clothes: the cloud he
+   * cleared at level 2 would lift at 4. `levelOf` is `plainLevel` for emberkeep
+   * and the editor's number is played verbatim — including level 1, which means
+   * "already open" and is the one honest reading of a cell drawn at the level
+   * the game starts on.
+   *
+   * What must still hold, and is what this pins:
+   *   - level 1 ⇒ `active`. Open is open; a cloud that lifts on a level already
+   *     held would flash on the first frame and never be a gate.
+   *   - level ≥ 2 ⇒ `unlockable`, NEVER `locked`. This is the trap the whole
+   *     change was: `UnlockSystem.unlockForLevel` only lifts a region already
+   *     at `unlockable`, so a `locked` one ignores every level-up for ever, no
+   *     matter what its `unlock.level` says. `LEVEL_CAP` is read from
+   *     `LEVEL_XP` now precisely so a band the player can reach is never minted
+   *     locked — which is what levels 4-6 shipped as while the cap said 3.
+   *   - nothing above the cap, or it is unreachable ground again.
+   *   - and no two bands share a name: `regionStatus` is one flat Map, so a
+   *     duplicate id is one region wearing two banks and opening both at once.
    */
-  it('opens its new ground inside Chapter One, never before level 2', () => {
+  it('plays the level the editor drew, and never mints a band no level-up can lift', () => {
     const added = EMBERKEEP.map.regions.filter((r) => !MAP.regions.some((a) => a.id === r.id));
     expect(added.length).toBeGreaterThan(0);
     for (const region of added) {
-      const level = region.unlock?.level ?? 0;
-      expect(level).toBeGreaterThanOrEqual(2);
-      // Above the cap is SHUT ON PURPOSE and says so. The editor lets a cell be
-      // marked for any level, and some are marked past Chapter One; `locked` is
-      // build-zones declaring that ground unreachable rather than pretending a
-      // level-up will ever reach it. What must never happen is the third state:
-      // `locked` at a level the player DOES cross, which no level-up would lift.
-      if (level > LEVEL_XP.length) expect(region.status).toBe('locked');
-      else expect(region.status).toBe('unlockable');
+      const level = region.unlock?.level ?? 1;
+      expect(level).toBeLessThanOrEqual(LEVEL_XP.length);
+      expect(region.status).toBe(level <= 1 ? 'active' : 'unlockable');
     }
+    const ids = added.map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
+
 
   /**
    * The merge law, measured the way a player reads it: you may merge with the
@@ -240,24 +244,35 @@ describe('zones — new ground beside the isle', () => {
       }
       islands.push(size);
     }
-    expect(islands.sort((a, b) => b - a)).toEqual([102, 29, 9]);
+    // 103/29/9 — and these are the SAME three components `build-zones`
+    // measures for itself when it decides which island a band belongs to
+    // (`islandsOf`). Two independent implementations, one answer: the script
+    // works in editor/art pixels before zones exist, the engine works in world
+    // pixels through `neighborsOf`, and they agree cell for cell. If this line
+    // and the script's report ever disagree, one of them has stopped
+    // describing the painting.
+    expect(islands.sort((a, b) => b - a)).toEqual([103, 29, 9]);
   });
 
   /**
-   * FOG GATES BY REGION, so a region spread over two islands lifts cloud in two
-   * places at once — the far one with no path to it and no warning.
+   * NO BAND MAY STRADDLE TWO ISLANDS — fog gates by region, so one that spans a
+   * gap lifts cloud in two places at once, the far one with no path to it and
+   * no warning.
    *
-   * This used to hold outright: shore 9 / coast 103 / keep 29 were exactly the
-   * three painted islands. The 2026-08-12 re-export from the editor moved five
-   * mainland cells to unlock level 1, and regions are grouped BY LEVEL, so those
-   * five joined `borealis_shore`. The landing platform's cloud now also clears
-   * five tiles in the middle of the coast.
+   * This used to be an exception list. Regions were grouped BY LEVEL alone, so
+   * the five mainland cells the editor marked level 1 joined `borealis_shore`
+   * and the landing platform's cloud also cleared five tiles adrift in the
+   * middle of the coast. It was pinned rather than repaired, on the grounds
+   * that which cell opens when is level design.
    *
-   * Pinned rather than repaired: which cell opens when is level design, and it
-   * belongs to whoever marks the cells in the editor, not to this test. If the
-   * five are re-marked to level 2 the shape changes here and someone looks.
+   * That was the right call and the wrong diagnosis: the bug was never the
+   * level marking, it was that ONE NUMBER was naming the island AND setting the
+   * schedule. `build-zones` measures the island now (`islandsOf`) and bands are
+   * cut per island × level, so the editor may mark any cell any level and a
+   * region still cannot span open water. The exception is gone, and the rule is
+   * the whole rule.
    */
-  it('gates fog per island, except for the five mainland cells marked level 1', () => {
+  it('never lets one region straddle two islands', () => {
     const world = WORLDS.get('borealis')!;
     const regionOf = new Map<string, string>();
     for (const r of world.map.regions) for (const [c, x] of r.tiles) regionOf.set(`${c},${x}`, r.id);
@@ -286,7 +301,7 @@ describe('zones — new ground beside the isle', () => {
       island++;
     }
     const spread = [...straddle].filter(([, on]) => on.size > 1).map(([id]) => id);
-    expect(spread).toEqual(['borealis_shore']);
+    expect(spread).toEqual([]);
   });
 
   /** The authored isle must never gain a neighbour it was not drawn with — a
@@ -326,7 +341,9 @@ describe('zones — new ground beside the isle', () => {
     // then — its first. Both sit on painted flagstone (audit:ground is clean on
     // them); the drawing shifted the derived editor→art fit by 1–3 px everywhere.
     // 40 → 36 on 2026-08-21, four cells taken back out of the emberkeep draw.
-    expect(checked).toBe(36 + 140 + 144 + 5);
+    // 36 → 37 and borealis 140 → 141 on 2026-08-23, the re-level pass that gave
+    // every cell its own fog band (one cell drawn on each, and no cell lost).
+    expect(checked).toBe(37 + 141 + 144 + 5);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {
@@ -909,5 +926,64 @@ describe('runevault — the cauldron is still on the rune circle', () => {
     // the lookup came back empty and the pot never boiled. Both halves pinned.
     expect(decorClipCharacter(CAULDRON_DECOR)).toBe('cauldron');
     expect(clipFor(decorClipCharacter(CAULDRON_DECOR), 'boil')).toBeTruthy();
+  });
+});
+
+describe('the keepsake under the cloud', () => {
+  /** The one authored gift: a Frost Dragon Egg on the north-west island,
+   *  handed over when its level-4 band lifts. */
+  const bandOf = (): { id: string; contents: Array<{ chain: string; keepsake?: boolean }> } => {
+    const world = ZONES.worlds.find((w) => w.id === 'emberkeep')!;
+    const band = world.map.regions!.find((r) => (r.contents ?? []).some((c) => c.chain === 'frost'));
+    expect(band, 'emberkeep no longer seeds a frost keepsake').toBeDefined();
+    return band as never;
+  };
+
+  it('rides a level-4 band, on a cell that band actually owns', () => {
+    const world = ZONES.worlds.find((w) => w.id === 'emberkeep')!;
+    const band = world.map.regions!.find((r) => (r.contents ?? []).some((c) => c.chain === 'frost'))!;
+    expect(band.unlock?.level, `${band.id} is not level-gated at 4`).toBe(4);
+    // Derived placement, so the only thing worth pinning is that it is INSIDE.
+    // A hand-written cell would be a hole in the sky after the next export.
+    for (const c of band.contents!) {
+      expect(
+        band.tiles.some(([col, row]) => col === c.at[0] && row === c.at[1]),
+        `${c.chain} at ${c.at.join(',')} is not on ${band.id}`
+      ).toBe(true);
+    }
+  });
+
+  it('is exactly ONE egg, and marked as a keepsake', () => {
+    // "un seul" is the design: one egg is short of the three a Frost Dragon
+    // takes, which is what keeps the find a question about the north rather
+    // than a supply line opening at home.
+    const eggs = bandOf().contents.filter((c) => c.chain === 'frost');
+    expect(eggs).toHaveLength(1);
+    expect(eggs[0]!.keepsake, 'without this the reveal drops it silently').toBe(true);
+  });
+
+  it('is actually ON THE BOARD once the Keeper reaches rank 4', () => {
+    // The end-to-end claim, and the only one that would have caught the silent
+    // drop: rank up on the real map and look for the egg among the pieces.
+    const ctx = new GameContext(new MemoryStorage(), { map: realMap as never });
+    ctx.state.tutorialDone = true;
+    expect([...ctx.state.items.values()].some((i) => i.chain === 'frost')).toBe(false);
+    ctx.bus.emit('economy:add', { xp: LEVEL_XP[3]!, reason: 'test' });
+    expect(ctx.state.level).toBe(4);
+    const eggs = [...ctx.state.items.values()].filter((i) => i.chain === 'frost');
+    expect(eggs, 'the cloud lifted and handed over nothing').toHaveLength(1);
+    expect(eggs[0]!.tier).toBe(1);
+  });
+
+  it('survives the reveal — and an unmarked northern piece still does not', () => {
+    // The whole point of the flag. `frost` names Borealis in chains.json, so
+    // the reveal withholds it in Emberkeep; the keepsake is the author saying
+    // this one placement is not that accident.
+    const foreign = { id: 'frost', world: 'borealis' };
+    expect(chainHiddenIn(foreign, 'emberkeep')).toBe(true); // the rule, unchanged
+    expect(chainHiddenIn(foreign, 'emberkeep', true)).toBe(false); // the exception
+    // …and the exception lifts the WORLD half only: a later chapter's chain is
+    // not made shippable by being a gift.
+    expect(chainHiddenIn({ id: 'nest' }, 'emberkeep', true)).toBe(true);
   });
 });

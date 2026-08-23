@@ -38,6 +38,19 @@ export class WorldSystem {
   ) {
     bus.on('world:switch', ({ to }) => this.switchTo(to));
     bus.on('dragon:cross_gate', ({ itemId, to }) => this.crossDragon(itemId, to));
+    // A LOADED RANK IS STILL A RANK.
+    //
+    // `settleUnlocks` ran on arrival only, so the ground a Keeper's level
+    // already covers was lifted by walking through a door and by nothing else.
+    // Reopening the game is not walking through a door: a save banked at rank 4
+    // came back with its rank-2, -3 and -4 bands still fogged, waiting for a
+    // `keeper:leveled` that had already happened — and at the cap, for one that
+    // never comes again. Settling here costs one sweep of the active world's
+    // regions and asks nothing of the rest of the boot.
+    bus.on('state:loaded', () => {
+      const world = this.state.worlds.get(this.state.worldId);
+      if (world) this.settleUnlocks(world);
+    });
   }
 
   /**
@@ -251,11 +264,31 @@ export class WorldSystem {
    * walked through a door.
    */
   private settleUnlocks(world: WorldRuntime): void {
-    for (const region of world.map.regions) {
-      const level = region.unlock?.level;
-      if (level === undefined || level > this.state.level) continue;
-      if (this.state.regionStatus.get(region.id) === 'active') continue;
-      this.state.regionStatus.set(region.id, 'active');
+    // A fixed point, for the same reason UnlockSystem's sweep is one: a band may
+    // be waiting on another band (`unlock.after`), and settling in file order
+    // would leave it fogged until the next level-up.
+    for (let pass = 0; pass < world.map.regions.length + 1; pass++) {
+      let opened = 0;
+      for (const region of world.map.regions) {
+        const level = region.unlock?.level;
+        if (level === undefined || level > this.state.level) continue;
+        // A PRICE IS NOT A DELAY. This used to settle any region whose level was
+        // met, which force-opened every gate that costs Gold Keys as well —
+        // `level_2_gate` is `{ keys: 1, level: 2 }`, so a Keeper at level 2 who
+        // walked to Roothold and back was handed it for nothing, key unspent,
+        // and the tutorial's whole key lesson with it. `keys` means the door is
+        // bought, never waited out; only `UnlockSystem.tryKeyUnlock` may open one.
+        if (region.unlock?.keys !== undefined) continue;
+        // Only what is OFFERED. `locked` is build-zones saying "not this
+        // chapter"; nothing at runtime lifts it, and arriving is not an
+        // exception to that.
+        if (this.state.regionStatus.get(region.id) !== 'unlockable') continue;
+        const after = region.unlock?.after;
+        if (after !== undefined && this.state.regionStatus.get(after) !== 'active') continue;
+        this.state.regionStatus.set(region.id, 'active');
+        opened++;
+      }
+      if (!opened) return;
     }
   }
 }

@@ -313,6 +313,11 @@ export interface DialogueData {
    *  as the story moves, which is where weeks of dialogue come from without new
    *  design (docs/script-chapters.md, Part II). StorySystem picks the bank. */
   orderComplete: Record<string, string[]>;
+  /** What the giver says as a QUEST-REWARD egg lands on the board, keyed by the
+   *  egg's chain. `lines` runs in grant order — line n plays when the n-th
+   *  spawning quest completes (derived from the `q:done:` latches, so a reload
+   *  can never repeat or skip a line) — and the last line covers any overflow. */
+  eggGift: Record<string, { speaker: string; lines: string[] }>;
   /** Post-tutorial chapter beats, keyed by chapter number. */
   chapters: Record<string, StoryChapterConfig>;
   /**
@@ -759,6 +764,23 @@ export interface MapItemPlacement {
   chain: string;
   tier: number;
   at: [number, number];
+  /**
+   * A KEEPSAKE — one piece of another world's vocabulary, placed here on
+   * purpose, and exempt from the cross-world filter for that reason alone.
+   *
+   * Region data is shared between worlds, so `chainHiddenIn` withholds anything
+   * whose chain names a different world: a region in the north may seed frozen
+   * goods, and the same data must not seed them in Emberkeep. That guard is
+   * right, and it is also blind — it cannot tell a shared region's accident
+   * from a single egg an author put under a specific cloud.
+   *
+   * This says which one it is. It lifts ONLY the world half of the rule: a
+   * chain held back because it belongs to a later CHAPTER (`HIDDEN_CHAINS`)
+   * stays held back, and nothing else about the chain changes — it is still
+   * foreign to this world's Cookbook, its recipe tree and its hints, which is
+   * exactly what makes the find a curiosity rather than a new supply line.
+   */
+  keepsake?: boolean;
 }
 
 export interface MapDecorPlacement {
@@ -795,8 +817,22 @@ export interface MapRegionConfig {
   status: RegionStatus;
   /** Tile list as [col, row] pairs. */
   tiles: [number, number][];
-  /** A region lifts on spending `keys` Gold Keys OR on reaching Keeper `level`. */
-  unlock?: { keys?: number; level?: number };
+  /**
+   * A region lifts on spending `keys` Gold Keys OR on reaching Keeper `level`.
+   *
+   * `after` names a region that must ALREADY be open first — a precondition, not
+   * a second price. It exists because an island can be several fog bands deep:
+   * Borealis's mainland is a door bought with a Gold Key and then three more
+   * waves that lift on rank, and without this a Keeper who banked the rank
+   * before the key would clear the three inner waves while the door around them
+   * stayed shut — twenty-five bare tiles ringed by cloud, with no way in.
+   *
+   * It gates only the LIFTING. The band still needs its own `level`, and the
+   * wait is not lost: `UnlockSystem` re-runs the level sweep whenever any region
+   * opens, so a wave whose rank was reached long ago lifts in the same breath as
+   * the door it was waiting on.
+   */
+  unlock?: { keys?: number; level?: number; after?: string };
   /**
    * Wear a cloud while locked? Default true — fog is how the board says "there
    * is ground here, come and take it".
@@ -1509,6 +1545,26 @@ export interface EventMap {
    * about it, which is the whole reason this is an event.
    */
   'ui:recipe_help': { chain: string; tier: number; count: number };
+  /**
+   * Intent: the pointer came to rest on a row of the quest tracker — "and what
+   * IS that?" — or left it (`goal: null`).
+   *
+   * The same ladder the `?` opens, without the trip to the Ledger: the tracker
+   * already says what to do next, and this says how, where the eye already is.
+   * It carries an ANCHOR because the cluster hugs the right edge, so the sheet
+   * has to open to its left; the tracker knows where its own row is and the
+   * sheet knows how wide it is, and neither should have to know the other.
+   *
+   * A peek is not the `?`. It follows the cursor, so it never dims the screen
+   * and never takes input — anything under it stays live.
+   */
+  'ui:recipe_peek': {
+    goal: { chain: string; tier: number; count: number } | null;
+    /** Left edge of the row, in live space: the sheet's right edge goes here. */
+    x: number;
+    /** Vertical middle of the row. */
+    y: number;
+  };
   /** The Keeper's Store opened/closed. */
   'ui:store_toggled': { open: boolean };
   /** The Ember Emporium opened/closed, and on which shelf. The shortfall

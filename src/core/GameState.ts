@@ -282,9 +282,35 @@ export class GameState {
       if (id === WORLD_ID || !this.worlds.has(id)) continue;
       this.hydrateBoard(id, board);
     }
-    this.nextItemId = save.nextItemId;
+    // The item map is keyed by id, so a counter behind its own board is not a
+    // cosmetic drift: the next spawn REPLACES a piece the player owns while the
+    // grid goes on pointing at the id it just overwrote. A save can carry one —
+    // an older writer, a hand-edited file, a board hydrated from a world the
+    // counter was never told about — so the floor is derived from what is
+    // actually standing rather than trusted from the file.
+    let highest = 0;
+    for (const b of this.boards.values()) {
+      for (const id of b.items.keys()) highest = Math.max(highest, id);
+    }
+    this.nextItemId = Math.max(save.nextItemId, highest + 1);
+    // A SAVE RECORDS PROGRESS, NOT THE LADDER.
+    //
+    // The statuses seeded above come from the maps this BUILD ships; the save's
+    // are what some earlier build wrote. Letting the file overwrite them both
+    // ways meant a stale echo could CLOSE ground the current map authors as
+    // openable — and `locked` is a one-way door: UnlockSystem only ever lifts a
+    // region already at `unlockable`, so a locked band ignores every level-up
+    // for the rest of that save's life. Any save written while the level cap
+    // was short carries exactly that for every band above the old cap.
+    //
+    // So only `active` — the one status that means the player DID something —
+    // travels, and only for a region this build still has. A renamed band (the
+    // isle's waves are named from measured islands, and re-exporting renames
+    // them) leaves its old id behind rather than haunting the map with a status
+    // nothing reads.
     for (const [regionId, status] of Object.entries(save.regions)) {
-      this.regionStatus.set(regionId, status);
+      if (status !== 'active' || !this.regionStatus.has(regionId)) continue;
+      this.regionStatus.set(regionId, 'active');
     }
     this.energyCurrent = save.energy.current;
     this.energyLastRegenAt = save.energy.lastRegenAt;
@@ -342,7 +368,27 @@ export class GameState {
         this.stashDisplaced(state);
         continue;
       }
-      const placed: BoardItemState = { ...state, col: at.col, row: at.row };
+      // ONE PIECE PER CELL. Merging, dragging, the grid's reverse lookup and
+      // every hit test assume it, and the loader is the one place that can
+      // break it: writing both and letting the grid remember only the last
+      // leaves a piece that exists in `items` — so it draws, and the rules walk
+      // it — under a cell that points at something else. Invisible to the
+      // rules, visible on screen, and unreachable for ever.
+      //
+      // The save can say it for reasons that are nobody's fault: a re-grid can
+      // land two art positions in one cell, and `restoreFixtures` below seats
+      // landmarks on cells it does not ask permission for. So the second piece
+      // is re-seated beside the first, or banked — never dropped, never stacked.
+      let seat: TilePos | null = { col: at.col, row: at.row };
+      if (board.grid[seat.row]?.[seat.col] != null) {
+        const home = zoneAt(world, seat.col, seat.row) ?? world.fallback;
+        seat = this.nearestFree(world, board, seat.col, seat.row, true, home);
+      }
+      if (!seat) {
+        this.stashDisplaced(state);
+        continue;
+      }
+      const placed: BoardItemState = { ...state, col: seat.col, row: seat.row };
       board.items.set(placed.id, placed);
       board.grid[placed.row]![placed.col] = placed.id;
     }
