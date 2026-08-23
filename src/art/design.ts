@@ -145,7 +145,6 @@ export const CHROME_KEYS = [
   'ui_shop_card',
   'ui_shop_card_hot',
   'ui_shop_price',
-  'ui_shop_price_free',
   'ui_shop_tab',
   'ui_shop_tab_on',
   'ui_shop_plaque',

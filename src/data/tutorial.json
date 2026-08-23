@@ -1673,7 +1673,7 @@
     {
       "id": "buy_energy",
       "speaker": "eleanor",
-      "text": "Out of Warmth? It comes back slowly by itself. Your first Ember Spark is FREE. Tap the ⚡ + button to get it.",
+      "text": "Out of Warmth? It comes back slowly by itself. Your first Warmth is FREE. Tap the ⚡ + button to get it.",
       "gate": {
         "type": "event",
         "event": "marketplace:purchased"

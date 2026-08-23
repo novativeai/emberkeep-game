@@ -394,11 +394,6 @@
       "generator": "ui"
     },
     {
-      "key": "ui_shop_price_free",
-      "source": "placeholder",
-      "generator": "ui"
-    },
-    {
       "key": "ui_shop_tab",
       "source": "placeholder",
       "generator": "ui"

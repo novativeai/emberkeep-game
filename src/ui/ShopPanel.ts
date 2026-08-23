@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
 import { FONT, INK } from '../art/design';
-import type { TextureFactory } from '../art/TextureFactory';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import { coinOffers, priceOf } from '../core/coinPacks';
@@ -43,9 +42,13 @@ const SHOP: Record<Currency, { title: string; tab: string; icon: string; iconSca
     icon: 'ui_icon_bolt',
     iconScale: 1.4,
     items: [
-      { amount: 5, price: '', gold: 20, name: 'Ember Spark' },
+      // Every pack says WARMTH. The shelf used to open on an "Ember Spark" and
+      // close on a "Keeper's Blaze", and neither word is the thing in the
+      // gauge: players read them as three different currencies. One noun, three
+      // sizes — the ladder is the adjective, and it is the whole name.
+      { amount: 5, price: '', gold: 20, name: 'Little Warmth' },
       { amount: 20, price: '', gold: 60, best: true, name: 'Warmth Pack' },
-      { amount: 50, price: '', gold: 130, name: 'Keeper’s Blaze' }
+      { amount: 50, price: '', gold: 130, name: 'Big Warmth' }
     ]
     // A hub Warmth pack, when the hub sells one, is APPENDED to these by
     // `shelfItems()` — real money under the Gold sink, in that order, so the
@@ -92,7 +95,6 @@ const ROW_GAP = 30;
 /** Row slots, measured from the row's centre. */
 const ROW_ART_X = -680;
 const ROW_TEXT_X = -500;
-const ROW_TAG_X = 150;
 const ROW_PRICE_X = 640;
 
 /** Painted glyphs (the ⚡ bolt) are authored at 44 logical units; blowing one up
@@ -119,7 +121,7 @@ function fitArt(img: Phaser.GameObjects.Image, slot: number): void {
  * printed on. `SHOP_INK` (TextureFactory) holds the sampled values.
  *
  * Content is still MECHANICS §7: the WARMTH shelf is a real GOLD SINK (after
- * the one-time free Ember Spark, refills cost earned Gold) — and, when the hub
+ * the one-time free Little Warmth, refills cost earned Gold) — and, when the hub
  * sells one, a real-money refill APPENDED under it. Both, in that order: the
  * earned way through is the one the eye reaches first, and the euro row is the
  * impatient way past it, never the only way. The GOLD shelf is the REAL IAP
@@ -376,7 +378,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
 
   /**
    * The shelf is a FEATURE over a pair of plates. Which pack is featured is not
-   * cosmetic: while the one-time free Ember Spark is unclaimed it takes the
+   * cosmetic: while the one-time free Little Warmth is unclaimed it takes the
    * banner, because a gift the player has to hunt for on a shelf is a gift that
    * gets missed (and the tutorial's guiding hand points at it). Once it is
    * spent, the best-value pack inherits the spot.
@@ -391,11 +393,11 @@ export class ShopPanel extends Phaser.GameObjects.Container {
 
     const cfg = SHOP[this.currency];
     const items = this.shelfItems();
-    // The one-time free Ember Spark leads the shelf while it is unclaimed — a
+    // The one-time free Little Warmth leads the shelf while it is unclaimed — a
     // gift further down a list is a gift that gets missed, and the tutorial's
     // guiding hand points at it. Otherwise the order is as authored.
     const freeIndex =
-      this.currency === 'energy' && this.gameState.stat('freeSparkUsed') === 0 ? 0 : -1;
+      this.currency === 'energy' && this.gameState.stat('freeWarmthUsed') === 0 ? 0 : -1;
     const order = items.map((item, tier) => ({ item, tier }));
     if (freeIndex >= 0) order.unshift(...order.splice(freeIndex, 1));
 
@@ -526,33 +528,6 @@ export class ShopPanel extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Which pack may wear which tag.
-   *
-   * Printing the bonus percentages caught the shelf contradicting itself: the
-   * ×20 pack carried "BEST VALUE" while the ×50 beside it returned a better
-   * rate (+54% vs +33%). The tag was decoration, and the arithmetic exposed it.
-   *
-   * So the two claims are now separate and both true. BEST VALUE is DERIVED —
-   * it goes to whichever pack actually returns the most per unit spent, and
-   * moves on its own if pricing ever changes. The authored `best` flag keeps
-   * doing what it was really for (the highlight and the banner slot) under its
-   * honest name, MOST POPULAR.
-   */
-  private tagFor(items: Product[], item: Product, isFree: boolean): string | null {
-    if (isFree) return 'GIFT';
-    // Judged inside its own currency, and only where there is a judgement to
-    // make: the best value of ONE pack is not a claim, it is a decoration, and
-    // `bonusPercent` already answers 0 for a lone row so the tag had no number
-    // behind it either.
-    const kin = this.kin(items, item);
-    if (kin.length > 1) {
-      const bonuses = kin.map((i) => this.bonusPercent(items, i));
-      if (kin[bonuses.indexOf(Math.max(...bonuses))] === item) return 'BEST VALUE';
-    }
-    return item.best ? 'MOST POPULAR' : null;
-  }
-
-  /**
    * Gold-priced, or money-priced.
    *
    * The Warmth shelf now carries both, and NOTHING that compares value may
@@ -623,44 +598,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       );
     }
 
-    const tag = this.tagFor(items, item, isFree);
-    if (tag) row.add(this.ribbon(ROW_TAG_X, 0, tag));
     row.add(this.pricePlate(ROW_PRICE_X, 0, item, isFree, 1));
     return row;
-  }
-
-  /**
-   * The sash tag, CUT TO ITS LABEL — measure the words, then ask the factory
-   * for that much cloth.
-   *
-   * It used to be one fixed 104-unit texture with the label pinned at a
-   * hand-tuned (112, 2): GIFT floated in a sash three times its width, while
-   * MOST POPULAR and BEST VALUE ran off both ends and printed over the fold and
-   * the swallowtail. The cloth is tilted, so its body's centre is not the
-   * texture's centre — that offset is why the label also sat low and left. Both
-   * the length and the centre come back from the painter now, off the same
-   * transform, so they cannot drift apart again.
-   */
-  private ribbon(x: number, y: number, label: string): Phaser.GameObjects.Container {
-    const tag = this.scene.add.container(x, y);
-    // Cream ink with a dark shadow, because the sash is ember now — brown on
-    // orange was unreadable. Built FIRST: its width is what the cloth is cut to.
-    const text = this.scene.add
-      .text(0, 0, label, { fontFamily: FONT.ui, fontSize: '24px', fontStyle: 'bold', color: '#FFF3DC' })
-      .setOrigin(0.5)
-      .setShadow(0, 2, 'rgba(94,36,10,0.75)', 3);
-    const factory = this.scene.registry.get('textureFactory') as TextureFactory | undefined;
-    const sash = factory?.shopRibbonFor(text.width);
-    if (!sash) {
-      // No factory (a bare harness scene): the label still reads, unribboned —
-      // art failures degrade, they never blank a row.
-      tag.add(text);
-      return tag;
-    }
-    tag.add(this.scene.add.image(0, 0, sash.key).setOrigin(0, 0.5));
-    text.setPosition(sash.cx, sash.cy).setAngle(sash.angle);
-    tag.add(text);
-    return tag;
   }
 
   /**
@@ -675,10 +614,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     scale: number
   ): Phaser.GameObjects.Container {
     const btn = this.scene.add.container(x, y).setScale(scale);
-    // The CLAIM key is green, the buy key is plum. A plum plate with no coin on
-    // it and the word FREE on it read as a priced button greyed out — a
-    // disabled control, which is the one thing this is not.
-    const bg = this.scene.add.image(0, 0, isFree ? 'ui_shop_price_free' : 'ui_shop_price');
+    const bg = this.scene.add.image(0, 0, 'ui_shop_price');
     btn.add(bg);
 
     const label = isFree ? 'FREE' : item.gold !== undefined ? `${item.gold}` : item.price;
@@ -694,7 +630,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
         fontFamily: FONT.ui,
         fontSize: '46px',
         fontStyle: 'bold',
-        color: isFree ? INK.onField : INK.onFieldGold
+        color: INK.onFieldGold
       })
       .setOrigin(0.5)
       .setShadow(0, 3, 'rgba(24,16,22,0.5)', 4);

@@ -52,7 +52,7 @@ Eleanor herself are all rows: they are live from the first frame.
 | Concept | First on screen | Taught at | Note |
 |---|---|---|---|
 | Warmth is spent, and returns on its own | gauge + regen countdown, frame 1 | `buy_energy` | the countdown under the gauge is the readout |
-| The Emporium sells Warmth | ⚡+ button, frame 1 | `buy_energy` | first Ember Spark is free |
+| The Emporium sells Warmth | ⚡+ button, frame 1 | `buy_energy` | first Warmth gift is free |
 | Real-money Gold packs (IAP) | the Emporium's GOLD tab, post-tutorial | `buy_energy` | same beat teaches the Emporium; the GOLD shelf's checkout is HARD-GATED to post-tutorial (`ui:iap_buy_requested` requires `done`) and never emits `marketplace:purchased`, so it cannot satisfy or deadlock the free-Spark lesson. Hub-embedded only; standalone shows the mock showcase |
 | Running dry | Warmth hits 0 | `zeroWarmth` | |
 | Gold is earned and spent | the House's payout | `sell_it` | earn by selling, spend on skips and Warmth |

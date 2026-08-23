@@ -78,7 +78,7 @@ export class EnergySystem {
   }
 
   /** Set Warmth to an exact value, clamped to [0, max] (the tutorial scripts the
-   *  gauge to 18/20 before the "claim your free Spark" step). Pins the regen
+   *  gauge to 18/20 before the "claim your free Warmth" step). Pins the regen
    *  clock so the next +1 counts from now. */
   private setTo(value: number): void {
     const max = this.state.energyMax;
