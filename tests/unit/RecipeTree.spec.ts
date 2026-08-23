@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { recipeHelp } from '../../src/core/recipeTree';
+import { questGoalPiece, recipeHelp } from '../../src/core/recipeTree';
 import { WORLD_ID } from '../../src/core/Constants';
 import chains from '../../src/data/chains.json';
 import type { ChainsData } from '../../src/core/types';
@@ -135,5 +135,59 @@ describe('recipeHelp — how do I make that?', () => {
     expect(help({ chain: 'not_a_chain', tier: 2, count: 1 })).toBeNull();
     expect(help({ chain: 'flame_gem', tier: 9, count: 1 })).toBeNull();
     expect(help({ chain: 'flame_gem', tier: 3, count: 0 })).toBeNull();
+  });
+});
+
+/**
+ * THE HOVER HINT'S OWN RULE — which quest steps have a ladder to show.
+ *
+ * The quest tracker raises the same sheet the Ledger's `?` opens when the
+ * pointer rests on a row (`ui:recipe_peek`). Whether a row HAS anything to say
+ * is this function, and it lives outside the Phaser container so it can be held
+ * here rather than on a screenshot.
+ */
+describe('which quest steps name a piece worth explaining', () => {
+  it('reads a piece straight off the goals that carry one', () => {
+    expect(questGoalPiece({ kind: 'have', chain: 'emberberry', tier: 3, count: 1 })).toEqual({
+      chain: 'emberberry',
+      tier: 3,
+      count: 1
+    });
+    expect(
+      questGoalPiece({ kind: 'gift', characterId: 'eleanor', chain: 'flame_gem', tier: 2, count: 2 })
+    ).toEqual({ chain: 'flame_gem', tier: 2, count: 2 });
+  });
+
+  it('explains the tier a recipe step wants MADE, not the one it starts from', () => {
+    expect(questGoalPiece({ kind: 'recipe', chain: 'flame_gem', fromTier: 1, toTier: 2 })).toEqual({
+      chain: 'flame_gem',
+      tier: 2,
+      count: 1
+    });
+  });
+
+  it('follows a DELIVER step one hop, to the pieces the order requires', () => {
+    // "Deliver 6 Gem Chips to Eleanor" should explain the Gem Chips. The needs
+    // come from QuestSystem.needsFor — the same function `pnpm quests` audits
+    // with, so the tracker and the offline proof cannot disagree.
+    expect(
+      questGoalPiece({ kind: 'order', orderId: 'eleanor_brazier' }, [
+        { chain: 'flame_gem', tier: 1, count: 6 }
+      ])
+    ).toEqual({ chain: 'flame_gem', tier: 1, count: 6 });
+    // An order whose needs cannot be resolved says nothing rather than guessing.
+    expect(questGoalPiece({ kind: 'order', orderId: 'eleanor_brazier' })).toBeNull();
+  });
+
+  it('says nothing for the steps that count things instead of wanting them', () => {
+    // There is no ladder for "merge 10 times", and a hint that invents one is a
+    // hint that lies. These rows simply raise no sheet.
+    expect(questGoalPiece({ kind: 'stat', stat: 'merges', count: 10 })).toBeNull();
+    expect(questGoalPiece({ kind: 'level', level: 3 })).toBeNull();
+    expect(questGoalPiece({ kind: 'region', regionId: 'level_2_gate' })).toBeNull();
+    expect(questGoalPiece({ kind: 'brew', recipeId: 'moonwater', count: 1 })).toBeNull();
+    expect(questGoalPiece({ kind: 'task', taskId: 'orders_5' })).toBeNull();
+    expect(questGoalPiece({ kind: 'world', worldId: 'borealis' })).toBeNull();
+    expect(questGoalPiece({ kind: 'regard', characterId: 'eleanor', hearts: 3 })).toBeNull();
   });
 });

@@ -7,6 +7,10 @@ import {
   STATUS_FADE_IN_MS,
   STATUS_FADE_OUT_MS,
   STATUS_FLASH_MS,
+  STATUS_HEARTS_Y,
+  STATUS_LINE_INK,
+  STATUS_LINE_Y,
+  STATUS_NAME_Y,
   STATUS_READOUT_GAP,
   STATUS_READOUT_H,
   UI_SCALE
@@ -29,14 +33,23 @@ import { uiRegistry } from './theme';
  *  a dragon's name printed across it. */
 const GAP = STATUS_READOUT_GAP;
 
-const NAME_Y = 0;
-/** 72, not 58: the name line is TYPE.sub (~34px, ~41 tall), so a gauge whose
- *  top edge sat at 43 let the descenders TOUCH the meter — the owner flagged
- *  it on the frost readout. 14 units of air now, and the caption follows. */
-const HEARTS_Y = 72;
-const LINE_Y = 110;
-/** The rows above must fit inside the height the column clears. */
-if (LINE_Y + 30 > STATUS_READOUT_H) {
+/* THE ROWS COME FROM CONSTANTS, they are not declared here.
+ *
+ * They used to be, with `STATUS_READOUT_H` over in Constants as a hand-typed
+ * summary of them — and the HUD column's whole clearance is computed from that
+ * summary. So when HEARTS_Y went 58 → 72 and LINE_Y 96 → 110 (the name line is
+ * TYPE.sub, ~41 tall, and a gauge seated at 43 let its descenders touch the
+ * meter — the owner flagged it on the frost readout), the summary did not
+ * follow, and the caption came down on the Dragon Codex plate. Two files
+ * describing one column is how that happens twice. It is one file now. */
+const NAME_Y = STATUS_NAME_Y;
+const HEARTS_Y = STATUS_HEARTS_Y;
+const LINE_Y = STATUS_LINE_Y;
+/** The rows above must fit inside the height the column clears. This can no
+ *  longer be self-confirming — it once compared LINE_Y + the caption's FONT
+ *  SIZE against a height built from the same two numbers, so it agreed with
+ *  itself while the ink overran by 8 units. `STATUS_LINE_INK` is measured. */
+if (LINE_Y + STATUS_LINE_INK > STATUS_READOUT_H) {
   throw new Error(`StatusPanel is taller than STATUS_READOUT_H (${STATUS_READOUT_H})`);
 }
 
@@ -216,7 +229,9 @@ export class StatusPanel extends Phaser.GameObjects.Container {
     return {
       x: this.x - (this.nameText.width / 2) * this.scaleX,
       y: this.y,
-      height: (LINE_Y + TYPE.label) * this.scaleY
+      // STATUS_READOUT_H, not a third copy of `LINE_Y + the caption's font
+      // size` — that model was wrong in both of the other two places it lived.
+      height: STATUS_READOUT_H * this.scaleY
     };
   }
 

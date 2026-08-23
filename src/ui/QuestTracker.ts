@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import {
+  IS_MOBILE,
   LIVE_GAME_WIDTH,
   num,
   PALETTE,
@@ -12,6 +13,7 @@ import {
   UI_SCALE
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import { questGoalPiece } from '../core/recipeTree';
 import type { QuestConfig, QuestStepConfig } from '../core/types';
 import type { QuestSystem } from '../systems/QuestSystem';
 import { uiRegistry } from './theme';
@@ -49,7 +51,8 @@ const MAX_W = 840;
 const MIN_FIT_SCALE = 0.72;
 
 /** Mask width — rows are right-aligned and grow leftward, so this only has to
- *  be wider than the longest label can ever be. */
+ *  be wider than the longest label can ever be. It is a CLIP, not a target:
+ *  input hit-tests the rows' own bounds (`overList`), never this. */
 const VIEW_W = 1040;
 
 /** Gap between a row's label and its `n/target` counter. */
@@ -70,6 +73,21 @@ const COUNT_GAP = 16;
 const ICON_BOX = 42;
 const ICON_GAP = 14;
 const ICON_CHIP_PAD = 6;
+
+/**
+ * Slack around a row's own ink before the pointer counts as "on it".
+ *
+ * A hover readout wants a target the size of the thing it explains, plus a
+ * little for the hand — and how much "a little" is depends on the hand. Ten
+ * units at 2560 is about four CSS pixels, which is all a mouse needs and far
+ * less than a finger does; touch gets the fingertip's own radius instead.
+ */
+const PEEK_PAD: number = IS_MOBILE ? 28 : 10;
+
+/** A row faded below this is an affordance, not a target: the half-visible
+ *  fourth row says "there is more below", and explaining a line the player can
+ *  barely read is noise. */
+const PEEK_MIN_ALPHA = 0.6;
 
 /** Strike-through baseline, measured from a row's top. */
 const STRIKE_Y = 18;
@@ -147,6 +165,15 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   private storyVisible = false;
   private tasksVisible = false;
   private readonly offBus: Array<() => void> = [];
+  /** The step id whose ladder is currently peeked, so a pointer travelling
+   *  along one row does not re-emit on every move event. */
+  private peekedStep: string | null = null;
+  /** Where the pointer went down, to tell a TAP from the start of a drag. */
+  private downAt: { x: number; y: number } | null = null;
+  /** Reused by the hit tests — a mouse crossing the cluster asks for row bounds
+   *  a few dozen times a second, and every answer is read immediately. */
+  private readonly probe = new Phaser.Geom.Rectangle();
+  private readonly bus: EventBus;
 
   constructor(
     scene: Phaser.Scene,
@@ -155,6 +182,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   ) {
     super(scene, LIVE_GAME_WIDTH - QUEST_TRACKER_RIGHT, QUEST_TRACKER_TOP_Y);
     this.owner = scene;
+    this.bus = bus;
     this.setScale(UI_SCALE); // magnifies down-left from the top-right anchor
 
     // ---- Main quest ----
@@ -264,6 +292,8 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   }
 
   teardown(): void {
+    // A sheet explaining a row of a tracker that no longer exists.
+    this.dropPeek();
     this.offBus.forEach((off) => off());
     this.offBus.length = 0;
     this.owner.input.off(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
@@ -294,6 +324,9 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.mainGroup.setVisible(this.storyVisible);
     this.listViewport.setVisible(this.tasksVisible);
     this.setVisible(this.storyVisible || this.tasksVisible);
+    // `overList` already refuses a hidden list, but nothing re-asks it: a
+    // cluster hidden under the pointer would leave its peek standing.
+    if (!this.tasksVisible) this.dropPeek();
     this.seatMask();
   }
 
@@ -512,6 +545,8 @@ export class QuestTracker extends Phaser.GameObjects.Container {
 
   private retireRow(row: Row): void {
     row.retiring = true;
+    // Explaining how to make a thing the player has just finished making.
+    if (row.step.id === this.peekedStep) this.dropPeek();
     const { need } = this.quests.progressFor(row.step);
     row.count.setText(`${need} / ${need}`);
     row.root.setScale(1);
@@ -595,39 +630,176 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.applyFade();
   }
 
-  /** Is the pointer over the list? Pointer coords arrive in the same 2560-space
-   *  the UI is authored in (UIScene's camera is fixed), so this is a plain rect
-   *  test against the viewport's own bounds. */
+  /** The masked viewport's floor and ceiling in screen space — a row scrolled
+   *  past either is not on screen, so it is not under the pointer either. */
+  private viewBand(): { top: number; bottom: number } {
+    const top = this.y + QUEST_LIST_TOP_Y * this.scaleY;
+    return { top, bottom: top + QUEST_VIEW_H * this.scaleY };
+  }
+
+  /**
+   * Is the pointer over the list? Over the ROWS, that is — not over the box
+   * they are masked by.
+   *
+   * `VIEW_W` is a MASK width: how far a row may ever grow leftward before it
+   * starts scaling down, i.e. the worst case the clip has to allow for. Used as
+   * a hit rect it made 1040 units — two fifths of the screen — react to a
+   * pointer nowhere near a word, and react at that worst case even when the
+   * list was three short lines. It put an invisible catcher across the board's
+   * whole top-right corner, which is the exact thing the note above says this
+   * cluster refuses to do.
+   *
+   * Rows are right-anchored and as wide as their own text, so the union of
+   * their bounds is the honest answer, and it shrinks with the list. Pointer
+   * coords arrive in the same 2560-space the UI is authored in (UIScene's
+   * camera is fixed), so the comparison is direct.
+   */
   private overList(pointer: Phaser.Input.Pointer): boolean {
     if (!this.tasksVisible) return false;
-    const left = this.x - VIEW_W * this.scaleX;
-    const top = this.y + QUEST_LIST_TOP_Y * this.scaleY;
+    const band = this.viewBand();
+    let left = Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const row of this.rows) {
+      if (row.retiring) continue; // sliding out to the right on its own alpha
+      const b = row.root.getBounds(this.probe);
+      left = Math.min(left, b.left);
+      top = Math.min(top, b.top);
+      bottom = Math.max(bottom, b.bottom);
+    }
+    if (left === Infinity) return false; // nothing drawn, nothing to be over
     return (
-      pointer.x >= left &&
-      pointer.x <= this.x &&
-      pointer.y >= top &&
-      pointer.y <= top + QUEST_VIEW_H * this.scaleY
+      pointer.x >= left - PEEK_PAD &&
+      pointer.x <= this.x + PEEK_PAD &&
+      pointer.y >= Math.max(top, band.top) - PEEK_PAD &&
+      pointer.y <= Math.min(bottom, band.bottom) + PEEK_PAD
     );
   }
 
+  /**
+   * AND WHAT IS THAT? — the row under the pointer, and the piece it wants.
+   *
+   * The tracker says what to do next; this is where the player asks how. It is
+   * the same ladder the Ledger's `?` opens (`ui:recipe_peek` / RecipeHelpPanel),
+   * raised where the eye already is instead of two panels away.
+   *
+   * Bounds-tested like the scroll above it, and for the same reason: an
+   * interactive Zone over this list would sit across the board's top-right
+   * corner and swallow every tap on the pieces under it. Nothing here is
+   * interactive; the cluster only reacts inside its own rect.
+   */
+  private rowAt(pointer: Phaser.Input.Pointer): Row | null {
+    if (!this.overList(pointer)) return null;
+    const band = this.viewBand();
+    for (const row of this.rows) {
+      if (row.retiring || row.root.alpha < PEEK_MIN_ALPHA) continue;
+      const b = row.root.getBounds(this.probe);
+      // The row's own ink, on BOTH axes. Testing only the y band made every
+      // row a full-width stripe, so a pointer travelling up the board picked
+      // one up by its altitude alone.
+      if (pointer.x < b.left - PEEK_PAD || pointer.x > b.right + PEEK_PAD) continue;
+      const top = Math.max(b.top, band.top);
+      const bottom = Math.min(b.bottom, band.bottom);
+      if (pointer.y >= top - PEEK_PAD && pointer.y <= bottom + PEEK_PAD) return row;
+    }
+    return null;
+  }
+
+  /**
+   * The piece a step is asking for, if it is asking for a piece at all.
+   *
+   * `have` and `gift` name one outright. A step that waits on an ORDER names it
+   * one hop away, through the same `needsFor` the offline quest audit uses — so
+   * "Deliver 6 Gem Chips" explains the Gem Chips rather than shrugging. Steps
+   * that count merges, levels or regions have no ladder and get no sheet; that
+   * is the rule the `?` already follows, not a new one.
+   */
+  private goalOf(step: QuestStepConfig): { chain: string; tier: number; count: number } | null {
+    // `needsFor` walks orders, tasks and cauldron recipes, so it is only asked
+    // for the goal kinds that can use the answer.
+    const needs =
+      step.goal.kind === 'order' || step.goal.kind === 'active_order'
+        ? this.quests.needsFor(step)
+        : [];
+    return questGoalPiece(step.goal, needs);
+  }
+
+  /** Raise (or drop) the peek for a row. Idempotent per step, because a mouse
+   *  crossing one row fires a dozen move events. */
+  private peekRow(row: Row | null): void {
+    const step = row && !row.retiring ? row.step : null;
+    const goal = step ? this.goalOf(step) : null;
+    const id = goal && step ? step.id : null;
+    if (id === this.peekedStep) return;
+    this.peekedStep = id;
+    if (!row || !goal) {
+      this.bus.emit('ui:recipe_peek', { goal: null, x: 0, y: 0 });
+      return;
+    }
+    const listTop = this.y + QUEST_LIST_TOP_Y * this.scaleY;
+    const top = listTop + (row.root.y - this.scrollY) * this.scaleY;
+    // The ROW's own left edge, not the viewport's. `VIEW_W` is how far the
+    // cluster may ever grow leftward before it starts scaling down — anchoring
+    // on it puts the sheet a third of a screen from the words it explains, and
+    // walks it over the energy and coin pills on the way. A row is
+    // right-anchored and as wide as its own text, so its bounds are the answer.
+    this.bus.emit('ui:recipe_peek', {
+      goal,
+      x: row.root.getBounds().x,
+      y: top + (QUEST_ROW_H * this.scaleY) / 2
+    });
+  }
+
+  /** Drop the peek without asking why — used by every path that can take the
+   *  rows out from under the pointer (scrolling, hiding, teardown). */
+  private dropPeek(): void {
+    if (this.peekedStep === null) return;
+    this.peekedStep = null;
+    this.bus.emit('ui:recipe_peek', { goal: null, x: 0, y: 0 });
+  }
+
   private onWheel(pointer: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number): void {
-    if (this.overList(pointer)) this.scrollBy(dy * 0.6);
+    if (!this.overList(pointer)) return;
+    this.scrollBy(dy * 0.6);
+    // The rows just moved under a pointer that did not: whatever was being
+    // explained is no longer where the sheet is pointing.
+    this.dropPeek();
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
+    this.downAt = this.overList(pointer) ? { x: pointer.x, y: pointer.y } : null;
     if (this.maxScroll() <= 0 || !this.overList(pointer)) return;
     this.dragging = true;
     this.dragLastY = pointer.y;
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (!this.dragging) return;
-    this.scrollBy(-(pointer.y - this.dragLastY));
-    this.dragLastY = pointer.y;
+    if (this.dragging) {
+      this.scrollBy(-(pointer.y - this.dragLastY));
+      this.dragLastY = pointer.y;
+      this.dropPeek();
+      return;
+    }
+    // A FINGER HAS NO HOVER. On touch the peek is raised by a tap in
+    // `onPointerUp`, and a move here would only ever tear it down again —
+    // Phaser reports the drag of a finger as pointer movement.
+    if (IS_MOBILE) return;
+    this.peekRow(this.rowAt(pointer));
   }
 
-  private onPointerUp(): void {
+  private onPointerUp(pointer: Phaser.Input.Pointer): void {
+    const from = this.downAt;
+    this.downAt = null;
+    const wasDragging = this.dragging;
     this.dragging = false;
+    if (!IS_MOBILE || wasDragging || !from) return;
+    // A tap, not a scroll: within a thumb's wobble of where it went down.
+    if (Math.abs(pointer.x - from.x) > 24 || Math.abs(pointer.y - from.y) > 24) return;
+    const row = this.rowAt(pointer);
+    // Tapping the row that is already open closes it — the finger's version of
+    // looking away.
+    if (row && row.step.id === this.peekedStep) this.dropPeek();
+    else this.peekRow(row);
   }
 
   /** Geometry masks live in WORLD space, so the clip rect is re-cut whenever the

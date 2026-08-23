@@ -1,6 +1,6 @@
 import { chainHiddenIn } from './Constants';
 import { recipeFor } from './mergeRule';
-import type { ChainsData } from './types';
+import type { ChainsData, QuestGoal } from './types';
 
 /**
  * "HOW DO I MAKE THAT?" — the question a quest card cannot answer on its own.
@@ -192,4 +192,40 @@ export function recipeHelp(
     source,
     baseMissing: bottom.missing
   };
+}
+
+
+/**
+ * WHAT A QUEST STEP IS ASKING FOR, if it is asking for a piece at all.
+ *
+ * The quest tracker says what to do next; the ladder above says how. Between
+ * the two sits this: a step's goal is one of a dozen shapes and only some of
+ * them name a piece.
+ *
+ *   `have` / `gift`   name one outright.
+ *   `recipe`          names the tier it wants MADE.
+ *   `order`           names it one hop away — the pieces the order requires,
+ *                     which the caller passes in (QuestSystem.needsFor, the
+ *                     same function the offline quest audit uses, so the
+ *                     tracker and `pnpm quests` cannot disagree).
+ *   everything else   counts merges, levels, regions, brews. No ladder exists
+ *                     for "merge 10 times", and inventing one would be a hint
+ *                     that lies.
+ *
+ * Pure, and separate from the tracker, so the rule can be held in node instead
+ * of on a screenshot.
+ */
+export function questGoalPiece(
+  goal: QuestGoal,
+  needs: readonly { chain: string; tier: number; count: number }[] = []
+): { chain: string; tier: number; count: number } | null {
+  if (goal.kind === 'have' || goal.kind === 'gift') {
+    return { chain: goal.chain, tier: goal.tier, count: goal.count };
+  }
+  if (goal.kind === 'recipe') return { chain: goal.chain, tier: goal.toTier, count: 1 };
+  if (goal.kind === 'order' || goal.kind === 'active_order') {
+    const first = needs[0];
+    return first ? { chain: first.chain, tier: first.tier, count: first.count } : null;
+  }
+  return null;
 }

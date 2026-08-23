@@ -52,6 +52,24 @@ const FOOT_PX = 28;
 const CLOSE_X = FRAME_HALF_W - 92;
 const CLOSE_Y = -FRAME_HALF_H + 88;
 
+/**
+ * TWO DRESSINGS, ONE LADDER.
+ *
+ * `modal` is the sheet the `?` opens: dimmed, seated centre-screen, closed by
+ * its own ✕. `peek` is the same ladder under the cursor on a quest row —
+ * no scrim, no ✕, no input at all, anchored beside the row it explains. They
+ * share every number they draw, which is the point: two panels that answer
+ * "how do I make that?" differently is two answers.
+ */
+export type RecipeHelpVariant = 'modal' | 'peek';
+/** Air between the quest cluster's left edge and the peek's right edge. */
+const PEEK_GAP = 26;
+/** The peek never touches the canvas edge — it is a card, not a bar. */
+const PEEK_MARGIN = 24;
+/** A peek is quieter than the sheet it mirrors: it is glanced at, not read. */
+const PEEK_ALPHA = 0.97;
+const PEEK_FADE_MS = 110;
+
 /** One drawn line of the ladder. Kept so a re-open can repaint in place rather
  *  than rebuild — the sheet is opened and shut far more often than it changes. */
 interface HelpRow {
@@ -81,26 +99,34 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
   private rows: HelpRow[] = [];
   private rowsGroup: Phaser.GameObjects.Container;
   private foot: Phaser.GameObjects.Text;
+  private frameImage!: Phaser.GameObjects.Image;
   private offBus: Array<() => void> = [];
+  /** The peek's own goal, so a pointer sliding along one row does not repaint
+   *  the same ladder on every mouse event. */
+  private peeking: string | null = null;
 
   constructor(
     scene: Phaser.Scene,
     bus: EventBus,
     private gameState: GameState,
-    private chains: ChainsData
+    private chains: ChainsData,
+    private readonly variant: RecipeHelpVariant = 'modal'
   ) {
     super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
-    // A scrim that SWALLOWS taps without dismissing: a thumb that scrolls the
-    // Ledger underneath and releases here would otherwise shut the help it just
-    // opened. Only the ✕ closes — the same rule every other panel follows.
-    const dim = scene.add
-      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.5)
-      .setInteractive();
-    this.add(dim);
+    if (variant === 'modal') {
+      // A scrim that SWALLOWS taps without dismissing: a thumb that scrolls the
+      // Ledger underneath and releases here would otherwise shut the help it just
+      // opened. Only the ✕ closes — the same rule every other panel follows.
+      const dim = scene.add
+        .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.5)
+        .setInteractive();
+      this.add(dim);
+    }
 
     const frame = scene.add.image(0, 0, 'ui_quest_panel').setScale(FRAME_SCALE_X, FRAME_SCALE_Y);
     this.baseScale = panelMobileScale(frame.width * FRAME_SCALE_X);
+    this.frameImage = frame;
     this.add(frame);
 
     this.title = scene.add
@@ -134,7 +160,45 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
     this.add(this.foot);
 
     // The same royal disc every panel wears. A panel that draws its own Close
-    // is a panel the player has to re-learn.
+    // is a panel the player has to re-learn. A peek has none: it is dismissed
+    // by looking away, which is the only gesture it was opened with.
+    if (variant === 'modal') this.addCloseButton(scene);
+
+    scene.add.existing(this);
+    this.setVisible(false);
+
+    if (variant === 'peek') {
+      // NOTHING under a peek may be blocked — not the board, not the tracker it
+      // hangs off. It is a label that happens to be a panel.
+      this.setAlpha(0);
+      this.offBus.push(bus.on('ui:recipe_peek', ({ goal, x, y }) => this.peek(goal, x, y)));
+      // The `?` sheet is the same answer, louder. Two of them on screen is one
+      // too many, so the peek stands down the moment the modal takes over.
+      this.offBus.push(bus.on('ui:recipe_help', () => this.peek(null, 0, 0)));
+      uiRegistry.register(scene, 'panel.recipe_peek', 'Recipe peek', 'Panels', this, {
+        frame: this.frameImage,
+        title: this.title
+      });
+      scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
+      return;
+    }
+
+    uiRegistry.register(scene, 'panel.recipe_help', 'Recipe help sheet', 'Panels', this, {
+      frame: this.frameImage,
+      title: this.title
+    });
+
+    this.offBus.push(bus.on('ui:recipe_help', (goal) => this.open(goal)));
+    // A sheet standing open over a Ledger that has just closed is furniture.
+    this.offBus.push(bus.on('ui:ledger_toggled', ({ open }) => !open && this.close()));
+    // UIScene tears its panels down explicitly (BusLifetime.spec enforces it);
+    // this is for the UI Builder's scene, which builds the chrome to theme it
+    // and has no such list.
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
+  }
+
+  /** The royal ✕, factored out so the peek can simply not have one. */
+  private addCloseButton(scene: Phaser.Scene): void {
     const closeButton = scene.add.container(CLOSE_X, CLOSE_Y);
     const closeBg = scene.add.image(0, 0, 'ui_btn_round_royal').setScale(0.56);
     const closeX = scene.add
@@ -155,22 +219,6 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
     closeButton.setInteractive({ useHandCursor: true });
     closeButton.on('pointerup', () => this.close());
     this.add(closeButton);
-
-    scene.add.existing(this);
-    this.setVisible(false);
-
-    uiRegistry.register(scene, 'panel.recipe_help', 'Recipe help sheet', 'Panels', this, {
-      frame,
-      title: this.title
-    });
-
-    this.offBus.push(bus.on('ui:recipe_help', (goal) => this.open(goal)));
-    // A sheet standing open over a Ledger that has just closed is furniture.
-    this.offBus.push(bus.on('ui:ledger_toggled', ({ open }) => !open && this.close()));
-    // UIScene tears its panels down explicitly (BusLifetime.spec enforces it);
-    // this is for the UI Builder's scene, which builds the chrome to theme it
-    // and has no such list.
-    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
   }
 
   get isOpen(): boolean {
@@ -205,6 +253,72 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
       scale: this.baseScale,
       duration: 180,
       ease: 'Back.easeOut'
+    });
+  }
+
+  /**
+   * THE PEEK — the same ladder, beside the row that raised the question.
+   *
+   * `goal: null` is "the pointer left", and it is by far the commonest call, so
+   * it costs nothing: no repaint, no tween restart, just a fade if something is
+   * up. A goal that has not changed is also free — a mouse crossing one row
+   * fires a dozen move events and every one of them would otherwise rebuild a
+   * ladder that already says the right thing.
+   *
+   * WHERE IT GOES. The quest cluster hugs the right edge, so the only room is
+   * to its LEFT: the sheet's right edge lands `PEEK_GAP` short of the row's
+   * left edge, and its middle lines up with the row's. Both are then clamped
+   * inside the canvas, because a hint that is half off-screen is not a hint —
+   * with three rows the bottom one would otherwise hang the sheet's foot below
+   * the floor.
+   */
+  peek(goal: { chain: string; tier: number; count: number } | null, x: number, y: number): void {
+    if (this.variant !== 'peek') return;
+    if (!goal) {
+      if (this.peeking === null) return;
+      this.peeking = null;
+      this.scene.tweens.killTweensOf(this);
+      this.scene.tweens.add({
+        targets: this,
+        alpha: 0,
+        duration: PEEK_FADE_MS,
+        ease: 'Sine.easeIn',
+        onComplete: () => this.setVisible(false)
+      });
+      return;
+    }
+    const key = `${goal.chain}:${goal.tier}:${goal.count}`;
+    const help = recipeHelp(
+      this.chains,
+      goal,
+      (chain, tier) => this.gameState.countItemsAnywhere(chain, tier),
+      this.gameState.worldId
+    );
+    // Nothing to explain is the same answer the `?` gives: no sheet at all.
+    if (!help) {
+      this.peek(null, 0, 0);
+      return;
+    }
+    const fresh = this.peeking !== key;
+    if (fresh) {
+      this.paint(help);
+      this.peeking = key;
+    }
+    const halfW = FRAME_HALF_W * this.baseScale;
+    const halfH = FRAME_HALF_H * this.baseScale;
+    this.setPosition(
+      Phaser.Math.Clamp(x - PEEK_GAP - halfW, PEEK_MARGIN + halfW, LIVE_GAME_WIDTH - PEEK_MARGIN - halfW),
+      Phaser.Math.Clamp(y, PEEK_MARGIN + halfH, LIVE_GAME_HEIGHT - PEEK_MARGIN - halfH)
+    );
+    this.setScale(this.baseScale);
+    if (!fresh && this.visible) return;
+    this.setVisible(true);
+    this.scene.tweens.killTweensOf(this);
+    this.scene.tweens.add({
+      targets: this,
+      alpha: PEEK_ALPHA,
+      duration: PEEK_FADE_MS,
+      ease: 'Sine.easeOut'
     });
   }
 
