@@ -3,23 +3,158 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import path from 'node:path';
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 import { createEventsApi } from './tools/events-api/server';
-import { createTutorialApi } from './tools/tutorial-api/server';
+import { createTutorialApi, declaresJson, callerAllowed } from './tools/tutorial-api/server';
+
+/* ------------------------------------------------------------------ */
+/* THE DEV-API WRITE GUARD — one door policy for all sixteen doors      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Every `/__*` endpoint below EDITS SOURCE FILES the repo cannot regenerate
+ * (map.json, zones.json, chains.json, art under assets/sprites, the editor's
+ * world export…). They used to stamp `Access-Control-Allow-Origin: *` on every
+ * reply, which handed any page the owner happened to have open — an ad iframe,
+ * a docs tab — the right to read them AND to write them: a header cannot stop a
+ * request that has already run, and a POST with a simple content-type needs no
+ * preflight at all. So the tutorial/events APIs grew a two-part guard, and this
+ * is that same guard (`callerAllowed` / `declaresJson`, imported rather than
+ * copied) mounted in front of every other endpoint:
+ *
+ *  - ORIGIN, enforced server-side. No Origin at all (curl, the tut/evt CLIs —
+ *    not browsers, so no ambient authority to borrow), an Origin matching the
+ *    request's own Host, or any loopback origin (the World Builder on
+ *    `python3 -m http.server 8820`) passes. Everything else, `null` included —
+ *    the opaque origin a sandboxed third-party iframe sends — gets a 403 before
+ *    the route is looked at, so a refused write never reaches disk.
+ *  - FETCH METADATA, for the requests Origin cannot see: a browser sends no
+ *    Origin on a no-cors GET either, so `<img src="…/__open-in-editor?file=…">`
+ *    from a stranger's page used to be indistinguishable from curl. A browser
+ *    labels those `Sec-Fetch-Site: cross-site` and a page cannot forge or strip
+ *    that header, so no-Origin + cross-site is refused. Measurements per
+ *    element type are on `callerAllowed`.
+ *  - CONTENT TYPE on the WRITE methods, so a cross-origin write can never be a
+ *    CORS *simple* request: demanding `application/json` forces a preflight,
+ *    and a stranger's preflight comes back without an allow-origin header, so
+ *    the browser drops the write before it is sent.
+ *
+ * The guard is a separate middleware registered FIRST (this plugin leads the
+ * plugins array) rather than a wrapper around each handler, so the list below
+ * is the audit: a door missing from it is a door with no guard, which is
+ * exactly the question a reader needs answered in one place. Read-only routes
+ * are listed too — they still lose the `*` (their reply now echoes only an
+ * origin we serve), they just have no write to refuse.
+ */
+const DEV_API_GUARDS: ReadonlyArray<readonly [route: string, methods: string]> = [
+  ['/__uibuilder/theme', 'GET,POST,OPTIONS'],
+  ['/__fxlab/presets', 'GET,POST,OPTIONS'],
+  ['/__auroralab/presets', 'GET,POST,OPTIONS'],
+  ['/__snowlab/presets', 'GET,POST,OPTIONS'],
+  ['/__worldbuilder/merge', 'GET,POST,OPTIONS'],
+  ['/__worldbuilder/emitters', 'GET,POST,OPTIONS'],
+  ['/__worldbuilder/characters', 'GET,POST,OPTIONS'],
+  ['/__worldbuilder/zones', 'GET,POST,OPTIONS'],
+  ['/__worldbuilder/island', 'POST,OPTIONS'],
+  ['/__worldbuilder/map', 'GET,OPTIONS'], // read-only, but no longer world-readable
+  ['/__editor/map', 'GET,POST,OPTIONS'],
+  ['/__editor/worlds', 'POST,OPTIONS'],
+  ['/__asset3d', 'GET,POST,OPTIONS'],
+  ['/asset3d', 'GET,OPTIONS'], // read-only file serve
+  // VITE'S OWN, and the reason this audit exists: `/__open-in-editor?file=…`
+  // launches an editor on this machine from a plain GET, which any page can
+  // send (an `<img src>` is enough — no CORS, no preflight). That GET carries
+  // NO Origin, so the origin half of the guard waves it through with curl; it
+  // is `Sec-Fetch-Site: cross-site` that stops it (see `callerAllowed`). The
+  // error overlay that uses this is served by vite itself, so its own fetch is
+  // `same-origin` and still reaches it.
+  ['/__open-in-editor', 'GET,OPTIONS']
+  // `/__tutorial` and `/__events` carry this same guard INSIDE their handlers
+  // (tools/tutorial-api/server.ts), because they are mounted whole.
+];
+
+/** The methods that can change something on disk. */
+const WRITE_METHOD = /^(?:POST|PUT|PATCH|DELETE)$/i;
+
+const devApiGuard = (): Plugin => ({
+  name: 'emberkeep-dev-api-guard',
+  configureServer(server: ViteDevServer) {
+    for (const [route, methods] of DEV_API_GUARDS) {
+      const canWrite = /POST|PUT|PATCH|DELETE/.test(methods);
+      server.middlewares.use(route, (req, res, next) => {
+        const origin = req.headers.origin;
+        const allowed = callerAllowed(req);
+        // Echo the caller's own origin when it is one we serve — never `*`,
+        // which also OVERRODE vite's `server.cors` default (loopback only).
+        if (origin && allowed) {
+          res.setHeader('Access-Control-Allow-Origin', origin);
+          res.setHeader('Access-Control-Allow-Methods', methods);
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        }
+        res.setHeader('Vary', 'Origin, Sec-Fetch-Site');
+        if (!allowed) {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(
+            JSON.stringify({
+              ok: false,
+              error: `origin "${String(origin)}" may not reach ${route} — a dev API writes source files; open the tool on localhost (or serve it over http) instead of file://`
+            })
+          );
+          return;
+        }
+        if (canWrite && WRITE_METHOD.test(req.method ?? '') && !declaresJson(req)) {
+          res.statusCode = 415;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: 'a write needs Content-Type: application/json' }));
+          return;
+        }
+        // OPTIONS falls through to the endpoint's own 204 — one place per route
+        // decides what it answers, the guard only decides who may ask.
+        next();
+      });
+    }
+    // A LIST IS ONLY AS GOOD AS THE NEXT ENDPOINT ADDED BELOW IT. Once every
+    // plugin has mounted (this post hook runs after them), walk what is
+    // actually mounted and name any `/__…` door missing from the table — so
+    // forgetting the guard costs a red line at dev-server start instead of a
+    // security review a year later. Read-only and fail-quiet: a shape change in
+    // vite's middleware stack must never be what stops the dev server.
+    return () => {
+      try {
+        const stack = (server.middlewares as unknown as { stack?: Array<{ route?: string }> }).stack ?? [];
+        const guarded = new Set<string>([...DEV_API_GUARDS.map(([r]) => r), '/__tutorial', '/__events']);
+        const naked = [
+          ...new Set(
+            stack
+              .map((layer) => (layer.route ?? '').replace(/\/+$/, '').toLowerCase())
+              .filter((route) => route.startsWith('/__') && !guarded.has(route))
+          )
+        ];
+        if (naked.length) {
+          server.config.logger.error(
+            `[dev-api-guard] UNGUARDED dev endpoint(s): ${naked.join(', ')} — add each to DEV_API_GUARDS in vite.config.ts, ` +
+              'or any page in the browser can drive it.'
+          );
+        }
+      } catch {
+        /* introspection is a courtesy; the guards above are the fix */
+      }
+    };
+  }
+});
 
 /**
  * Dev-only endpoint for the UI Builder satellite tool (tools/uibuilder):
  *   GET  /__uibuilder/theme  → current src/data/ui-theme.json
  *   POST /__uibuilder/theme  → validate + write it (the game bundles this file,
  *                              so a save lands in the REAL game, not a copy)
- * CORS is open because the tool may also be opened straight from file://.
+ * CORS is `devApiGuard`'s: same-origin, loopback or no Origin at all. A tool
+ * opened straight off `file://` no longer reaches it — serve it over http.
  */
 const uiThemeEndpoint = (): Plugin => ({
   name: 'emberkeep-uibuilder-theme',
   configureServer(server: ViteDevServer) {
     const file = path.resolve(__dirname, 'src/data/ui-theme.json');
     server.middlewares.use('/__uibuilder/theme', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
         res.end();
@@ -72,9 +207,6 @@ const fxLabPresetsEndpoint = (): Plugin => ({
   configureServer(server: ViteDevServer) {
     const file = path.resolve(__dirname, 'src/data/fx-emitters.json');
     server.middlewares.use('/__fxlab/presets', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
         res.end();
@@ -126,9 +258,6 @@ const auroraLabEndpoint = (): Plugin => ({
   configureServer(server: ViteDevServer) {
     const file = path.resolve(__dirname, 'src/data/aurora.json');
     server.middlewares.use('/__auroralab/presets', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
@@ -180,9 +309,6 @@ const snowLabEndpoint = (): Plugin => ({
   configureServer(server: ViteDevServer) {
     const file = path.resolve(__dirname, 'src/data/snow.json');
     server.middlewares.use('/__snowlab/presets', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
@@ -262,9 +388,6 @@ const worldbuilderEmittersEndpoint = (): Plugin => ({
     const file = path.resolve(__dirname, 'src/data/emitters.json');
     const presetFile = path.resolve(__dirname, 'src/data/fx-emitters.json');
     server.middlewares.use('/__worldbuilder/emitters', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
@@ -323,15 +446,14 @@ const worldbuilderEmittersEndpoint = (): Plugin => ({
  *   POST /__worldbuilder/merge → validate + apply a merge export: writes
  *        chains.json, decodes uploaded art into assets/sprites/items/wb/, and
  *        wires assets.json/anchors.json — same logic as scripts/ingest-merge.mjs.
- * CORS is open because the tool is usually opened from :8820 or file://.
+ * Reached from :8820 as well as from vite itself, which `devApiGuard` allows
+ * (any loopback origin) — but not from `file://`, whose `Origin: null` is the
+ * one a third-party iframe sends too.
  */
 const worldbuilderMergeEndpoint = (): Plugin => ({
   name: 'emberkeep-worldbuilder-merge',
   configureServer(server: ViteDevServer) {
     server.middlewares.use('/__worldbuilder/merge', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
         res.end();
@@ -387,8 +509,6 @@ const worldbuilderMapEndpoint = (): Plugin => ({
   name: 'emberkeep-worldbuilder-map',
   configureServer(server: ViteDevServer) {
     server.middlewares.use('/__worldbuilder/map', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
@@ -424,9 +544,6 @@ const worldbuilderZonesEndpoint = (): Plugin => ({
   name: 'emberkeep-worldbuilder-zones',
   configureServer(server: ViteDevServer) {
     server.middlewares.use('/__worldbuilder/zones', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Content-Type', 'application/json');
       const file = path.resolve(__dirname, 'src/data/zones.json');
       if (req.method === 'OPTIONS') {
@@ -585,9 +702,6 @@ const worldbuilderCharactersEndpoint = (): Plugin => ({
   name: 'emberkeep-worldbuilder-characters',
   configureServer(server: ViteDevServer) {
     server.middlewares.use('/__worldbuilder/characters', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
@@ -660,9 +774,6 @@ const worldbuilderIslandEndpoint = (): Plugin => ({
     };
 
     server.middlewares.use('/__worldbuilder/island', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
@@ -835,7 +946,17 @@ const copyRuntimeArt = (): Plugin => ({
       'sprites/characters/dragon/golden-dragon/golden-egg', // items/golden-egg.webp ships
       'sprites/characters/dragon/golden-dragon/golden-egg-sunset',
       'map', //  World Builder project files — the game reads src/data/map.json
-      'atlases' //  empty scaffold
+      'atlases', //  empty scaffold
+      // The bonus-widget art. The gift, honour and duel panels are behind
+      // `HUD_WIDGETS` and off; their code is kept but no key in assets.json and
+      // no path in src/ names these files, so `pnpm audit:art` sees them ship
+      // and sees nothing ask for them. 4.5 MB of source PNG, 0.75 MB re-encoded
+      // into the deploy for a screen the player cannot open. If a widget comes
+      // back on, its art comes back with it by deleting the line that hides it.
+      'sprites/duel',
+      'sprites/ui/gifts.png',
+      'sprites/ui/honeur.png',
+      'sprites/items/keyprin.png'
     ];
     /**
      * The same rule, as PATTERNS, for what recurs per character and per dragon.
@@ -1164,9 +1285,6 @@ const editorMapStore = (): Plugin => ({
     const dir = path.resolve(__dirname, 'asset3d');
     const file = path.join(dir, 'editor-map.json');
     server.middlewares.use('/__editor/map', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
         res.end();
@@ -1212,7 +1330,6 @@ const asset3dStore = (): Plugin => ({
       const name = safe(decodeURIComponent((req.url ?? '').split('?')[0].replace(/^\/+/, '')));
       const p = path.join(dir, name);
       if (req.method === 'GET' && name && EXT.test(name) && existsSync(p) && statSync(p).isFile()) {
-        res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Content-Type', 'application/octet-stream');
         res.end(readFileSync(p));
         return;
@@ -1221,9 +1338,6 @@ const asset3dStore = (): Plugin => ({
     });
 
     server.middlewares.use('/__asset3d', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
         res.end();
@@ -1293,9 +1407,6 @@ const editorWorldsEndpoint = (): Plugin => ({
         child.on('close', (code) => (code === 0 ? resolve(script) : reject(new Error(`${script}: ${err || code}`))));
       });
     server.middlewares.use('/__editor/worlds', (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
@@ -1335,6 +1446,9 @@ export default defineConfig({
   base: './',
   publicDir: 'assets',
   plugins: [
+    // FIRST: connect runs middlewares in registration order, so the guard must
+    // be mounted before the endpoints it protects.
+    devApiGuard(),
     uiThemeEndpoint(),
     asset3dStore(),
     editorMapStore(),

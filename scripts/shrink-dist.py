@@ -303,7 +303,17 @@ def main():
     # breed. Measured 139.6; 142 keeps the customary ~2 MB. The rig table
     # emptying returns only ~0.5 MB (the catalog's three rig jsons stay — the
     # UI Builder's loadCharacterRig can still ask for them at runtime).
-    ap.add_argument("--budget", type=float, default=142.0, help="fail over this many MB")
+    #
+    # 145 (2026-08-22, the Golden Elder speaks): she was the last speaker in the
+    # game with no mouth, and giving her one means her two portrait sheets —
+    # blinking (25 frames) and talking (40) — join the deploy at 2.45 MB. That
+    # alone put the build at 142.1 against a 142 ceiling. Two things happened
+    # here rather than one: the bonus-widget art (the gift, honour and duel
+    # panels, hidden behind HUD_WIDGETS and named by nothing in src/) left the
+    # deploy through vite.config's SOURCE_ONLY, which returns 0.75 MB, and the
+    # ceiling went to 145. Measured 141.4 after both; 145 restores the customary
+    # ~2 MB of slack that 142 no longer had.
+    ap.add_argument("--budget", type=float, default=145.0, help="fail over this many MB")
     args = ap.parse_args()
 
     if not DIST.exists():

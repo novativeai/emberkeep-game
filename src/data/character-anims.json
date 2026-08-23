@@ -470,8 +470,8 @@
         }
       },
       "portrait": {
-        "height": 420,
-        "dy": -190,
+        "height": 372,
+        "dy": -162,
         "headCrop": 0.58
       }
     },

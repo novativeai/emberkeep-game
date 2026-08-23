@@ -33,7 +33,8 @@
     "events": "node scripts/events.mjs list",
     "say": "node scripts/say.mjs",
     "check:register": "node scripts/check-register.mjs",
-    "check:standee": "tsx tools/checks/standee-hit.ts"
+    "check:standee": "tsx tools/checks/standee-hit.ts",
+    "frame:portrait": "python3 scripts/frame-portrait.py"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.1",
