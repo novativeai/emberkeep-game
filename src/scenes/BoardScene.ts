@@ -9,6 +9,7 @@ import {
   DEPTHS,
   DRAG,
   DRAGON_ANIM,
+  EGG_GIFT,
   DRAGON_CLIPS,
   DRAGON_NAP_LENGTH_MS,
   GATE_FLIGHT,
@@ -3222,6 +3223,40 @@ export class BoardScene extends Phaser.Scene {
     this.time.delayedCall(3000, () =>
       this.beat('ceremony.return', () => this.glideToWorld(home.x, home.y, 1150))
     );
+  }
+
+  /** One quest-egg flight at a time — a second grant in the same breath keeps
+   *  its flare but must not yank the camera mid-glide. */
+  private questEggFlying = false;
+
+  /**
+   * A quest-reward egg NEVER lands silently: hold a beat for the quest banner,
+   * glide to the egg, flare and name it, glide home — the altar ceremony's
+   * grammar, at whatever tile the reward landed on. The giver's spoken line
+   * rides the same EGG_GIFT timeline from UIScene, so camera and voice arrive
+   * together.
+   */
+  private questEggCeremony(snap: ItemSnapshot): void {
+    const { x, y } = gridToWorld(snap.col, snap.row);
+    const tierName =
+      this.ctx.data.chains.chains.find((c) => c.id === snap.chain)?.tiers[snap.tier - 1]?.name ?? '';
+    const flare = (): void => {
+      this.glowFlash(x, y - 40, PALETTE.goldAccent, 0.85, 1.6);
+      this.sparks.explode(22, x, y - 40);
+      if (tierName) this.floatText(x, y - 80, tierName, PALETTE.goldAccent);
+    };
+    if (this.questEggFlying) {
+      this.time.delayedCall(EGG_GIFT.flareDelayMs, flare);
+      return;
+    }
+    this.questEggFlying = true;
+    const home = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
+    this.time.delayedCall(EGG_GIFT.glideDelayMs, () => this.glideToWorld(x, y + 60, EGG_GIFT.glideMs));
+    this.time.delayedCall(EGG_GIFT.flareDelayMs, flare);
+    this.time.delayedCall(EGG_GIFT.homeDelayMs, () => {
+      this.questEggFlying = false;
+      this.glideToWorld(home.x, home.y, EGG_GIFT.glideMs);
+    });
   }
 
   /** The Elder stands on the altar — live rig when available, gold-tinted
@@ -8170,6 +8205,28 @@ export class BoardScene extends Phaser.Scene {
             });
           }
         }
+        // The MAP'S OWN decor clips — the cauldron's boil.
+        //
+        // They need their own queue for the same reason the standee banks do:
+        // a clip sheet is a SPRITESHEET, and the `fetchable` loop below only
+        // knows how to `load.image` something `assets.json` can resolve. A clip
+        // key has no assets entry, so every decor clip fell through that loop's
+        // `continue` and was never fetched at all. PreloadScene queues these,
+        // which is why the pot boils when you BOOT into its world and stands
+        // still when you walk in through the door — the one way anybody
+        // actually arrives.
+        const arriving = this.ctx.state.worlds.get(this.ctx.state.worldId);
+        for (const d of arriving?.map.mapDecor ?? []) {
+          const art = decorClipCharacter(d.name);
+          for (const [clipId, clip] of Object.entries(clipsFor(art))) {
+            const key = clipKey(art, clipId);
+            if (this.textures.exists(key)) continue;
+            this.load.spritesheet(key, clip.file, {
+              frameWidth: clip.frameWidth,
+              frameHeight: clip.frameHeight
+            });
+          }
+        }
         for (const key of fetchable) {
           const entry = this.ctx.data.assets.images.find((e) => e.key === key);
           if (this.textures.exists(key) || entry?.source !== 'file' || !entry.file) continue;
@@ -8220,10 +8277,12 @@ export class BoardScene extends Phaser.Scene {
       }),
       bus.on('store:skin_changed', () => this.applyManorSkin()),
       bus.on('store:dragon_skin_changed', ({ dragon }) => this.applyDragonSkin(dragon)),
-      bus.on('item:spawned', ({ item }) => {
+      bus.on('item:spawned', ({ item, cause }) => {
         const sprite = this.acquireSprite(item, false);
         // Any dragon generator (ember or emerald) wears its live rig.
         if (this.wearsRigTier(item.chain, item.tier)) this.attachDragon(sprite, false);
+        // The one arrival that is a story beat rather than a fact.
+        if (cause === 'quest') this.questEggCeremony(item);
       }),
       bus.on('economy:changed', () => this.updateGoldenTremble()),
       // A key arriving (or being spent) moves which gates the player can pay —

@@ -4,6 +4,7 @@ import {
   ATMOSPHERE,
   ENERGY_REGEN_MS,
   FINALE,
+  EGG_GIFT,
   FIRST_CONTACT,
   FIRST_CONTACT_RETRY_MS,
   GOLDEN_ALTAR,
@@ -192,6 +193,8 @@ export class UIScene extends Phaser.Scene {
   private tooltip!: Tooltip;
   private ledger!: LedgerPanel;
   private recipeHelp!: RecipeHelpPanel;
+  /** The hover twin of the `?` sheet — see where it is built. */
+  private recipePeek!: RecipeHelpPanel;
   private shop!: ShopPanel;
   private bag!: BagPanel;
   /** "What shall it make?" — a finished House's one-time commission. */
@@ -407,6 +410,20 @@ export class UIScene extends Phaser.Scene {
     // has to still be there behind it when it closes.
     this.recipeHelp = new RecipeHelpPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
     this.recipeHelp.setDepth(DEPTH_PANEL + 9);
+    // The SAME ladder, raised under the cursor on a quest row instead of two
+    // panels away. A second instance rather than a mode on the first: the
+    // modal one owns a scrim and a ✕ that a hint must never have, and a panel
+    // that puts those on and takes them off is a panel that will one day leave
+    // a scrim over a live board. It seats itself under the modal's depth, so
+    // the `?` always wins when both could speak.
+    this.recipePeek = new RecipeHelpPanel(
+      this,
+      this.ctx.bus,
+      this.ctx.state,
+      this.ctx.data.chains,
+      'peek'
+    );
+    this.recipePeek.setDepth(DEPTH_PANEL + 8);
 
     this.bag = new BagPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
     // Opens on nest:hatched and cannot be dismissed — the dragon is waiting.
@@ -580,6 +597,7 @@ export class UIScene extends Phaser.Scene {
       this.hud.teardown();
       this.ledger.teardown();
       this.recipeHelp.teardown();
+      this.recipePeek.teardown();
       this.cookbook.teardown();
       this.codex.teardown();
       this.shop.teardown();
@@ -1001,6 +1019,23 @@ export class UIScene extends Phaser.Scene {
         }
       }),
       bus.on('item:spawned', () => this.sweepFirstContact()),
+      // A quest-reward egg never lands silently: while BoardScene flies the
+      // camera to it (the shared EGG_GIFT timeline), the giver says what just
+      // arrived. Line n of the chain's eggGift bank belongs to the n-th
+      // spawning quest — derived from the done latches, so a reload can never
+      // repeat or skip a line, and the last line covers any overflow.
+      bus.on('item:spawned', ({ item, cause }) => {
+        if (cause !== 'quest') return;
+        const gift = this.ctx.data.dialogue.eggGift[item.chain];
+        if (!gift || gift.lines.length === 0) return;
+        const granted = this.ctx.data.quests.quests.filter(
+          (q) => q.rewards?.spawn?.chain === item.chain && this.ctx.state.stat(`q:done:${q.id}`) > 0
+        ).length;
+        const line = gift.lines[Math.min(Math.max(granted - 1, 0), gift.lines.length - 1)]!;
+        this.time.delayedCall(EGG_GIFT.sayDelayMs, () =>
+          this.bubble.say(gift.speaker as SpeakerId, line, EGG_GIFT.sayHoldMs)
+        );
+      }),
       bus.on('tutorial:nudge', () => this.nudgeMarkers()),
       // The popup offers Gold AND Warmth; the tutorial only ever demonstrated
       // Warmth on the House, so name the cheaper option the first time it shows.
