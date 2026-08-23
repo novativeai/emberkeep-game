@@ -106,6 +106,34 @@ export const adultServingsFor = (chain: string): number =>
 const cellKey = (col: number, row: number): string => `${col},${row}`;
 
 /**
+ * THE MONOTONE LATCHES — "this has happened once, ever".
+ *
+ * Trust and a name both live on the board ITEM, and an item is the most
+ * perishable thing in the game: pocket it, sell it, deliver it, carry it to
+ * another world, or drop it on the wrong side of a merge, and the dragon that
+ * trusted you is gone with its record. That is fine for the Codex, which is
+ * ABOUT the dragon in front of you — and fatal for a chapter gate, which has no
+ * counters of its own and is only ever asked on the tick its trigger fires. A
+ * predicate over `state.items` goes true, then false, and the chapter it was
+ * guarding never opens.
+ *
+ * So the FACT is recorded beside the item, in `stats`, where nothing takes it
+ * away: `trust:<n>` for every rung a dragon has ever reached, and a count of
+ * every dragon ever named. They cost one integer each and they are the only
+ * form of these facts a monotone predicate can read.
+ *
+ * They are TIME-SENSITIVE. A save that crossed one of these thresholds before
+ * the latch existed cannot prove it afterwards — the item's `care.trust` is a
+ * snapshot of the dragon still on the board, not of the ones that left — which
+ * is why they land with the machinery rather than with the gate that will want
+ * them.
+ */
+export const trustKey = (rung: number): string => `trust:${rung}`;
+
+/** How many dragons the Keeper has ever named. */
+export const NAMED_DRAGONS_STAT = 'dragons:named';
+
+/**
  * Dragons as **named companions**, and the Cold Nest that produces them.
  *
  * The naming law (merge-chains §1.2): anything on the merge board is anonymous
@@ -389,6 +417,9 @@ export class DragonSystem {
     const clean = name.trim().slice(0, 16);
     if (!clean) return;
     item.dragonName = clean;
+    // Latch BEFORE the emit: `dragon:named` is what makes SaveSystem write, so
+    // a fact recorded after it would not be in the save it triggered.
+    this.state.addStat(NAMED_DRAGONS_STAT, 1);
     this.bus.emit('dragon:named', { itemId, name: clean, chain: item.chain });
   }
 
@@ -577,6 +608,15 @@ export class DragonSystem {
       trustMoved = true;
     }
     item.care = care;
+    // Every rung UP TO the new trust, not just the new one: a favourite meal
+    // moves trust by 2, and a gate reading `trust:3` must not be skipped over by
+    // a dragon that went 2 → 4. Latched before the emits below, which are what
+    // make SaveSystem write.
+    if (trustMoved) {
+      for (let rung = 1; rung <= care.trust; rung++) {
+        if (this.state.stat(trustKey(rung)) === 0) this.state.addStat(trustKey(rung), 1);
+      }
+    }
 
     this.bus.emit('dragon:fed', {
       itemId,

@@ -14,6 +14,7 @@
     "e2e": "playwright test",
     "verify": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run e2e",
     "quests": "tsx scripts/quest-audit.ts",
+    "chapters": "tsx scripts/chapter-audit.ts",
     "audit:art": "node scripts/audit-art.mjs",
     "audit:ground": "python3 scripts/audit-ground.py",
     "optimize:art": "python3 scripts/optimize-art.py",
@@ -27,7 +28,12 @@
     "beats:record": "node scripts/beats.mjs record",
     "beat": "node scripts/beats.mjs at",
     "beats": "node scripts/beats.mjs list",
-    "beats:check": "node scripts/beats.mjs check"
+    "beats:check": "node scripts/beats.mjs check",
+    "event": "node scripts/events.mjs run",
+    "events": "node scripts/events.mjs list",
+    "say": "node scripts/say.mjs",
+    "check:register": "node scripts/check-register.mjs",
+    "check:standee": "tsx tools/checks/standee-hit.ts"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.1",

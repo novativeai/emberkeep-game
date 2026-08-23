@@ -26,6 +26,16 @@ const SPEAKERS: Record<SpeakerId, { name: string; tag: string }> = {
  *  A second table would drift the first time somebody is renamed. */
 export const speakerName = (id: string): string => SPEAKERS[id as SpeakerId]?.name ?? id;
 
+/** One tap-advanced run of lines: exactly the four things `sequence` is given,
+ *  kept together so a run that has to wait is the same object as one that
+ *  plays. */
+interface SequenceRun {
+  speaker: SpeakerId;
+  lines: string[];
+  onDone?: () => void;
+  onLine?: (idx: number) => void;
+}
+
 const BUBBLE_WIDTH = 1200;
 const TEXT_WIDTH = 940;
 const MIN_HEIGHT = 192;
@@ -107,6 +117,17 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   private sayTimer: Phaser.Time.TimerEvent | null = null;
   /** Who is currently standing in the ring — drives the crossfade on handoff. */
   private artSpeaker = '';
+  /**
+   * THE ONE DOOR onto lazily-fetched ring art, installed by the owning scene
+   * and asked on EVERY speaker swap — a tutorial step, a `say`, a chapter run,
+   * an authored event's line, the editor's peek. It hangs HERE because this is
+   * the single place a name takes the ring: the Golden Elder's fetch used to be
+   * three hand-placed calls in UIScene, and the paths that were not on that
+   * list (a tutorial beat authored in her voice — `tutorialScripts` lists her
+   * as a legal step speaker) opened her still bust under a moving voice. A
+   * fourth hand-placed call would only have moved the next gap.
+   */
+  private artNeeded: ((speaker: string) => void) | null = null;
   /** A post-tutorial chapter run: tap-advanced lines from one speaker. Empty
    *  when no run is playing, which is also how the tap handler tells the two
    *  modes apart. */
@@ -115,6 +136,25 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   private seqSpeaker: SpeakerId = 'eleanor';
   private seqDone: (() => void) | undefined;
   private seqOnLine?: (idx: number) => void;
+  /**
+   * Runs asked for while another was playing, in the order they were asked.
+   *
+   * A SEQUENCE NEVER ERASES A SEQUENCE. Two runs used to mean the second simply
+   * overwrote the first's lines mid-sentence and dropped its `onDone` on the
+   * floor — a chapter's beats eaten by an arrival, a tour, an authored event or
+   * the next chapter, and every one of those beats is a one-shot the persisted
+   * story pointer can never replay. They queue instead, so both are heard and
+   * both callbacks run. `say`/`show` still take the bubble outright (see
+   * `cancelSequence`): the tutorial and a one-off line are meant to preempt.
+   *
+   * The price is paid by the hub tours, the only callers that USED the old
+   * behaviour: a walkthrough's follow-up line no longer cuts its own narration
+   * short, it waits for the run it interrupts to finish. Slower, in a rare path
+   * (closing the shop before she is done with the shelves) — and the same
+   * bargain the rest of the bubble already makes, where a line taken away
+   * mid-sentence is the thing being fixed, not the feature.
+   */
+  private seqQueue: SequenceRun[] = [];
   /** Coloured runs drawn over the body copy (the dragon's name). */
   private highlightFx!: Phaser.GameObjects.Container;
   /** Unwrapped, invisible twin of `label`, used only to measure run widths. */
@@ -423,15 +463,18 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
    *  Static speaker — single disc INSIDE the ring like a medallion
    *  photo (ring in front, centred origin), matching the original look. */
   private setSpeakerArt(speaker: string, text: string): void {
+    // Ask for anything of this speaker's that is not resident BEFORE choosing
+    // what to seat: a fetch that lands inside the frame is seated right here,
+    // and one that lands later re-seats itself through `onSpeakerArtLoaded`.
+    // The scene's side is idempotent on texture residency, so a per-line call
+    // costs a residency check once the sheets are in.
+    this.artNeeded?.(speaker);
     // The ring is a stage with room for one. When the person standing in it
     // changes, the disc crossfades rather than cutting — a hard swap under a
     // stationary frame reads as a rendering bug.
     if (speaker !== this.artSpeaker) {
       this.artSpeaker = speaker;
-      for (const img of [this.portrait, this.portraitTop]) {
-        img.setAlpha(0);
-        this.scene.tweens.add({ targets: img, alpha: 1, duration: SPEAKER_CROSSFADE_MS, ease: 'Sine.easeOut' });
-      }
+      this.fadeInPortrait();
     }
     // Shown by default; only the static branch below can withhold it, and only
     // when the speaker has no face of their own to wear.
@@ -502,15 +545,29 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     return CHARACTER_ANIMS.characters[speaker]?.portrait ?? null;
   }
 
-  private trySetAtlasPortrait(speaker: string, text: string): boolean {
-    const talking = clipFor(speaker, 'talking');
-    const blinking = clipFor(speaker, 'blinking');
-    if (talking?.stage !== 'portrait' || blinking?.stage !== 'portrait') return false;
-    if (!this.scene.textures.exists(clipKey(speaker, 'talking')) || !this.scene.textures.exists(clipKey(speaker, 'blinking'))) {
+  /**
+   * Everything `trySetAtlasPortrait` needs before it can mount the clips —
+   * staged as portrait clips, framed by a view, and BOTH sheets resident.
+   *
+   * Its own predicate because residency is the one part of it that changes
+   * under a live bubble: a lazily-fetched speaker (the Golden Elder, whose two
+   * sheets are only asked for when the endgame needs them) can be mid-line when
+   * her textures land, and `onSpeakerArtLoaded` asks exactly this question.
+   */
+  private atlasReady(speaker: string): boolean {
+    if (clipFor(speaker, 'talking')?.stage !== 'portrait' || clipFor(speaker, 'blinking')?.stage !== 'portrait') {
       return false;
     }
-    const view = this.atlasView(speaker);
-    if (!view) return false;
+    if (!this.atlasView(speaker)) return false;
+    return (
+      this.scene.textures.exists(clipKey(speaker, 'talking')) && this.scene.textures.exists(clipKey(speaker, 'blinking'))
+    );
+  }
+
+  private trySetAtlasPortrait(speaker: string, text: string): boolean {
+    if (!this.atlasReady(speaker)) return false;
+    const talking = clipFor(speaker, 'talking')!;
+    const blinking = clipFor(speaker, 'blinking')!;
     this.portraitAnim.rest(); // the disc animator steps aside entirely
     this.atlasSpeaker = speaker;
     this.atlasClips = { talking, blinking };
@@ -574,6 +631,48 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.atlasTalkHold = null;
     this.atlasSpeaker = '';
     this.atlasClips = null;
+  }
+
+  /** Dissolve whatever now stands in the ring in. Both split copies, together —
+   *  the head and the body are one person and must never fade apart. */
+  private fadeInPortrait(): void {
+    for (const img of [this.portrait, this.portraitTop]) {
+      img.setAlpha(0);
+      this.scene.tweens.add({ targets: img, alpha: 1, duration: SPEAKER_CROSSFADE_MS, ease: 'Sine.easeOut' });
+    }
+  }
+
+  /** Install the fetch hook (see `artNeeded`). The SCENE owns it: deciding what
+   *  a speaker's art is and asking the loader for it is scene work, and the
+   *  answer comes back through `onSpeakerArtLoaded`. */
+  onSpeakerArtNeeded(fn: (speaker: string) => void): void {
+    this.artNeeded = fn;
+  }
+
+  /**
+   * A speaker's portrait clips have just finished loading — re-seat the ring if
+   * they belong to whoever is standing in it RIGHT NOW.
+   *
+   * `setSpeakerArt` is asked once, when the line opens, so a speaker whose
+   * sheets are fetched lazily (the Golden Elder: two sheets, endgame-only, kept
+   * off the boot preload on purpose) reads the whole line on the still-bust
+   * fallback if the network was a moment slower than she was. This is the other
+   * half of that bargain — the fallback is what she opens on, not what she is
+   * stuck with. No polling: the loader says when, and this says whether.
+   *
+   * The line is re-opened on the text still to be TYPED, so the talk clip runs
+   * out with the words instead of chewing past them by however long she spent
+   * waiting; an empty remainder floors at the clip's own minimum.
+   */
+  onSpeakerArtLoaded(speaker: string): void {
+    if (!this.visible || speaker !== this.artSpeaker) return; // somebody else has the ring now
+    if (this.atlasSpeaker === speaker) return; // already animating — nothing arrived that it needs
+    if (!this.atlasReady(speaker)) return; // the fetch failed, or it was never her clips
+    this.setSpeakerArt(speaker, this.fullLine.slice(this.typeCursor));
+    this.layout(speaker);
+    // Same-speaker, so setSpeakerArt's handoff crossfade did not run — and this
+    // swap moves her a whole bust-height up the ring. Dissolved, not cut.
+    this.fadeInPortrait();
   }
 
   /** UI Builder registration — call AFTER the scene has positioned the bubble
@@ -675,6 +774,10 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
    * and must not scroll past unread, so they are tap-advanced rather than timed;
    * `STORY_BEAT_HOLD_MS` is only a safety net so a bubble can never strand the
    * board if the player walks away.
+   *
+   * Asked while another run is playing, this one WAITS ITS TURN (`seqQueue`)
+   * rather than talking over it, and its `onDone` runs when its own last line
+   * does — never earlier, never not at all.
    */
   sequence(
     speaker: SpeakerId,
@@ -686,13 +789,26 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       onDone?.();
       return;
     }
-    this.seqLines = [...lines];
-    this.seqIdx = 0;
-    this.seqSpeaker = speaker;
-    this.seqDone = onDone;
     // Per-line hook — the hub tours move their pointer as she talks (section
     // by section, then the close button), so the arrow is part of the line.
-    this.seqOnLine = onLine;
+    const run: SequenceRun = { speaker, lines: [...lines], onDone, onLine };
+    // Something is already talking (or waiting to): take a number. FIRST ASKED,
+    // FIRST HEARD — the alternative is not "the newest run wins", it is "the
+    // older run's remaining lines and its `onDone` are lost", and a caller
+    // waiting on that `onDone` waits forever.
+    if (this.seqLines.length || this.seqQueue.length) {
+      this.seqQueue.push(run);
+      return;
+    }
+    this.startRun(run);
+  }
+
+  private startRun(run: SequenceRun): void {
+    this.seqLines = [...run.lines];
+    this.seqIdx = 0;
+    this.seqSpeaker = run.speaker;
+    this.seqDone = run.onDone;
+    this.seqOnLine = run.onLine;
     this.playSequenceLine();
   }
 
@@ -732,17 +848,29 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     const done = this.seqDone;
     this.seqDone = undefined;
     this.seqOnLine = undefined;
-    this.hide();
+    // Only really over when nothing is waiting: fading out and back in between
+    // two beats that follow each other reads as a glitch, not as a breath.
+    if (!this.seqQueue.length) this.hide();
     done?.();
+    // Drained AFTER `done`, and only if `done` left the bubble alone. A callback
+    // that speaks for itself (a tour stepping on, `say`, a tutorial step) has
+    // just taken the bubble on purpose — and `say`/`show` empty the queue, so
+    // what they take is not handed back a moment later.
+    if (!this.seqLines.length) {
+      const next = this.seqQueue.shift();
+      if (next) this.startRun(next);
+    }
   }
 
-  /** Cancel any run in flight — the tutorial and one-off lines both own the
-   *  bubble outright when they take it. */
+  /** Cancel the run in flight AND everything queued behind it — the tutorial and
+   *  one-off lines both own the bubble outright when they take it, so a queue
+   *  left standing would hand it straight back and talk over them. */
   private cancelSequence(): void {
     this.seqLines = [];
     this.seqIdx = 0;
     this.seqDone = undefined;
     this.seqOnLine = undefined;
+    this.seqQueue = [];
   }
 
   /** Hold a still face on the current speaker. Set it before the line reveals —
@@ -970,6 +1098,15 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.typeTimer = null;
     this.portraitAnim.rest();
     this.stopAtlasPortrait();
+    // THE RING IS EMPTY THE MOMENT SHE STARTS LEAVING, not when the fade ends.
+    // `visible` stays true for the whole 180 ms below, and `stopAtlasPortrait`
+    // has just cleared `atlasSpeaker` — so a lazily-fetched speaker's sheets
+    // landing in that window passed BOTH of `onSpeakerArtLoaded`'s guards and
+    // re-seated the art of a bubble on its way out, starting a frame ticker and
+    // a talk-hold timer that this very call had cancelled and that nothing left
+    // would cancel again. Nobody stands in the ring while it fades, so nothing
+    // arriving belongs to it.
+    this.artSpeaker = '';
     const targetY = this.y;
     this.scene.tweens.add({
       targets: this,

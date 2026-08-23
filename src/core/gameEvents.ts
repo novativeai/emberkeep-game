@@ -356,6 +356,15 @@ function validateTrigger(t: EventTrigger, at: string, ctx: EventsContext): strin
     else if (t.match) {
       for (const k of Object.keys(t.match)) if (!keys.includes(k)) errors.push(`${at}: "${t.event}" has no payload key "${k}" (has ${keys.join(', ') || 'none'})`);
     }
+    // `event:fired` is the one fact this system both EMITS and observes, so an
+    // un-narrowed one describes the author's own firing as well as everyone
+    // else's — the shape that recursed ~1160 frames deep. The runtime bounds
+    // that cascade now (EventSystem's `spent`), and this rule is not a stand-in
+    // for it: a pair naming each OTHER by id passes here and is bounded there.
+    // It refuses the sentence no author means — "whenever ANY event fires".
+    if (t.event === 'event:fired' && typeof t.match?.id !== 'string') {
+      errors.push(`${at}: an "event:fired" trigger must name the event it watches (match.id) — "whenever any event fires" includes its own firing`);
+    }
   } else if (t.type === 'tap') {
     const fact = tapFactOf(t.target ?? '');
     if (!fact) errors.push(`${at}: tap target must be character:<id>, item:<chain>, fog:<region> or elder`);

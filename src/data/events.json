@@ -1,1 +1,170 @@
-{ "events": [] }
+{
+  "events": [
+    {
+      "id": "demo_say",
+      "title": "Demo · a spoken line",
+      "when": [
+        {
+          "type": "manual"
+        }
+      ],
+      "then": [
+        {
+          "say": {
+            "speaker": "eleanor",
+            "lines": [
+              "This is a say action: my voice, in the ring, one line at a time.",
+              "Tap to move along — the last line hands the board straight back."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "demo_add",
+      "title": "Demo · gold, Warmth and a flag",
+      "when": [
+        {
+          "type": "manual"
+        }
+      ],
+      "then": [
+        {
+          "add": "keeper.coins",
+          "amount": 25,
+          "reason": "events demo"
+        },
+        {
+          "add": "keeper.energy",
+          "amount": 3,
+          "reason": "events demo"
+        },
+        {
+          "set": "flag.demo_add_ran",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "demo_spawn",
+      "title": "Demo · pieces onto the board",
+      "when": [
+        {
+          "type": "manual"
+        }
+      ],
+      "then": [
+        {
+          "spawn": {
+            "chain": "emberberry",
+            "tier": 1,
+            "count": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "demo_open",
+      "title": "Demo · a panel opens",
+      "when": [
+        {
+          "type": "manual"
+        }
+      ],
+      "then": [
+        {
+          "open": "bag"
+        }
+      ]
+    },
+    {
+      "id": "demo_prompt",
+      "title": "Demo · a question with two answers",
+      "when": [
+        {
+          "type": "manual"
+        }
+      ],
+      "then": [
+        {
+          "prompt": {
+            "id": "demo_choice",
+            "speaker": "eleanor",
+            "text": "A prompt stops the board until it is answered. Which branch shall we run?",
+            "choices": [
+              {
+                "id": "take",
+                "label": "Take the gold",
+                "then": [
+                  {
+                    "add": "keeper.coins",
+                    "amount": 10,
+                    "reason": "events demo"
+                  }
+                ]
+              },
+              {
+                "id": "leave",
+                "label": "Leave it be",
+                "then": [
+                  {
+                    "set": "flag.demo_left_it",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "demo_gate",
+      "title": "Demo · a parent that arms a child",
+      "when": [
+        {
+          "type": "manual"
+        }
+      ],
+      "then": [
+        {
+          "set": "flag.demo_gate_open",
+          "value": 1
+        },
+        {
+          "say": {
+            "speaker": "eleanor",
+            "lines": [
+              "There. The next one is listening now."
+            ]
+          }
+        }
+      ],
+      "children": [
+        {
+          "id": "demo_gate_child",
+          "title": "Demo · the child, armed by its parent",
+          "when": [
+            {
+              "type": "manual"
+            }
+          ],
+          "if": [
+            {
+              "prop": "event.demo_gate.fired",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "then": [
+            {
+              "add": "keeper.keys",
+              "amount": 1,
+              "reason": "events demo"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

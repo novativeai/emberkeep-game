@@ -255,7 +255,8 @@ export class UIScene extends Phaser.Scene {
    *  in (see `speakHere`). Flushed on `world:switched`. */
   private pendingAway: Array<{ speaker: SpeakerId; lines: string[] }> = [];
   /** Authored-event beats (`event:say` / `event:prompt`) held while a tutorial
-   *  script owns the bubble — played, in order, the moment it hands back. */
+   *  script owns the bubble, or while an unanswered prompt owns the screen —
+   *  played, in order, the moment whichever gate holds them opens. */
   private pendingEvents: Array<{ say?: EventMap['event:say']; prompt?: EventMap['event:prompt'] }> = [];
   private choice!: ChoicePrompt;
   /** The opening's held silence is a one-shot: only the very first step of a
@@ -507,6 +508,11 @@ export class UIScene extends Phaser.Scene {
     this.reveal = new DragonReveal(this, this.ctx.bus, this.ctx);
 
     this.bubble = new CharacterBubble(this, this.ctx.bus);
+    // THE ONE DOOR onto lazily-fetched ring art (`ensureRingArt`). Hung on the
+    // bubble's own speaker swap rather than on the call sites that were known
+    // when the Elder got a voice, so every path that can name a speaker — a
+    // tutorial beat authored in her voice included — fetches her face.
+    this.bubble.onSpeakerArtNeeded((speaker) => this.ensureRingArt(speaker));
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
     // cover, over the empty bottom-right margin during tutorial steps.
     this.bubble.setPosition(LIVE_GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
@@ -733,6 +739,21 @@ export class UIScene extends Phaser.Scene {
       // running tutorial script like every other unscripted beat.
       bus.on('event:say', (say) => this.playEventBeat({ say })),
       bus.on('event:prompt', (prompt) => this.playEventBeat({ prompt })),
+      // THE ANSWER IS WHAT UNBLOCKS THE NEXT QUESTION. A beat held because a
+      // prompt was already open used to wait on `tutorial:step`'s done beat —
+      // the queue's only drain — and once the script and any mid-game lesson
+      // have ended no `tutorial:step` ever arrives again: the beat, and the
+      // branch behind it, were stranded for the rest of the session.
+      //
+      // Next tick, not inline: this fires INSIDE ChoicePrompt's emit, ahead of
+      // EventSystem running the branch the player just chose, and that branch's
+      // own line is a direct consequence of the answer — it speaks first.
+      // Whatever is still blocked when the drain runs re-queues itself in
+      // `playEventBeat`, in order, and waits for the next answer.
+      bus.on('ui:event_choice', () => {
+        if (!this.pendingEvents.length) return;
+        this.time.delayedCall(0, () => this.drainEventQueue());
+      }),
       bus.on('ui:panel_open_requested', ({ panel }) => this.openPanel(panel)),
       bus.on('story:arrival', ({ worldId }) => this.playArrivalBeats(worldId)),
       // The House's commission. The board decides WHEN to ask; the panel is the
@@ -1597,30 +1618,79 @@ export class UIScene extends Phaser.Scene {
     guard(`ui.finale.${where}`, fn, undefined);
   }
 
+  /**
+   * HER BUSTS ARRIVE HERE, AND NOWHERE EARLIER.
+   *
+   * She was the only speaker in the game who did not move while she talked:
+   * Eleanor and Selyna have `stage:'portrait'` talking/blinking clips, so the
+   * ring's split treatment falls out for them with no branch, and the Elder had
+   * none — a still bust under a voice. Her clips are two big sheets, and she
+   * cannot say a word before the endgame, so preloading them would spend that
+   * decode on every session that never gets there. A line that outruns the
+   * network still reads, because the ring degrades to `portrait_golden_elder`,
+   * her own still bust — and re-seats itself onto the clips when they land.
+   *
+   * WHOEVER TAKES THE RING, not whoever was on a list. This is the far side of
+   * the bubble's `onSpeakerArtNeeded` hook, so it is asked on every path that
+   * can name a speaker — the finale ceremony, the LATE awakening (the golden
+   * order delivered after Level 3, which cracks the egg outside the timeline),
+   * an authored `say`, and a tutorial beat written in her voice, which the
+   * three hand-placed calls this replaces did not cover. Idempotent by texture
+   * residency, so a line by a resident speaker costs one `exists` per clip.
+   *
+   * The RING's clips only: `clipsFor` answers with everything a character has,
+   * and Eleanor's board clips (idle/cast/laugh/happy) have no business being
+   * pulled in because she opened her mouth.
+   */
+  private ensureRingArt(speaker: string): void {
+    let added = 0;
+    for (const [clipId, clip] of Object.entries(clipsFor(speaker))) {
+      if (clip.stage !== 'portrait') continue;
+      const key = clipKey(speaker, clipId);
+      if (this.textures.exists(key)) continue;
+      const before = this.load.list.size;
+      this.load.spritesheet(key, clip.file, {
+        frameWidth: clip.frameWidth,
+        frameHeight: clip.frameHeight
+      });
+      // WHAT THE LOADER TOOK, not what was asked of it. `addFile` silently
+      // REFUSES a key that is already resident, queued or inflight, so a second
+      // line opened while the first fetch is still in the air adds nothing —
+      // and counting the request counted work nobody was doing: it re-armed a
+      // listener for a file already listened for, and could `start()` a batch
+      // with no files in it (which on an idle loader emits COMPLETE at once,
+      // spending every other module's pending COMPLETE listener). A file that
+      // FAILED leaves the loader, so a later line asks again by itself.
+      if (this.load.list.size === before) continue;
+      added += 1;
+      // KEYED TO HER OWN FILE. `Loader.Events.COMPLETE` belongs to whichever
+      // batch happens to finish first, and this scene's loader is shared — the
+      // Emporium, the Cauldron and the Codex all fetch through
+      // `lazyTextures.ensureTextures` on it — so a one-shot COMPLETE listener
+      // was routinely spent on somebody else's images, and the sheets landing
+      // afterwards never re-seated the ring. Phaser emits
+      // `filecomplete-<type>-<key>` per file, which is the only signal about
+      // HER. Fired per sheet: the first finds the other still missing and does
+      // nothing (`atlasReady` wants both), the last re-seats her mid-sentence.
+      this.load.once(`${Phaser.Loader.Events.FILE_KEY_COMPLETE}spritesheet-${key}`, () =>
+        // Guarded for the same reason every finale beat is: this runs out of a
+        // loader callback, outside any `update`, and a throw there ends the RAF
+        // chain — the session, not the line.
+        guard('ui.ring.clips', () => this.bubble.onSpeakerArtLoaded(speaker), undefined)
+      );
+    }
+    if (added === 0) return;
+    this.load.start();
+  }
+
   private runFinaleUi(): void {
     if (this.finaleActive) return;
     this.finaleActive = true;
     this.finaleReleased = false;
-    // HER BUSTS ARRIVE HERE, AND NOWHERE EARLIER.
-    //
-    // She was the only speaker in the game who did not move while she talked:
-    // Eleanor and Selyna have `stage:'portrait'` talking/blinking clips, so the
-    // ring's split treatment falls out for them with no branch, and the Elder
-    // had none — a still bust under a voice. Her clips are two big sheets, and
-    // she cannot say a word before this very ceremony, so preloading them would
-    // spend that decode on every session that never reaches the finale. The
-    // camera pan covers the fetch; a line that outruns the network still reads,
-    // because the ring degrades to `portrait_golden_elder`, her own still bust.
-    let elderQueued = 0;
-    for (const [clipId, clip] of Object.entries(clipsFor('golden_elder'))) {
-      if (this.textures.exists(clipKey('golden_elder', clipId))) continue;
-      this.load.spritesheet(clipKey('golden_elder', clipId), clip.file, {
-        frameWidth: clip.frameWidth,
-        frameHeight: clip.frameHeight
-      });
-      elderQueued += 1;
-    }
-    if (elderQueued > 0) this.load.start();
+    // A PREFETCH, not the door: the bubble asks for her face by itself when she
+    // opens her mouth (`ensureRingArt`), but her two sheets are big and the
+    // camera pan to the altar is free time to spend on them.
+    this.ensureRingArt('golden_elder');
     this.clearRecipeHint(); // the finale owns the stage — no competing pointers
     this.ledger.requestClose();
     this.shop.requestClose('system'); // clearing the stage is not the player leaving
@@ -1718,6 +1788,11 @@ export class UIScene extends Phaser.Scene {
       this.buildCelebrationBanner('ORDER COMPLETE', parts.join('    '), quote);
     });
     if (golden && this.ctx.state.level >= 3) {
+      // ASKED NOW, SPOKEN IN 3.2s — the fetch rides the wait rather than racing
+      // her line. Queued outside the `delayedCall` on purpose: this is the one
+      // path with a free head start, and spending it is what left her a
+      // photograph on the awakening she is the whole point of.
+      this.ensureRingArt('golden_elder');
       // BoardScene's lateGoldenAwakening cracks the egg at ~2.4s — her line
       // lands right as the Elder rises.
       this.time.delayedCall(3200, () =>
@@ -1954,9 +2029,7 @@ export class UIScene extends Phaser.Scene {
         this.playRegardBeats(beat.characterId, beat.hearts);
       }
     }
-    if (step.done && this.pendingEvents.length) {
-      for (const beat of this.pendingEvents.splice(0)) this.playEventBeat(beat);
-    }
+    if (step.done && this.pendingEvents.length) this.drainEventQueue();
     this.hud.setLedgerEnabled(step.done || step.allow.ledger);
     // The tracker is a readout of the Ledger, so BOTH halves ride the same gate
     // as the Ledger button.
@@ -2059,11 +2132,22 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
+  /** Replay what waited, in the order it arrived. Anything whose gate is still
+   *  shut pushes itself straight back onto the queue from `playEventBeat`, so
+   *  draining is safe at any moment and from either unblocking event. */
+  private drainEventQueue(): void {
+    for (const beat of this.pendingEvents.splice(0)) this.playEventBeat(beat);
+  }
+
   /**
    * An authored event spoke or asked. While a tutorial script is on the bubble
    * the beat waits — `say()` would wipe the gate the beat is standing on — and
    * plays on the handover, in the order it arrived. A prompt is one at a time:
    * a second question while one is open waits for the answer.
+   *
+   * TWO gates, so TWO drains (`drainEventQueue`): the tutorial's done beat, and
+   * `ui:event_choice`. A queue drained on only one of the events that fills it
+   * strands everything held for the other.
    */
   private playEventBeat(beat: { say?: EventMap['event:say']; prompt?: EventMap['event:prompt'] }): void {
     const tutorialHolds = !(this.lastStep?.done ?? this.ctx.state.tutorialDone);

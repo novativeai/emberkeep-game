@@ -16,10 +16,30 @@ import { uiRegistry } from './theme';
 const FRAME_W = 1060;
 const HEAD_H = 250;
 const BTN_SCALE = IS_MOBILE ? 1.05 : 0.86;
-const BTN_H = 152 * BTN_SCALE;
 const BTN_GAP = 26;
-const BTN_HALF_W = 230 * BTN_SCALE;
 const FOOT = 56;
+/**
+ * THE PLATE THE ANSWERS WEAR — and the only place its name is written.
+ *
+ * The row pitch, the frame height and the blocker's hole are all MEASURED off
+ * this texture (`plateH` / `plateHalfW`), because the numbers that used to
+ * state them were the wrong plate's. They read `152 * BTN_SCALE` and
+ * `230 * BTN_SCALE` — `ui_btn_green` is 420x152 game units, and those came
+ * over from TravelPrompt with it — while the plate drawn here is `ui_btn_play`,
+ * 528x192. So the pitch was 156.7 against a plate 165.1 tall and every answer
+ * sat 8.4 units INSIDE the one above it (185.6 against 201.6, so 16, on
+ * portrait). The hole cut for each plate was 197.8 half-wide against a plate
+ * 227.0 half-wide, which broke the one guarantee this panel's input geometry
+ * is FOR: the blocker and the buttons overlapped by 29.2 units a side (35.7 on
+ * portrait), so along the plate's own edges the dispatch was decided by depth
+ * order rather than by nothing touching anything.
+ *
+ * TravelPrompt's header comment is the same trap written down after the fact:
+ * "the keys were not close together, they were 13 units INSIDE each other".
+ * Typing a sibling panel's plate size is how that happens twice, so this panel
+ * asks the texture instead and cannot drift when either plate is repainted.
+ */
+const PLATE_KEY = 'ui_btn_play';
 const TITLE_PX = IS_MOBILE ? 44 : 36;
 const BODY_PX = IS_MOBILE ? 40 : 32;
 const LABEL_PX = IS_MOBILE ? 38 : 30;
@@ -42,10 +62,12 @@ type PromptRequest = EventMap['event:prompt'];
  * prompt, and it is NOT dismissible: a question with no answer is a branch
  * that never runs, so the dim swallows taps instead of closing it.
  *
- * Same input geometry as TravelPrompt, for the same measured reason: the dim,
- * the frame blocker and the buttons never overlap, so Phaser's dispatch between
- * them is never ambiguous. Every plate is the ROYAL one — the answers are
- * peers, and a green plate would tell the player which one is "right".
+ * Same input SHAPE as TravelPrompt, for the same measured reason: the dim, the
+ * frame blocker and the buttons never overlap, so Phaser's dispatch between
+ * them is never ambiguous. The NUMBERS are this panel's own, read off its own
+ * plate (see PLATE_KEY) — borrowing TravelPrompt's is the bug that shape once
+ * hid. Every plate is the ROYAL one — the answers are peers, and a green plate
+ * would tell the player which one is "right".
  */
 export class ChoicePrompt extends Phaser.GameObjects.Container {
   private dim: Phaser.GameObjects.Rectangle;
@@ -57,6 +79,9 @@ export class ChoicePrompt extends Phaser.GameObjects.Container {
   private labels: Phaser.GameObjects.Text[] = [];
   private current: PromptRequest | null = null;
   private frameH = HEAD_H;
+  /** The drawn plate's half-width and height, in game units, at BTN_SCALE. */
+  private readonly plateHalfW: number;
+  private readonly plateH: number;
 
   constructor(
     scene: Phaser.Scene,
@@ -112,7 +137,7 @@ export class ChoicePrompt extends Phaser.GameObjects.Container {
     this.add(body);
 
     for (let i = 0; i < MAX_CHOICES; i++) {
-      const plate = scene.add.image(cx, cy, 'ui_btn_play').setScale(BTN_SCALE * pScale).setDepth(60002).setVisible(false);
+      const plate = scene.add.image(cx, cy, PLATE_KEY).setScale(BTN_SCALE * pScale).setDepth(60002).setVisible(false);
       const label = scene.add
         .text(cx, cy, '', { fontFamily: FONT.display, fontSize: `${fpx(LABEL_PX)}px`, fontStyle: 'bold', color: PALETTE.cream })
         .setOrigin(0.5)
@@ -127,6 +152,14 @@ export class ChoicePrompt extends Phaser.GameObjects.Container {
       this.plates.push(plate);
       this.labels.push(label);
     }
+
+    // Measured off the frame the plates are actually wearing. Read ONCE: the
+    // chrome is painted before any panel is built, and a live re-theme redraws
+    // that texture IN PLACE (same canvas, same size), so there is nothing here
+    // to go stale. `pScale` is left out on purpose — every layout number below
+    // is in the body's own space and is multiplied by it at the point of use.
+    this.plateHalfW = (this.plates[0].width / 2) * BTN_SCALE;
+    this.plateH = this.plates[0].height * BTN_SCALE;
 
     uiRegistry.register(scene, 'panel.choice', 'Choice prompt', 'Panels', this, { frame: this.frame, title: this.who });
 
@@ -151,7 +184,7 @@ export class ChoicePrompt extends Phaser.GameObjects.Container {
     const cy = LIVE_GAME_HEIGHT / 2;
     const pScale = panelMobileScale(FRAME_W);
 
-    this.frameH = HEAD_H + choices.length * (BTN_H + BTN_GAP) + FOOT;
+    this.frameH = HEAD_H + choices.length * (this.plateH + BTN_GAP) + FOOT;
     this.frame.clear();
     this.frame.fillStyle(num(PALETTE.plum), 0.98);
     this.frame.fillRoundedRect(-FRAME_W / 2, -this.frameH / 2, FRAME_W, this.frameH, 46);
@@ -167,7 +200,7 @@ export class ChoicePrompt extends Phaser.GameObjects.Container {
     const rows: number[] = [];
     for (let i = 0; i < MAX_CHOICES; i++) {
       const shown = i < choices.length;
-      const y = -this.frameH / 2 + HEAD_H + i * (BTN_H + BTN_GAP) + BTN_H / 2;
+      const y = -this.frameH / 2 + HEAD_H + i * (this.plateH + BTN_GAP) + this.plateH / 2;
       rows.push(y);
       this.plates[i].setPosition(cx, cy + y * pScale).setVisible(shown);
       this.labels[i].setText(shown ? choices[i].label : '').setPosition(cx, cy + (y - 4) * pScale).setVisible(shown);
@@ -182,7 +215,7 @@ export class ChoicePrompt extends Phaser.GameObjects.Container {
         const lx = x - bw / 2;
         const ly = y - bh / 2;
         for (let i = 0; i < choices.length; i++) {
-          if (Math.abs(lx) < (BTN_HALF_W + 6) * pScale && Math.abs(ly - rows[i] * pScale) < (BTN_H / 2 + 6) * pScale) return false;
+          if (Math.abs(lx) < (this.plateHalfW + 6) * pScale && Math.abs(ly - rows[i] * pScale) < (this.plateH / 2 + 6) * pScale) return false;
         }
         return true;
       }

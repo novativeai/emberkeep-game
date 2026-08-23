@@ -7,22 +7,30 @@
  *   GET  /context     → pickers: facts + payload keys, property catalogue,
  *                       speakers, panels, commands, chains, quests, characters,
  *                       regions, worlds, tutorial scripts
- *   PUT  /            ← { events }                 replace the file (validated)
+ *   PUT  /            ← { events }                 replace the file (validated);
+ *                       the reply's `dropped` names every event the body omits
  *   POST /op          ← one EditOp                 a single atomic edit (validated)
  *   POST /validate    → { ok, errors }             the committed file, checked
  *
  * `applyOp` is pure and exported so the unit suite drives the same code the
  * server runs. Every write validates first; a refused write leaves the file
- * untouched and says why.
+ * untouched and says why — and an accepted one leaves the replaced file behind
+ * in the temp dir (`keepBackup`), because unlike a tutorial with no beats an
+ * events file with no events is a LEGAL state the validator cannot refuse for
+ * you: `{"events":[]}` really does mean "no authored moments", and a client
+ * that PUTs back only the branch it edited is recoverable rather than refusable.
+ * The write guard is the tutorial API's, IMPORTED rather than copied.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import {
   ACTION_KINDS,
   COMPARE_OPS,
   EMITTABLE_COMMANDS,
   findEvent,
+  flattenEvents,
   PANELS,
   PROPERTY_CATALOG,
   siblingsOf,
@@ -32,6 +40,7 @@ import {
   validateEventsData,
   type EventsContext
 } from '../../src/core/gameEvents';
+import { declaresJson, callerAllowed } from '../tutorial-api/server';
 import type { EventsData, GameEventConfig } from '../../src/core/types';
 
 export type EditOp =
@@ -149,6 +158,46 @@ export function buildContext(root: string): Record<string, unknown> {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* The write guard — kept verbatim in tools/tutorial-api/server.ts      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ONE PREDICATE, NOT THREE COPIES. This file used to carry its own verbatim
+ * copy of the origin/content-type check; vite.config.ts now applies the same
+ * pair to every other endpoint that writes source (`devApiGuard`), and three
+ * copies of a security rule is two that can silently drift. The rule, and the
+ * long why behind both halves of it, live in tools/tutorial-api/server.ts —
+ * re-exported here so this file's own callers keep their import.
+ */
+export { declaresJson, callerAllowed };
+
+/** How many replaced copies of one file are kept before the oldest is dropped. */
+const BACKUP_KEEP = 8;
+
+/**
+ * Keep what a write replaced. These APIs overwrite an authored source file in
+ * one shot, and that file is usually mid-edit and uncommitted, so a bad write
+ * used to be unrecoverable. The copy goes to the OS temp dir rather than beside
+ * the original on purpose: `src/data` is inside the dev server's watch
+ * allow-list, and a sibling `.bak` would fire a rebuild on every save from the
+ * editor. Returns where it landed so the reply can name it; a backup that
+ * cannot be taken is reported as null and never blocks the edit.
+ */
+export function keepBackup(file: string, tag: string): string | null {
+  try {
+    const dir = path.join(os.tmpdir(), 'emberkeep-dev-api');
+    mkdirSync(dir, { recursive: true });
+    const to = path.join(dir, `${tag}.${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    copyFileSync(file, to);
+    const mine = readdirSync(dir).filter((f) => f.startsWith(`${tag}.`)).sort();
+    for (const f of mine.slice(0, Math.max(0, mine.length - BACKUP_KEEP))) rmSync(path.join(dir, f), { force: true });
+    return to;
+  } catch {
+    return null;
+  }
+}
+
 function readJson(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -164,20 +213,64 @@ function readJson(req: IncomingMessage): Promise<unknown> {
 }
 
 /** The connect-style middleware vite mounts at `/__events`. */
+/**
+ * The ids on disk that a whole-file PUT no longer carries, at ANY DEPTH — a
+ * nested child dies as silently as a root event, and re-parenting one is not
+ * destroying it, so the comparison is over the flattened tree, not the top list.
+ *
+ * `replaced` only ever said HOW MANY events the file HELD: a caller that sent
+ * back one branch of six was answered `{"ok":true,"replaced":6}` with no word
+ * about the five it had just destroyed. This is the same silence the tutorial
+ * API's beat accounting closed one file over.
+ *
+ * It is a RECEIPT, NOT A GATE, and deliberately so: unlike a tutorial with no
+ * beats, `{"events":[]}` is a legal authored state (see the header), so this
+ * cannot refuse the write the way `refuseDrop` does — it names the dead in the
+ * reply, and `backup` is where to get them back.
+ */
+export function droppedEventIds(before: GameEventConfig[], after: GameEventConfig[]): string[] {
+  const kept = new Set(flattenEvents(after).map((f) => f.event.id));
+  return flattenEvents(before)
+    .map((f) => f.event.id)
+    .filter((id) => !kept.has(id));
+}
+
 export function createEventsApi(root: string): (req: IncomingMessage, res: ServerResponse) => void {
   const file = path.join(root, 'src/data/events.json');
   const load = (): EventsData => JSON.parse(readFileSync(file, 'utf8')) as EventsData;
-  const save = (data: EventsData): void => writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
+  /** Every write goes through here, so every write leaves a copy behind. */
+  const save = (data: EventsData): string | null => {
+    const kept = keepBackup(file, 'events');
+    writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
+    return kept;
+  };
   const send = (res: ServerResponse, code: number, body: unknown): void => {
     res.statusCode = code;
     res.end(JSON.stringify(body));
   };
   return (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,PUT,POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    const origin = req.headers.origin;
+    const allowed = callerAllowed(req);
+    // Echo the caller's own origin when it is one we serve — never `*`, which
+    // published the tree to every page in the browser and overrode vite's cors.
+    if (origin && allowed) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET,PUT,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+    res.setHeader('Vary', 'Origin, Sec-Fetch-Site');
     res.setHeader('Content-Type', 'application/json');
     const sub = (req.url ?? '/').split('?')[0]!.replace(/\/+$/, '') || '/';
+    if (!allowed) {
+      // Refused before the route is even looked at. The PREFLIGHT never reaches
+      // here — vite's cors answers OPTIONS upstream — but it answers a stranger
+      // with no allow-origin header, so the browser never dispatches the write.
+      // This is the second lock, for the request that arrives regardless.
+      return send(res, 403, {
+        ok: false,
+        error: `origin "${String(origin)}" may not reach /__events — a dev API writes source files; open the tool on localhost (or serve it over http) instead of file://`
+      });
+    }
     if (req.method === 'OPTIONS') {
       res.statusCode = 204;
       res.end();
@@ -188,19 +281,28 @@ export function createEventsApi(root: string): (req: IncomingMessage, res: Serve
         if (req.method === 'GET' && sub === '/') return send(res, 200, { events: load().events });
         if (req.method === 'GET' && sub === '/context') return send(res, 200, buildContext(root));
         if (req.method === 'PUT' && sub === '/') {
+          if (!declaresJson(req)) return send(res, 415, { ok: false, error: 'a write needs Content-Type: application/json' });
           const body = (await readJson(req)) as { events?: GameEventConfig[] };
           if (!Array.isArray(body.events)) throw new Error('body must be { events: [...] }');
           const data: EventsData = { events: body.events };
           const errors = validateEventsData(data, contextOf(root));
           if (errors.length) return send(res, 400, { ok: false, errors });
-          save(data);
-          return send(res, 200, { ok: true, events: data.events });
+          // What this replace COST, said out loud: `replaced` is how many events
+          // the file held and `dropped` NAMES the ones the body no longer
+          // carries. An empty tree is legal, so this reports rather than
+          // refuses — `backup` is where to get the named ones back.
+          const previous = load();
+          const replaced = previous.events.length;
+          const dropped = droppedEventIds(previous.events, data.events);
+          const backup = save(data);
+          return send(res, 200, { ok: true, backup, replaced, dropped, events: data.events });
         }
         if (req.method === 'POST' && sub === '/op') {
+          if (!declaresJson(req)) return send(res, 415, { ok: false, error: 'a write needs Content-Type: application/json' });
           const op = (await readJson(req)) as EditOp;
           const next = applyOp(load(), op, contextOf(root));
-          save(next);
-          return send(res, 200, { ok: true, events: next.events });
+          const backup = save(next);
+          return send(res, 200, { ok: true, backup, events: next.events });
         }
         if (req.method === 'POST' && sub === '/validate') {
           const errors = validateEventsData(load(), contextOf(root));

@@ -9,8 +9,10 @@ import {
   validateTutorialData,
   type TriggerFacts
 } from '../../src/core/tutorialScripts';
-import type { TutorialData, TutorialStepConfig } from '../../src/core/types';
-import { capture, createTestContext } from './helpers';
+import { callerAllowed, dropReport, refuseDrop, TACIT_STEP_DROPS } from '../../tools/tutorial-api/server';
+import type { IncomingMessage } from 'node:http';
+import type { MarkerPoint, TutorialData, TutorialStepConfig } from '../../src/core/types';
+import { capture, createTestContext, drag } from './helpers';
 
 const shipped = tutorialJson as unknown as TutorialData;
 
@@ -82,6 +84,115 @@ describe('tutorialScripts (the file, read once)', () => {
     expect(errors.some((e) => e.includes('no step "nope"'))).toBe(true);
     expect(errors.some((e) => e.includes('duplicate script id "y"'))).toBe(true);
     expect(errors.some((e) => e.includes('unknown tutorial "ghost"'))).toBe(true);
+  });
+
+  it('refuses to rebuild the file from a list that dropped Chapter One', () => {
+    // The shape a client PUTs when it sends back only the scripts it edited —
+    // and the shape `{"scripts": []}` takes. It used to yield `{ steps: [] }`
+    // and a cheerful 200 over all 64 beats; it must cost an exception instead.
+    expect(() => dataOf(scriptsOf(fixture).filter((s) => s.id !== MAIN_SCRIPT_ID))).toThrow(/no "main" script/);
+    expect(() => dataOf([])).toThrow(/without Chapter One/);
+  });
+
+  it('a partial PUT that keeps main still has to admit the lessons it drops', () => {
+    // `dataOf` only catches the list that lost CHAPTER ONE. The list that kept
+    // main and lost a mid-game LESSON is legal to rebuild — and rebuilding from
+    // it DELETES that lesson — so the PUT boundary compares against disk
+    // instead. Undeclared: refuse. Declared: delete, and say which.
+    const before = scriptsOf(fixture);
+    const partial = before.filter((s) => s.id === MAIN_SCRIPT_ID);
+    const bare = dropReport(before, partial);
+    expect(bare.scripts).toEqual(['pots', 'after_pots']);
+    expect(bare.undeclared.scripts).toEqual(['pots', 'after_pots']);
+    expect(refuseDrop(bare)).toMatch(/omits 2 script\(s\)[\s\S]*pots, after_pots/);
+    // Declaring the scripts covers the beats that die WITH them — deleting a
+    // lesson does not also mean listing its beats one by one.
+    const said = dropReport(before, partial, ['pots', 'after_pots']);
+    expect(said.steps).toEqual(['pots:p1', 'pots:p2', 'after_pots:a1']);
+    expect(said.undeclared).toEqual({ scripts: [], steps: [] });
+    expect(refuseDrop(said)).toBeNull();
+    // Declaring one of two is still a caller that forgot the other.
+    expect(dropReport(before, partial, ['pots']).undeclared.scripts).toEqual(['after_pots']);
+    // The whole file back is not a deletion at all.
+    expect(dropReport(before, before)).toEqual({ scripts: [], steps: [], dropped: [], undeclared: { scripts: [], steps: [] } });
+  });
+
+  it('accounts for BEATS, so a truncated script cannot ride in under a full script list', () => {
+    // The measured hole: every script id present, `main` cut to its first beat,
+    // answered ok:true with dropped:[] over the rest of Chapter One. The
+    // accounting is per-BEAT now, so the same body is a 409 that names them.
+    const before = scriptsOf(fixture);
+    const truncated = before.map((s) => (s.id === MAIN_SCRIPT_ID ? { ...s, steps: s.steps.slice(0, 1) } : s));
+    // One beat lost is an EDIT (the World Builder's delete button) and passes,
+    // but it is never silent — `dropped` names it and `backup` holds it.
+    const one = dropReport(before, truncated);
+    expect(one.scripts).toEqual([]);
+    expect(one.dropped).toEqual(['main:m2']);
+    expect(one.undeclared.steps).toEqual(['main:m2']);
+    expect(refuseDrop(one)).toBeNull();
+    expect(TACIT_STEP_DROPS).toBe(1);
+
+    // Two or more is a caller sending back something other than the file.
+    const gutted = before.map((s) => (s.id === 'pots' ? { ...s, steps: [] } : { ...s, steps: s.steps.slice(0, 1) }));
+    const many = dropReport(before, gutted);
+    expect(many.undeclared.steps).toEqual(['main:m2', 'pots:p1', 'pots:p2']);
+    expect(refuseDrop(many)).toMatch(/destroys 3 beats[\s\S]*main:m2, pots:p1, pots:p2/);
+    // …and saying so is what makes it legal. Any of the three spellings works.
+    expect(refuseDrop(dropReport(before, gutted, ['main:m2', 'p1', 'pots:p2']))).toBeNull();
+  });
+
+  it('does not call a beat MOVED between scripts a beat destroyed', () => {
+    // Step ids are unique file-wide, so a beat that turns up under another
+    // script is still in the file. Reporting it as dropped would refuse a
+    // legitimate re-parent and teach callers to declare drops they did not make.
+    const before = scriptsOf(fixture);
+    const moved = before.map((s) =>
+      s.id === MAIN_SCRIPT_ID ? { ...s, steps: [s.steps[0]!] } : s.id === 'pots' ? { ...s, steps: [...s.steps, before[0]!.steps[1]!] } : s
+    );
+    expect(dropReport(before, moved)).toEqual({ scripts: [], steps: [], dropped: [], undeclared: { scripts: [], steps: [] } });
+  });
+
+  it('a cross-site page cannot reach a dev API even with no Origin to judge', () => {
+    // MEASURED against Chromium: a third-party page's <img>/<script>/<link>/
+    // iframe/no-cors-fetch all arrive with NO Origin header — the shape the
+    // guard lets through for curl — and all of them carry
+    // `Sec-Fetch-Site: cross-site`, a forbidden header name no page can forge
+    // or strip. That pair is the whole rule; `/__open-in-editor` spawns an
+    // editor on this machine from exactly such a GET.
+    const req = (headers: Record<string, string>): IncomingMessage =>
+      ({ headers: { host: 'localhost:5173', ...headers } }) as unknown as IncomingMessage;
+
+    for (const dest of ['image', 'script', 'style', 'iframe', 'empty']) {
+      expect(callerAllowed(req({ 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'no-cors', 'sec-fetch-dest': dest }))).toBe(false);
+    }
+    // A cross-site NAVIGATION (a link, window.open) is the same refusal.
+    expect(callerAllowed(req({ 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' }))).toBe(false);
+
+    // …and everything legitimate still passes.
+    expect(callerAllowed(req({}))).toBe(true); // curl, tut.py, evt.py — not browsers
+    expect(callerAllowed(req({ 'sec-fetch-site': 'same-origin' }))).toBe(true); // vite's error overlay
+    expect(callerAllowed(req({ 'sec-fetch-site': 'none' }))).toBe(true); // a URL typed by hand
+    // The World Builder on another loopback port: cross-SITE when it is served
+    // from 127.0.0.1 while the game is on localhost, but it sends an Origin and
+    // that Origin is loopback, so the origin rule still answers for it.
+    expect(callerAllowed(req({ origin: 'http://127.0.0.1:8820', 'sec-fetch-site': 'cross-site' }))).toBe(true);
+    expect(callerAllowed(req({ origin: 'http://localhost:8820', 'sec-fetch-site': 'same-site' }))).toBe(true);
+    // A stranger that DOES send an Origin was already refused, and still is.
+    expect(callerAllowed(req({ origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' }))).toBe(false);
+    expect(callerAllowed(req({ origin: 'null' }))).toBe(false); // sandboxed iframe
+  });
+
+  it('refuses a main script with no steps, but keeps letting a lesson be empty', () => {
+    // The rule sits in the validator, so it also catches the OTHER way to empty
+    // Chapter One: a `remove_step` on its last beat through `POST /op`.
+    const emptyMain: TutorialData = { steps: [], tutorials: fixture.tutorials };
+    expect(validateTutorialData(emptyMain).join(';')).toMatch(/Chapter One must keep at least one step/);
+    // A mid-game lesson with no beats is an author mid-draft, not a broken game.
+    const emptyLesson: TutorialData = {
+      steps: [tap('m1')],
+      tutorials: [{ id: 'draft', trigger: { type: 'tutorial_done', tutorial: MAIN_SCRIPT_ID }, steps: [] }]
+    };
+    expect(validateTutorialData(emptyLesson)).toEqual([]);
   });
 
   it('a move gate needs a chain and a region and/or an [col,row] cell', () => {
@@ -200,5 +311,97 @@ describe('TutorialDirector (mid-game lessons on their triggers)', () => {
     ctx.bus.emit('tutorial:advance_requested', { stepId: 'm1' });
     // Main done → the latched observation starts the lesson immediately.
     expect(ctx.systems.tutorial.activeScriptId).toBe('hatch_tip');
+  });
+});
+
+/**
+ * A LESSON'S POINTER IS AS LIVE AS THE MAIN SCRIPT'S.
+ *
+ * `refreshMarkers` used to bail on `state.tutorialDone`, which read as "no
+ * script is running" back when `main` was the only script there was. Every
+ * mid-game lesson plays with that flag TRUE, so the guard silenced exactly the
+ * scripts that need re-aiming: the hand, arrow and highlight froze on whatever
+ * the beat resolved on entry, and an arrow whose piece then left the board was
+ * hidden by UIScene and never came back — the beat went on gating with nothing
+ * on screen pointing at anything.
+ */
+describe('a mid-game lesson re-aims its pointer at the live board', () => {
+  const pointing: TutorialData = {
+    steps: [tap('m1')],
+    tutorials: [
+      {
+        id: 'tidy',
+        trigger: { type: 'tutorial_done', tutorial: MAIN_SCRIPT_ID },
+        steps: [
+          {
+            ...tap('t1'),
+            highlight: [{ chain: 'ashmoss', nth: 0 }],
+            arrow: { tile: { chain: 'ashmoss', nth: 0 } }
+          }
+        ]
+      }
+    ]
+  };
+
+  /** Two tufts on the board, the main script answered, the lesson holding it. */
+  function openLesson(): ReturnType<typeof createTestContext> {
+    const ctx = createTestContext(undefined, { tutorial: pointing });
+    ctx.state.addItem({ chain: 'ashmoss', tier: 1, col: 1, row: 1, kind: 'item' });
+    ctx.state.addItem({ chain: 'ashmoss', tier: 1, col: 5, row: 4, kind: 'item' });
+    ctx.systems.tutorial.begin();
+    ctx.bus.emit('tutorial:advance_requested', { stepId: 'm1' });
+    expect(ctx.systems.tutorial.activeScriptId).toBe('tidy');
+    return ctx;
+  }
+
+  const arrowTile = (arrow: unknown): MarkerPoint | undefined =>
+    (arrow as { tile?: MarkerPoint } | null | undefined)?.tile;
+
+  it('follows the piece its arrow names when the player drags it away', () => {
+    const ctx = openLesson();
+    const steps = capture(ctx.bus, 'tutorial:step');
+    const markers = capture(ctx.bus, 'tutorial:markers');
+    ctx.systems.tutorial.begin(); // re-open with a listener attached
+    const aimed = arrowTile(steps.at(-1)!.arrow)!;
+    expect(aimed).toMatchObject({ col: 1, row: 1 });
+    const itemId = aimed.item!;
+
+    // Free ground well clear of the other tuft: a drop there is only a move.
+    drag(ctx, [1, 1], [1, 4]);
+
+    const after = arrowTile(markers.at(-1)?.arrow);
+    expect(after, 'the lesson never re-aimed its arrow').toBeTruthy();
+    expect(after).toMatchObject({ col: 1, row: 4, item: itemId });
+    expect(markers.at(-1)!.highlight).toEqual([{ col: 1, row: 4 }]);
+  });
+
+  it('re-aims — rather than going dark — when that piece leaves the board', () => {
+    const ctx = openLesson();
+    const steps = capture(ctx.bus, 'tutorial:step');
+    const markers = capture(ctx.bus, 'tutorial:markers');
+    ctx.systems.tutorial.begin();
+    const gone = arrowTile(steps.at(-1)!.arrow)!.item!;
+    const survivor = ctx.state.itemAt(5, 4)!.id;
+
+    // Merged, sold, pocketed — all of them reach the board the same way.
+    ctx.bus.emit('board:consume_items', { itemIds: [gone], reason: 'delivered' });
+
+    const after = arrowTile(markers.at(-1)?.arrow);
+    expect(after, 'the arrow was left on a piece that no longer exists').toBeTruthy();
+    // The rank re-resolves onto the tuft still standing: UIScene hides a
+    // piece-anchored arrow whose piece is gone, and only a fresh marker event
+    // can ever bring it back.
+    expect(after).toMatchObject({ col: 5, row: 4, item: survivor });
+    // The beat is still gating — nothing about the step itself was re-emitted.
+    expect(steps.at(-1)!.id).toBe('t1');
+  });
+
+  it('does not call the tutorial done while a lesson holds the board', () => {
+    const ctx = openLesson();
+    expect(ctx.state.tutorialDone).toBe(true); // main is over...
+    expect(ctx.systems.tutorial.isDone()).toBe(false); // ...but the board is not the player's
+    ctx.bus.emit('tutorial:advance_requested', { stepId: 't1' });
+    expect(ctx.systems.tutorial.activeScriptId).toBeNull();
+    expect(ctx.systems.tutorial.isDone()).toBe(true);
   });
 });

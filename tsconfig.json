@@ -20,6 +20,7 @@
     "src",
     "tests",
     "scripts",
+    "tools/checks",
     "vite.config.ts",
     "vitest.config.ts",
     "playwright.config.ts"

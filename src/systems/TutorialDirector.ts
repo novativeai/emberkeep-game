@@ -537,8 +537,16 @@ export class TutorialDirector {
     }
   }
 
+  /**
+   * Is the board the PLAYER'S — nothing scripted holding it?
+   *
+   * `tutorialDone` answered that only while `main` was the only script there
+   * was. It is true for every mid-game lesson ever authored, so on its own it
+   * now says "the main script is over" and nothing more; a lesson gating the
+   * board with its own allow-list would read as done. Both halves, then.
+   */
   isDone(): boolean {
-    return this.state.tutorialDone;
+    return this.state.tutorialDone && !this.activeScript;
   }
 
   private onGateEvent(event: string, chain?: string, currency?: string): void {
@@ -689,7 +697,16 @@ export class TutorialDirector {
    */
   private refreshMarkers(): void {
     const step = this.currentStep;
-    if (!step || this.state.tutorialDone) return;
+    // MARKERS ARE LIVE WHENEVER A BEAT IS ON SCREEN. This used to bail on
+    // `tutorialDone`, which meant "no script is running" back when the main
+    // script was the only one; it is TRUE for every mid-game lesson, so the
+    // guard silenced exactly the scripts that need re-aiming most — the hand,
+    // arrow and highlight froze on whatever `emitStep()` resolved on entry, and
+    // an arrow whose piece then merged away was hidden by the UI and never came
+    // back, leaving the beat gating with no pointer at all. `currentStep` is the
+    // honest test: it is undefined precisely when no script holds the board, and
+    // while `main` runs it says exactly what `!tutorialDone` said.
+    if (!step) return;
     const view = this.resolveStep(step);
     const key = markerKey(view);
     if (key === this.lastMarkers) return;

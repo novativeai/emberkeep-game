@@ -263,9 +263,10 @@ interface HitBox {
 /**
  * A world character's tap area, in TEXTURE space so `setScale` cannot shift it.
  *
- * `whole` widens it from her lower body to all of her — used only while a give
- * is armed, when there is no board tap left to protect and a miss would cancel
- * the gesture instead of landing it.
+ * `whole` widens it from her lower body to all of her, so that her HEAD answers
+ * a tap whenever a tap on her means something. It is only half the shape: the
+ * rect is a coarse bound and `standeeOpaqueAt` decides inside it, which is what
+ * stops a two-tile-tall box from swallowing the cells drawn behind her.
  */
 function characterHitRect(b: HitBox, whole: boolean): Phaser.Geom.Rectangle {
   return whole
@@ -4054,15 +4055,18 @@ export class BoardScene extends Phaser.Scene {
       // her clips are authored at different scales (idle 0.5671, cast 0.61371) and
       // deriving it per clip would change the weight of her outline the moment she
       // raised her scepter. Frames re-dress themselves; see SpriteInk.
-      attachSpriteInk(this, sprite, {
-        units: keylineUnits(
-          bank
-            ? Math.max(bank.frameWidth, bank.frameHeight) * standeeScale
-            : Math.max(sprite.displayWidth, sprite.displayHeight),
-          DRAGON_OUTLINE
-        )
-      });
+      const inkUnits = keylineUnits(
+        bank
+          ? Math.max(bank.frameWidth, bank.frameHeight) * standeeScale
+          : Math.max(sprite.displayWidth, sprite.displayHeight),
+        DRAGON_OUTLINE
+      );
+      attachSpriteInk(this, sprite, { units: inkUnits });
       syncSpriteInk(sprite);
+      // The ink twin is drawn BEHIND her and reaches PAST her frame, so what the
+      // player SEES of her is her art plus this line. The hit test below has to
+      // use that same edge, or a tap on her own outline would fall through her.
+      sprite.setData('inkUnits', inkUnits);
       // The ground shadow that plants her: sized to her BODY, never the frame
       // (the frame also spans the cast's ember bolt, which would throw a shadow
       // for a spell she is not casting). Just under her, so the breath lifts off
@@ -4076,13 +4080,14 @@ export class BoardScene extends Phaser.Scene {
         STANDEE_SHADOW_DX,
         STANDEE_SHADOW_DY
       );
-      // Her hit area is her LOWER BODY, never her full frame. A standee is ~2
-      // tiles tall, so its bounding box reaches over the cells behind her and
-      // would swallow taps and drags meant for the board — the same trap the fog
-      // puffs have (they get a tile diamond, not their puffy frame). Measured
-      // off the baked BODY box, never the frame: the frame also contains the
-      // scepter blaze and the ember bolt, and neither is her. Texture space (so
-      // `setScale` does not shift it), and origin does not either.
+      // Her hit area is her SILHOUETTE: a rect bound, and her own painted
+      // pixels inside it. A standee is ~2 tiles tall, so any box around her
+      // reaches over the cells behind her and would swallow taps and drags meant
+      // for the board — the same trap the fog puffs have (they get a tile
+      // diamond, not their puffy frame). The bound is measured off the baked
+      // BODY box, never the frame: the frame also contains the scepter blaze and
+      // the ember bolt, and neither is her. Texture space (so `setScale` does not
+      // shift it), and origin does not either.
       const b = bank?.body ?? { x: 0, y: 0, width: sprite.width, height: sprite.height };
       // With an atlas idle under her, texture space changed: carry the bank's
       // BODY box through game space into the clip's frame so the hit area still
@@ -4098,7 +4103,23 @@ export class BoardScene extends Phaser.Scene {
             })
           : b;
       sprite.setData('bodyBox', box);
-      sprite.setInteractive(characterHitRect(box, this.standeeWhole()), Phaser.Geom.Rectangle.Contains);
+      // Rect AND pixels, the same pair board items are hit-tested by: the rect
+      // is swapped in place by `reshapeStandees`, the callback outlives every
+      // swap. Failing on her transparent pixels is what keeps the pointer list
+      // empty over the board she is standing in front of — Phaser's `topOnly`
+      // would otherwise hand her every pointer inside the box, and a piece
+      // behind her sorts BELOW her, so it would answer neither tap nor drag.
+      sprite.setInteractive({
+        hitArea: characterHitRect(box, this.standeeWhole()),
+        hitAreaCallback: (
+          area: Phaser.Geom.Rectangle,
+          hx: number,
+          hy: number,
+          obj: Phaser.GameObjects.Sprite
+        ): boolean =>
+          Phaser.Geom.Rectangle.Contains(area, hx, hy) &&
+          this.standeeOpaqueAt(obj, hx, hy, this.standeeHitRing(obj))
+      });
       this.input.setDraggable(sprite, false);
       // Identity is the WARDROBE key: Eleanor-at-home is Eleanor — one Regard
       // gauge, one dialogue bank, one action cooldown, wherever she stands.
@@ -4464,15 +4485,90 @@ export class BoardScene extends Phaser.Scene {
    */
   /**
    * Is a standee something the player may TAP right now? Then her whole body
-   * listens. The lower-body rect exists so her two-tile frame cannot swallow
-   * taps meant for the cells behind her while she is only scenery — but when a
-   * tap on her means something (her action, a give, every post-tutorial
-   * moment) the bubble's arrow points at her head, and a head that does not
-   * answer reads as a broken button. The body box already excludes the
-   * scepter blaze and the bolt, so "whole" is still her and nothing else.
+   * listens. When a tap on her means something (her action, a give, every
+   * post-tutorial moment) the bubble's arrow points at her head, and a head
+   * that does not answer reads as a broken button. The body box already
+   * excludes the scepter blaze and the bolt, so "whole" is still her and
+   * nothing else — and `standeeOpaqueAt` keeps it to the pixels she paints, so
+   * widening the bound never costs the board a cell.
    */
   private standeeWhole(): boolean {
     return this.tutorialDone || this.allow.character;
+  }
+
+  /**
+   * Does a hit-area point land on a standee's OWN painted pixels?
+   *
+   * The rule board items already live under (`BoardItem.hitsOpaqueArt`, and the
+   * art-bounds law): a sprite owns the pixels it draws and not one more. It is
+   * what makes a whole-body bound safe. A standee is ~2 tiles tall and her body
+   * box hangs over the cells drawn BEHIND her; those sort at a LOWER depth, so
+   * `topOnly` cuts the hit list down to her alone and the piece standing there
+   * answers neither tap nor drag — `processDragDownEvent` never even sees it.
+   * Measured in Roothold, where she stands one cell in front of (85,0): the
+   * whole-body box claims 100% of that piece's footprint (the lower-body box
+   * claimed 44%). Yielding her transparent pixels hands the board back every
+   * part of a piece the player can actually SEE, in both directions — she still
+   * answers a tap on her head, because her head is opaque.
+   *
+   * Hit-area points arrive in the LIVE frame's texture space (Phaser adds
+   * `displayOrigin` and has already undone scale), which is the same space the
+   * bodyBox rect is measured in — so the alpha lookup needs no conversion.
+   */
+  private standeeOpaqueAt(
+    sprite: Phaser.GameObjects.Sprite,
+    hx: number,
+    hy: number,
+    ring: number
+  ): boolean {
+    const key = sprite.texture.key;
+    // No pixels to ask (a texture evicted by travel mid-pointer): behave like
+    // the plain rect rather than going deaf.
+    if (!this.textures.exists(key)) return true;
+    const frame = sprite.frame.name;
+    const sample = (x: number, y: number): boolean => {
+      // Source art faces LEFT; a mirrored standee reads the mirrored column.
+      const px = sprite.flipX ? sprite.width - x : x;
+      const a = this.textures.getPixelAlpha(Math.floor(px), Math.floor(y), key, frame);
+      return a !== null && a > 0;
+    };
+    if (sample(hx, hy)) return true;
+    if (ring <= 0) return false;
+    return (
+      sample(hx + ring, hy) ||
+      sample(hx - ring, hy) ||
+      sample(hx, hy + ring) ||
+      sample(hx, hy - ring) ||
+      sample(hx + ring, hy + ring) ||
+      sample(hx - ring, hy - ring) ||
+      sample(hx + ring, hy - ring) ||
+      sample(hx - ring, hy + ring)
+    );
+  }
+
+  /**
+   * How far past her painted pixels a pointer still counts as her — her
+   * KEYLINE, in texture px.
+   *
+   * Not forgiveness: the ink twin is part of what is drawn, so this is still
+   * "her silhouette" and nothing more. That distinction is worth the ceremony,
+   * because generosity here is expensive in a way it is not for a board item.
+   * A piece standing behind her shows as a fringe a few pixels wide past her
+   * outline, and that fringe is the whole of what the player has to aim at.
+   * Measured in Roothold on the piece at (85,0): her art alone covers 82% of
+   * it, her keyline takes that to 93% — and a board-item-sized ring
+   * (HIT_FORGIVENESS_PX, ~40 texture px once converted onto her) would take it
+   * to 99%, handing back almost exactly the sliver being aimed at. Forgiveness
+   * is for thin, holey pieces; a standee is the largest silhouette on the board
+   * and needs none.
+   *
+   * Divided by the LIVE scale: the units are on-board (the line does not change
+   * weight between clips), and hit-area points arrive in texture space.
+   */
+  private standeeHitRing(sprite: Phaser.GameObjects.Sprite): number {
+    const units = (sprite.getData('inkUnits') as number | undefined) ?? 0;
+    const scale = Math.abs(sprite.scaleX);
+    return units > 0 && scale > 0 ? units / scale : 0;
   }
 
   private reshapeStandees(): void {

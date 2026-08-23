@@ -13,7 +13,7 @@ import {
   type PropertyFacts
 } from '../../src/core/gameEvents';
 import type { EventsData, GameEventConfig } from '../../src/core/types';
-import { applyOp } from '../../tools/events-api/server';
+import { applyOp, droppedEventIds } from '../../tools/events-api/server';
 
 const shipped = eventsJson as unknown as EventsData;
 
@@ -149,6 +149,31 @@ describe('gameEvents (the model)', () => {
     expect(validateEventsData({ events: [say('Bad-Id')] }).join('; ')).toMatch(/lowercase/);
   });
 
+  /**
+   * `event:fired` is the one fact the system both emits and observes, so an
+   * un-narrowed trigger on it describes the author's own firing too — the
+   * shape that used to recurse ~1160 frames deep. The runtime bounds the
+   * cascade whatever the author writes (EventSystem's one-turn-per-cascade
+   * rule); this rule only refuses the sentence nobody means.
+   */
+  it('refuses an "event:fired" trigger that does not name the event it watches', () => {
+    const on = (match?: Record<string, string | number | boolean>): string =>
+      validateEventsData({ events: [{ ...say('x'), when: [{ type: 'event', event: 'event:fired', ...(match ? { match } : {}) }] }] }).join('; ');
+    expect(on()).toMatch(/must name the event it watches \(match\.id\)/);
+    // A `match` that narrows something ELSE is the same sentence: every event's
+    // first firing is still every event's.
+    expect(on({ count: 1 })).toMatch(/must name the event it watches/);
+    expect(on({ id: 'greet' })).toBe('');
+    // And a pair naming each OTHER is legal — it is the runtime, not this rule,
+    // that keeps their loop finite.
+    expect(validateEventsData({
+      events: [
+        { ...say('ping'), when: [{ type: 'event', event: 'event:fired', match: { id: 'pong' } }] },
+        { ...say('pong'), when: [{ type: 'event', event: 'event:fired', match: { id: 'ping' } }] }
+      ]
+    })).toEqual([]);
+  });
+
   it('says what a trigger and an action do, in one line each', () => {
     expect(triggerSentence({ type: 'event', event: 'item:merged', match: { chain: 'sparkweed' } })).toBe('on item:merged where chain = sparkweed');
     expect(triggerSentence({ type: 'property', prop: 'keeper.coins', op: '>=', value: 100 })).toBe('when keeper.coins becomes >= 100');
@@ -190,5 +215,38 @@ describe('events API ops (pure, validated)', () => {
     expect(() => applyOp(base, { op: 'update_event', id: 'rich', patch: { then: [] } }, ctx)).toThrow(/at least one action/);
     expect(() => applyOp(base, { op: 'remove_event', id: 'rich' }, ctx)).toThrow(/fire names no event "rich"/);
     expect(JSON.stringify(base)).toBe(before);
+  });
+});
+
+describe('events API: a whole-file replace names what it destroyed', () => {
+  // The repro this closes, measured against the live dev server: PUT
+  // { events: [first of six] } answered {"ok":true,"replaced":6} — a count of
+  // what the file HELD, which reads the same whether five events died or none.
+  const ctx = { chains: ['sparkweed'], characters: ['eleanor'] };
+  const leaf = (id: string, children?: GameEventConfig[]): GameEventConfig => ({
+    id,
+    title: id,
+    when: [{ type: 'manual' }],
+    then: [{ add: 'keeper.coins', amount: 1 }],
+    ...(children ? { children } : {})
+  });
+  const before = [leaf('a', [leaf('a_kid')]), leaf('b'), leaf('c')];
+
+  it('names every id the body no longer carries, at any depth', () => {
+    expect(droppedEventIds(before, [leaf('a')])).toEqual(['a_kid', 'b', 'c']);
+    expect(droppedEventIds(before, [leaf('a', [leaf('a_kid')]), leaf('b'), leaf('c')])).toEqual([]);
+  });
+
+  it('does not report a re-parented child as destroyed', () => {
+    // 'a_kid' moved up to the root is still in the file — a move is not a loss.
+    const after = [leaf('a'), leaf('a_kid'), leaf('b'), leaf('c')];
+    expect(droppedEventIds(before, after)).toEqual([]);
+  });
+
+  it('reports the whole tree when the body is empty (a legal, reportable state)', () => {
+    // {"events":[]} is authored-legal, so this reports rather than refuses —
+    // the difference from the tutorial API's beat rule, which 409s.
+    expect(droppedEventIds(before, [])).toEqual(['a', 'a_kid', 'b', 'c']);
+    expect(validateEventsData({ events: [] }, ctx)).toEqual([]);
   });
 });

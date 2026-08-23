@@ -27,9 +27,24 @@ export function scriptsOf(data: TutorialData): TutorialScriptConfig[] {
   ];
 }
 
-/** Rebuild the file shape from a script list (the editor's save path). */
+/**
+ * Rebuild the file shape from a script list (the editor's save path).
+ *
+ * A list with no `main` is not a file with an empty Chapter One — it is a
+ * caller that dropped Chapter One, and the two must never be confused. This
+ * used to substitute `steps: []`, which is how `PUT /__tutorial {"scripts":[]}`
+ * — the natural shape of `tut put` on a partial dump, or of any client that
+ * PUTs back only the scripts it edited — answered `{"ok":true}` while erasing
+ * all 64 beats. Refuse, so the mistake costs a 400 instead of the game.
+ *
+ * That covers only the list that lost CHAPTER ONE. The same partial dump minus
+ * a mid-game LESSON is a legal list, and rebuilding from it is a real deletion;
+ * catching that needs the file on disk to compare against, so it lives one
+ * level up, in the PUT handler (`dropReport`, tools/tutorial-api/server.ts).
+ */
 export function dataOf(scripts: TutorialScriptConfig[]): TutorialData {
   const main = scripts.find((s) => s.id === MAIN_SCRIPT_ID);
+  if (!main) throw new Error(`no "${MAIN_SCRIPT_ID}" script in the list — refusing to rebuild tutorial.json without Chapter One`);
   const rest = scripts
     .filter((s) => s.id !== MAIN_SCRIPT_ID)
     .map(({ id, title, trigger, allowBase, steps }) => {
@@ -38,7 +53,7 @@ export function dataOf(scripts: TutorialScriptConfig[]): TutorialData {
       if (allowBase && allowBase !== 'everything') out.allowBase = allowBase;
       return out;
     });
-  const data: TutorialData = { steps: main?.steps ?? [] };
+  const data: TutorialData = { steps: main.steps };
   if (rest.length) data.tutorials = rest;
   return data;
 }
@@ -142,6 +157,18 @@ export function validateTutorialData(data: TutorialData): string[] {
     if (!Array.isArray(script.steps)) {
       errors.push(`script "${script.id}": steps must be an array`);
       continue;
+    }
+    // Chapter One with no beats is a file the game cannot start from: the
+    // director has no step to emit, so no `tutorial:step` ever fires, BoardScene
+    // keeps the opening NO_ALLOW (every flag false, drag: []) and `tutorialDone`
+    // is unreachable — an inert board that says nothing about why. The rule
+    // lives HERE, not at the PUT boundary, because every write funnels through
+    // this one validator: the PUT, `POST /op` (a `remove_step` on the last
+    // beat), and the unit test that holds the committed file to the same law.
+    // A MID-GAME script may be empty on purpose — `add_script` creates one
+    // before its beats exist, and an unstarted lesson breaks nothing.
+    if (script.id === MAIN_SCRIPT_ID && script.steps.length === 0) {
+      errors.push(`script "${script.id}": Chapter One must keep at least one step — an empty main script makes the game inert`);
     }
     if (script.allowBase !== undefined && script.allowBase !== 'nothing' && script.allowBase !== 'everything') {
       errors.push(`script "${script.id}": allowBase must be 'nothing' or 'everything'`);

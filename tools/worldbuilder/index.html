@@ -1711,8 +1711,15 @@ function buildMergeExport() {
   }));
   return { version: 1, kind: 'emberkeep-merge', mergeRule: S.merge.mergeRule, chains, art };
 }
-/** Call a `/__worldbuilder/*` dev-server endpoint, wherever this page is open
- *  from — same origin when served by vite, localhost:5173 from file:// or :8820. */
+/** Call a dev-server endpoint (`/__worldbuilder/*`, `/__tutorial`, `/__events`),
+ *  wherever this page is open from — same origin when served by vite, and
+ *  localhost:5173 when served from :8820.
+ *  NOT from `file://` any more, for ANY of them: a file:// page sends
+ *  `Origin: null`, and an opaque origin is exactly what a sandboxed third-party
+ *  iframe sends, so every dev API that writes source files refuses it (the
+ *  shared guard in vite.config.ts `devApiGuard`, and the same one inside
+ *  tools/tutorial-api/server.ts). Serve this page over http — which is the
+ *  documented way anyway — and the writes land as before. */
 async function devEndpoint(path, method, body) {
   const bases = location.protocol === 'file:' ? ['http://localhost:5173'] : ['', 'http://localhost:5173'];
   let lastErr = null;
@@ -1724,6 +1731,15 @@ async function devEndpoint(path, method, body) {
         body: body ? JSON.stringify(body) : undefined
       });
       if (res.ok || res.status === 400) return res.json();
+      // A REFUSAL THE SERVER EXPLAINS IS AN ANSWER, not a dead base. 403 (origin),
+      // 415 (a write that did not declare JSON) and 409 (a whole-file PUT that
+      // would delete scripts it never mentioned) carry the same
+      // `{ ok:false, error }` the panels already render, so hand it back rather
+      // than trying the next base and reporting a bare "HTTP 403".
+      if (res.status === 403 || res.status === 409 || res.status === 415) {
+        const out = await res.json().catch(() => null);
+        if (out && out.ok === false) return out;
+      }
       lastErr = new Error(`HTTP ${res.status}`);
     } catch (e) { lastErr = e; }
   }
@@ -5329,7 +5345,10 @@ setCategory('tile');
  * and the STATES it leaves the UI in (allow flags, held panels, hand-back).
  * ----------------------------------------------------------------------------- */
 const TUT = (() => {
-  const st = { scripts: null, ctx: null, sel: 'main', editing: null, dirty: false, loading: false, lastOut: null };
+  // `dropped`: ids deleted here since the last save. PUT replaces the whole
+  // file, so the server refuses an omission it was not told about — this page
+  // holds the whole file (it loaded it), so its deletions are the declared kind.
+  const st = { scripts: null, ctx: null, sel: 'main', editing: null, dirty: false, loading: false, lastOut: null, dropped: [] };
   const api = (path, method = 'GET', body) => devEndpoint(`/__tutorial${path}`, method, body);
   const el = (tag, attrs = {}, ...kids) => {
     const n = document.createElement(tag);
@@ -5701,7 +5720,9 @@ const TUT = (() => {
     const users = st.scripts.filter((s) => (s.trigger?.type === 'step_done' || s.trigger?.type === 'tutorial_done') && s.trigger.tutorial === id);
     if (users.length) { alert(`${users.map((s) => s.id).join(', ')} trigger off "${id}" — repoint them first.`); return; }
     if (!confirm(`Delete tutorial "${id}" and its beats?`)) return;
-    st.scripts = st.scripts.filter((s) => s.id !== id); st.sel = 'main'; mark(); render();
+    st.scripts = st.scripts.filter((s) => s.id !== id);
+    if (!st.dropped.includes(id)) st.dropped.push(id);
+    st.sel = 'main'; mark(); render();
   }
 
   /* ------------------------------- I/O ------------------------------- */
@@ -5711,16 +5732,18 @@ const TUT = (() => {
     st.loading = true; render();
     try {
       const [doc, ctx] = await Promise.all([api(''), st.ctx ? Promise.resolve(st.ctx) : api('/context')]);
-      st.scripts = doc.scripts; st.ctx = ctx; st.dirty = false; st.lastOut = null;
+      st.scripts = doc.scripts; st.ctx = ctx; st.dirty = false; st.lastOut = null; st.dropped = [];
       if (!st.scripts.some((s) => s.id === st.sel)) st.sel = 'main';
     } catch (e) { st.scripts = null; console.warn('[tutorial editor]', e); }
     st.loading = false; render();
   }
   async function save() {
     try {
-      const res = await api('', 'PUT', { scripts: st.scripts });
+      const res = await api('', 'PUT', { scripts: st.scripts, drop: st.dropped });
       if (!res.ok) { st.lastOut = { ok: false, text: `NOT SAVED — the file would be broken:\n• ${(res.errors ?? [res.error]).join('\n• ')}` }; render(); return; }
-      st.scripts = res.scripts; st.dirty = false; st.lastOut = { ok: true, text: 'Saved to src/data/tutorial.json. The running game picks it up on its next reload.' };
+      st.scripts = res.scripts; st.dirty = false; st.dropped = [];
+      const gone = res.dropped?.length ? `\nDeleted: ${res.dropped.join(', ')} — the replaced file is at ${res.backup ?? '(no backup)'}.` : '';
+      st.lastOut = { ok: true, text: `Saved to src/data/tutorial.json. The running game picks it up on its next reload.${gone}` };
     } catch (e) { st.lastOut = { ok: false, text: `Save failed: ${e.message}` }; }
     render();
   }
