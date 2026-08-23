@@ -96,3 +96,5 @@ __pycache__/
 
 # beat checkpoints: the save blobs are committed, the screenshots are regenerated
 tests/e2e/checkpoints/*.png
+.vercel
+.env*
