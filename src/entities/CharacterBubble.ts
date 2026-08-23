@@ -3,7 +3,8 @@ import { FONT } from '../art/design';
 import { CHARACTER_ANIMS, type CharacterClip, clipFor, clipKey, type PortraitView } from '../core/characterAnims';
 import { num, PALETTE, PORTRAIT_CLIP_TALK, readMs, STORY_BEAT_HOLD_MS, TIMINGS, TYPEWRITER } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
-import type { SpeakerId, TutorialStepEvent } from '../core/types';
+import { nounMatcher, pieceNames } from '../core/speechHighlight';
+import type { ChainsData, SpeakerId, TutorialStepEvent } from '../core/types';
 import {
   ANIMATED_SPEAKER,
   discTextureFor,
@@ -175,7 +176,13 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   private atlasTick: Phaser.Time.TimerEvent | null = null;
   private atlasTalkHold: Phaser.Time.TimerEvent | null = null;
 
-  constructor(scene: Phaser.Scene, private bus: EventBus) {
+  constructor(
+    scene: Phaser.Scene,
+    private bus: EventBus,
+    /** The roster the highlighter reads its nouns out of — every tier of every
+     *  chain is a thing the player can be told to go and find. */
+    private chains: ChainsData
+  ) {
     super(scene, 0, 0);
     this.bg = scene.add.graphics();
     this.label = scene.add
@@ -383,13 +390,47 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
    * reuses the label's exact wrap: `getWrappedText` gives the same lines the
    * label drew, and an unwrapped twin measures the prefix on each one.
    *
-   * Only the dragon's name is ever highlighted. It is a name the player chose,
-   * and it should read like one.
+   * WHAT is highlighted: every noun the line names that the player could go and
+   * look at — the people, and every piece on the board (`chains.json` tier
+   * names, which is where the words in these lines come from in the first
+   * place). It used to be the dragon's name alone, which left a line like
+   * "for Kioto it is resin" colouring the dragon and not the thing the player
+   * has to go and find — the half of the sentence that is an instruction.
+   *
+   * One colour for all of them, deliberately: the highlight means "this is a
+   * thing in the world", and a second hue would be a second meaning nobody
+   * taught. The dragon's chosen name joins the same list rather than keeping a
+   * colour of its own.
    */
+  /** Cached matcher + the dragon name it was built for (the one noun that
+   *  arrives mid-game, when the player names their whelp). */
+  private highlightCache: { seed: string; re: RegExp | null } | null = null;
+
+  /**
+   * One matcher over every noun this line could be naming: the people, every
+   * piece on the board, and the dragon's chosen name once the player has given
+   * one. Rebuilt only when that name changes — it is the single noun that
+   * arrives mid-game.
+   *
+   * The matching rules (longest-first, whole-word, plural-tolerant) live in
+   * `core/speechHighlight`, where a node test can hold them.
+   */
+  private highlightRe(): RegExp | null {
+    const seed = this.tokens.dragon ?? '';
+    if (this.highlightCache?.seed === seed) return this.highlightCache.re;
+    const re = nounMatcher([
+      ...pieceNames(this.chains),
+      ...Object.values(SPEAKERS).map((s) => s.name),
+      seed
+    ]);
+    this.highlightCache = { seed, re };
+    return re;
+  }
+
   private paintHighlight(): void {
     this.highlightFx.removeAll(true);
-    const word = this.tokens.dragon;
-    if (!word || !this.label.text.includes(word)) return;
+    const re = this.highlightRe();
+    if (!re) return;
 
     const scale = this.label.scaleX;
     const lines = this.label.getWrappedText(this.label.text);
@@ -407,10 +448,10 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     const topY = this.label.y - (this.label.height * scale) / 2;
 
     lines.forEach((line, row) => {
-      for (let from = 0; ; ) {
-        const at = line.indexOf(word, from);
-        if (at < 0) break;
-        from = at + word.length;
+      re.lastIndex = 0;
+      for (let m = re.exec(line); m !== null; m = re.exec(line)) {
+        const word = m[0];
+        const at = m.index;
         const x = this.label.x + this.widthOf(line.slice(0, at)) * scale;
         const y = topY + (row * advance + lineBox / 2) * scale;
         const w = this.widthOf(word) * scale;
@@ -424,7 +465,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
             fontFamily: FONT.ui,
             fontSize: this.label.style.fontSize,
             fontStyle: 'bold',
-            color: PALETTE.lava
+            color: PALETTE.goldShade
           })
           .setOrigin(0, 0.5)
           .setScale(scale);

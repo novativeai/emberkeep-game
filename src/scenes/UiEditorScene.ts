@@ -65,7 +65,7 @@ export class UiEditorScene extends Phaser.Scene {
     const shop = new ShopPanel(this, ctx.bus, ctx.state);
     shop.setDepth(68);
 
-    const bubble = new CharacterBubble(this, ctx.bus);
+    const bubble = new CharacterBubble(this, ctx.bus, ctx.data.chains);
     bubble.setPosition(LIVE_GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
     bubble.setDepth(100);
     bubble.registerUi();

@@ -507,7 +507,7 @@ export class UIScene extends Phaser.Scene {
     // one thing it must never do is arrive long after the moment it is about.
     this.reveal = new DragonReveal(this, this.ctx.bus, this.ctx);
 
-    this.bubble = new CharacterBubble(this, this.ctx.bus);
+    this.bubble = new CharacterBubble(this, this.ctx.bus, this.ctx.data.chains);
     // THE ONE DOOR onto lazily-fetched ring art (`ensureRingArt`). Hung on the
     // bubble's own speaker swap rather than on the call sites that were known
     // when the Elder got a voice, so every path that can name a speaker — a
