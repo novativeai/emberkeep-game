@@ -165,6 +165,8 @@ export class QuestTracker extends Phaser.GameObjects.Container {
 
   private storyVisible = false;
   private tasksVisible = false;
+  /** Something is over the board — see `setSuppressed`. */
+  private suppressed = false;
   private readonly offBus: Array<() => void> = [];
   /** The step id whose ladder is currently peeked, so a pointer travelling
    *  along one row does not re-emit on every move event. */
@@ -319,6 +321,31 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.tasksVisible = visible;
     if (visible) this.syncRows();
     this.applyVisibility();
+  }
+
+  /**
+   * Something is over the board: hold every hover, wheel and drag this cluster
+   * would answer, and drop whatever sheet is standing.
+   *
+   * The tracker STAYS on screen — it is a readout, and a panel does not make it
+   * untrue. What must stop is the reaching: the peek is bounds-tested against
+   * the rows rather than owned by an interactive object, so it cannot be
+   * covered up the way a real hit area would be, and a pointer crossing the
+   * cluster's coordinates on its way to the Settings sheet raised a recipe card
+   * over the dialog the player had just opened.
+   *
+   * Driven every frame from UIScene's `update` rather than off eight
+   * `*_opened` events, for the same reason the hint hand is: the question is
+   * "is anything up", not "which one just went up".
+   */
+  setSuppressed(value: boolean): void {
+    if (this.suppressed === value) return;
+    this.suppressed = value;
+    if (value) {
+      this.dropPeek();
+      this.dragging = false;
+      this.downAt = null;
+    }
   }
 
   private applyVisibility(): void {
@@ -666,7 +693,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
    * camera is fixed), so the comparison is direct.
    */
   private overList(pointer: Phaser.Input.Pointer): boolean {
-    if (!this.tasksVisible) return false;
+    if (!this.tasksVisible || this.suppressed) return false;
     const band = this.viewBand();
     let left = Infinity;
     let top = Infinity;

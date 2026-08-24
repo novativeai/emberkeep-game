@@ -318,7 +318,13 @@ export class UIScene extends Phaser.Scene {
       this.cauldron.isOpen ||
       this.cookbook.isOpen ||
       this.codex.isOpen ||
-      this.topUp.isOpen
+      this.topUp.isOpen ||
+      // The two DIALOGS are over the board exactly as much as a panel is, and
+      // were missing from a test whose whole point is that there be only one of
+      // it. The Settings sheet is the one the player opens most, and it is the
+      // one that is not a panel.
+      this.dialog !== null ||
+      this.iapDialog !== null
     );
   }
   /** The carry lesson holds the hand until the thing has been carried — see
@@ -631,6 +637,9 @@ export class UIScene extends Phaser.Scene {
       this.hintHand = false;
       this.clearMarkers();
     }
+    // Same question, same answer, one frame later: the quest tracker stops
+    // reaching for the pointer while anything is over the board.
+    this.questTracker.setSuppressed(this.panelUp());
     // Re-project board-anchored tutorial markers EVERY frame so they stay glued
     // to their cell as the board camera pans/zooms (they live on the UI scene's
     // own fixed camera, so without this they'd appear stuck to the screen).
