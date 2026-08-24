@@ -456,7 +456,15 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     const goal = step.goal;
     if (goal.kind === 'recipe') return `item_${goal.chain}_${goal.fromTier}`;
     if (goal.kind === 'have' || goal.kind === 'gift') return `item_${goal.chain}_${goal.tier}`;
-    return null;
+    // A DELIVERY names an ORDER, not a piece — and delivery is what most of the
+    // ladder asks for, so the commonest row in the game was the one row with no
+    // icon: "Deliver 6 Gem Chips to Eleanor" sat bare beside "Merge 3 Rubies"
+    // wearing its ruby. The piece is one hop away through the same `needsFor`
+    // the hover sheet already walks, so the row can say what to go touch here
+    // too. Goals that name no piece at all — a level, a region, a person's
+    // regard — still get none, which is the rule and not an omission.
+    const piece = this.goalOf(step);
+    return piece ? `item_${piece.chain}_${piece.tier}` : null;
   }
 
   private addRow(questId: string, step: QuestStepConfig): void {
