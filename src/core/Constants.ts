@@ -2149,7 +2149,7 @@ export interface FogStyle {
 export const FOG_STYLE_BY_WORLD: Readonly<Record<string, FogStyle>> = {
   // `emberkeep` is the world built from the nb2-4k-aligned editor map
   // (scripts/build-zones.mjs `editorMap`) — the board the player lands on.
-  emberkeep: { tile: 'cloud_tile_dark', storm: true }
+  emberkeep: { tile: 'cloud_tile', storm: true }
 };
 export const FOG_STYLE_DEFAULT: FogStyle = { tile: 'cloud_tile', storm: false };
 
