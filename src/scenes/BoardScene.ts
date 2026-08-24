@@ -25,6 +25,10 @@ import {
   FINALE_ENDS_MS,
   GATE_LESSON_STAT,
   FINALE_REGION,
+  FOG_BLANKET,
+  FOG_STORM,
+  FOG_STYLE_BY_WORLD,
+  FOG_STYLE_DEFAULT,
   LIVE_GAME_WIDTH,
   GOLDEN_ALTAR,
   GOLDEN_CHAIN,
@@ -69,7 +73,9 @@ import {
   TIMINGS,
   WORLD_ID
 } from '../core/Constants';
+import type { FogStyle } from '../core/Constants';
 import { FONT as FONT_FAMILIES } from '../art/design';
+import { seededRandom } from '../art/colors';
 import {
   type CharacterClip,
   clipFor,
@@ -498,6 +504,8 @@ export class BoardScene extends Phaser.Scene {
   /** The always-on ambience gated off in doze: 2 updrafts + the firefly swarm. */
   private ambientEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   private twinkleTimer?: Phaser.Time.TimerEvent;
+  /** Rolls the lightning inside this world's cloud banks; paused on doze. */
+  private stormTimer?: Phaser.Time.TimerEvent;
   /** Ember-fly ambience: the emit zone tracks the camera's worldView. */
   private fireflyZone?: Phaser.Geom.Rectangle;
   /** Authored world FX emitters (src/data/emitters.json) + their orchestrator. */
@@ -665,6 +673,7 @@ export class BoardScene extends Phaser.Scene {
     this.ctx.bus.on('regard:gift_accepted', ({ characterId }) => this.playStandeeReaction(characterId, 'happy'));
     this.ctx.bus.on('regard:heart', ({ characterId }) => this.playStandeeReaction(characterId, 'laugh'));
     this.buildFog();
+    this.startFogStorm();
     this.buildSouthPromise();
     this.buildKeyBadges();
     this.buildPortals(); // the doors out — after buildFog, so a cloud covers one
@@ -708,6 +717,7 @@ export class BoardScene extends Phaser.Scene {
       this.loads.reset();
       this.ambientEmitters = [];
       this.twinkleTimer = undefined;
+      this.stormTimer = undefined;
       this.offBus.forEach((off) => off());
       this.offBus = [];
       for (const ld of this.liveDragons.values()) {
@@ -794,6 +804,7 @@ export class BoardScene extends Phaser.Scene {
     }
     for (const emitter of this.ambientEmitters) emitter.emitting = !doze;
     if (this.twinkleTimer) this.twinkleTimer.paused = doze;
+    if (this.stormTimer) this.stormTimer.paused = doze;
     this.hubGlow?.setVisible(!doze);
     this.hubSign?.setVisible(!doze);
     // The FX director takes the state itself: it caps quality in two steps
@@ -4968,10 +4979,87 @@ export class BoardScene extends Phaser.Scene {
       // `fog: false` = ground this chapter cannot reach; it keeps its painted
       // scenery rather than a cloud that would never lift (see MapRegionConfig).
       if (region.fog === false) continue;
+      // A cap has to know its own bank's shape: one with cloud on all four
+      // sides is deep inside and can sit big and solid, one on the rim has to
+      // fray or the bank ends on a hard diamond staircase.
+      const own = new Set(region.tiles.map(([c, r]) => `${c},${r}`));
       for (const [col, row] of region.tiles) {
-        this.createFogSprite(region.id, col, row);
+        this.createFogSprite(region.id, col, row, own);
       }
     }
+  }
+
+  /** How this world's blockers look and whether they carry weather. */
+  private fogStyle(): FogStyle {
+    return FOG_STYLE_BY_WORLD[this.ctx.state.world.id] ?? FOG_STYLE_DEFAULT;
+  }
+
+  /**
+   * The storm inside the cloud banks. Ambience and nothing else: it reads no
+   * state, writes none, and takes no input — a bolt over a cloud must never be
+   * mistaken for something the player can tap.
+   *
+   * One rolling timer for the whole board rather than one per cloud: 50 clouds
+   * would otherwise mean 50 timers to pause, and the strike has to pick a
+   * cloud anyway. `graphics.profile.weather` is the same lever the sky and snow
+   * answer to, so the low tier drops this with the rest of the weather.
+   */
+  private startFogStorm(): void {
+    if (!this.fogStyle().storm || !graphics.profile.weather) return;
+    this.stormTimer = this.time.addEvent({
+      delay: FOG_STORM.tickMs,
+      loop: true,
+      callback: () => {
+        if (Math.random() < FOG_STORM.chance) this.strikeFog();
+      }
+    });
+  }
+
+  /** One flash: a cloud lights from within and a fork drops out of its base. */
+  private strikeFog(): void {
+    // Only clouds the player can actually see — a flash outside the worldView
+    // costs two sprites and a tween to show nobody anything.
+    const view = this.cameras.main.worldView;
+    const lit = [...this.fog.values()].filter((p) => p.visible && view.contains(p.x, p.y));
+    if (lit.length === 0) return;
+    const cloud = Phaser.Utils.Array.GetRandom(lit);
+    const dx = (Math.random() - 0.5) * cloud.displayWidth * FOG_STORM.jitterFrac;
+
+    // BEHIND the cloud (depth − 1), hanging from just above its anchor: the
+    // bank swallows the top of the bolt and only the fork clears the base,
+    // which is what sells "inside the cloud" rather than "in front of it".
+    const bolt = this.add
+      .image(
+        cloud.x + dx,
+        cloud.y - cloud.displayHeight * FOG_STORM.hangFrac,
+        Phaser.Utils.Array.GetRandom(['fx_bolt_1', 'fx_bolt_2', 'fx_bolt_3'])
+      )
+      .setOrigin(0.5, 0)
+      .setDepth(cloud.depth - 1)
+      .setAlpha(0);
+    bolt.setScale((cloud.displayHeight * FOG_STORM.boltHeightRatio) / bolt.height);
+    // The light the bolt casts INTO the cloud — additive, over the cap. Without
+    // it the fork reads as a decal stuck on the sky instead of a lit interior.
+    const glow = this.add
+      .image(cloud.x + dx * 0.5, cloud.y - cloud.displayHeight * 0.1, 'fx_glow')
+      .setTint(num(PALETTE.goldAccent))
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(cloud.depth + 1)
+      .setAlpha(0);
+    glow.setScale((cloud.displayWidth * FOG_STORM.glowWidthRatio) / glow.width);
+
+    let at = 0;
+    for (const [alpha, hold] of FOG_STORM.beats) {
+      this.time.delayedCall(at, () => {
+        bolt.setAlpha(alpha);
+        glow.setAlpha(alpha * FOG_STORM.glowPeakAlpha);
+      });
+      at += hold;
+    }
+    this.time.delayedCall(at, () => {
+      bolt.destroy();
+      glow.destroy();
+    });
   }
 
   /**
@@ -5610,32 +5698,81 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
-  private createFogSprite(regionId: string, col: number, row: number): void {
+  private createFogSprite(regionId: string, col: number, row: number, own: ReadonlySet<string>): void {
     const { x, y } = gridToWorld(col, row);
     // The real authored level-blocker cloud (the same tile the world builder
-    // paints), placed uniformly on the grid so neighbours overlap into one
-    // seamless blanket. Anchor 0.5/0.62 puffs it up over the tile.
+    // paints). Anchor 0.5/0.62 puffs it up over the tile. A world may name its
+    // own cloud (FOG_STYLE_BY_WORLD) — every cap is framed to that same anchor,
+    // so a repaint is a texture swap and nothing else moves.
+    //
+    // The cap is then OVERSIZED and varied per cell (FOG_BLANKET). At scale 1
+    // the art is exactly one tile wide and the caps tile perfectly, which is
+    // precisely why the bank reads as a staircase of stamps rather than weather.
     const zoneScale = artScaleAt(this.ctx.state.world, col, row);
+    const tile = this.fogStyle().tile;
+    // Seeded on the CELL, so a bank looks the same every reload and after every
+    // camera move — a blanket that reshuffles itself on reload reads as a bug.
+    const rand = seededRandom(((col + 4096) * 73856093) ^ ((row + 4096) * 19349663));
+    const jitter = (amp: number): number => (rand() - 0.5) * 2 * amp;
+    const sides = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ].filter(([dc, dr]) => own.has(`${col + (dc as number)},${row + (dr as number)}`)).length;
+    // 0 = walled in on all four sides, 1 = a lone puff facing open sky.
+    const exposure = Math.max(0, FOG_BLANKET.interiorNeighbours - sides) / FOG_BLANKET.interiorNeighbours;
+    const scale =
+      zoneScale *
+      FOG_BLANKET.overlap *
+      (1 + jitter(FOG_BLANKET.scaleJitter)) *
+      (1 - FOG_BLANKET.edgeShrink * exposure);
+    const dx = jitter(TILE_W * FOG_BLANKET.offsetXFrac) * zoneScale;
+    const dy = jitter(TILE_H * FOG_BLANKET.offsetYFrac) * zoneScale;
+    const alpha = FOG_BLANKET.coreAlpha + (FOG_BLANKET.edgeAlpha - FOG_BLANKET.coreAlpha) * exposure;
     const puff = this.add
-      .image(x, y, 'cloud_tile')
+      .image(x + dx, y + dy, tile)
       .setOrigin(0.5, 0.62)
-      .setScale(zoneScale)
+      .setScale(scale)
+      // Depth from the CELL's y, never the jittered one: the bank has to stay
+      // sorted by row or a cap nudged south would draw over its own neighbour.
       .setDepth(DEPTHS.itemBase + y + 2)
-      .setAlpha(0.995);
+      .setAlpha(alpha);
     puff.setData('regionId', regionId);
+    // `weather` is the tier flag for "this device can afford the extra fill".
+    // The under-pass is ~60 more large translucent quads of pure overdraw, and
+    // `low` is exactly the profile that cannot pay for it — it goes back to
+    // plain caps, seamier but whole.
+    if (sides >= FOG_BLANKET.underNeighbours && graphics.profile.weather) {
+      // Behind its own cap and behind the row in front (whose depth is higher
+      // by a whole row), so it fills the valleys between crowns without ever
+      // covering a cap. No tween and no input: it is mass, not detail.
+      const under = this.add
+        .image(puff.x, puff.y, tile)
+        .setOrigin(0.5, 0.62)
+        .setScale(scale * FOG_BLANKET.underScale * (1 - FOG_BLANKET.underExposureShrink * exposure))
+        .setDepth(DEPTHS.itemBase + y + 1)
+        .setAlpha(alpha * FOG_BLANKET.underAlpha);
+      // Carried ON the cap so every place that lifts, destroys or reconciles
+      // fog gets the pair — an under-pass left behind is a cloud over open
+      // ground that nothing can ever clear.
+      puff.setData('under', under);
+    }
     // Hit area = just this tile's diamond, not the whole puffy frame —
     // otherwise the smoke drapes over (and steals input from) the active
-    // tiles one row south. Hit-area coords are frame-local, so they stay the
-    // game tile's — `setScale(zoneScale)` above already shrinks both the cloud
-    // and its diamond to whatever tile the owning zone uses, and the authored
-    // isle's zone reports 1, leaving this exactly the area it has always been.
-    const ox = puff.displayOriginX;
-    const oy = puff.displayOriginY;
+    // tiles one row south. Hit-area coords are frame-local, so the diamond is
+    // divided back down by the cap's own scale and shifted back by its own
+    // offset: however big or nudged the art gets, the TAP TARGET stays exactly
+    // the cell, and a bigger cap never starts stealing its neighbour's taps.
+    const ox = puff.displayOriginX - dx / scale;
+    const oy = puff.displayOriginY - dy / scale;
+    const hw = TILE_W / 2 / scale;
+    const hh = TILE_H / 2 / scale;
     const diamond = new Phaser.Geom.Polygon([
-      new Phaser.Geom.Point(ox, oy - TILE_H / 2),
-      new Phaser.Geom.Point(ox + TILE_W / 2, oy),
-      new Phaser.Geom.Point(ox, oy + TILE_H / 2),
-      new Phaser.Geom.Point(ox - TILE_W / 2, oy)
+      new Phaser.Geom.Point(ox, oy - hh),
+      new Phaser.Geom.Point(ox + hw, oy),
+      new Phaser.Geom.Point(ox, oy + hh),
+      new Phaser.Geom.Point(ox - hw, oy)
     ]);
     puff.setInteractive({
       hitArea: diamond,
@@ -5646,12 +5783,15 @@ export class BoardScene extends Phaser.Scene {
       if (!this.isTap(pointer)) return;
       this.onFogTapped(regionId, col, row);
     });
-    // Slow rolling breath across the bank, phased by iso row.
+    // Slow rolling breath across the bank, phased by iso row. Every target is a
+    // MULTIPLE of this cap's own base — absolute values would snap a cap that
+    // is not at scale 1 (every zone but the authored isle, and now every cap)
+    // to 1.02 on the first frame of the tween.
     this.tweens.add({
       targets: puff,
-      alpha: 0.9,
-      scaleX: 1.02,
-      scaleY: 1.035,
+      alpha: alpha * FOG_BLANKET.breathAlpha,
+      scaleX: scale * FOG_BLANKET.breathScaleX,
+      scaleY: scale * FOG_BLANKET.breathScaleY,
       duration: TIMINGS.fogPulsePeriodMs / 2,
       delay: ((col + row) % 6) * 230,
       yoyo: true,
@@ -8832,16 +8972,19 @@ export class BoardScene extends Phaser.Scene {
         this.fog.delete(key);
         this.tweens.killTweensOf(puff);
         puff.disableInteractive();
-        this.tweens.add({
-          targets: puff,
-          y: puff.y - 104,
-          alpha: 0,
-          scale: puff.scale * 1.24,
-          duration: TIMINGS.fogLift,
-          delay,
-          ease: 'Sine.easeIn',
-          onComplete: () => puff.destroy()
-        });
+        const under = puff.getData('under') as Phaser.GameObjects.Image | undefined;
+        for (const smoke of under ? [puff, under] : [puff]) {
+          this.tweens.add({
+            targets: smoke,
+            y: smoke.y - 104,
+            alpha: 0,
+            scale: smoke.scale * 1.24,
+            duration: TIMINGS.fogLift,
+            delay,
+            ease: 'Sine.easeIn',
+            onComplete: () => smoke.destroy()
+          });
+        }
       }
       // The grass tile is already there beneath the cloud — brighten it as the
       // warmth floods back in.
@@ -8974,6 +9117,7 @@ export class BoardScene extends Phaser.Scene {
       const [col, row] = key.split(',').map(Number) as [number, number];
       if (this.ctx.state.regionStatusAt(col, row) === 'active') {
         this.tweens.killTweensOf(puff);
+        (puff.getData('under') as Phaser.GameObjects.Image | undefined)?.destroy();
         puff.destroy();
         this.fog.delete(key);
       }

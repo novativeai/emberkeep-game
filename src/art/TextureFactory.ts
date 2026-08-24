@@ -201,6 +201,9 @@ export class TextureFactory {
       case 'cliff_rock': return this.cliffRock(key);
       case 'fog_puff_1': return this.fogPuff(key, 5);
       case 'fog_puff_2': return this.fogPuff(key, 91);
+      case 'fx_bolt_1': return this.bolt(key, 17);
+      case 'fx_bolt_2': return this.bolt(key, 143);
+      case 'fx_bolt_3': return this.bolt(key, 209);
       case 'decor_brazier': return this.brazier(key);
       case 'decor_far_isle': return this.farIsle(key);
       case 'item_sparkweed_1': return this.sparkweed1(key);
@@ -687,6 +690,94 @@ export class TextureFactory {
         g.ellipse(px - pr * 0.22, py - pr * 0.5, pr * 0.5, pr * 0.26, -0.35, 0, Math.PI * 2);
         g.fill();
       }
+    });
+  }
+
+  /**
+   * A fork of lightning, for the storm inside a cloud bank.
+   *
+   * PAINTED, not sourced. `docs/vfx-textures.md` says buy the generic
+   * textures — fire, smoke, lightning — and it is right about all of them but
+   * this one: every stock bolt is photoreal, and photoreal on a cel-shaded
+   * cloud reads as a photograph taped to a drawing.
+   *
+   * Drawn as a TAPERED POLYGON rather than a stroke. A constant-width stroke
+   * reads as a bent stick; lightning is wide where it leaves the cloud and
+   * needle-thin where it ends. The spine alternates side to side about a
+   * vertical axis, so it wanders without turning into a scribble.
+   */
+  private bolt(key: string, seed: number): void {
+    const w = 120;
+    const h = 150;
+    this.paint(key, w, h, (g) => {
+      const rand = seededRandom(seed);
+      type Pt = { x: number; y: number };
+      // Which way the first kink goes. Without this every seed produces the
+      // same handedness and the three bolts read as one bolt drawn thrice.
+      const lead = rand() < 0.5 ? 1 : -1;
+      const spine = (x0: number, y0: number, y1: number, steps: number, spread: number): Pt[] => {
+        const pts: Pt[] = [];
+        for (let i = 0; i <= steps; i++) {
+          // Ends stay on the axis so a fork meets its parent cleanly.
+          const wob = i === 0 || i === steps ? 0 : (i % 2 === 0 ? lead : -lead) * spread * (0.4 + rand() * 0.9);
+          pts.push({ x: x0 + wob, y: y0 + ((y1 - y0) * i) / steps });
+        }
+        return pts;
+      };
+      // Offset horizontally rather than perpendicular to the spine: on a shape
+      // this near-vertical the two are within a pixel, and the horizontal one
+      // keeps the segment ends flat, which is what gives the angular read.
+      const taperPath = (pts: Pt[], wide: number, thin: number): void => {
+        g.beginPath();
+        pts.forEach((p, i) => {
+          const hw = (wide + (thin - wide) * (i / (pts.length - 1))) / 2;
+          const x = p.x - hw;
+          if (i === 0) g.moveTo(x, p.y);
+          else g.lineTo(x, p.y);
+        });
+        for (let i = pts.length - 1; i >= 0; i--) {
+          const p = pts[i]!;
+          const hw = (wide + (thin - wide) * (i / (pts.length - 1))) / 2;
+          g.lineTo(p.x + hw, p.y);
+        }
+        g.closePath();
+      };
+      // Kink count and wander both vary: three bolts of the same step count
+      // have the same rhythm however far each step strays.
+      const steps = 4 + Math.floor(rand() * 3);
+      const main = spine(w / 2, h * 0.05, h * 0.97, steps, 11 + rand() * 9);
+      // A fork leaves the main bolt part-way down and DIES EARLY — one that
+      // runs the full height reads as a letter Y, not as weather. It leaves
+      // outward (away from the axis) so it never crosses back over the parent.
+      const at = 1 + Math.floor(rand() * (steps - 2));
+      const from = main[at]!;
+      const side = from.x < w / 2 ? -1 : 1;
+      const drift = (9 + rand() * 9) * side;
+      const fork = spine(from.x, from.y, from.y + h * (0.2 + rand() * 0.14), 3, 8).map((p, i, all) => ({
+        x: p.x + (i / (all.length - 1)) * drift,
+        y: p.y
+      }));
+
+      const draw = (pts: Pt[], wide: number, thin: number, fill: string, blur: number): void => {
+        g.save();
+        if (blur > 0) {
+          g.shadowColor = P.goldAccent;
+          g.shadowBlur = blur;
+        }
+        g.fillStyle = fill;
+        taperPath(pts, wide, thin);
+        g.fill();
+        g.restore();
+      };
+      // Three passes: a gold haze that bleeds into the cloud, the bolt body,
+      // then a cream core. The core is what makes it read as LIGHT rather than
+      // as a gold ribbon.
+      draw(main, 13, 3, withAlpha(P.gold, 0.5), 18);
+      draw(fork, 8, 2, withAlpha(P.gold, 0.4), 12);
+      draw(main, 7.5, 1.8, P.goldAccent, 0);
+      draw(fork, 4.5, 1.2, P.goldAccent, 0);
+      draw(main, 3.4, 0.8, P.cream, 0);
+      draw(fork, 2, 0.5, P.cream, 0);
     });
   }
 

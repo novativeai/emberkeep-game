@@ -575,6 +575,30 @@
       "file": "sprites/environment/blockers/cloud/cloud-tile.webp"
     },
     {
+      "key": "cloud_tile_dark",
+      "source": "file",
+      "generator": "fog",
+      "file": "sprites/environment/blockers/cloud/cloud-tile-dark.webp"
+    },
+    {
+      "key": "fx_bolt_1",
+      "source": "placeholder",
+      "generator": "fx",
+      "file": "raw/ai/fx_bolt_1.png"
+    },
+    {
+      "key": "fx_bolt_2",
+      "source": "placeholder",
+      "generator": "fx",
+      "file": "raw/ai/fx_bolt_2.png"
+    },
+    {
+      "key": "fx_bolt_3",
+      "source": "placeholder",
+      "generator": "fx",
+      "file": "raw/ai/fx_bolt_3.png"
+    },
+    {
       "key": "tile_border-fgreen",
       "source": "file",
       "generator": "tile",

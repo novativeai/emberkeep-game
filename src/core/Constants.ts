@@ -2132,6 +2132,142 @@ export const WELCOME_BACK_MIN_MS = 300_000;
  *  small waiting harvest (never 1, never unlimited; MECHANICS §4.3). */
 export const OFFLINE_BANK_CYCLES = 3;
 
+/** How one world's blocker clouds look and behave. */
+export interface FogStyle {
+  /** Texture key for the per-tile cloud cap. */
+  tile: string;
+  /** Whether lightning flickers inside the banks. */
+  storm: boolean;
+}
+
+/**
+ * The cloud a world's blockers wear. A world names its own here; the ones that
+ * don't get the pale blanket the world builder paints, and no weather.
+ * Keyed by world id (`WorldRuntime.id`), NOT by anything the editor re-exports,
+ * so a re-export of the worlds never silently repaints the sky.
+ */
+export const FOG_STYLE_BY_WORLD: Readonly<Record<string, FogStyle>> = {
+  // `emberkeep` is the world built from the nb2-4k-aligned editor map
+  // (scripts/build-zones.mjs `editorMap`) — the board the player lands on.
+  emberkeep: { tile: 'cloud_tile_dark', storm: true }
+};
+export const FOG_STYLE_DEFAULT: FogStyle = { tile: 'cloud_tile', storm: false };
+
+/**
+ * How the per-tile cloud caps become ONE bank instead of a grid of stamps.
+ *
+ * The projection's width reference is fixed at `TILE_W` (iso.ts `projectionOf`)
+ * and the cap art is exactly `TILE_W` wide, so at scale 1 neighbouring clouds
+ * abut EDGE TO EDGE — never overlapping, never gapping. That is the staircase:
+ * identical silhouettes tiling perfectly. Overlap plus per-cell variation is
+ * what dissolves it.
+ *
+ * NO MIRRORING here, deliberately. Flipping alternate caps is the obvious way
+ * to break the repetition, and it is closed to us: BOTH caps are lit from one
+ * side. Measured off the art, the white cap's highlight runs 7:1 to the RIGHT
+ * and the dark cap's gold rim 10:1 to the LEFT — mirroring either would put
+ * the sun on both sides of the same bank. Any future cap wants the same check
+ * before the idea comes back.
+ */
+export const FOG_BLANKET = {
+  /** Cap size as a multiple of its tile. >1 so neighbours overlap. */
+  overlap: 1.22,
+  /** Per-cell size variation, ± this fraction. */
+  scaleJitter: 0.07,
+  /** Per-cell offset, ± this fraction of a tile. Kept small: the tap target is
+   *  shifted back by the same amount, but the cap still has to cover its cell. */
+  offsetXFrac: 0.08,
+  offsetYFrac: 0.05,
+  /**
+   * Exposure is GRADED, not a threshold: `(interiorNeighbours − sides) / 4`,
+   * so a cap frays in proportion to how much open sky it faces.
+   *
+   * A yes/no test looks right and is wrong. `level_2` is eight cells in two
+   * thin arms and its most enclosed cap has THREE neighbours — under a
+   * "4 neighbours = interior" rule not one cap in the region counted as
+   * interior, so the whole bank frayed and kept its staircase while the fat
+   * regions beside it fused. Most authored banks are arms and elbows, not
+   * blobs; almost nothing has four neighbours.
+   */
+  interiorNeighbours: 4,
+  /** Shrink at FULL exposure (no neighbours at all); scaled down by exposure. */
+  edgeShrink: 0.12,
+  /** Alpha at full exposure. An enclosed cap sits at `coreAlpha`. */
+  edgeAlpha: 0.8,
+  /** A cap needs at least this many neighbours to be worth an under-pass —
+   *  below it the cap is a stub and the broad pass would only spill onto open
+   *  ground. */
+  underNeighbours: 2,
+  /** How much of the under-pass's size exposure takes away, at full exposure. */
+  underExposureShrink: 0.3,
+  /** Opacity of a cap deep inside the bank. */
+  coreAlpha: 0.995,
+  /**
+   * The UNDER-PASS: one bigger, dimmer copy of the cap drawn behind the bank,
+   * INTERIOR CELLS ONLY.
+   *
+   * Overlap alone does not close the bank. Each cap is a dome, so between two
+   * crowns in a row there is a valley, and through it you see the bright ember
+   * base of the row behind — the red seams that make the bank read as stacked
+   * rows rather than as weather. Pushing `overlap` up far enough to close them
+   * just makes the stamps bigger and their repetition MORE obvious; a broad
+   * dim pass behind plugs the valleys and costs nothing in silhouette.
+   *
+   * Interior only, deliberately: on the rim that exposed ember base is the
+   * thing that makes the bank look lit from beneath, and an under-cap there
+   * would only make the outline blobbier.
+   */
+  underScale: 1.5,
+  underAlpha: 0.85,
+  /** The breathing tween's targets, as multiples of the cap's own base. */
+  breathScaleX: 1.02,
+  breathScaleY: 1.035,
+  breathAlpha: 0.905
+} as const;
+
+/**
+ * The storm inside a cloud bank — pure ambience, and deliberately SPARSE.
+ *
+ * A strike is rolled per tick rather than fired on a fixed period: a bolt every
+ * exactly-N-seconds reads as a metronome, and weather has to feel like it might
+ * not happen. At these numbers a given bank flashes roughly every 7 s.
+ */
+export const FOG_STORM = {
+  tickMs: 1400,
+  /** Probability a tick strikes at all. */
+  chance: 0.2,
+  /**
+   * Every size below is a FRACTION of the cloud the bolt strikes, never a pixel
+   * count: the cap art is 240x300 painted but 174 tall on screen, zones scale
+   * their art from 0.90 to 1.17, and a fixed number would be twice too big on
+   * the authored isle and wrong again on the next zone.
+   */
+  /** Lateral spread of the strike, as a fraction of the cloud's width. */
+  jitterFrac: 0.35,
+  /** Bolt height, as a multiple of the cloud's — >1 so the fork clears the base. */
+  boltHeightRatio: 1.35,
+  /** How far ABOVE the cloud's anchor the fork hangs from, as a fraction of its height. */
+  hangFrac: 0.2,
+  /** Glow width, as a multiple of the cloud's. */
+  glowWidthRatio: 1.2,
+  /**
+   * Deliberately low. This cloud is dark on purpose, and an additive gold disc
+   * strong enough to "light it up" washes it back to the pale blanket the art
+   * was made to replace. The flash has to read as light INSIDE a dark cloud.
+   */
+  glowPeakAlpha: 0.3,
+  /**
+   * The flicker, as [alpha, hold-ms] beats. Real lightning is a strike, a gap
+   * and a brighter restrike — a single fade in and out reads as a lamp.
+   */
+  beats: [
+    [1, 45],
+    [0, 55],
+    [1, 80],
+    [0.5, 60]
+  ] as ReadonlyArray<readonly [number, number]>
+} as const;
+
 /** Item motion & juice timings (ms unless noted). */
 export const TIMINGS = {
   dragReturn: 290,
