@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import {
+  GIVER_MARK,
   IS_MOBILE,
   LIVE_GAME_WIDTH,
   num,
@@ -341,7 +342,9 @@ export class QuestTracker extends Phaser.GameObjects.Container {
       this.mainProgress.setText('');
       return;
     }
-    this.mainTitle.setText(this.quests.titleFor(quest));
+    // A marked giver's asks wear her mark, so a glance says whose page is open
+    // when two tracks share a board (GIVER_MARK).
+    this.mainTitle.setText((GIVER_MARK[quest.giver] ?? '') + this.quests.titleFor(quest));
     // A multi-step quest counts its steps; a one-step quest (the endless Ledger
     // tail) would only ever read "0 / 1", so it shows that step's own item
     // progress instead — the same number the Ledger's order card shows.

@@ -3366,6 +3366,17 @@ export const SCENES = {
  * the bubble's name tag, a subquest's "Deliver … to Eleanor", a HUD line.
  * A second copy of this table drifts the first time somebody is renamed.
  */
+/**
+ * The mark a giver's quest titles wear on the tracker, so a glance says whose
+ * page is open when two tracks share a board. Absent = unmarked: the world's
+ * HOST giver owns the plain title (Eleanor in the south, Selyna in the north),
+ * and the Elder — who gives from the altar in both — is the one who needs
+ * telling apart. Twelve of her quests share the ladder with Eleanor's twelve.
+ */
+export const GIVER_MARK: Partial<Record<SpeakerId, string>> = {
+  golden_elder: '✦ '
+};
+
 export const SPEAKER_NAMES: Record<SpeakerId, string> = {
   eleanor: 'Eleanor',
   selyna: 'Selyna',
