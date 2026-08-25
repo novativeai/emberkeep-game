@@ -337,8 +337,9 @@ const ACTION_FONT = px(32);
  * ACTION_TOP).
  */
 const ACTION_FOOT = IS_MOBILE ? AIR : Math.round(AIR * 0.4);
-const ACTION_Y = CARD_H / 2 - ACTION_FOOT - ACTION_PLATE_HALF_H * ACTION_SCALE;
-const ACTION_TOP = ACTION_Y - ACTION_PLATE_HALF_H * ACTION_SCALE;
+// ACTION_Y / ACTION_TOP live inside `makeCard` now, computed from the card's
+// own height — the keeper rail's posters are taller than CARD_H and the button
+// keeps the same authored foot on every plate.
 const HERO_ACTION_SCALE = IS_MOBILE ? 2 : 0.82;
 const HERO_ACTION_FONT = px(40);
 /** The showcase card's key gets the same foot. Its plate is bigger, so the
@@ -1089,6 +1090,42 @@ export class StorePanel extends Phaser.GameObjects.Container {
     const hero = section.items.find((item) => item.hero) ?? null;
     const rest = hero ? section.items.filter((item) => item !== hero) : section.items;
 
+    /*
+     * THE WARDROBE RAIL — keeper looks are portrait posters, not squat cards.
+     *
+     * Each poster takes the whole height of the shelf window less 12 real
+     * pixels of air above and below (a CSS pixel is 2 units on the landscape
+     * sheet, ~6.6 in portrait), and the art cover-fills its plate: `coverFit`
+     * crops to the box, so the plate is never letterboxed and the art never
+     * spills the rim. Landscape hangs the pair side by side, CENTRED as a
+     * block — the four-column grid law (a short row leaves its gap on the
+     * right) is for trailing rows of a stocked shelf, and this shelf's whole
+     * stock is one short row. Portrait hangs them full-width, one per row,
+     * with the same 12px breathing between and around.
+     */
+    if (section.kind === 'keeper_skin') {
+      const pad = IS_MOBILE ? 80 : 24;
+      const rail = VIEW_H - pad * 2;
+      if (IS_MOBILE) {
+        const contentH = rest.length * rail + Math.max(0, rest.length - 1) * pad;
+        const top = -VIEW_H / 2 + pad;
+        this.maxScroll = Math.max(0, contentH + pad * 2 - VIEW_H);
+        rest.forEach((item, i) =>
+          this.place(this.makeCard(0, top + i * (rail + pad) + rail / 2, item, section, HERO_W, rail), item)
+        );
+      } else {
+        const blockW = rest.length * HERO_W + Math.max(0, rest.length - 1) * AIR;
+        const startX = -blockW / 2 + HERO_W / 2;
+        this.maxScroll = 0;
+        rest.forEach((item, i) =>
+          this.place(this.makeCard(startX + i * (HERO_W + AIR), 0, item, section, HERO_W, rail), item)
+        );
+      }
+      this.spendPendingScroll();
+      this.seatMask();
+      return;
+    }
+
     if (CX.heroStacked) {
       /*
        * PORTRAIT: the showcase card is a BANNER, not a column.
@@ -1466,11 +1503,18 @@ export class StorePanel extends Phaser.GameObjects.Container {
     section: StoreSection,
     /** The column width of the layout this card is being placed into — three
      *  equal columns beside a hero, four without one. */
-    w: number
+    w: number,
+    /** The card's height — CARD_H everywhere except the keeper rail, whose
+     *  posters take the whole shelf window. The text block and the action keep
+     *  their authored distance from the BOTTOM edge, so a taller card grows
+     *  upward into art rather than stretching its typography apart. */
+    h: number = CARD_H
   ): Phaser.GameObjects.Container {
     const card = this.scene.add.container(x, y);
     const owned = this.gameState.ownedCosmetics.includes(item.id);
     const worn = this.isWorn(item, section);
+    const actionY = h / 2 - ACTION_FOOT - ACTION_PLATE_HALF_H * ACTION_SCALE;
+    const actionTop = actionY - ACTION_PLATE_HALF_H * ACTION_SCALE;
     // A legendary is printed on the foil plate; everything else keeps the cream
     // card. That is the only thing rarity changes about how a card behaves.
     const foil = !!item.rarity && RARITY[item.rarity].foil;
@@ -1490,7 +1534,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
       const plate = makeFoilPlate(
         this.scene,
         w,
-        CARD_H,
+        h,
         CARD_R,
         worn ? INK.ember : undefined
       );
@@ -1500,21 +1544,21 @@ export class StorePanel extends Phaser.GameObjects.Container {
     } else {
       const g = this.scene.add.graphics();
       g.fillStyle(num(INK.goldDeep), 1);
-      g.fillRoundedRect(-w / 2, -CARD_H / 2 + 8, w, CARD_H, CARD_R);
+      g.fillRoundedRect(-w / 2, -h / 2 + 8, w, h, CARD_R);
       g.fillStyle(num(INK.field), 1);
-      g.fillRoundedRect(-w / 2, -CARD_H / 2, w, CARD_H, CARD_R);
+      g.fillRoundedRect(-w / 2, -h / 2, w, h, CARD_R);
       card.add(g);
       // The rim is its own layer so full-bleed art can slide UNDER it — a
       // stroke fused into the plate would be painted over by the art.
       rim = this.scene.add.graphics();
       rim.lineStyle(6, num(worn ? INK.ember : INK.gold), 1);
-      rim.strokeRoundedRect(-w / 2, -CARD_H / 2, w, CARD_H, CARD_R);
+      rim.strokeRoundedRect(-w / 2, -h / 2, w, h, CARD_R);
     }
 
     let art: Phaser.GameObjects.Image | null = null;
     if (this.scene.textures.exists(item.art)) {
       if (bleed) {
-        const inner = { w: w - PLATE_INSET * 2, h: CARD_H - PLATE_INSET * 2 };
+        const inner = { w: w - PLATE_INSET * 2, h: h - PLATE_INSET * 2 };
         art = this.scene.add.image(0, 0, item.art);
         this.coverFit(art, inner.w, inner.h);
         card.add(art);
@@ -1562,11 +1606,11 @@ export class StorePanel extends Phaser.GameObjects.Container {
       this.sheens.push(runSheen(this.scene, sheen, this.sheens.length * 900));
     }
     if (rim) card.add(rim);
-    if (item.rarity) card.add(this.makeRibbon(item.rarity, -CARD_H / 2 + px(8)));
+    if (item.rarity) card.add(this.makeRibbon(item.rarity, -h / 2 + px(8)));
 
     // A BLED card's name has to stay on its scrim; a PLAIN card's has only the
     // picture above it, so it rides higher and hands the slack to the blurb.
-    const nameY = bleed ? NAME_Y : PLAIN_NAME_Y;
+    const nameY = (bleed ? NAME_Y : PLAIN_NAME_Y) + (h - CARD_H) / 2;
     const name = this.scene.add
       .text(0, nameY, item.name, {
         fontFamily: FONT.ui, fontSize: `${px(32)}px`, fontStyle: 'bold',
@@ -1589,10 +1633,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5, 0)
       .setAlpha(bleed || foil ? 1 : 0.88);
     if (bleed) blurb.setShadow(0, 3, 'rgba(36,27,34,0.7)', 5);
-    this.fitBlurb(blurb, ACTION_TOP - blurbTop - BLURB_FOOT);
+    this.fitBlurb(blurb, actionTop - blurbTop - BLURB_FOOT);
     card.add(blurb);
     if (this.isLocked(item)) this.addLockOverlay(card, art, bleed ? px(-60) : (IS_MOBILE ? -325 : -114), px(88));
-    card.add(this.makeAction(item, section, owned, worn, ACTION_Y, ACTION_SCALE, ACTION_FONT));
+    card.add(this.makeAction(item, section, owned, worn, actionY, ACTION_SCALE, ACTION_FONT));
     return card;
   }
 }
