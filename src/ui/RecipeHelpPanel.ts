@@ -6,7 +6,9 @@ import {
   LIVE_GAME_WIDTH,
   num,
   panelMobileScale,
-  TAP_SCALE
+  QUEST_ROW_H,
+  TAP_SCALE,
+  UI_SCALE
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
@@ -265,12 +267,26 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
    * fires a dozen move events and every one of them would otherwise rebuild a
    * ladder that already says the right thing.
    *
-   * WHERE IT GOES. The quest cluster hugs the right edge, so the only room is
-   * to its LEFT: the sheet's right edge lands `PEEK_GAP` short of the row's
-   * left edge, and its middle lines up with the row's. Both are then clamped
-   * inside the canvas, because a hint that is half off-screen is not a hint —
-   * with three rows the bottom one would otherwise hang the sheet's foot below
-   * the floor.
+   * WHERE IT GOES, IN LANDSCAPE. The quest cluster hugs the right edge, so the
+   * only room is to its LEFT: the sheet's right edge lands `PEEK_GAP` short of
+   * the row's left edge, and its middle lines up with the row's. Both are then
+   * clamped inside the canvas, because a hint that is half off-screen is not a
+   * hint — with three rows the bottom one would otherwise hang the sheet's foot
+   * below the floor.
+   *
+   * WHERE IT GOES IN PORTRAIT IS A DIFFERENT ANSWER, because "to its left" is
+   * not a place there. The sheet is scaled UP for a phone (`panelMobileScale`)
+   * while the canvas stays 2560 wide, so it is two thirds of the screen across:
+   * asked to sit left of a row that starts at x 1595 it cannot, the clamp pins
+   * it against the left margin, and it lands ON the row it is explaining and on
+   * the energy and coin pills above it. The player taps a line to find out what
+   * it wants and the line disappears under the answer.
+   *
+   * Portrait has the one thing landscape does not — HEIGHT — so the sheet goes
+   * BELOW the row instead of beside it, centred on the screen: its top edge
+   * clears the row's own foot (`QUEST_ROW_H × UI_SCALE`, the pitch the tracker
+   * lays its rows out on) by the same `PEEK_GAP`. Nothing is covered, the sheet
+   * still points at the line that raised it, and the same clamp keeps it in.
    */
   peek(goal: { chain: string; tier: number; count: number } | null, x: number, y: number): void {
     if (this.variant !== 'peek') return;
@@ -306,9 +322,12 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
     }
     const halfW = FRAME_HALF_W * this.baseScale;
     const halfH = FRAME_HALF_H * this.baseScale;
+    // `y` is the ROW'S MIDDLE, so half a row's pitch is what clears its foot.
+    const wantX = IS_MOBILE ? LIVE_GAME_WIDTH / 2 : x - PEEK_GAP - halfW;
+    const wantY = IS_MOBILE ? y + (QUEST_ROW_H * UI_SCALE) / 2 + PEEK_GAP + halfH : y;
     this.setPosition(
-      Phaser.Math.Clamp(x - PEEK_GAP - halfW, PEEK_MARGIN + halfW, LIVE_GAME_WIDTH - PEEK_MARGIN - halfW),
-      Phaser.Math.Clamp(y, PEEK_MARGIN + halfH, LIVE_GAME_HEIGHT - PEEK_MARGIN - halfH)
+      Phaser.Math.Clamp(wantX, PEEK_MARGIN + halfW, LIVE_GAME_WIDTH - PEEK_MARGIN - halfW),
+      Phaser.Math.Clamp(wantY, PEEK_MARGIN + halfH, LIVE_GAME_HEIGHT - PEEK_MARGIN - halfH)
     );
     this.setScale(this.baseScale);
     if (!fresh && this.visible) return;

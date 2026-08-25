@@ -84,6 +84,17 @@ const ICON_CHIP_PAD = 6;
  * less than a finger does; touch gets the fingertip's own radius instead.
  */
 const PEEK_PAD: number = IS_MOBILE ? 28 : 10;
+/**
+ * How far a finger may travel and still be a tap, in CSS PIXELS — the only unit
+ * a thumb is actually measured in.
+ *
+ * Not in the 2560-space the rest of this file is authored in, because that space
+ * is not a physical size: it is squeezed into 390 CSS px on a phone and 1280 on
+ * a laptop, so one authored unit is 0.15 real pixels there and 0.5 here. A
+ * fixed 24 units means 12 px of allowance on the desktop and under four on the
+ * phone — on the device that has no mouse and the wobbliest pointer.
+ */
+const TAP_SLOP_CSS = 10;
 
 /** A row faded below this is an affordance, not a target: the half-visible
  *  fourth row says "there is more below", and explaining a line the player can
@@ -702,6 +713,37 @@ export class QuestTracker extends Phaser.GameObjects.Container {
    * coords arrive in the same 2560-space the UI is authored in (UIScene's
    * camera is fixed), so the comparison is direct.
    */
+  /**
+   * THE POINTER ARRIVES IN THE CANVAS'S SPACE; THIS CLUSTER IS DRAWN IN THE
+   * GAME'S. On most machines they are the same number and the difference is
+   * invisible — which is exactly how it survived.
+   *
+   * The UI is authored at 2560 wide and painted into a backing of
+   * `LIVE_GAME_WIDTH × renderScale` (GameConfig), with UIScene's camera zoomed
+   * by that same factor to fit. `renderScale` is 1 on an ordinary desktop, and
+   * there world coordinates and pointer coordinates coincide. It is NOT 1
+   * anywhere else: 1.5 on a hi-DPI display, 0.75 on a phone, 0.5 on iOS, 0.34
+   * on a weak device — so `pointer.x` came in at half (or a third) of where the
+   * rows actually are, `overList` answered false for every point on the
+   * cluster, and the peek could not be raised on any of them. On a phone that
+   * is the whole feature: there is no hover, so the tap is the only way in.
+   *
+   * `getWorldPoint` is the camera's own inverse — zoom, scroll and origin
+   * together — so nothing here has to know which of them is doing the work.
+   */
+  private pointerWorld(pointer: Phaser.Input.Pointer): { x: number; y: number } {
+    return this.owner.cameras.main.getWorldPoint(pointer.x, pointer.y);
+  }
+
+  /** CSS pixels per authored unit, for the one measurement that must be
+   *  physical (see `TAP_SLOP_CSS`). Guarded: the scale manager reports a zero
+   *  display width for a frame or two while a tab is hidden, and a zero here
+   *  would make every drag a tap. */
+  private slopUnits(): number {
+    const css = this.owner.scale.displaySize.width;
+    return css > 0 ? TAP_SLOP_CSS / (css / LIVE_GAME_WIDTH) : TAP_SLOP_CSS;
+  }
+
   private overList(pointer: Phaser.Input.Pointer): boolean {
     if (!this.tasksVisible || this.suppressed) return false;
     const band = this.viewBand();
@@ -716,11 +758,12 @@ export class QuestTracker extends Phaser.GameObjects.Container {
       bottom = Math.max(bottom, b.bottom);
     }
     if (left === Infinity) return false; // nothing drawn, nothing to be over
+    const at = this.pointerWorld(pointer);
     return (
-      pointer.x >= left - PEEK_PAD &&
-      pointer.x <= this.x + PEEK_PAD &&
-      pointer.y >= Math.max(top, band.top) - PEEK_PAD &&
-      pointer.y <= Math.min(bottom, band.bottom) + PEEK_PAD
+      at.x >= left - PEEK_PAD &&
+      at.x <= this.x + PEEK_PAD &&
+      at.y >= Math.max(top, band.top) - PEEK_PAD &&
+      at.y <= Math.min(bottom, band.bottom) + PEEK_PAD
     );
   }
 
@@ -739,16 +782,17 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   private rowAt(pointer: Phaser.Input.Pointer): Row | null {
     if (!this.overList(pointer)) return null;
     const band = this.viewBand();
+    const at = this.pointerWorld(pointer); // canvas space → the 2560-space the rows live in
     for (const row of this.rows) {
       if (row.retiring || row.root.alpha < PEEK_MIN_ALPHA) continue;
       const b = row.root.getBounds(this.probe);
       // The row's own ink, on BOTH axes. Testing only the y band made every
       // row a full-width stripe, so a pointer travelling up the board picked
       // one up by its altitude alone.
-      if (pointer.x < b.left - PEEK_PAD || pointer.x > b.right + PEEK_PAD) continue;
+      if (at.x < b.left - PEEK_PAD || at.x > b.right + PEEK_PAD) continue;
       const top = Math.max(b.top, band.top);
       const bottom = Math.min(b.bottom, band.bottom);
-      if (pointer.y >= top - PEEK_PAD && pointer.y <= bottom + PEEK_PAD) return row;
+      if (at.y >= top - PEEK_PAD && at.y <= bottom + PEEK_PAD) return row;
     }
     return null;
   }
@@ -838,16 +882,21 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    this.downAt = this.overList(pointer) ? { x: pointer.x, y: pointer.y } : null;
+    const at = this.pointerWorld(pointer);
+    this.downAt = this.overList(pointer) ? { x: at.x, y: at.y } : null;
     if (this.maxScroll() <= 0 || !this.overList(pointer)) return;
     this.dragging = true;
-    this.dragLastY = pointer.y;
+    this.dragLastY = at.y;
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
     if (this.dragging) {
-      this.scrollBy(-(pointer.y - this.dragLastY));
-      this.dragLastY = pointer.y;
+      // In WORLD units, like the rows the drag is moving: a raw pointer delta
+      // scrolls by the backing factor — half a finger's travel on iOS, a third
+      // on a weak device.
+      const at = this.pointerWorld(pointer);
+      this.scrollBy(-(at.y - this.dragLastY));
+      this.dragLastY = at.y;
       this.dropPeek();
       return;
     }
@@ -864,8 +913,12 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     const wasDragging = this.dragging;
     this.dragging = false;
     if (!IS_MOBILE || wasDragging || !from) return;
-    // A tap, not a scroll: within a thumb's wobble of where it went down.
-    if (Math.abs(pointer.x - from.x) > 24 || Math.abs(pointer.y - from.y) > 24) return;
+    // A tap, not a scroll: within a thumb's wobble of where it went down. Both
+    // points are in world units and the allowance is converted from real
+    // pixels, so it is the same physical distance on every backing.
+    const at = this.pointerWorld(pointer);
+    const slop = this.slopUnits();
+    if (Math.abs(at.x - from.x) > slop || Math.abs(at.y - from.y) > slop) return;
     const row = this.rowAt(pointer);
     // Tapping the row that is already open closes it — the finger's version of
     // looking away.

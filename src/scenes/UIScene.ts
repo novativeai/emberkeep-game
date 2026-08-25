@@ -600,6 +600,14 @@ export class UIScene extends Phaser.Scene {
     this.arrow.setScale(this.arrowBaseScale);
 
     // Close the tooltip on taps that land outside it.
+    //
+    // `getWorldPoint`, and it is not a flourish: the pointer arrives in the
+    // CANVAS's space and this rect is built from the tooltip's own position in
+    // the 2560-space the UI is authored in. The camera bridges them by
+    // `renderScale` (GameConfig), which is 1 on an ordinary desktop and nowhere
+    // else — 0.5 on iOS, 0.34 on a weak device. Compared raw, a tap INSIDE the
+    // tooltip reads as outside on every one of those and shuts it under the
+    // finger that was reaching for it.
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.tooltip.visible) return;
       const bounds = new Phaser.Geom.Rectangle(
@@ -608,7 +616,8 @@ export class UIScene extends Phaser.Scene {
         480,
         304
       );
-      if (!bounds.contains(pointer.x, pointer.y)) this.tooltip.close();
+      const at = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      if (!bounds.contains(at.x, at.y)) this.tooltip.close();
     });
 
     this.subscribe();
