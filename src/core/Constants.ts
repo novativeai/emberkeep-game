@@ -2377,8 +2377,6 @@ export const DRAG = {
   liftY: -34,
   liftMs: 120,
   settleMs: 210,
-  /** Exponential-smoothing time constant (ms): lower = snappier follow. */
-  followTau: 90,
   /**
    * WHERE A CARRIED PIECE IS CONSIDERED TO BE STANDING.
    *

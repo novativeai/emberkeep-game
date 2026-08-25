@@ -107,6 +107,7 @@ import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGover
 import { cappedTier } from '../core/graphics';
 import { GRAPHICS_EVENT, graphics, liveCrystalAvailable } from '../core/graphicsState';
 import { CRYSTAL_SPIN, CRYSTAL_SPIN_KEY } from '../core/crystalSpin';
+import { lightHaptic } from '../core/haptics';
 import { renderScale } from '../core/render-scale';
 import type {
   BoardItemState,
@@ -432,6 +433,17 @@ export class BoardScene extends Phaser.Scene {
   /** Live drag: the lifted sprite eases toward this pointer-tracked target. */
   private dragSprite: BoardItem | null = null;
   private dragTarget = { x: 0, y: 0 };
+  /** The finger that owns the live drag, and where on the piece it took hold —
+   *  the pair that lets update() re-derive the carry point from the LIVE
+   *  pointer every frame instead of trusting the last DRAG event. */
+  private dragPointer: Phaser.Input.Pointer | null = null;
+  private dragGrab = { x: 0, y: 0 };
+  /** Two-finger zoom: the previous frame's finger distance and midpoint, null
+   *  when no pinch is running. */
+  private pinchPrev: { dist: number; midX: number; midY: number } | null = null;
+  /** Taps are refused for a beat after a pinch — a finger lifting off a zoom
+   *  gesture is not a tap on whatever it happened to be resting on. */
+  private pinchTapBlockUntil = 0;
   /** The reticle currently on screen — always one of `dragCells`. Everything
    *  that shows or hides "the" reticle goes through this handle, so the verb
    *  swap in `updateDrag` is the only place that knows there are three. */
@@ -6209,6 +6221,9 @@ export class BoardScene extends Phaser.Scene {
   /* ----------------------------- input ------------------------------ */
 
   private isTap(pointer: Phaser.Input.Pointer): boolean {
+    // A finger coming off a pinch is the END OF A ZOOM, not a tap on whatever
+    // it happened to be resting over.
+    if (this.time.now < this.pinchTapBlockUntil) return false;
     return (
       pointer.getDistance() <= TAP_MAX_DISTANCE_PX + 2 && pointer.getDuration() <= TAP_MAX_MS
     );
@@ -6220,8 +6235,11 @@ export class BoardScene extends Phaser.Scene {
 
     this.input.on(
       Phaser.Input.Events.DRAG_START,
-      (_pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+      (pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
         if (!(obj instanceof BoardItem)) return;
+        // Two fingers are a ZOOM, not a pick-up — a piece must not leap into a
+        // hand that is mid-pinch.
+        if (this.pinchPrev) return;
         this.dragFrom = { col: obj.col, row: obj.row };
         // A picked-up piece stops leaning THIS frame: the lift is about to tween
         // the same art the lean offsets, and a lean carried into the player's
@@ -6229,9 +6247,16 @@ export class BoardScene extends Phaser.Scene {
         this.stopLean(obj.itemId, true);
         obj.setData('dragged', true);
         obj.liftForDrag();
-        // The sprite EASES toward this target in update() (Fairyland-style
-        // weighted follow); seed it at the current pos so it doesn't jump.
+        // The tick that says "you have it" — the visual lift's touch twin.
+        lightHaptic();
+        // update() re-derives the carry point from THIS pointer every frame
+        // (see updateDrag): the grab offset keeps the piece under the same
+        // spot of art the finger closed on, so it neither jumps on pick-up nor
+        // trails on a fast swipe.
         this.dragSprite = obj;
+        this.dragPointer = pointer;
+        this.dragGrab.x = pointer.worldX - obj.x;
+        this.dragGrab.y = pointer.worldY - obj.y;
         this.dragTarget.x = obj.x;
         this.dragTarget.y = obj.y;
         // Through the live resolver rather than a bare setVisible(true): the
@@ -6274,6 +6299,7 @@ export class BoardScene extends Phaser.Scene {
         // leaving it up is correct — so it is unconditional, not another
         // branch to keep in step.
         this.dragSprite = null;
+        this.dragPointer = null;
         this.dragCell.setVisible(false);
         if (!this.dragFrom) return;
         // WYSIWYG: drop into the cell the reticle showed (the dragged item's
@@ -6603,12 +6629,25 @@ export class BoardScene extends Phaser.Scene {
    * a cloud is not a slot either. Nothing offered, nothing taken away: the drop
    * itself still resolves the same address, so what you see is where it lands.
    */
-  private updateDrag(delta: number): void {
+  private updateDrag(_delta: number): void {
     const s = this.dragSprite;
     if (!s) return;
-    const k = 1 - Math.exp(-delta / DRAG.followTau);
-    s.x += (this.dragTarget.x - s.x) * k;
-    s.y += (this.dragTarget.y - s.y) * k;
+    // PIXEL-PERFECT, EVERY FRAME. The follow used to be an exponential ease
+    // (~90 ms behind a moving target, worse on a dropped frame), which read as
+    // the piece trailing the finger on any fast swipe. Two changes close the
+    // gap completely: the carry point is re-derived HERE from the live pointer
+    // through the current camera — not from the last DRAG event, which is a
+    // frame stale whenever input and paint drift apart — and the sprite takes
+    // that point outright. The pick-up lift, the settle, the drop bounce all
+    // still tween; the carry itself is the player's hand and follows like it.
+    const p = this.dragPointer;
+    if (p?.isDown) {
+      const wp = p.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
+      this.dragTarget.x = wp.x - this.dragGrab.x;
+      this.dragTarget.y = wp.y - this.dragGrab.y - 24;
+    }
+    s.x = this.dragTarget.x;
+    s.y = this.dragTarget.y;
     const hover = this.resolveDrop(s);
     const cell = hover?.cell ?? null;
     // The piece's OWN shadows answer to the same question as the diamond: over
@@ -7113,9 +7152,99 @@ export class BoardScene extends Phaser.Scene {
    * on an item or fog is left to the drag/tap handlers, so navigation never
    * fights gameplay.
    */
+  /**
+   * The zoom range BOTH inputs clamp to — the wheel and the pinch must never
+   * disagree about how far the world goes.
+   *
+   * The floor is the backdrop fit (`minZoom` — the camera may never show past
+   * the painting). The ceiling used to be the world-builder's `cameraZoom.max`
+   * alone, which is a LANDSCAPE number: on a portrait phone the fit floor
+   * (~2.8 logical) sits far ABOVE that 1.4, the clamp range inverted, and
+   * `Clamp` pinned every zoom gesture to the floor — phones simply could not
+   * zoom, wheel or pinch. The ceiling now guarantees headroom over the floor
+   * (1.8x — about the detail the authored 1.4 gives desktop over its own
+   * fit), and desktop keeps its authored number exactly (max of the two).
+   */
+  private zoomBounds(): { min: number; max: number } {
+    const z = this.ctx.state.map.cameraZoom ?? { min: 0.2, max: 1.4 };
+    const r = renderScale.value;
+    return { min: this.minZoom * r, max: Math.max(z.max, this.minZoom * 1.8) * r };
+  }
+
   private wireCameraNav(): void {
     const cam = this.cameras.main;
     this.input.mouse?.disableContextMenu(); // so RIGHT-drag can pan (esp. in the editor) without the menu popping
+
+    /*
+     * PINCH — two fingers zoom, the world point between them stays put.
+     *
+     * Phaser ships one touch pointer; the second is asked for here (idempotent
+     * — addPointer caps at 10). The gesture reads the two pointers' LIVE
+     * state on every move rather than tracking which finger fired the event,
+     * so it cannot desync when the fingers alternate.
+     *
+     * Three rules keep it honest with the gestures already on this board:
+     *   - a pinch never starts over a held piece (DRAG_START refuses while
+     *     pinching, and a pinch does not begin while `dragSprite` is armed);
+     *   - the moment a second finger lands, any one-finger pan yields;
+     *   - a finger lifting off a pinch is not a tap — `isTap` holds its fire
+     *     for a beat (`pinchTapBlockUntil`), so releasing a zoom over a
+     *     generator does not harvest it.
+     *
+     * The zoom clamps are the WHEEL's own (world-builder cameraZoom lock and
+     * `minZoom` — the backdrop fit the camera may never see past), so the two
+     * inputs can never disagree about how far out the world goes. Anchoring:
+     * the world point under the fingers' midpoint is re-pinned every frame,
+     * which folds two-finger PAN in for free — moving both fingers together
+     * moves the board with them.
+     */
+    if (this.input.pointer2 === undefined) this.input.addPointer(1);
+    const livePinchPair = (): [Phaser.Input.Pointer, Phaser.Input.Pointer] | null => {
+      const a = this.input.pointer1;
+      const b = this.input.pointer2;
+      return a?.isDown && b?.isDown ? [a, b] : null;
+    };
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, () => {
+      const pair = livePinchPair();
+      if (!pair || this.dragSprite) return;
+      this.flyTween?.stop();
+      this.panFrom = null; // two fingers: the pan yields to the pinch
+      this.pinchPrev = {
+        dist: Phaser.Math.Distance.Between(pair[0].x, pair[0].y, pair[1].x, pair[1].y),
+        midX: (pair[0].x + pair[1].x) / 2,
+        midY: (pair[0].y + pair[1].y) / 2
+      };
+    });
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, () => {
+      if (!this.pinchPrev) return;
+      const pair = livePinchPair();
+      if (!pair) return;
+      const dist = Phaser.Math.Distance.Between(pair[0].x, pair[0].y, pair[1].x, pair[1].y);
+      const midX = (pair[0].x + pair[1].x) / 2;
+      const midY = (pair[0].y + pair[1].y) / 2;
+      const bounds = this.zoomBounds();
+      const next = Phaser.Math.Clamp(
+        cam.zoom * (dist / Math.max(1, this.pinchPrev.dist)),
+        bounds.min,
+        bounds.max
+      );
+      // Keep the world point that WAS under the previous midpoint under the
+      // new one: zoom about the fingers, pan with them, in one correction.
+      const anchor = cam.getWorldPoint(this.pinchPrev.midX, this.pinchPrev.midY);
+      cam.setZoom(next);
+      const now = cam.getWorldPoint(midX, midY);
+      cam.scrollX += anchor.x - now.x;
+      cam.scrollY += anchor.y - now.y;
+      this.pinchPrev = { dist, midX, midY };
+      this.pinchTapBlockUntil = this.time.now + 250;
+    });
+    this.input.on(Phaser.Input.Events.POINTER_UP, () => {
+      if (!this.pinchPrev) return;
+      if (!livePinchPair()) {
+        this.pinchPrev = null;
+        this.pinchTapBlockUntil = this.time.now + 250;
+      }
+    });
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       /**
        * THE MAP EDITOR OWNS THE LEFT BUTTON.
@@ -7203,11 +7332,10 @@ export class BoardScene extends Phaser.Scene {
       Phaser.Input.Events.POINTER_WHEEL,
       (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
         this.flyTween?.stop();
-        const z = this.ctx.state.map.cameraZoom ?? { min: 0.2, max: 1.4 }; // world-builder zoom lock
-        // minZoom is raised to the background-image fit so you can't zoom out past it;
-        // ×renderScale converts the logical bounds into the actual (scaled) zoom space.
-        const r = renderScale.value;
-        cam.setZoom(Phaser.Math.Clamp(cam.zoom * (dy < 0 ? 1.1 : 1 / 1.1), this.minZoom * r, z.max * r));
+        // One clamp for wheel and pinch alike — see `zoomBounds` for why the
+        // ceiling is not the world-builder number alone.
+        const bounds = this.zoomBounds();
+        cam.setZoom(Phaser.Math.Clamp(cam.zoom * (dy < 0 ? 1.1 : 1 / 1.1), bounds.min, bounds.max));
       }
     );
   }
