@@ -7340,6 +7340,31 @@ export class BoardScene extends Phaser.Scene {
     if (live && (live.col !== snap.col || live.row !== snap.row)) {
       snap = { ...snap, col: live.col, row: live.row };
     }
+    // ONE SPRITE PER ITEM, and this is the only place that can break it.
+    //
+    // `itemSprites` is a map, so a second acquire for a live id silently
+    // REPLACES the entry and the first container is left standing: still
+    // active, still drawn, still on its old tile — but no longer the sprite the
+    // board answers with. Every mover (item:moved, the merge gather, the gate
+    // flight, release) then works on the new one, so the old copy is a piece
+    // the player can see, can put a finger on, and cannot move. That is the
+    // doubled dragon, and the doubled anything else.
+    //
+    // Retire it HERE rather than trusting each caller: seven paths acquire
+    // (spawn, hatch, merge output, region reveal, harvest, gift, resync) and
+    // only the resync ever checked. What lets an id come round twice is a
+    // stale `nextItemId` minting one that is already standing — repaired on
+    // load now, but a save carrying the collision predates the repair, and a
+    // board that draws a ghost for the rest of its life is too high a price
+    // for an invariant one line can hold.
+    const standing = this.itemSprites.get(snap.id);
+    if (standing) {
+      this.removeDragonRig(snap.id);
+      this.detachItemAura(snap.id);
+      this.stopLean(snap.id, true);
+      this.itemSprites.delete(snap.id);
+      standing.release();
+    }
     let sprite = this.pool.find((s) => !s.active);
     if (!sprite) {
       sprite = new BoardItem(this);

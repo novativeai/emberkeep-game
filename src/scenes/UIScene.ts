@@ -554,11 +554,28 @@ export class UIScene extends Phaser.Scene {
       })
     );
     // `{dragon}` in any authored line resolves to what the player called her,
-    // and the bubble paints it in lava. Seeded from state so a resumed save
-    // speaks her name too, then kept live off the naming fact.
-    const named = this.ctx.systems.dragons.firstNamed();
-    if (named) this.bubble.setToken('dragon', named.name);
+    // and the bubble paints it in lava. Kept live off the naming fact — and
+    // re-asked when a SAVE lands, which is the only way a resumed run learns it.
+    //
+    // Seeding here alone was a beat too early: `create()` runs BEFORE
+    // `beginRun` loads the save (the same ordering `buildPortals` and the key
+    // badges already work around), so on a reopened game `firstNamed()` was
+    // asked of an empty board, answered nothing, and every later line spoke the
+    // token raw — "Drag {dragon} and drop her on the House". The name was never
+    // lost; nobody had told the bubble.
+    //
+    // `namedDragons` backs `firstNamed` up because the token is WHAT THE PLAYER
+    // CALLED HER, not who happens to be standing underfoot: `firstNamed` reads
+    // the active board only, so a dragon that walked through the Ember Gate
+    // would take her own name out of Eleanor's mouth for as long as the Keeper
+    // stayed behind.
+    const speakHerName = (): void => {
+      const named = this.ctx.systems.dragons.firstNamed() ?? this.ctx.systems.dragons.namedDragons()[0];
+      if (named) this.bubble.setToken('dragon', named.name);
+    };
+    speakHerName();
     this.offBus.push(
+      this.ctx.bus.on('state:loaded', speakHerName),
       this.ctx.bus.on('dragon:named', ({ name }) => {
         this.bubble.setToken('dragon', name);
         this.revealCodexButton();
