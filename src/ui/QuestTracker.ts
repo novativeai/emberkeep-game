@@ -465,10 +465,24 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     if (!this.tasksVisible) return;
     const quest = this.quests.activeQuest;
 
-    // The ladder moved on: the old quest's steps are all done by definition, so
-    // they play their completion beat rather than vanishing.
+    // THE LADDER MOVED ON — and that now has TWO causes, only one of which is
+    // an achievement.
+    //
+    // It used to have one: a quest left the tracker when it was finished, so
+    // "the old quest's steps are all done by definition" was true and every
+    // outgoing row could play the completion beat. Then the tracker learned to
+    // follow the world underfoot, and CROSSING A PORTAL became the second way —
+    // the Keeper walks through the Ember Gate with Selyna's gift half gathered,
+    // and the row for it was ticked to `2 / 2`, struck through and turned moss
+    // green on the way out. The one thing on screen that says what to do next
+    // said the player had just done it.
+    //
+    // So the row is asked, rather than assumed: a step that is genuinely done
+    // keeps its ceremony, and one that is merely somewhere else leaves quietly.
     for (const row of this.rows) {
-      if (!row.retiring && row.questId !== quest?.id) this.retireRow(row);
+      if (row.retiring || row.questId === quest?.id) continue;
+      if (this.quests.progressFor(row.step).done) this.retireRow(row);
+      else this.dropRow(row);
     }
     if (!quest) {
       this.layoutRows();
@@ -600,6 +614,35 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   private rowWidth(row: Row): number {
     const iconW = row.icon ? ICON_GAP + ICON_BOX + ICON_CHIP_PAD : 0;
     return row.count.width + COUNT_GAP + row.label.width + iconW;
+  }
+
+  /**
+   * A row that is leaving WITHOUT being finished — the ladder under the
+   * Keeper's feet changed because she changed worlds, not because she achieved
+   * anything.
+   *
+   * Deliberately the same fade and the same 30-unit slide as the tail of
+   * `retireRow`, and deliberately none of its front half: no count rewritten to
+   * `need / need`, no strike drawn through it, no moss green. Those three are
+   * the vocabulary of DONE, and spending them on a quest the player still owes
+   * is worse than saying nothing — they will come home to a task the HUD has
+   * already congratulated them for.
+   */
+  private dropRow(row: Row): void {
+    row.retiring = true;
+    if (row.step.id === this.peekedStep) this.dropPeek();
+    this.scene.tweens.add({
+      targets: row.root,
+      alpha: 0,
+      x: 30,
+      duration: 260,
+      ease: 'Sine.easeIn',
+      onComplete: () => {
+        this.rows = this.rows.filter((r) => r !== row);
+        row.root.destroy();
+        this.layoutRows();
+      }
+    });
   }
 
   private retireRow(row: Row): void {
