@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { CHARACTER_ANIMS, type CharacterClip, clipFor, clipKey, type PortraitView } from '../core/characterAnims';
-import { IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, PALETTE, PORTRAIT_CLIP_TALK, readMs, STORY_BEAT_HOLD_MS, TIMINGS, TYPEWRITER } from '../core/Constants';
+import { HUD_COLUMN_X, IS_MOBILE, LIVE_GAME_HEIGHT, num, PALETTE, PORTRAIT_CLIP_TALK, readMs, STORY_BEAT_HOLD_MS, TIMINGS, TYPEWRITER } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { nounMatcher, pieceNames } from '../core/speechHighlight';
 import type { ChainsData, SpeakerId, TutorialStepEvent } from '../core/types';
@@ -49,8 +49,17 @@ const BUBBLE_WIDTH = 1200;
  * could. Text objects render at double resolution so the scaled type is
  * crisp, not enlarged blur.
  */
-const MOBILE_BUBBLE_SCALE = 1.8;
-const MOBILE_EDGE_RIGHT = 40;
+/** 1.65, not more: the card's visual span is the plate PLUS the ring's
+ *  overhang (RING_SIZE/2 − 30 = 120 left of the plate), and the right edge is
+ *  pinned short of the button column at ~2218. 1.65 lands the ring's left
+ *  edge at ~40 units — on screen with a breath. 1.8 clipped her portrait. */
+const MOBILE_BUBBLE_SCALE = 1.65;
+/** The card's right edge stops SHORT OF THE BUTTON COLUMN, not at the screen.
+ *  The Ledger and Bag buttons live in the card's own vertical band, so a
+ *  screen-edge anchor printed the card straight over them. Derived from the
+ *  column's centre: half a button plate (~122 at mobile magnification) plus a
+ *  30-unit breath, so the anchor follows the column if it ever moves. */
+const MOBILE_ANCHOR_RIGHT = HUD_COLUMN_X - 152;
 const MOBILE_EDGE_BOTTOM = 40;
 const TEXT_RESOLUTION = IS_MOBILE ? 2 : 1;
 const TEXT_WIDTH = 940;
@@ -1169,7 +1178,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     if (IS_MOBILE) {
       this.anchorScale = MOBILE_BUBBLE_SCALE;
       this.setScale(MOBILE_BUBBLE_SCALE);
-      this.x = LIVE_GAME_WIDTH - MOBILE_EDGE_RIGHT - (width / 2) * MOBILE_BUBBLE_SCALE;
+      this.x = MOBILE_ANCHOR_RIGHT - (width / 2) * MOBILE_BUBBLE_SCALE;
       this.y = LIVE_GAME_HEIGHT - MOBILE_EDGE_BOTTOM - (height / 2) * MOBILE_BUBBLE_SCALE;
     }
   }
