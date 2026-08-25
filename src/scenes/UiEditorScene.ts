@@ -59,7 +59,7 @@ export class UiEditorScene extends Phaser.Scene {
 
     // The `?` sheet is chrome like the rest — the UI Builder has to be able to
     // theme it, so it is built here too.
-    const recipeHelp = new RecipeHelpPanel(this, ctx.bus, ctx.state, ctx.data.chains);
+    const recipeHelp = new RecipeHelpPanel(this, ctx.bus, ctx.state, ctx.data.chains, ctx.data.cauldron);
     recipeHelp.setDepth(69);
 
     const shop = new ShopPanel(this, ctx.bus, ctx.state);

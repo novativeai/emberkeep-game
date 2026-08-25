@@ -414,7 +414,13 @@ export class UIScene extends Phaser.Scene {
     this.ledger.setDepth(DEPTH_PANEL);
     // The `?` sheet stands OVER the Ledger that opened it — the card it explains
     // has to still be there behind it when it closes.
-    this.recipeHelp = new RecipeHelpPanel(this, this.ctx.bus, this.ctx.state, this.ctx.data.chains);
+    this.recipeHelp = new RecipeHelpPanel(
+      this,
+      this.ctx.bus,
+      this.ctx.state,
+      this.ctx.data.chains,
+      this.ctx.data.cauldron
+    );
     this.recipeHelp.setDepth(DEPTH_PANEL + 9);
     // The SAME ladder, raised under the cursor on a quest row instead of two
     // panels away. A second instance rather than a mode on the first: the
@@ -427,6 +433,7 @@ export class UIScene extends Phaser.Scene {
       this.ctx.bus,
       this.ctx.state,
       this.ctx.data.chains,
+      this.ctx.data.cauldron,
       'peek'
     );
     this.recipePeek.setDepth(DEPTH_PANEL + 8);

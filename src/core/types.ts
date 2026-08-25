@@ -1579,6 +1579,13 @@ export interface EventMap {
    */
   'ui:recipe_peek': {
     goal: { chain: string; tier: number; count: number } | null;
+    /**
+     * The row is a BREW, and `goal` is the cauldron's input rather than the
+     * piece the row names. Sent so the sheet can put the pot at the top of the
+     * ladder instead of silently answering about a different noun — see
+     * `recipeTree.brewHelp`. Absent on every ordinary row.
+     */
+    brew?: { recipeId: string; count: number };
     /** Left edge of the row, in live space: the sheet's right edge goes here. */
     x: number;
     /** Vertical middle of the row. */

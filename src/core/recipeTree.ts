@@ -1,6 +1,6 @@
 import { chainHiddenIn } from './Constants';
 import { recipeFor } from './mergeRule';
-import type { ChainsData, QuestGoal } from './types';
+import type { CauldronRecipeConfig, ChainsData, QuestGoal } from './types';
 
 /**
  * "HOW DO I MAKE THAT?" — the question a quest card cannot answer on its own.
@@ -45,6 +45,18 @@ export interface RecipeRung {
   /** How many of the tier BELOW make one of these. Absent on the base rung,
    *  which is not made by merging anything. */
   fromCount?: number;
+  /**
+   * HOW this rung is made, when it is not made by merging — the one word that
+   * stops the line below reading as a contradiction.
+   *
+   * Every other rung is a merge, and a merge needs no naming: three of the
+   * piece under it, in your hands, on the board. A BREW is not that. It happens
+   * in the Cauldron, from a piece that is not the tier below and may not even
+   * be the same chain, and a line that says "1 × Glass Float → Iron Hat" with
+   * no more is a claim the player cannot act on and does not believe. Rendered
+   * as a suffix by RecipeHelpPanel; absent everywhere a merge explains itself.
+   */
+  via?: string;
 }
 
 export type RecipeSourceKind = 'tap' | 'none';
@@ -228,4 +240,79 @@ export function questGoalPiece(
     return first ? { chain: first.chain, tier: first.tier, count: first.count } : null;
   }
   return null;
+}
+
+/**
+ * THE SAME LADDER, FOR A PIECE THAT IS BREWED RATHER THAN MERGED.
+ *
+ * `recipeHelp` walks a chain downward, and a brewed piece has nothing under it:
+ * an Iron Hat is not three of anything, so the walk finds one rung, no producer
+ * and returns null — the sheet stayed shut on seven of Selyna's eleven rows.
+ * Pointed at the cauldron's INPUT instead it opened, and then said the wrong
+ * thing: the row read "Brew 4 Iron Hats", the icon showed an Iron Hat, and the
+ * panel was titled "4 × Glass Float". Two nouns, no stated relation — which is
+ * indistinguishable, from the player's chair, from a hint that is simply wrong.
+ *
+ * So the brew becomes THE TOP RUNG of an ordinary ladder. The title is what the
+ * row names (`QuestSystem.pieceFor`, the same answer the icon draws), the first
+ * line says what the pot eats to make it, and everything below is the input's
+ * own merge ladder walked by `recipeHelp` exactly as before — one answer, read
+ * top to bottom, with no step the player has to supply themselves.
+ *
+ * `input` is chosen by the caller (`QuestSystem.peekNeedFor` picks the largest
+ * shortfall, because the first line of a two-ingredient recipe is the wrong
+ * answer as often as not); the ingredients NOT walked are named in the rung's
+ * `via`, so a recipe that also wants three Iron Hats never pretends otherwise.
+ */
+export function brewHelp(
+  chains: ChainsData,
+  recipe: CauldronRecipeConfig,
+  input: { chain: string; tier: number; count: number },
+  goalCount: number,
+  held: (chain: string, tier: number) => number,
+  worldId: string
+): RecipeHelp | null {
+  const out = recipe.output;
+  const config = chains.chains.find((c) => c.id === out.chain);
+  const outName = config?.tiers.find((t) => t.tier === out.tier)?.name ?? out.chain;
+  const inner = recipeHelp(chains, input, held, worldId);
+  // The pot's own line, spelled from the recipe rather than from the walk: how
+  // many go in per one that comes out, and every other ingredient by name.
+  const per = recipe.inputs.find((i) => i.chain === input.chain && i.tier === input.tier);
+  const others = recipe.inputs
+    .filter((i) => i !== per)
+    .map((i) => {
+      const c = chains.chains.find((x) => x.id === i.chain);
+      return `${i.count} × ${c?.tiers.find((t) => t.tier === i.tier)?.name ?? i.chain}`;
+    });
+  const head: RecipeRung = {
+    chain: out.chain,
+    tier: out.tier,
+    name: outName,
+    need: goalCount,
+    have: Math.max(0, held(out.chain, out.tier)),
+    missing: Math.max(0, goalCount - Math.max(0, held(out.chain, out.tier))),
+    fromCount: per?.count ?? 1,
+    via: others.length > 0 ? `Cauldron, with ${others.join(' + ')}` : 'Cauldron'
+  };
+  // A pot whose ingredient has no ladder and no maker still has a pot: the head
+  // rung and the ingredient under it are a complete answer on their own.
+  if (!inner) {
+    const inConfig = chains.chains.find((c) => c.id === input.chain);
+    const inName = inConfig?.tiers.find((t) => t.tier === input.tier)?.name ?? input.chain;
+    const have = Math.max(0, held(input.chain, input.tier));
+    const missing = Math.max(0, input.count - have);
+    return {
+      goal: { chain: out.chain, tier: out.tier, name: outName, count: goalCount },
+      rungs: [head, { chain: input.chain, tier: input.tier, name: inName, need: input.count, have, missing }],
+      source: { kind: 'none', label: '' },
+      baseMissing: missing
+    };
+  }
+  return {
+    goal: { chain: out.chain, tier: out.tier, name: outName, count: goalCount },
+    rungs: [head, ...inner.rungs],
+    source: inner.source,
+    baseMissing: inner.baseMissing
+  };
 }

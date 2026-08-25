@@ -887,6 +887,13 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   private peekRow(row: Row | null): void {
     const step = row && !row.retiring ? row.step : null;
     const goal = step ? this.goalOf(step) : null;
+    // A brew's `goal` is the pot's INPUT, not the piece the row names, so the
+    // sheet is told which pot — otherwise it opens titled after a different
+    // noun and reads as a hint that is simply wrong.
+    const brew =
+      step?.goal.kind === 'brew'
+        ? { recipeId: step.goal.recipeId, count: step.goal.count }
+        : undefined;
     const id = goal && step ? step.id : null;
     if (id === this.peekedStep) return;
     this.peekedStep = id;
@@ -903,6 +910,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     // right-anchored and as wide as its own text, so its bounds are the answer.
     this.bus.emit('ui:recipe_peek', {
       goal,
+      ...(brew ? { brew } : {}),
       x: row.root.getBounds().x,
       y: top + (QUEST_ROW_H * this.scaleY) / 2
     });

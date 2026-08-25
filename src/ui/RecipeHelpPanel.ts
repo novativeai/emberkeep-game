@@ -12,8 +12,8 @@ import {
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
-import { recipeHelp, type RecipeHelp } from '../core/recipeTree';
-import type { ChainsData } from '../core/types';
+import { brewHelp, recipeHelp, type RecipeHelp } from '../core/recipeTree';
+import type { CauldronData, ChainsData } from '../core/types';
 import { uiRegistry } from './theme';
 
 /* ------------------------------ the sheet ------------------------------ *
@@ -112,6 +112,9 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
     bus: EventBus,
     private gameState: GameState,
     private chains: ChainsData,
+    /** The grimoire, for the one ladder that does not start with a merge —
+     *  see `recipeTree.brewHelp`. */
+    private cauldron: CauldronData,
     private readonly variant: RecipeHelpVariant = 'modal'
   ) {
     super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
@@ -173,7 +176,7 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
       // NOTHING under a peek may be blocked — not the board, not the tracker it
       // hangs off. It is a label that happens to be a panel.
       this.setAlpha(0);
-      this.offBus.push(bus.on('ui:recipe_peek', ({ goal, x, y }) => this.peek(goal, x, y)));
+      this.offBus.push(bus.on('ui:recipe_peek', ({ goal, x, y, brew }) => this.peek(goal, x, y, brew)));
       // The `?` sheet is the same answer, louder. Two of them on screen is one
       // too many, so the peek stands down the moment the modal takes over.
       this.offBus.push(bus.on('ui:recipe_help', () => this.peek(null, 0, 0)));
@@ -288,7 +291,12 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
    * lays its rows out on) by the same `PEEK_GAP`. Nothing is covered, the sheet
    * still points at the line that raised it, and the same clamp keeps it in.
    */
-  peek(goal: { chain: string; tier: number; count: number } | null, x: number, y: number): void {
+  peek(
+    goal: { chain: string; tier: number; count: number } | null,
+    x: number,
+    y: number,
+    brew?: { recipeId: string; count: number }
+  ): void {
     if (this.variant !== 'peek') return;
     if (!goal) {
       if (this.peeking === null) return;
@@ -303,13 +311,15 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
       });
       return;
     }
-    const key = `${goal.chain}:${goal.tier}:${goal.count}`;
-    const help = recipeHelp(
-      this.chains,
-      goal,
-      (chain, tier) => this.gameState.countItemsAnywhere(chain, tier),
-      this.gameState.worldId
-    );
+    // The pot is part of the key: the same input can be walked for two different
+    // recipes, and a sheet that re-used the paint would keep the first one's title.
+    const key = `${goal.chain}:${goal.tier}:${goal.count}:${brew?.recipeId ?? ''}`;
+    const held = (chain: string, tier: number): number =>
+      this.gameState.countItemsAnywhere(chain, tier);
+    const recipe = brew ? this.cauldron.recipes.find((r) => r.id === brew.recipeId) : undefined;
+    const help = recipe
+      ? brewHelp(this.chains, recipe, goal, brew!.count, held, this.gameState.worldId)
+      : recipeHelp(this.chains, goal, held, this.gameState.worldId);
     // Nothing to explain is the same answer the `?` gives: no sheet at all.
     if (!help) {
       this.peek(null, 0, 0);
@@ -422,7 +432,12 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
       const row = this.acquireRow(line);
       row.root.setY(ROWS_TOP + line * ROW_GAP).setVisible(true);
       this.fitIcon(row.icon, `item_${rung.chain}_${rung.tier}`, ROW_ICON_FIT);
-      row.text.setText(`${above.fromCount} × ${rung.name}  →  ${above.name}`);
+      // `above.via` is how the rung ABOVE is made when it is not a merge — the
+      // Cauldron, and any ingredient this ladder is not the one walking down.
+      row.text.setText(
+        `${above.fromCount} × ${rung.name}  →  ${above.name}` +
+          (above.via ? `  ·  ${above.via}` : '')
+      );
       row.count.setText(rung.missing > 0 ? `${rung.missing}` : '✓');
       row.count.setColor(rung.missing > 0 ? INK.onFieldGold : INK.gain);
       line += 1;

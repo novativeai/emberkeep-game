@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { questGoalPiece, recipeHelp } from '../../src/core/recipeTree';
+import { brewHelp, questGoalPiece, recipeHelp } from '../../src/core/recipeTree';
 import { WORLD_ID } from '../../src/core/Constants';
+import cauldron from '../../src/data/cauldron.json';
 import chains from '../../src/data/chains.json';
-import type { ChainsData } from '../../src/core/types';
+import type { CauldronData, ChainsData } from '../../src/core/types';
 
 const CHAINS = chains as unknown as ChainsData;
+const CAULDRON = cauldron as unknown as CauldronData;
 
 /** A pocket: `chain:tier` → count. Anything not listed, the Keeper does not have. */
 const pocket =
@@ -189,5 +191,66 @@ describe('which quest steps name a piece worth explaining', () => {
     expect(questGoalPiece({ kind: 'task', taskId: 'orders_5' })).toBeNull();
     expect(questGoalPiece({ kind: 'world', worldId: 'borealis' })).toBeNull();
     expect(questGoalPiece({ kind: 'regard', characterId: 'eleanor', hearts: 3 })).toBeNull();
+  });
+});
+
+/**
+ * A BREWED PIECE HAS NOTHING UNDER IT, and that is the whole difficulty.
+ *
+ * An Iron Hat is not three of anything — it comes out of the Cauldron — so
+ * `recipeHelp` walks one rung, finds no producer and answers null. Seven of
+ * Selyna's eleven rows are brews, so the sheet stayed shut on most of the
+ * northern ladder. Pointing it at the pot's INPUT opened it and then said the
+ * wrong thing: the row read "Brew 4 Iron Hats" and the panel was titled
+ * "4 × Glass Float" — two nouns with no stated relation, which from the
+ * player's chair is indistinguishable from a hint that is simply wrong.
+ */
+describe('a brew is the top rung of an ordinary ladder', () => {
+  const recipe = (id: string) => CAULDRON.recipes.find((r) => r.id === id)!;
+  const brew = (
+    id: string,
+    input: { chain: string; tier: number; count: number },
+    count: number,
+    owned: Record<string, number> = {}
+  ) => brewHelp(CHAINS, recipe(id), input, count, pocket(owned), 'borealis');
+
+  it('is titled after the piece the row names, not after what the pot eats', () => {
+    // iron_cap: 1 Glass Float in, 1 Iron Hat out. The step asks for four.
+    const help = brew('iron_cap', { chain: 'seaglass', tier: 2, count: 4 }, 4)!;
+    expect(help.goal).toMatchObject({ chain: 'warhelm', tier: 1, name: 'Iron Hat', count: 4 });
+  });
+
+  it('says the pot, and keeps walking down the ingredient underneath it', () => {
+    const help = brew('iron_cap', { chain: 'seaglass', tier: 2, count: 4 }, 4)!;
+    // Rung 0 is the goal (the title); rung 1 is what the pot eats; below that
+    // is the ingredient's own merge ladder, unchanged.
+    expect(help.rungs[0]).toMatchObject({ chain: 'warhelm', tier: 1, fromCount: 1, via: 'Cauldron' });
+    expect(help.rungs[1]).toMatchObject({ chain: 'seaglass', tier: 2, fromCount: 3 });
+    expect(help.rungs[2]).toMatchObject({ chain: 'seaglass', tier: 1 });
+    // …and the bottom of it still names who makes the base piece.
+    expect(help.source).toMatchObject({ kind: 'tap', label: 'Glass Oven' });
+    expect(help.baseMissing).toBe(12); // 4 floats x 3 balls, none held
+  });
+
+  it('names the ingredient it is NOT walking down, so a two-part recipe cannot lie', () => {
+    // fire_brick: 2 Tar Drops + 1 Iron Hat. Walking the Tar Drops must still
+    // say the hats are wanted — a ladder that mentions one half of a recipe
+    // and stops is a hint the player will act on and be refused for.
+    const help = brew('fire_brick', { chain: 'emberheart', tier: 1, count: 6 }, 3)!;
+    expect(help.rungs[0].via).toBe('Cauldron, with 1 × Iron Hat');
+    expect(help.rungs[0]).toMatchObject({ name: 'Fire Brick', fromCount: 2 });
+  });
+
+  it('counts what is already brewed against the ask', () => {
+    const help = brew('iron_cap', { chain: 'seaglass', tier: 2, count: 4 }, 4, { 'warhelm:1': 3 })!;
+    expect(help.rungs[0]).toMatchObject({ need: 4, have: 3, missing: 1 });
+  });
+
+  it('still answers when the ingredient has no ladder and no maker', () => {
+    // The pot alone is a complete answer: the head rung, and the thing it eats.
+    const help = brew('iron_cap', { chain: 'seaglass', tier: 1, count: 2 }, 2)!;
+    expect(help).not.toBeNull();
+    expect(help.goal.name).toBe('Iron Hat');
+    expect(help.rungs).toHaveLength(2);
   });
 });
