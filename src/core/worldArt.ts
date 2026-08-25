@@ -32,7 +32,12 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
     // is only ever wanted at home and Selyna's only in the north, which is
     // exactly what a per-world list is for.
     const look = ctx.state.keeperSkins[art];
-    if (look) keys.push(`skin_${look}`);
+    if (look) {
+      keys.push(`skin_${look}`);
+      // …and the look's own clip set (its wan-shot idle/cast), which is world
+      // art for exactly the reason her own is.
+      for (const clipId of Object.keys(clipsFor(look))) keys.push(clipKey(look, clipId));
+    }
     // …and her Align-Studio BOARD clips, which are by far the heaviest thing a
     // character brings: a frame sheet is stored DECODED, so Selyna's clips are
     // tens of MB of video memory from a few MB of WebP. PreloadScene fetches
