@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import charactersDoc from '../../src/data/characters.json';
 import ordersDoc from '../../src/data/orders.json';
+import { WORLD_ID } from '../../src/core/Constants';
 import type { OrdersData } from '../../src/core/types';
 import { capture, createTestContext } from './helpers';
 
@@ -215,5 +217,71 @@ describe('give and Deliver are one verb in two grammars', () => {
     expect(ctx.state.countItems('orrery', 1)).toBe(1); // the fourth stays — she asked for three
     ctx.bus.emit('ui:gift_deliver_requested', { characterId: 'selyna', chain: 'quartz', tier: 1 });
     expect(ctx.systems.regard.given('selyna', 'quartz', 1)).toBe(0);
+  });
+});
+
+/**
+ * AN ORDER BELONGS TO THE WORLD ITS GIVER STANDS IN, and nothing in the shape
+ * of the file says so — `world` is optional and its absence means EMBERKEEP
+ * (`OrderSystem.here`, the default every Eleanor order relies on). That is a
+ * sensible default and a silent trap: leave the field off one of Selyna's and
+ * her order joins Eleanor's Ledger at home.
+ *
+ * It happened, to exactly one line. `selyna_buoys` — "A Gift for Selyna",
+ * 2 Glass Floats — sat in the home Ledger, so the endless tail borrowed its
+ * title for the quest tracker and the Keeper was told, on the isle, to go and
+ * deliver a piece that only exists on the ice. Crossing north then swapped the
+ * whole display for Selyna's real ladder, and the quest she had been shown for
+ * an hour was gone.
+ *
+ * The fix is one word of data. This is what stops the next one: the giver's own
+ * world is in characters.json, so the two can be made to agree here rather than
+ * on a player's screen.
+ */
+describe('every order is filed under the world its giver stands in', () => {
+  const HOME_OF = new Map(
+    (charactersDoc as { characters: { id: string; world?: string }[] }).characters.map((c) => [
+      c.id,
+      c.world ?? WORLD_ID
+    ])
+  );
+  const doc = ordersDoc as unknown as OrdersData;
+  const every = [
+    ...doc.orders.map((o, i) => ({ what: o.id, giver: o.giver, world: o.world, i })),
+    ...(doc.repeatable ?? []).map((o, i) => ({
+      what: `repeatable[${i}] "${o.title}"`,
+      giver: o.giver,
+      world: o.world,
+      i
+    }))
+  ];
+
+  it('names a giver the cast actually has', () => {
+    for (const order of every) {
+      expect(HOME_OF.has(order.giver), `${order.what}: unknown giver "${order.giver}"`).toBe(true);
+    }
+  });
+
+  it('is where its giver is — declared, or defaulted to the authored world', () => {
+    for (const order of every) {
+      // The same resolution `OrderSystem.here` performs, asked of the data.
+      expect(order.world ?? WORLD_ID, order.what).toBe(HOME_OF.get(order.giver));
+    }
+  });
+
+  /**
+   * And the same claim made of the SYSTEM, at the moment it actually bit: with
+   * Eleanor's scripted ladder delivered, the home Ledger falls through to the
+   * encore pool, and that is where a mis-filed northern order surfaces — first
+   * on the card, then in the quest tracker, which borrows the live order's
+   * title for the endless tail.
+   */
+  it('never puts a northern order on the home Ledger, scripted or encore', () => {
+    const ctx = createTestContext();
+    ctx.state.completedOrderIds.push(...SCRIPTED_ORDER_IDS.filter((id) => id.startsWith('eleanor_')));
+    const shown = ctx.systems.order.activeOrders;
+    expect(shown.length).toBeGreaterThan(0);
+    for (const order of shown) expect(order.giver, order.title).toBe('eleanor');
+    expect(ctx.systems.order.giverHere).toBe('eleanor');
   });
 });

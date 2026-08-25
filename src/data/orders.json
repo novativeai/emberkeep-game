@@ -169,6 +169,7 @@
     {
       "id": "selyna_buoys",
       "giver": "selyna",
+      "world": "borealis",
       "title": "A Gift for Selyna",
       "blurb": "Bring me 2 Glass Floats. Carry them up the beach yourself. I want to see how you work.",
       "requires": [
