@@ -457,7 +457,7 @@ def do_dex():
 STORE_SECTIONS = {
   'skins': ('Mansion Looks', 'Give your Mansion a brand new look. It still makes the same Gold.'),
   'decor': ('Decorations', 'Placed on a free tile when you buy it. Just for fun — nothing merges with it. The big ones at the end can be seen from across the island.'),
-  'dragons': ('Dragon Looks', 'You cannot buy a dragon — but your own dragons can wear a new look. Same eggs, same food, same friends.'),
+  'dragons': ('Dragons', 'New dragons for your keep, and new looks for the dragons you already have. A new dragon starts as three eggs — merge them and raise your own.'),
 }
 STORE_ITEMS = {
   'manor_mushroom': ('Mushroom Cottage', 'Grown, not built. The big cap keeps the ash off like a roof keeps off rain.'),
