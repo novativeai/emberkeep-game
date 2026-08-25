@@ -337,37 +337,9 @@ const ACTION_FONT = px(32);
  * ACTION_TOP).
  */
 const ACTION_FOOT = IS_MOBILE ? AIR : Math.round(AIR * 0.4);
-/**
- * A BLED CARD'S NAME, MEASURED FROM ITS FOOT rather than from its middle.
- *
- * `NAME_Y` is an offset from the centre, which is the same thing on a card of
- * one fixed height and a different thing the moment a shelf sizes its cards to
- * its own art (`portraitShelf`). Stated as a foot, the whole block — name,
- * blurb, key — keeps the composition it was tuned with on a card of any height,
- * instead of stranding the words in the middle with a hand's width of empty
- * plate under them. Derived from today's numbers, so the square card is
- * unchanged to the pixel: 1040/2 - 60 = 460.
- */
-const NAME_FOOT = CARD_H / 2 - NAME_Y;
-/**
- * A POSTER SHELF GETS ONE CARD PER ROW IN PORTRAIT, and the card takes the
- * SHAPE OF ITS ART.
- *
- * The Dragon and Keeper looks are printed full-bleed — the art IS the card —
- * and their art is nothing like square: a keeper look is 900x1268 and a dragon
- * banner is 900x506. Cover-fitted into the shelf's square 1040 they were both
- * cropped to a slot: the keepers lost their heads and their feet, the dragons
- * became a letterboxed strip half a thumb tall. Two columns of that on a
- * 390-pixel screen is four cropped thumbnails where the shelf is meant to be
- * showing off.
- *
- * So: one column, the full width of the shelf, and a height read off the art
- * itself, capped at this fraction of the window so the next card always peeks
- * and the shelf still reads as a list. The Manor skins and Decorations keep
- * their two columns — their art is an OBJECT on a stage, it is nearly square,
- * and it tiles.
- */
-const POSTER_MAX_H = 0.62;
+// ACTION_Y / ACTION_TOP live inside `makeCard` now, computed from the card's
+// own height — the keeper rail's posters are taller than CARD_H and the button
+// keeps the same authored foot on every plate.
 const HERO_ACTION_SCALE = IS_MOBILE ? 2 : 0.82;
 const HERO_ACTION_FONT = px(40);
 /** The showcase card's key gets the same foot. Its plate is bigger, so the
@@ -1118,8 +1090,43 @@ export class StorePanel extends Phaser.GameObjects.Container {
     const hero = section.items.find((item) => item.hero) ?? null;
     const rest = hero ? section.items.filter((item) => item !== hero) : section.items;
 
+    /*
+     * THE WARDROBE RAIL — keeper looks are portrait posters, not squat cards.
+     *
+     * Each poster takes the whole height of the shelf window less 12 real
+     * pixels of air above and below (a CSS pixel is 2 units on the landscape
+     * sheet, ~6.6 in portrait), and the art cover-fills its plate: `coverFit`
+     * crops to the box, so the plate is never letterboxed and the art never
+     * spills the rim. Landscape hangs the pair side by side, CENTRED as a
+     * block — the four-column grid law (a short row leaves its gap on the
+     * right) is for trailing rows of a stocked shelf, and this shelf's whole
+     * stock is one short row. Portrait hangs them full-width, one per row,
+     * with the same 12px breathing between and around.
+     */
+    if (section.kind === 'keeper_skin') {
+      const pad = IS_MOBILE ? 80 : 24;
+      const rail = VIEW_H - pad * 2;
+      if (IS_MOBILE) {
+        const contentH = rest.length * rail + Math.max(0, rest.length - 1) * pad;
+        const top = -VIEW_H / 2 + pad;
+        this.maxScroll = Math.max(0, contentH + pad * 2 - VIEW_H);
+        rest.forEach((item, i) =>
+          this.place(this.makeCard(0, top + i * (rail + pad) + rail / 2, item, section, HERO_W, rail), item)
+        );
+      } else {
+        const blockW = rest.length * HERO_W + Math.max(0, rest.length - 1) * AIR;
+        const startX = -blockW / 2 + HERO_W / 2;
+        this.maxScroll = 0;
+        rest.forEach((item, i) =>
+          this.place(this.makeCard(startX + i * (HERO_W + AIR), 0, item, section, HERO_W, rail), item)
+        );
+      }
+      this.spendPendingScroll();
+      this.seatMask();
+      return;
+    }
+
     if (CX.heroStacked) {
-      const shelf = this.portraitShelf(section, rest);
       /*
        * PORTRAIT: the showcase card is a BANNER, not a column.
        *
@@ -1130,9 +1137,8 @@ export class StorePanel extends Phaser.GameObjects.Container {
        * grid runs whole underneath it — the shelf scrolls anyway, and vertical
        * room is the one thing a portrait screen is not short of.
        */
-      const rows = Math.ceil(rest.length / shelf.cols);
-      const rowGap = shelf.cardH + AIR;
-      const gridH = rows > 0 ? (rows - 1) * rowGap + shelf.cardH : 0;
+      const rows = Math.ceil(rest.length / COLS);
+      const gridH = rows > 0 ? (rows - 1) * ROW_GAP + CARD_H : 0;
       const contentH = (hero ? HERO_H + AIR : 0) + gridH;
       // Short sections stay optically centred; an overflowing one starts at the
       // top of the window, because a centred overflow hides its first row as
@@ -1142,17 +1148,15 @@ export class StorePanel extends Phaser.GameObjects.Container {
       this.maxScroll = Math.max(0, contentH + 2 * AIR - VIEW_H);
       if (hero) this.place(this.makeHeroCard(0, top + HERO_H / 2, hero, section), hero);
       const gridTop = top + (hero ? HERO_H + AIR : 0);
-      const colGap = shelf.cardW + AIR;
-      const colStartX = -((shelf.cols - 1) * colGap) / 2;
+      const colStartX = -((COLS - 1) * COL_GAP) / 2;
       rest.forEach((item, i) => {
         this.place(
           this.makeCard(
-            colStartX + (i % shelf.cols) * colGap,
-            gridTop + Math.floor(i / shelf.cols) * rowGap + shelf.cardH / 2,
+            colStartX + (i % COLS) * COL_GAP,
+            gridTop + Math.floor(i / COLS) * ROW_GAP + CARD_H / 2,
             item,
             section,
-            shelf.cardW,
-            shelf.cardH
+            CARD_W
           ),
           item
         );
@@ -1492,41 +1496,6 @@ export class StorePanel extends Phaser.GameObjects.Container {
     return card;
   }
 
-  /**
-   * WHAT SHAPE THIS SHELF'S CARDS ARE, IN PORTRAIT.
-   *
-   * A full-bleed shelf (`bleed`, below: the art IS the card) takes ONE column
-   * of the full shelf width, and its height is read off the art rather than
-   * chosen — cover-fit crops whatever the card's aspect does not match, so a
-   * card that is the wrong shape is a card that throws its own picture away.
-   * The height is capped at `POSTER_MAX_H` of the window so the next card
-   * always peeks over the fold and the shelf still reads as a list.
-   *
-   * Every other shelf keeps the square two-column grid it was authored with:
-   * its art is an object on a stage, not a poster, and objects tile.
-   *
-   * The aspect is MEASURED, not declared, so a re-cut card moves the shelf with
-   * it and no table has to be remembered. The first item whose texture is
-   * loaded answers for the shelf — a shelf's cards are cut to one size by the
-   * same pipeline — and a shelf whose art failed to load falls back to the
-   * square grid rather than inventing a shape for pictures it cannot see.
-   */
-  private portraitShelf(
-    section: StoreSection,
-    items: readonly StoreItem[]
-  ): { cols: number; cardW: number; cardH: number } {
-    const square = { cols: COLS, cardW: CARD_W, cardH: CARD_H };
-    if (section.kind !== 'dragon_skin' && section.kind !== 'keeper_skin') return square;
-    const drawn = items.find((item) => this.scene.textures.exists(item.art));
-    if (!drawn) return square;
-    const src = this.scene.textures.get(drawn.art).getSourceImage();
-    const aspect = src.height > 0 ? src.width / src.height : 1;
-    if (!Number.isFinite(aspect) || aspect <= 0) return square;
-    const cardW = HERO_W; // the full shelf width, the same span the hero banner uses
-    const cardH = Math.min(Math.round(cardW / aspect), Math.round(VIEW_H * POSTER_MAX_H));
-    return { cols: 1, cardW, cardH };
-  }
-
   private makeCard(
     x: number,
     y: number,
@@ -1535,13 +1504,17 @@ export class StorePanel extends Phaser.GameObjects.Container {
     /** The column width of the layout this card is being placed into — three
      *  equal columns beside a hero, four without one. */
     w: number,
-    /** And its height. Only a portrait poster shelf passes one; every other
-     *  card is the authored square. */
+    /** The card's height — CARD_H everywhere except the keeper rail, whose
+     *  posters take the whole shelf window. The text block and the action keep
+     *  their authored distance from the BOTTOM edge, so a taller card grows
+     *  upward into art rather than stretching its typography apart. */
     h: number = CARD_H
   ): Phaser.GameObjects.Container {
     const card = this.scene.add.container(x, y);
     const owned = this.gameState.ownedCosmetics.includes(item.id);
     const worn = this.isWorn(item, section);
+    const actionY = h / 2 - ACTION_FOOT - ACTION_PLATE_HALF_H * ACTION_SCALE;
+    const actionTop = actionY - ACTION_PLATE_HALF_H * ACTION_SCALE;
     // A legendary is printed on the foil plate; everything else keeps the cream
     // card. That is the only thing rarity changes about how a card behaves.
     const foil = !!item.rarity && RARITY[item.rarity].foil;
@@ -1637,15 +1610,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
 
     // A BLED card's name has to stay on its scrim; a PLAIN card's has only the
     // picture above it, so it rides higher and hands the slack to the blurb.
-    //
-    // The bled one is measured from the card's FOOT (`NAME_FOOT`), because a
-    // poster shelf sizes its cards to its own art and an offset from the middle
-    // would strand the whole block — name, blurb, key — halfway up a tall card
-    // with a hand's width of empty plate under it. On the authored square the
-    // two are the same number to the pixel.
-    const actionY = h / 2 - ACTION_FOOT - ACTION_PLATE_HALF_H * ACTION_SCALE;
-    const actionTop = actionY - ACTION_PLATE_HALF_H * ACTION_SCALE;
-    const nameY = bleed ? h / 2 - NAME_FOOT : PLAIN_NAME_Y;
+    const nameY = (bleed ? NAME_Y : PLAIN_NAME_Y) + (h - CARD_H) / 2;
     const name = this.scene.add
       .text(0, nameY, item.name, {
         fontFamily: FONT.ui, fontSize: `${px(32)}px`, fontStyle: 'bold',

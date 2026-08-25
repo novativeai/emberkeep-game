@@ -154,8 +154,8 @@
     },
     {
       "id": "dragons",
-      "title": "Dragon Looks",
-      "blurb": "You cannot buy a dragon — but your own dragons can wear a new look. Same eggs, same food, same friends.",
+      "title": "Dragons",
+      "blurb": "New dragons for your keep, and new looks for the dragons you already have. A new dragon starts as three eggs — merge them and raise your own.",
       "kind": "dragon_skin",
       "items": [
         {
