@@ -4028,7 +4028,21 @@ export class BoardScene extends Phaser.Scene {
             })
             .setDepth(DEPTHS.itemBase + y + 2);
         }
-        sprite.setInteractive({ useHandCursor: true });
+        // Opaque pixels, not the frame: a bare setInteractive is the full
+        // texture box, and the pot's transparent margins would swallow taps
+        // aimed at the rune floor beside it. Same rule as every item and
+        // standee — the touch zone is the drawn pot.
+        sprite.setInteractive({
+          hitArea: new Phaser.Geom.Rectangle(0, 0, sprite.width, sprite.height),
+          hitAreaCallback: (
+            area: Phaser.Geom.Rectangle,
+            hx: number,
+            hy: number,
+            obj: Phaser.GameObjects.Image
+          ): boolean =>
+            Phaser.Geom.Rectangle.Contains(area, hx, hy) && this.standeeOpaqueAt(obj, hx, hy, 6),
+          useHandCursor: true
+        });
         sprite.on(
           'pointerup',
           (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
@@ -4769,7 +4783,7 @@ export class BoardScene extends Phaser.Scene {
    * bodyBox rect is measured in — so the alpha lookup needs no conversion.
    */
   private standeeOpaqueAt(
-    sprite: Phaser.GameObjects.Sprite,
+    sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Image,
     hx: number,
     hy: number,
     ring: number
@@ -4998,11 +5012,22 @@ export class BoardScene extends Phaser.Scene {
       const hw = sprite.width;
       const hh = sprite.height;
       // Same trap as the world characters: a tall sprite anchored to one cell
-      // overhangs the cells behind it, so the hit area is its lower body only.
-      sprite.setInteractive(
-        new Phaser.Geom.Rectangle(hw * 0.22, hh * 0.5, hw * 0.56, hh * 0.5),
-        Phaser.Geom.Rectangle.Contains
-      );
+      // overhangs the cells behind it, so the hit area is its lower body only —
+      // and inside that box, OPAQUE PIXELS only, the same rule every board item
+      // and standee answers to: the touch zone is the drawn dragon, not the
+      // rectangle around it, so the empty corners of the frame never steal a
+      // tap from whatever the player can see behind it.
+      sprite.setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(hw * 0.22, hh * 0.5, hw * 0.56, hh * 0.5),
+        hitAreaCallback: (
+          area: Phaser.Geom.Rectangle,
+          hx: number,
+          hy: number,
+          obj: Phaser.GameObjects.Image
+        ): boolean =>
+          Phaser.Geom.Rectangle.Contains(area, hx, hy) && this.standeeOpaqueAt(obj, hx, hy, 6),
+        useHandCursor: true
+      });
       this.input.setDraggable(sprite, false);
       sprite.on('pointerup', () => this.onCompanionTapped(c.id, sprite));
       this.companionSprites.set(c.id, sprite);
