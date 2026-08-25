@@ -329,6 +329,52 @@ export class QuestSystem {
   }
 
   /**
+   * WHAT IS ACTUALLY STOPPING A BREW — the ingredient the player is shortest of.
+   *
+   * A brewed piece has no merge ladder of its own (nothing merges into an Iron
+   * Hat), so the hover sheet has nothing to walk unless it is pointed at the
+   * CAULDRON'S INPUT instead. Most recipes take one and the choice is empty;
+   * three of Selyna's take two, and there the first input is the wrong answer
+   * as often as not — a player holding six Tar Drops and no Iron Hats would be
+   * shown the Tar Drops and told they were fine.
+   *
+   * So it is the LARGEST SHORTFALL, not the first line: need minus held, over
+   * every board the Keeper has stood on (`countItemsAnywhere`, the same sum the
+   * quest counts themselves are paid out of). Ties and a fully-stocked bench
+   * both fall back to the first input, which is the recipe's own idea of what
+   * it is mainly made of.
+   *
+   * Only brews go through here. Every other goal already names a piece whose
+   * own chain is the answer.
+   */
+  peekNeedFor(step: QuestStepConfig): OrderRequirement | null {
+    if (step.goal.kind !== 'brew') return null;
+    const needs = this.needsFor(step);
+    if (needs.length === 0) return null;
+    let worst = needs[0]!;
+    let gap = -Infinity;
+    for (const need of needs) {
+      const short = need.count - this.heldForBrew(need.chain, need.tier);
+      if (short > gap) {
+        gap = short;
+        worst = need;
+      }
+    }
+    return worst;
+  }
+
+  /** Boards AND bag, because a brew is paid out of the BAG and the bag is
+   *  filled from the boards: an ingredient already pocketed is not one the
+   *  player still has to go and find, and pointing them back at the board for
+   *  it is the same wrong answer as naming the wrong ingredient. */
+  private heldForBrew(chain: string, tier: number): number {
+    const pocketed = this.state.bag
+      .filter((stack) => stack.chain === chain && stack.tier === tier)
+      .reduce((n, stack) => n + stack.count, 0);
+    return this.state.countItemsAnywhere(chain, tier) + pocketed;
+  }
+
+  /**
    * The PIECE a step's row is about, or null when the goal is not about one.
    *
    * This is deliberately not `needsFor`. That answers "what does this step

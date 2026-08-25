@@ -321,6 +321,42 @@ describe('brew goals — the cauldron as a quest driver', () => {
       }).label
     ).toBe('Brew 2 × Iron Hat');
   });
+
+  /**
+   * THE HOVER SHEET'S QUESTION IS NOT THE ROW'S. The row NAMES the Iron Hat;
+   * the sheet has to say how to get one, and nothing merges into an Iron Hat —
+   * so pointed at the output it walks one rung, finds no producer and says
+   * nothing at all. Seven of Selyna's rows are brews, so the whole northern
+   * ladder hovered blank while every Emberkeep row explained itself.
+   */
+  it('points a brew peek at the cauldron input, scaled by the brew count', () => {
+    const ctx = createTestContext();
+    const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
+    // iron_cap takes 1 Glass Float per hat; the step asks for four.
+    expect(ctx.systems.quests.peekNeedFor(step)).toEqual({ chain: 'seaglass', tier: 2, count: 4 });
+  });
+
+  it('picks the ingredient the player is shortest of, not the first line', () => {
+    const ctx = createTestContext();
+    // north_pitchpot brews `fire_brick` three times: 6 x Tar Drop
+    // (emberheart:1) + 3 x Iron Hat (warhelm:1). Stock the Tar Drops and the
+    // answer must move to the hats — the first input is the wrong answer as
+    // often as not to "why can I not brew this yet".
+    const step = ctx.systems.quests.all.find((q) => q.id === 'north_pitchpot')!.steps[0]!;
+    expect(ctx.systems.quests.peekNeedFor(step)).toEqual({
+      chain: 'emberheart',
+      tier: 1,
+      count: 6
+    });
+    ctx.bus.emit('bag:bank', { chain: 'emberheart', tier: 1, count: 6 });
+    expect(ctx.systems.quests.peekNeedFor(step)!.chain).toBe('warhelm');
+  });
+
+  it('answers nothing for a goal that is not a brew', () => {
+    const ctx = createTestContext();
+    const step = ctx.systems.quests.all.find((q) => q.id === 'north_landing')!.steps[0]!;
+    expect(ctx.systems.quests.peekNeedFor(step)).toBeNull();
+  });
 });
 
 describe('the tracker row knows which piece it is about', () => {

@@ -770,6 +770,25 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     // beside the row name Selyna's Glass Floats. `pieceFor` reads the LIVE
     // order instead, exactly like the row's own icon.
     if (step.goal.kind === 'active_order') return this.quests.pieceFor(step);
+    // A BREW IS THE ONE ROW WHOSE PEEK MUST DISAGREE WITH ITS OWN ICON.
+    //
+    // The icon answers "what is this row NAMING" — an Iron Hat, because that is
+    // the noun in the sentence (`pieceFor`). The peek answers "how do I get
+    // there", and for a brewed piece the honest answer is not up its own chain:
+    // nothing MERGES into an Iron Hat, so `recipeHelp` walks one rung, finds no
+    // producer, and correctly says nothing at all. The row went quiet — and in
+    // the north it is the commonest row there is, so the whole of Selyna's
+    // ladder hovered blank while every Emberkeep row explained itself.
+    //
+    // What the player must go and get is the CAULDRON'S INPUT — four Glass
+    // Floats for four Iron Hats — and that piece has a ladder like any other.
+    // `peekNeedFor` picks WHICH input when a recipe takes two: the one with the
+    // largest shortfall, because the first line of a recipe is the wrong answer
+    // as often as not to "why can I not brew this yet".
+    if (step.goal.kind === 'brew') {
+      const need = this.quests.peekNeedFor(step);
+      return need ? { chain: need.chain, tier: need.tier, count: need.count } : null;
+    }
     // `needsFor` walks orders, tasks and cauldron recipes, so it is only asked
     // for the goal kinds that can use the answer.
     const needs = step.goal.kind === 'order' ? this.quests.needsFor(step) : [];
