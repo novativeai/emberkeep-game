@@ -318,6 +318,50 @@ export class QuestSystem {
     );
   }
 
+  /**
+   * The PIECE a step's row is about, or null when the goal is not about one.
+   *
+   * This is deliberately not `needsFor`. That answers "what does this step
+   * COST", which is the audit's question; this answers "what is the row
+   * NAMING", which is the tracker's — and the two part company exactly where a
+   * brew is concerned. `needsFor` charges a brew its ingredients (the honest
+   * cost), while the row reads "Brew 4 Broken Strakes" and the player is
+   * looking for a Broken Strake. The icon has to match the words beside it or
+   * it is a second, quieter instruction disagreeing with the first.
+   *
+   * The rule, then: whatever noun the row says. A merge names its INPUT
+   * ("Merge 3 Drift Spars into…"), a delivery names what is delivered, a brew
+   * names what comes out, and a level, a region or a person's regard name no
+   * piece at all.
+   */
+  pieceFor(step: QuestStepConfig): { chain: string; tier: number } | null {
+    const goal = step.goal;
+    switch (goal.kind) {
+      case 'recipe':
+        return { chain: goal.chain, tier: goal.fromTier };
+      case 'have':
+      case 'gift':
+        return { chain: goal.chain, tier: goal.tier };
+      case 'order': {
+        const first = this.orderById(goal.orderId)?.requires[0];
+        return first ? { chain: first.chain, tier: first.tier } : null;
+      }
+      case 'active_order': {
+        // The encore the Ledger is actually showing — the row tracks a LIVE
+        // order, so a template's first requirement would be the wrong piece the
+        // moment the pool rotated.
+        const first = this.orders.activeOrders[0]?.requires[0];
+        return first ? { chain: first.chain, tier: first.tier } : null;
+      }
+      case 'brew': {
+        const out = this.cauldron.recipes.find((r) => r.id === goal.recipeId)?.output;
+        return out ? { chain: out.chain, tier: out.tier } : null;
+      }
+      default:
+        return null;
+    }
+  }
+
   // ------------------------------------------------------------- evaluation
 
   private evaluate(announce: boolean): void {

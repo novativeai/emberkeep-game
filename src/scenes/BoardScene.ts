@@ -4054,8 +4054,15 @@ export class BoardScene extends Phaser.Scene {
       // then skip entirely. Art missing must degrade, never block. `art` (not
       // id) keys the wardrobe, so Eleanor-at-home wears Eleanor.
       const animated = bank !== undefined && this.textures.exists(bank.keys.idle);
-      const key = animated ? bank!.keys.idle : `char_${art}`;
-      if (!animated && !this.textures.exists(key)) continue;
+      // …and a bought LOOK (Emporium `keeper_skin`) overrides the texture — but
+      // only the texture. Everything geometric still comes off her bank: the
+      // skin still is painted on the bank's own frame, at the bank's feet, so
+      // her anchor, her scale, her shadow, her keyline and her hit box are the
+      // ones already solved for her. A skin that brought its own geometry would
+      // have to re-solve all five.
+      const dressed = this.keeperSkinTexture(art);
+      const key = dressed ?? (animated ? bank!.keys.idle : `char_${art}`);
+      if (!dressed && !animated && !this.textures.exists(key)) continue;
       const [col, row] = cfg.anchor;
       const cell = gridToWorld(col, row);
       // Her authored nudge off the cell centre. Builder pixels, rebased onto the
@@ -4084,7 +4091,7 @@ export class BoardScene extends Phaser.Scene {
       } else {
         sprite.setOrigin(0.5, 1);
       }
-      if (animated) {
+      if (animated && !dressed) {
         // Register the one-shot cast whether or not an atlas idle takes over —
         // the scepter answer still plays off the bank.
         this.ensureStandeeAnims(art, bank!);
@@ -4093,8 +4100,12 @@ export class BoardScene extends Phaser.Scene {
       // still + breath: it IS an authored idle loop, registered onto the same
       // feet anchor by the pushed transform. Without one, she rests on the
       // bank's frame 0 and her standing life stays the breath in `update`.
-      const clipIdle = this.applyStandeeRest(art, sprite);
-      if (!clipIdle && animated) sprite.setFrame(0);
+      // Whichever clip set her CURRENT look answers to: her own when
+      // undressed, the look's own wan-shot set when dressed (null = a look
+      // with no clips yet, which stays a still + breath).
+      const clipArt = this.keeperClipArt(art);
+      const clipIdle = clipArt !== null && this.applyStandeeRest(clipArt, sprite);
+      if (!clipIdle && animated && !dressed) sprite.setFrame(0);
       // Arm/disarm pulses read this instead of assuming 1.
       sprite.setData('baseScale', sprite.scale);
       // Her keyline. Width comes from the BANK's geometry, not the clip's, because
@@ -4138,16 +4149,7 @@ export class BoardScene extends Phaser.Scene {
       // With an atlas idle under her, texture space changed: carry the bank's
       // BODY box through game space into the clip's frame so the hit area still
       // covers her lower body and nothing else.
-      const idleClip = clipIdle ? clipFor(art, 'idle') : null;
-      const box =
-        idleClip && bank
-          ? clipTextureRect(idleClip, {
-              x: (b.x - bank.anchorX * bank.frameWidth) * standeeScale,
-              y: (b.y - bank.anchorY * bank.frameHeight) * standeeScale,
-              width: b.width * standeeScale,
-              height: b.height * standeeScale
-            })
-          : b;
+      const box = this.standeeBodyBox(art, clipIdle ? clipArt : null, b);
       sprite.setData('bodyBox', box);
       // Rect AND pixels, the same pair board items are hit-tested by: the rect
       // is swapped in place by `reshapeStandees`, the callback outlives every
@@ -4175,7 +4177,11 @@ export class BoardScene extends Phaser.Scene {
       // The atlas idle already breathes — a squash on top would double it.
       if (!clipIdle) this.startBreathing(art, sprite);
       // …and it blinks: rare full-segment blink one-shots over the idle loop.
-      if (clipIdle && clipFor(art, 'blinking')?.stage !== 'portrait' && clipFor(art, 'blinking')) {
+      // Armed off her BASE set even while she stands dressed: the one-shot
+      // resolves the clip set at FIRE time (playStandeeReaction), so while a
+      // look without a blinking clip is worn the fire is a silent no-op, and
+      // the moment she undresses the same timer blinks her again.
+      if (clipFor(art, 'blinking')?.stage !== 'portrait' && clipFor(art, 'blinking')) {
         this.scheduleStandeeBlink(art, sprite);
       }
     }
@@ -4275,6 +4281,31 @@ export class BoardScene extends Phaser.Scene {
    * Returns false when she has no atlas idle, leaving the caller the bank's
    * frame-0 still.
    */
+  /**
+   * The hit box to file on a standee, in whatever texture space she is standing
+   * in.
+   *
+   * A standee is ~2 tiles tall, so the bound has to be her BODY and never her
+   * frame — the frame also holds the scepter blaze and the cast's ember bolt,
+   * and neither is her. The bank bakes that body box in BANK frame pixels,
+   * which is the right answer for the bank still and for a worn look (both are
+   * painted on the bank's own frame) and the wrong one under an atlas idle,
+   * whose sheet is a different size at a different scale. Hence the carry
+   * through game space into the clip's own texture space.
+   */
+  private standeeBodyBox(art: string, clipArt: string | null, body: HitBox): HitBox {
+    const bank = STANDEE_BANKS[art];
+    const clip = clipArt ? clipFor(clipArt, 'idle') : null;
+    if (!clip || !bank) return body;
+    const scale = bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1);
+    return clipTextureRect(clip, {
+      x: (body.x - bank.anchorX * bank.frameWidth) * scale,
+      y: (body.y - bank.anchorY * bank.frameHeight) * scale,
+      width: body.width * scale,
+      height: body.height * scale
+    });
+  }
+
   private applyStandeeRest(art: string, sprite: Phaser.GameObjects.Sprite): boolean {
     const clip = this.ensureClipAnim(art, 'idle');
     if (!clip) return false;
@@ -4295,25 +4326,152 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /**
+   * The board texture of the LOOK a keeper is wearing, or null for her authored
+   * self.
+   *
+   * `skin_<itemId>` is the wardrobe's own naming, shared with the Manor and the
+   * dragons: `card_<id>` is what the shelf shows, `skin_<id>` is what the board
+   * wears. Using it means this art inherits both halves of the skin contract
+   * for free — held off the boot preload by `isLazyScreenArt`, and pulled back
+   * into it by key when a save is actually wearing it.
+   *
+   * Null when the texture has not landed yet, so a slow connection shows her
+   * authored self rather than nothing — the degrade rule the rest of the art
+   * follows.
+   */
+  private keeperSkinTexture(art: string): string | null {
+    const worn = this.ctx.state.keeperSkins[art];
+    if (!worn) return null;
+    const key = `skin_${worn}`;
+    return this.textures.exists(key) ? key : null;
+  }
+
+  /**
+   * The clip-set id a keeper's CURRENT look answers to.
+   *
+   * Undressed, she is her own clip set. Dressed, she is her LOOK's — the look
+   * is its own character in character-anims.json (`eleanor_beach`), wan-shot
+   * off the skin still and registered onto the same feet — and a look with no
+   * clips answers NULL, because the one thing a dressed keeper must never do
+   * is play the base set: those frames are painted in her robes, and a cast
+   * would undress her for its length and dress her again after.
+   */
+  private keeperClipArt(art: string): string | null {
+    const worn = this.ctx.state.keeperSkins[art];
+    if (!worn) return art;
+    return Object.keys(clipsFor(worn)).length ? worn : null;
+  }
+
+  /**
+   * Re-dress a keeper where she stands, when a look is bought or swapped.
+   *
+   * Her plate is LAZY, exactly like the Manor's and the dragons' (`skin_` is
+   * held off the boot preload), and `keeperSkinTexture` answers null while it
+   * is missing — which is the right fallback everywhere else and precisely the
+   * wrong thing here, because the player has just put the look ON. So fetch
+   * first and dress after, the same order `reskinChain` uses.
+   */
+  private applyKeeperSkin(keeper: string): void {
+    const worn = this.ctx.state.keeperSkins[keeper];
+    const still = worn ? `skin_${worn}` : null;
+    const wantStill = still !== null && !this.textures.exists(still);
+    // The look's own clip sheets ride the same fetch: like the still they are
+    // lazy (only the boot world's worn look preloads), and dressing her before
+    // they land would strand her on the still until something else re-dressed
+    // her — `ensureClipAnim` checks residency at play time and nothing retries.
+    const sheets = worn
+      ? Object.entries(clipsFor(worn)).filter(([id]) => !this.textures.exists(clipKey(worn, id)))
+      : [];
+    if (!wantStill && sheets.length === 0) {
+      this.dressKeeper(keeper);
+      return;
+    }
+    if (wantStill) {
+      const entry = this.ctx.data.assets.images.find((e) => e.key === still);
+      if (entry?.source === 'file' && entry.file) this.load.image(still, entry.file);
+    }
+    for (const [clipId, clip] of sheets) {
+      this.load.spritesheet(clipKey(worn!, clipId), clip.file, {
+        frameWidth: clip.frameWidth,
+        frameHeight: clip.frameHeight
+      });
+    }
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => this.dressKeeper(keeper));
+    this.load.start();
+  }
+
+  /**
+   * Put whichever look she is wearing under her, and the life that goes with it.
+   *
+   * The two sides are interchangeable by construction — a skin still is painted
+   * on the bank's own frame — so this is a texture plus the geometry that
+   * belongs to whichever side she lands on: her CLIP idle carries its own scale
+   * and origin (`seatStandeeClip`), the skin carries the bank's. The breath is
+   * the other half: her clip idle already breathes, and a squash on top of it
+   * would double, so it is added when she dresses and dropped when she strips.
+   */
+  private dressKeeper(keeper: string): void {
+    const sprite = this.characterSprites.get(keeper);
+    if (!sprite?.active) return; // the fetch is async — she may have left
+    const dressed = this.keeperSkinTexture(keeper);
+    const bank = STANDEE_BANKS[keeper];
+    this.standeeReacting.delete(keeper);
+    sprite.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    sprite.stop();
+    this.breathing = this.breathing.filter((b) => b.sprite !== sprite);
+    // The look's own clip idle first — the same preference order the build
+    // uses. The chain of fallbacks under it: the look's STILL (its clips have
+    // not landed, or it has none), then the base clip idle, then the bank.
+    const clipArt = this.keeperClipArt(keeper);
+    const onClipIdle = clipArt !== null && this.applyStandeeRest(clipArt, sprite);
+    if (!onClipIdle) {
+      if (dressed) {
+        const standeeScale = bank ? bank.scale * (STANDEE_SCALE_TRIM[keeper] ?? 1) : 1;
+        sprite.setTexture(dressed);
+        if (bank) sprite.setOrigin(bank.anchorX, bank.anchorY);
+        sprite.setScale(standeeScale);
+        sprite.setData('baseScale', standeeScale);
+      } else {
+        this.restoreBankStill(keeper, sprite);
+      }
+      this.startBreathing(keeper, sprite);
+    }
+    // Whichever texture space she landed in, the hit box follows it.
+    if (bank) sprite.setData('bodyBox', this.standeeBodyBox(keeper, onClipIdle ? clipArt : null, bank.body));
+    syncSpriteInk(sprite);
+    this.reshapeStandees();
+  }
+
+  /**
    * Play a ONE-SHOT reaction clip (cast / happy / laugh / a blink segment) and
    * settle back onto the rest look. The latest reaction wins — a second event
    * mid-flight replaces the first rather than queueing a stale emotion.
    */
   private playStandeeReaction(art: string, clipId: string): void {
+    // The clip set is resolved at FIRE time, not at wiring time: her worn
+    // look's own set while dressed, her own while not. A dressed keeper whose
+    // look lacks this reaction does NOTHING — the base clips are painted in
+    // her robes, and playing one would undress her for its length. (The blink
+    // timer stays armed through all of this and simply no-ops while a look
+    // without a blinking clip is on.)
+    const clipArt = this.keeperClipArt(art);
+    if (clipArt === null) return;
     const sprite = this.characterSprites.get(art);
     if (!sprite?.active) return;
-    const clip = this.ensureClipAnim(art, clipId);
+    const clip = this.ensureClipAnim(clipArt, clipId);
     if (!clip) return;
     sprite.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
     this.standeeReacting.add(art);
-    this.seatStandeeClip(sprite, art, clipId, clip);
+    this.seatStandeeClip(sprite, clipArt, clipId, clip);
     sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       this.standeeReacting.delete(art);
       if (!sprite.active) return;
       sprite.stop();
-      if (!this.applyStandeeRest(art, sprite)) this.restoreBankStill(art, sprite);
+      // Settle back onto whatever her current look rests on — dressKeeper is
+      // the one place that knows the whole fallback chain, hit box included.
+      this.dressKeeper(art);
     });
-    sprite.play(clipKey(art, clipId));
+    sprite.play(clipKey(clipArt, clipId));
   }
 
   /**
@@ -4359,13 +4517,19 @@ export class BoardScene extends Phaser.Scene {
    * the IDLE texture's frame 0 under her again — not replaying an idle loop.
    */
   private playStandeeCast(characterId: string): void {
+    // Resolve the look first: a dressed keeper casts with her LOOK's cast clip
+    // (wan-shot in the outfit), and a look with none stays still — the bank
+    // fallback below is her robes and must never answer for her.
+    const clipArt = this.keeperClipArt(characterId);
+    if (clipArt === null) return;
     // The Align-Studio CAST is the definitive answer to `character:action_used`
     // when pushed — the bank one-shot never doubles under it (one event, one
     // animation). The bank path below survives as the no-atlas fallback.
-    if (this.characterSprites.get(characterId)?.active && this.ensureClipAnim(characterId, 'cast')) {
+    if (this.characterSprites.get(characterId)?.active && this.ensureClipAnim(clipArt, 'cast')) {
       this.playStandeeReaction(characterId, 'cast');
       return;
     }
+    if (clipArt !== characterId) return; // dressed: the bank is not her outfit
     const sprite = this.characterSprites.get(characterId);
     const bank = STANDEE_BANKS[characterId];
     if (!sprite || !bank) return;
@@ -8328,12 +8492,18 @@ export class BoardScene extends Phaser.Scene {
           const art = cfg.art ?? cfg.id;
           // Her Align-Studio atlas clips travel with her banks — same door,
           // same run, and worldArtKeys lists them for the matching eviction.
-          for (const [clipId, clip] of Object.entries(clipsFor(art))) {
-            if (this.textures.exists(clipKey(art, clipId))) continue;
-            this.load.spritesheet(clipKey(art, clipId), clip.file, {
-              frameWidth: clip.frameWidth,
-              frameHeight: clip.frameHeight
-            });
+          // The WORN LOOK's clip set rides along under its own id: it is world
+          // art exactly as her own is (Eleanor's look is only ever wanted at
+          // home), and its still is already in `fetchable` via worldArtKeys.
+          const look = this.ctx.state.keeperSkins[art];
+          for (const owner of look ? [art, look] : [art]) {
+            for (const [clipId, clip] of Object.entries(clipsFor(owner))) {
+              if (this.textures.exists(clipKey(owner, clipId))) continue;
+              this.load.spritesheet(clipKey(owner, clipId), clip.file, {
+                frameWidth: clip.frameWidth,
+                frameHeight: clip.frameHeight
+              });
+            }
           }
           const bank = STANDEE_BANKS[art];
           if (!bank) continue;
@@ -8417,6 +8587,7 @@ export class BoardScene extends Phaser.Scene {
       }),
       bus.on('store:skin_changed', () => this.applyManorSkin()),
       bus.on('store:dragon_skin_changed', ({ dragon }) => this.applyDragonSkin(dragon)),
+      bus.on('store:keeper_skin_changed', ({ keeper }) => this.applyKeeperSkin(keeper)),
       bus.on('item:spawned', ({ item, cause }) => {
         const sprite = this.acquireSprite(item, false);
         // Any dragon generator (ember or emerald) wears its live rig.

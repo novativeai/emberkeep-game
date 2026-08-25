@@ -496,12 +496,16 @@ export interface TaskConfig {
  *
  * `kind` is what a purchase DOES, and it is the whole contract:
  *   'skin'  — swaps the art of the top-tier Manor. Owned + equipped.
+ *   'dragon_skin' — re-dresses a merge chain's dragon. Owned + equipped.
+ *   'keeper_skin' — re-dresses a PERSON where she stands on the board. Owned +
+ *                   equipped. The third wardrobe: the Manor, the dragons, and
+ *                   now the keepers themselves.
  *   'decor' — places a non-merging prop on the board. Owned; one placement each.
  *   'soon'  — nothing is for sale; the section renders its blurb and a badge.
  * A 'soon' section carries no items ON PURPOSE: a priced card that cannot be
  * bought is worse than an honest empty shelf.
  */
-export type StoreKind = 'skin' | 'dragon_skin' | 'decor' | 'soon';
+export type StoreKind = 'skin' | 'dragon_skin' | 'keeper_skin' | 'decor' | 'soon';
 
 /**
  * How rare a shelf item is meant to feel. It is PRESENTATION ONLY — a legendary
@@ -522,6 +526,18 @@ export interface StoreItem {
   /** `dragon_skin` only: the merge chain this skin re-dresses ('ember_dragon',
    *  'emerald'). It is the wardrobe slot — one worn skin per dragon. */
   dragon?: string;
+  /**
+   * `keeper_skin` only: the WARDROBE KEY of the person it dresses ('eleanor',
+   * 'selyna') — `characters.json`'s `art ?? id`, the same key her standee bank,
+   * her Regard gauge and her dialogue bank are filed under. It is the wardrobe
+   * slot: one worn look per keeper, and Eleanor-at-home wears what Eleanor
+   * wears because they are one key.
+   *
+   * The board art it swaps to is `char_<id>` — the SAME naming the authored
+   * fallback standee uses, because that is exactly what it is: a still of her,
+   * on her bank's frame, at her bank's feet.
+   */
+  keeper?: string;
   /** A CHAIN-GRANT card (frost/storm): buying it spawns a clutch of three
    *  tier-1 eggs of this chain — the breed is its own merge line, not a skin.
    *  Mutually exclusive with `dragon`. */
@@ -1391,6 +1407,9 @@ export interface SaveDataV1 {
    *  the breeds are different animals — wearing Ashglass on the ember dragon
    *  says nothing about what the emerald dragon is wearing. */
   dragonSkins?: Record<string, string>;
+  /** Worn keeper looks, by wardrobe key. Optional like `dragonSkins`: a save
+   *  written before the wardrobe existed simply has none, so no version bump. */
+  keeperSkins?: Record<string, string>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1638,6 +1657,9 @@ export interface EventMap {
   /** Fact: this DRAGON now wears this skin (null = its authored art).
    *  BoardScene re-textures every item of that chain whose tier has skin art. */
   'store:dragon_skin_changed': { dragon: string; itemId: string | null };
+  /** A keeper changed clothes. `keeper` is her wardrobe key; BoardScene
+   *  re-dresses the standee she is standing in, if she is in this world. */
+  'store:keeper_skin_changed': { keeper: string; itemId: string | null };
   /** Settings toggled the background music on/off (AudioManager applies it). */
   'audio:set_music_muted': { muted: boolean };
   'fog:tapped': { regionId: string };

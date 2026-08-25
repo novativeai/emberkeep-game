@@ -29,11 +29,11 @@ export class EconomySystem {
       this.state.keys -= keys;
       this.announce();
     });
-    // The one-time free Ember Spark is a SAVE fact, not a browser-session one:
+    // The one-time free Warmth gift is a SAVE fact, not a browser-session one:
     // sessionStorage survived game resets, so replays lost their FREE card and
     // the tutorial's buy_energy step could never be completed.
     bus.on('marketplace:purchased', ({ free }) => {
-      if (free && this.state.stat('freeSparkUsed') === 0) this.state.addStat('freeSparkUsed', 1);
+      if (free && this.state.stat('freeWarmthUsed') === 0) this.state.addStat('freeWarmthUsed', 1);
     });
     bus.on('ui:bag_sell_requested', ({ chain, tier, count }) => this.sellFromBag(chain, tier, count ?? 1));
     /**

@@ -210,6 +210,34 @@
           "world": "emberkeep"
         }
       ]
+    },
+    {
+      "id": "keepers",
+      "title": "Keeper Looks",
+      "blurb": "What the Keepers wear when the work is done. It changes nothing but the view.",
+      "kind": "keeper_skin",
+      "items": [
+        {
+          "id": "eleanor_beach",
+          "name": "Eleanor — Sunned Shore",
+          "blurb": "The ash washed off. She kept the red and left the coat at home.",
+          "art": "card_eleanor_beach",
+          "keeper": "eleanor",
+          "gold": 800,
+          "rarity": "epic",
+          "world": "emberkeep"
+        },
+        {
+          "id": "selyna_beach",
+          "name": "Selyna — Pale Tide",
+          "blurb": "Even a northern shore has a summer. She waited a long time for it.",
+          "art": "card_selyna_beach",
+          "keeper": "selyna",
+          "gold": 800,
+          "rarity": "epic",
+          "world": "borealis"
+        }
+      ]
     }
   ]
 }

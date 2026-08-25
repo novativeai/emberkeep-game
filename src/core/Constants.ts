@@ -1857,7 +1857,7 @@ export const chestGiftsIn = (worldId: string): ReadonlyArray<ChestGift> =>
 /** Energy. */
 export const ENERGY_MAX = 30;
 /** Warmth a brand-new game starts with — 2 below max, so the tutorial's free
- *  Ember Spark visibly tops the gauge back toward full. */
+ *  free Warmth visibly tops the gauge back toward full. */
 export const ENERGY_START = 28;
 export const ENERGY_REGEN_MS = 60_000; // 1 Warmth every minute (cozy session gate, not a wall)
 export const ENERGY_REGEN_AMOUNT = 1;

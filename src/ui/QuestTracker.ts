@@ -475,22 +475,17 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     this.layoutRows();
   }
 
-  /** The piece a step's goal spends, as an item texture key — for a merge
-   *  (`recipe`) goal that is the FROM tier: the row points at what the player
-   *  must gather, and they gather inputs, not results. Null when the goal is
-   *  not about a piece (a level, a region, a person's regard). */
+  /** The piece a step's row NAMES, as an item texture key — resolved by
+   *  `QuestSystem.pieceFor`, which owns the orders and the grimoire the answer
+   *  has to be read out of. Null when the goal is not about a piece (a level, a
+   *  region, a person's regard), and the row then starts at its label.
+   *
+   *  It used to answer for three goal kinds only and return null for the rest,
+   *  which left the two commonest rows in the game bare: every "Deliver N to
+   *  Eleanor" (the goal is an `order`, and the piece is in the order's own
+   *  requirements) and every "Brew N" (the piece is the recipe's output). */
   private iconKeyFor(step: QuestStepConfig): string | null {
-    const goal = step.goal;
-    if (goal.kind === 'recipe') return `item_${goal.chain}_${goal.fromTier}`;
-    if (goal.kind === 'have' || goal.kind === 'gift') return `item_${goal.chain}_${goal.tier}`;
-    // A DELIVERY names an ORDER, not a piece — and delivery is what most of the
-    // ladder asks for, so the commonest row in the game was the one row with no
-    // icon: "Deliver 6 Gem Chips to Eleanor" sat bare beside "Merge 3 Rubies"
-    // wearing its ruby. The piece is one hop away through the same `needsFor`
-    // the hover sheet already walks, so the row can say what to go touch here
-    // too. Goals that name no piece at all — a level, a region, a person's
-    // regard — still get none, which is the rule and not an omission.
-    const piece = this.goalOf(step);
+    const piece = this.quests.pieceFor(step);
     return piece ? `item_${piece.chain}_${piece.tier}` : null;
   }
 
@@ -559,6 +554,15 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     const progress = this.quests.progressFor(row.step);
     row.label.setText(progress.label);
     row.count.setText(`${progress.have} / ${progress.need}`);
+    // …and so does the PIECE, for the same reason: the endless tail tracks
+    // whichever order is live, so its icon rotates with the wording it sits
+    // beside. Contain-fit again after the swap — a replacement is a different
+    // drawing at its own resolution.
+    const key = this.iconKeyFor(row.step);
+    if (row.icon && key && row.icon.texture.key !== key && this.scene.textures.exists(key)) {
+      row.icon.setTexture(key);
+      row.icon.setScale(ICON_BOX / Math.max(row.icon.width, row.icon.height));
+    }
     row.root.setScale(1);
     row.label.setX(-(row.count.width + COUNT_GAP));
     this.seatIcon(row);

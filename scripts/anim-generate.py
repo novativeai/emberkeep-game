@@ -62,6 +62,18 @@ ADULT_FOOTER = (
     'The whole dragon stays fully inside the frame, nothing cut off. '
     'Static locked-off camera, no camera movement. The background stays still.'
 )
+KEEPER_FOOTER = (
+    'She is a human woman, not a creature: she stays standing on the same spot '
+    'with her feet planted and her weight on both legs. She does not walk, '
+    'turn around, step forward or lean out of position. '
+    'NOTHING MAY REACH THE EDGE OF THE FRAME. She, her hair, her clothing, her '
+    'scepter and every spark or beam of light stay well inside the picture with '
+    'clear empty space on all four sides at all times; nothing is cut off by '
+    'the top, the sides or the bottom. '
+    'Static locked-off camera, no camera movement, no zoom, no pan. The flat '
+    'background stays completely empty and untouched — no ground, no shadow, '
+    'no scenery, no sky.'
+)
 PORTRAIT_FOOTER = (
     'This is a close bust portrait: only the head, neck and upper chest are in '
     'shot, and the chest runs off the bottom edge of the frame. The head stays '
@@ -120,6 +132,52 @@ CLIPS = {
                 'effects — the plain flat background stays completely empty '
                 'and untouched. Static locked-off camera, no camera movement. '
                 'The background stays still.'
+            )
+        }
+    },
+    # ---- KEEPER LOOKS (the board standee of a bought outfit) -----------------
+    # The two clips a world character actually plays, and no more: her idle is
+    # what she does all day, her cast is the answer to `character:action_used`.
+    # Both are described against the SHIPPED banks rather than invented — the
+    # cast in particular is not a generic spell: her scepter gem flares and
+    # throws a bolt of light sideways past her elbow
+    # (`sprites/<who>/world-cast.webp`, frames 5-7), and it ends back on the
+    # rest pose so the one-shot can settle into the idle without a jump.
+    'keeper': {
+        'idle': {
+            'duration': 5,
+            'prompt': (
+                'The woman stands at rest, breathing slowly and evenly. Her '
+                'chest and shoulders rise and fall a little, her head drifts a '
+                'few degrees and settles, she blinks twice, and her loose hair '
+                'and light clothing sway very gently as if in a soft breeze. '
+                'She holds her scepter upright in the same hand, steady, its tip '
+                'resting on the ground. The motion is small and calm and never '
+                f'stops. {KEEPER_FOOTER}'
+            )
+        },
+        'cast': {
+            'duration': 4,
+            # v2 of this prompt. v1 asked for "a bolt of light shooting out
+            # sideways" — the authored bank's ember bolt — and wan took it to
+            # the wall: measured at 12fps, 23 of Eleanor's 45 frames and 20 of
+            # Selyna's had the beam crossing the plate's LEFT edge, through
+            # ~250px of margin. A beam that exits the canvas ships as a beam
+            # ending in a straight cut mid-air. So the bolt became a BURST:
+            # everything the spell does now happens within a forearm of the
+            # gem, and the word "beam" appears only as a prohibition.
+            'prompt': (
+                'The woman casts a spell with her scepter. She lifts it a '
+                'little and steadies it in front of her; the gem at its head '
+                'glows, then bursts into a COMPACT star-shaped flash of warm '
+                'magical light with a few small sparks that arc outward no '
+                'farther than a hand-width from the gem before winking out. '
+                'The whole effect is a small tight burst centred on the gem — '
+                'NO long beam, NO ray, NO bolt flying away, nothing streaking '
+                'across the picture. She lowers the scepter and settles back '
+                'to exactly the calm standing rest pose she began in, so the '
+                'first and last frames match. Her feet never leave the ground '
+                f'and her body stays in the same spot. {KEEPER_FOOTER}'
             )
         }
     },
@@ -192,7 +250,11 @@ PLATE_STAGES = {
     # `golden_adult` plate above is the altar fixture, this one is the dialogue
     # bust (scripts/gen-elder-portrait.py). Same dragon, different stage, and
     # the two never share a clip — hence a plate of its own.
-    'golden_elder': 'portrait'
+    'golden_elder': 'portrait',
+    # The keeper looks. Two clips each, and only two: a bought outfit answers
+    # the same two events the authored standee does.
+    'eleanor_beach': 'keeper',
+    'selyna_beach': 'keeper'
 }
 
 

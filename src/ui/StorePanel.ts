@@ -566,6 +566,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
     this.offBus.push(bus.on('store:purchased', () => this.isOpen && this.refresh()));
     this.offBus.push(bus.on('store:skin_changed', () => this.isOpen && this.refresh()));
     this.offBus.push(bus.on('store:dragon_skin_changed', () => this.isOpen && this.refresh()));
+    this.offBus.push(bus.on('store:keeper_skin_changed', () => this.isOpen && this.refresh()));
     // Travelling changes the STOCK: local goods are on the shelf only in the
     // world that makes them, so the same stall carries a different catalogue
     // in Borealis than it does here.
@@ -1232,6 +1233,9 @@ export class StorePanel extends Phaser.GameObjects.Container {
    *  WORN says nothing about the emerald dragon. */
   private isWorn(item: StoreItem, section: StoreSection): boolean {
     if (section.kind === 'skin') return this.gameState.manorSkin === item.id;
+    if (section.kind === 'keeper_skin') {
+      return !!item.keeper && this.gameState.keeperSkins[item.keeper] === item.id;
+    }
     if (section.kind === 'dragon_skin') {
       return !!item.dragon && this.gameState.dragonSkins[item.dragon] === item.id;
     }
@@ -1332,7 +1336,11 @@ export class StorePanel extends Phaser.GameObjects.Container {
     // `!item.chain`: a CHAIN-GRANT card (frost/storm) sells a breed, not a
     // wardrobe — once owned there is nothing to WEAR, the animal is on the
     // board (or in the bag) already.
-    const skinAction = (section.kind === 'skin' || section.kind === 'dragon_skin') && owned && !worn && !item.chain;
+    const skinAction =
+      (section.kind === 'skin' || section.kind === 'dragon_skin' || section.kind === 'keeper_skin') &&
+      owned &&
+      !worn &&
+      !item.chain;
     const isPrice = !worn && !owned;
     const text = worn ? 'WORN' : owned ? (skinAction ? 'WEAR' : 'OWNED') : `${item.gold}`;
     const btnImg = this.scene.add.image(0, 0, owned && !skinAction ? 'ui_btn_free' : 'ui_btn_price');
@@ -1471,7 +1479,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
     // hero: art bled to the plate's edges, the words on a scrim over it. The
     // Manor skins and Decorations keep the stage: their art is an OBJECT, and
     // an object wants a card around it, not a poster.
-    const bleed = section.kind === 'dragon_skin';
+    // …and the keeper looks, for the same reason: a card whose art is a person
+    // is a POSTER. Only the Manor skins and the Decorations keep the stage,
+    // because their art is an OBJECT and an object wants a card around it.
+    const bleed = section.kind === 'dragon_skin' || section.kind === 'keeper_skin';
 
     let rim: Phaser.GameObjects.Graphics | null = null;
     let sheen: Phaser.GameObjects.TileSprite | null = null;

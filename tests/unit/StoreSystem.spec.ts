@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RARITY } from '../../src/core/Constants';
 import assetsDoc from '../../src/data/assets.json';
+import charactersDoc from '../../src/data/characters.json';
 import storeDoc from '../../src/data/store.json';
 import type { StoreData } from '../../src/core/types';
 import { capture, createTestContext } from './helpers';
@@ -115,6 +116,59 @@ describe('StoreSystem (cosmetics, bought with earned Gold)', () => {
     expect(ctx.state.dragonSkins).toEqual({ ember_dragon: 'ashglass' });
     expect(ctx.state.manorSkin).toBeNull(); // the Manor is untouched
     expect(worn.at(-1)).toEqual({ dragon: 'ember_dragon', itemId: 'ashglass' });
+  });
+
+  it('a keeper look fills its own keeper slot, and no other wardrobe', () => {
+    const ctx = createTestContext();
+    fund(ctx, 2000);
+    const worn = capture(ctx.bus, 'store:keeper_skin_changed');
+
+    ctx.bus.emit('ui:store_buy_requested', { itemId: 'eleanor_beach' });
+
+    expect(ctx.state.keeperSkins).toEqual({ eleanor: 'eleanor_beach' });
+    // Three wardrobes, three slots, and buying into one must not touch another.
+    expect(ctx.state.manorSkin).toBeNull();
+    expect(ctx.state.dragonSkins).toEqual({});
+    expect(worn.at(-1)).toEqual({ keeper: 'eleanor', itemId: 'eleanor_beach' });
+  });
+
+  it('a keeper look survives a save round trip', () => {
+    const ctx = createTestContext();
+    fund(ctx, 2000);
+    ctx.bus.emit('ui:store_buy_requested', { itemId: 'eleanor_beach' });
+
+    // `keeperSkins` is an ADDITIVE save field — old saves simply have none,
+    // which is why the wardrobe needed no SAVE_VERSION bump. Both directions
+    // are pinned here so that stays true.
+    const round = createTestContext();
+    round.state.hydrate(ctx.state.toSave(0, 1));
+    expect(round.state.keeperSkins).toEqual({ eleanor: 'eleanor_beach' });
+
+    const bare = createTestContext();
+    bare.state.hydrate({ ...ctx.state.toSave(0, 1), keeperSkins: undefined });
+    expect(bare.state.keeperSkins).toEqual({});
+  });
+
+  it('every keeper look names a keeper who exists, and art the game ships', () => {
+    // The wardrobe key is `characters.json`'s `art ?? id` — the same key her
+    // bank, her Regard gauge and her dialogue bank are filed under. A look
+    // filed under a name nobody wears could never appear on anyone.
+    const wardrobe = new Set(
+      (charactersDoc as { characters: { id: string; art?: string }[] }).characters.map((c) => c.art ?? c.id)
+    );
+    const keys = new Set((assetsDoc as { images: { key: string }[] }).images.map((i) => i.key));
+    const looks = (storeDoc as StoreData).sections
+      .filter((s) => s.kind === 'keeper_skin')
+      .flatMap((s) => s.items);
+    expect(looks.length).toBeGreaterThan(0);
+    for (const item of looks) {
+      expect(item.keeper, `${item.id} names no keeper`).toBeTruthy();
+      expect(wardrobe.has(item.keeper!), `${item.id} -> ${item.keeper}`).toBe(true);
+      // Two pieces of art, and they are not the same picture: `card_` is the
+      // shelf's poster, `skin_` is what the board actually wears.
+      expect(keys.has(item.art), `${item.id}: ${item.art}`).toBe(true);
+      expect(keys.has(`skin_${item.id}`), `${item.id}: skin_${item.id}`).toBe(true);
+    }
   });
 
   it('a chain-grant card hands over a clutch, and fills no wardrobe slot', () => {

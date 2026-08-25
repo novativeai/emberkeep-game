@@ -319,3 +319,77 @@ describe('brew goals — the cauldron as a quest driver', () => {
     ).toBe('Brew 2 × Iron Hat');
   });
 });
+
+describe('the tracker row knows which piece it is about', () => {
+  /** Every goal kind that NAMES a piece must resolve one; the rest must not. */
+  const NAMES_A_PIECE = new Set(['recipe', 'have', 'gift', 'order', 'active_order', 'brew']);
+
+  it('resolves the piece for every row that names one, across the whole ladder', () => {
+    const ctx = createTestContext();
+    const bare: string[] = [];
+    let resolved = 0;
+    for (const quest of ctx.systems.quests.all) {
+      for (const step of quest.steps) {
+        const piece = ctx.systems.quests.pieceFor(step);
+        if (!NAMES_A_PIECE.has(step.goal.kind)) {
+          // A level, a region, a person's regard, a lifetime counter — the row
+          // starts at its label, and an icon there would be an invented noun.
+          expect(piece, `${step.id} (${step.goal.kind})`).toBeNull();
+          continue;
+        }
+        if (piece) resolved++;
+        else bare.push(`${step.id} (${step.goal.kind})`);
+      }
+    }
+    // The gap this closed: `order` and `brew` rows used to resolve nothing, so
+    // every "Deliver N to Eleanor" and every "Brew N" showed a bare row.
+    expect(bare).toEqual([]);
+    expect(resolved).toBeGreaterThan(40);
+  });
+
+  it('a delivery row points at what is DELIVERED, a brew at what comes OUT', () => {
+    const ctx = createTestContext();
+    const stepOf = (id: string) =>
+      ctx.systems.quests.all.flatMap((q) => q.steps).find((s) => s.id === id)!;
+
+    const deliver = ctx.systems.quests.all
+      .flatMap((q) => q.steps)
+      .find((s) => s.goal.kind === 'order')!;
+    const order = ctx.data.orders.orders.find(
+      (o) => o.id === (deliver.goal as { orderId: string }).orderId
+    )!;
+    expect(ctx.systems.quests.pieceFor(deliver)).toEqual({
+      chain: order.requires[0]!.chain,
+      tier: order.requires[0]!.tier
+    });
+
+    const brew = ctx.systems.quests.all
+      .flatMap((q) => q.steps)
+      .find((s) => s.goal.kind === 'brew');
+    if (brew) {
+      const recipe = ctx.data.cauldron.recipes.find(
+        (r) => r.id === (brew.goal as { recipeId: string }).recipeId
+      )!;
+      // The OUTPUT, not the ingredients: the row says "Brew 4 Broken Strakes"
+      // and the icon has to be the thing the words name.
+      expect(ctx.systems.quests.pieceFor(brew)).toEqual({
+        chain: recipe.output.chain,
+        tier: recipe.output.tier
+      });
+    }
+    expect(stepOf(deliver.id)).toBe(deliver);
+  });
+
+  it('a merge row points at the INPUT — what the player must go and gather', () => {
+    const ctx = createTestContext();
+    const recipe = ctx.systems.quests.all
+      .flatMap((q) => q.steps)
+      .find((s) => s.goal.kind === 'recipe');
+    if (!recipe) return;
+    const goal = recipe.goal as { chain: string; fromTier: number };
+    expect(ctx.systems.quests.pieceFor(recipe)).toEqual({
+      chain: goal.chain,
+      tier: goal.fromTier
+    });
+  });
+});

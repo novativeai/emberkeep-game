@@ -86,6 +86,35 @@ const ROSTER = {
     // Bust framing, same treatment as Eleanor's; neck-line at her choker.
     portraitView: { height: 380, dy: -172, headCrop: 0.55 }
   },
+  // ---- KEEPER LOOKS (Emporium `keeper_skin`) -------------------------------
+  // The wan-generated life of a BOUGHT OUTFIT. Each registers against the BASE
+  // keeper's standee reference — the skin still was generated ON the bank's own
+  // frame (same content box to the pixel, checked at generation), so the
+  // authored rest box IS the skin's rest box, and clips aligned to it land on
+  // the same feet at the same display size as the standee they replace.
+  //
+  // Two clips only, on purpose: a world character answers two events — rest,
+  // and `character:action_used`. The BASE keeper keeps her four (idle / cast /
+  // laugh / happy for Eleanor); a look that cannot laugh yet simply does not,
+  // and BoardScene falls back to doing nothing rather than undressing her.
+  eleanor_beach: {
+    label: 'Eleanor — Sunned Shore (keeper look)',
+    rawDir: `${RAW_BASE}/eleanor_beach_atlasses`,
+    standee: 'eleanor',
+    clipInfo: {
+      idle: { trigger: 'board rest while the look is worn — replaces the skin still + breath' },
+      cast: { trigger: 'character:action_used while the look is worn', loop: false }
+    }
+  },
+  selyna_beach: {
+    label: 'Selyna — Pale Tide (keeper look)',
+    rawDir: `${RAW_BASE}/selyna_beach_atlasses`,
+    standee: 'selyna',
+    clipInfo: {
+      idle: { trigger: 'board rest while the look is worn — replaces the skin still + breath' },
+      cast: { trigger: 'character:action_used while the look is worn', loop: false }
+    }
+  },
   golden_elder: {
     label: 'Golden Elder (dialogue bust)',
     rawDir: `${RAW_BASE}/golden_elder_atlasses`,

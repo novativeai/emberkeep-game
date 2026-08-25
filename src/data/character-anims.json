@@ -954,6 +954,66 @@
         }
       },
       "board": "storm:2"
+    },
+    "eleanor_beach": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/eleanor_beach/idle.webp",
+          "frames": 39,
+          "frameWidth": 134,
+          "frameHeight": 226,
+          "fps": 12,
+          "loop": true,
+          "scale": 0.8001488059701494,
+          "dx": -11.67,
+          "dy": 1,
+          "srcFrameWidth": 213,
+          "srcFrameHeight": 360
+        },
+        "cast": {
+          "file": "sprites/anims/eleanor_beach/cast.webp",
+          "frames": 45,
+          "frameWidth": 205,
+          "frameHeight": 281,
+          "fps": 12,
+          "loop": false,
+          "scale": 0.8038562926829269,
+          "dx": -39.31,
+          "dy": 1.25,
+          "srcFrameWidth": 263,
+          "srcFrameHeight": 360
+        }
+      }
+    },
+    "selyna_beach": {
+      "clips": {
+        "idle": {
+          "file": "sprites/anims/selyna_beach/idle.webp",
+          "frames": 57,
+          "frameWidth": 143,
+          "frameHeight": 229,
+          "fps": 12,
+          "loop": true,
+          "scale": 0.8033758741258741,
+          "dx": -5.56,
+          "dy": 1.01,
+          "srcFrameWidth": 225,
+          "srcFrameHeight": 360
+        },
+        "cast": {
+          "file": "sprites/anims/selyna_beach/cast.webp",
+          "frames": 45,
+          "frameWidth": 220,
+          "frameHeight": 353,
+          "fps": 12,
+          "loop": false,
+          "scale": 0.8003316363636362,
+          "dx": -39.61,
+          "dy": 0.77,
+          "srcFrameWidth": 224,
+          "srcFrameHeight": 360
+        }
+      }
     }
   }
 }
