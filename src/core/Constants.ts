@@ -2371,6 +2371,19 @@ export const SKIP_KEYS = {
   labelDx: 18
 } as const;
 
+/**
+ * EDGE CARRY — holding a dragged piece against the screen's edge scrolls the
+ * world under it, so a piece can cross a board wider than the view in ONE
+ * gesture. The margin is a fraction of the viewport's short side; the speed is
+ * screen pixels per second (converted through the live zoom), ramping from 0
+ * at the margin's inner lip to full at the screen edge so entering the zone
+ * never jerks.
+ */
+export const EDGE_SCROLL = {
+  marginFrac: 0.09,
+  speedPxPerSec: 1500
+} as const;
+
 export const DRAG = {
   /** Pick-up scale-up and how high the art floats above the finger (px). */
   liftScale: 1.16,

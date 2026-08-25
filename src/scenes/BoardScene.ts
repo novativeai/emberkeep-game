@@ -8,6 +8,7 @@ import {
   DECOR_SCALE,
   DEPTHS,
   DRAG,
+  EDGE_SCROLL,
   DRAGON_ANIM,
   EGG_GIFT,
   DRAGON_CLIPS,
@@ -6629,9 +6630,38 @@ export class BoardScene extends Phaser.Scene {
    * a cloud is not a slot either. Nothing offered, nothing taken away: the drop
    * itself still resolves the same address, so what you see is where it lands.
    */
-  private updateDrag(_delta: number): void {
+  private updateDrag(delta: number): void {
     const s = this.dragSprite;
     if (!s) return;
+    /*
+     * EDGE CARRY — the camera moves so the piece doesn't have to be dropped.
+     *
+     * A board wider than the view made the far column unreachable in one
+     * gesture: the finger hit the screen edge with the world still going. So
+     * a held piece pressed into the edge margin scrolls the camera toward
+     * that edge — ramped from nothing at the margin's lip to full speed at
+     * the screen edge, in screen pixels through the live zoom so it feels the
+     * same at any magnification. The camera's own bounds (the backdrop rect)
+     * clamp the scroll, so the carry can never sail into open sky; and
+     * because the carry point below is re-derived from the pointer through
+     * the CURRENT camera every frame, the piece stays glued to the finger
+     * while the world slides under it.
+     */
+    const cam = this.cameras.main;
+    const p0 = this.dragPointer;
+    if (p0?.isDown) {
+      const margin = EDGE_SCROLL.marginFrac * Math.min(cam.width, cam.height);
+      const push = (pos: number, size: number): number =>
+        pos < margin ? -(1 - pos / margin) : pos > size - margin ? 1 - (size - pos) / margin : 0;
+      const fx = push(p0.x, cam.width);
+      const fy = push(p0.y, cam.height);
+      if (fx !== 0 || fy !== 0) {
+        this.flyTween?.stop();
+        const step = (EDGE_SCROLL.speedPxPerSec / cam.zoom) * (delta / 1000);
+        cam.scrollX += fx * step;
+        cam.scrollY += fy * step;
+      }
+    }
     // PIXEL-PERFECT, EVERY FRAME. The follow used to be an exponential ease
     // (~90 ms behind a moving target, worse on a dropped frame), which read as
     // the piece trailing the finger on any fast swipe. Two changes close the
