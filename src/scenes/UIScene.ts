@@ -530,7 +530,7 @@ export class UIScene extends Phaser.Scene {
     // one thing it must never do is arrive long after the moment it is about.
     this.reveal = new DragonReveal(this, this.ctx.bus, this.ctx);
 
-    this.bubble = new CharacterBubble(this, this.ctx.bus);
+    this.bubble = new CharacterBubble(this, this.ctx.bus, this.ctx.data.chains);
     // THE ONE DOOR onto lazily-fetched ring art (`ensureRingArt`). Hung on the
     // bubble's own speaker swap rather than on the call sites that were known
     // when the Elder got a voice, so every path that can name a speaker — a
@@ -915,7 +915,7 @@ export class UIScene extends Phaser.Scene {
         this.shop.open(currency);
       }),
       // Real-money packs: strictly post-tutorial (the buy_energy beat allows
-      // the Emporium, never a checkout — its gate is the free Spark).
+      // the Emporium, never a checkout — its gate is the free Warmth).
       bus.on('ui:iap_buy_requested', ({ packId }) => {
         if (!this.tutorialOver()) return;
         this.openIapConfirmDialog(packId);
@@ -929,7 +929,7 @@ export class UIScene extends Phaser.Scene {
        * and 130 Gold. A player at that beat holding fewer than 60 taps "Hearth
        * Bundle" and gets a Gold refusal — mid-lesson, from a panel the script
        * put in front of them. Raise a modal over that and its scrim covers the
-       * free Spark plate (`ShopPanel.getFreeButtonPos`), which is the ONLY
+       * free Warmth plate (`ShopPanel.getFreeButtonPos`), which is the ONLY
        * thing that can fire `marketplace:purchased`, which is that step's gate.
        * The run would be unfinishable. So "the tutorial is over" is the test —
        * not "no lesson is on screen right now", which that beat would pass.

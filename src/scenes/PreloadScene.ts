@@ -137,6 +137,10 @@ export class PreloadScene extends Phaser.Scene {
       // `textureFor`), so ask for every tier and let the filter drop the rest.
       for (let tier = 1; tier <= 5; tier++) wornSkins.add(`skin_${skin}_${tier}`);
     }
+    // A keeper's look is ONE plate, not a tier ladder — she is one standee.
+    for (const [, look] of Object.entries(ctx.state.keeperSkins ?? {})) {
+      if (look) wornSkins.add(`skin_${look}`);
+    }
     const skipAtBoot = (key: string): boolean =>
       (/^(tile_|decor_)/.test(key) && !neededArt.has(key)) ||
       (/^background_/.test(key) && !liveBackdrops.has(key)) ||
@@ -223,12 +227,19 @@ export class PreloadScene extends Phaser.Scene {
     for (const c of ctx.data.characters.characters) {
       if (c.world !== ctx.state.worldId) continue;
       const art = c.art ?? c.id;
-      for (const [clipId, clip] of Object.entries(clipsFor(art))) {
-        if (this.textures.exists(clipKey(art, clipId))) continue;
-        this.load.spritesheet(clipKey(art, clipId), clip.file, {
-          frameWidth: clip.frameWidth,
-          frameHeight: clip.frameHeight
-        });
+      // The WORN LOOK's clip set loads beside her own, under its own id — the
+      // save may resume with her dressed, and her look's idle is then what the
+      // board draws the moment it opens. (Its STILL is in `wornSkins` above;
+      // an undressed keeper costs nothing here, like everything else lazy.)
+      const look = ctx.state.keeperSkins[art];
+      for (const owner of look ? [art, look] : [art]) {
+        for (const [clipId, clip] of Object.entries(clipsFor(owner))) {
+          if (this.textures.exists(clipKey(owner, clipId))) continue;
+          this.load.spritesheet(clipKey(owner, clipId), clip.file, {
+            frameWidth: clip.frameWidth,
+            frameHeight: clip.frameHeight
+          });
+        }
       }
     }
     // Map-decor clips — the Runevault cauldron's boil loop. A decor piece's

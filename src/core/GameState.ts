@@ -117,6 +117,8 @@ export class GameState {
    *  breeds are different animals: what the ember dragon wears says nothing
    *  about the emerald one. StoreSystem owns writes. */
   dragonSkins: Record<string, string> = {};
+  /** Worn keeper looks, by wardrobe key ('eleanor' -> 'eleanor_beach'). */
+  keeperSkins: Record<string, string> = {};
   /** Test hook: pins the Dragon Book discovery roll. Unset in play. */
   rollOverride: number | undefined = undefined;
 
@@ -264,6 +266,7 @@ export class GameState {
     this.ownedCosmetics = [];
     this.manorSkin = null;
     this.dragonSkins = {};
+    this.keeperSkins = {};
   }
 
   hydrate(save: SaveDataV1): void {
@@ -335,6 +338,7 @@ export class GameState {
     this.ownedCosmetics = [...(save.ownedCosmetics ?? [])];
     this.manorSkin = save.manorSkin ?? null;
     this.dragonSkins = { ...(save.dragonSkins ?? {}) };
+    this.keeperSkins = { ...(save.keeperSkins ?? {}) };
     // Last: the board the player was standing on. Unknown or absent (every save
     // written before travel existed) means the authored world, which is where
     // the game has always resumed.
@@ -527,7 +531,8 @@ export class GameState {
       nests: home.nests,
       ownedCosmetics: [...this.ownedCosmetics],
       manorSkin: this.manorSkin,
-      dragonSkins: { ...this.dragonSkins }
+      dragonSkins: { ...this.dragonSkins },
+      keeperSkins: { ...this.keeperSkins }
     };
   }
 

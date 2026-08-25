@@ -133,7 +133,7 @@ in `chains.json` as the unit tests' generic merge chain but is listed in
 **Gold** and **Warmth** are the live currencies. Gold comes from orders, Gold
 Coins/Pouches (the House loop), and selling; it sinks into timer skips and
 Warmth refills in the **Warmth Shop** (5/20/50 Warmth for 20/60/130 Gold, after
-one free Ember Spark in the tutorial). The **Gold Shop** carries mock real-money
+one free Little Warmth in the tutorial). The **Gold Shop** carries mock real-money
 tags ($2.99/$9.99/$19.99) as an IAP showcase. **Keys are never sold** — they
 gate story, not power.
 

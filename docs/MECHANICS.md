@@ -321,7 +321,7 @@ energy meter + temporary event currency.** Emberkeep themes them:
 
 | Resource | Theme | Earned from | Spent on | Status |
 | --- | --- | --- | --- | --- |
-| **Warmth** (energy) | the lantern's hearthlight | regen (+1/60 s), level-up full refill, one free tutorial Ember Spark, Warmth Shop (bought with **Gold**) | harvesting dragons, premium timer skips (1.5×) | **[L1]** |
+| **Warmth** (energy) | the lantern's hearthlight | regen (+1/60 s), level-up full refill, one free tutorial Warmth gift, Warmth Shop (bought with **Gold**) | harvesting dragons, premium timer skips (1.5×) | **[L1]** |
 | **Gold** (coins) | the sanctuary's ancient gold | orders, Gold Coins/Pouches from Houses, selling, chests, level-ups | **timer skips** and **Warmth refills** — the two live sinks | **[L1]** |
 | **Gold Keys** | keys of ancient gold ("Stone Key" in the tutorial) | **one, granted by the tutorial**; [full] orders, chests, merging Silver Keys | unlocking fog regions — one gate in the demo | **[L1 scripted once] — see §12** |
 | **Star Shards** (premium) | shards of fallen stars dragons hoard | sparse: daily, events, milestones (or purchase) | Warmth refills, skip a nap, +board space, pop a bubble early | **[full]** |
@@ -342,7 +342,7 @@ regen*. For a **cozy single-player** game the research says go gentler still.
 | Knob | Shipped today | Full-game target | Rationale |
 | --- | --- | --- | --- |
 | Max Warmth | **30**, +3 per Keeper level | **40**, +5 per milestone | cap = session *length* |
-| Start | **28** (so the tutorial's free Spark visibly tops it up) | — | teach the shop without a wall |
+| Start | **28** (so the tutorial's free Warmth visibly tops it up) | — | teach the shop without a wall |
 | Regen | **+1 / 60 s** | +1 / 30 s (faster for cozy) | regen = session *frequency* |
 | Level-up | **full refill + scaling Gold** (`LEVELUP_REWARD`) | + cap bump | rescue the player at the wall → reward, not friction |
 | Offline | **no — the clock stops with the player** (§4.3) | catch-up on load, uncapped overflow banks | the isle runs while someone is watching it |

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { GameContext } from '../../src/core/Context';
-import { capture, createTestContext } from './helpers';
+import { GameContext } from '../../src/core/Context';
+import { LEVEL_XP } from '../../src/core/Constants';
+import type { MapData } from '../../src/core/types';
+import realMap from '../../src/data/map.json';
+import { capture, createTestContext, MemoryStorage } from './helpers';
 
 /** Put `count` pieces on the board and let the systems see them. */
 function place(ctx: GameContext, chain: string, tier: number, count = 1): void {
@@ -317,5 +320,124 @@ describe('brew goals — the cauldron as a quest driver', () => {
         goal: { kind: 'brew', recipeId: 'iron_cap', count: 2 }
       }).label
     ).toBe('Brew 2 × Iron Hat');
+  });
+});
+
+describe('the tracker row knows which piece it is about', () => {
+  /** Every goal kind that NAMES a piece must resolve one; the rest must not. */
+  const NAMES_A_PIECE = new Set(['recipe', 'have', 'gift', 'order', 'active_order', 'brew']);
+
+  it('resolves the piece for every row that names one, across the whole ladder', () => {
+    const ctx = createTestContext();
+    const bare: string[] = [];
+    let resolved = 0;
+    for (const quest of ctx.systems.quests.all) {
+      for (const step of quest.steps) {
+        const piece = ctx.systems.quests.pieceFor(step);
+        if (!NAMES_A_PIECE.has(step.goal.kind)) {
+          // A level, a region, a person's regard, a lifetime counter — the row
+          // starts at its label, and an icon there would be an invented noun.
+          expect(piece, `${step.id} (${step.goal.kind})`).toBeNull();
+          continue;
+        }
+        if (piece) resolved++;
+        else bare.push(`${step.id} (${step.goal.kind})`);
+      }
+    }
+    // The gap this closed: `order` and `brew` rows used to resolve nothing, so
+    // every "Deliver N to Eleanor" and every "Brew N" showed a bare row.
+    expect(bare).toEqual([]);
+    expect(resolved).toBeGreaterThan(40);
+  });
+
+  it('a delivery row points at what is DELIVERED, a brew at what comes OUT', () => {
+    const ctx = createTestContext();
+    const stepOf = (id: string) =>
+      ctx.systems.quests.all.flatMap((q) => q.steps).find((s) => s.id === id)!;
+
+    const deliver = ctx.systems.quests.all
+      .flatMap((q) => q.steps)
+      .find((s) => s.goal.kind === 'order')!;
+    const order = ctx.data.orders.orders.find(
+      (o) => o.id === (deliver.goal as { orderId: string }).orderId
+    )!;
+    expect(ctx.systems.quests.pieceFor(deliver)).toEqual({
+      chain: order.requires[0]!.chain,
+      tier: order.requires[0]!.tier,
+      count: order.requires[0]!.count
+    });
+
+    const brew = ctx.systems.quests.all
+      .flatMap((q) => q.steps)
+      .find((s) => s.goal.kind === 'brew');
+    if (brew) {
+      const recipe = ctx.data.cauldron.recipes.find(
+        (r) => r.id === (brew.goal as { recipeId: string }).recipeId
+      )!;
+      // The OUTPUT, not the ingredients: the row says "Brew 4 Broken Strakes"
+      // and the icon has to be the thing the words name.
+      expect(ctx.systems.quests.pieceFor(brew)).toEqual({
+        chain: recipe.output.chain,
+        tier: recipe.output.tier,
+        count: (brew.goal as { count: number }).count
+      });
+    }
+    expect(stepOf(deliver.id)).toBe(deliver);
+  });
+
+  it('a merge row points at the INPUT — what the player must go and gather', () => {
+    const ctx = createTestContext();
+    const recipe = ctx.systems.quests.all
+      .flatMap((q) => q.steps)
+      .find((s) => s.goal.kind === 'recipe');
+    if (!recipe) return;
+    const goal = recipe.goal as { chain: string; fromTier: number };
+    expect(ctx.systems.quests.pieceFor(recipe)).toEqual({
+      chain: goal.chain,
+      tier: goal.fromTier,
+      count: 1
+    });
+  });
+});
+
+describe('the north tracks its own ladder', () => {
+  /** Travel needs the real authored map: the 8×8 fixture degrades emberkeep and
+   *  the door out of it. Same recipe as WorldTravel.spec. */
+  const northContext = (): GameContext => {
+    const ctx = new GameContext(new MemoryStorage(), { map: realMap as unknown as MapData });
+    ctx.state.tutorialDone = true;
+    ctx.state.addStat('q:done:keepers_hoard', 1); // the Elder is awake — Borealis is open
+    ctx.bus.emit('economy:add', { xp: LEVEL_XP[2], reason: 'test' }); // rank 3, the door's floor
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    expect(ctx.state.worldId).toBe('borealis');
+    return ctx;
+  };
+
+  it('standing in Borealis, the HUD tracks Selyna’s first quest — not Eleanor’s endless tail', () => {
+    // The trap this pins: `keep_the_ledger` is ALWAYS live and sits earlier in
+    // file order than every northern quest, so a visited-filtered `find` never
+    // gets past it — the player stood on the ice watching Eleanor’s Ledger.
+    const ctx = northContext();
+    expect(ctx.systems.quests.activeQuest?.id).toBe('north_landing');
+    expect(ctx.systems.quests.activeQuest?.giver).toBe('selyna');
+  });
+
+  it('back home, the ladder is Emberkeep’s again', () => {
+    const ctx = northContext();
+    ctx.bus.emit('world:switch', { to: 'emberkeep' });
+    const active = ctx.systems.quests.activeQuest;
+    expect(active).not.toBeNull();
+    expect(active!.world ?? 'emberkeep').toBe('emberkeep');
+  });
+
+  it('the northern tail’s piece is the LIVE order’s — never the pool’s first template', () => {
+    // The screenshot bug: words naming Selyna’s Glass Floats over Eleanor’s
+    // Gem Chip, because the flattened encore pool leads with the other world’s
+    // template. The live order in a fresh north is `selyna_signal`.
+    const ctx = northContext();
+    const tail = ctx.systems.quests.all
+      .flatMap((q) => q.steps)
+      .find((s) => s.id === 'north_encore')!;
+    expect(ctx.systems.quests.pieceFor(tail)).toEqual({ chain: 'seaglass', tier: 2, count: 2 });
   });
 });

@@ -45,7 +45,16 @@ OUT_DIR = Path('assets/raw/new-animations/plates')
 # content's BOTTOM edge lands as a fraction of canvas height.
 STAGE = {
     'baby': {'canvas': 1.5, 'bottom': 0.80},
-    'adult': {'canvas': 2.0, 'bottom': 0.88}
+    'adult': {'canvas': 2.0, 'bottom': 0.88},
+    # A KEEPER in a bought look. She is a person, not an animal: nothing
+    # unfolds, so the room is not for wings — it is for the CAST. Her scepter
+    # gem flares above her head and then throws a bolt of light sideways (see
+    # `sprites/<who>/world-cast.webp`, frames 5-7, where the bolt reaches far
+    # past her elbow), and the ingest crops to the UNION of every frame with a
+    # 4px pad it CLAMPS to the plate. So anything the model draws against the
+    # plate edge arrives as a sprite touching its own frame border. Generous
+    # margins here are what stop that, and `--report` prints them.
+    'keeper': {'canvas': 1.8, 'bottom': 0.90}
 }
 
 #: name -> (baked rest pose, stage, plate colour). The plate colour is chosen by
@@ -88,7 +97,16 @@ ROSTER = {
         f'{DRAGONS}/emerald-dragon/sprite-porcelain/emerald-dragon-baked.png', 'baby', GREEN),
     'porcelain_adult': (
         f'{DRAGONS}/emerald-dragon/sprite-adult-porcelain/emerald-dragon-adult-baked.png',
-        'adult', GREEN)
+        'adult', GREEN),
+    # ---- KEEPER LOOKS (Emporium `keeper_skin`) ------------------------------
+    # Not dragons at all: the two people, wearing something they were bought.
+    # The source is the skin's shipped standee still, which is her rest pose on
+    # her bank's own frame — so what the clips come back registered to is the
+    # same geometry the still already sits on. GREEN both: measured, neither has
+    # a single strongly-green pixel, and neither is dark enough for a black
+    # plate to be safe (Eleanor is 4.6% near-black in her hair alone).
+    'eleanor_beach': ('assets/sprites/eleanor/skin-beach.webp', 'keeper', GREEN),
+    'selyna_beach': ('assets/sprites/selyna/skin-beach.webp', 'keeper', GREEN)
 }
 
 

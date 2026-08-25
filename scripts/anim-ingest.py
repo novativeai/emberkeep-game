@@ -186,6 +186,24 @@ def main() -> None:
     ap.add_argument('--skip', type=int, default=0,
                     help='drop the first N extracted frames (wan puts plate '
                          'compression noise on frame 0)')
+    ap.add_argument('--despill', action='store_true',
+                    help='clamp green to max(r,b) on every kept pixel. For a '
+                         'clip whose SUBJECT emits light: an additive glow '
+                         'over the green plate genuinely contains green, so '
+                         'the keyer keeps it and the flare ships green-tinted '
+                         '(the dragon prompts BAN effects for exactly this '
+                         'reason — a cast cannot ban its own flare). Only for '
+                         'a subject with no legitimate green of its own; '
+                         'clamping turns the contamination warm-white and '
+                         'would do the same to a green dress.')
+    ap.add_argument('--edge-fade', type=int, default=0,
+                    help='fade alpha to 0 over the outer N source px. For a '
+                         'clip whose EFFECT strays: a lone spark that grazes '
+                         'the canvas edge would otherwise drag the union crop '
+                         'to the border and ship a frame whose content touches '
+                         'its own frame — faded, it dissolves instead. Keep N '
+                         'small; a real subject inside the ramp would visibly '
+                         'thin out.')
     ap.add_argument('--character', default=None)
     args = ap.parse_args()
 
@@ -227,6 +245,24 @@ def main() -> None:
         if cut < len(keyed) - 1:
             trimmed_at = cut
             keyed = keyed[:cut + 1]
+
+    if args.despill:
+        for f in keyed:
+            g = f[..., 1]
+            cap = np.maximum(f[..., 0], f[..., 2])
+            np.minimum(g, cap, out=g)
+
+    if args.edge_fade > 0:
+        n = args.edge_fade
+        h0, w0 = keyed[0].shape[:2]
+        ramp = np.ones((h0, w0), dtype=np.float32)
+        lin = (np.arange(n, dtype=np.float32) + 1) / (n + 1)
+        ramp[:, :n] = np.minimum(ramp[:, :n], lin[None, :])
+        ramp[:, -n:] = np.minimum(ramp[:, -n:], lin[::-1][None, :])
+        ramp[:n, :] = np.minimum(ramp[:n, :], lin[:, None])
+        ramp[-n:, :] = np.minimum(ramp[-n:, :], lin[::-1][:, None])
+        for f in keyed:
+            f[..., 3] = (f[..., 3] * ramp).astype(f.dtype)
 
     # Union bbox across ALL frames — a per-frame crop would jitter the sprite.
     l = t = 10 ** 9

@@ -219,8 +219,37 @@ export class GameContext {
      * downstream — the backdrop PreloadScene fetches included — build the world
      * the player actually left.
      */
-    const wasOn = save.peek()?.activeWorld;
-    if (wasOn) this.state.switchWorld(wasOn);
+    const resumed = save.peek();
+    if (resumed?.activeWorld) this.state.switchWorld(resumed.activeWorld);
+
+    /**
+     * WHAT THE KEEPER WAS WEARING — answered here for exactly the same reason,
+     * and it is the same bug one wardrobe later.
+     *
+     * `PreloadScene` decides which `skin_` plates and which clip sheets to
+     * fetch by reading the WORN slots off the state (its `wornSkins` set, and
+     * the look's clip set beside each keeper's own). Those slots are filled by
+     * `hydrate`, which runs inside `beginRun` — and `beginRun` is called by
+     * UIScene, two scenes later. So the preload read three empty maps and
+     * fetched nothing, and a save that had bought a look booted with none of
+     * its art resident: the Manor and the dragons fell back to their authored
+     * plates, and a dressed keeper fell back to her BASE CLIP SET — frames
+     * painted in her robes, which is the one thing a dressed keeper must never
+     * play (`keeperClipArt`). Nothing recovered it either: the fetch-then-dress
+     * path answers only to a live `store:*_changed`, so the look returned only
+     * if the player re-equipped it or travelled and came back.
+     *
+     * Seeding the three slots from the SAME version-checked `peek` costs
+     * nothing (the parse above is already paid) and cannot disagree with the
+     * save: `hydrate` overwrites them a moment later with the values they were
+     * read from. A build that would discard this save peeks `null` and seeds
+     * nothing, and a fresh `newGame` clears them anyway.
+     */
+    if (resumed) {
+      this.state.manorSkin = resumed.manorSkin ?? null;
+      this.state.dragonSkins = { ...(resumed.dragonSkins ?? {}) };
+      this.state.keeperSkins = { ...(resumed.keeperSkins ?? {}) };
+    }
   }
 
   /** Called once the gameplay scenes are subscribed: load the save or start fresh. */

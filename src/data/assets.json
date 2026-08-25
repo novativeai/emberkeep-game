@@ -1488,6 +1488,30 @@
       "file": "sprites/items/manor.webp"
     },
     {
+      "key": "card_eleanor_beach",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/store/card-eleanor-beach.webp"
+    },
+    {
+      "key": "skin_eleanor_beach",
+      "source": "file",
+      "generator": "character",
+      "file": "sprites/eleanor/skin-beach.webp"
+    },
+    {
+      "key": "card_selyna_beach",
+      "source": "file",
+      "generator": "ui",
+      "file": "sprites/ui/store/card-selyna-beach.webp"
+    },
+    {
+      "key": "skin_selyna_beach",
+      "source": "file",
+      "generator": "character",
+      "file": "sprites/selyna/skin-beach.webp"
+    },
+    {
       "key": "card_frost",
       "source": "file",
       "generator": "ui",
