@@ -48,6 +48,7 @@ export class Hud {
   private regenLabel: Phaser.GameObjects.Text;
   private xpFill: Phaser.GameObjects.Graphics;
   private levelText: Phaser.GameObjects.Text;
+  private levelGroup!: Phaser.GameObjects.Container;
   private xpLabel: Phaser.GameObjects.Text;
   private bagBadge: Phaser.GameObjects.Container;
   private bagBadgeText: Phaser.GameObjects.Text;
@@ -169,6 +170,7 @@ export class Hud {
     // (children keep their authored absolute coords; the group sits at 0,0).
     const xpY = LIVE_GAME_HEIGHT - 92;
     const levelGroup = scene.add.container(0, 0);
+    this.levelGroup = levelGroup;
     const barBg = scene.add.graphics();
     barBg.fillStyle(num(PALETTE.plumShade), 0.85);
     barBg.fillRoundedRect(172, xpY - 18, 440, 36, 18);
@@ -466,6 +468,14 @@ export class Hud {
       duration: 140,
       ease: 'Sine.easeOut'
     });
+  }
+
+  /** The phone's dialogue card grows leftward over this corner; the cluster
+   *  steps aside while she speaks and steps back the moment she is done.
+   *  Visibility only — nothing is rebuilt, so the XP shown after is whatever
+   *  the facts moved it to meanwhile. */
+  setLevelVisible(visible: boolean): void {
+    this.levelGroup.setVisible(visible);
   }
 
   private refreshEconomy(): void {

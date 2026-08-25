@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../art/design';
 import { CHARACTER_ANIMS, type CharacterClip, clipFor, clipKey, type PortraitView } from '../core/characterAnims';
-import { num, PALETTE, PORTRAIT_CLIP_TALK, readMs, STORY_BEAT_HOLD_MS, TIMINGS, TYPEWRITER } from '../core/Constants';
+import { IS_MOBILE, LIVE_GAME_HEIGHT, LIVE_GAME_WIDTH, num, PALETTE, PORTRAIT_CLIP_TALK, readMs, STORY_BEAT_HOLD_MS, TIMINGS, TYPEWRITER } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { nounMatcher, pieceNames } from '../core/speechHighlight';
 import type { ChainsData, SpeakerId, TutorialStepEvent } from '../core/types';
@@ -38,6 +38,21 @@ interface SequenceRun {
 }
 
 const BUBBLE_WIDTH = 1200;
+/**
+ * PHONES READ THE BUBBLE, THEY DO NOT SQUINT AT IT. On a portrait phone the
+ * 2560-unit page maps to ~390 CSS px, which put the 38px body copy at under
+ * 6 real pixels — the one piece of UI made of WORDS was the least legible
+ * thing on screen. The whole card (plate, portrait, type, chevron) scales up,
+ * ANCHORED AT ITS BOTTOM-RIGHT: growth goes up and left into open sky, the
+ * right margin and the floor never move, and a taller line-count can never
+ * push the card off the bottom of the screen the way the centred layout
+ * could. Text objects render at double resolution so the scaled type is
+ * crisp, not enlarged blur.
+ */
+const MOBILE_BUBBLE_SCALE = 1.8;
+const MOBILE_EDGE_RIGHT = 40;
+const MOBILE_EDGE_BOTTOM = 40;
+const TEXT_RESOLUTION = IS_MOBILE ? 2 : 1;
 const TEXT_WIDTH = 940;
 const MIN_HEIGHT = 192;
 const PAD = 40;
@@ -107,6 +122,11 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   private chevron: Phaser.GameObjects.Text;
   private chevronTween: Phaser.Tweens.Tween | null = null;
   private hitZone: Phaser.GameObjects.Zone;
+  /** The container's resting scale — 1 on desktop, the phone magnification on
+   *  mobile. The re-pop tween returns HERE; tweening to a hardcoded 1 would
+   *  quietly shrink a scaled bubble on its second line. */
+  private anchorScale = 1;
+  private visibilityCb: ((visible: boolean) => void) | null = null;
   private currentStepId = '';
   private tapGated = false;
   /** The typewriter: the line in full, the timer revealing it, and how far in. */
@@ -192,7 +212,8 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
         fontStyle: 'bold',
         color: PALETTE.textBrown,
         wordWrap: { width: TEXT_WIDTH },
-        lineSpacing: 8
+        lineSpacing: 8,
+        resolution: TEXT_RESOLUTION
       })
       .setOrigin(0, 0.5);
     // Animated portrait bust + the gold ring framing it. Falls back to the old
@@ -223,7 +244,8 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
         fontFamily: FONT.ui,
         fontSize: '30px',
         fontStyle: 'bold',
-        color: PALETTE.cream
+        color: PALETTE.cream,
+        resolution: TEXT_RESOLUTION
       })
       .setOrigin(0.5);
     // Explicit continue cue — a lone chevron read as decoration; the words
@@ -233,7 +255,8 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
         fontFamily: FONT.ui,
         fontSize: '26px',
         fontStyle: 'bold',
-        color: PALETTE.goldShade
+        color: PALETTE.goldShade,
+        resolution: TEXT_RESOLUTION
       })
       .setOrigin(1, 0.5);
     this.hitZone = scene.add.zone(0, 0, BUBBLE_WIDTH, MIN_HEIGHT);
@@ -255,7 +278,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     // Sits immediately over the body copy — see `paintHighlight`.
     this.highlightFx = scene.add.container(0, 0);
     this.measurer = scene.add
-      .text(0, 0, '', { fontFamily: FONT.ui, fontSize: '38px', fontStyle: 'bold' })
+      .text(0, 0, '', { fontFamily: FONT.ui, fontSize: '38px', fontStyle: 'bold', resolution: TEXT_RESOLUTION })
       .setVisible(false);
     this.add([
       this.bg,
@@ -686,6 +709,13 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   /** Install the fetch hook (see `artNeeded`). The SCENE owns it: deciding what
    *  a speaker's art is and asking the loader for it is scene work, and the
    *  answer comes back through `onSpeakerArtLoaded`. */
+  /** Watch the card come and go — the phone HUD hides its bottom-left level
+   *  cluster under the enlarged card and brings it back the moment the words
+   *  are done. Fired on the flip, not per line. */
+  onVisibilityChanged(cb: (visible: boolean) => void): void {
+    this.visibilityCb = cb;
+  }
+
   onSpeakerArtNeeded(fn: (speaker: string) => void): void {
     this.artNeeded = fn;
   }
@@ -766,6 +796,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       this.samplePeek = false;
       this.setLine('', true);
       this.setVisible(false);
+      this.visibilityCb?.(false);
     }
   }
 
@@ -973,6 +1004,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   private popIn(): void {
     if (!this.visible) {
       this.setVisible(true);
+      this.visibilityCb?.(true);
       this.setAlpha(0);
       const targetY = this.y;
       this.setY(targetY + 52);
@@ -986,7 +1018,7 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     } else {
       this.scene.tweens.add({
         targets: this,
-        scale: { from: 0.97, to: 1 },
+        scale: { from: this.anchorScale * 0.97, to: this.anchorScale },
         alpha: { from: 0.85, to: 1 },
         duration: 210,
         ease: 'Sine.easeOut'
@@ -1129,10 +1161,22 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
       this.bg.lineStyle(2, num(PALETTE.gold), 0.45);
       this.bg.strokeRoundedRect(cxr - cw, cyy - chh / 2, cw, chh, chh / 2);
     }
+
+    // The phone anchor — LAST, because it needs this layout's own `height`.
+    // The card's bottom-right corner is pinned to the page's bottom-right
+    // margin whatever the line count: growth goes up and left, never down and
+    // never off-screen. Desktop keeps the scene-authored position untouched.
+    if (IS_MOBILE) {
+      this.anchorScale = MOBILE_BUBBLE_SCALE;
+      this.setScale(MOBILE_BUBBLE_SCALE);
+      this.x = LIVE_GAME_WIDTH - MOBILE_EDGE_RIGHT - (width / 2) * MOBILE_BUBBLE_SCALE;
+      this.y = LIVE_GAME_HEIGHT - MOBILE_EDGE_BOTTOM - (height / 2) * MOBILE_BUBBLE_SCALE;
+    }
   }
 
   hide(): void {
     if (!this.visible) return;
+    this.visibilityCb?.(false);
     // The reveal dies with the line it was revealing — a timer that outlived
     // the bubble would keep typing an invisible line until the next `setLine`.
     this.typeTimer?.remove();

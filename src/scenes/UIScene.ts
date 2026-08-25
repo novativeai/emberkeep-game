@@ -552,6 +552,12 @@ export class UIScene extends Phaser.Scene {
     // when the Elder got a voice, so every path that can name a speaker — a
     // tutorial beat authored in her voice included — fetches her face.
     this.bubble.onSpeakerArtNeeded((speaker) => this.ensureRingArt(speaker));
+    // The phone bubble is anchored bottom-right and grows up-left — over the
+    // level cluster's corner. The cluster yields for exactly as long as the
+    // words are up. Desktop's bubble never reaches it; nothing changes there.
+    if (IS_MOBILE) {
+      this.bubble.onVisibilityChanged((visible) => this.hud.setLevelVisible(!visible));
+    }
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
     // cover, over the empty bottom-right margin during tutorial steps.
     this.bubble.setPosition(LIVE_GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);
