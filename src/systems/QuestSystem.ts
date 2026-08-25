@@ -169,12 +169,22 @@ export class QuestSystem {
     return this.quests.quests.filter((q) => this.state.visited(q.world ?? WORLD_ID));
   }
 
+  /** The ladder of the world UNDERFOOT — what the HUD may speak for right now.
+   *  `tracked` answers a different question (everything the Keeper has walked
+   *  into, for the sheet); the live pointers below must not reach across a
+   *  portal, or Borealis spends eternity tracking Eleanor's endless tail: the
+   *  tail is ALWAYS live and sits earlier in file order than every northern
+   *  quest, so a visited-filtered `find` can never get past it. */
+  private get here(): QuestConfig[] {
+    return this.quests.quests.filter((q) => (q.world ?? WORLD_ID) === this.state.worldId);
+  }
+
   /** The quest the HUD tracks by default: the first LIVE one in THIS world not
    *  finished. The authored world's ladder ends in the endless Ledger tail, so
    *  it is never null there; a world with no ladder yet returns null and the
    *  HUD stays empty rather than showing another world's business. */
   get activeQuest(): QuestConfig | null {
-    return this.tracked.find((q) => this.isLive(q)) ?? null;
+    return this.here.find((q) => this.isLive(q)) ?? null;
   }
 
   /**
@@ -204,7 +214,7 @@ export class QuestSystem {
    */
   private liveTracks(): Map<SpeakerId, QuestConfig> {
     const tracks = new Map<SpeakerId, QuestConfig>();
-    for (const quest of this.tracked) {
+    for (const quest of this.here) {
       if (!tracks.has(quest.giver) && this.isLive(quest)) tracks.set(quest.giver, quest);
     }
     return tracks;
@@ -334,28 +344,32 @@ export class QuestSystem {
    * names what comes out, and a level, a region or a person's regard name no
    * piece at all.
    */
-  pieceFor(step: QuestStepConfig): { chain: string; tier: number } | null {
+  pieceFor(step: QuestStepConfig): { chain: string; tier: number; count: number } | null {
     const goal = step.goal;
     switch (goal.kind) {
       case 'recipe':
-        return { chain: goal.chain, tier: goal.fromTier };
+        return { chain: goal.chain, tier: goal.fromTier, count: 1 };
       case 'have':
       case 'gift':
-        return { chain: goal.chain, tier: goal.tier };
+        return { chain: goal.chain, tier: goal.tier, count: goal.count };
       case 'order': {
         const first = this.orderById(goal.orderId)?.requires[0];
-        return first ? { chain: first.chain, tier: first.tier } : null;
+        return first ? { chain: first.chain, tier: first.tier, count: first.count } : null;
       }
       case 'active_order': {
         // The encore the Ledger is actually showing — the row tracks a LIVE
         // order, so a template's first requirement would be the wrong piece the
-        // moment the pool rotated.
+        // moment the pool rotated. `activeOrders` filters by the world
+        // underfoot, which is the second half of the answer: the pool holds
+        // BOTH ledgers' templates, and its first entry is Eleanor's Gem Chips
+        // — the piece the northern tail wore for a while, over words that
+        // correctly named Selyna's Glass Floats.
         const first = this.orders.activeOrders[0]?.requires[0];
-        return first ? { chain: first.chain, tier: first.tier } : null;
+        return first ? { chain: first.chain, tier: first.tier, count: first.count } : null;
       }
       case 'brew': {
         const out = this.cauldron.recipes.find((r) => r.id === goal.recipeId)?.output;
-        return out ? { chain: out.chain, tier: out.tier } : null;
+        return out ? { chain: out.chain, tier: out.tier, count: goal.count } : null;
       }
       default:
         return null;

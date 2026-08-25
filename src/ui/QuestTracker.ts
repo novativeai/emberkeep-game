@@ -274,6 +274,12 @@ export class QuestTracker extends Phaser.GameObjects.Container {
       'keeper:leveled',
       'region:unlocked',
       'bag:changed',
+      // A crossing swaps the whole ladder underfoot — QuestSystem lists it as
+      // a trigger for the same reason. Without it the tracker kept painting
+      // the world the Keeper just LEFT until some board fact happened to fire,
+      // and a return visit (no arrival seed, so no item:spawned) could stay
+      // stale indefinitely.
+      'world:switched',
       'state:loaded'
     ] as const) {
       this.offBus.push(
@@ -757,12 +763,16 @@ export class QuestTracker extends Phaser.GameObjects.Container {
    * is the rule the `?` already follows, not a new one.
    */
   private goalOf(step: QuestStepConfig): { chain: string; tier: number; count: number } | null {
+    // The endless tail's peek must describe the order the Ledger is actually
+    // showing. `needsFor` answers the AUDIT's question — what could this step
+    // ever cost — by flattening the whole encore pool, both worlds' templates
+    // included, so its first entry is Eleanor's Gem Chips even when the words
+    // beside the row name Selyna's Glass Floats. `pieceFor` reads the LIVE
+    // order instead, exactly like the row's own icon.
+    if (step.goal.kind === 'active_order') return this.quests.pieceFor(step);
     // `needsFor` walks orders, tasks and cauldron recipes, so it is only asked
     // for the goal kinds that can use the answer.
-    const needs =
-      step.goal.kind === 'order' || step.goal.kind === 'active_order'
-        ? this.quests.needsFor(step)
-        : [];
+    const needs = step.goal.kind === 'order' ? this.quests.needsFor(step) : [];
     return questGoalPiece(step.goal, needs);
   }
 
