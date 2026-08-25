@@ -23,6 +23,7 @@ import {
   GATE_FX_HEIGHT,
   ROOTHOLD_HOUSE,
   FINALE_ENDS_MS,
+  gateLightBackstopMs,
   GATE_LESSON_STAT,
   FINALE_REGION,
   FOG_BLANKET,
@@ -3073,6 +3074,35 @@ export class BoardScene extends Phaser.Scene {
         this.glideToWorld(frame.x, frame.y, 1400);
       })
     );
+
+    // 4 — AND THE DOOR OPENS EVEN IF NOBODY SAYS SO.
+    //
+    // The North Crossing is lit by `gate:opened`, which UIScene emits from the
+    // completion callback of Eleanor's gate speech, which is itself started
+    // from the completion callback of the Elder's. Two nested one-shots: a
+    // panel, a teardown, a crossing mid-sentence, and neither ever runs. The
+    // arch then stays dark for the whole session — on a board whose only
+    // remaining task is to walk through it — and comes back on the next
+    // reload, because `state:loaded` re-derives it from the latch. That is the
+    // "sometimes there, sometimes not" the north was reported with, and it is
+    // not a save bug: the save was right every time, the door was not asking.
+    //
+    // Armed HERE rather than made a live sync, because the exclusion in
+    // `syncPortalFx` is right: lighting the arch while the Elder is waking
+    // would scoop the one irreversible beat of the chapter. So the ceremony
+    // keeps its exclusive window and is simply given an END — computed from the
+    // two dialogues' own pacing (`gateLightBackstopMs`), so it moves when they
+    // do and can never cut Eleanor off. `ignitePortal` no-ops on a door already
+    // lit, so the ordinary run reaches this and does nothing at all.
+    const dlg = this.ctx.data.dialogue;
+    this.time.delayedCall(
+      gateLightBackstopMs(
+        dlg.finaleElder.length,
+        dlg.finaleElderProphecy.length,
+        dlg.gateOpens?.lines.length ?? 0
+      ),
+      () => this.beat('gate.backstop', () => this.ignitePortal('emberkeep_altar_gate'))
+    );
   }
 
   /** Ambient anticipation: the altar egg trembles once the Keeper is close
@@ -5829,6 +5859,13 @@ export class BoardScene extends Phaser.Scene {
   private ignitePortal(id: string): void {
     const door = this.portalDoors.get(id);
     if (!door || door.fx.isLive) return;
+    // THE SAME RULE `refreshPortals` ENDS ON, ASKED ONE STEP EARLIER. A door is
+    // lit only if the Keeper could actually walk through it: `syncPortalFx`
+    // checks availability before every light it gives, and this path — a
+    // ceremony, or the backstop behind it — is the only other way a door turns
+    // on. Without it a mis-timed ignition paints an arch over a world that is
+    // still shut, and `refreshPortals` then has to refuse the taps it invites.
+    if (!this.ctx.systems.worlds.available().some((w) => w.id === door.to)) return;
     door.fx.bloom();
     this.widenDoor(door);
     this.refreshPortals();

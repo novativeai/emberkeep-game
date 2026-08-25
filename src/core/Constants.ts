@@ -2004,6 +2004,52 @@ export const FINALE = {
 export const FINALE_ENDS_MS = FINALE.elderAtMs + FINALE.elderHoldMs;
 
 /**
+ * Air after the last word of the Gate ceremony before the North Crossing gives
+ * up on being spoken open and simply lights. One second, and it is a BACKSTOP's
+ * second: by the time it is asked, the ceremony has already overrun every
+ * safety net it owns.
+ */
+export const GATE_LIGHT_GRACE_MS = 1000;
+
+/**
+ * WHEN THE NORTH CROSSING MAY LIGHT ITSELF — the latest instant, in ms from the
+ * `keeper:leveled(3)`… no: from the `quest:completed` beat that starts the
+ * finale, at which the whole ceremony must be over however slowly it ran.
+ *
+ * The door is the ONE piece of chrome in the chapter whose lit state is not
+ * derived from the save within a session: `syncPortalFx` deliberately skips it
+ * on live syncs so the awakening is not scooped, and `gate:opened` — emitted
+ * from the completion callback of Eleanor's gate speech, itself started from
+ * the completion callback of the Elder's — is all that turns it on. Two nested
+ * one-shot callbacks: interrupt either (a panel, a scene teardown, a travel
+ * mid-sentence) and the arch stays dark for the rest of the session, on a board
+ * where the only thing left to do is walk through it. A reload fixes it, which
+ * is exactly why it reads as "sometimes there, sometimes not".
+ *
+ * So it is COMPUTED, not chosen — and computed from the same numbers the two
+ * ceremonies are actually paced by, so adding a line to either moves it:
+ *
+ *   the Elder's release backstop   elderAtMs + max(her lines) * hold + 1000
+ * + the Gate speech's own budget   chapterBeatDelay + gate lines * hold
+ * + a second of air                GATE_LIGHT_GRACE_MS
+ *
+ * The first term mirrors `UIScene.runFinaleUi`'s own backstop exactly: it is
+ * the last moment `releaseFinaleStage` can run, and the gate speech starts from
+ * there. A door lit at this instant can never cut Eleanor off — she cannot
+ * still be talking, by her own per-line net.
+ */
+export function gateLightBackstopMs(
+  elderLines: number,
+  prophecyLines: number,
+  gateLines: number
+): number {
+  const releaseLatest =
+    FINALE.elderAtMs + Math.max(elderLines, prophecyLines, 1) * STORY_BEAT_HOLD_MS + 1000;
+  const ceremony = TIMINGS.chapterBeatDelay + gateLines * STORY_BEAT_HOLD_MS;
+  return releaseLatest + ceremony + GATE_LIGHT_GRACE_MS;
+}
+
+/**
  * How long the travelling curtain may stay up without the board saying it is
  * ready before UIScene lifts it anyway and complains in the console.
  *

@@ -397,6 +397,29 @@ const CARD_TITLE_BUDGET =
   CARD_TITLE_BAND_BOTTOM - CARD_TITLE_AIR - (CARD_TITLE_BAND_TOP + CARD_TITLE_AIR);
 
 // ---- The requirement count badge ----
+/**
+ * HOW MANY YOU HAVE, OF HOW MANY THE ORDER WANTS — and until now, invisibly.
+ *
+ * The one line on the card that says whether Deliver will work was drawn in
+ * `INK.onField` with a WHITE drop shadow, seated at the bottom-right of the
+ * requirement slot. `ui_slot` is a CREAM plate (`#EFE0C8`); `onField` is the
+ * cream for type standing on the PLUM FIELD. The palette names its tokens after
+ * the surface they sit on precisely so that a wrong pairing is obvious in the
+ * source, and this was the wrong pairing: cream on cream, with a white halo
+ * finishing off whatever contrast the glyph edges had left. A player on the ice
+ * reported "no information about what to deliver, and nothing works" — the
+ * information was there, in `0/2`, and it could not be read at any zoom.
+ *
+ * NO INK ALONE COULD FIX IT, because the badge STRADDLES the plate's edge. The
+ * plate's painted body runs to x 66 with a 30-unit corner radius, so at y 80 it
+ * ends at 36 + sqrt(30² - 8²) = 64.9 — and "0/2" at 30px already reaches 72.
+ * A longer count ("10/12", ~85 units) hangs 25 units into the plum. Dark ink
+ * would read on the plate and vanish off it; cream does the reverse. So the
+ * badge is given GROUND OF ITS OWN — a pill in the field's own deep plum under
+ * a gold hairline — and then the pairing is settled: cream on plum, everywhere
+ * along it, whatever the digits do. It also stops being an accident that it
+ * overhangs the corner: that is where a count badge belongs.
+ */
 const CARD_COUNT_X = 48;
 const CARD_COUNT_Y = 80;
 const CARD_COUNT_PX = 30;
@@ -408,6 +431,16 @@ const CARD_COUNT_MIN_PX = 20;
 const CARD_COUNT_AIR = 10;
 const CARD_COUNT_BUDGET_W =
   2 * Math.min(CARD_COUNT_X, CARD_PLATE_HALF_W - CARD_COUNT_AIR - CARD_COUNT_X);
+/** Air the pill keeps around the line it carries. The x is generous because a
+ *  pill's rounded caps eat their own radius; the y is not, because the badge's
+ *  foot must stay clear of the reward line at y 148. */
+const CARD_COUNT_PAD_X = 18;
+const CARD_COUNT_PAD_Y = 7;
+/** A floor under the pill so a one-digit count is not a circle, and a ceiling
+ *  so it cannot grow into the reward line: 80 + 60/2 = 110 against a reward
+ *  line whose own top edge is 148 - 19 = 129. */
+const CARD_COUNT_PILL_MIN_W = 76;
+const CARD_COUNT_PILL_MAX_H = 60;
 
 // ---- The "how do I make that?" key ----
 /**
@@ -463,6 +496,10 @@ interface OrderCard {
   medallion: Phaser.GameObjects.Image;
   title: Phaser.GameObjects.Text;
   slotIcon: Phaser.GameObjects.Image;
+  /** The pill under the count — redrawn on every refresh, because the line it
+   *  has to carry changes width with the digits AND with whatever size
+   *  `fitLine` settled on. See CARD_COUNT_* for why the count needs one. */
+  slotBadge: Phaser.GameObjects.Graphics;
   slotCount: Phaser.GameObjects.Text;
   rewardText: Phaser.GameObjects.Text;
   /** Real coin art in front of the reward line — shown only when the order pays
@@ -860,6 +897,29 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
     }
   }
 
+  /**
+   * The pill under the requirement count, drawn to fit the line it carries.
+   *
+   * Measured rather than fixed: `fitLine` may have shrunk the type, and the
+   * digits themselves move ("0/2" against "10/12"), so a hand-sized plate would
+   * either clip a long count or leave a short one adrift in it. The radius is
+   * half the height, which makes it a true pill at every size — a rounded rect
+   * whose radius outlives its own height draws inside out in Canvas.
+   */
+  private drawCountBadge(card: OrderCard): void {
+    const w = Math.max(CARD_COUNT_PILL_MIN_W, card.slotCount.width + 2 * CARD_COUNT_PAD_X);
+    const h = Math.min(CARD_COUNT_PILL_MAX_H, card.slotCount.height + 2 * CARD_COUNT_PAD_Y);
+    const x = CARD_COUNT_X - w / 2;
+    const y = CARD_COUNT_Y - h / 2;
+    const r = h / 2;
+    const g = card.slotBadge;
+    g.clear();
+    g.fillStyle(num(INK.fieldDeep), 0.92);
+    g.fillRoundedRect(x, y, w, h, r);
+    g.lineStyle(2, num(INK.gold), 0.75);
+    g.strokeRoundedRect(x, y, w, h, r);
+  }
+
   /** One order card: portrait, title, requirement slot, reward line, Deliver. */
   private buildCard(scene: Phaser.Scene, x: number): OrderCard {
     const root = scene.add.container(x, CARD_Y);
@@ -877,6 +937,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5);
     const slot = scene.add.image(0, SLOT_Y, 'ui_slot');
     const slotIcon = scene.add.image(0, 28, 'item_flame_gem_2').setScale(0.72);
+    const slotBadge = scene.add.graphics();
     const slotCount = scene.add
       .text(CARD_COUNT_X, CARD_COUNT_Y, '0/0', {
         fontFamily: FONT.ui,
@@ -885,7 +946,11 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
         color: INK.onField
       })
       .setOrigin(0.5)
-      .setShadow(0, 2, '#FFFFFF', 4);
+      // A LIFT, NOT A HALO. The old shadow was white at radius 4, which on the
+      // cream plate under it was not a shadow at all — it was a second, softer
+      // copy of the glyphs in the same colour as their background. Scrim,
+      // offset down: the type sits ON the pill instead of floating over it.
+      .setShadow(0, 2, 'rgba(11,7,10,0.55)', 3);
     const rewardCoin = scene.add.image(0, CARD_REWARD_Y, 'ui_icon_coin').setVisible(false);
     rewardCoin.setScale(CARD_REWARD_COIN_FIT / Math.max(rewardCoin.width, rewardCoin.height));
     const rewardText = scene.add
@@ -944,6 +1009,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       medallion: portrait,
       title,
       slotIcon,
+      slotBadge,
       slotCount,
       rewardText,
       rewardCoin,
@@ -963,6 +1029,7 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       title,
       slot,
       slotIcon,
+      slotBadge,
       slotCount,
       rewardCoin,
       rewardText,
@@ -1291,6 +1358,14 @@ export class LedgerPanel extends Phaser.GameObjects.Container {
       card.slotCount.setFontSize(CARD_COUNT_PX);
       card.slotCount.setText(`${have[0] ?? 0}/${requirement.count}`);
       this.fitLine(card.slotCount, CARD_COUNT_BUDGET_W, CARD_COUNT_MIN_PX);
+      // GREEN THE MOMENT IT IS ENOUGH. `deliverable` already dims the Deliver
+      // key when it is not, but a key at 0.55 alpha still looks like a key and
+      // the player presses it — the refusal was silent because the ONE number
+      // that explains it was the unreadable one. Now the count answers first:
+      // cream while you are still gathering, the gain green the instant the
+      // order can go, which is the same colour the Tasks tab ticks with.
+      card.slotCount.setColor(deliverable ? INK.gain : INK.onField);
+      this.drawCountBadge(card);
       const parts: string[] = [];
       if (order.rewards.coins) parts.push(`${order.rewards.coins}`);
       if (order.rewards.xp) parts.push(`✦ ${order.rewards.xp} XP`);
