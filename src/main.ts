@@ -1,6 +1,6 @@
 // The Map Editor's chrome is drawn with FontAwesome glyphs (src/editor/EditorDom.ts).
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import { onErrorRecorded, recordedErrors, type RecordedError } from './core/crash';
+import { onErrorRecorded, recordedErrors, recordError, type RecordedError } from './core/crash';
 import Phaser from 'phaser';
 import { AudioManager } from './audio/AudioManager';
 import { GameContext } from './core/Context';
@@ -250,6 +250,57 @@ document.addEventListener('visibilitychange', () => {
  */
 window.addEventListener('pageshow', (event: PageTransitionEvent) => {
   if (event.persisted) window.location.reload();
+});
+
+/**
+ * THE GRAY SCREEN, CAUGHT — a lost WebGL context heals itself.
+ *
+ * Travel is this game's memory peak: the new world's backdrop and sheets are
+ * uploaded while the old world's are still resident (the arrival eviction runs
+ * only once the new board exists, because evicting a texture out from under a
+ * live sprite is worse). A renderer at its memory cap — WebKit's above all —
+ * answers that spike by dropping the GL context, and a dropped context has no
+ * way back: Phaser does not restore it, so the canvas sits as the browser's
+ * flat gray placeholder until the player thinks of F5. That is precisely the
+ * report this fixes: "moving to the other area, all gray, only refresh fixes
+ * it."
+ *
+ * So the player's own cure runs automatically: write the board down and press
+ * F5 for them. The save already carries the active world and the worn looks
+ * (`Context` seeds both from `peek` before any scene runs), so the reload
+ * lands them exactly where the gray struck, about a second later.
+ *
+ * Guarded against the one way this could make things worse: a device so
+ * starved it loses the context DURING boot would reload forever. Two
+ * automatic recoveries per 90 seconds, counted in sessionStorage (dies with
+ * the tab); past that the wreck is left for a human, exactly as before.
+ */
+const CTX_LOSS_KEY = 'emberkeep:ctxloss';
+game.events.once(Phaser.Core.Events.READY, () => {
+  game.canvas.addEventListener('webglcontextlost', () => {
+    recordError('webgl.contextlost', 'WebGL context lost — attempting auto-recovery');
+    let recent: number[] = [];
+    try {
+      const parsed: unknown = JSON.parse(sessionStorage.getItem(CTX_LOSS_KEY) ?? '[]');
+      if (Array.isArray(parsed)) {
+        recent = parsed.filter((t): t is number => typeof t === 'number');
+      }
+    } catch {
+      // Unreadable counter — treat as a clean slate; the cap still applies
+      // from here on.
+    }
+    const now = Date.now();
+    recent = recent.filter((t) => now - t < 90_000);
+    if (recent.length >= 2) return;
+    try {
+      sessionStorage.setItem(CTX_LOSS_KEY, JSON.stringify([...recent, now]));
+    } catch {
+      // Counter unwritable (private mode edge) — recover anyway; the worst
+      // case is the pre-fix behaviour, reached only if recovery keeps failing.
+    }
+    flushSave();
+    window.location.reload();
+  });
 });
 
 /* ------------------- agent instrumentation (spec §5) ------------------ */
