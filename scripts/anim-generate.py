@@ -3,9 +3,10 @@
 workflow (fal-ai/wan/v2.7/image-to-video over the queue API).
 
 Every job sends the dragon's green generation plate (scripts/anim-plate.py) as
-BOTH `image_url` and `end_image_url` — start and end pinned to the same rest
-pose is what makes the clip loop, and the green plate is what lets
-scripts/anim-ingest.py key the result back out. Prompts are the authored clip
+BOTH `start_image_url` and `end_image_url` — start and end pinned to the same
+rest pose is what makes the clip loop, and the green plate is what lets
+scripts/anim-ingest.py key the result back out. Model: wan 3.0 at 480p (see the
+QUEUE note); everything through the keeper looks was shot on wan 2.7/720p. Prompts are the authored clip
 briefs below; outputs land in assets/raw/new-animations/raw-mp4/ next to the
 originals, with a manifest recording every request for reproducibility.
 
@@ -30,7 +31,25 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-QUEUE = 'https://queue.fal.run/fal-ai/wan/v2.7/image-to-video'
+# Wan 3.0 (fal id `alibaba/wan-3.0/image-to-video`) at 480p — the standing
+# direction since 2026-08-25; every clip before that shipped off wan 2.7/720p.
+# 480p is PLENTY: the tallest thing ever cut from a wan return is a ~515px
+# keeper on a ~1050px plate, staged to ≤360px frames and drawn at ~256 game px,
+# so 720p was decoding pixels the sheet never kept — and 480p is half the
+# price per second.
+#
+# Schema deltas from 2.7, all folded in below:
+#   image_url  -> start_image_url  (end_image_url survives, and with it the
+#                                   start=end pinning that makes clips loop)
+#   negative_prompt — GONE. The banned-list now rides inside the prompt as a
+#                     plain sentence; wan 3 has no separate channel for it.
+#   audio: true by default — forced off, frames are all the ingest keeps.
+#   enable_prompt_expansion: true by default — forced OFF. The rewriter is
+#                     exactly the wrong tool for a locked-off plate shot: it
+#                     invents camera moves and scenery, which are the two
+#                     things every brief here forbids.
+QUEUE = 'https://queue.fal.run/alibaba/wan-3.0/image-to-video'
+RESOLUTION = '480p'
 PLATES = Path('assets/raw/new-animations/plates')
 OUT = Path('assets/raw/new-animations/raw-mp4')
 MANIFEST = OUT / 'generation-manifest.json'
@@ -340,14 +359,17 @@ def main() -> None:
             raise SystemExit(f'{j["id"]}: missing plate {plate} — run scripts/anim-plate.py first')
         uri = data_uri(plate)
         payload = {
-            'prompt': j['prompt'],
+            # Wan 3 has no negative_prompt channel — the banned-list rides in
+            # the prompt itself, as an AVOID sentence at the end.
+            'prompt': f"{j['prompt']} Avoid: {NEGATIVE}.",
             'duration': j['duration'],
-            'image_url': uri,
+            'start_image_url': uri,
             'end_image_url': uri,
-            'resolution': '720p',
-            'negative_prompt': NEGATIVE,
+            'resolution': RESOLUTION,
+            'aspect_ratio': 'adaptive',  # follow the plate, never reframe it
+            'audio': False,
             'enable_safety_checker': False,
-            'enable_prompt_expansion': True
+            'enable_prompt_expansion': False
         }
         sub = api(QUEUE, key, payload)
         pending[j['id']] = {'job': j, 'status_url': sub['status_url'], 'response_url': sub['response_url']}
@@ -356,7 +378,8 @@ def main() -> None:
             'duration': j['duration'],
             'prompt': j['prompt'],
             'negative_prompt': NEGATIVE,
-            'resolution': '720p',
+            'resolution': RESOLUTION,
+            'model': 'alibaba/wan-3.0',
             'plate': str(plate)
         }
         print(f"submitted {j['id']} ({j['duration']}s) → {sub.get('request_id')}")
