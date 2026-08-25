@@ -205,3 +205,54 @@ describe('loading a save announces the wallet', () => {
     expect(seen.at(-1)).toMatchObject({ coins: 340, keys: 2, xp: 12 });
   });
 });
+
+/**
+ * THE BOOT-ORDER CONTRACT.
+ *
+ * `PreloadScene` decides which `skin_` plates and which clip sheets to FETCH by
+ * reading the worn wardrobe slots off the state. But `hydrate` runs inside
+ * `beginRun`, and `beginRun` is called by UIScene — two scenes after the
+ * preload. So anything the preload needs has to be on the state the moment the
+ * context exists, not merely by the time the board is playable.
+ */
+describe('the worn wardrobes are readable BEFORE the run begins', () => {
+  /** A save written by a player who had bought and equipped all three. */
+  function dressedSave(): MemoryStorage {
+    const storage = new MemoryStorage();
+    const ctx = createTestContext(storage);
+    ctx.beginRun();
+    ctx.state.manorSkin = 'ivy';
+    ctx.state.dragonSkins = { ember_dragon: 'ashglass' };
+    ctx.state.keeperSkins = { eleanor: 'eleanor_beach' };
+    ctx.systems.save.save();
+    return storage;
+  }
+
+  it('a fresh context already knows what the save was wearing', () => {
+    const booted = createTestContext(dressedSave());
+    // NOT beginRun() — this is the state PreloadScene sees. It used to see
+    // three empty maps, so it fetched none of the art and the board came up
+    // with the Manor and the dragons on their authored plates and a dressed
+    // keeper playing her BASE clip set — frames painted in her robes.
+    expect(booted.state.keeperSkins).toEqual({ eleanor: 'eleanor_beach' });
+    expect(booted.state.dragonSkins).toEqual({ ember_dragon: 'ashglass' });
+    expect(booted.state.manorSkin).toBe('ivy');
+  });
+
+  it('and still knows once the run has actually begun', () => {
+    const booted = createTestContext(dressedSave());
+    booted.beginRun();
+    // hydrate overwrites the seed with the values it was read from, so the two
+    // can never drift — this is the assertion that says so.
+    expect(booted.state.keeperSkins).toEqual({ eleanor: 'eleanor_beach' });
+    expect(booted.state.dragonSkins).toEqual({ ember_dragon: 'ashglass' });
+    expect(booted.state.manorSkin).toBe('ivy');
+  });
+
+  it('an empty storage seeds nothing — a fresh game is undressed', () => {
+    const fresh = createTestContext(new MemoryStorage());
+    expect(fresh.state.keeperSkins).toEqual({});
+    expect(fresh.state.dragonSkins).toEqual({});
+    expect(fresh.state.manorSkin).toBeNull();
+  });
+});
