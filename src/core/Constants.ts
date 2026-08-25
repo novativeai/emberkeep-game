@@ -1925,6 +1925,17 @@ export const GOLDEN_ELDER_TIER = 2;
  *  golden rig fails to load — remove alongside the assets.json swap. */
 export const GOLDEN_TINT = 0xffd84d;
 /** The fogged region the finale glimpses into (the "south terrace" promise). */
+/**
+ * How many Cookbook pages the Keeper had read the last time she opened it.
+ *
+ * A stats counter rather than a save field, so it needs no SAVE_VERSION and an
+ * old save simply reads 0 — every page it already holds counts as unread once,
+ * which is the harmless direction to be wrong in. The dot on the button is the
+ * subtraction against `discoveredRecipes.length` (UIScene.syncCookbookDot);
+ * both sides only grow, so it can never go negative.
+ */
+export const COOKBOOK_SEEN_KEY = 'cookbook:seen';
+
 export const FINALE_REGION = 'level_5';
 /** XP progress within level 2 past which the Golden Egg starts trembling. */
 export const GOLDEN_TREMBLE_PROGRESS = 0.8;

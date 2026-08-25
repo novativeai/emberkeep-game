@@ -44,10 +44,26 @@ const ROW_GAP = 92;
 const ROW_ICON_X = -FRAME_HALF_W + 118;
 const ROW_TEXT_X = ROW_ICON_X + 74;
 const ROW_TEXT_PX = 30;
+/**
+ * The widest a rung's line may be BEFORE its figure is measured — the starting
+ * budget, cut down per row by `wrapBefore` below.
+ *
+ * It used to be the whole budget, and it was wrong by construction: the line
+ * starts at `ROW_TEXT_X` and this let it run to `FRAME_HALF_W - 68`, which is
+ * ten units PAST the right edge of the figure column. Every shipped line was
+ * short enough that nothing ever met there — until a brew rung grew a
+ * `· Cauldron` suffix and the ✓ landed against the "n".
+ */
 const ROW_TEXT_WRAP = 2 * FRAME_HALF_W - 260;
 /** The still-missing figure, hard right, where the eye goes for a number. */
 const ROW_COUNT_X = FRAME_HALF_W - 78;
 const ROW_COUNT_PX = 34;
+/** Air between a rung's line and its figure. A ✓ is one glyph and a count is
+ *  two, so the gap has to be measured from the figure, not assumed. */
+const ROW_COUNT_GAP = 26;
+/** A line never shrinks below this — past it the wrap makes word-per-line
+ *  columns, which is less readable than the collision it was avoiding. */
+const MIN_ROW_TEXT_W = 300;
 
 const FOOT_PX = 28;
 /** The ✕, in panel space — inside the frame's painted corner. */
@@ -417,6 +433,23 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
    * than vanishing — a line that disappears as you make progress takes the
    * explanation with it.
    */
+  /**
+   * Give a rung's line exactly the room its own figure leaves it.
+   *
+   * The figure is origin-(1, 0.5) at `ROW_COUNT_X`, so it grows LEFTWARD by
+   * however wide it is — "12" takes more than "✓" and an empty source row takes
+   * none. Measuring it and cutting the wrap to what is left is the only version
+   * of this that cannot collide; a constant would have to assume the widest
+   * figure on every row and would waste that width on all the others.
+   *
+   * Set BEFORE the text, because a wrap applied afterwards does not re-run the
+   * layout Phaser has already done for the old width.
+   */
+  private wrapBefore(row: HelpRow): void {
+    const budget = ROW_COUNT_X - row.count.width - ROW_COUNT_GAP - ROW_TEXT_X;
+    row.text.setWordWrapWidth(Math.max(MIN_ROW_TEXT_W, Math.min(ROW_TEXT_WRAP, budget)));
+  }
+
   private paint(help: RecipeHelp): void {
     this.title.setText(
       help.goal.count > 1 ? `${help.goal.count} × ${help.goal.name}` : help.goal.name
@@ -432,14 +465,17 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
       const row = this.acquireRow(line);
       row.root.setY(ROWS_TOP + line * ROW_GAP).setVisible(true);
       this.fitIcon(row.icon, `item_${rung.chain}_${rung.tier}`, ROW_ICON_FIT);
+      // The FIGURE first, then the line that has to fit beside it — see
+      // `wrapBefore`. The other order lets a long rung run under its own count.
+      row.count.setText(rung.missing > 0 ? `${rung.missing}` : '✓');
+      row.count.setColor(rung.missing > 0 ? INK.onFieldGold : INK.gain);
+      this.wrapBefore(row);
       // `above.via` is how the rung ABOVE is made when it is not a merge — the
       // Cauldron, and any ingredient this ladder is not the one walking down.
       row.text.setText(
         `${above.fromCount} × ${rung.name}  →  ${above.name}` +
           (above.via ? `  ·  ${above.via}` : '')
       );
-      row.count.setText(rung.missing > 0 ? `${rung.missing}` : '✓');
-      row.count.setColor(rung.missing > 0 ? INK.onFieldGold : INK.gain);
       line += 1;
     }
 
@@ -456,10 +492,11 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
       const cost: string[] = [];
       if (help.source.energyCost) cost.push(`${help.source.energyCost} ⚡`);
       if (help.source.cooldownMs) cost.push(`${Math.round(help.source.cooldownMs / 1000)}s`);
+      row.count.setText('');
+      this.wrapBefore(row);
       row.text.setText(
         `Tap the ${help.source.label}${cost.length > 0 ? `  ·  ${cost.join('  ·  ')}` : ''}`
       );
-      row.count.setText('');
       line += 1;
     }
 

@@ -7,6 +7,7 @@ import {
   EGG_GIFT,
   FIRST_CONTACT,
   FIRST_CONTACT_RETRY_MS,
+  COOKBOOK_SEEN_KEY,
   GOLDEN_ALTAR,
   GOLDEN_TREMBLE_PROGRESS,
   HUD_COLUMN_ICON,
@@ -397,6 +398,14 @@ export class UIScene extends Phaser.Scene {
     this.hud.bagButton.setDepth(DEPTH_HUD);
     this.hud.storeButton.setDepth(DEPTH_HUD);
     this.hud.storeButton.setVisible(this.ctx.state.tutorialDone && this.shopUnlocked());
+    // SEEDED HERE AND RE-ASKED WHEN THE SAVE LANDS, for the reason the `{dragon}`
+    // token below already gives: `create()` runs BEFORE `beginRun` loads the
+    // save, so this reads an EMPTY bag on every boot and the badge hides itself.
+    // Nothing re-announced it — `bag:changed` only fires when the bag is
+    // touched — so a Keeper who reopened the game with six stacks in her satchel
+    // saw no count at all until she pocketed a seventh. Crossing a world rebuilt
+    // the scene against a loaded state and the number appeared, which is why it
+    // looked like the badge disagreed with itself from world to world.
     this.hud.setBagCount(this.ctx.state.bag.length);
     this.hud.gearButton.setDepth(DEPTH_HUD);
 
@@ -583,6 +592,12 @@ export class UIScene extends Phaser.Scene {
     speakHerName();
     this.offBus.push(
       this.ctx.bus.on('state:loaded', speakHerName),
+      // The same beat, for the two badges that are also read out of a state the
+      // scene was built before: the satchel's count and the Cookbook's dot.
+      this.ctx.bus.on('state:loaded', () => {
+        this.hud.setBagCount(this.ctx.state.bag.length);
+        this.syncCookbookDot();
+      }),
       this.ctx.bus.on('dragon:named', ({ name }) => {
         this.bubble.setToken('dragon', name);
         this.revealCodexButton();
@@ -1091,7 +1106,7 @@ export class UIScene extends Phaser.Scene {
         // The demonstrated recipe was performed — retire the guiding hand.
         if (`${chain}:${fromTier}>${resultTier}` === this.recipeHint) this.clearRecipeHint();
         if (!this.ctx.state.tutorialDone || this.cookbook.isOpen) return;
-        this.cookbookDot.setVisible(true);
+        this.syncCookbookDot();
         this.tweens.add({
           targets: this.cookbookButton,
           scale: { from: 1, to: 1.16 },
@@ -1466,12 +1481,43 @@ export class UIScene extends Phaser.Scene {
       if (this.cookbook.isOpen) {
         this.cookbook.requestClose();
       } else {
-        this.cookbookDot.setVisible(false);
+        this.markCookbookSeen();
         this.cookbook.open();
       }
     });
     button.setVisible(this.ctx.state.tutorialDone);
+    this.syncCookbookDot();
     return button;
+  }
+
+  /**
+   * THE DOT IS A FACT ABOUT THE SAVE, NOT ABOUT THIS SESSION.
+   *
+   * It used to be a boolean nobody wrote down: raised by `cookbook:discovered`,
+   * lowered by opening the book. Discover a recipe and close the tab and it was
+   * gone on the next boot — the Keeper had never looked, and the game had
+   * stopped saying so. It could not come back either, because nothing outside
+   * that one event could ever raise it again.
+   *
+   * `discoveredRecipes` is already in the save and only ever grows, so the
+   * answer is a subtraction: how many pages exist against how many had been
+   * written the last time the book was opened. Monotone on both sides, so it
+   * survives a reload, agrees across worlds, and needs no new save field.
+   */
+  private syncCookbookDot(): void {
+    if (!this.cookbookDot) return;
+    const unseen =
+      this.ctx.state.discoveredRecipes.length - this.ctx.state.stat(COOKBOOK_SEEN_KEY);
+    this.cookbookDot.setVisible(this.ctx.state.tutorialDone && unseen > 0);
+  }
+
+  /** Opening the book is reading it. `addStat` is the only setter, and the two
+   *  counters only ever grow, so the difference is never negative. */
+  private markCookbookSeen(): void {
+    const unseen =
+      this.ctx.state.discoveredRecipes.length - this.ctx.state.stat(COOKBOOK_SEEN_KEY);
+    if (unseen > 0) this.ctx.state.addStat(COOKBOOK_SEEN_KEY, unseen);
+    this.cookbookDot.setVisible(false);
   }
 
   /**
@@ -2244,7 +2290,12 @@ export class UIScene extends Phaser.Scene {
       case 'bag': return this.bag.open();
       case 'cauldron': return this.cauldron.open();
       case 'codex': return this.codex.open();
-      case 'cookbook': return this.cookbook.open();
+      case 'cookbook': {
+        // Opening it from anywhere is still reading it — the button is not the
+        // only door, and a dot that survives the panel it points at is noise.
+        this.markCookbookSeen();
+        return this.cookbook.open();
+      }
     }
   }
 

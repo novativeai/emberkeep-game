@@ -337,8 +337,37 @@ const ACTION_FONT = px(32);
  * ACTION_TOP).
  */
 const ACTION_FOOT = IS_MOBILE ? AIR : Math.round(AIR * 0.4);
-const ACTION_Y = CARD_H / 2 - ACTION_FOOT - ACTION_PLATE_HALF_H * ACTION_SCALE;
-const ACTION_TOP = ACTION_Y - ACTION_PLATE_HALF_H * ACTION_SCALE;
+/**
+ * A BLED CARD'S NAME, MEASURED FROM ITS FOOT rather than from its middle.
+ *
+ * `NAME_Y` is an offset from the centre, which is the same thing on a card of
+ * one fixed height and a different thing the moment a shelf sizes its cards to
+ * its own art (`portraitShelf`). Stated as a foot, the whole block — name,
+ * blurb, key — keeps the composition it was tuned with on a card of any height,
+ * instead of stranding the words in the middle with a hand's width of empty
+ * plate under them. Derived from today's numbers, so the square card is
+ * unchanged to the pixel: 1040/2 - 60 = 460.
+ */
+const NAME_FOOT = CARD_H / 2 - NAME_Y;
+/**
+ * A POSTER SHELF GETS ONE CARD PER ROW IN PORTRAIT, and the card takes the
+ * SHAPE OF ITS ART.
+ *
+ * The Dragon and Keeper looks are printed full-bleed — the art IS the card —
+ * and their art is nothing like square: a keeper look is 900x1268 and a dragon
+ * banner is 900x506. Cover-fitted into the shelf's square 1040 they were both
+ * cropped to a slot: the keepers lost their heads and their feet, the dragons
+ * became a letterboxed strip half a thumb tall. Two columns of that on a
+ * 390-pixel screen is four cropped thumbnails where the shelf is meant to be
+ * showing off.
+ *
+ * So: one column, the full width of the shelf, and a height read off the art
+ * itself, capped at this fraction of the window so the next card always peeks
+ * and the shelf still reads as a list. The Manor skins and Decorations keep
+ * their two columns — their art is an OBJECT on a stage, it is nearly square,
+ * and it tiles.
+ */
+const POSTER_MAX_H = 0.62;
 const HERO_ACTION_SCALE = IS_MOBILE ? 2 : 0.82;
 const HERO_ACTION_FONT = px(40);
 /** The showcase card's key gets the same foot. Its plate is bigger, so the
@@ -1090,6 +1119,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
     const rest = hero ? section.items.filter((item) => item !== hero) : section.items;
 
     if (CX.heroStacked) {
+      const shelf = this.portraitShelf(section, rest);
       /*
        * PORTRAIT: the showcase card is a BANNER, not a column.
        *
@@ -1100,8 +1130,9 @@ export class StorePanel extends Phaser.GameObjects.Container {
        * grid runs whole underneath it — the shelf scrolls anyway, and vertical
        * room is the one thing a portrait screen is not short of.
        */
-      const rows = Math.ceil(rest.length / COLS);
-      const gridH = rows > 0 ? (rows - 1) * ROW_GAP + CARD_H : 0;
+      const rows = Math.ceil(rest.length / shelf.cols);
+      const rowGap = shelf.cardH + AIR;
+      const gridH = rows > 0 ? (rows - 1) * rowGap + shelf.cardH : 0;
       const contentH = (hero ? HERO_H + AIR : 0) + gridH;
       // Short sections stay optically centred; an overflowing one starts at the
       // top of the window, because a centred overflow hides its first row as
@@ -1111,15 +1142,17 @@ export class StorePanel extends Phaser.GameObjects.Container {
       this.maxScroll = Math.max(0, contentH + 2 * AIR - VIEW_H);
       if (hero) this.place(this.makeHeroCard(0, top + HERO_H / 2, hero, section), hero);
       const gridTop = top + (hero ? HERO_H + AIR : 0);
-      const colStartX = -((COLS - 1) * COL_GAP) / 2;
+      const colGap = shelf.cardW + AIR;
+      const colStartX = -((shelf.cols - 1) * colGap) / 2;
       rest.forEach((item, i) => {
         this.place(
           this.makeCard(
-            colStartX + (i % COLS) * COL_GAP,
-            gridTop + Math.floor(i / COLS) * ROW_GAP + CARD_H / 2,
+            colStartX + (i % shelf.cols) * colGap,
+            gridTop + Math.floor(i / shelf.cols) * rowGap + shelf.cardH / 2,
             item,
             section,
-            CARD_W
+            shelf.cardW,
+            shelf.cardH
           ),
           item
         );
@@ -1459,6 +1492,41 @@ export class StorePanel extends Phaser.GameObjects.Container {
     return card;
   }
 
+  /**
+   * WHAT SHAPE THIS SHELF'S CARDS ARE, IN PORTRAIT.
+   *
+   * A full-bleed shelf (`bleed`, below: the art IS the card) takes ONE column
+   * of the full shelf width, and its height is read off the art rather than
+   * chosen — cover-fit crops whatever the card's aspect does not match, so a
+   * card that is the wrong shape is a card that throws its own picture away.
+   * The height is capped at `POSTER_MAX_H` of the window so the next card
+   * always peeks over the fold and the shelf still reads as a list.
+   *
+   * Every other shelf keeps the square two-column grid it was authored with:
+   * its art is an object on a stage, not a poster, and objects tile.
+   *
+   * The aspect is MEASURED, not declared, so a re-cut card moves the shelf with
+   * it and no table has to be remembered. The first item whose texture is
+   * loaded answers for the shelf — a shelf's cards are cut to one size by the
+   * same pipeline — and a shelf whose art failed to load falls back to the
+   * square grid rather than inventing a shape for pictures it cannot see.
+   */
+  private portraitShelf(
+    section: StoreSection,
+    items: readonly StoreItem[]
+  ): { cols: number; cardW: number; cardH: number } {
+    const square = { cols: COLS, cardW: CARD_W, cardH: CARD_H };
+    if (section.kind !== 'dragon_skin' && section.kind !== 'keeper_skin') return square;
+    const drawn = items.find((item) => this.scene.textures.exists(item.art));
+    if (!drawn) return square;
+    const src = this.scene.textures.get(drawn.art).getSourceImage();
+    const aspect = src.height > 0 ? src.width / src.height : 1;
+    if (!Number.isFinite(aspect) || aspect <= 0) return square;
+    const cardW = HERO_W; // the full shelf width, the same span the hero banner uses
+    const cardH = Math.min(Math.round(cardW / aspect), Math.round(VIEW_H * POSTER_MAX_H));
+    return { cols: 1, cardW, cardH };
+  }
+
   private makeCard(
     x: number,
     y: number,
@@ -1466,7 +1534,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
     section: StoreSection,
     /** The column width of the layout this card is being placed into — three
      *  equal columns beside a hero, four without one. */
-    w: number
+    w: number,
+    /** And its height. Only a portrait poster shelf passes one; every other
+     *  card is the authored square. */
+    h: number = CARD_H
   ): Phaser.GameObjects.Container {
     const card = this.scene.add.container(x, y);
     const owned = this.gameState.ownedCosmetics.includes(item.id);
@@ -1490,7 +1561,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
       const plate = makeFoilPlate(
         this.scene,
         w,
-        CARD_H,
+        h,
         CARD_R,
         worn ? INK.ember : undefined
       );
@@ -1500,21 +1571,21 @@ export class StorePanel extends Phaser.GameObjects.Container {
     } else {
       const g = this.scene.add.graphics();
       g.fillStyle(num(INK.goldDeep), 1);
-      g.fillRoundedRect(-w / 2, -CARD_H / 2 + 8, w, CARD_H, CARD_R);
+      g.fillRoundedRect(-w / 2, -h / 2 + 8, w, h, CARD_R);
       g.fillStyle(num(INK.field), 1);
-      g.fillRoundedRect(-w / 2, -CARD_H / 2, w, CARD_H, CARD_R);
+      g.fillRoundedRect(-w / 2, -h / 2, w, h, CARD_R);
       card.add(g);
       // The rim is its own layer so full-bleed art can slide UNDER it — a
       // stroke fused into the plate would be painted over by the art.
       rim = this.scene.add.graphics();
       rim.lineStyle(6, num(worn ? INK.ember : INK.gold), 1);
-      rim.strokeRoundedRect(-w / 2, -CARD_H / 2, w, CARD_H, CARD_R);
+      rim.strokeRoundedRect(-w / 2, -h / 2, w, h, CARD_R);
     }
 
     let art: Phaser.GameObjects.Image | null = null;
     if (this.scene.textures.exists(item.art)) {
       if (bleed) {
-        const inner = { w: w - PLATE_INSET * 2, h: CARD_H - PLATE_INSET * 2 };
+        const inner = { w: w - PLATE_INSET * 2, h: h - PLATE_INSET * 2 };
         art = this.scene.add.image(0, 0, item.art);
         this.coverFit(art, inner.w, inner.h);
         card.add(art);
@@ -1562,11 +1633,19 @@ export class StorePanel extends Phaser.GameObjects.Container {
       this.sheens.push(runSheen(this.scene, sheen, this.sheens.length * 900));
     }
     if (rim) card.add(rim);
-    if (item.rarity) card.add(this.makeRibbon(item.rarity, -CARD_H / 2 + px(8)));
+    if (item.rarity) card.add(this.makeRibbon(item.rarity, -h / 2 + px(8)));
 
     // A BLED card's name has to stay on its scrim; a PLAIN card's has only the
     // picture above it, so it rides higher and hands the slack to the blurb.
-    const nameY = bleed ? NAME_Y : PLAIN_NAME_Y;
+    //
+    // The bled one is measured from the card's FOOT (`NAME_FOOT`), because a
+    // poster shelf sizes its cards to its own art and an offset from the middle
+    // would strand the whole block — name, blurb, key — halfway up a tall card
+    // with a hand's width of empty plate under it. On the authored square the
+    // two are the same number to the pixel.
+    const actionY = h / 2 - ACTION_FOOT - ACTION_PLATE_HALF_H * ACTION_SCALE;
+    const actionTop = actionY - ACTION_PLATE_HALF_H * ACTION_SCALE;
+    const nameY = bleed ? h / 2 - NAME_FOOT : PLAIN_NAME_Y;
     const name = this.scene.add
       .text(0, nameY, item.name, {
         fontFamily: FONT.ui, fontSize: `${px(32)}px`, fontStyle: 'bold',
@@ -1589,10 +1668,10 @@ export class StorePanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5, 0)
       .setAlpha(bleed || foil ? 1 : 0.88);
     if (bleed) blurb.setShadow(0, 3, 'rgba(36,27,34,0.7)', 5);
-    this.fitBlurb(blurb, ACTION_TOP - blurbTop - BLURB_FOOT);
+    this.fitBlurb(blurb, actionTop - blurbTop - BLURB_FOOT);
     card.add(blurb);
     if (this.isLocked(item)) this.addLockOverlay(card, art, bleed ? px(-60) : (IS_MOBILE ? -325 : -114), px(88));
-    card.add(this.makeAction(item, section, owned, worn, ACTION_Y, ACTION_SCALE, ACTION_FONT));
+    card.add(this.makeAction(item, section, owned, worn, actionY, ACTION_SCALE, ACTION_FONT));
     return card;
   }
 }
