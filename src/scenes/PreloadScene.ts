@@ -137,6 +137,10 @@ export class PreloadScene extends Phaser.Scene {
       // `textureFor`), so ask for every tier and let the filter drop the rest.
       for (let tier = 1; tier <= 5; tier++) wornSkins.add(`skin_${skin}_${tier}`);
     }
+    // A keeper's look is ONE plate, not a tier ladder — she is one standee.
+    for (const [, look] of Object.entries(ctx.state.keeperSkins ?? {})) {
+      if (look) wornSkins.add(`skin_${look}`);
+    }
     const skipAtBoot = (key: string): boolean =>
       (/^(tile_|decor_)/.test(key) && !neededArt.has(key)) ||
       (/^background_/.test(key) && !liveBackdrops.has(key)) ||

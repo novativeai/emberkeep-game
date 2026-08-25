@@ -3,8 +3,9 @@ import type { GameState } from '../core/GameState';
 import type { StoreData, StoreItem, StoreKind } from '../core/types';
 
 /**
- * The cosmetics store — Manor skins and decorations, bought with the Gold the
- * player earns. It owns `state.ownedCosmetics` and `state.manorSkin`; the panel
+ * The cosmetics store — Manor skins, dragon and keeper looks, and decorations,
+ * bought with the Gold the player earns. It owns `state.ownedCosmetics`,
+ * `state.manorSkin`, `state.dragonSkins` and `state.keeperSkins`; the panel
  * only renders and emits intents.
  *
  * Two rules the whole thing rests on:
@@ -77,7 +78,9 @@ export class StoreSystem {
       return;
     }
     // A skin you just bought is a skin you want to see.
-    if (entry.kind === 'skin' || entry.kind === 'dragon_skin') this.equip(itemId);
+    if (entry.kind === 'skin' || entry.kind === 'dragon_skin' || entry.kind === 'keeper_skin') {
+      this.equip(itemId);
+    }
   }
 
   private settleDecor(decor: string, placed: boolean): void {
@@ -100,14 +103,22 @@ export class StoreSystem {
   /**
    * Wear an owned skin, or pass null to go back to the authored art.
    *
-   * Two wardrobes, and the item says which one it belongs to: a Manor skin
+   * THREE wardrobes, and the item says which one it belongs to: a Manor skin
    * fills the single `manorSkin` slot, a dragon skin fills the slot for the
-   * chain it re-skins. `null` only clears the Manor — a dragon is undressed by
-   * equipping a different skin, and there is no "bare" card to tap.
+   * chain it re-skins, a keeper skin fills the slot for the person it dresses.
+   * `null` only clears the Manor — a dragon or a keeper is undressed by
+   * equipping a different look, and there is no "bare" card to tap.
    */
   private equip(itemId: string | null): void {
     if (itemId !== null && !this.owns(itemId)) return;
     const entry = itemId === null ? null : this.byId.get(itemId);
+    if (entry?.kind === 'keeper_skin') {
+      const keeper = entry.item.keeper;
+      if (!keeper || this.state.keeperSkins[keeper] === itemId) return;
+      this.state.keeperSkins[keeper] = itemId!;
+      this.bus.emit('store:keeper_skin_changed', { keeper, itemId });
+      return;
+    }
     if (entry?.kind === 'dragon_skin') {
       const dragon = entry.item.dragon;
       if (!dragon || this.state.dragonSkins[dragon] === itemId) return;

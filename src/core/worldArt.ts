@@ -27,6 +27,12 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
     const art = cfg.art ?? cfg.id;
     const bank = STANDEE_BANKS[art];
     if (bank) keys.push(...Object.values(bank.keys));
+    // The LOOK she is wearing, if she has been bought one. World art like the
+    // banks: fetched at the same door, released from the same list. Eleanor's
+    // is only ever wanted at home and Selyna's only in the north, which is
+    // exactly what a per-world list is for.
+    const look = ctx.state.keeperSkins[art];
+    if (look) keys.push(`skin_${look}`);
     // …and her Align-Studio BOARD clips, which are by far the heaviest thing a
     // character brings: a frame sheet is stored DECODED, so Selyna's clips are
     // tens of MB of video memory from a few MB of WebP. PreloadScene fetches
