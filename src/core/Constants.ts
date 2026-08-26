@@ -2248,13 +2248,23 @@ export const FOG_BLANKET = {
    */
   interiorNeighbours: 4,
   /** Shrink at FULL exposure (no neighbours at all); scaled down by exposure. */
-  edgeShrink: 0.12,
-  /** Alpha at full exposure. An enclosed cap sits at `coreAlpha`. */
-  edgeAlpha: 0.8,
+  edgeShrink: 0.07,
+  /**
+   * Alpha at full exposure. An enclosed cap sits at `coreAlpha`.
+   *
+   * Kept HIGH on purpose. Fading exposed caps was the first attempt at a soft
+   * rim and it is the wrong lever: a bank made of thin arms is nearly all
+   * exposed cells, so the whole thing went see-through — lava reading straight
+   * through the cloud, next to a fat bank that stayed solid. A cloud you can
+   * see through does not read as a cloud. The rim softens by SIZE; opacity
+   * barely moves.
+   */
+  edgeAlpha: 0.96,
   /** A cap needs at least this many neighbours to be worth an under-pass —
-   *  below it the cap is a stub and the broad pass would only spill onto open
-   *  ground. */
-  underNeighbours: 2,
+   *  below it it is a lone puff and the broad pass would spill onto open
+   *  ground. At 1, a thin arm still gets its mass: `underExposureShrink` has
+   *  already pulled the pass down to barely wider than the cap by then. */
+  underNeighbours: 1,
   /** How much of the under-pass's size exposure takes away, at full exposure. */
   underExposureShrink: 0.3,
   /** Opacity of a cap deep inside the bank. */
