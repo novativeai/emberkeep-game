@@ -65,7 +65,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: novativeai/embergames
-          ref: nionja
+          # `main`, and it is the ONLY deploy line now. Two lanes used to sync
+          # this hub on two branches and production went to whichever agent ran
+          # `vercel deploy --prod` last — an anonymous trigger with no record.
+          # nionja was merged into main on 26 Aug (fast-forward, nothing lost:
+          # main's own commits touched only the embedded game, on an older
+          # build). One branch, one truth about what is live.
+          ref: main
           path: hub
           fetch-depth: 1
           # The default GITHUB_TOKEN is scoped to THIS repo and cannot push to
@@ -129,7 +135,7 @@ jobs:
             git commit -q -m "chore: sync emberkeep build ${GITHUB_SHA:0:7}
 
           ${{ github.event.head_commit.message }}"
-            git push origin nionja
+            git push origin main
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
