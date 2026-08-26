@@ -132,6 +132,16 @@ jobs:
         id: commit
         if: steps.cfg.outputs.ready == 'true'
         working-directory: hub
+        env:
+          # THROUGH `env`, NEVER `${{ }}` INSIDE THE SCRIPT. A `${{ }}` is
+          # substituted as TEXT before bash ever sees the line, so a commit
+          # message is not data there — it is source code. One of mine carried
+          # a pair of double quotes and closed the string, which is how this
+          # was found; a message carrying `$(…)` or backticks would instead
+          # have RUN, on a runner holding HUB_TOKEN and VERCEL_TOKEN. An `env`
+          # value is handed to the process by the runner and parsed by nothing.
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+          GAME_SHA: ${{ github.sha }}
         run: |
           git config user.name '0nja'
           git config user.email 'nionja7@gmail.com'
@@ -140,9 +150,11 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "::notice::The build is byte-identical to the one already deployed — nothing to ship."
           else
-            git commit -q -m "chore: sync emberkeep build ${GITHUB_SHA:0:7}
-
-          ${{ github.event.head_commit.message }}"
+            # Two -m: subject, then body. `workflow_dispatch` has no head
+            # commit, so the body says so rather than being empty.
+            git commit -q \
+              -m "chore: sync emberkeep build ${GAME_SHA:0:7}" \
+              -m "${HEAD_MSG:-(manual run from the Actions tab)}"
             git push origin main
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
