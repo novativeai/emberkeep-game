@@ -1,0 +1,169 @@
+# A push to `nionja` — from anyone — builds, syncs the hub, and deploys.
+#
+# WHY THIS LIVES IN THE GAME REPO. The hub serves a COMMITTED COPY of the
+# game's `dist/` (public/games/emberkeep). Nothing in `novativeai/embergames`
+# knows the game changed, so the hub can never be the thing that notices. The
+# push that matters is this one.
+#
+# IT IS SAFE TO MERGE BEFORE IT IS CONFIGURED. With no HUB_TOKEN secret the job
+# says so and stops, green. Add the secret and the very next push ships.
+#
+# WHAT CHANGES: only COMMITTED work deploys. Today a deploy carries whatever is
+# in the working tree, uncommitted edits included. Which is also why the four
+# editor-generated map files stop needing to be parked before every build — CI
+# builds the committed tree, and those files are only ever dirty locally.
+
+name: deploy
+
+on:
+  push:
+    branches: [nionja]
+  workflow_dispatch: # a manual re-deploy, from the Actions tab
+
+# Two pushes a minute apart must not race for the same hub commit and the same
+# production alias. The later one waits; it does not cancel the earlier one,
+# because a half-finished deploy is worse than a slow one.
+concurrency:
+  group: deploy-emberkeep
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      # ── the one thing you have to configure ───────────────────────────────
+      # A secret cannot be read in a job-level `if`, so the gate is a step and
+      # everything below hangs off it. No secret, no work, no red X.
+      - name: Is this configured yet?
+        id: cfg
+        env:
+          HUB_TOKEN: ${{ secrets.HUB_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$HUB_TOKEN" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Not configured yet — add a HUB_TOKEN secret (a PAT with write access to novativeai/embergames) and the next push will deploy."
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          # Vercel is deployed by CLI unless the hub project is connected to
+          # GitHub, in which case pushing the hub is already enough and this
+          # secret can simply be left unset.
+          if [ -n "$VERCEL_TOKEN" ]; then echo "cli=true" >> "$GITHUB_OUTPUT"; else echo "cli=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Check out the game
+        if: steps.cfg.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          # The history is 1.5 GB of art. The build only ever reads the tip.
+          fetch-depth: 1
+
+      - name: Check out the hub
+        if: steps.cfg.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: novativeai/embergames
+          ref: nionja
+          path: hub
+          fetch-depth: 1
+          # The default GITHUB_TOKEN is scoped to THIS repo and cannot push to
+          # that one — hence the PAT.
+          token: ${{ secrets.HUB_TOKEN }}
+
+      - if: steps.cfg.outputs.ready == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.cfg.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.cfg.outputs.ready == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # scripts/shrink-dist.py re-encodes 368 textures through Pillow. Without
+      # it `pnpm build` fails at its THIRD command, after a clean typecheck and
+      # a clean vite build — which reads as a mystery unless you know.
+      - name: Install Pillow
+        if: steps.cfg.outputs.ready == 'true'
+        run: python3 -m pip install --quiet pillow
+
+      - name: Install dependencies
+        if: steps.cfg.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      # THE GATE. A push that does not typecheck, or that breaks a test, must
+      # not reach players. E2E is deliberately NOT here: it wants a GPU
+      # Chromium at 2560x1600 and belongs on a machine someone is watching.
+      - name: Typecheck
+        if: steps.cfg.outputs.ready == 'true'
+        run: pnpm typecheck
+
+      - name: Unit tests
+        if: steps.cfg.outputs.ready == 'true'
+        run: pnpm test
+
+      # sync-game.mjs runs `pnpm build` ITSELF and copies dist/ into the hub.
+      - name: Build and sync into the hub
+        if: steps.cfg.outputs.ready == 'true'
+        working-directory: hub
+        env:
+          EMBERKEEP_GAME_ROOT: ${{ github.workspace }}
+        run: node scripts/sync-game.mjs
+
+      - name: Commit the built copy
+        id: commit
+        if: steps.cfg.outputs.ready == 'true'
+        working-directory: hub
+        run: |
+          git config user.name '0nja'
+          git config user.email 'nionja7@gmail.com'
+          git add -A public/games/emberkeep src/lib/game-synced.json
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::The build is byte-identical to the one already deployed — nothing to ship."
+          else
+            git commit -q -m "chore: sync emberkeep build ${GITHUB_SHA:0:7}
+
+          ${{ github.event.head_commit.message }}"
+            git push origin nionja
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Skipped when the hub project is connected to GitHub: the push above is
+      # then already the trigger, and no Vercel token is needed at all.
+      - name: Deploy the hub to production
+        if: steps.commit.outputs.changed == 'true' && steps.cfg.outputs.cli == 'true'
+        working-directory: hub
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npx --yes vercel@latest deploy --prod \
+            --token "${{ secrets.VERCEL_TOKEN }}" \
+            --scope 0njas-projects
+
+      # A deploy nobody checked is a deploy nobody trusts. The same assertion
+      # made by hand after every ship: the bytes the browser gets are the bytes
+      # that were built. Generous retries, because a git-triggered deploy has
+      # to build the Next app before the alias swings.
+      - name: Verify what production actually serves
+        if: steps.commit.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          built=$(basename "$(ls hub/public/games/emberkeep/assets/index-*.js)")
+          for i in $(seq 1 20); do
+            live=$(curl -fsS https://embergames-psi.vercel.app/games/emberkeep/index.html \
+              | grep -o 'index-[A-Za-z0-9_-]*\.js' | sort -u | head -1) || live=''
+            if [ "$live" = "$built" ]; then
+              echo "live bundle is $live — matches the build"
+              exit 0
+            fi
+            echo "live '$live', built '$built' — the alias has not swung yet ($i/20)"
+            sleep 20
+          done
+          echo "production is still serving a different bundle after ~7 minutes" >&2
+          exit 1
