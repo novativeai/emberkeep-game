@@ -458,7 +458,7 @@ def do_dex():
 # ---------------------------------------------------------------- store
 STORE_SECTIONS = {
   'skins': ('Mansion Looks', 'Give your Mansion a brand new look. It still makes the same Gold.'),
-  'decor': ('Decorations', 'Placed on a free tile when you buy it. Just for fun — nothing merges with it. The big ones at the end can be seen from across the island.'),
+  'decor': ('Decorations', 'Placed on a free tile when you buy it. Just for fun — nothing merges with it. The big ones can be seen from across the island.'),
   'dragons': ('Dragons', 'New dragons for your keep, and new looks for the dragons you already have. A new dragon starts as three eggs — merge them and raise your own.'),
 }
 STORE_ITEMS = {
@@ -466,10 +466,9 @@ STORE_ITEMS = {
   'manor_windmill': ('Old Windmill', 'It ground flour before the fire. The sails still turn in the wind.'),
   'manor_treehouse': ('Great Tree House', 'One tree survived the fire. Someone built a house in it.'),
   'manor_igloo': ('Igloo', 'Cut from Borealis ice and carried south. It still has not melted.'),
-  'ash_urn': ('Ash Pot', 'The island turned to ash. Keeping a little of it helps us remember.'),
-  'watch_bell': ('Watch Bell', 'Keepers rang this bell to call the dragons home.'),
-  'rekindled_step': ('Mossy Step', 'Moss growing through a cracked step, with gold in the crack.'),
-  'chain_anchor': ('Chain Anchor', 'One hook, one chain, one island held up. There are thousands of them.'),
+  # ash_urn / watch_bell / rekindled_step / chain_anchor retired from the shelf
+  # (owner's call, 2026-08-26) — already-placed ones keep rendering from the
+  # board, they are just no longer sold.
   'ice_lantern': ('Ice Lantern', 'A flame kept inside ice. Someone up north knows how to do this.'),
   'frozen_spill': ('Frozen Waterfall', 'A waterfall that froze in the middle of falling.'),
   'rune_pad': ('Rune Stone', 'Glowing lines under the snow. Nobody lit them, but they still glow.'),

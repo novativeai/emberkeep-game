@@ -86,8 +86,11 @@ describe('the reveal roster and the Emporium landmarks (authored data)', () => {
   });
 
   it('every decoration on the shelf has art and a price', () => {
+    // 9, down from 13: the four small Emberkeep props (ash pot, watch bell,
+    // mossy step, chain anchor) retired from the shelf on the owner's call —
+    // already-placed ones still render, they are just no longer sold.
     const decor = (storeDoc as StoreData).sections.find((s) => s.id === 'decor')!;
-    expect(decor.items.length).toBeGreaterThanOrEqual(13);
+    expect(decor.items.length).toBeGreaterThanOrEqual(9);
     for (const item of decor.items) {
       expect(keys, `${item.id} art`).toContain(item.art);
       expect(item.gold, `${item.id} price`).toBeGreaterThan(0);

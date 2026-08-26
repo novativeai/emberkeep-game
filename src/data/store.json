@@ -43,73 +43,9 @@
     {
       "id": "decor",
       "title": "Decorations",
-      "blurb": "Placed on a free tile when you buy it. Just for fun — nothing merges with it. The big ones at the end can be seen from across the island.",
+      "blurb": "Placed on a free tile when you buy it. Just for fun — nothing merges with it. The big ones can be seen from across the island.",
       "kind": "decor",
       "items": [
-        {
-          "id": "ash_urn",
-          "name": "Ash Pot",
-          "blurb": "The island turned to ash. Keeping a little of it helps us remember.",
-          "art": "decor_ash_urn",
-          "gold": 120,
-          "world": "emberkeep"
-        },
-        {
-          "id": "watch_bell",
-          "name": "Watch Bell",
-          "blurb": "Keepers rang this bell to call the dragons home.",
-          "art": "decor_watch_bell",
-          "gold": 160,
-          "world": "emberkeep"
-        },
-        {
-          "id": "rekindled_step",
-          "name": "Mossy Step",
-          "blurb": "Moss growing through a cracked step, with gold in the crack.",
-          "art": "decor_rekindled_step",
-          "gold": 200,
-          "world": "emberkeep"
-        },
-        {
-          "id": "chain_anchor",
-          "name": "Chain Anchor",
-          "blurb": "One hook, one chain, one island held up. There are thousands of them.",
-          "art": "decor_chain_anchor",
-          "gold": 240,
-          "world": "emberkeep"
-        },
-        {
-          "id": "ice_lantern",
-          "name": "Ice Lantern",
-          "blurb": "A flame kept inside ice. Someone up north knows how to do this.",
-          "art": "decor_ice_lantern",
-          "gold": 300,
-          "world": "borealis"
-        },
-        {
-          "id": "frozen_spill",
-          "name": "Frozen Waterfall",
-          "blurb": "A waterfall that froze in the middle of falling.",
-          "art": "decor_frozen_spill",
-          "gold": 340,
-          "world": "borealis"
-        },
-        {
-          "id": "rune_pad",
-          "name": "Rune Stone",
-          "blurb": "Glowing lines under the snow. Nobody lit them, but they still glow.",
-          "art": "decor_rune_pad",
-          "gold": 380,
-          "world": "borealis"
-        },
-        {
-          "id": "drift_cairn",
-          "name": "Stone Pile",
-          "blurb": "Stones, a green glass ball and a ribbon of light. A way of saying hello.",
-          "art": "decor_drift_cairn",
-          "gold": 420,
-          "world": "borealis"
-        },
         {
           "id": "keeper_statue",
           "name": "The First Keeper",
@@ -149,6 +85,38 @@
           "art": "decor_tethered_isle",
           "gold": 1800,
           "world": "emberkeep"
+        },
+        {
+          "id": "ice_lantern",
+          "name": "Ice Lantern",
+          "blurb": "A flame kept inside ice. Someone up north knows how to do this.",
+          "art": "decor_ice_lantern",
+          "gold": 300,
+          "world": "borealis"
+        },
+        {
+          "id": "frozen_spill",
+          "name": "Frozen Waterfall",
+          "blurb": "A waterfall that froze in the middle of falling.",
+          "art": "decor_frozen_spill",
+          "gold": 340,
+          "world": "borealis"
+        },
+        {
+          "id": "rune_pad",
+          "name": "Rune Stone",
+          "blurb": "Glowing lines under the snow. Nobody lit them, but they still glow.",
+          "art": "decor_rune_pad",
+          "gold": 380,
+          "world": "borealis"
+        },
+        {
+          "id": "drift_cairn",
+          "name": "Stone Pile",
+          "blurb": "Stones, a green glass ball and a ribbon of light. A way of saying hello.",
+          "art": "decor_drift_cairn",
+          "gold": 420,
+          "world": "borealis"
         }
       ]
     },
@@ -177,7 +145,7 @@
           "gold": 1600,
           "chain": "storm",
           "rarity": "legendary",
-          "world": "emberkeep"
+          "world": "borealis"
         },
         {
           "id": "moonwhisker",

@@ -1,6 +1,7 @@
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { StoreData, StoreItem, StoreKind } from '../core/types';
+import { soldHere } from '../core/worldGates';
 
 /**
  * The cosmetics store — Manor skins, dragon and keeper looks, and decorations,
@@ -48,10 +49,11 @@ export class StoreSystem {
       this.bus.emit('store:purchase_failed', { itemId, reason: 'owned' });
       return;
     }
-    // Local goods, sold where they are made. The panel already padlocks the
-    // card, but the gate is enforced HERE too: a shelf is data, and the one
-    // thing a purchase must never depend on is the UI having drawn it right.
-    if (entry.item.world && entry.item.world !== this.state.worldId) {
+    // Local goods, sold where they are made — and in that world's own hub
+    // (core/worldGates.soldHere). The panel already padlocks the card, but the
+    // gate is enforced HERE too: a shelf is data, and the one thing a purchase
+    // must never depend on is the UI having drawn it right.
+    if (!soldHere(entry.item.world, this.state.worldId)) {
       this.bus.emit('store:purchase_failed', { itemId, reason: 'locked' });
       return;
     }

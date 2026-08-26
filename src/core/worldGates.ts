@@ -44,3 +44,21 @@ export function worldOpen(state: GameState, worldId: string): boolean {
   if (!world) return false;
   return state.tutorialDone && state.level >= world.level && storyOpen(state, worldId);
 }
+
+/**
+ * The hub that fronts each MAIN world's goods: Roothold is Emberkeep's
+ * shopfront, the Runevault is Borealis's (owner's call, 2026-08-26).
+ */
+const HUB_OF: Record<string, string> = { emberkeep: 'roothold', borealis: 'runevault' };
+
+/**
+ * Is a store item tagged for `itemWorld` sold where the Keeper stands? Local
+ * goods are sold where they are made AND in that world's own hub — the hubs
+ * are the main worlds' storefronts, not fifth catalogues. Untagged goods sell
+ * everywhere. StoreSystem enforces it at the bus and StorePanel padlocks by
+ * it, through this one predicate so the two can never disagree.
+ */
+export function soldHere(itemWorld: string | undefined, worldId: string): boolean {
+  if (!itemWorld) return true;
+  return itemWorld === worldId || HUB_OF[itemWorld] === worldId;
+}

@@ -7,7 +7,7 @@ import type { StoreData } from '../../src/core/types';
 import { capture, createTestContext } from './helpers';
 
 const SKIN = 'manor_mushroom'; // 250 gold
-const DECOR = 'ash_urn'; // 120 gold
+const DECOR = 'keeper_statue'; // 900 gold — the shelf's first decor since the four small props retired
 
 /** Give the player enough Gold to shop with. */
 function fund(ctx: ReturnType<typeof createTestContext>, coins: number): void {
@@ -66,7 +66,7 @@ describe('StoreSystem (cosmetics, bought with earned Gold)', () => {
     const placed = [...ctx.state.items.values()].filter((i) => i.kind === 'decor');
     expect(placed).toHaveLength(1);
     expect(placed[0]!.chain).toBe(DECOR);
-    expect(ctx.state.coins).toBe(1000 - 120);
+    expect(ctx.state.coins).toBe(1000 - 900);
     expect(ctx.state.ownedCosmetics).toContain(DECOR);
   });
 
@@ -176,7 +176,10 @@ describe('StoreSystem (cosmetics, bought with earned Gold)', () => {
     fund(ctx, 2000);
     const worn = capture(ctx.bus, 'store:dragon_skin_changed');
 
-    // `storm` is sold in Emberkeep, which is where a fresh context stands.
+    // `storm` is BOREALIS-BORN now (owner's call — it stood on the wrong
+    // shelf, spawning storm eggs on the southern isle), so the clutch is
+    // bought where the breed lives.
+    ctx.state.switchWorld('borealis');
     ctx.bus.emit('ui:store_buy_requested', { itemId: 'storm' });
 
     // THREE tier-1 eggs — one 3-merge from the animal. Fewer would be a
@@ -222,7 +225,7 @@ describe('StoreSystem (cosmetics, bought with earned Gold)', () => {
 
   it('survives a save round-trip: what you own and what you wear both persist', () => {
     const ctx = createTestContext();
-    fund(ctx, 2000); // a Manor skin, a decoration and a 900g dragon skin
+    fund(ctx, 3000); // a Manor skin, a 900g decoration and a 900g dragon skin
     ctx.bus.emit('ui:store_buy_requested', { itemId: SKIN });
     ctx.bus.emit('ui:store_buy_requested', { itemId: DECOR });
 
@@ -333,6 +336,37 @@ describe('goods that are only sold in the world that makes them', () => {
 
     expect(failed.at(-1)).toMatchObject({ itemId: 'manor_mushroom', reason: 'locked' });
     expect(ctx.state.ownedCosmetics).not.toContain('manor_mushroom');
+  });
+
+  it("sells a main world's goods in its OWN hub — Roothold fronts Emberkeep", () => {
+    // The hubs are the main worlds' storefronts (owner's call): Emberkeep
+    // goods buy in Roothold, Borealis goods in the Runevault. Never across.
+    const ctx = createTestContext();
+    fund(ctx, 2000);
+    ctx.state.switchWorld('roothold');
+
+    ctx.bus.emit('ui:store_buy_requested', { itemId: 'manor_mushroom' }); // world: emberkeep
+    expect(ctx.state.ownedCosmetics).toContain('manor_mushroom');
+  });
+
+  it('…and the Runevault fronts Borealis', () => {
+    const ctx = createTestContext();
+    fund(ctx, 2000);
+    ctx.state.switchWorld('runevault');
+
+    ctx.bus.emit('ui:store_buy_requested', { itemId: NORTHERN }); // world: borealis
+    expect(ctx.state.ownedCosmetics).toContain(NORTHERN);
+  });
+
+  it('but never across: Borealis goods stay locked in Roothold', () => {
+    const ctx = createTestContext();
+    fund(ctx, 2000);
+    ctx.state.switchWorld('roothold');
+    const failed = capture(ctx.bus, 'store:purchase_failed');
+
+    ctx.bus.emit('ui:store_buy_requested', { itemId: NORTHERN });
+    expect(failed.at(-1)).toMatchObject({ itemId: NORTHERN, reason: 'locked' });
+    expect(ctx.state.ownedCosmetics).not.toContain(NORTHERN);
   });
 
   it('every card names the world it is sold in', () => {
