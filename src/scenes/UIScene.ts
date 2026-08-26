@@ -736,6 +736,20 @@ export class UIScene extends Phaser.Scene {
         if (p) this.hand.setPosition(p.x, p.y + this.handBob.v);
       }
     }
+    // TWO ARROWS ON ONE BUILDING. `house_skip` aims its beat arrow at the House
+    // so the player opens it — and the House's popup then draws its OWN arrow at
+    // the ⚡ row (`BoardScene.showSkipButton`). Each is right alone; together
+    // they are a doubled marker over the same object, the beat arrow's tip
+    // buried under the popup it asked for. So a PIECE arrow stands down while a
+    // skip offer is up: the popup covers the piece anyway, and its pointer is
+    // the one now saying something the player does not already know. It comes
+    // straight back if the offer is dismissed without paying — the arrow is
+    // muted, never cleared, so nothing has to re-arm it.
+    if (this.arrowOnPiece && this.arrowAnchor) {
+      const board = this.scene.get(SCENES.board) as BoardScene | undefined;
+      if (board?.skipKeyWorldPoint?.('warmth')) this.arrow.setVisible(false);
+      else if (!this.arrow.visible && this.arrowAnchor()) this.arrow.setVisible(true);
+    }
     if (this.arrow.visible && this.arrowAnchor) {
       const a = this.arrowAnchor();
       // A PIECE-anchored arrow whose piece is gone points at nothing, so it
