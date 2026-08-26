@@ -10,7 +10,7 @@ import { buildWorlds, zoneAt } from '../../src/core/world';
 import { TutorialDirector } from '../../src/systems/TutorialDirector';
 import chainsJson from '../../src/data/chains.json';
 import map8x8 from '../fixtures/map-8x8.json';
-import type { ChainsData, MapData, MarkerPoint, TutorialAllow, TutorialStepConfig, TutorialData } from '../../src/core/types';
+import type { ChainsData, MapData, MarkerPoint, TilePos, TutorialAllow, TutorialStepConfig, TutorialData } from '../../src/core/types';
 import { capture, createTestContext, drag, MemoryStorage } from './helpers';
 
 /** The tutorial's own beats name cells of the AUTHORED isle, so a beat that is
