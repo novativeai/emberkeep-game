@@ -8898,6 +8898,11 @@ export class BoardScene extends Phaser.Scene {
         this.settleAfterDrag(sprite, x, y);
       }),
       bus.on('item:merged', (payload) => {
+        // The release-side twin of the pick-up tick. A merge only ever happens
+        // on a drop (the drop is the verb), and the synchronous bus delivers
+        // this fact inside that same pointer-up — the strongest gesture
+        // context, which is what the iOS switch-toggle path needs.
+        lightHaptic();
         // A merge is the answer to the hint, whether or not it was the one
         // offered — the player is playing, so the clock starts over and the
         // next offer waits out `restMs` rather than arriving on their heels.
