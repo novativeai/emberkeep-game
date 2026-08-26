@@ -706,6 +706,16 @@
       }
     },
     {
+      "id": "camera_hold",
+      "speaker": "eleanor",
+      "text": "To look around, press and hold an empty tile. When you feel a little tick, slide your finger — the island moves with you!",
+      "gate": {
+        "type": "event",
+        "event": "camera:panned"
+      },
+      "platform": "mobile"
+    },
+    {
       "id": "emberberry_tap",
       "speaker": "eleanor",
       "text": "A Berry Bush grew in the new land! Tap it to pick an Emberberry. Picking berries is FREE — it never costs Warmth.",

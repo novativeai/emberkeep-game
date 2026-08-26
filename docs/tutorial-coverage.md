@@ -46,6 +46,7 @@ Eleanor herself are all rows: they are live from the first frame.
 | Dragons work a generator | after `plank_merge` | `dragon_work` | ×2 per working dragon |
 | Dragons tire and go home | after `dragon_work` | `dragon_rest` | |
 | Harvest from a dragon (job menu) | the Red Dragon | `gem_harvest` | tap → menu → Harvest. Moved off the Green Dragon when the Emerald ladder left the opening — the Red produces the same Gem Shards, and the beat now calls her by name |
+| **Move the camera on touch — hold an empty tile, then drag** | the board, from the first frame | `camera_hold` | mobile-only (`platform: "mobile"` — desktop's mouse pans immediately and the director passes the beat through). On touch the finger's first meaning is the PIECE: a swipe on empty ground does nothing, holding `HOLD_TO_PAN.holdMs` arms the pan with a haptic tick. Placed right after `board_room` — the first beat that sends the player across the world, so the need is fresh — and gated on the gesture itself (`camera:panned`) |
 
 ## The economy
 

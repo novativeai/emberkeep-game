@@ -921,7 +921,7 @@ export interface MapData {
 
 export type TutorialGate =
   | { type: 'tap' }
-  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'ui:codex_closed' | 'ui:codex_dragon_opened' | 'ui:codex_evolution_opened' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used'; chain?: string; currency?: 'gold' | 'warmth' }
+  | { type: 'event'; event: 'item:merged' | 'item:hatched' | 'item:harvested' | 'item:sold' | 'order:completed' | 'region:unlocked' | 'ui:ledger_opened' | 'ui:cookbook_opened' | 'ui:cookbook_closed' | 'ui:codex_closed' | 'ui:codex_dragon_opened' | 'ui:codex_evolution_opened' | 'chest:open' | 'dragon:working' | 'dragon:fed' | 'dragon:named' | 'regard:gift_accepted' | 'ui:character_tapped' | 'bag:give_armed' | 'generator:produce_set' | 'marketplace:purchased' | 'generator:skipped' | 'bag:stored' | 'character:action_used' | 'camera:panned'; chain?: string; currency?: 'gold' | 'warmth' }
   | { type: 'count'; chain: string; tier: number; count: number }
   /**
    * A piece of `chain` CARRIED into `region` — the board-hygiene lesson. The
@@ -1123,6 +1123,15 @@ export interface TutorialStepConfig {
   allow?: TutorialAllow;
   /** Side-effects fired once, when this step becomes the active step. */
   effects?: TutorialEffect[];
+  /**
+   * The step plays only on this platform; elsewhere the director passes
+   * through it silently — same index on every device, so a save can cross
+   * platforms without desync. Absent = every platform. A platform-gated step
+   * must gate on something its platform can always do (the mobile camera
+   * lesson gates on the hold-pan gesture itself) and must carry no effects
+   * another step depends on — the other platform never runs them.
+   */
+  platform?: 'mobile' | 'desktop';
 }
 
 /**
@@ -2110,6 +2119,10 @@ export interface EventMap {
   /** Command: start a mid-game tutorial script by id, if it may start now. */
   'tutorial:start_requested': { tutorial: string };
   'gate:opened': Record<string, never>;
+  /** Fact: the player deliberately moved the camera — a hold-armed touch pan
+   *  (or a desktop drag-pan) that travelled past HOLD_TO_PAN.announcePx. Fired
+   *  once per gesture; the mobile camera lesson gates on it. */
+  'camera:panned': Record<string, never>;
   /** Intent: open the Emporium — the Roothold house is its physical storefront. */
   'ui:emporium_requested': Record<string, never>;
   /** Tour pointer over a BOARD landmark. BoardScene resolves the target's own

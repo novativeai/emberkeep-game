@@ -211,6 +211,8 @@ TUTORIAL = {
   'levelup': "You reached Level 2! New land opened up to the west. Tap to take a look!",
   'key_unlock': "Your dragon found a Gold Key! See the cloudy land? Tap the clouds to clear them away.",
   'board_room': "One more trick: the Mossy Stump can work anywhere. Drag it to the glowing spot on the far island. It will grow moss there too.",
+  # mobile-only beat (platform: "mobile" in tutorial.json) — teaches hold-to-pan
+  'camera_hold': "To look around, press and hold an empty tile. When you feel a little tick, slide your finger — the island moves with you!",
   'emberberry_tap': "A Berry Bush grew in the new land! Tap it to pick an Emberberry. Picking berries is FREE — it never costs Warmth.",
   'emberberry_merge': "Two more berries! Merge the three Emberberries into a Berry Basket. The bush grows new berries forever.",
   'wood_merge': "Look, Logs! Drag the three piles of Logs together to make Planks.",

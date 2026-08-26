@@ -249,6 +249,9 @@ function validateStep(scriptId: string, step: TutorialStepConfig, i: number, ste
     if (!g.region && g.at === undefined) errors.push(`${at}: move gate needs a region and/or an 'at' cell`);
   }
   if (step.effects !== undefined && !Array.isArray(step.effects)) errors.push(`${at}: effects must be an array`);
+  if (step.platform !== undefined && step.platform !== 'mobile' && step.platform !== 'desktop') {
+    errors.push(`${at}: platform must be 'mobile' or 'desktop' (or absent for every platform)`);
+  }
   if (step.highlight !== undefined && !Array.isArray(step.highlight)) errors.push(`${at}: highlight must be an array`);
   if (step.allow !== undefined && (typeof step.allow !== 'object' || step.allow === null)) errors.push(`${at}: allow must be an object`);
   return errors;

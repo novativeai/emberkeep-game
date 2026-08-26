@@ -9,6 +9,8 @@ import {
   DEPTHS,
   DRAG,
   EDGE_SCROLL,
+  HOLD_TO_PAN,
+  IS_MOBILE,
   DRAGON_ANIM,
   EGG_GIFT,
   DRAGON_CLIPS,
@@ -505,6 +507,13 @@ export class BoardScene extends Phaser.Scene {
   private levelFrames = new Map<number, CameraFrame>();
   private flyTween?: Phaser.Tweens.Tween;
   private panFrom: { px: number; py: number; sx: number; sy: number } | null = null;
+  /** A touch resting on empty ground, waiting out HOLD_TO_PAN.holdMs to become
+   *  a pan. Cleared by lift-off, by wandering past slopPx, by a second finger
+   *  (pinch), or by an item claiming the gesture. Mobile only. */
+  private panHold: { px: number; py: number; timer: Phaser.Time.TimerEvent } | null = null;
+  /** Set once an armed pan has travelled announcePx and said `camera:panned`,
+   *  so the fact fires once per gesture. */
+  private panAnnounced = false;
   /** Live Three.js emerald crystal driving the `item_crystal_1` texture (the
    *  Theme-Crystal generator's look) + any authored 3D-decor placement. */
   private crystal3d?: Crystal3D;
@@ -7264,6 +7273,7 @@ export class BoardScene extends Phaser.Scene {
       if (!pair || this.dragSprite) return;
       this.flyTween?.stop();
       this.panFrom = null; // two fingers: the pan yields to the pinch
+      this.cancelPanHold(); // and so does a hold still waiting to become one
       this.pinchPrev = {
         dist: Phaser.Math.Distance.Between(pair[0].x, pair[0].y, pair[1].x, pair[1].y),
         midX: (pair[0].x + pair[1].x) / 2,
@@ -7342,9 +7352,44 @@ export class BoardScene extends Phaser.Scene {
       const ui = this.scene.get(SCENES.ui);
       if (ui?.input?.hitTestPointer(pointer).length) return;
       this.flyTween?.stop();
+      /*
+       * TOUCH: THE FINGER'S FIRST MEANING IS THE PIECE. Item hit zones are the
+       * art's opaque pixels now, so a grab that misses by a hair lands on
+       * "empty" ground — and when that miss instantly became a camera pan, the
+       * board slid away from the player mid-reach. On touch, a pan must be
+       * MEANT: rest the finger on empty ground for holdMs (a light haptic
+       * answers "the camera is yours"), then drag. A quick swipe on empty
+       * ground does nothing at all. Desktop mice keep the immediate drag-pan —
+       * a cursor does not miss the way a fingertip does.
+       */
+      if (IS_MOBILE) {
+        this.cancelPanHold();
+        const timer = this.time.delayedCall(HOLD_TO_PAN.holdMs, () => {
+          const hold = this.panHold;
+          this.panHold = null;
+          if (!hold || !pointer.isDown || this.pinchPrev || this.dragSprite) return;
+          if (Phaser.Math.Distance.Between(pointer.x, pointer.y, hold.px, hold.py) > HOLD_TO_PAN.slopPx) return;
+          // Armed: pan starts from where the finger is NOW, so the wander
+          // inside the slop never jerks the view on the first frame.
+          this.panFrom = { px: pointer.x, py: pointer.y, sx: cam.scrollX, sy: cam.scrollY };
+          this.panAnnounced = false;
+          lightHaptic();
+        });
+        this.panHold = { px: pointer.x, py: pointer.y, timer };
+        return;
+      }
       this.panFrom = { px: pointer.x, py: pointer.y, sx: cam.scrollX, sy: cam.scrollY };
+      this.panAnnounced = false;
     });
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => {
+      // A finger that wanders past the slop before the hold matures was a
+      // swipe, not a hold — the candidate dies and the gesture means nothing.
+      if (
+        this.panHold &&
+        Phaser.Math.Distance.Between(pointer.x, pointer.y, this.panHold.px, this.panHold.py) > HOLD_TO_PAN.slopPx
+      ) {
+        this.cancelPanHold();
+      }
       if (!this.panFrom) return;
       // Belt & braces for the same lock-up: if the button is no longer held
       // (the matching pointer-up was consumed elsewhere), the pan is over.
@@ -7354,9 +7399,17 @@ export class BoardScene extends Phaser.Scene {
       }
       cam.scrollX = this.panFrom.sx - (pointer.x - this.panFrom.px) / cam.zoom;
       cam.scrollY = this.panFrom.sy - (pointer.y - this.panFrom.py) / cam.zoom;
+      if (
+        !this.panAnnounced &&
+        Phaser.Math.Distance.Between(pointer.x, pointer.y, this.panFrom.px, this.panFrom.py) > HOLD_TO_PAN.announcePx
+      ) {
+        this.panAnnounced = true;
+        this.ctx.bus.emit('camera:panned', {});
+      }
     });
     const endPan = (): void => {
       this.panFrom = null;
+      this.cancelPanHold();
     };
     /**
      * A held-out piece, released over nothing: put it away.
@@ -7393,6 +7446,12 @@ export class BoardScene extends Phaser.Scene {
         cam.setZoom(Phaser.Math.Clamp(cam.zoom * (dy < 0 ? 1.1 : 1 / 1.1), bounds.min, bounds.max));
       }
     );
+  }
+
+  /** Forget a touch waiting to become a pan (lift-off, wander, pinch, drag). */
+  private cancelPanHold(): void {
+    this.panHold?.timer.remove(false);
+    this.panHold = null;
   }
 
   private canDrag(sprite: BoardItem): boolean {

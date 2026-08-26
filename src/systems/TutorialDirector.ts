@@ -1,3 +1,4 @@
+import { IS_MOBILE } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -277,7 +278,10 @@ export class TutorialDirector {
     // refuses. Defaults to the shipped file so the composition root needs no
     // change to keep working; `GameContext` should hand it `this.data.chains`
     // so a test that overrides the recipes sees the hand follow them.
-    private chains: ChainsData = chainsJson as unknown as ChainsData
+    private chains: ChainsData = chainsJson as unknown as ChainsData,
+    // Which platform-gated steps play here (see TutorialStepConfig.platform).
+    // Defaults to the live device; tests hand in either value explicitly.
+    private onMobile: boolean = IS_MOBILE
   ) {
     this.scripts = scriptsOf(data);
     // An `event` trigger is an OBSERVATION: the fact is latched into stats the
@@ -344,6 +348,9 @@ export class TutorialDirector {
     bus.on('marketplace:purchased', () => this.onGateEvent('marketplace:purchased'));
     bus.on('order:completed', () => this.onGateEvent('order:completed'));
     bus.on('region:unlocked', () => this.onGateEvent('region:unlocked'));
+    // The mobile camera lesson: gated on the gesture it teaches — a hold-armed
+    // pan that actually travelled (BoardScene announces it once per gesture).
+    bus.on('camera:panned', () => this.onGateEvent('camera:panned'));
     bus.on('ui:ledger_toggled', ({ open }) => {
       if (open) this.onGateEvent('ui:ledger_opened');
     });
@@ -448,6 +455,13 @@ export class TutorialDirector {
   /** Emit the current step (fresh game or resume after load). */
   begin(): void {
     if (!this.state.tutorialDone) {
+      // A save made on the other platform can rest ON a step this device never
+      // plays — advance() lands it on the next step that runs here (and fires
+      // that step's effects, which have not run yet).
+      if (!this.stepRunsHere(this.currentStep)) {
+        this.advance();
+        return;
+      }
       this.emitStep();
       this.replayPrompts(this.currentStep);
       this.checkCountGate();
@@ -569,11 +583,27 @@ export class TutorialDirector {
     }
   }
 
+  /** Does this step play on THIS device? A step authored for the other
+   *  platform is passed through silently, keeping the index identical on every
+   *  device so a save can cross platforms without desync. */
+  private stepRunsHere(step: TutorialStepConfig | undefined): boolean {
+    if (!step?.platform) return true;
+    return (step.platform === 'mobile') === this.onMobile;
+  }
+
   private advance(): void {
     const script = this.activeScript;
     if (!script) return;
     if (script.id === MAIN_SCRIPT_ID) {
       this.state.tutorialIndex++;
+      // Pass through the other platform's steps WITHOUT running their effects
+      // — the platform that plays them is the one their grants belong to.
+      while (
+        this.state.tutorialIndex < this.data.steps.length &&
+        !this.stepRunsHere(this.data.steps[this.state.tutorialIndex])
+      ) {
+        this.state.tutorialIndex++;
+      }
       if (this.state.tutorialIndex >= this.data.steps.length) {
         this.state.tutorialDone = true;
         this.emitDone();
@@ -583,6 +613,12 @@ export class TutorialDirector {
     } else {
       const keys = scriptStatKeys(script.id);
       this.state.addStat(keys.step, 1);
+      while (
+        this.state.stat(keys.step) < script.steps.length &&
+        !this.stepRunsHere(script.steps[this.state.stat(keys.step)])
+      ) {
+        this.state.addStat(keys.step, 1);
+      }
       if (this.state.stat(keys.step) >= script.steps.length) {
         this.state.addStat(keys.done, 1);
         this.activeId = null;

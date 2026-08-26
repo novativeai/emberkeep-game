@@ -56,6 +56,12 @@ const cmd = args[0];
 
 const tutorial = JSON.parse(readFileSync(path.join(ROOT, 'src/data/tutorial.json'), 'utf8'));
 const STEPS = tutorial.steps.map((s) => s.id);
+// The recorder drives a desktop mouse, and the director on a desktop viewport
+// passes straight through `platform: "mobile"` steps — they never appear, so
+// they get no checkpoint (tests/unit/Beats.spec.ts skips them the same way).
+// File numbering stays the FULL-list index: it must match the save blob's
+// tutorialIndex, which counts every authored step on every platform.
+const RECORDABLE = tutorial.steps.filter((s) => s.platform !== 'mobile');
 const FINGERPRINT = beatsFingerprint();
 const file = (id) => path.join(OUT, `${String(STEPS.indexOf(id)).padStart(2, '0')}-${id}.json`);
 
@@ -284,11 +290,13 @@ async function record() {
   const { browser, page } = await launch();
   try {
     let startIdx = 0;
-    if (FROM) { await bootAt(page, FROM); startIdx = STEPS.indexOf(FROM); }
+    if (FROM) { await bootAt(page, FROM); startIdx = RECORDABLE.findIndex((s) => s.id === FROM); }
     else await bootFresh(page);
-    for (let i = startIdx; i < tutorial.steps.length; i++) {
-      const step = tutorial.steps[i];
-      const next = STEPS[i + 1] ?? null;
+    if (startIdx < 0) throw new Error(`--from "${FROM}" is not a recordable beat on this platform`);
+    for (let r = startIdx; r < RECORDABLE.length; r++) {
+      const step = RECORDABLE[r];
+      const i = STEPS.indexOf(step.id);
+      const next = RECORDABLE[r + 1]?.id ?? null;
       if (!(await waitStep(page, step.id))) throw new Error(`expected beat "${step.id}", game is on "${await stepOf(page)}"`);
       await sleep(500); // let the beat's spawns land and the camera settle
       const blob = await page.evaluate(() => window.__emberkeep.snapshot());
@@ -309,7 +317,7 @@ async function record() {
       }
       console.log(`${String(i).padStart(2)} ${step.id.padEnd(20)} ✓  ${tried.join(' ') || '—'}`);
     }
-    console.log(`\n${tutorial.steps.length} checkpoints in ${path.relative(ROOT, OUT)}/ · fingerprint ${FINGERPRINT}`);
+    console.log(`\n${RECORDABLE.length} checkpoints in ${path.relative(ROOT, OUT)}/ · fingerprint ${FINGERPRINT}`);
   } catch (e) {
     const p = path.join(OUT, `_failed-${Date.now()}.png`);
     await page.screenshot({ path: p }).catch(() => {});
@@ -336,13 +344,14 @@ async function at(id) {
 
 function check() {
   const have = new Map(list().map((c) => [c.id, c]));
-  const missing = STEPS.filter((id) => !have.has(id));
-  const stale = STEPS.filter((id) => have.get(id) && !have.get(id).fresh);
-  const orphans = [...have.keys()].filter((id) => !STEPS.includes(id));
-  for (const id of STEPS) console.log(`${have.has(id) ? (have.get(id).fresh ? '✓' : '✗ stale  ') : '✗ missing'} ${id}`);
-  for (const id of orphans) console.log(`· orphan  ${id} (no longer a step)`);
+  const wanted = RECORDABLE.map((s) => s.id);
+  const missing = wanted.filter((id) => !have.has(id));
+  const stale = wanted.filter((id) => have.get(id) && !have.get(id).fresh);
+  const orphans = [...have.keys()].filter((id) => !wanted.includes(id));
+  for (const id of wanted) console.log(`${have.has(id) ? (have.get(id).fresh ? '✓' : '✗ stale  ') : '✗ missing'} ${id}`);
+  for (const id of orphans) console.log(`· orphan  ${id} (no longer a recordable step)`);
   const bad = missing.length + stale.length;
-  console.log(bad ? `\n${bad} checkpoint(s) need \`pnpm beats:record\` · game fingerprint ${FINGERPRINT}` : `\nall ${STEPS.length} checkpoints fresh · ${FINGERPRINT}`);
+  console.log(bad ? `\n${bad} checkpoint(s) need \`pnpm beats:record\` · game fingerprint ${FINGERPRINT}` : `\nall ${wanted.length} checkpoints fresh · ${FINGERPRINT}`);
   if (bad) process.exitCode = 1;
 }
 

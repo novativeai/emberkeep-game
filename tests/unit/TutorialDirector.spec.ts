@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest';
 import tutorial from '../../src/data/tutorial.json';
 import authoredMap from '../../src/data/map.json';
 import { GameContext } from '../../src/core/Context';
+import { EventBus } from '../../src/core/EventBus';
+import { GameClock } from '../../src/core/GameClock';
+import { GameState } from '../../src/core/GameState';
 import { verdictOnto } from '../../src/core/mergeRule';
 import { buildWorlds, zoneAt } from '../../src/core/world';
-import type { MapData, MarkerPoint, TutorialAllow, TutorialStepConfig } from '../../src/core/types';
+import { TutorialDirector } from '../../src/systems/TutorialDirector';
+import chainsJson from '../../src/data/chains.json';
+import map8x8 from '../fixtures/map-8x8.json';
+import type { ChainsData, MapData, MarkerPoint, TutorialAllow, TutorialStepConfig, TutorialData } from '../../src/core/types';
 import { capture, createTestContext, drag, MemoryStorage } from './helpers';
 
 /** The tutorial's own beats name cells of the AUTHORED isle, so a beat that is
@@ -519,7 +525,9 @@ describe('a move beat that names its cell', () => {
     expect(ctx.state.tutorialIndex).toBe(idx);
 
     ctx.bus.emit('item:moved', { itemId: stump.id, from, to: { col: at[0], row: at[1] } });
-    expect(ctx.state.tutorialIndex).toBe(idx + 1);
+    // node is a "desktop" — the mobile-only camera_hold beat right after
+    // board_room is passed through, landing on emberberry_tap.
+    expect(steps[ctx.state.tutorialIndex]!.id).toBe('emberberry_tap');
   });
 
   it('accepts the drop anyway when its cell is under someone else', () => {
@@ -537,6 +545,66 @@ describe('a move beat that names its cell', () => {
       from: { col: 7, row: 3 },
       to: { col: at[0] + 1, row: at[1] }
     });
-    expect(ctx.state.tutorialIndex).toBe(idx + 1);
+    expect(steps[ctx.state.tutorialIndex]!.id).toBe('emberberry_tap');
+  });
+});
+
+describe('platform-gated steps (camera_hold is mobile-only)', () => {
+  const tiny = {
+    steps: [
+      { id: 'a', speaker: 'eleanor', text: '', gate: { type: 'tap' } },
+      { id: 'b', speaker: 'eleanor', text: '', gate: { type: 'event', event: 'camera:panned' }, platform: 'mobile' },
+      { id: 'c', speaker: 'eleanor', text: '', gate: { type: 'tap' } }
+    ]
+  } as unknown as TutorialData;
+
+  const rig = (onMobile: boolean, index = 0) => {
+    const state = new GameState(map8x8 as unknown as MapData);
+    state.tutorialIndex = index;
+    const bus = new EventBus();
+    const director = new TutorialDirector(state, bus, new GameClock(), tiny, chainsJson as unknown as ChainsData, onMobile);
+    director.begin();
+    return { state, bus, director };
+  };
+
+  it('the shipped script carries it, right after board_room', () => {
+    const step = steps[stepAt('board_room') + 1]!;
+    expect(step.id).toBe('camera_hold');
+    expect(step.platform).toBe('mobile');
+    expect(step.gate).toEqual({ type: 'event', event: 'camera:panned' });
+  });
+
+  it('desktop passes straight through it, without running it', () => {
+    const { state, bus } = rig(false);
+    bus.emit('tutorial:advance_requested', { stepId: 'a' });
+    expect(state.tutorialIndex).toBe(2); // a → c, b never emitted
+  });
+
+  it('mobile plays it, and the pan gesture is its gate', () => {
+    const { state, bus } = rig(true);
+    bus.emit('tutorial:advance_requested', { stepId: 'a' });
+    expect(state.tutorialIndex).toBe(1);
+    bus.emit('camera:panned', {});
+    expect(state.tutorialIndex).toBe(2);
+  });
+
+  it('a save resting on the other platform\'s step resumes past it', () => {
+    // Saved on the phone mid-lesson, opened on a desktop: begin() advances.
+    const { state } = rig(false, 1);
+    expect(state.tutorialIndex).toBe(2);
+  });
+
+  it('skipping the LAST step still finishes the script', () => {
+    const tail = {
+      steps: [
+        { id: 'a', speaker: 'eleanor', text: '', gate: { type: 'tap' } },
+        { id: 'b', speaker: 'eleanor', text: '', gate: { type: 'event', event: 'camera:panned' }, platform: 'mobile' }
+      ]
+    } as unknown as TutorialData;
+    const state = new GameState(map8x8 as unknown as MapData);
+    const bus = new EventBus();
+    new TutorialDirector(state, bus, new GameClock(), tail, chainsJson as unknown as ChainsData, false).begin();
+    bus.emit('tutorial:advance_requested', { stepId: 'a' });
+    expect(state.tutorialDone).toBe(true);
   });
 });

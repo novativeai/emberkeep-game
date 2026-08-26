@@ -2384,6 +2384,22 @@ export const EDGE_SCROLL = {
   speedPxPerSec: 1500
 } as const;
 
+/**
+ * HOLD-TO-PAN — on touch, the finger's first meaning is the PIECE, not the
+ * camera. A swipe that begins on empty ground does nothing; holding still on
+ * empty ground for `holdMs` arms the pan (confirmed by a light haptic), and
+ * only then does dragging move the view. `slopPx` is how far the held finger
+ * may wander (game-space px — the phone maps ~6.5 of them to one CSS px) and
+ * still count as holding; `announcePx` is how far an armed pan must actually
+ * travel before it is announced as the fact `camera:panned` (the mobile
+ * tutorial beat's gate). Desktop mice keep the immediate drag-pan.
+ */
+export const HOLD_TO_PAN = {
+  holdMs: 350,
+  slopPx: 60,
+  announcePx: 90
+} as const;
+
 export const DRAG = {
   /** Pick-up scale-up and how high the art floats above the finger (px). */
   liftScale: 1.16,
