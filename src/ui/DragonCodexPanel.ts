@@ -88,7 +88,6 @@ const CX = IS_MOBILE
       stageW: 1320, stageH: 680, evoArtW: 1160, evoArtH: 580, gaugeW: 760, gaugeH: 38,
       completionFont: TYPE.label
     };
-const EDGE_X = CX.edgeX;
 const HEAD_Y = CX.headY;
 const BODY_TOP = CX.bodyTop;
 const BODY_FLOOR = CX.bodyFloor;
@@ -112,9 +111,13 @@ const ROSTER_COLS = CX.rosterCols;
  * ON the frame's top rim. At this row it runs -554..-470, the same band the
  * close disc occupies (136 units painted, 0.58 scale, -551..-473).
  *
- * PORTRAIT KEEPS ITS OWN BACK SEAT. The tall frame's plaque is 208 units and
- * at least 1240 wide, so at this row the pill's right edge would come within
- * 10 units of the plaque's left edge; it drops below the banner instead.
+ * PORTRAIT SEATS THE PAIR ON THE PLATE'S TOP CORNERS (owner's law,
+ * 2026-08-26: "always perfectly placed on the top right and top left of the
+ * main container"). They used to drop below the banner into the band between
+ * plaque and portrait — the one panel in the suite whose keys were not on the
+ * corners — and the owner read that band as "a strange middle space". The
+ * plaque cannot reach them there: `setHeading` caps the banner 32 short of
+ * the BACK pill's hit box, the same guard the Store's cartouche wears.
  */
 const CHROME_ROW_Y = HEAD_Y + 88;
 
@@ -151,12 +154,17 @@ const CLOSE_GLYPH_PX = Math.round(CLOSE_ART * CLOSE_DISC_SCALE * 0.507);
  * straight edges instead: the seat this replaces had 48 units, this one 49
  * from a disc that is also smaller. Landscape x is the arc centre; y stays on
  * the chrome row so the mark and the BACK pill still read as a pair.
+ *
+ * PORTRAIT OBEYS THE SAME LAW ON ITS OWN FRAME: `ui_panel_tall` rounds its
+ * plate (inner box x ±1136, top −2008) by the same 84, so its top-right arc
+ * centre is (1052, −1924) — the exact seat the Store's ✕ already holds on
+ * this sheet. The BACK pill mirrors it: its 357-wide ink cannot sit ON a
+ * point, so its outer edge keeps the ✕'s ~20-unit gap to the left rim
+ * (centre −938) and it shares the ✕'s row.
  */
-const CLOSE_SEAT_X = IS_MOBILE ? CX.edgeX - 130 : 932;
-const BACK_Y = IS_MOBILE ? HEAD_Y + 230 : -508;
-/** Portrait puts BOTH keys on the BACK row, under the plaque — they sat on two
- *  different rows (✕ on the banner, BACK below it) and the owner read the
- *  page as misaligned. Landscape keeps its corner-arc seat. */
+const CLOSE_SEAT_X = IS_MOBILE ? 1052 : 932;
+const BACK_X = IS_MOBILE ? -938 : -836;
+const BACK_Y = IS_MOBILE ? -1924 : -508;
 const CLOSE_ROW_Y = IS_MOBILE ? BACK_Y : CHROME_ROW_Y;
 
 const TASTE_W = 566;
@@ -472,7 +480,13 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
   /** Set the plaque's line and re-cut the banner to it. */
   private setHeading(title: string): void {
     this.title.setText(title);
-    const w = Math.max(IS_MOBILE ? 1240 : 620, this.title.width + 220);
+    // The cap stops 32 short of the BACK pill's hit box (which starts at
+    // x −728 portrait / −736 landscape) — the corner keys own the corners,
+    // and a long dragon name must not print its banner under them.
+    const w = Math.min(
+      IS_MOBILE ? 1392 : 1408,
+      Math.max(IS_MOBILE ? 1240 : 620, this.title.width + 220)
+    );
     const h = CX.bannerH;
     const y = HEAD_Y - h / 2;
     const g = this.titleBg;
@@ -1164,7 +1178,7 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
    */
   private backButton(onTap: () => void): Phaser.GameObjects.Container {
     const btn = this.scene.add
-      .container(IS_MOBILE ? -EDGE_X + 240 : -836, BACK_Y)
+      .container(BACK_X, BACK_Y)
       .setScale(CX.backScale);
     const w = 170;
     const h = 64;
