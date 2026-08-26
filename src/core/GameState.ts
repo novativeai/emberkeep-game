@@ -90,6 +90,11 @@ export class GameState {
   xp = 0;
   completedOrderIds: string[] = [];
   tutorialIndex = 0;
+  /** The id of the beat `tutorialIndex` names, stamped by TutorialDirector as
+   *  each one plays. The index is a position in an EDITED list; the id is not,
+   *  so this is what a resume trusts first. Null until a beat has played (a
+   *  fresh game, or a save written before the field existed). */
+  tutorialStepId: string | null = null;
   tutorialDone = false;
   /** Lifetime counters (hatches, merges, goldEarned, elderTaps, …) plus
    *  one-shot numeric flags (finaleSeen, tasksClaimed). TaskSystem owns writes. */
@@ -254,6 +259,7 @@ export class GameState {
     this.xp = 0;
     this.completedOrderIds = [];
     this.tutorialIndex = 0;
+    this.tutorialStepId = null;
     this.tutorialDone = false;
     this.stats = {};
     this.discoveredRecipes = [];
@@ -322,6 +328,9 @@ export class GameState {
     this.xp = save.xp;
     this.completedOrderIds = [...save.orderProgress.completedIds];
     this.tutorialIndex = save.tutorial.index;
+    // The id, when the save carries one — TutorialDirector.begin() re-derives
+    // the index from it, so an inserted beat cannot slide a resume backwards.
+    this.tutorialStepId = save.tutorial.step ?? null;
     this.tutorialDone = save.tutorial.done;
     this.stats = { ...(save.stats ?? {}) };
     this.discoveredRecipes = [...(save.discoveredRecipes ?? [])];
@@ -521,7 +530,11 @@ export class GameState {
       keys: this.keys,
       xp: this.xp,
       orderProgress: { completedIds: [...this.completedOrderIds] },
-      tutorial: { index: this.tutorialIndex, done: this.tutorialDone },
+      tutorial: {
+        index: this.tutorialIndex,
+        done: this.tutorialDone,
+        ...(this.tutorialStepId === null ? {} : { step: this.tutorialStepId })
+      },
       stats: { ...this.stats },
       discoveredRecipes: [...this.discoveredRecipes],
       bag: this.bag.map((s) => ({ ...s })),

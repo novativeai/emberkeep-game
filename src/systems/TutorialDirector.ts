@@ -455,6 +455,14 @@ export class TutorialDirector {
   /** Emit the current step (fresh game or resume after load). */
   begin(): void {
     if (!this.state.tutorialDone) {
+      // THE ID WINS OVER THE INDEX. A beat inserted into the main script (the
+      // mobile `camera_hold`) slides every later index back one, and a beat
+      // replayed that way RE-FIRES its effects — seventeen of them spawn
+      // pieces, so the board would quietly gain a second set. The id says
+      // which beat this save was actually ON; the index is only a hint about
+      // where to find it. A save written before the id existed has none, and
+      // falls through to the index exactly as it always did.
+      this.resumeByStepId();
       // A save made on the other platform can rest ON a step this device never
       // plays — advance() lands it on the next step that runs here (and fires
       // that step's effects, which have not run yet).
@@ -583,6 +591,22 @@ export class TutorialDirector {
     }
   }
 
+  /**
+   * Put `tutorialIndex` back on the beat the save NAMES, when it names one.
+   *
+   * Silent in every ordinary case: a save whose id already matches its index
+   * (the overwhelming majority) changes nothing, and one whose id is not in
+   * this build's script at all — a beat that was renamed or deleted since —
+   * keeps the index, which is the best guess left.
+   */
+  private resumeByStepId(): void {
+    const id = this.state.tutorialStepId;
+    if (id === null) return;
+    if (this.data.steps[this.state.tutorialIndex]?.id === id) return;
+    const found = this.data.steps.findIndex((s) => s.id === id);
+    if (found >= 0) this.state.tutorialIndex = found;
+  }
+
   /** Does this step play on THIS device? A step authored for the other
    *  platform is passed through silently, keeping the index identical on every
    *  device so a save can cross platforms without desync. */
@@ -698,6 +722,10 @@ export class TutorialDirector {
   private emitStep(): void {
     const step = this.currentStep;
     if (!step) return;
+    // STAMP THE BEAT'S ID, so the resume has something an edit cannot move.
+    // Only the MAIN script: every other one already keys its progress by
+    // script id in `stats` and was never index-fragile.
+    if (this.activeScript?.id === MAIN_SCRIPT_ID) this.state.tutorialStepId = step.id;
     // A new beat: the pins belong to the beat that made them.
     const script = this.activeScript;
     const beat = script ? `${script.id}:${this.activeIndex(script)}` : '';

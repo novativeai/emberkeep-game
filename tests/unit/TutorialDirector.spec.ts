@@ -608,3 +608,81 @@ describe('platform-gated steps (camera_hold is mobile-only)', () => {
     expect(state.tutorialDone).toBe(true);
   });
 });
+
+/**
+ * INSERTING A BEAT MUST NOT MOVE A SAVE.
+ *
+ * `tutorialIndex` is a position in a list the game edits — `camera_hold` went
+ * in after `board_room` and slid every later beat back one. A resume that
+ * trusts the index therefore replays the PREVIOUS beat, and a replayed beat
+ * re-fires its effects: seventeen of the shipped ones spawn pieces, so the
+ * board silently gains a second set. Bumping SAVE_VERSION cannot be the guard
+ * either — `SaveSystem.peek` DISCARDS an unknown version, so the bump that
+ * protects the index throws the whole save away.
+ *
+ * So the save names the beat by ID, and the id is what a resume trusts.
+ */
+describe('resuming the tutorial after a beat is inserted', () => {
+  const before = {
+    steps: [
+      { id: 'a', speaker: 'eleanor', text: '', gate: { type: 'tap' } },
+      { id: 'b', speaker: 'eleanor', text: '', gate: { type: 'tap' } },
+      { id: 'c', speaker: 'eleanor', text: '', gate: { type: 'tap' } }
+    ]
+  } as unknown as TutorialData;
+  // The same script with one beat inserted ahead of 'b' — every later index +1.
+  const after = {
+    steps: [
+      { id: 'a', speaker: 'eleanor', text: '', gate: { type: 'tap' } },
+      { id: 'inserted', speaker: 'eleanor', text: '', gate: { type: 'tap' } },
+      { id: 'b', speaker: 'eleanor', text: '', gate: { type: 'tap' } },
+      { id: 'c', speaker: 'eleanor', text: '', gate: { type: 'tap' } }
+    ]
+  } as unknown as TutorialData;
+
+  const resume = (data: TutorialData, index: number, step: string | null) => {
+    const state = new GameState(map8x8 as unknown as MapData);
+    state.tutorialIndex = index;
+    state.tutorialStepId = step;
+    const bus = new EventBus();
+    new TutorialDirector(state, bus, new GameClock(), data, chainsJson as unknown as ChainsData, false).begin();
+    return state;
+  };
+
+  it('lands on the beat the save NAMES, not the one its old index now points at', () => {
+    // Saved on 'b', which was index 1. After the insertion index 1 is 'inserted'.
+    const state = resume(after, 1, 'b');
+    expect(after.steps[state.tutorialIndex]!.id).toBe('b');
+  });
+
+  it('without the id — a save older than the field — it still uses the index', () => {
+    const state = resume(after, 1, null);
+    expect(after.steps[state.tutorialIndex]!.id).toBe('inserted');
+  });
+
+  it('an id this build no longer has keeps the index rather than throwing', () => {
+    const state = resume(after, 2, 'a_beat_that_was_deleted');
+    expect(state.tutorialIndex).toBe(2);
+  });
+
+  it('stamps the id of every main beat it plays, so the next save carries it', () => {
+    const state = new GameState(map8x8 as unknown as MapData);
+    const bus = new EventBus();
+    const director = new TutorialDirector(state, bus, new GameClock(), before, chainsJson as unknown as ChainsData, false);
+    director.begin();
+    expect(state.tutorialStepId).toBe('a');
+    bus.emit('tutorial:advance_requested', { stepId: 'a' });
+    expect(state.tutorialStepId).toBe('b');
+  });
+
+  it('survives a round trip through the save', () => {
+    const state = new GameState(map8x8 as unknown as MapData);
+    state.tutorialIndex = 2;
+    state.tutorialStepId = 'c';
+    const blob = state.toSave(0, 14);
+    expect(blob.tutorial.step).toBe('c');
+    const fresh = new GameState(map8x8 as unknown as MapData);
+    fresh.hydrate(blob);
+    expect(fresh.tutorialStepId).toBe('c');
+  });
+});

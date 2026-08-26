@@ -1390,7 +1390,23 @@ export interface SaveDataV1 {
   keys: number;
   xp: number;
   orderProgress: { completedIds: string[] };
-  tutorial: { index: number; done: boolean };
+  /**
+   * Where the walkthrough is, by INDEX and — since the index stopped being
+   * stable — by the beat's own ID.
+   *
+   * `index` alone is a position in a list that is edited: inserting one beat
+   * (the mobile `camera_hold`) slid every later save back one beat, and a
+   * replayed beat RE-FIRES its effects, so seventeen of them would have
+   * spawned their pieces a second time. Bumping SAVE_VERSION is not the
+   * answer either — `SaveSystem.peek` DISCARDS a version it does not know, so
+   * the bump that protects the index would throw the whole save away.
+   *
+   * `step` is the fix and it needs no version at all: an id survives any
+   * insertion, and a save written before this field simply does not have it
+   * and falls back to the index exactly as it always did. Resolved by
+   * TutorialDirector, which is the only thing that owns the step list.
+   */
+  tutorial: { index: number; done: boolean; step?: string };
   /** Lifetime counters (Keeper's Tasks + chapter-card stats) and one-shot
    *  flags (`finaleSeen`, `tasksClaimed`) — all numeric for easy versioning. */
   stats: Record<string, number>;
