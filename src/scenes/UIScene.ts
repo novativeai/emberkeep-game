@@ -558,8 +558,18 @@ export class UIScene extends Phaser.Scene {
     // level cluster's corner. The cluster yields for exactly as long as the
     // words are up. Desktop's bubble never reaches it; nothing changes there.
     if (IS_MOBILE) {
-      this.bubble.onVisibilityChanged((visible) => this.hud.setLevelVisible(!visible));
+      this.bubble.onVisibilityChanged((visible) => {
+        this.hud.setLevelVisible(!visible);
+        // The tall sheets hold the upper seat only while the card speaks —
+        // a card arriving or leaving mid-panel glides them between seats.
+        this.codex.seatForDialogue(visible, true);
+        this.store.seatForDialogue(visible, true);
+      });
     }
+    // The tall sheets ask this at every open: centred in the full screen,
+    // unless a dialogue owns the bottom band right now.
+    this.codex.dialogueUp = () => this.bubble.visible;
+    this.store.dialogueUp = () => this.bubble.visible;
     // Sit low AND shifted right — clear of the front-left 3D Crystal it used to
     // cover, over the empty bottom-right margin during tutorial steps.
     this.bubble.setPosition(LIVE_GAME_WIDTH / 2 + 220, LIVE_GAME_HEIGHT - 150);

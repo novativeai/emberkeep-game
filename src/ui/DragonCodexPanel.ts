@@ -246,19 +246,18 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     private chains: ChainsData,
     private ctx: GameContext
   ) {
-    // Centred in the SAFE region on a phone — the speech card owns the bottom
-    // band, and the codex lesson talks the whole time the book is open, so a
-    // full-height sheet parked EVOLUTION under the card (see
-    // MOBILE_DIALOGUE_BAND). Air above the sheet = air below it, band excluded.
-    super(scene, LIVE_GAME_WIDTH / 2, panelSafeCenterY());
+    // Centred in the FULL screen by default; `seatForDialogue` lifts it into
+    // the safe region above the speech card's band only WHILE a dialogue is
+    // up (owner's law — the upper seat exists for the card, nothing else).
+    super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
 
     // ×2 OVERSIZE (BagPanel's rule): the dim is a CHILD of this container, so
     // the panel's fit scale shrinks it too — and panelFitScale dips BELOW 1 on
     // short in-browser viewports (Safari's chrome eats the height), which left
     // bright board strips beside the sheet. Twice the screen covers any scale
-    // this panel can wear (≥0.5).
+    // this panel can wear (≥0.5) from EITHER seat.
     const dim = scene.add
-      .rectangle(0, LIVE_GAME_HEIGHT / 2 - panelSafeCenterY(), LIVE_GAME_WIDTH * 2, LIVE_GAME_HEIGHT * 2, num(INK.scrim), 0.62)
+      .rectangle(0, 0, LIVE_GAME_WIDTH * 2, LIVE_GAME_HEIGHT * 2, num(INK.scrim), 0.62)
       .setInteractive();
     // ONLY THE ✕ CLOSES — the dim swallows the tap but no longer dismisses.
     // A thumb scrolling the body releases ON the dim, and tap-outside-to-close
@@ -343,8 +342,29 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     });
   }
 
+  /** UIScene hands in "is a dialogue on screen" — the panel cannot see the
+   *  bubble itself, and the seat depends on it. */
+  dialogueUp: (() => boolean) | null = null;
+
+  /**
+   * Two seats: centred in the full screen, or lifted clear of the speech
+   * card's band while a dialogue is up. Tweened when the card appears or
+   * leaves mid-panel, so the sheet glides rather than jumps. A no-op on
+   * desktop, where both seats are the same centre.
+   */
+  seatForDialogue(up: boolean, animate = false): void {
+    const y = up ? panelSafeCenterY() : LIVE_GAME_HEIGHT / 2;
+    if (y === this.y) return;
+    if (animate && this.isOpen) {
+      this.scene.tweens.add({ targets: this, y, duration: 220, ease: 'Sine.easeInOut' });
+    } else {
+      this.setY(y);
+    }
+  }
+
   open(): void {
     this.isOpen = true;
+    this.seatForDialogue(this.dialogueUp?.() ?? false);
     this.revealPending = false;
     this.revealArmed = false;
     this.fetchEvolutionArt();

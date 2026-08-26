@@ -371,7 +371,11 @@ export class NamePanel extends Phaser.GameObjects.Container {
 
     this.fieldText.setText(this.chosen || 'Type a name…');
     this.fieldText.setColor(this.chosen ? PALETTE.cream : PALETTE.ash);
-    this.caret.setX(this.fieldText.x + this.fieldText.width / 2 + 8);
+    // Hugging the word: the '|' glyph carries its own left side-bearing in the
+    // display serif, so a positive pad here read as a full space between the
+    // name and the caret (owner: "3px too far"). -2 lands the glyph's ink a
+    // hair off the last letter.
+    this.caret.setX(this.fieldText.x + this.fieldText.width / 2 - 2);
     this.caret.setVisible(this.isOpen);
   }
 
