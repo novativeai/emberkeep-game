@@ -93,9 +93,17 @@ jobs:
       # scripts/shrink-dist.py re-encodes 368 textures through Pillow. Without
       # it `pnpm build` fails at its THIRD command, after a clean typecheck and
       # a clean vite build — which reads as a mystery unless you know.
+      #
+      # PINNED, and the pin is load-bearing. A different Pillow writes the same
+      # PNG with different bytes — the first CI run re-encoded 141 textures
+      # nobody had touched (fx_glow 7982 -> 7986 bytes) purely because the
+      # runner had a newer build of the library. Those files are COMMITTED into
+      # the hub, so unpinned it would add a few megabytes of pure noise to that
+      # repository on every single deploy. 10.2.0 is what the machine these
+      # were last encoded on runs; move it only together with a re-encode.
       - name: Install Pillow
         if: steps.cfg.outputs.ready == 'true'
-        run: python3 -m pip install --quiet pillow
+        run: python3 -m pip install --quiet 'pillow==10.2.0'
 
       - name: Install dependencies
         if: steps.cfg.outputs.ready == 'true'
