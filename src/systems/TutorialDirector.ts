@@ -802,13 +802,27 @@ export class TutorialDirector {
   }
 
   private resolveStep(step: TutorialStepConfig): TutorialStepEvent {
-    // Highlights stay CELLS: a glow is painted on the ground, and the board
-    // repaints it whenever this view is re-emitted (which a move does).
-    const highlight = (step.highlight ?? [])
-      .map((ref) => this.resolveTileRef(ref))
-      .filter((p): p is MarkerPoint => p !== null)
-      .map((p): TilePos => ({ col: p.col, row: p.row }));
-
+    /**
+     * THE HAND IS RESOLVED FIRST, AND THAT ORDER IS THE WHOLE POINT.
+     *
+     * A merge beat says two things about the same pieces: the DIAMONDS say
+     * "these ones", the HAND says "carry that one onto this one". They were
+     * chosen by two selectors that never spoke to each other — the highlights
+     * by `resolveRefItem`'s screen-depth ranking (with its shadow demotion),
+     * the hand by `aimMergeHand`'s planner over `readyClusters`, which is
+     * handed EVERY piece of the kind rather than the ranked three. With three
+     * pieces on the board the two agree by luck. With a FOURTH — and a chest
+     * gift of the same chain is enough — they part by construction, and the
+     * beat lights up one set of pieces while the gauntlet lifts a piece
+     * carrying no diamond at all. That is the "it shows me one and points at
+     * the other" this order fixes.
+     *
+     * Planning first lets the hand CLAIM its two pieces in `pinned`, which is
+     * the mechanism the ranking already respects ("never pin over a piece
+     * another rank of the same step already claimed"). The highlights below
+     * then resolve those ranks to the very pieces the hand is about, and any
+     * remaining rank picks a third distinct piece as it always did.
+     */
     let hand: ResolvedHand | null = null;
     if (step.hand) {
       if ('from' in step.hand) {
@@ -820,6 +834,12 @@ export class TutorialDirector {
         const planned = sameKind(step.hand.from, step.hand.to)
           ? this.aimMergeHand(step, step.hand.from as PieceRef)
           : null;
+        // The claim. Without it the ranking below is free to hand the same
+        // ranks to different pieces.
+        if (planned) {
+          this.pinRef(step.hand.from, planned.from.id);
+          this.pinRef(step.hand.to, planned.to.id);
+        }
         const from = planned
           ? { col: planned.from.col, row: planned.from.row, item: planned.from.id }
           : this.resolveTileRef(step.hand.from);
@@ -845,6 +865,14 @@ export class TutorialDirector {
         hand = step.hand;
       }
     }
+
+    // Highlights stay CELLS: a glow is painted on the ground, and the board
+    // repaints it whenever this view is re-emitted (which a move does). Read
+    // AFTER the hand, so the ranks it claimed resolve to its own pieces.
+    const highlight = (step.highlight ?? [])
+      .map((ref) => this.resolveTileRef(ref))
+      .filter((p): p is MarkerPoint => p !== null)
+      .map((p): TilePos => ({ col: p.col, row: p.row }));
 
     const resolveArrow = (ref: TutorialArrowConfig | undefined): ResolvedArrow | null => {
       if (!ref) return null;
@@ -1084,6 +1112,17 @@ export class TutorialDirector {
    * standing — which is the whole difference between a pointer that follows the
    * piece and one that keeps pointing at the tile the piece has left.
    */
+  /**
+   * Claim a piece for a `{chain, nth}` ref, under the SAME key
+   * `resolveRefItem` builds — so every later reader of this beat resolves that
+   * rank to this piece and no other. A cell or `last_hatched` ref names its
+   * piece outright and has nothing to claim.
+   */
+  private pinRef(ref: TileRef, id: number): void {
+    if (Array.isArray(ref) || typeof ref === 'string') return;
+    this.pinned.set(`${ref.chain}:${ref.tier ?? '*'}:${ref.nth}`, id);
+  }
+
   private resolveRefItem(ref: TileRef): BoardItemState | null {
     if (Array.isArray(ref)) {
       // An authored cell can still be pointing AT something: a beat that names

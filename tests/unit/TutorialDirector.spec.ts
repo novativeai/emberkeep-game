@@ -686,3 +686,90 @@ describe('resuming the tutorial after a beat is inserted', () => {
     expect(fresh.tutorialStepId).toBe('c');
   });
 });
+
+/**
+ * A MERGE BEAT SAYS ONE THING, NOT TWO.
+ *
+ * The diamonds and the gauntlet describe the same pieces, and they used to be
+ * chosen by selectors that never spoke: the highlights by `resolveRefItem`'s
+ * screen-depth ranking (plus its shadow demotion), the hand by `aimMergeHand`'s
+ * planner over `readyClusters` — which is handed EVERY piece of the kind, not
+ * the ranked three. Three pieces on the board and they agree by luck; a FOURTH
+ * and they part by construction, so the beat lit up one set while the hand
+ * lifted a piece carrying no diamond.
+ *
+ * A fourth is not hypothetical: the `chest` beat gates on opening the chest,
+ * one CHEST_GIFTS slot in three is `anyItem`, and the isle's wildcard pool
+ * includes `lumber`.
+ */
+describe('a merge beat highlights the pieces its hand actually names', () => {
+  const woodMerge = steps[stepAt('wood_merge')]!;
+
+  // The beat's own three, on the cells `level_2_gate` seeds them on (the
+  // region is still fogged when a spec builds the context, so they are placed
+  // here rather than waited for).
+  const SEEDED: Array<[number, number]> = [
+    [6, 5],
+    [5, 5],
+    [6, 6]
+  ];
+
+  const run = (extraLogs: Array<[number, number]>) => {
+    const ctx = onAuthoredIsle();
+    for (const [col, row] of [...SEEDED, ...extraLogs]) {
+      ctx.state.addItem({ chain: 'lumber', tier: 1, col, row, kind: 'item' });
+    }
+    const director = new TutorialDirector(
+      ctx.state,
+      ctx.bus,
+      new GameClock(),
+      tutorial as unknown as TutorialData,
+      chainsJson as unknown as ChainsData,
+      false
+    );
+    const view = capture(ctx.bus, 'tutorial:step');
+    ctx.state.tutorialIndex = stepAt('wood_merge');
+    director.begin();
+    const emitted = view[view.length - 1];
+    expect(emitted).toBeTruthy();
+    return emitted!;
+  };
+
+  const cellsOf = (v: { highlight: TilePos[] }) => v.highlight.map((t) => `${t.col},${t.row}`);
+
+  it('the beat is the one this is about', () => {
+    expect(woodMerge.id).toBe('wood_merge');
+    expect(woodMerge.hand && 'from' in woodMerge.hand).toBe(true);
+  });
+
+  it('with the seeded three, both hand ends carry a diamond', () => {
+    const v = run([]);
+    const hand = v.hand as { from: MarkerPoint; to: MarkerPoint };
+    const lit = cellsOf(v);
+    expect(lit).toContain(`${hand.from.col},${hand.from.row}`);
+    expect(lit).toContain(`${hand.to.col},${hand.to.row}`);
+  });
+
+  it('with a FOURTH log on the board they still agree — the reported bug', () => {
+    const v = run([[7, 7]]);
+    const hand = v.hand as { from: MarkerPoint; to: MarkerPoint };
+    const lit = cellsOf(v);
+    expect(lit).toContain(`${hand.from.col},${hand.from.row}`);
+    expect(lit).toContain(`${hand.to.col},${hand.to.row}`);
+  });
+
+  it('and with a fourth ANYWHERE the player could have put one', () => {
+    const stray: Array<[number, number]> = [
+      [7, 7], [7, 6], [8, 6], [8, 7], [6, 7], [5, 4], [4, 5], [7, 5], [5, 7]
+    ];
+    const broken: string[] = [];
+    for (const at of stray) {
+      const v = run([at]);
+      const hand = v.hand as { from: MarkerPoint; to: MarkerPoint };
+      const lit = cellsOf(v);
+      const ends = [`${hand.from.col},${hand.from.row}`, `${hand.to.col},${hand.to.row}`];
+      for (const e of ends) if (!lit.includes(e)) broken.push(`4th log at ${at.join(',')}: hand end ${e} unlit (lit: ${lit.join(' ')})`);
+    }
+    expect(broken).toEqual([]);
+  });
+});
