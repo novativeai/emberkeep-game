@@ -88,9 +88,31 @@ export class WorldSystem {
     const free = (col: number, row: number): boolean =>
       world.playable.has(`${col},${row}`) && !taken.has(`${col},${row}`);
 
-    // The door BACK is the anchor: a dragon that crossed at the arch comes out
-    // beside the arch. Portals are authored as world-pixel rectangles, so the
-    // anchor is the world POINT at their centre.
+    // SOMEBODY LIVES HERE FIRST: wherever the far world authors a character —
+    // Eleanor keeps Roothold, Selyna her sanctuary — a dragon sent ahead of
+    // the Keeper is RECEIVED, not left on the doorstep: it seats beside the
+    // resident (never on her own cell), so following it through finds the two
+    // of them together (owner's call, the production line's landing law).
+    // Distance in world pixels through the resident's own zone tile, the only
+    // measurement that means anything across a zoned world.
+    const resident = this.folk.characters.find((c) => c.world === world.id);
+    if (resident) {
+      const her = worldPointOf(world, resident.anchor[0], resident.anchor[1]);
+      const zone = zoneAt(world, resident.anchor[0], resident.anchor[1]);
+      const tile = zone
+        ? (Math.hypot(zone.u.x, zone.u.y) + Math.hypot(zone.v.x, zone.v.y)) / 2
+        : 0;
+      const seat = nearestPlayableCell(world, her.x, her.y, (col, row) => {
+        if (!free(col, row)) return false;
+        const p = worldPointOf(world, col, row);
+        return Math.hypot(p.x - her.x, p.y - her.y) >= tile * GATE_LANDING.residentCells;
+      });
+      if (seat) return seat;
+    }
+
+    // No resident: the door BACK is the anchor — a dragon that crossed at the
+    // arch comes out beside the arch. Portals are authored as world-pixel
+    // rectangles, so the anchor is the world POINT at their centre.
     const doorBack = world.portals.find((p) => p.to === from);
     if (doorBack) {
       const door = {

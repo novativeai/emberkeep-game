@@ -246,6 +246,14 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.bobPaused = false;
     this.cooling = false;
     this.artHidden = false;
+    // The drag flag's normal clear is a 60ms delayedCall in BoardScene's drag
+    // endings — a window a scene restart (world travel mid-gesture) or a lost
+    // pointer can fall inside, and a pooled container KEEPS its DataManager.
+    // Re-acquired with the flag stuck true, every pointerup on this sprite
+    // returned before `onItemTapped` — a permanently tap-dead item, dragons
+    // included, until the sprite happened to be dragged again. The acquire
+    // boundary owns the reset, like every other pooled-state field here.
+    this.setData('dragged', false);
     this.sprite.setTexture(textureKey);
     const [ax, ay] = anchors.byKey[textureKey] ?? anchors.default;
     this.sprite.setOrigin(ax, ay);
@@ -403,6 +411,15 @@ export class BoardItem extends Phaser.GameObjects.Container {
    *  holey art (sprout stems) comfortably tappable. A rig host's hidden art
    *  still answers (the live rig stands where the art would). */
   hitsOpaqueArt(hx: number, hy: number): boolean {
+    // A RIG HOST answers ANYWHERE in its rect. The doc above always promised
+    // this ("a rig host's hidden art still answers"), and the pose proxy tries
+    // to keep the test honest — but a live clip repaints every frame, atlas
+    // trims shift its pixel space, and every drifted pixel is a tap that dies
+    // on a visibly solid dragon (the pose-dependent "clicking him does
+    // nothing" reports, fixed the same way on the production line). The rect
+    // is the honest hit test for a dressed dragon; depth order still routes a
+    // genuinely covered tap to whatever stands in front.
+    if (this.artHidden) return true;
     if (this.artOpaqueAt(hx, hy)) return true;
     const r = HIT_FORGIVENESS_PX;
     return (

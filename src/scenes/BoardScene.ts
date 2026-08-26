@@ -7306,11 +7306,21 @@ export class BoardScene extends Phaser.Scene {
       );
       // Keep the world point that WAS under the previous midpoint under the
       // new one: zoom about the fingers, pan with them, in one correction.
-      const anchor = cam.getWorldPoint(this.pinchPrev.midX, this.pinchPrev.midY);
+      //
+      // ANALYTIC, not getWorldPoint: the camera's world matrix is rebuilt in
+      // preRender, so between setZoom and the next frame getWorldPoint answers
+      // with the OLD zoom — and several touchmoves land between frames. Each
+      // stale answer under-corrected toward the viewport origin, which is why
+      // the zoom crawled to the top-left instead of staying under the fingers.
+      // screen↔world here is scroll + centre + (screen − centre)/zoom (no
+      // rotation on the board camera), valid the instant zoom is assigned.
+      const w2 = cam.width / 2;
+      const h2 = cam.height / 2;
+      const anchorX = cam.scrollX + w2 + (this.pinchPrev.midX - w2) / cam.zoom;
+      const anchorY = cam.scrollY + h2 + (this.pinchPrev.midY - h2) / cam.zoom;
       cam.setZoom(next);
-      const now = cam.getWorldPoint(midX, midY);
-      cam.scrollX += anchor.x - now.x;
-      cam.scrollY += anchor.y - now.y;
+      cam.scrollX = anchorX - w2 - (midX - w2) / next;
+      cam.scrollY = anchorY - h2 - (midY - h2) / next;
       this.pinchPrev = { dist, midX, midY };
       this.pinchTapBlockUntil = this.time.now + 250;
     });
@@ -8043,27 +8053,23 @@ export class BoardScene extends Phaser.Scene {
     if (this.clipCharacterFor(item.chain, item.tier) && isGenerator && (this.tutorialDone || this.allow.dragonWork)) {
       this.selectSubject('dragon', String(item.id), false);
     }
-    // A SLEEPING dragon is not a button. The tap wakes it — and only wakes it:
-    // it does not also harvest, because the wake is the whole gesture and its
-    // animation has to finish before the animal is a working generator again.
-    //
-    // Every sleep is now the nap, and the nap is the player's to interrupt. The
-    // shift-rest used to refuse this tap ("that sleep was bought with the
-    // work") — it no longer puts the dragon down at all, so there is nothing
-    // here to refuse; a tired dragon takes the tap like any other awake one and
-    // is simply not hireable until its fatigue runs out.
+    // A DRAGON TAP ALWAYS ENDS IN ONE OF ITS TWO EVENTS (owner's law): the
+    // skip offer while it cools, or its item when it is ready. A sleeping
+    // dragon still WAKES on the tap — the pulse, the sparks and the keep-awake
+    // window all fire — but waking is no longer the whole answer, and the
+    // wake-up clip no longer swallows the tap either: both used to eat the
+    // gesture ("tap him and nothing happens" from a player's seat, because a
+    // curled dragon and a cooling dragon look alike). The harvest is emitted
+    // immediately and never coupled to the animation finishing — the same
+    // reliability rule the plain harvest below follows — so paying out over a
+    // dragon still unfolding costs a flourish, not a gem.
     if (this.ctx.systems.dragons.isBoardDragon(item)) {
       if (this.ctx.systems.dragonLife.sleepKindOf(item.id) === 'nap') {
         this.wakeDragonByTap(sprite, item.id);
-        return;
-      }
-      // Awake, but still folding out of a sleep: the wake clip owns these
-      // frames, and harvesting through it would pay out over a dragon that is
-      // visibly still getting up.
-      if (this.liveDragons.get(item.id)?.waking) {
+      } else if (this.liveDragons.get(item.id)?.waking) {
         scalePulse(this, sprite, 1.04, 120);
-        return;
       }
+      // …and fall through: the timer/harvest resolution below is the answer.
     }
     // An undecided House asks what it should make — and keeps asking, because a
     // player who dismissed the chooser must have a way back to it. Once
@@ -8238,7 +8244,18 @@ export class BoardScene extends Phaser.Scene {
     maxGold?: number
   ): void {
     this.hideSkipButton();
-    this.ctx.bus.emit('ui:skip_offered', { itemId: sprite.itemId });
+    // A COIN MINT (a House/Manor whose effective produce is the coin chain)
+    // takes Warmth only — paying gold to hurry gold is a loop wearing the
+    // costume of a choice, so the gold row simply is not there and the pin is
+    // one key tall. GeneratorSystem.producesCoin holds the same rule at the
+    // bus level for anything that never saw these keys. The offer fact drives
+    // Eleanor's "two ways past a wait" hint — spoken only when two ways are
+    // actually on screen; a mint's single ⚡ key under a line promising a gold
+    // option would be the UI calling her a liar.
+    const skipItem = this.ctx.state.items.get(sprite.itemId);
+    const warmthOnly =
+      skipItem?.kind === 'item' ? this.ctx.systems.generator.producesCoin(skipItem) : false;
+    if (!warmthOnly) this.ctx.bus.emit('ui:skip_offered', { itemId: sprite.itemId });
     this.skipMaxGold = maxGold; // per-generator gold cap (Crystal emeralds are dear)
 
     /*
@@ -8262,8 +8279,9 @@ export class BoardScene extends Phaser.Scene {
     const ROW_GAP = 10;
     const PAD_X = 22;
     const PAD_Y = 18;
+    const rows = warmthOnly ? 1 : 2;
     const bodyW = KEY_W + PAD_X * 2;
-    const bodyH = KEY_H * 2 + ROW_GAP + PAD_Y * 2;
+    const bodyH = KEY_H * rows + ROW_GAP * (rows - 1) + PAD_Y * 2;
     const SPIKE = 30;
     // Seated so the spike's tip lands just over the art's crown: `sprite.y` is
     // the tile origin and the piece stands on it, so the pin hangs off the top
@@ -8349,16 +8367,18 @@ export class BoardScene extends Phaser.Scene {
       btn.add([bg, label]);
       return label;
     };
-    // The gold row wears the REAL coin art (the 🪙 emoji read as a generic
-    // token); the label carries only the price and sits right of the icon.
-    this.skipGoldLabel = make(0, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
-    this.skipGoldLabel.setX(SKIP_KEYS.labelDx);
-    btn.add(
-      this.add
-        .image(SKIP_KEYS.coinDx, rowY(0) - 2, 'item_coin_1')
-        .setScale(plateScale('item_coin_1', 0.086))
-    );
-    this.skipWarmthLabel = make(1, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
+    if (!warmthOnly) {
+      // The gold row wears the REAL coin art (the 🪙 emoji read as a generic
+      // token); the label carries only the price and sits right of the icon.
+      this.skipGoldLabel = make(0, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
+      this.skipGoldLabel.setX(SKIP_KEYS.labelDx);
+      btn.add(
+        this.add
+          .image(SKIP_KEYS.coinDx, rowY(0) - 2, 'item_coin_1')
+          .setScale(plateScale('item_coin_1', 0.086))
+      );
+    }
+    this.skipWarmthLabel = make(rows - 1, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
     btn.add(caption); // on top of the keys
     // Tutorial: bounce an arrow over the WARMTH (⚡) row so the player learns to
     // pay the House's timer with energy (and watches their Warmth drop). It
@@ -8366,7 +8386,7 @@ export class BoardScene extends Phaser.Scene {
     // above the second row would sit on the first one.
     if (this.tutorialStepId === 'house_skip') {
       const hint = this.add
-        .image(-bodyW / 2 - 46, rowY(1), 'ui_arrow')
+        .image(-bodyW / 2 - 46, rowY(rows - 1), 'ui_arrow')
         .setScale(0.16)
         .setAngle(-90);
       btn.add(hint);

@@ -2134,7 +2134,14 @@ export const GATE_FX_HEIGHT = 380;
  * 4.04 — none of them moved, their people being nowhere near their doors. The
  * Rune Way's island keeps its 0.19 and its cell.
  */
-export const GATE_LANDING = { standoffCells: 4, slackCells: 2, folkCells: 3 } as const;
+/**
+ * `residentCells`: a world with somebody home RECEIVES an arriving dragon —
+ * it seats this many of the resident's own tiles from her anchor (nearest
+ * qualifying ground), which is "beside her" without standing on her slab
+ * (the slab's far half sits 1.26 tiles out). The standoff pair below is the
+ * fallback law for a world with nobody home: a few paces clear of the arch.
+ */
+export const GATE_LANDING = { residentCells: 1.5, standoffCells: 4, slackCells: 2, folkCells: 3 } as const;
 
 /**
  * Portal colours, keyed by DESTINATION — the door wears where it goes, so the
@@ -2621,7 +2628,10 @@ export const MERGE_READY = {
  * play out several times (`placeHand`'s cycle is ~1.6s), so a pulse lands as a
  * fresh reading of the board rather than as an interruption of one.
  */
-export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000, followUpMs: 490, repulseMs: 30_000 } as const;
+// followUpMs 5000, up from 490 (owner's call): the half-second follow-up hand
+// after a plan's first merge read as the hint "showing up too fast" — every
+// appearance of the hand now waits at least five seconds of idle.
+export const MERGE_HINT = { idleMs: 10_000, restMs: 10_000, followUpMs: 5_000, repulseMs: 30_000 } as const;
 
 /**
  * WHAT THE HAND WEIGHS — the merge hint's decision, written as numbers.

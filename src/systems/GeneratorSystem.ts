@@ -79,6 +79,18 @@ export class GeneratorSystem {
     return this.tierConfig(item.chain, item.tier)?.produceMaxTier ?? 1;
   }
 
+  /**
+   * Does this generator currently MINT gold — its effective produce is the
+   * coin chain (the House's default, the Manor's, or a commission pointed
+   * back at it)? Gold may not hurry gold: a gold skip on a mint is a loop
+   * wearing the costume of a choice, so the scene offers only the Warmth
+   * key and `onSkip` refuses the currency outright — both read THIS.
+   */
+  producesCoin(item: Pick<BoardItemState, 'chain' | 'tier' | 'produces'>): boolean {
+    const generator = this.generatorConfig(item.chain, item.tier);
+    return (item.produces ?? generator?.produces)?.chain === 'coin';
+  }
+
   /** What a generator actually makes: its own commission if it has one, else
    *  whatever its tier makes by default. ONE resolver, so the passive tick, the
    *  offline catch-up and a tap can never disagree about a House's output. */
@@ -259,6 +271,10 @@ export class GeneratorSystem {
       }
       this.bus.emit('energy:spend', { amount: cost, reason: 'skip_cooldown' });
     } else {
+      // A coin mint takes Warmth only (see producesCoin) — the scene never
+      // shows this key for one, so a gold skip arriving here is a bus caller
+      // bypassing the UI, and the refusal is the invariant.
+      if (this.producesCoin(item)) return;
       const cost = skipEnergyCost(timer.at - now, timer.total, cfg.skipMaxGold);
       if (this.state.coins < cost) {
         this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'gold' });

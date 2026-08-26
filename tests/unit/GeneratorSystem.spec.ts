@@ -132,11 +132,14 @@ describe('skip cooldown for Warmth', () => {
     expect(ctx.state.coins).toBeLessThan(coinsBefore); // this one was a real purchase
   });
 
-  it('a PASSIVE-only generator (the House) still sells its passive wait', () => {
+  it('a PASSIVE-only generator (a commissioned House) still sells its passive wait', () => {
     // The tutorial's `house_skip` beat depends on this: a piece with no tap
     // verb has only its passive clock to skip, so that path must stay live.
+    // COMMISSIONED away from coins, because a default House is a mint and a
+    // mint refuses gold (see the mint describe below).
     const ctx = createTestContext();
     const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
+    house.produces = { chain: 'sparkweed', tier: 1 };
     house.passiveAt = ctx.clock.now() + 210_000;
     ctx.state.coins = 999;
     const coinsBefore = ctx.state.coins;
@@ -145,6 +148,54 @@ describe('skip cooldown for Warmth', () => {
 
     expect(house.passiveAt!).toBeLessThanOrEqual(ctx.clock.now());
     expect(ctx.state.coins).toBeLessThan(coinsBefore);
+  });
+
+  /**
+   * GOLD MAY NOT HURRY GOLD (owner's law, ported from the production line). A
+   * House/Manor whose EFFECTIVE produce is the coin chain — the default, or a
+   * commission pointed back at it — is a mint: the scene shows only the ⚡ key,
+   * and the bus refuses the currency outright for any caller that bypassed it.
+   */
+  describe('coin mints take Warmth only', () => {
+    it('knows a mint when it sees one', () => {
+      const ctx = createTestContext();
+      const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
+      expect(ctx.systems.generator.producesCoin(house)).toBe(true); // default House mints
+      house.produces = { chain: 'sparkweed', tier: 1 };
+      expect(ctx.systems.generator.producesCoin(house)).toBe(false); // commissioned away
+      house.produces = { chain: 'coin', tier: 2 };
+      expect(ctx.systems.generator.producesCoin(house)).toBe(true); // pointed back at gold
+      const dragon = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 3, row: 3, kind: 'item' });
+      expect(ctx.systems.generator.producesCoin(dragon)).toBe(false); // gems, not gold
+    });
+
+    it('refuses a GOLD skip on a mint: no coins move, the timer stands', () => {
+      const ctx = createTestContext();
+      const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
+      const armedAt = ctx.clock.now() + 210_000;
+      house.passiveAt = armedAt;
+      ctx.state.coins = 999;
+      const skipped = capture(ctx.bus, 'generator:skipped');
+
+      ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'gold' });
+
+      expect(house.passiveAt).toBe(armedAt);
+      expect(ctx.state.coins).toBe(999);
+      expect(skipped).toEqual([]);
+    });
+
+    it('still sells the same wait for WARMTH', () => {
+      const ctx = createTestContext();
+      const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
+      house.passiveAt = ctx.clock.now() + 210_000;
+      ctx.state.energyCurrent = ctx.state.energyMax;
+      const energyBefore = ctx.state.energyCurrent;
+
+      ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'warmth' });
+
+      expect(house.passiveAt!).toBeLessThanOrEqual(ctx.clock.now());
+      expect(ctx.state.energyCurrent).toBeLessThan(energyBefore);
+    });
   });
 
   /**

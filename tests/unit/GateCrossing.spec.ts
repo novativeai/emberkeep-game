@@ -30,13 +30,6 @@ function doorTile(world: WorldRuntime, from: string): number {
   return (Math.hypot(zone.u.x, zone.u.y) + Math.hypot(zone.v.x, zone.v.y)) / 2;
 }
 
-/** How far a landing cell sits from its own door back, in door-tiles. */
-function tilesFromDoor(world: WorldRuntime, from: string, at: TilePos): number {
-  const c = doorPoint(world, from);
-  const p = worldPointOf(world, at.col, at.row);
-  return Math.hypot(p.x - c.x, p.y - c.y) / doorTile(world, from);
-}
-
 /** How far it sits from the NEAREST authored standee, in the same unit. */
 function tilesFromFolk(world: WorldRuntime, from: string, at: TilePos): number {
   const people = (characters as unknown as CharactersData).characters.filter(
@@ -136,72 +129,28 @@ describe('a dragon crossing a gate', () => {
     expect(seats).not.toContain(`${at.col},${at.row}`);
   });
 
-  it('comes out a few paces clear of the arch, not standing in it', () => {
-    // The picture is the point: on the door's own cell he reads as still
-    // crossing. Roothold's arch used to seat him 1.78 tiles away — inside the
-    // painted archway — and the fix is stated in TILES because a Roothold tile
-    // is 95px and an Emberkeep one 145.
+  it('is RECEIVED: it comes out beside the innkeeper, never left at the arch', () => {
+    // The owner's landing law (the production line's): somebody LIVES on the
+    // far side, and a dragon sent ahead is received, not left on the doorstep
+    // — following it through finds the two of them together. Beside her means
+    // at least residentCells of HER OWN tiles (clear of her two-cell slab,
+    // whose far half sits 1.26 tiles out) and still close: this replaced a
+    // four-to-six-tile arch standoff the owner read as "he arrives too far
+    // from Eleanor".
     const ctx = createTestContext();
     const itemId = namedDragon(ctx);
     const crossed = capture(ctx.bus, 'dragon:crossed');
     ctx.bus.emit('dragon:cross_gate', { itemId, to: 'roothold' });
 
     const roothold = ctx.state.worlds.get('roothold')!;
-    const paces = tilesFromDoor(roothold, 'emberkeep', crossed[0]!.at);
-    expect(paces).toBeGreaterThanOrEqual(GATE_LANDING.standoffCells);
-    expect(paces).toBeLessThanOrEqual(GATE_LANDING.standoffCells + GATE_LANDING.slackCells);
+    const d = tilesFromFolk(roothold, 'emberkeep', crossed[0]!.at);
+    expect(d).toBeGreaterThanOrEqual(GATE_LANDING.residentCells);
+    expect(d).toBeLessThanOrEqual(GATE_LANDING.residentCells + 2);
   });
 
-  it('does not come out on the innkeeper, which four tiles from the door does not prevent', () => {
-    // Roothold's arch and Roothold's Eleanor are 3.4 tiles apart, so "four from
-    // the door" is BEHIND her. The first version of this rule landed him on the
-    // far half of her own two-cell slab — 1.26 tiles away — and passed the
-    // assertion above while looking exactly like the defect it replaced.
-    const ctx = createTestContext();
-    const itemId = namedDragon(ctx);
-    const crossed = capture(ctx.bus, 'dragon:crossed');
-    ctx.bus.emit('dragon:cross_gate', { itemId, to: 'roothold' });
-
-    const roothold = ctx.state.worlds.get('roothold')!;
-    expect(tilesFromFolk(roothold, 'emberkeep', crossed[0]!.at)).toBeGreaterThanOrEqual(
-      GATE_LANDING.folkCells
-    );
-  });
-
-  it('measures a tile at the DOOR, so a small-tiled slab cannot buy its way in', () => {
-    // The unit is the whole trap: against its own 89px tiles Eleanor's slab
-    // cleared the bar at 357 real px, where the plaza's 95.6px tiles put the
-    // same bar at 382. Nearest-qualifying then chose the cheat. This asserts
-    // the unit is taken from the ground the arch opens onto, once.
-    const ctx = createTestContext();
-    const roothold = ctx.state.worlds.get('roothold')!;
-    const c = doorPoint(roothold, 'emberkeep');
-    const anchor = nearestPlayableCell(roothold, c.x, c.y)!;
-    const anchorZone = zoneAt(roothold, anchor.col, anchor.row)!;
-
-    const itemId = namedDragon(ctx);
-    const crossed = capture(ctx.bus, 'dragon:crossed');
-    ctx.bus.emit('dragon:cross_gate', { itemId, to: 'roothold' });
-    const at = crossed[0]!.at;
-    const landedZone = zoneAt(roothold, at.col, at.row)!;
-    const landedTile =
-      (Math.hypot(landedZone.u.x, landedZone.u.y) + Math.hypot(landedZone.v.x, landedZone.v.y)) / 2;
-    const anchorTile =
-      (Math.hypot(anchorZone.u.x, anchorZone.u.y) + Math.hypot(anchorZone.v.x, anchorZone.v.y)) / 2;
-    // Real distance, against the DOOR's tile — the reading the rule is stated
-    // in — and it must clear the bar even if the landing zone's own tile is
-    // smaller, which is precisely what the broken version could not promise.
-    const p = worldPointOf(roothold, at.col, at.row);
-    const real = Math.hypot(p.x - c.x, p.y - c.y);
-    expect(real / anchorTile).toBeGreaterThanOrEqual(GATE_LANDING.standoffCells);
-    expect(landedTile).toBeGreaterThan(0);
-  });
-
-  it('keeps a one-cell island beside its arch rather than fling him across the sky', () => {
-    // The Rune Way's door stands on a SINGLE cell: past two tiles the nearest
-    // legal ground is eight away over open sky. The standoff is a preference,
-    // and a door that cannot honour it keeps the old answer — otherwise the fix
-    // for "he stands in the door" would reintroduce "he came out miles away".
+  it('receives beside its OWN resident on the Rune Way too, tiny island or not', () => {
+    // The Runevault authors Selyna at the hearth; a crossing seats beside her
+    // rather than at the arch, and never on top of her slab.
     const ctx = createTestContext();
     const borealis = ctx.state.worlds.get('borealis')!;
     const runevault = ctx.state.worlds.get('runevault')!;
@@ -214,8 +163,8 @@ describe('a dragon crossing a gate', () => {
     ctx.bus.emit('dragon:cross_gate', { itemId: item.id, to: 'runevault' });
 
     expect(crossed).toHaveLength(1);
-    expect(tilesFromDoor(runevault, 'borealis', crossed[0]!.at)).toBeLessThan(
-      GATE_LANDING.standoffCells
+    expect(tilesFromFolk(runevault, 'borealis', crossed[0]!.at)).toBeGreaterThanOrEqual(
+      GATE_LANDING.residentCells
     );
   });
 

@@ -460,8 +460,12 @@ export class StorePanel extends Phaser.GameObjects.Container {
     // cancelling it leaves the shelf tracking a cursor with no button held, for
     // the rest of the session. A swallow that silences the whole scene is not a
     // swallow. It was tried, measured, and taken back out — hence this note.
+    // ×2 OVERSIZE (BagPanel's rule): the dim is a CHILD of this container, so
+    // the panel's fit scale shrinks it too — and panelFitScale dips BELOW 1 on
+    // short in-browser viewports, which left bright board strips beside the
+    // sheet. Twice the screen covers any scale this panel can wear (≥0.5).
     this.dim = scene.add
-      .rectangle(0, LIVE_GAME_HEIGHT / 2 - panelSafeCenterY(), LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
+      .rectangle(0, LIVE_GAME_HEIGHT / 2 - panelSafeCenterY(), LIVE_GAME_WIDTH * 2, LIVE_GAME_HEIGHT * 2, num(INK.scrim), 0.62)
       .setInteractive();
 
     const frame = scene.add.image(0, CX.frameY, CX.frameKey);
