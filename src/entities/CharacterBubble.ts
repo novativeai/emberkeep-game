@@ -1082,7 +1082,15 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     // so it is repainted here rather than at setText time — layout() runs after
     // every line change AND on every theme edit.
     this.paintHighlight();
-    this.hitZone.setSize(width + RING_SIZE, Math.max(height, RING_SIZE) + 60);
+    // The advance zone hugs what the player SEES: the card plus the ring's
+    // overhang off its LEFT edge — never symmetric padding. The old
+    // `width + RING_SIZE` pushed the zone's right edge ~RING_SIZE/2 past the
+    // card; invisible, but the zone sits at DEPTH_TUTORIAL, above the HUD, and
+    // on the phone the anchored card ends 152px short of HUD_COLUMN_X — so the
+    // overhang covered the Bag button and silently ate its taps on the very
+    // beat that says "open your Bag".
+    this.hitZone.setSize(width + RING_SIZE / 2, Math.max(height, RING_SIZE) + 60);
+    this.hitZone.setPosition(-RING_SIZE / 4, 0);
 
     // Ring centre sits ON the card's left edge — the frame is half outside the
     // text card, rising above its top; its bottom edge stays seated on the
