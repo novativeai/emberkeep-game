@@ -7,6 +7,7 @@ import {
   num,
   panelFitScale,
   panelMobileScale,
+  panelSafeCenterY,
   TAP_SCALE,
   WELL_FED_EVOLUTION
 } from '../core/Constants';
@@ -245,10 +246,14 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     private chains: ChainsData,
     private ctx: GameContext
   ) {
-    super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    // Centred in the SAFE region on a phone — the speech card owns the bottom
+    // band, and the codex lesson talks the whole time the book is open, so a
+    // full-height sheet parked EVOLUTION under the card (see
+    // MOBILE_DIALOGUE_BAND). Air above the sheet = air below it, band excluded.
+    super(scene, LIVE_GAME_WIDTH / 2, panelSafeCenterY());
 
     const dim = scene.add
-      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
+      .rectangle(0, LIVE_GAME_HEIGHT / 2 - panelSafeCenterY(), LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
     // ONLY THE ✕ CLOSES — the dim swallows the tap but no longer dismisses.
     // A thumb scrolling the body releases ON the dim, and tap-outside-to-close
@@ -673,16 +678,18 @@ export class DragonCodexPanel extends Phaser.GameObjects.Container {
     if (entry?.evolution) {
       // Mobile: centred under the taste stack (the specimen no longer owns a
       // column to close); the button itself doubles for a thumb.
-      // PORTRAIT SEAT, MEASURED AGAINST BOTH NEIGHBOURS. At BODY_FLOOR + 60 the
-      // key's top edge landed at 1745 against a WON'T TOUCH card whose plate
-      // ends at 1720 — 24.8 units, which is a rounding error, not a margin, and
-      // the owner read the two as touching. `ui_panel_tall` paints its plate to
-      // y 1992 (1180x2040 logical, inset 16, x2 for game units), so the band
-      // between the card and the ink is 272 units and the key is 110.4 of it.
-      // The remaining 161.6 splits ~100 above / ~62 below: BODY_FLOOR + 135.
+      // PORTRAIT SEAT, MEASURED AGAINST THE FRAME'S OWN RHYTHM (ui-spacing-check).
+      // The spacing law pairs the key's bottom gap with the TITLE PLAQUE's top
+      // gap: the plaque's box tops out at -1894 against ink at -2008 — 114
+      // units of air. `ui_panel_tall` paints its plate to y 1992, and at the
+      // old BODY_FLOOR + 135 the key's bottom sat 64 off it — the owner read
+      // the page as bottom-heavy (measured 160 vs 66 in game units). At +83
+      // the 110.4-unit key's bottom lands at 1878: 114 off the ink, the
+      // plaque's own number. The WON'T TOUCH card above (plate ends 1720)
+      // keeps 48 units — twice the 24.8 the owner once called touching.
       this.evolutionBtn = this.emberButton(
         IS_MOBILE ? 0 : SPEC_X,
-        IS_MOBILE ? BODY_FLOOR + 135 : BODY_FLOOR - 96,
+        IS_MOBILE ? BODY_FLOOR + 83 : BODY_FLOOR - 96,
         'EVOLUTION  ›',
         () => this.showPage('evolution')
       );

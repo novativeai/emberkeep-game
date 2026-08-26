@@ -8,6 +8,7 @@ import {
   num,
   panelFitScale,
   panelMobileScale,
+  panelSafeCenterY,
   px,
   RARITY,
   TAP_SCALE
@@ -427,7 +428,11 @@ export class StorePanel extends Phaser.GameObjects.Container {
     data: StoreData,
     private ctx: GameContext
   ) {
-    super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
+    // Centred in the SAFE region on a phone — the speech card owns the bottom
+    // band (MOBILE_DIALOGUE_BAND), and the buy_energy lesson talks while the
+    // Emporium is open, so a full-height sheet would park its checkout row
+    // under the card. Air above the sheet = air below it, band excluded.
+    super(scene, LIVE_GAME_WIDTH / 2, panelSafeCenterY());
     this.sections = data.sections;
 
     // THE DIM SWALLOWS; IT DOES NOT DISMISS.
@@ -456,7 +461,7 @@ export class StorePanel extends Phaser.GameObjects.Container {
     // the rest of the session. A swallow that silences the whole scene is not a
     // swallow. It was tried, measured, and taken back out — hence this note.
     this.dim = scene.add
-      .rectangle(0, 0, LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
+      .rectangle(0, LIVE_GAME_HEIGHT / 2 - panelSafeCenterY(), LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num(INK.scrim), 0.62)
       .setInteractive();
 
     const frame = scene.add.image(0, CX.frameY, CX.frameKey);

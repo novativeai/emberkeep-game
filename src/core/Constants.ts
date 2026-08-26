@@ -152,9 +152,32 @@ export const TAP_SCALE: number = IS_MOBILE ? 2.2 : 1;
  * landscape frames keep their authored size. (Ported with the dark Codex —
  * its portrait tall frame is sized by both axes.)
  */
+/**
+ * THE SPEECH CARD OWNS THE BOTTOM OF A PHONE SCREEN.
+ *
+ * The mobile bubble is anchored bottom-right (CharacterBubble: card bottom 40
+ * units off the floor, 1.65x scale, the portrait ring rising ~495 above the
+ * floor; a four-line card tops out near 600). A tutorial beat can hold a panel
+ * open WHILE the card speaks — the Codex walk, the Emporium's free Spark — and
+ * a panel laid out over the full height parks its bottom controls (EVOLUTION,
+ * the checkout row) exactly under the card. So on a phone this band is
+ * reserved: height-fitted panels size and centre themselves in the space ABOVE
+ * it, with equal air top and bottom.
+ */
+export const MOBILE_DIALOGUE_BAND = 640;
+
+/** The vertical space a full-height mobile panel may use — the screen minus
+ *  the speech card's band. The full height on desktop. */
+export const panelSafeHeight = (): number =>
+  IS_MOBILE ? LIVE_GAME_HEIGHT - MOBILE_DIALOGUE_BAND : LIVE_GAME_HEIGHT;
+
+/** Where a height-fitted panel centres: the middle of the safe region, so the
+ *  air above the sheet equals the air between the sheet and the speech band. */
+export const panelSafeCenterY = (): number => panelSafeHeight() / 2;
+
 export function panelFitScale(frameW: number, frameH: number): number {
   if (!IS_MOBILE) return 1;
-  return Math.min(2.2, (LIVE_GAME_WIDTH * 0.94) / frameW, (LIVE_GAME_HEIGHT * 0.92) / frameH);
+  return Math.min(2.2, (LIVE_GAME_WIDTH * 0.94) / frameW, (panelSafeHeight() * 0.94) / frameH);
 }
 
 /**

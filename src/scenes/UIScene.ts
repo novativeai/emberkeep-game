@@ -95,7 +95,9 @@ const DEPTH_DIALOG = 200;
 // On-screen heights (2560-space) for the tutorial pointer/arrow. The real art
 // loads at its native pixel size, so each is scaled to these.
 const HAND_MARKER_H = 172;
-const ARROW_MARKER_H = 148;
+// +75% on the phone (owner's call): at 148 units the pointer renders ~23 real
+// px on a 390px handset and disappears against the busy board.
+const ARROW_MARKER_H = IS_MOBILE ? 259 : 148;
 
 /**
  * WHAT a marker points at, as one comparable string.
