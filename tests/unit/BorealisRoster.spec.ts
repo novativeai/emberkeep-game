@@ -72,8 +72,14 @@ const ICE = { satMax: 0.55, darkMax: 0.52, brightMin: 0.8 };
  * and accepted: its art is breed-pipeline (frost_baby/frost_adult clips), not
  * a chain sheet a re-cut could fix, and the owner's call was availability
  * first. If a recolour ever lands, take it back OUT of this set.
+ *
+ * `storm` followed for the same reason (owner's call, 2026-08-26 — it sold on
+ * the wrong shelf and its eggs stood on the southern isle): breed-pipeline
+ * skin bakes, not a sheet. `stormcap` is its food and moved north WITH it —
+ * that one IS a chain sheet, cut for the southern palette and never measured
+ * against ice; if it ever reads pale up there, re-cut and take it out.
  */
-const GRANDFATHERED = new Set(['rimewyrm', 'frost']);
+const GRANDFATHERED = new Set(['rimewyrm', 'frost', 'storm', 'stormcap']);
 
 /** Mean saturation/value of a webp's opaque pixels, straight off the file. */
 function meanHsv(file: string): { sat: number; val: number } {

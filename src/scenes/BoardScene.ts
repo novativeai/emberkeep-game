@@ -7937,7 +7937,7 @@ export class BoardScene extends Phaser.Scene {
    * Can this piece go in the bag? Only PLAIN merge pieces: anything with a
    * generator (dragons, plants, houses, the crystal) keeps its own tap
    * behaviour, coins still bank, the chest still opens, and story items
-   * (`sellable: false` — the Golden Egg and the Elder) are never pocketable.
+   * (`storable: false` — the Golden Egg and the Elder) are never pocketable.
    */
   private isStorable(itemId: number): boolean {
     const item = this.ctx.state.items.get(itemId);
@@ -7949,7 +7949,12 @@ export class BoardScene extends Phaser.Scene {
     const tier = this.ctx.data.chains.chains
       .find((c) => c.id === item.chain)
       ?.tiers.find((t) => t.tier === item.tier);
-    if (tier?.sellable === false) return false;
+    // `storable`, NOT `sellable`: the two used to be one flag, and the brewed
+    // dragon eggs (unsellable by law) became unpocketable by accident — a tap
+    // on an Ash Dragon Egg did nothing. Unsellable ≠ unstorable: the bag takes
+    // the egg and simply never offers the Sell plate for it. Only the story
+    // fixtures (the Golden Egg, the Elder) refuse the satchel outright.
+    if (tier?.storable === false) return false;
     // Mid-tutorial the board is a script; pocketing a scripted piece would
     // strand the step that wants it merged. `allow.bag` opens it for the one
     // beat that teaches the satchel, on a piece nothing else needs.

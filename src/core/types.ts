@@ -152,8 +152,14 @@ export interface ChainTierConfig {
   sell: number;
   /** XP granted when a merge produces this tier. */
   xp: number;
-  /** false = the sell path refuses this tier (story items like the Golden Egg). */
+  /** false = the sell path refuses this tier. Every dragon EGG carries it —
+   *  an egg is a promise, not merchandise — alongside the story items. It says
+   *  nothing about POCKETING: that is `storable`. */
   sellable?: boolean;
+  /** false = the satchel refuses this tier (the Golden Egg and the Elder —
+   *  story fixtures that must stay where the story put them). Separate from
+   *  `sellable` on purpose: an unsellable egg still goes in the bag. */
+  storable?: boolean;
   generator?: GeneratorConfig;
   /** Per-TIER merge recipe override — takes precedence over the chain-level
    *  `merge` when merging items of THIS tier (e.g. 2 Houses → 1 Manor while

@@ -97,6 +97,14 @@ export class BagSystem {
   private store(itemId: number): void {
     const item = this.state.items.get(itemId);
     if (!item || item.kind !== 'item') return;
+    // Story fixtures (`storable: false` — the Golden Egg, the Elder) refuse
+    // the satchel at the bus too: the scene already never offers the tap, but
+    // a shelf is data and a pocketing must not depend on the UI having drawn
+    // it right.
+    const tierConfig = this.chains.chains
+      .find((c) => c.id === item.chain)
+      ?.tiers.find((t) => t.tier === item.tier);
+    if (tierConfig?.storable === false) return;
     // Same rule from the other direction: pocketing a Coin adds its worth to
     // the purse and takes the piece off the board.
     if (item.chain === 'coin') {

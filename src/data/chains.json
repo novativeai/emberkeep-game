@@ -93,7 +93,8 @@
           "id": "ember_dragon_2",
           "name": "Red Dragon Egg",
           "sell": 10,
-          "xp": 0
+          "xp": 0,
+          "sellable": false
         },
         {
           "tier": 3,
@@ -370,7 +371,8 @@
           "id": "emerald_2",
           "name": "Green Dragon Egg",
           "sell": 10,
-          "xp": 0
+          "xp": 0,
+          "sellable": false
         },
         {
           "tier": 3,
@@ -421,7 +423,8 @@
           "id": "frost_1",
           "name": "Frost Dragon Egg",
           "sell": 10,
-          "xp": 0
+          "xp": 0,
+          "sellable": false
         },
         {
           "tier": 2,
@@ -477,6 +480,7 @@
     },
     {
       "id": "storm",
+      "world": "borealis",
       "name": "Storm Dragons",
       "hatchAtTier": 2,
       "tiers": [
@@ -485,7 +489,8 @@
           "id": "storm_1",
           "name": "Storm Dragon Egg",
           "sell": 10,
-          "xp": 0
+          "xp": 0,
+          "sellable": false
         },
         {
           "tier": 2,
@@ -550,7 +555,8 @@
           "name": "Golden Egg",
           "sell": 0,
           "xp": 0,
-          "sellable": false
+          "sellable": false,
+          "storable": false
         },
         {
           "tier": 2,
@@ -558,7 +564,8 @@
           "name": "Golden Elder",
           "sell": 0,
           "xp": 0,
-          "sellable": false
+          "sellable": false,
+          "storable": false
         }
       ]
     },
@@ -789,6 +796,7 @@
     },
     {
       "id": "stormcap",
+      "world": "borealis",
       "name": "Storm Mushrooms",
       "tiers": [
         {

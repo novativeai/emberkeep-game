@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BAG_SLOTS } from '../../src/core/Constants';
+import chainsJson from '../../src/data/chains.json';
 import { capture, createTestContext } from './helpers';
 
 /** Put a piece on the board and hand back its id. */
@@ -96,5 +97,48 @@ describe('BagSystem (store on tap, retrieve from the panel)', () => {
     const fresh = createTestContext();
     fresh.state.hydrate(save);
     expect(fresh.state.bag).toEqual([{ chain: 'flame_gem', tier: 1, count: 1 }]);
+  });
+});
+
+/**
+ * EGGS ARE PROMISES, NOT MERCHANDISE (owner's law, 2026-08-26): every dragon
+ * egg goes IN the bag and never OUT through the till. The two used to be one
+ * flag — `sellable:false` also made the brewed eggs unpocketable, so a tap on
+ * an Ash Dragon Egg died silently. `storable` now carries the story-fixture
+ * refusal on its own.
+ */
+describe('dragon eggs: pocketable, never sellable', () => {
+  it('every tier named an Egg refuses the till, in data', () => {
+    // The law is pinned on the DATA so a future breed cannot ship a sellable
+    // egg by forgetting a flag.
+    const chains = (chainsJson as { chains: Array<{ tiers: Array<{ name: string; sellable?: boolean }> }> }).chains;
+    const leaks = chains
+      .flatMap((c) => c.tiers)
+      .filter((t) => /\bEgg\b/.test(t.name) && t.sellable !== false)
+      .map((t) => t.name);
+    expect(leaks).toEqual([]);
+  });
+
+  it('a brewed Ash Dragon Egg goes into the bag from a tap', () => {
+    const ctx = createTestContext();
+    ctx.bus.emit('ui:store_requested', { itemId: place(ctx, 'ashdrake', 1) });
+    expect(ctx.state.bag).toEqual([{ chain: 'ashdrake', tier: 1, count: 1 }]);
+  });
+
+  it('a banked Red Dragon Egg cannot be sold — coins and stack untouched', () => {
+    const ctx = createTestContext();
+    ctx.bus.emit('bag:bank', { chain: 'ember_dragon', tier: 2, count: 2 });
+    const coins = ctx.state.coins;
+
+    ctx.bus.emit('ui:bag_sell_requested', { chain: 'ember_dragon', tier: 2, count: 2 });
+
+    expect(ctx.state.coins).toBe(coins);
+    expect(ctx.state.bag).toEqual([{ chain: 'ember_dragon', tier: 2, count: 2 }]);
+  });
+
+  it('the Golden Egg still refuses the satchel outright, at the bus', () => {
+    const ctx = createTestContext();
+    ctx.bus.emit('ui:store_requested', { itemId: place(ctx, 'golden_egg', 1) });
+    expect(ctx.state.bag).toEqual([]);
   });
 });
