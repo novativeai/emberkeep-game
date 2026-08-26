@@ -6931,9 +6931,20 @@ export class BoardScene extends Phaser.Scene {
       !this.tutorialDone && this.ctx.state.worldId === WORLD_ID && !!this.tutorialStep;
     // Outside it, a HAND that is up gets the floor for the same reason: the
     // board must not strain at one cluster while the pointer names another.
+    // …and "gets the floor" has to mean the floor is EMPTY when it does not
+    // want it. `?? clusters[0]` said the opposite: a hand whose plan touches no
+    // ready cluster — a gather, or a set one of whose pieces is vetoed — fell
+    // through to the OLDEST cluster, which is chosen by a different rule than
+    // the hand's (first-completed, against the planner's highest-scoring). The
+    // board then strained one group of pieces while the hand demonstrated
+    // another, which is two instructions at once and the exact thing the line
+    // above forbids. With a hand up the answer is that cluster or NONE; the
+    // carried piece still leans on its own, through `askedMove` below.
     const active = teaching
       ? this.tutorialFocus(clusters)
-      : (clusters.find((c) => this.hintTouches(c)) ?? clusters[0] ?? null);
+      : this.hintShown
+        ? (clusters.find((c) => this.hintTouches(c)) ?? null)
+        : (clusters[0] ?? null);
     // THE ASKED MOVE. Whatever the game is currently asking the player to carry
     // — the tutorial beat's own hand, or the idle hint's first step — strains
     // toward the cell it is being sent to. It is the same gesture as a
