@@ -49,7 +49,12 @@ export class WorldSystem {
     // regions and asks nothing of the rest of the boot.
     bus.on('state:loaded', () => {
       const world = this.state.worlds.get(this.state.worldId);
-      if (world) this.settleUnlocks(world);
+      if (!world) return;
+      this.settleUnlocks(world);
+      // The bare-board heal, for a reload that lands ON the stranded world
+      // (the door-crossing case is handled in `switchTo` — see the note
+      // there). Empty makes it safe: nothing to duplicate.
+      if (this.state.items.size === 0) this.seed(world);
     });
   }
 
@@ -255,7 +260,14 @@ export class WorldSystem {
     const arriving = !this.state.visited(to);
     this.state.switchWorld(to);
     this.settleUnlocks(world);
-    if (arriving) this.seed(world);
+    // Seed on FIRST arrival — and heal a board that stands utterly BARE.
+    // The bare case is real (owner's report, 2026-08-27): a save that had
+    // "visited" Borealis before a world re-export carried the visit latch but
+    // none of the re-gridded regions' contents, so the shore had no Glass
+    // Oven and nothing to play with — a world where nothing can ever happen.
+    // Empty is the guard that makes re-seeding safe: with zero pieces on the
+    // board there is nothing the reveal could duplicate.
+    if (arriving || this.state.items.size === 0) this.seed(world);
     this.bus.emit('world:switched', { from, to });
   }
 

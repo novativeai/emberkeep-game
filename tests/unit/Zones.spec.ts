@@ -609,6 +609,33 @@ describe('portals — every world has a way out of it', () => {
     }
   });
 
+  /** THE BARE-BOARD HEAL (owner's report, 2026-08-27): a save that "visited"
+   *  Borealis before a world re-export kept the visit latch but none of the
+   *  re-gridded regions' contents — an island with no producer. Crossing onto
+   *  a board with ZERO pieces re-seeds its active regions; zero is what makes
+   *  that safe (nothing to duplicate). */
+  it('re-seeds a visited world whose board comes up empty', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[2]!;
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    const seeded = ctx.state.items.size;
+    expect(seeded).toBeGreaterThan(0);
+
+    // The stranded-save shape: visited, but the board holds nothing.
+    for (const id of [...ctx.state.items.keys()]) ctx.state.removeItem(id);
+    ctx.bus.emit('world:switch', { to: WORLD_ID });
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    expect(ctx.state.items.size).toBe(seeded);
+
+    // A board with even one piece is NOT healed — that is a played board.
+    const keep = [...ctx.state.items.keys()][0]!;
+    for (const id of [...ctx.state.items.keys()]) if (id !== keep) ctx.state.removeItem(id);
+    ctx.bus.emit('world:switch', { to: WORLD_ID });
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    expect(ctx.state.items.size).toBe(1);
+  });
+
   it('the latch is scoped: it is not rank anywhere south of the clouds', () => {
     const ctx = createTestContext();
     ctx.state.addStat(CAULDRON_REACHED_STAT, 1);

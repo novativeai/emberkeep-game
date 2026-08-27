@@ -34,6 +34,7 @@ import {
   FOG_STYLE_BY_WORLD,
   FOG_STYLE_DEFAULT,
   LIVE_GAME_WIDTH,
+  ELDER_WOKEN_STAT,
   GOLDEN_ALTAR,
   GOLDEN_CHAIN,
   GOLDEN_ELDER_TIER,
@@ -3014,9 +3015,12 @@ export class BoardScene extends Phaser.Scene {
       // ignored is still waiting next session, and one they followed is done.
       this.ctx.bus.on('dragon:crossed', () => this.clearGateLesson(true)),
       this.ctx.bus.on('tour:unpoint', () => this.clearTourArrow()),
-      this.ctx.bus.on('quest:completed', ({ questId }) => {
-        if (questId === GOLDEN_ALTAR.awakenQuestId) this.beat('trigger', () => this.runFinale());
-      })
+      // The awakening rides the RANK that opens Borealis now (owner's call,
+      // 2026-08-27): StorySystem latches ELDER_WOKEN_STAT and speaks this
+      // fact exactly once per save — on the level-up, or on the first load of
+      // a save already past it. The quest trigger it replaces lives on in the
+      // latch StorySystem defers to.
+      this.ctx.bus.on('story:elder_wakes', () => this.beat('trigger', () => this.runFinale()))
     );
   }
 
@@ -3068,23 +3072,12 @@ export class BoardScene extends Phaser.Scene {
       })
     );
     // …and the Golden Egg cracks: the legendary Elder AWAKENS on her ledge.
-    // ONLY if Eleanor's golden order was delivered — the egg is authored decor
-    // now, so its mere existence no longer implies the promise was earned; the
-    // prophecy finale variant leaves her sleeping (deliver later → the late
-    // awakening plays instead).
-    this.time.delayedCall(FINALE.awakenAtMs, () =>
-      this.beat('awaken', () => {
-        if (this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId)) {
-          this.awakenAltarElder();
-        } else if (this.altarEgg) {
-          // Prophecy variant: she stirs but does NOT wake — the un-filled order
-          // stays the hook.
-          const p = this.altarPoint();
-          this.wobbleGoldenEgg();
-          this.glowFlash(p.x, p.y + 40, PALETTE.goldAccent, 0.7, 1.4);
-        }
-      })
-    );
+    // UNCONDITIONALLY (owner's call, 2026-08-27): the ceremony fires when the
+    // rank opens Borealis, and a door that opens onto a still-sleeping Elder
+    // is a story told out of order. The old prophecy variant (stir, don't
+    // wake, when the golden order was unpaid) is retired with the quest
+    // trigger that made it possible.
+    this.time.delayedCall(FINALE.awakenAtMs, () => this.beat('awaken', () => this.awakenAltarElder()));
 
     // 3 — home again: the board is handed straight back to the player. Fenced
     // like the rest, and the reason it matters most here: this is the beat that
@@ -3188,8 +3181,10 @@ export class BoardScene extends Phaser.Scene {
     // is off-grid on purpose, so on another world it would be drawn by that
     // world's fallback lattice — an Emberkeep altar floating over the aurora.
     if (this.ctx.state.worldId !== WORLD_ID) return;
-    const delivered = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
-    const awake = delivered && this.goldenQuestDone();
+    // Awake if the ceremony has PLAYED — the rank latch StorySystem writes —
+    // or by the legacy quest latch older saves carry. Either way she stands on
+    // the next boot and the ceremony never replays.
+    const awake = this.ctx.state.stat(ELDER_WOKEN_STAT) > 0 || this.goldenQuestDone();
     if (awake) this.showAltarElder();
     else {
       this.showAltarEgg(false);
@@ -5749,15 +5744,18 @@ export class BoardScene extends Phaser.Scene {
    * fresh opening (ignition flash + shockwave); build time passes false so an
    * already-earned door simply stands lit. The North Crossing is a LEVEL door
    * now (owner's call, 2026-08-26 — worldGates dropped its quest latch), so it
-   * blooms here on the level-up like any other, and no longer needs excluding:
-   * its availability cannot flip mid-finale any more, so there is no ceremony
-   * left to scoop. `gate:opened` and the finale backstop still call
-   * `ignitePortal` on it, which simply no-ops on a door already lit.
+   * is a LEVEL door — and the LEVEL is also the awakening (owner's call,
+   * 2026-08-27: `story:elder_wakes` fires on the same rank), so the exclusion
+   * is back: lighting the arch on the bare level-up would scoop the ceremony
+   * that the rank itself starts. The ceremony's `gate:opened` and the finale
+   * backstop ignite it instead; build time (bloom=false) still stands an
+   * already-earned door lit on reload.
    */
   private syncPortalFx(bloom: boolean): void {
     const open = new Set(this.ctx.systems.worlds.available().map((w) => w.id));
-    for (const [, door] of this.portalDoors) {
+    for (const [id, door] of this.portalDoors) {
       if (door.fx.isLive || !open.has(door.to)) continue;
+      if (bloom && id === 'emberkeep_altar_gate') continue;
       if (bloom) {
         door.fx.bloom();
         // The gate's REVEAL carries a passenger: once the ignition has played

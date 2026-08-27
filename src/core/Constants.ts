@@ -2208,6 +2208,18 @@ export const PORTAL_TINTS: Record<string, PortalTints> = {
  */
 export const CAULDRON_REACHED_STAT = 'q:cauldron:reached';
 
+/**
+ * THE ELDER WAKES ON RANK (owner's call, 2026-08-27). Reaching the level that
+ * opens Borealis IS the awakening now: the finale — camera to the altar, the
+ * egg cracking, her first words, Eleanor speaking the Gate open — rides the
+ * `story:elder_wakes` fact, which StorySystem emits exactly once when the
+ * Keeper's level reaches the north's own `level`. This latch records that the
+ * ceremony has PLAYED (monotonic, in `stats`, so it ships in the save): the
+ * altar derives her standing from it (or from the legacy `q:done` latch), and
+ * a reload can never replay the chapter's one irreversible beat.
+ */
+export const ELDER_WOKEN_STAT = 'story:elder_woken';
+
 /** The Roothold house — the Emporium's painted storefront — as a world-px
  *  rect: roothold.webp [755, 205, 330, 340] through the shared art→world
  *  transform (build-zones: origin (1584.8, 954.2), unit 1.2190). Tapping it

@@ -1,12 +1,69 @@
 import { describe, expect, it } from 'vitest';
 import { LAST_CHAPTER, StorySystem } from '../../src/systems/StorySystem';
-import { LEVEL_XP } from '../../src/core/Constants';
+import { ELDER_WOKEN_STAT, LEVEL_XP } from '../../src/core/Constants';
 import { capture, createTestContext } from './helpers';
 
 /** The campaign only moves once the tutorial has handed the board over. */
 function pastTutorial(ctx: ReturnType<typeof createTestContext>): void {
   ctx.state.tutorialDone = true;
 }
+
+/**
+ * THE ELDER WAKES ON RANK (owner's law, 2026-08-27): reaching the level that
+ * opens Borealis fires `story:elder_wakes` exactly once per save — the finale
+ * rides it in both scenes. StorySystem is the one writer of the latch.
+ */
+describe('the Elder wakes on the rank that opens Borealis', () => {
+  it('wakes once at the rank, and never again', () => {
+    const ctx = createTestContext();
+    pastTutorial(ctx);
+    const woke = capture(ctx.bus, 'story:elder_wakes');
+
+    ctx.state.xp = LEVEL_XP[1]!; // Level 2 — below the north's gate
+    ctx.bus.emit('keeper:leveled', { level: ctx.state.level, from: ctx.state.level - 1 });
+    expect(woke).toHaveLength(0);
+    expect(ctx.state.stat(ELDER_WOKEN_STAT)).toBe(0);
+
+    ctx.state.xp = LEVEL_XP[2]!; // Level 3 — the door's own level
+    ctx.bus.emit('keeper:leveled', { level: ctx.state.level, from: ctx.state.level - 1 });
+    expect(woke).toHaveLength(1);
+    expect(ctx.state.stat(ELDER_WOKEN_STAT)).toBe(1);
+
+    ctx.state.xp = LEVEL_XP[3]!; // later ranks never replay the ceremony
+    ctx.bus.emit('keeper:leveled', { level: ctx.state.level, from: ctx.state.level - 1 });
+    expect(woke).toHaveLength(1);
+    expect(ctx.state.stat(ELDER_WOKEN_STAT)).toBe(1);
+  });
+
+  it('a loaded save already past the rank wakes her on boot', () => {
+    const ctx = createTestContext();
+    pastTutorial(ctx);
+    ctx.state.xp = LEVEL_XP[3]!; // banked at Level 4, ceremony never played
+    const woke = capture(ctx.bus, 'story:elder_wakes');
+    ctx.bus.emit('state:loaded', { offlineMs: 0, energyRecovered: 0 });
+    expect(woke).toHaveLength(1);
+    expect(ctx.state.stat(ELDER_WOKEN_STAT)).toBe(1);
+  });
+
+  it('a save whose quest latch already woke her is left alone', () => {
+    const ctx = createTestContext();
+    pastTutorial(ctx);
+    ctx.state.addStat('q:done:keepers_hoard', 1); // the legacy path
+    ctx.state.xp = LEVEL_XP[3]!;
+    const woke = capture(ctx.bus, 'story:elder_wakes');
+    ctx.bus.emit('state:loaded', { offlineMs: 0, energyRecovered: 0 });
+    expect(woke).toHaveLength(0);
+    expect(ctx.state.stat(ELDER_WOKEN_STAT)).toBe(0);
+  });
+
+  it('never fires mid-tutorial', () => {
+    const ctx = createTestContext();
+    ctx.state.xp = LEVEL_XP[2]!;
+    const woke = capture(ctx.bus, 'story:elder_wakes');
+    ctx.bus.emit('keeper:leveled', { level: ctx.state.level, from: ctx.state.level - 1 });
+    expect(woke).toHaveLength(0);
+  });
+});
 
 describe('StorySystem (the chapter pointer)', () => {
   it('starts at chapter 1', () => {

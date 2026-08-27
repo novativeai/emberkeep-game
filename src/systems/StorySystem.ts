@@ -1,3 +1,4 @@
+import { ELDER_WOKEN_STAT, GOLDEN_ALTAR } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { DialogueData } from '../core/types';
@@ -192,6 +193,29 @@ export class StorySystem {
       this.evaluate('recheck');
     });
     bus.on('world:switched', ({ to }) => this.arrive(to));
+    // The Elder's awakening rides the RANK that opens Borealis (owner's call,
+    // 2026-08-27) — checked live on every level-up, and on load so a save
+    // already past the rank (the door moved onto levels after it leveled)
+    // wakes her on its next boot rather than never.
+    bus.on('keeper:leveled', () => this.wakeElderForRank());
+    bus.on('state:loaded', () => this.wakeElderForRank());
+  }
+
+  /**
+   * THE ELDER WAKES ON RANK — the one writer of `ELDER_WOKEN_STAT` and the one
+   * emitter of `story:elder_wakes` (the long note lives on the constant).
+   * Latched BEFORE the emit, so the two scenes reading the stat can never race
+   * it. A save whose legacy quest latch (`q:done:keepers_hoard`) already says
+   * she is awake is left alone: she is standing, the ceremony has played.
+   */
+  private wakeElderForRank(): void {
+    if (!this.state.tutorialDone) return;
+    if (this.state.stat(ELDER_WOKEN_STAT) > 0) return;
+    if (this.state.stat(`q:done:${GOLDEN_ALTAR.awakenQuestId}`) > 0) return;
+    const gate = this.state.worlds.get('borealis')?.level ?? Infinity;
+    if (this.state.level < gate) return;
+    this.state.addStat(ELDER_WOKEN_STAT, 1);
+    this.bus.emit('story:elder_wakes', {});
   }
 
   /**

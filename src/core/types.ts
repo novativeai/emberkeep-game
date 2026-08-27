@@ -2038,6 +2038,13 @@ export interface EventMap {
   /** Every step of a quest is done — the main line strikes through and the next
    *  quest takes the HUD. */
   'quest:completed': { questId: string };
+  /** The Golden Elder WAKES — the Keeper's rank just reached the level that
+   *  opens Borealis (owner's law, 2026-08-27; the ceremony used to ride
+   *  `quest:completed` for keepers_hoard). Emitted ONCE ever per save by
+   *  StorySystem, which writes ELDER_WOKEN_STAT before speaking so the two
+   *  scenes can never race the latch. BoardScene answers with the camera and
+   *  the egg, UIScene with her voice and Eleanor's Gate ceremony. */
+  'story:elder_wakes': Record<string, never>;
   /** The first brew quest of some ladder has reached the player's track head
    *  (or was finished out of order) — the cauldron latch just flipped, ONCE
    *  ever per save. The clouds' and the Rune Way's second key (worldGates
