@@ -448,27 +448,6 @@
       }
     },
     {
-      "id": "north_strakes",
-      "chapter": 11,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "Brew Iron Hats",
-      "steps": [
-        {
-          "id": "strakes_brew",
-          "label": "Brew 4 Iron Hats in the Cauldron",
-          "goal": {
-            "kind": "brew",
-            "recipeId": "iron_cap",
-            "count": 4
-          }
-        }
-      ],
-      "rewards": {
-        "coins": 35
-      }
-    },
-    {
       "id": "north_fuel",
       "chapter": 11,
       "giver": "selyna",
@@ -510,27 +489,6 @@
       }
     },
     {
-      "id": "north_threadwork",
-      "chapter": 11,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "Brew Light Thread",
-      "steps": [
-        {
-          "id": "thread_brew",
-          "label": "Brew 4 Light Threads from Spyglasses",
-          "goal": {
-            "kind": "brew",
-            "recipeId": "light_thread",
-            "count": 4
-          }
-        }
-      ],
-      "rewards": {
-        "coins": 55
-      }
-    },
-    {
       "id": "north_salvage",
       "chapter": 11,
       "giver": "selyna",
@@ -562,24 +520,67 @@
       }
     },
     {
-      "id": "north_pitchpot",
+      "id": "north_strakes",
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Bricks for a New Oven",
+      "title": "Brew Tar Buckets",
       "steps": [
         {
-          "id": "pitchpot_brew",
-          "label": "Brew 3 Fire Bricks",
+          "id": "strakes_brew",
+          "label": "Brew 2 Tar Buckets in the Cauldron",
           "goal": {
             "kind": "brew",
-            "recipeId": "fire_brick",
-            "count": 3
+            "recipeId": "tar_spile",
+            "count": 2
           }
         }
       ],
       "rewards": {
-        "coins": 75
+        "coins": 35
+      }
+    },
+    {
+      "id": "north_pitchworks",
+      "chapter": 11,
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Make an Ember Heart",
+      "rewards": {
+        "coins": 130
+      },
+      "steps": [
+        {
+          "id": "pitchworks_ember",
+          "label": "Make 1 Ember Heart",
+          "goal": {
+            "kind": "have",
+            "chain": "emberheart",
+            "tier": 3,
+            "count": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "north_threadwork",
+      "chapter": 11,
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Brew Light Cloth",
+      "steps": [
+        {
+          "id": "thread_brew",
+          "label": "Brew 2 Light Cloths from Spyglasses",
+          "goal": {
+            "kind": "brew",
+            "recipeId": "light_thread",
+            "count": 2
+          }
+        }
+      ],
+      "rewards": {
+        "coins": 55
       }
     },
     {
@@ -608,24 +609,24 @@
       }
     },
     {
-      "id": "north_lamplight",
+      "id": "north_pitchpot",
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Lamps for the Long Night",
+      "title": "Racks for a New Oven",
       "steps": [
         {
-          "id": "lamplight_brew",
-          "label": "Brew 3 Oil Lamps",
+          "id": "pitchpot_brew",
+          "label": "Brew 3 Oven Racks",
           "goal": {
             "kind": "brew",
-            "recipeId": "oil_lamp",
+            "recipeId": "fire_brick",
             "count": 3
           }
         }
       ],
       "rewards": {
-        "coins": 95
+        "coins": 75
       }
     },
     {
@@ -671,24 +672,24 @@
       "orderId": "selyna_buoys"
     },
     {
-      "id": "north_lodestones",
+      "id": "north_lamplight",
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Make Magnet Rocks",
+      "title": "Lamps for the Long Night",
       "steps": [
         {
-          "id": "lodestones_brew",
-          "label": "Brew 3 Magnet Rocks",
+          "id": "lamplight_brew",
+          "label": "Brew 2 Big Lanterns",
           "goal": {
             "kind": "brew",
-            "recipeId": "lodestone",
-            "count": 3
+            "recipeId": "oil_lamp",
+            "count": 2
           }
         }
       ],
       "rewards": {
-        "coins": 115
+        "coins": 95
       }
     },
     {
@@ -719,67 +720,24 @@
       ]
     },
     {
-      "id": "north_skeins",
-      "chapter": 12,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "Weave Light Cloth",
-      "steps": [
-        {
-          "id": "skeins_brew",
-          "label": "Brew 3 Light Cloths",
-          "goal": {
-            "kind": "brew",
-            "recipeId": "woven_bolt",
-            "count": 3
-          }
-        }
-      ],
-      "rewards": {
-        "coins": 135
-      }
-    },
-    {
-      "id": "north_pitchworks",
+      "id": "north_lodestones",
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Make an Ember Heart",
-      "rewards": {
-        "coins": 130
-      },
+      "title": "Make Compass Needles",
       "steps": [
         {
-          "id": "pitchworks_ember",
-          "label": "Make 1 Ember Heart",
-          "goal": {
-            "kind": "have",
-            "chain": "emberheart",
-            "tier": 3,
-            "count": 1
-          }
-        }
-      ]
-    },
-    {
-      "id": "north_runeshards",
-      "chapter": 12,
-      "giver": "selyna",
-      "world": "borealis",
-      "title": "Make Rune Chips",
-      "steps": [
-        {
-          "id": "runeshards_brew",
-          "label": "Brew Rune Chips from an Ember Heart",
+          "id": "lodestones_brew",
+          "label": "Brew 2 Compass Needles",
           "goal": {
             "kind": "brew",
-            "recipeId": "rune_shard",
-            "count": 1
+            "recipeId": "lodestone",
+            "count": 2
           }
         }
       ],
       "rewards": {
-        "coins": 155
+        "coins": 115
       }
     },
     {
@@ -812,6 +770,27 @@
       ],
       "rewards": {
         "coins": 140
+      }
+    },
+    {
+      "id": "north_skeins",
+      "chapter": 12,
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Brew Spinning Wheels",
+      "steps": [
+        {
+          "id": "skeins_brew",
+          "label": "Brew 2 Spinning Wheels",
+          "goal": {
+            "kind": "brew",
+            "recipeId": "silver_spindle",
+            "count": 2
+          }
+        }
+      ],
+      "rewards": {
+        "coins": 135
       }
     },
     {
@@ -861,7 +840,28 @@
         }
       ],
       "rewards": {
-        "coins": 200,
+        "coins": 200
+      }
+    },
+    {
+      "id": "north_runeshards",
+      "chapter": 12,
+      "giver": "selyna",
+      "world": "borealis",
+      "title": "Carve a Rune",
+      "steps": [
+        {
+          "id": "runeshards_brew",
+          "label": "Brew a Carved Rune from an Ember Heart",
+          "goal": {
+            "kind": "brew",
+            "recipeId": "rune_shard",
+            "count": 1
+          }
+        }
+      ],
+      "rewards": {
+        "coins": 155,
         "spawn": {
           "chain": "rimewyrm",
           "tier": 1,

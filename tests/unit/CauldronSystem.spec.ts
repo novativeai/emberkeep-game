@@ -128,6 +128,20 @@ describe('cauldron.json (the recipe book itself)', () => {
       expect(loops, recipe.id).toBe(false);
     }
   });
+
+  /**
+   * THE TIER LAW (owner, 2026-08-26): the pot never hands back a tier-1 item —
+   * a brew must be worth at least a merge. The one exemption is the eggs: by
+   * the legendary directive tier 1 IS the egg (three merge into the dragon),
+   * and the Cauldron is their sanctioned faucet.
+   */
+  it('no recipe outputs a tier-1 item, eggs excepted', () => {
+    const eggs = new Set(['ashdrake', 'rimewyrm', 'golden_egg']);
+    const leaks = data.recipes
+      .filter((r) => r.output.tier < 2 && !eggs.has(r.output.chain))
+      .map((r) => r.id);
+    expect(leaks).toEqual([]);
+  });
 });
 
 describe('Recipe gating (the grimoire is earned page by page)', () => {
@@ -137,10 +151,10 @@ describe('Recipe gating (the grimoire is earned page by page)', () => {
   const order = quests.map((q) => q.id);
   const at = (id: string): number => order.indexOf(id);
 
-  it('the ledger opens with exactly the four starter pages', () => {
+  it('the ledger opens with exactly the three starter pages', () => {
     const ctx = createTestContext();
     const ids = ctx.systems.cauldron.available().map((r) => r.id);
-    expect(ids).toEqual(['hearth_cake', 'treasure_chest', 'red_egg', 'green_egg']);
+    expect(ids).toEqual(['hearth_cake', 'red_egg', 'green_egg']);
   });
 
   it('every unlock names a quest that exists', () => {
@@ -171,7 +185,7 @@ describe('Recipe gating (the grimoire is earned page by page)', () => {
     expect(ctx.systems.cauldron.available().map((r) => r.id)).not.toContain('iron_cap');
     expect(ctx.systems.cauldron.isNew('iron_cap')).toBe(false); // locked is not new
 
-    ctx.state.addStat('q:done:north_coast', 1);
+    ctx.state.addStat('q:done:north_salvage', 1);
     expect(ctx.systems.cauldron.available().map((r) => r.id)).toContain('iron_cap');
     expect(ctx.systems.cauldron.isNew('iron_cap')).toBe(true);
 

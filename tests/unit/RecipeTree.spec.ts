@@ -215,16 +215,16 @@ describe('a brew is the top rung of an ordinary ladder', () => {
   ) => brewHelp(CHAINS, recipe(id), input, count, pocket(owned), 'borealis');
 
   it('is titled after the piece the row names, not after what the pot eats', () => {
-    // iron_cap: 1 Glass Float in, 1 Iron Hat out. The step asks for four.
-    const help = brew('iron_cap', { chain: 'seaglass', tier: 2, count: 4 }, 4)!;
-    expect(help.goal).toMatchObject({ chain: 'warhelm', tier: 1, name: 'Iron Hat', count: 4 });
+    // iron_cap: 2 Glass Floats in, 1 Iron Helmet out. The step asks for two.
+    const help = brew('iron_cap', { chain: 'seaglass', tier: 2, count: 4 }, 2)!;
+    expect(help.goal).toMatchObject({ chain: 'warhelm', tier: 2, name: 'Iron Helmet', count: 2 });
   });
 
   it('says the pot, and keeps walking down the ingredient underneath it', () => {
-    const help = brew('iron_cap', { chain: 'seaglass', tier: 2, count: 4 }, 4)!;
+    const help = brew('iron_cap', { chain: 'seaglass', tier: 2, count: 4 }, 2)!;
     // Rung 0 is the goal (the title); rung 1 is what the pot eats; below that
     // is the ingredient's own merge ladder, unchanged.
-    expect(help.rungs[0]).toMatchObject({ chain: 'warhelm', tier: 1, fromCount: 1, via: 'Cauldron' });
+    expect(help.rungs[0]).toMatchObject({ chain: 'warhelm', tier: 2, fromCount: 2, via: 'Cauldron' });
     expect(help.rungs[1]).toMatchObject({ chain: 'seaglass', tier: 2, fromCount: 3 });
     expect(help.rungs[2]).toMatchObject({ chain: 'seaglass', tier: 1 });
     // …and the bottom of it still names who makes the base piece.
@@ -233,24 +233,24 @@ describe('a brew is the top rung of an ordinary ladder', () => {
   });
 
   it('names the ingredient it is NOT walking down, so a two-part recipe cannot lie', () => {
-    // fire_brick: 2 Tar Drops + 1 Iron Hat. Walking the Tar Drops must still
+    // fire_brick: 1 Tar Loaf + 2 Iron Hats. Walking the Tar Loaves must still
     // say the hats are wanted — a ladder that mentions one half of a recipe
     // and stops is a hint the player will act on and be refused for.
-    const help = brew('fire_brick', { chain: 'emberheart', tier: 1, count: 6 }, 3)!;
-    expect(help.rungs[0].via).toBe('Cauldron, with 1 × Iron Hat');
-    expect(help.rungs[0]).toMatchObject({ name: 'Fire Brick', fromCount: 2 });
+    const help = brew('fire_brick', { chain: 'emberheart', tier: 2, count: 3 }, 3)!;
+    expect(help.rungs[0].via).toBe('Cauldron, with 2 × Iron Hat');
+    expect(help.rungs[0]).toMatchObject({ name: 'Oven Rack', fromCount: 1 });
   });
 
   it('counts what is already brewed against the ask', () => {
-    const help = brew('iron_cap', { chain: 'seaglass', tier: 2, count: 4 }, 4, { 'warhelm:1': 3 })!;
-    expect(help.rungs[0]).toMatchObject({ need: 4, have: 3, missing: 1 });
+    const help = brew('iron_cap', { chain: 'seaglass', tier: 2, count: 4 }, 2, { 'warhelm:2': 1 })!;
+    expect(help.rungs[0]).toMatchObject({ need: 2, have: 1, missing: 1 });
   });
 
   it('still answers when the ingredient has no ladder and no maker', () => {
     // The pot alone is a complete answer: the head rung, and the thing it eats.
     const help = brew('iron_cap', { chain: 'seaglass', tier: 1, count: 2 }, 2)!;
     expect(help).not.toBeNull();
-    expect(help.goal.name).toBe('Iron Hat');
+    expect(help.goal.name).toBe('Iron Helmet');
     expect(help.rungs).toHaveLength(2);
   });
 });

@@ -26,40 +26,40 @@
       "id": "iron_cap",
       "output": {
         "chain": "warhelm",
-        "tier": 1,
+        "tier": 2,
         "count": 1
       },
       "inputs": [
         {
           "chain": "seaglass",
           "tier": 2,
-          "count": 1
+          "count": 2
         }
       ],
-      "flavor": "Melt a Glass Float, and the iron from its net comes out.",
-      "use": "Iron Hats are hard to find. This makes them faster.",
+      "flavor": "Melt two Glass Floats, and the iron from their nets comes out — enough for a whole helmet.",
+      "use": "Iron Helmets are hard to find. This makes them faster.",
       "unlock": {
-        "quest": "north_coast"
+        "quest": "north_salvage"
       }
     },
     {
       "id": "light_thread",
       "output": {
         "chain": "auroraweave",
-        "tier": 1,
+        "tier": 2,
         "count": 1
       },
       "inputs": [
         {
           "chain": "orrery",
           "tier": 2,
-          "count": 1
+          "count": 2
         }
       ],
-      "flavor": "Break a Spyglass into lenses, hold them up to the northern lights, and a strand of colour comes off.",
-      "use": "Makes Light Thread without building a whole Star Machine.",
+      "flavor": "Break two Spyglasses into lenses, hold them up to the northern lights, and the colour weaves itself.",
+      "use": "Makes Light Cloth without building a whole Star Machine.",
       "unlock": {
-        "quest": "north_fuel"
+        "quest": "north_strakes"
       }
     },
     {
@@ -91,14 +91,14 @@
       "id": "oil_lamp",
       "output": {
         "chain": "hearthlamp",
-        "tier": 1,
+        "tier": 2,
         "count": 1
       },
       "inputs": [
         {
           "chain": "emberheart",
           "tier": 2,
-          "count": 1
+          "count": 2
         },
         {
           "chain": "emberdram",
@@ -106,8 +106,8 @@
           "count": 2
         }
       ],
-      "flavor": "Tar to burn, Fire Juice for the light, and a wick.",
-      "use": "3 Oil Lamps make a Big Lantern. Only a few were ever left on the ice.",
+      "flavor": "Tar to burn twice over, Fire Juice for the light, and wicks for both.",
+      "use": "3 Big Lanterns make a Warm Lamp. Only a few were ever left on the ice.",
       "unlock": {
         "quest": "north_door"
       }
@@ -116,23 +116,23 @@
       "id": "lodestone",
       "output": {
         "chain": "wayfinder",
-        "tier": 1,
+        "tier": 2,
         "count": 1
       },
       "inputs": [
         {
           "chain": "manastone",
-          "tier": 1,
-          "count": 2
+          "tier": 2,
+          "count": 1
         },
         {
           "chain": "warhelm",
-          "tier": 1,
+          "tier": 2,
           "count": 1
         }
       ],
-      "flavor": "Two Magic Pebbles fight over one Iron Hat until one wins and points north.",
-      "use": "The first step to a Treasure Compass, which makes Gold forever.",
+      "flavor": "A Magic Rock and an Iron Helmet argue until a needle points north.",
+      "use": "3 Compass Needles make a Treasure Compass, which makes Gold forever.",
       "unlock": {
         "quest": "north_lamplight"
       }
@@ -141,13 +141,13 @@
       "id": "woven_bolt",
       "output": {
         "chain": "auroraweave",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "auroraweave",
-          "tier": 1,
+          "tier": 2,
           "count": 2
         },
         {
@@ -156,8 +156,8 @@
           "count": 1
         }
       ],
-      "flavor": "Two Light Threads and a Spyglass to hold them apart while they set.",
-      "use": "3 Light Cloths make an Aurora Cloak. Selyna's last order needs those.",
+      "flavor": "Two Light Cloths and a Spyglass to hold them apart while they set.",
+      "use": "Selyna's last order asks for Aurora Cloaks. This weaves one whole.",
       "unlock": {
         "quest": "north_lodestones"
       }
@@ -166,8 +166,8 @@
       "id": "rune_shard",
       "output": {
         "chain": "runestone",
-        "tier": 1,
-        "count": 3
+        "tier": 2,
+        "count": 1
       },
       "inputs": [
         {
@@ -181,8 +181,8 @@
           "count": 1
         }
       ],
-      "flavor": "An Ember Heart burns hot enough to split a Magic Rock into clean pieces.",
-      "use": "3 Rune Chips start a new Runestone. A Runestone makes Tar Drops forever.",
+      "flavor": "An Ember Heart burns hot enough to fuse a Magic Rock into one carved rune.",
+      "use": "3 Carved Runes finish a Runestone. A Runestone makes Tar Drops forever.",
       "unlock": {
         "quest": "north_pitchworks"
       }
@@ -191,73 +191,73 @@
       "id": "fire_brick",
       "output": {
         "chain": "glasskiln",
-        "tier": 1,
+        "tier": 2,
         "count": 1
       },
       "inputs": [
         {
           "chain": "emberheart",
-          "tier": 1,
-          "count": 2
+          "tier": 2,
+          "count": 1
         },
         {
           "chain": "warhelm",
           "tier": 1,
-          "count": 1
+          "count": 2
         }
       ],
-      "flavor": "Clay needs a fire under it and an iron ring to hold its shape.",
-      "use": "9 Fire Bricks build a second Glass Oven.",
+      "flavor": "Clay needs a slow fire under it and iron rings to hold its shape.",
+      "use": "3 Oven Racks build a second Glass Oven.",
       "unlock": {
-        "quest": "north_salvage"
+        "quest": "north_threadwork"
       }
     },
     {
       "id": "tar_spile",
       "output": {
         "chain": "tarkiln",
-        "tier": 1,
+        "tier": 2,
         "count": 1
       },
       "inputs": [
         {
           "chain": "seaglass",
-          "tier": 1,
-          "count": 2
+          "tier": 2,
+          "count": 1
         },
         {
           "chain": "warhelm",
           "tier": 1,
-          "count": 1
+          "count": 2
         }
       ],
-      "flavor": "A glass tube and an iron tip. That is all a Tar Scoop is.",
-      "use": "9 Tar Scoops build a second Tar Oven.",
+      "flavor": "A Glass Float's worth of tubes and two iron tips. That is all a Tar Bucket is.",
+      "use": "3 Tar Buckets build a second Tar Oven.",
       "unlock": {
-        "quest": "north_door"
+        "quest": "north_salvage"
       }
     },
     {
       "id": "iron_billet",
       "output": {
         "chain": "wreckforge",
-        "tier": 1,
+        "tier": 2,
         "count": 1
       },
       "inputs": [
         {
           "chain": "warhelm",
-          "tier": 1,
-          "count": 3
+          "tier": 2,
+          "count": 1
         },
         {
           "chain": "emberheart",
-          "tier": 1,
+          "tier": 2,
           "count": 1
         }
       ],
-      "flavor": "Three Iron Hats melted down, with a little tar to keep the fire honest.",
-      "use": "9 Iron Bars build a second Shipwreck Forge.",
+      "flavor": "An Iron Helmet melted down, with a loaf of tar to keep the fire honest.",
+      "use": "3 Bellows build a second Shipwreck Forge.",
       "unlock": {
         "quest": "north_hulls"
       }
@@ -266,23 +266,23 @@
       "id": "brass_cog",
       "output": {
         "chain": "starbench",
-        "tier": 1,
+        "tier": 2,
         "count": 1
       },
       "inputs": [
         {
           "chain": "warhelm",
-          "tier": 1,
-          "count": 2
+          "tier": 2,
+          "count": 1
         },
         {
           "chain": "emberheart",
           "tier": 1,
-          "count": 1
+          "count": 2
         }
       ],
-      "flavor": "Iron Hats melted and poured into a tiny gear shape.",
-      "use": "9 Gears build a second Star Workbench.",
+      "flavor": "Iron melted and poured into meshing gear shapes.",
+      "use": "3 Gear Wheels build a second Star Workbench.",
       "unlock": {
         "quest": "north_skeins"
       }
@@ -291,48 +291,26 @@
       "id": "silver_spindle",
       "output": {
         "chain": "auroraloom",
-        "tier": 1,
+        "tier": 2,
         "count": 1
       },
       "inputs": [
         {
           "chain": "orrery",
-          "tier": 1,
-          "count": 2
+          "tier": 2,
+          "count": 1
         },
         {
           "chain": "warhelm",
-          "tier": 1,
-          "count": 1
-        }
-      ],
-      "flavor": "Iron pulled out as thin as thread, with a ring made from two lenses.",
-      "use": "9 Silver Spools build a second Aurora Loom.",
-      "unlock": {
-        "quest": "north_pitchworks"
-      }
-    },
-    {
-      "id": "treasure_chest",
-      "output": {
-        "chain": "chest",
-        "tier": 1,
-        "count": 1
-      },
-      "inputs": [
-        {
-          "chain": "lumber",
-          "tier": 1,
-          "count": 3
-        },
-        {
-          "chain": "flame_gem",
           "tier": 2,
           "count": 1
         }
       ],
-      "flavor": "Build a box from Logs and seal it with a warm gem. The island fills it on its own.",
-      "use": "Opens into Gold, Rubies, or a rare find."
+      "flavor": "Iron pulled thin as thread around a ring of lenses, then set spinning.",
+      "use": "3 Spinning Wheels build a second Aurora Loom.",
+      "unlock": {
+        "quest": "north_pitchworks"
+      }
     },
     {
       "id": "red_egg",
