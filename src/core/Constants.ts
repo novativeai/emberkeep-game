@@ -1879,7 +1879,12 @@ export const CHEST_GIFTS_BY_WORLD: Readonly<Record<string, ReadonlyArray<ChestGi
     // per-world table.
     { kind: 'item', chain: 'seaglass', tier: 1, count: 3, label: '3 Glass Balls!' },
     { kind: 'item', chain: 'orrery', tier: 1, count: 3, label: '3 Glass Lenses!' },
-    { kind: 'item', chain: 'warhelm', tier: 1, count: 2, label: '2 Iron Hats!' }
+    { kind: 'item', chain: 'warhelm', tier: 1, count: 2, label: '2 Iron Hats!' },
+    // Second faucets for the two slowest tier-1s (2026-08-27): Magic Pebbles
+    // and Fire Juice otherwise trickle ONLY from one seeded machine's every-5th
+    // bonus yield, and the compass/lamp brews would be an hours-long wall.
+    { kind: 'item', chain: 'manastone', tier: 1, count: 2, label: '2 Magic Pebbles!' },
+    { kind: 'item', chain: 'emberdram', tier: 1, count: 2, label: '2 Fire Juices!' }
   ]
 };
 
@@ -1927,8 +1932,12 @@ export const ENERGY_REGEN_AMOUNT = 1;
  * Elder's awakening lives on `GOLDEN_ALTAR.awakenQuestId` — a level the player
  * crosses mid-merge is the wrong trigger for the chapter's one irreversible
  * story beat.
+ *
+ * The steps must ASCEND (each level costs more than the last): the old 1000
+ * made Level 5 cost 580 and Level 6 only 400. 850 keeps the curve monotonic
+ * (60 · 160 · 200 · 430 · 550) and stays out of the finale window above.
  */
-export const LEVEL_XP = [0, 60, 220, 420, 1000, 1400] as const;
+export const LEVEL_XP = [0, 60, 220, 420, 850, 1400] as const;
 
 /** Max Warmth grows by this much per Keeper level (level 1 = ENERGY_MAX). */
 export const ENERGY_PER_LEVEL = 3;

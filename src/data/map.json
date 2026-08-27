@@ -3,8 +3,8 @@
   "rows": 12,
   "tile": {
     "width": 420,
-    "height": 242,
-    "skew": 0,
+    "height": 249,
+    "skew": -0.728,
     "angle": 29.95
   },
   "regions": [
@@ -954,9 +954,9 @@
   ],
   "backgroundCalibration": {
     "emberkeep": {
-      "offsetX": 0,
-      "offsetY": 0,
-      "scale": 2,
+      "offsetX": -5.05,
+      "offsetY": -15.2,
+      "scale": 2.0289,
       "anchor": {
         "x": 0.5,
         "y": 0.5

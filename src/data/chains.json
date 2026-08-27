@@ -663,14 +663,16 @@
           "id": "dew_basin_1",
           "name": "Hollow Stone",
           "sell": 3,
-          "xp": 4
+          "xp": 4,
+          "sellable": false
         },
         {
           "tier": 2,
           "id": "dew_basin_2",
           "name": "Dew Bowl",
           "sell": 9,
-          "xp": 8
+          "xp": 8,
+          "sellable": false
         },
         {
           "tier": 3,
@@ -686,7 +688,8 @@
             "cooldownMs": 240000,
             "energyCost": 0,
             "passiveMs": 240000
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -958,7 +961,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1031,7 +1035,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1104,7 +1109,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1177,7 +1183,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1250,7 +1257,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1323,7 +1331,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1354,7 +1363,7 @@
           "xp": 18,
           "generator": {
             "produces": {
-              "chain": "seaglass",
+              "chain": "emberdram",
               "tier": 1
             },
             "cooldownMs": 180000,
@@ -1368,7 +1377,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1452,13 +1462,14 @@
             "passiveMs": 300000,
             "tappable": true,
             "bonus": {
-              "every": 12,
+              "every": 5,
               "produces": {
                 "chain": "manastone",
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },

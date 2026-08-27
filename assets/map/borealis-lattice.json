@@ -1,0 +1,245 @@
+{
+  "format": "emberkeep-measured-lattice",
+  "version": 1,
+  "backdrop": "borealis",
+  "note": "Painted-flagstone lattice of the SHIPPED borealis.webp, measured from the art (2026-08-27): autocorrelation for the per-island basis, grout-valley scan for the phase, per-stone refit on the runepad. Backdrop px. build-zones snaps each editor grid onto this lattice. The grids block pins each editor grid to its validated stones (island + lattice index of local (0,0)) so re-fitting the editor transform can never re-deal the assignment.",
+  "islands": [
+    {
+      "name": "main",
+      "u": [
+        71.99,
+        38.209
+      ],
+      "v": [
+        -70.609,
+        38.419
+      ],
+      "origin": [
+        24.52,
+        -4.11
+      ]
+    },
+    {
+      "name": "east",
+      "u": [
+        71.259,
+        37.616
+      ],
+      "v": [
+        -70.153,
+        37.303
+      ],
+      "origin": [
+        1.54,
+        41.13
+      ]
+    },
+    {
+      "name": "runepad",
+      "u": [
+        62.95,
+        36.48
+      ],
+      "v": [
+        -68.51,
+        37.74
+      ],
+      "origin": [
+        1726.88,
+        1273.27
+      ]
+    }
+  ],
+  "grids": {
+    "Grille 1": {
+      "island": "runepad",
+      "a0": -21,
+      "b0": -5
+    },
+    "Grille 2": {
+      "island": "east",
+      "a0": 8,
+      "b0": -1
+    },
+    "Grille 3": {
+      "island": "main",
+      "a0": 9,
+      "b0": 1
+    },
+    "Grille 4": {
+      "island": "runepad",
+      "a0": -21,
+      "b0": -1
+    },
+    "Grille 5": {
+      "island": "runepad",
+      "a0": -21,
+      "b0": 1
+    },
+    "Grille 6": {
+      "island": "main",
+      "a0": 11,
+      "b0": -1
+    },
+    "Grille 7": {
+      "island": "main",
+      "a0": 11,
+      "b0": 2
+    },
+    "Grille 8": {
+      "island": "main",
+      "a0": 12,
+      "b0": -1
+    },
+    "Grille 9": {
+      "island": "main",
+      "a0": 12,
+      "b0": 3
+    },
+    "Grille 10": {
+      "island": "east",
+      "a0": 13,
+      "b0": -2
+    },
+    "Grille 11": {
+      "island": "main",
+      "a0": 13,
+      "b0": 2
+    },
+    "Grille 12": {
+      "island": "east",
+      "a0": 13,
+      "b0": 4
+    },
+    "Grille 13": {
+      "island": "main",
+      "a0": 14,
+      "b0": -1
+    },
+    "Grille 14": {
+      "island": "main",
+      "a0": 14,
+      "b0": 2
+    },
+    "Grille 15": {
+      "island": "east",
+      "a0": 14,
+      "b0": 4
+    },
+    "Grille 16": {
+      "island": "main",
+      "a0": 15,
+      "b0": 1
+    },
+    "Grille 17": {
+      "island": "main",
+      "a0": 15,
+      "b0": 4
+    },
+    "Grille 18": {
+      "island": "east",
+      "a0": 15,
+      "b0": 6
+    },
+    "Grille 19": {
+      "island": "main",
+      "a0": 16,
+      "b0": 2
+    },
+    "Grille 20": {
+      "island": "main",
+      "a0": 16,
+      "b0": 4
+    },
+    "Grille 21": {
+      "island": "main",
+      "a0": 16,
+      "b0": 6
+    },
+    "Grille 22": {
+      "island": "east",
+      "a0": 16,
+      "b0": 7
+    },
+    "Grille 23": {
+      "island": "main",
+      "a0": 18,
+      "b0": 4
+    },
+    "Grille 24": {
+      "island": "main",
+      "a0": 18,
+      "b0": 6
+    },
+    "Grille 25": {
+      "island": "main",
+      "a0": 18,
+      "b0": 9
+    },
+    "Grille 26": {
+      "island": "main",
+      "a0": 19,
+      "b0": 7
+    },
+    "Grille 27": {
+      "island": "main",
+      "a0": 19,
+      "b0": 9
+    },
+    "Grille 28": {
+      "island": "main",
+      "a0": 21,
+      "b0": 8
+    },
+    "Grille 29": {
+      "island": "main",
+      "a0": 21,
+      "b0": 10
+    },
+    "Grille 30": {
+      "island": "main",
+      "a0": 23,
+      "b0": 8
+    },
+    "Grille 31": {
+      "island": "runepad",
+      "a0": 0,
+      "b0": -2
+    },
+    "Grille 32": {
+      "island": "east",
+      "a0": 17,
+      "b0": -9
+    },
+    "Grille 33": {
+      "island": "east",
+      "a0": 19,
+      "b0": -9
+    },
+    "Grille 34": {
+      "island": "east",
+      "a0": 19,
+      "b0": -7
+    },
+    "Grille 35": {
+      "island": "east",
+      "a0": 21,
+      "b0": -9
+    },
+    "Grille 36": {
+      "island": "east",
+      "a0": 21,
+      "b0": -6
+    },
+    "Grille 37": {
+      "island": "east",
+      "a0": 23,
+      "b0": -7
+    },
+    "Grille 38": {
+      "island": "east",
+      "a0": 25,
+      "b0": -7
+    }
+  }
+}

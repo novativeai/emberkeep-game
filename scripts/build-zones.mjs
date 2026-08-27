@@ -139,9 +139,12 @@ const artToWorld = (x, y) => ({
   y: artOriginY + (y - ART_H / 2) * unit
 });
 
-/** The game lattice expressed in backdrop px, for the overlap test below. */
-const AU = { x: halfW / unit, y: halfH / unit };
-const AV = { x: -halfW / unit, y: halfH / unit };
+/** The game lattice expressed in backdrop px, for the overlap test below.
+ *  `tile.skew` shears columns with depth exactly as `iso.ts` projects them —
+ *  leave it out and the authored-isle veto reads the wrong cell near the rim. */
+const skewK = authored.tile?.skew ? Math.tan((authored.tile.skew * Math.PI) / 180) : 0;
+const AU = { x: (halfW + skewK * halfH) / unit, y: halfH / unit };
+const AV = { x: (-halfW + skewK * halfH) / unit, y: halfH / unit };
 const A0 = {
   x: (BOARD_ORIGIN_X - artOriginX) / unit + ART_W / 2,
   y: (BOARD_ORIGIN_Y - artOriginY) / unit + ART_H / 2
@@ -467,6 +470,121 @@ function deckZone(deck, island, index, block) {
     artScale: round2((Math.abs(deck.u[0] - deck.v[0]) * unit) / TILE_W),
     cells: cells.map(([i, j]) => [i - minI, j - minJ])
   };
+}
+
+/**
+ * A MEASURED LATTICE over an editor world: the painted flagstones, asked
+ * directly (owner's pass, 2026-08-27).
+ *
+ * The editor grids for Borealis were placed BY HAND, one small grid at a
+ * time — 38 origins and pitches, each eyeballed against the painting, drifting
+ * up to a third of a tile from the grout and from each other. The painting
+ * itself has one coherent lattice per island, and it was measured off the art
+ * (autocorrelation for the basis, a grout-valley scan for the phase, a
+ * per-stone refit on the runepad) into `assets/map/<backdrop>-lattice.json`.
+ *
+ * This step SNAPS each editor grid onto that lattice: every kept cell's
+ * editor-derived art point rounds to its nearest painted stone, the grid's
+ * origin/u/v are rewritten from the island's measured basis, and the editor's
+ * numbers survive only as the measurement that says WHICH stone each cell is.
+ * Cell indices, blocks, regions and counts do not move — only the pixels do.
+ *
+ * Two refusals keep it honest: a grid whose cells do not agree on one lattice
+ * placement (spread > 1.5 art px) fails, and two cells of the world claiming
+ * the SAME painted stone fail — both are authoring errors this step must not
+ * paper over.
+ */
+function snapZoneToMeasured(zone, keep, measured, claimed) {
+  /** Node at lattice index (a,b) of island `isl`. */
+  const nodeOf = (isl, a, b) => ({
+    a,
+    b,
+    nx: isl.origin[0] + a * isl.u[0] + b * isl.v[0],
+    ny: isl.origin[1] + a * isl.u[1] + b * isl.v[1]
+  });
+  // THE ASSIGNMENT IS DATA, NOT A FIT. The editor transform is calibrated
+  // against the authored lattice, so recalibrating the authored map (emberkeep
+  // 2026-08-27) moves every editor-derived art point a dozen px — and a
+  // nearest-node scan then re-deals borderline grids onto neighbouring stones.
+  // A grid whose stones are already named by the measured file never scans:
+  //   1. an island named exactly after the grid IS that grid's measurement,
+  //      local (0,0) at its origin (emberkeep's per-grille entries);
+  //   2. `grids[name]` pins the grid to its validated island + lattice index
+  //      (borealis, captured from the owner-approved build);
+  //   3. only an unpinned grid — a future export — falls back to the scan.
+  let best = null;
+  const own = measured.islands.find((i) => i.name === zone.name);
+  const pin = measured.grids?.[zone.name];
+  if (own) {
+    best = { isl: own, nodes: keep.map(({ cell }) => nodeOf(own, cell.i, cell.j)) };
+  } else if (pin) {
+    const isl = measured.islands.find((i) => i.name === pin.island);
+    if (!isl) throw new Error(`build-zones: "${zone.name}" is pinned to unknown island "${pin.island}"`);
+    best = { isl, nodes: keep.map(({ cell }) => nodeOf(isl, pin.a0 + cell.i, pin.b0 + cell.j)) };
+  } else {
+    for (const isl of measured.islands) {
+      const det = isl.u[0] * isl.v[1] - isl.v[0] * isl.u[1];
+      let sum = 0;
+      const nodes = [];
+      for (const { art } of keep) {
+        const dx = art.x - isl.origin[0];
+        const dy = art.y - isl.origin[1];
+        const a = Math.round((isl.v[1] * dx - isl.v[0] * dy) / det);
+        const b = Math.round((-isl.u[1] * dx + isl.u[0] * dy) / det);
+        sum += Math.hypot(art.x - nodeOf(isl, a, b).nx, art.y - nodeOf(isl, a, b).ny);
+        nodes.push(nodeOf(isl, a, b));
+      }
+      const mean = sum / keep.length;
+      if (!best || mean < best.mean) best = { isl, nodes, mean };
+    }
+  }
+  const { isl, nodes } = best;
+  // The zone origin every cell implies; they must all imply the same one.
+  let ox = 0;
+  let oy = 0;
+  keep.forEach(({ cell }, k) => {
+    ox += nodes[k].nx - cell.i * isl.u[0] - cell.j * isl.v[0];
+    oy += nodes[k].ny - cell.i * isl.u[1] - cell.j * isl.v[1];
+  });
+  ox /= keep.length;
+  oy /= keep.length;
+  const spread = Math.max(
+    ...keep.map(({ cell }, k) =>
+      Math.hypot(
+        nodes[k].nx - cell.i * isl.u[0] - cell.j * isl.v[0] - ox,
+        nodes[k].ny - cell.i * isl.u[1] - cell.j * isl.v[1] - oy
+      )
+    )
+  );
+  if (spread > 1.5) {
+    throw new Error(
+      `build-zones: grid "${zone.name}" does not sit on the measured ${isl.name} lattice as one piece (spread ${spread.toFixed(1)} art px)`
+    );
+  }
+  keep.forEach(({ cell }, k) => {
+    const key = `${isl.name}:${nodes[k].a},${nodes[k].b}`;
+    const holder = claimed.get(key);
+    if (holder) {
+      throw new Error(
+        `build-zones: "${zone.name}" cell (${cell.i},${cell.j}) and ${holder} claim the same painted stone ${key}`
+      );
+    }
+    claimed.set(key, `"${zone.name}" cell (${cell.i},${cell.j})`);
+  });
+  const origin = artToWorld(ox, oy);
+  const pa = artToWorld(ox, oy);
+  zone.origin = [round2(origin.x), round2(origin.y)];
+  zone.u = [round2(isl.u[0] * unit), round2(isl.u[1] * unit)];
+  zone.v = [round2(isl.v[0] * unit), round2(isl.v[1] * unit)];
+  // Measured off an unrotated painting — any editor rotation was part of the
+  // hand placement this step replaces.
+  zone.rotation = 0;
+  zone.pivot = [round2(pa.x), round2(pa.y)];
+  zone.artScale = round2((Math.abs(isl.u[0] - isl.v[0]) * unit) / TILE_W);
+  // The seeds' world points ride the snapped stones, not the hand placement.
+  keep.forEach((k2, k) => {
+    k2.art = { x: nodes[k].nx, y: nodes[k].ny };
+  });
 }
 
 /** World px centre of an editor cell — the address everything else derives from. */
@@ -1103,7 +1221,10 @@ const WORLDS = [
      * If the address ever stops resolving the BUILD FAILS — a gift that
      * silently stops being placed is worse than no gift.
      */
-    gifts: [{ island: 3, level: 4, seeds: [['frost', 1, 1]] }]
+    // Island 4 since the measured re-seat (2026-08-27): the lone slab by the
+    // gate plateau, (35,0), stands its true distance from both neighbours now
+    // and counts as its own island, pushing the north-west group from 3 to 4.
+    gifts: [{ island: 4, level: 4, seeds: [['frost', 1, 1]] }]
   },
   {
     id: 'borealis',
@@ -1242,6 +1363,11 @@ for (const spec of WORLDS) {
     nextCol += zone.matrix[0] + BLOCK_GUTTER;
   }
 
+  // A measured flagstone lattice for this backdrop, if one has been taken.
+  const latticePath = `assets/map/${spec.backdrop}-lattice.json`;
+  const measured = existsSync(resolve(ROOT, latticePath)) ? read(latticePath) : null;
+  const claimedStones = new Map();
+
   for (const grid of src?.grids ?? []) {
     if (!(grid.cells ?? []).length) continue;
     const keep = [];
@@ -1259,6 +1385,7 @@ for (const spec of WORLDS) {
     if (!keep.length) continue;
 
     const zone = zoneOf(grid, { col: nextCol, row: 0 });
+    if (measured) snapZoneToMeasured(zone, keep, measured, claimedStones);
     for (const { cell: c, art } of keep) {
       const col = nextCol + c.i;
       const row = c.j;

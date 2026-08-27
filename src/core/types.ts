@@ -2122,6 +2122,10 @@ export interface EventMap {
   /** Fact: it went through, and this is where it came out. */
   'dragon:crossed': { itemId: number; from: string; to: string; at: TilePos };
   'world:switch': { to: string };
+  /** A travel the UI wants CURTAINED: the veil covers first, and only then is
+   *  `world:switch` emitted — so not one frame of the new world paints before
+   *  the loading curtain is fully down. */
+  'ui:travel_departing': { to: string };
   /** Fact: the active world changed. BoardScene rebuilds on this — which means
    *  fetching art over the network, so this is where the travel veil goes UP. */
   'world:switched': { from: string; to: string };

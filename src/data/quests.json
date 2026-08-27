@@ -524,15 +524,15 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Brew Tar Buckets",
+      "title": "Brew a Tar Oven",
       "steps": [
         {
           "id": "strakes_brew",
-          "label": "Brew 2 Tar Buckets in the Cauldron",
+          "label": "Brew a Tar Oven in the Cauldron",
           "goal": {
             "kind": "brew",
             "recipeId": "tar_spile",
-            "count": 2
+            "count": 1
           }
         }
       ],
@@ -567,15 +567,15 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Brew Light Cloth",
+      "title": "Brew a Star Workbench",
       "steps": [
         {
           "id": "thread_brew",
-          "label": "Brew 2 Light Cloths from Spyglasses",
+          "label": "Brew a Star Workbench in the Cauldron",
           "goal": {
             "kind": "brew",
-            "recipeId": "light_thread",
-            "count": 2
+            "recipeId": "brass_cog",
+            "count": 1
           }
         }
       ],
@@ -613,15 +613,15 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Racks for a New Oven",
+      "title": "Brew a Glass Oven",
       "steps": [
         {
           "id": "pitchpot_brew",
-          "label": "Brew 3 Oven Racks",
+          "label": "Brew a Glass Oven in the Cauldron",
           "goal": {
             "kind": "brew",
             "recipeId": "fire_brick",
-            "count": 3
+            "count": 1
           }
         }
       ],
@@ -656,7 +656,7 @@
         },
         {
           "id": "take_flowers",
-          "label": "Give Selyna 3 Glass Lenses from your Bag",
+          "label": "Give Selyna 3 Glass Lenses",
           "goal": {
             "kind": "gift",
             "characterId": "selyna",
@@ -676,15 +676,15 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Lamps for the Long Night",
+      "title": "Brew a Warm Lamp",
       "steps": [
         {
           "id": "lamplight_brew",
-          "label": "Brew 2 Big Lanterns",
+          "label": "Brew a Warm Lamp in the Cauldron",
           "goal": {
             "kind": "brew",
             "recipeId": "oil_lamp",
-            "count": 2
+            "count": 1
           }
         }
       ],
@@ -724,15 +724,15 @@
       "chapter": 11,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Make Compass Needles",
+      "title": "Brew a Treasure Compass",
       "steps": [
         {
           "id": "lodestones_brew",
-          "label": "Brew 2 Compass Needles",
+          "label": "Brew a Treasure Compass in the Cauldron",
           "goal": {
             "kind": "brew",
             "recipeId": "lodestone",
-            "count": 2
+            "count": 1
           }
         }
       ],
@@ -777,15 +777,15 @@
       "chapter": 12,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Brew Spinning Wheels",
+      "title": "Brew an Aurora Loom",
       "steps": [
         {
           "id": "skeins_brew",
-          "label": "Brew 2 Spinning Wheels",
+          "label": "Brew an Aurora Loom in the Cauldron",
           "goal": {
             "kind": "brew",
             "recipeId": "silver_spindle",
-            "count": 2
+            "count": 1
           }
         }
       ],
@@ -848,11 +848,11 @@
       "chapter": 12,
       "giver": "selyna",
       "world": "borealis",
-      "title": "Carve a Rune",
+      "title": "Brew a Runestone",
       "steps": [
         {
           "id": "runeshards_brew",
-          "label": "Brew a Carved Rune from an Ember Heart",
+          "label": "Brew a Runestone in the Cauldron",
           "goal": {
             "kind": "brew",
             "recipeId": "rune_shard",

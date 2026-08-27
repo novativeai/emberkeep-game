@@ -196,10 +196,16 @@ interface TravelVeil {
   /** Every tween target that may still be animating when the veil dies — the
    *  ember dots repeat forever, so destroy must kill, not just drop. */
   pulse: Array<object>;
+  /** Destination — so the `world:switched` echo of a departure this veil
+   *  already covers does not tear it down and re-raise it. */
+  worldId: string;
   covered: boolean;
   coveredAt: number;
   revealAsked: boolean;
   revealing: boolean;
+  /** Runs ONCE when the cover completes — the departure path emits
+   *  `world:switch` here, so the swap happens under a fully-drawn curtain. */
+  onCovered?: () => void;
 }
 
 export class UIScene extends Phaser.Scene {
@@ -1204,7 +1210,17 @@ export class UIScene extends Phaser.Scene {
       // new board exists. Between those two the destination's backdrop is coming
       // over the network — without this the player taps a door and the game
       // simply does nothing for a second or two.
+      // A curtained departure: cover FIRST, and only then switch — the swap
+      // and the whole board rebuild happen under the veil.
+      bus.on('ui:travel_departing', ({ to }) =>
+        this.showTravelVeil(to, () => this.ctx.bus.emit('world:switch', { to }))
+      ),
+      // A switch this scene did not curtain (the console, a future script)
+      // still gets its veil — the same-journey guard keeps the curtained path
+      // from re-raising it.
       bus.on('world:switched', ({ to }) => this.showTravelVeil(to)),
+      // A refused switch must lift the curtain it was raised behind.
+      bus.on('world:switch_failed', () => this.hideTravelVeil()),
       bus.on('world:ready', () => {
         this.hideTravelVeil();
         this.sweepFirstContact();
@@ -1300,9 +1316,15 @@ export class UIScene extends Phaser.Scene {
    * scene never restarts, so the curtain is the one thing on screen that spans
    * the whole journey.
    */
-  private showTravelVeil(worldId: string): void {
-    // A veil can only still exist here if a previous journey's reveal is
-    // mid-flight; the new cover replaces it outright.
+  private showTravelVeil(worldId: string, onCovered?: () => void): void {
+    // The departure path raises the veil BEFORE the switch, so the
+    // `world:switched` echo arrives while this same journey's veil is already
+    // covering — keep it, or the curtain would blink mid-journey.
+    if (this.travelVeil && !this.travelVeil.revealAsked && this.travelVeil.worldId === worldId) {
+      return;
+    }
+    // Otherwise a veil can only still exist here if a previous journey's
+    // reveal is mid-flight; the new cover replaces it outright.
     if (this.travelVeil) this.destroyTravelVeil(this.travelVeil);
 
     const name = this.ctx.state.worlds.get(worldId)?.name ?? worldId;
@@ -1321,10 +1343,12 @@ export class UIScene extends Phaser.Scene {
       root,
       chrome,
       pulse: [chrome],
+      worldId,
       covered: false,
       coveredAt: 0,
       revealAsked: false,
-      revealing: false
+      revealing: false,
+      onCovered
     };
 
     if (ensureTravelWipePipeline(this.game)) {
@@ -1467,6 +1491,10 @@ export class UIScene extends Phaser.Scene {
   private travelVeilCovered(veil: TravelVeil): void {
     veil.covered = true;
     veil.coveredAt = this.time.now;
+    // The departure's switch happens HERE — under a fully-drawn curtain.
+    const go = veil.onCovered;
+    veil.onCovered = undefined;
+    go?.();
     if (veil.revealAsked) this.beginTravelReveal(veil);
   }
 

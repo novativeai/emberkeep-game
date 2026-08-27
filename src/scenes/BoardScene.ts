@@ -362,6 +362,10 @@ export class BoardScene extends Phaser.Scene {
   private skipWarmthLabel?: Phaser.GameObjects.Text;
   private skipForId = 0;
   private skipMaxGold?: number; // per-generator gold cap for the live skip price
+  /** Non-null while the pin is a HARVEST offer over a READY generator (the
+   *  warmth price it could not pay). The cooldown tick must not treat that
+   *  pin as a stale skip and hide it — there is no timer behind it. */
+  private skipHarvestCost: number | null = null;
   /** Dragon job menu (Work / Harvest) + the dragon it belongs to. */
   /** Countdown pill floating above a rig-hosted dragon: the BoardItem's own
    *  pill renders UNDER the rig (glued at host.depth + 0.5), so the timer
@@ -1119,8 +1123,10 @@ export class BoardScene extends Phaser.Scene {
         if (timer) {
           sprite.setCooldownRemaining(timer.remaining);
           if (this.skipForId === sprite.itemId) this.updateSkipCost(timer.remaining, timer.total);
-        } else if (this.skipForId === sprite.itemId) {
-          this.hideSkipButton(); // became ready
+        } else if (this.skipForId === sprite.itemId && this.skipHarvestCost === null) {
+          // Became ready: the SKIP pin's question is answered. A HARVEST pin
+          // has no timer behind it and stays until answered or dismissed.
+          this.hideSkipButton();
         }
       }
     }
@@ -6803,7 +6809,19 @@ export class BoardScene extends Phaser.Scene {
     // over the Borealis sky was therefore told it was standing on an island
     // 2700px away — which is what kept the piece's shadow lit over open cloud.
     // Null is the honest answer for open sky, and both callers below take it.
-    return groundCellAtWorldPoint(this.ctx.state.world, feet.x, feet.y);
+    //
+    // When the biased feet find only sky, ask again at the carry point itself.
+    // The feet sit up to a grab-offset plus bias below the pointer, and on a
+    // small-pitch zone that is more than the tile's own half-height — measured
+    // truth: an extension slab is ~62 px half-high against the isle's 76, so a
+    // stump dropped dead-centre on the tutorial's far-island cell sampled the
+    // sky past its south edge and bounced (the hand-wobble's inflated tiles
+    // had hidden this). The piece is DRAWN at the carry point; landing where
+    // the player sees it beats refusing a drop made on the cell's centre.
+    return (
+      groundCellAtWorldPoint(this.ctx.state.world, feet.x, feet.y) ??
+      groundCellAtWorldPoint(this.ctx.state.world, this.dragTarget.x, this.dragTarget.y)
+    );
   }
 
   /**
@@ -8106,6 +8124,15 @@ export class BoardScene extends Phaser.Scene {
     // Passive-only generators (house, big tree) never tap-harvest — they pay out
     // on their own timer; a ready tap does nothing.
     if (cfg?.tappable === false) return;
+    // A READY generator whose Warmth price cannot be paid still ANSWERS with
+    // the pin (owner's law, 2026-08-27): the ⚡ row carries the harvest price
+    // (and refuses loudly if it is still short), and the gold row buys the
+    // very same harvest for the same number — so an empty warmth gauge never
+    // turns a dragon into a dead object that flashes red at every tap.
+    if (isGenerator && cfg && this.ctx.state.energyCurrent < cfg.energyCost) {
+      this.showSkipButton(sprite, 0, cfg.cooldownMs || 1, cfg.skipMaxGold, cfg.energyCost);
+      return;
+    }
     // Harvest IMMEDIATELY (reliable — never coupled to an animation finishing),
     // then, for a plant, a nearby dragon flies over as a cosmetic "worker"
     // flourish. The harvest already happened, so a dropped frame can't stall it.
@@ -8250,9 +8277,13 @@ export class BoardScene extends Phaser.Scene {
     sprite: BoardItem,
     remaining: number,
     total: number,
-    maxGold?: number
+    maxGold?: number,
+    harvestCost?: number
   ): void {
     this.hideSkipButton();
+    // HARVEST MODE: the same pin over a READY generator, priced at the
+    // authored harvest cost in both currencies instead of the skip curve.
+    this.skipHarvestCost = harvestCost ?? null;
     // A COIN MINT (a House/Manor whose effective produce is the coin chain)
     // takes Warmth only — paying gold to hurry gold is a loop wearing the
     // costume of a choice, so the gold row simply is not there and the pin is
@@ -8376,10 +8407,13 @@ export class BoardScene extends Phaser.Scene {
       btn.add([bg, label]);
       return label;
     };
+    const verb = harvestCost !== undefined ? 'Harvest' : 'Skip';
+    const goldPrice = harvestCost !== undefined ? Math.max(1, harvestCost) : skipEnergyCost(remaining, total, maxGold);
+    const warmthPrice = harvestCost ?? skipWarmthCost(remaining, total, maxGold);
     if (!warmthOnly) {
       // The gold row wears the REAL coin art (the 🪙 emoji read as a generic
       // token); the label carries only the price and sits right of the icon.
-      this.skipGoldLabel = make(0, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
+      this.skipGoldLabel = make(0, 'gold', `${verb} with Gold`, `${goldPrice}`);
       this.skipGoldLabel.setX(SKIP_KEYS.labelDx);
       btn.add(
         this.add
@@ -8387,7 +8421,7 @@ export class BoardScene extends Phaser.Scene {
           .setScale(plateScale('item_coin_1', 0.086))
       );
     }
-    this.skipWarmthLabel = make(rows - 1, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
+    this.skipWarmthLabel = make(rows - 1, 'warmth', `${verb} with Warmth`, `⚡ ${warmthPrice}`);
     btn.add(caption); // on top of the keys
     // Tutorial: bounce an arrow over the WARMTH (⚡) row so the player learns to
     // pay the House's timer with energy (and watches their Warmth drop). It
@@ -8513,6 +8547,7 @@ export class BoardScene extends Phaser.Scene {
     this.skipGoldLabel = undefined;
     this.skipWarmthLabel = undefined;
     this.skipForId = 0;
+    this.skipHarvestCost = null;
     if (had) this.ctx.bus.emit('ui:skip_dismissed', { itemId: had });
   }
 
@@ -8626,7 +8661,7 @@ export class BoardScene extends Phaser.Scene {
         // Ready again — the sparkle the tinted ready-star would have given.
         this.sparks.explode(6, sprite.x, sprite.y - 110);
       }
-      if (this.skipForId === sprite.itemId) this.hideSkipButton();
+      if (this.skipForId === sprite.itemId && this.skipHarvestCost === null) this.hideSkipButton();
       return;
     }
     let badge = existing;
@@ -9059,6 +9094,12 @@ export class BoardScene extends Phaser.Scene {
         if (sprite) sprite.flashDenied();
         if (reason === 'no_space' && sprite) {
           this.floatText(sprite.x, sprite.y - 140, 'No room!', PALETTE.cream);
+        }
+        // The ⚡ choice refused for want of warmth says so in words — a red
+        // flash alone reads as a dead object, which is how "the skip menu
+        // stopped showing" was reported (owner, 2026-08-27).
+        if (reason === 'energy' && sprite) {
+          this.floatText(sprite.x, sprite.y - 140, 'No Warmth! ⚡', PALETTE.cream);
         }
       }),
       bus.on('bag:give_armed', ({ chain, tier }) => this.armGive(chain, tier)),

@@ -27,6 +27,15 @@ const keys = new Map(
  * grows a generator, which is why a fixture ladder is two tiers and not one.
  */
 const BONUS_EVERY = 12;
+/** The sole-faucet exception (owner flow pass, 2026-08-27): Magic Pebbles have
+ *  NO other source in the north — no chest entry paid them until the same
+ *  pass, and rebuilding their machine is circular — so their every-12 cadence
+ *  priced the compass and rune brews at half a day. They drop every 5th yield
+ *  instead; everything else keeps the standard cadence. (Fire Juice was the
+ *  second exception until the Juice Barrel's PRIMARY became the juice — its
+ *  seaglass primary was a migration artifact, two machines making Glass
+ *  Balls.) */
+const FAST_FAUCETS: Record<string, number> = { manastone: 5 };
 const FARMS: Array<[fixture: string, product: string]> = [
   ['glasskiln', 'seaglass'],
   ['starbench', 'orrery'],
@@ -41,7 +50,9 @@ const FARMS: Array<[fixture: string, product: string]> = [
  */
 const COMPASS: Array<[fixture: string, product: string | null]> = [
   ['runestone', 'emberheart'],
-  ['emberdram', 'seaglass'],
+  // Its own t1: the Juice Barrel pours Fire Juice — the seaglass primary was
+  // migrate-borealis-farms.py's mapping leaking through (two Glass Ball makers).
+  ['emberdram', 'emberdram'],
   ['manastone', 'orrery'],
   // The two documented exceptions: `reward` short-circuits `produces` in
   // GeneratorSystem, so a machine either makes a thing or pays a currency, never
@@ -144,8 +155,9 @@ describe('the Borealis roster', () => {
         expect(gen!.reward, `${fixtureId} neither produces nor pays`).toBeTruthy();
       }
       // The sub-generator drop — the whole reason a fixture has a ladder.
-      expect(gen!.bonus?.every, `${fixtureId} has no every-${BONUS_EVERY} drop`)
-        .toBe(BONUS_EVERY);
+      const cadence = FAST_FAUCETS[fixtureId] ?? BONUS_EVERY;
+      expect(gen!.bonus?.every, `${fixtureId} has no every-${cadence} drop`)
+        .toBe(cadence);
       expect(gen!.bonus?.produces, `${fixtureId}'s drop does not build a ${fixtureId}`)
         .toEqual({ chain: fixtureId, tier: 1 });
     }
