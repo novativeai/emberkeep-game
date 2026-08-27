@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GameContext } from '../../src/core/Context';
-import { LEVEL_XP } from '../../src/core/Constants';
+import { CAULDRON_REACHED_STAT, LEVEL_XP } from '../../src/core/Constants';
 import type { MapData } from '../../src/core/types';
 import realMap from '../../src/data/map.json';
 import { capture, createTestContext, MemoryStorage } from './helpers';
@@ -292,16 +292,16 @@ describe('brew goals — the cauldron as a quest driver', () => {
   it('counts brews, and spending what was brewed cannot un-do the step', () => {
     const ctx = createTestContext();
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
-    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 0, need: 4, done: false });
+    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 0, need: 2, done: false });
 
-    brew(ctx, 'iron_cap', 3);
-    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 3, done: false });
-    brew(ctx, 'iron_cap', 1);
+    brew(ctx, 'tar_spile', 1);
+    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 1, done: false });
+    brew(ctx, 'tar_spile', 1);
     expect(ctx.systems.quests.progressFor(step).done).toBe(true);
 
-    // The output is meant to be SPENT — four strakes merged away is the quest
+    // The output is meant to be SPENT — the buckets merged away is the quest
     // working, not the quest coming undone.
-    ctx.bus.emit('bag:consume', { chain: 'warhelm', tier: 1, count: 4 });
+    ctx.bus.emit('bag:consume', { chain: 'tarkiln', tier: 2, count: 2 });
     expect(ctx.systems.quests.progressFor(step).done).toBe(true);
   });
 
@@ -319,7 +319,7 @@ describe('brew goals — the cauldron as a quest driver', () => {
         id: 'unlabelled',
         goal: { kind: 'brew', recipeId: 'iron_cap', count: 2 }
       }).label
-    ).toBe('Brew 2 × Iron Hat');
+    ).toBe('Brew 2 × Iron Helmet');
   });
 
   /**
@@ -332,24 +332,57 @@ describe('brew goals — the cauldron as a quest driver', () => {
   it('points a brew peek at the cauldron input, scaled by the brew count', () => {
     const ctx = createTestContext();
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
-    // iron_cap takes 1 Glass Float per hat; the step asks for four.
-    expect(ctx.systems.quests.peekNeedFor(step)).toEqual({ chain: 'seaglass', tier: 2, count: 4 });
+    // tar_spile takes 1 Glass Float + 2 Iron Hats per bucket; the step asks
+    // for two, and the hats are the bigger of the two shortfalls.
+    expect(ctx.systems.quests.peekNeedFor(step)).toEqual({ chain: 'warhelm', tier: 1, count: 4 });
+  });
+
+  /** THE CAULDRON-REACHED LATCH (owner's law, 2026-08-26): the first brew
+   *  quest heading any ladder flips `q:cauldron:reached` — the clouds' and
+   *  the Rune Way's second key. Derived from the ladder's shape, never a
+   *  hardcoded id, so it must move if the ladder is reordered. */
+  it('latches cauldron-reached the moment the first brew quest heads the track', () => {
+    const ctx = createTestContext();
+    const reached = capture(ctx.bus, 'quest:cauldron_reached');
+    for (const id of ['north_landing', 'north_coast', 'north_fuel']) {
+      ctx.state.addStat(`q:done:${id}`, 1);
+    }
+    ctx.bus.emit('bag:changed', { used: 0, capacity: 12 });
+    // north_salvage still heads the northern track — not reached yet.
+    expect(ctx.state.stat(CAULDRON_REACHED_STAT)).toBe(0);
+
+    ctx.state.addStat('q:done:north_salvage', 1);
+    ctx.bus.emit('bag:changed', { used: 0, capacity: 12 });
+    expect(ctx.state.stat(CAULDRON_REACHED_STAT)).toBe(1);
+    expect(reached).toHaveLength(1);
+
+    // Monotonic: a later evaluate neither re-announces nor re-counts.
+    ctx.bus.emit('bag:changed', { used: 0, capacity: 12 });
+    expect(ctx.state.stat(CAULDRON_REACHED_STAT)).toBe(1);
+    expect(reached).toHaveLength(1);
+  });
+
+  it('a brew quest finished out of order still counts as reached', () => {
+    const ctx = createTestContext();
+    ctx.state.addStat('q:done:north_strakes', 1);
+    ctx.bus.emit('bag:changed', { used: 0, capacity: 12 });
+    expect(ctx.state.stat(CAULDRON_REACHED_STAT)).toBe(1);
   });
 
   it('picks the ingredient the player is shortest of, not the first line', () => {
     const ctx = createTestContext();
-    // north_pitchpot brews `fire_brick` three times: 6 x Tar Drop
-    // (emberheart:1) + 3 x Iron Hat (warhelm:1). Stock the Tar Drops and the
-    // answer must move to the hats — the first input is the wrong answer as
+    // north_pitchpot brews `fire_brick` three times: 3 x Tar Loaf
+    // (emberheart:2) + 6 x Iron Hat (warhelm:1). Stock the hats and the
+    // answer must move to the loaves — the first input is the wrong answer as
     // often as not to "why can I not brew this yet".
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_pitchpot')!.steps[0]!;
     expect(ctx.systems.quests.peekNeedFor(step)).toEqual({
-      chain: 'emberheart',
+      chain: 'warhelm',
       tier: 1,
       count: 6
     });
-    ctx.bus.emit('bag:bank', { chain: 'emberheart', tier: 1, count: 6 });
-    expect(ctx.systems.quests.peekNeedFor(step)!.chain).toBe('warhelm');
+    ctx.bus.emit('bag:bank', { chain: 'warhelm', tier: 1, count: 6 });
+    expect(ctx.systems.quests.peekNeedFor(step)!.chain).toBe('emberheart');
   });
 
   it('answers nothing for a goal that is not a brew', () => {

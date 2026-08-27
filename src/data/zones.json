@@ -8145,7 +8145,7 @@
     {
       "id": "runevault",
       "name": "Runevault",
-      "level": 3,
+      "level": 6,
       "backdrop": "runevault",
       "extendsAuthoredMap": false,
       "map": {

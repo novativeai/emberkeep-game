@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import realMap from '../../src/data/map.json';
 import {
   CAULDRON_DECOR,
+  CAULDRON_REACHED_STAT,
   chainHiddenIn,
   DECOR_SCALE,
   decorClipCharacter,
@@ -10,6 +11,7 @@ import {
   SAVE_VERSION,
   WORLD_ID
 } from '../../src/core/Constants';
+import { cloudLevelMet } from '../../src/core/worldGates';
 import { clipFor } from '../../src/core/characterAnims';
 import { GameContext } from '../../src/core/Context';
 import { GameState } from '../../src/core/GameState';
@@ -492,23 +494,25 @@ describe('portals — every world has a way out of it', () => {
   });
 
   /**
-   * The Gate opens on the STORY, not the cap: Borealis stays shut at Level 3
-   * until the Golden Elder has woken (`q:done:keepers_hoard` — the same latch
-   * the altar derives her presence from). A level the player crosses mid-merge
-   * is the wrong key for the chapter's one crossing.
+   * The Gate opens on the KEEPER'S RANK (owner's call, 2026-08-26: "unlock
+   * the portal to borealis at level"): the world's own `level` in zones.json
+   * is the whole gate. It replaced the `q:done:keepers_hoard` story latch —
+   * the Elder's awakening stays a quest beat, but the door no longer waits
+   * on it.
    */
-  it('holds Borealis shut until the Golden Elder has woken', () => {
+  it('holds Borealis shut below its level, and opens it on rank alone', () => {
     const ctx = createTestContext();
     ctx.state.tutorialDone = true;
-    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
+    expect(ctx.state.level).toBeLessThan(3);
     expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('borealis');
     const failures: string[] = [];
     ctx.bus.on('world:switch_failed', ({ reason }) => failures.push(reason));
     ctx.bus.emit('world:switch', { to: 'borealis' });
     expect(ctx.state.worldId).toBe(WORLD_ID);
-    expect(failures).toEqual(['story']);
+    expect(failures).toEqual(['level']);
 
-    ctx.state.addStat('q:done:keepers_hoard', 1);
+    // No quest, no latch — the rank alone turns the key.
+    ctx.state.xp = LEVEL_XP[2]!;
     expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('borealis');
     ctx.bus.emit('world:switch', { to: 'borealis' });
     expect(ctx.state.worldId).toBe('borealis');
@@ -529,21 +533,79 @@ describe('portals — every world has a way out of it', () => {
     expect(ctx.state.worldId).toBe('roothold');
   });
 
-  /** The Rune Way: Runevault opens on the per-world quest counter QuestSystem
-   *  keeps, never on an id list that could drift. */
-  it('holds Runevault shut until two Selyna quests are done', () => {
+  /** The Rune Way opens at the CAP (owner's call, 2026-08-26): Level 6 is the
+   *  rank that clears the last clouds off Borealis's main island, and the hub
+   *  is what stands beyond them. No quest counter, no latch — rank alone. */
+  it('holds Runevault shut below Level 6, and opens it at the cap', () => {
     const ctx = createTestContext();
     ctx.state.tutorialDone = true;
-    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
-    ctx.state.addStat('q:world:borealis:done', 1);
+    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 2]!; // Level 5
+    ctx.state.addStat('q:world:borealis:done', 19); // quests no longer turn this key
     expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('runevault');
     ctx.bus.emit('world:switch', { to: 'runevault' });
     expect(ctx.state.worldId).toBe(WORLD_ID);
 
-    ctx.state.addStat('q:world:borealis:done', 1);
+    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!; // Level 6, the cap
     expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('runevault');
     ctx.bus.emit('world:switch', { to: 'runevault' });
     expect(ctx.state.worldId).toBe('runevault');
+  });
+
+  /** THE DOUBLE KEY (owner's law, 2026-08-26): the ladder reaching its first
+   *  cauldron quest opens the Rune Way just as the cap would — a quester is
+   *  never handed a brew with the pot's door shut. */
+  it('the cauldron latch is the Rune Way’s second key, below the cap', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[2]!; // Level 3 — Borealis open, Runevault shut
+    expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('runevault');
+
+    ctx.state.addStat(CAULDRON_REACHED_STAT, 1);
+    expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('runevault');
+    ctx.bus.emit('world:switch', { to: 'runevault' });
+    expect(ctx.state.worldId).toBe('runevault');
+  });
+
+  /** …and it blows the level clouds off Borealis's main island, on BOTH
+   *  paths: settling on arrival, and live the moment the latch flips. The
+   *  latch is scoped — `cloudLevelMet` answers false for the southern isle,
+   *  so Emberkeep's own level land never rides along. */
+  it('the cauldron latch lifts the main island’s level slabs at level 3', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[2]!; // Level 3 — nowhere near the slabs' 4/5/6
+    const slabs = ['borealis_coast_l4', 'borealis_coast_l5', 'borealis_coast_l6'];
+
+    // Arrive WITHOUT the latch: the slabs stand fogged, offered.
+    ctx.state.regionStatus.set('borealis_coast', 'active'); // their `after` door
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    for (const id of slabs) expect(ctx.state.regionStatus.get(id)).toBe('unlockable');
+
+    // The latch flips mid-session → the fact sweeps them open where she stands.
+    ctx.state.addStat(CAULDRON_REACHED_STAT, 1);
+    ctx.bus.emit('quest:cauldron_reached', {});
+    for (const id of slabs) expect(ctx.state.regionStatus.get(id)).toBe('active');
+  });
+
+  it('arriving with the latch already earned settles the slabs open', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[2]!;
+    ctx.state.regionStatus.set('borealis_coast', 'active');
+    ctx.state.addStat(CAULDRON_REACHED_STAT, 1);
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    for (const id of ['borealis_coast_l4', 'borealis_coast_l5', 'borealis_coast_l6']) {
+      expect(ctx.state.regionStatus.get(id)).toBe('active');
+    }
+  });
+
+  it('the latch is scoped: it is not rank anywhere south of the clouds', () => {
+    const ctx = createTestContext();
+    ctx.state.addStat(CAULDRON_REACHED_STAT, 1);
+    expect(cloudLevelMet(ctx.state, 'emberkeep', 3)).toBe(false);
+    expect(cloudLevelMet(ctx.state, 'roothold', 3)).toBe(false);
+    expect(cloudLevelMet(ctx.state, 'borealis', 6)).toBe(true);
+    expect(cloudLevelMet(ctx.state, 'runevault', 6)).toBe(true);
   });
 });
 

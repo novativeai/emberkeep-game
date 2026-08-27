@@ -2,6 +2,7 @@ import { chainHiddenIn } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
+import { cloudLevelMet } from '../core/worldGates';
 import type { ChainsData, ItemSnapshot, MapData, MapRegionConfig, TilePos } from '../core/types';
 
 /**
@@ -9,7 +10,9 @@ import type { ChainsData, ItemSnapshot, MapData, MapRegionConfig, TilePos } from
  *   • KEY regions (`unlock.keys`) lift when the player taps them with enough
  *     Gold Keys — the tutorial's north_fog lesson.
  *   • LEVEL regions (`unlock.level`) lift automatically the moment the Keeper
- *     reaches that level — the authored world's per-level zones.
+ *     reaches that level — the authored world's per-level zones. On Borealis
+ *     the level carries a DOUBLE KEY (`cloudLevelMet`): the ladder reaching
+ *     its first cauldron quest lifts them just as the rank would.
  * Either way the tiles go active and the region's hidden contents appear.
  */
 export class UnlockSystem {
@@ -20,12 +23,15 @@ export class UnlockSystem {
     private chains: ChainsData
   ) {
     bus.on('fog:tapped', ({ regionId }) => this.tryKeyUnlock(regionId));
-    bus.on('keeper:leveled', ({ level }) => this.unlockForLevel(level));
+    bus.on('keeper:leveled', () => this.sweepLevelRegions());
+    // The latch is the clouds' second key — when it flips mid-session the
+    // slabs must lift NOW, not on the next rank.
+    bus.on('quest:cauldron_reached', () => this.sweepLevelRegions());
     bus.on('region:reveal', ({ regionId }) => {
       const region = this.map.regions.find((r) => r.id === regionId);
       if (!region) return;
       this.reveal(region);
-      this.unlockForLevel(this.state.level); // anything that was waiting behind it
+      this.sweepLevelRegions(); // anything that was waiting behind it
     });
   }
 
@@ -60,11 +66,11 @@ export class UnlockSystem {
     // mainland's inner bands name this region in `unlock.after`, and a Keeper
     // who banked the rank before the key would otherwise hold both halves of
     // the condition and see nothing move. Sweep again now that it is open.
-    this.unlockForLevel(this.state.level);
+    this.sweepLevelRegions();
   }
 
   /**
-   * On reaching `level`, lift every still-fogged zone gated at or below it.
+   * On reaching a level, lift every still-fogged zone gated at or below it.
    *
    * Runs to a FIXED POINT, because a band may be waiting on another band rather
    * than on the Keeper (`unlock.after` — see MapRegionConfig). One pass would
@@ -73,12 +79,14 @@ export class UnlockSystem {
    * changes nothing costs one extra sweep of a handful of regions and removes
    * the ordering question entirely.
    */
-  private unlockForLevel(level: number): void {
+  private sweepLevelRegions(): void {
     for (let pass = 0; pass < this.map.regions.length + 1; pass++) {
       const opened = this.map.regions.filter((region) => {
         if (region.unlock?.level === undefined) return false;
         if (region.unlock.keys !== undefined) return false; // keys unlock via fog:tapped
-        if (region.unlock.level > level) return false;
+        // Rank — or, on the worlds the cauldron latch keys, the ladder having
+        // reached its first brew quest.
+        if (!cloudLevelMet(this.state, this.state.worldId, region.unlock.level)) return false;
         if (this.state.regionStatus.get(region.id) !== 'unlockable') return false;
         return this.preconditionMet(region);
       });

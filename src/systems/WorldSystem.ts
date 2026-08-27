@@ -4,7 +4,7 @@ import type { WorldRuntime } from '../core/world';
 import { groundCellAtWorldPoint, nearestPlayableCell, worldPointOf, zoneAt } from '../core/world';
 import { GATE_LANDING } from '../core/Constants';
 import type { CharactersData, TilePos } from '../core/types';
-import { storyOpen, worldOpen } from '../core/worldGates';
+import { cloudLevelMet, storyOpen, worldOpen } from '../core/worldGates';
 
 /**
  * WORLD TRAVEL — which world the board is showing.
@@ -243,7 +243,7 @@ export class WorldSystem {
       this.bus.emit('world:switch_failed', { to, reason: 'tutorial' });
       return;
     }
-    if (this.state.level < world.level) {
+    if (!cloudLevelMet(this.state, to, world.level)) {
       this.bus.emit('world:switch_failed', { to, reason: 'level' });
       return;
     }
@@ -293,7 +293,11 @@ export class WorldSystem {
       let opened = 0;
       for (const region of world.map.regions) {
         const level = region.unlock?.level;
-        if (level === undefined || level > this.state.level) continue;
+        // `cloudLevelMet`, not a bare rank compare: Borealis's cloud slabs
+        // carry the double key (rank OR the cauldron latch — owner's law,
+        // 2026-08-26), and arriving must settle them the same way living
+        // there would.
+        if (level === undefined || !cloudLevelMet(this.state, world.id, level)) continue;
         // A PRICE IS NOT A DELAY. This used to settle any region whose level was
         // met, which force-opened every gate that costs Gold Keys as well —
         // `level_2_gate` is `{ keys: 1, level: 2 }`, so a Keeper at level 2 who

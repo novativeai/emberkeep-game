@@ -2038,6 +2038,11 @@ export interface EventMap {
   /** Every step of a quest is done — the main line strikes through and the next
    *  quest takes the HUD. */
   'quest:completed': { questId: string };
+  /** The first brew quest of some ladder has reached the player's track head
+   *  (or was finished out of order) — the cauldron latch just flipped, ONCE
+   *  ever per save. The clouds' and the Rune Way's second key (worldGates
+   *  `cloudLevelMet`); UnlockSystem sweeps and BoardScene re-lights doors. */
+  'quest:cauldron_reached': Record<string, never>;
   /** The tracked quest changed (advance, or a load landing mid-ladder). */
   'quest:advanced': { questId: string; giver: SpeakerId; index: number; total: number };
   'order:completed': { orderId: string; rewards: { coins: number; keys: number; xp?: number } };

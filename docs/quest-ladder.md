@@ -60,22 +60,31 @@ and this is the order that asks. Moonwater and quartz are `MAGE_ONLY` — no
 dragon eats any tier of either — so without this sink the chain and the Dew
 Basin that feeds it would be dead stock.
 
-*Borealis (`world: "borealis"`).*
+*Borealis (`world: "borealis"`).* The cauldron enters on the **5th** rung
+(owner's law, 2026-08-26 — never earlier), and from there brew quests and
+merge quests strictly alternate.
 
 | # | Quest | Order | Subquests |
 | --- | --- | --- | --- |
-| 1 | **Make Camp on the Ice** | `selyna_signal` | Merge 3 Drift Spars into a Bound Faggot · Deliver 2 Bound Faggots to Selyna |
-| 2 🥚 | **Open the Wrack Coast** | — | Spend 1 Gold Key on the fog along the coast |
-| 3 | **Feed the Northern Dragons** | `selyna_pitch` | Build a Drift Stack from 9 Drift Spars · Make 3 Pitch Cakes · Deliver 3 Pitch Cakes to Selyna |
-| 4 | **Salvage the Wrecks** | `selyna_frames` | Make 2 Lashed Frames · Deliver 2 Lashed Frames to Selyna |
-| 5 | **Open Selyna's Keep** | — | Spend 2 Gold Keys on the fog around the keep |
-| 6 🥚 | **What She Will Take** | — | Give Selyna 2 Bound Faggots · Give Selyna 3 Frost Flowers |
-| 7 | **Raise a Longhall** | — | Merge 2 Lashed Frames into an Upturned Hull · Merge 2 Upturned Hulls into a Longhall |
-| 8 | **Stock the Pitchworks** | — | Make 1 Black Ember |
-| 9 | **Turn Two Hulls** | — | Make 2 Upturned Hulls |
-| 10 🥚 | **Spin the Light-Fast Spindles** | `selyna_spindle` | Earn a place at Selyna's fire · Grow a Rime Bloom · Make 2 Light-Fast Spindles · Deliver 2 to Selyna |
-| 11 | **Wake the Rimewyrm** | — | Merge 3 Rimewyrm Eggs into the Rimewyrm |
-| 12 | *(the live order's title)* | the encore | whatever her Ledger asks |
+| 1 | **Make Camp on the Ice** | `selyna_signal` | Merge 3 Glass Balls into a Glass Float · Deliver 2 Glass Floats to Selyna |
+| 2 | **Open the Shipwreck Coast** | — | Use 1 Gold Key on the clouds by the coast |
+| 3 | **Feed the Northern Dragons** | `selyna_pitch` | Get 3 Tar Drops · Make 3 Tar Loaves · Deliver 3 Tar Loaves to Selyna |
+| 4 | **Search the Shipwrecks** | `selyna_frames` | Make 2 Iron Helmets at the Shipwreck Forge · Deliver 2 Iron Helmets to Selyna |
+| 5 | **Brew Tar Buckets** | — | Brew 2 Tar Buckets in the Cauldron |
+| 6 | **Make an Ember Heart** | — | Make 1 Ember Heart |
+| 7 | **Brew Light Cloth** | — | Brew 2 Light Cloths from Spyglasses |
+| 8 🥚 | **Open Selyna's Castle** | — | Use 2 Gold Keys on the clouds around the castle |
+| 9 | **Racks for a New Oven** | — | Brew 3 Oven Racks |
+| 10 | **A Gift for Selyna** | `selyna_buoys` | Make 2 Glass Floats · Deliver 2 Glass Floats · Give Selyna 3 Glass Lenses |
+| 11 | **Lamps for the Long Night** | — | Brew 2 Big Lanterns |
+| 12 🥚 | **Make Two Horned Helmets** | — | Make 2 Horned Helmets |
+| 13 | **Make Compass Needles** | — | Brew 2 Compass Needles |
+| 14 | **Build a Second Forge** | — | Merge 3 Iron Helmets into a Horned Helmet · Build a second Shipwreck Forge from 3 Bellows |
+| 15 | **Brew Spinning Wheels** | — | Brew 2 Spinning Wheels |
+| 16 | **Weave the Aurora** | `selyna_spindle` | Fill 1 of Selyna's hearts · Build a Star Machine · Make 2 Aurora Cloaks · Deliver 2 to Selyna |
+| 17 🥚 | **Carve a Rune** | — | Brew a Carved Rune from an Ember Heart |
+| 18 | **Wake the Ice Dragon** | — | Merge 3 Ice Dragon Eggs into the Ice Dragon |
+| 19 | *(the live order's title)* | the encore | whatever her Ledger asks |
 
 **The Borealis fog lifts south → north, on keys alone.** Shore (open, cy≈1509
 world px) → coast (1 key, cy≈884) → keep (2 keys, cy≈652): each cloud is the
@@ -279,9 +288,19 @@ Cookbook and the audit all call it. Selyna's four frozen chains used to sit in
 edit at exactly the moment the player crossed, and would have leaked the roster
 into Emberkeep if anyone forgot to put it back.
 
-**A world may only be opened by a quest step.** The `world` goal kind completes
-when the player has stood there, and latches, so coming home never re-opens the
-crossing.
+**How a world opens** lives in `src/core/worldGates.ts`: Roothold on Eleanor's
+first delivered order, **Borealis on the Keeper's level alone** (the world's
+own `level` in zones.json — owner's call, 2026-08-26; the old
+`q:done:keepers_hoard` latch is gone and the Elder's awakening stays a quest
+beat), **the Runevault on a DOUBLE KEY** — Level 6 (the rank that clears the
+last clouds off Borealis's main island) **or** the ladder reaching its first
+cauldron quest (`q:cauldron:reached`, latched by QuestSystem the moment a brew
+quest heads any track; `worldGates.cloudLevelMet` is the shared predicate).
+Borealis's own level cloud-slabs carry the same double key, so grinder and
+quester both get the north whole — and the Selyna-quest-count latch is gone.
+The `world` goal kind completes
+when the player has stood there, and latches, so coming home never re-opens
+the crossing.
 
 > ⚠️ `worlds.json` carries `teleport: { trigger: "hatch", chain: "flame_gem",
 > tier: 2, … toWorld: "borealis" }`. That is a **map-editor placeholder and must
@@ -353,10 +372,11 @@ loop is learned rather than re-taught. It deliberately does not reuse
 `driftwood`: that chain is already the fuel farm, and one chain feeding both the
 furnace and the housing collapses two decisions into one.
 
-*The ladder* is eight quests, `north_landing` → `north_ledger`, and it walks the
-islands: make camp on the shore, buy the door, feed her dragons, salvage the
-wrecks, buy the coast, raise a Longhall, spin the spindles, then her endless
-Ledger. `pnpm quests --all` proves every step and every key.
+*The ladder* is nineteen quests, `north_landing` → `north_ledger` (the table
+in §2), and it walks the islands: make camp on the shore, buy the coast, feed
+her dragons, salvage the wrecks — and only THEN, on the 5th rung, does the
+Cauldron get its first job, alternating with merge work the rest of the way.
+`pnpm quests --all` proves every step and every key.
 
 > **The one thing still missing is the crossing itself.** `WorldSystem` validates
 > travel and `UIScene` already draws the travelling curtain, but nothing on
@@ -426,10 +446,10 @@ dragon, and the audit says so in those words.
 
 | | Emberkeep — **Ashdrake** | Borealis — **Rimewyrm** |
 | --- | --- | --- |
-| Egg 1 | 2. Warm the Long Hearth | 2. Open Selyna's Keep |
-| Egg 2 | 6. Raise the Roofs | 6. What She Will Take |
-| Egg 3 | 10. Raise the Ember Brood | 10. Spin the Light-Fast Spindles |
-| Hatch | 11. Wake the Ashdrake | 11. Wake the Rimewyrm |
+| Egg 1 | 2. Warm the Long Hearth | 8. Open Selyna's Castle |
+| Egg 2 | 6. Raise the Roofs | 12. Make Two Horned Helmets |
+| Egg 3 | 10. Raise the Ember Brood | 17. Carve a Rune |
+| Hatch | 11. Wake the Ashdrake | 18. Wake the Ice Dragon |
 
 Both dragons come out **FINITE 1** in the audit, which is the correct and
 intended verdict: exactly one can ever exist per zone. That is also why a quest

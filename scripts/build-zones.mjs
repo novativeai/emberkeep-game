@@ -1134,9 +1134,11 @@ const WORLDS = [
   {
     id: 'runevault',
     name: 'Runevault',
-    // Borealis's hub, so it opens with Borealis: a hub the player cannot reach
-    // from the sanctuary it serves is a shop with the lights off.
-    level: 3,
+    // The Rune Way opens at the CAP (owner's call, 2026-08-26): level 6 is
+    // the rank that clears the last clouds off Borealis's main island, and
+    // the hub is the reward beyond them. worldGates carries no other latch
+    // for it — the rank alone is the gate.
+    level: 6,
     /**
      * WAS `hatchery`, MEASURED. This world had no editor grid, so its ground was
      * recovered from the painting by scripts/fit-deck-grid.py (`deck:`) — the

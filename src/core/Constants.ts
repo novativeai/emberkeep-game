@@ -2193,17 +2193,20 @@ export const PORTAL_TINTS: Record<string, PortalTints> = {
 };
 
 /**
- * Selyna quests that must be DONE before the Rune Way opens — counted off the
- * per-world `q:world:borealis:done` stat, so the gate never keeps a quest-id
- * list that could drift.
+ * THE CAULDRON-REACHED LATCH (owner's law, 2026-08-26): the moment any world's
+ * quest ladder puts its FIRST brew quest at the head — the player is being
+ * ASKED to use the pot — is a story fact with a second key on it. It is the
+ * alternative to rank for everything the Rune Way stands behind: Borealis's
+ * level-gated cloud slabs and the Runevault door itself open on Keeper level
+ * OR on this latch (`worldGates.cloudLevelMet`), so the ladder can never ask
+ * for a brew the player cannot reach, and a max-rank player never waits on
+ * quests either.
  *
- * TWO, and that number is the ladder's, not a feel: the north's third quest is
- * its first CAULDRON quest (`north_strakes`), and the pot stands through this
- * door. One quest later and the ladder would ask for a brew the player cannot
- * reach; much earlier and the door opens onto a hub before the north has taught
- * anything to carry through it. See docs/quest-ladder.md §5.
+ * QuestSystem derives and writes it (once, monotonic — `q:cauldron:reached`
+ * in `stats`, so it ships in the save with no schema change) and announces it
+ * as `quest:cauldron_reached`.
  */
-export const RUNEVAULT_QUESTS_NEEDED = 2;
+export const CAULDRON_REACHED_STAT = 'q:cauldron:reached';
 
 /** The Roothold house — the Emporium's painted storefront — as a world-px
  *  rect: roothold.webp [755, 205, 330, 340] through the shared art→world

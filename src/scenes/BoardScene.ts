@@ -5489,7 +5489,11 @@ export class BoardScene extends Phaser.Scene {
       // (→ Hatchery) on the third Selyna quest. Both are plain availability
       // flips, so one sync serves them — and any future gate — unchanged.
       this.ctx.bus.on('order:completed', () => this.syncPortalFx(true)),
-      this.ctx.bus.on('quest:completed', () => this.syncPortalFx(true))
+      this.ctx.bus.on('quest:completed', () => this.syncPortalFx(true)),
+      // The cauldron latch is the Rune Way's second key, and it flips AFTER
+      // the completion loop that emitted quest:completed — so the door must
+      // listen for the latch itself or it would light one fact too late.
+      this.ctx.bus.on('quest:cauldron_reached', () => this.syncPortalFx(true))
     );
     this.buildHubLandmarks();
   }
@@ -5743,15 +5747,17 @@ export class BoardScene extends Phaser.Scene {
   /**
    * Light every door whose destination is now available. `bloom` animates a
    * fresh opening (ignition flash + shockwave); build time passes false so an
-   * already-earned door simply stands lit. The North Crossing is excluded from
-   * LIVE syncs — its quest latch flips mid-finale, and lighting it there would
-   * scoop Eleanor's ceremony; `gate:opened` ignites it instead.
+   * already-earned door simply stands lit. The North Crossing is a LEVEL door
+   * now (owner's call, 2026-08-26 — worldGates dropped its quest latch), so it
+   * blooms here on the level-up like any other, and no longer needs excluding:
+   * its availability cannot flip mid-finale any more, so there is no ceremony
+   * left to scoop. `gate:opened` and the finale backstop still call
+   * `ignitePortal` on it, which simply no-ops on a door already lit.
    */
   private syncPortalFx(bloom: boolean): void {
     const open = new Set(this.ctx.systems.worlds.available().map((w) => w.id));
-    for (const [id, door] of this.portalDoors) {
+    for (const [, door] of this.portalDoors) {
       if (door.fx.isLive || !open.has(door.to)) continue;
-      if (bloom && id === 'emberkeep_altar_gate') continue;
       if (bloom) {
         door.fx.bloom();
         // The gate's REVEAL carries a passenger: once the ignition has played
