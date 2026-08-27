@@ -72,9 +72,14 @@ describe('cellCorners — the one answer for a cell\'s shape on screen', () => {
    * "simplifies" the corners back onto the constants.
    */
   it('matches the authored isle\'s real cell, which is NOT TILE_W x TILE_H', () => {
+    // 147.5048 → 152.6129 on 2026-08-27: the isle recalibration (tile 420x242 →
+    // 409.23x243.96) that seats the lattice ON the painted flagstones — the
+    // stones ran ~249.5 px against a 256 px lattice, drifting to 15 px by the
+    // south rim. Derived from map.json's own tile, pinned so nobody folds the
+    // corners back onto the constants.
     const { w, h } = spanOf(EMBERKEEP, 4, 4);
     expect(w).toBeCloseTo(256, 3);
-    expect(h).toBeCloseTo(147.5048, 3);
+    expect(h).toBeCloseTo(152.6129, 3);
   });
 
   it('gives every hand-drawn zone its own size, not one scaled guess', () => {
@@ -282,8 +287,18 @@ describe('zones — new ground beside the isle', () => {
           for (const n of ns) {
             const there = worldPointOf(world, n.col, n.row);
             const d = Math.hypot(there.x - here.x, there.y - here.y);
-            // One step, give or take the pitch mismatch between two editor grids.
-            expect(d).toBeLessThan(step * 1.6);
+            // One step, give or take the pitch mismatch between two editor
+            // grids — measured against the LARGER of the two endpoint zones'
+            // steps, because that is the bound the engine actually promises:
+            // buildAdjacency accepts a link when the PROBING zone lands within
+            // its own tolerance, and pass-2 symmetry then writes it into the
+            // other zone too, whose own step may be the smaller one. Judged
+            // only against the smaller step, a legitimate seam read 1.64 and
+            // failed the day the analytic editor→art transform moved every
+            // zone a few honest pixels (2026-08-27).
+            const zn = zoneAt(world, n.col, n.row);
+            const stepN = zn ? Math.max(Math.hypot(zn.u.x, zn.u.y), Math.hypot(zn.v.x, zn.v.y)) : step;
+            expect(d).toBeLessThan(Math.max(step, stepN) * 1.6);
             if (zoneAt(world, n.col, n.row) !== z) crossZone++;
           }
         }

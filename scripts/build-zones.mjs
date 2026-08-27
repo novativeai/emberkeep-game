@@ -347,8 +347,62 @@ function solve(samples, fit) {
   return { scale: b[0] / M[0][0], offsetX: b[1] / M[1][1], offsetY: b[2] / M[2][2] };
 }
 
+/* ------------------------------------------------------------------ */
+/* 2b. the ANALYTIC editor→art transform — the fit is now a watchdog     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The editor places every imported map image by a FORMULA, not by hand —
+ * `BoardEditor.renderCurrentMap`: the layer is centred on the authored
+ * backdrop's world rect (`backdropRect`, whose centre is exactly `artOrigin`
+ * above) and scaled to COVER it (`cover = max(rect/layer)` per axis). Both
+ * ends of that placement are constants this script already holds, so
+ * editor→art needs no estimation at all.
+ *
+ * The least-squares fit above measured the same relationship from the cells,
+ * and measuring it was the imprecision: the samples' `gameCell`s are ROUNDED
+ * lattice answers, so the solve chases their rounding structure and lands
+ * 0.3–0.8% off scale run over run (1.22453 → 1.22876 across two exports).
+ * Composed with `artToWorld`, a 0.8% scale error is a shear of ±12 world px
+ * across the board — the drawn grid sat visibly beside the painted tiles it
+ * was traced from. The analytic transform composes to identity within ~0.5 px
+ * (the residue is the layer's own 1024×640 downscale of 2610×1632 art).
+ *
+ * The fit still runs, as a WATCHDOG: if someone changes how the editor places
+ * the layer, the measured transform drifts away from this one and the build
+ * says so loudly instead of silently mis-placing every zone.
+ */
+const LAYERS = (source.project?.maps ?? []).map((m) => ({ name: m.name, w: m.w, h: m.h }));
+const LAYER = LAYERS[0] ?? { w: 1024, h: 640 };
+for (const l of LAYERS) {
+  if (l.w !== LAYER.w || l.h !== LAYER.h) {
+    throw new Error(
+      `build-zones: editor map layers disagree on size (${LAYER.w}x${LAYER.h} vs ${l.name} ${l.w}x${l.h}) — ` +
+        'the analytic editor→art assumes one layer geometry; teach it per-map sizes before importing this project.'
+    );
+  }
+}
+const COVER = Math.max((ART_W * unit) / LAYER.w, (ART_H * unit) / LAYER.h);
+const LAYER_TL = { x: artOriginX - (LAYER.w * COVER) / 2, y: artOriginY - (LAYER.h * COVER) / 2 };
+const editorToArt = (p) => ({
+  x: ((p.x - LAYER_TL.x) / COVER) * (ART_W / LAYER.w),
+  y: ((p.y - LAYER_TL.y) / COVER) * (ART_H / LAYER.h)
+});
+
 const FIT = fitEditorToArt();
-const editorToArt = (p) => ({ x: (p.x - FIT.offsetX) / FIT.scale, y: (p.y - FIT.offsetY) / FIT.scale });
+{
+  // The watchdog: express the analytic transform in the fit's own
+  // `editor = scale·art + offset` terms and compare.
+  const aScale = (COVER * LAYER.w) / ART_W;
+  const drift = Math.abs(FIT.scale - aScale) / aScale;
+  if (drift > 0.02) {
+    console.error(
+      `build-zones: the MEASURED editor→art (scale ${FIT.scale.toFixed(5)}) is ${(drift * 100).toFixed(1)}% away ` +
+        `from the ANALYTIC one (${aScale.toFixed(5)}). Either the editor changed how it places the map layer ` +
+        '(update the analytic constants above) or the export is corrupt. The analytic transform was used.'
+    );
+  }
+}
 
 /**
  * How faithfully the fit reproduces the editor's own cell assignment.
@@ -1606,10 +1660,12 @@ const doc = {
   /** The measured editor→backdrop transform, kept for provenance: anyone
    *  re-importing from the editor can check these numbers still hold. */
   editorToArt: {
-    scale: Math.round(FIT.scale * 1e5) / 1e5,
-    offsetX: round2(FIT.offsetX),
-    offsetY: round2(FIT.offsetY),
-    samples: FIT.samples,
+    method: 'analytic (layer cover placement); least-squares kept as watchdog',
+    scaleX: Math.round(((COVER * LAYER.w) / ART_W) * 1e5) / 1e5,
+    scaleY: Math.round(((COVER * LAYER.h) / ART_H) * 1e5) / 1e5,
+    offsetX: round2(LAYER_TL.x),
+    offsetY: round2(LAYER_TL.y),
+    fitted: { scale: Math.round(FIT.scale * 1e5) / 1e5, offsetX: round2(FIT.offsetX), offsetY: round2(FIT.offsetY), samples: FIT.samples },
     reproducesEditorCells: `${acc.hit}/${acc.total}`,
     worstErrorArtPx: Math.round(acc.worst)
   },
@@ -1618,7 +1674,7 @@ const doc = {
 
 writeFileSync(resolve(ROOT, OUT), `${JSON.stringify(doc, null, 2)}\n`);
 
-console.log(`editor→art  scale ${doc.editorToArt.scale}  offset (${doc.editorToArt.offsetX}, ${doc.editorToArt.offsetY})`);
+console.log(`editor→art  scale ${doc.editorToArt.scaleX}/${doc.editorToArt.scaleY} (analytic)  offset (${doc.editorToArt.offsetX}, ${doc.editorToArt.offsetY})  [fit watchdog: ${doc.editorToArt.fitted.scale}]`);
 console.log(`            reproduces the editor's own gameCell for ${acc.hit}/${acc.total} cells (worst ${Math.round(acc.worst)} art px)`);
 for (const r of report) {
   console.log(

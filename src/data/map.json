@@ -2,10 +2,10 @@
   "cols": 13,
   "rows": 12,
   "tile": {
-    "width": 420,
-    "height": 242,
+    "width": 409.23,
+    "height": 243.96,
     "skew": 0,
-    "angle": 29.95
+    "angle": 30.8
   },
   "regions": [
     {
@@ -948,8 +948,8 @@
       "col": 6,
       "row": 4,
       "z": 0,
-      "dx": 80,
-      "dy": -163
+      "dx": 88.36,
+      "dy": -172.83
     }
   ],
   "backgroundCalibration": {
