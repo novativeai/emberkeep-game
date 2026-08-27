@@ -116,7 +116,7 @@
         },
         {
           "id": "roofs_thatch",
-          "label": "Make 2 Moss Bunches for the roofs",
+          "label": "Make 2 Moss Bunches",
           "goal": {
             "kind": "have",
             "chain": "ashmoss",

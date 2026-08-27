@@ -89,7 +89,7 @@ knows what the thing is, what to do, and what just happened.**
 | `rekindle_brazier` | Light the Brazier | **Light the Fire Bowl** | Merge 10 times · Collect 6 Gem Chips · Deliver 6 Gem Chips to Eleanor |
 | `fill_the_larder` | Fill the Larder | **Make Emberberry Jam** | Make 1 Emberberry Jam |
 | `warm_the_hearth` | Warm the Long Hearth | **Warm the Fireplace** | Make 2 Fire Gems · Deliver 2 Fire Gems to Eleanor |
-| `raise_the_roofs` | Raise the Roofs | **Build Two Houses** | Build 2 Houses · Make 2 Moss Bunches for the roofs |
+| `raise_the_roofs` | Raise the Roofs | **Build Two Houses** | Build 2 Houses · Make 2 Moss Bunches |
 | `the_long_gallery` | Light the Long Gallery | **Light the Hallway** | Make 2 Crystals |
 | `catch_the_moonwater` | Catch the Moonwater | **Make Moonwater** | Make 1 Moonwater · Deliver 1 Moonwater to Eleanor |
 | `radiant_centerpiece` | Craft the Radiant Centerpiece | **Make a Sun Gem** | Make 1 Sun Gem · Deliver 1 Sun Gem to Eleanor |

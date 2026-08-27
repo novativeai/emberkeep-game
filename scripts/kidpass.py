@@ -86,7 +86,7 @@ QUESTS = {
   'rekindle_brazier': ('Light the Fire Bowl', {'brazier_merges': 'Merge 10 times', 'brazier_shards': 'Collect 6 Gem Chips', 'brazier_deliver': 'Deliver 6 Gem Chips to Eleanor'}),
   'fill_the_larder': ('Make Emberberry Jam', {'larder_preserve': 'Make 1 Emberberry Jam'}),
   'warm_the_hearth': ('Warm the Fireplace', {'hearth_gems': 'Make 2 Fire Gems', 'hearth_deliver': 'Deliver 2 Fire Gems to Eleanor'}),
-  'raise_the_roofs': ('Build Two Houses', {'roofs_houses': 'Build 2 Houses', 'roofs_thatch': 'Make 2 Moss Bunches for the roofs'}),
+  'raise_the_roofs': ('Build Two Houses', {'roofs_houses': 'Build 2 Houses', 'roofs_thatch': 'Make 2 Moss Bunches'}),
   'the_long_gallery': ('Light the Hallway', {'gallery_crystals': 'Make 2 Crystals'}),
   'catch_the_moonwater': ('Make Moonwater', {'moonwater_make': 'Make 1 Moonwater', 'moonwater_deliver': 'Deliver 1 Moonwater to Eleanor'}),
   'radiant_centerpiece': ('Make a Sun Gem', {'centerpiece_radiant': 'Make 1 Sun Gem', 'centerpiece_deliver': 'Deliver 1 Sun Gem to Eleanor'}),

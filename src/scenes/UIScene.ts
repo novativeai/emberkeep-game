@@ -283,6 +283,9 @@ export class UIScene extends Phaser.Scene {
   /** True while the HAND is showing an idle merge hint rather than a tutorial
    *  beat — so the hint only ever takes back what the hint put there. */
   private hintHand = false;
+  /** Last frame's `panelUp()` — the edge detector behind suspending and
+   *  re-arming the recipe demonstration around open panels. */
+  private panelWasUp = false;
   /**
    * WHO IS HOLDING THE HAND — stated, not inferred.
    *
@@ -703,9 +706,24 @@ export class UIScene extends Phaser.Scene {
       this.hintHand = false;
       this.clearMarkers();
     }
+    // PANEL TRANSITIONS steer the recipe demonstration the same way (owner's
+    // report, 2026-08-27: the two-Houses gauntlet rode above the commission
+    // chooser). A panel opening over a live demo takes its hand down — the
+    // beat is suspended, not spent; the last panel closing re-aims a
+    // suspended demo, and gives a deferred one (checkRecipeHints refused
+    // while a panel was up) its chance a beat later.
+    const overBoard = this.panelUp();
+    if (overBoard && !this.panelWasUp && this.recipeHint) {
+      this.clearMarkers();
+    }
+    if (!overBoard && this.panelWasUp) {
+      if (this.recipeHint) this.refreshRecipeHint();
+      else this.time.delayedCall(400, () => this.checkRecipeHints());
+    }
+    this.panelWasUp = overBoard;
     // Same question, same answer, one frame later: the quest tracker stops
     // reaching for the pointer while anything is over the board.
-    this.questTracker.setSuppressed(this.panelUp());
+    this.questTracker.setSuppressed(overBoard);
     // Re-project board-anchored tutorial markers EVERY frame so they stay glued
     // to their cell as the board camera pans/zooms (they live on the UI scene's
     // own fixed camera, so without this they'd appear stuck to the screen).
@@ -1059,12 +1077,12 @@ export class UIScene extends Phaser.Scene {
         this.celebrateOrder(orderId, rewards);
       }),
       bus.on('keeper:leveled', ({ level }) => this.celebrateLevelUp(level)),
-      bus.on('quest:completed', ({ questId }) => {
-        // The Golden Elder's awakening — UIScene runs her voice, BoardScene the
-        // camera and the egg, both off this one beat.
-        if (questId === GOLDEN_ALTAR.awakenQuestId) {
-          this.time.delayedCall(0, () => this.beat('trigger', () => this.runFinaleUi()));
-        }
+      // The Golden Elder's awakening — UIScene runs her voice, BoardScene the
+      // camera and the egg, both off this one beat. It rides the RANK that
+      // opens Borealis now (owner's call, 2026-08-27): StorySystem latches and
+      // speaks it exactly once per save.
+      bus.on('story:elder_wakes', () => {
+        this.time.delayedCall(0, () => this.beat('trigger', () => this.runFinaleUi()));
       }),
       bus.on('tasks:all_complete', () => this.celebrateTasksComplete()),
       bus.on('energy:changed', ({ current }) => {
@@ -1852,14 +1870,11 @@ export class UIScene extends Phaser.Scene {
     this.cookbook.requestClose();
     this.time.delayedCall(FINALE.elderAtMs, () =>
       this.beat('elder.speaks', () => {
-        // No egg earned (Order 1 skipped)? Her words read as PROPHECY — selling
-        // the promise the player hasn't collected yet, never claiming an
-        // awakening that didn't happen. Read HERE, not hoisted: the variant is a
-        // fact about the moment she opens her mouth.
-        const eggEarned = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
-        const lines = eggEarned
-          ? this.ctx.data.dialogue.finaleElder
-          : this.ctx.data.dialogue.finaleElderProphecy;
+        // Always her REAL first words: the awakening is unconditional now
+        // (owner's call, 2026-08-27 — she wakes when the rank opens Borealis),
+        // so the prophecy variant that covered a still-sleeping Elder is
+        // retired with the quest trigger that made it possible.
+        const lines = this.ctx.data.dialogue.finaleElder;
         // TAP-ADVANCED, like every chapter beat: these are her first words in
         // the whole game and must not scroll past unread. `say()` was wrong on
         // both counts — it takes ONE string, and it times out.
@@ -2065,6 +2080,13 @@ export class UIScene extends Phaser.Scene {
    */
   private checkRecipeHints(): void {
     if (!this.ctx.state.tutorialDone || this.finaleActive || this.recipeHint) return;
+    // NOT OVER AN OPEN PANEL (owner's report, 2026-08-27): the second House
+    // opens its commission chooser, and this demo used to fire 700ms later —
+    // the gauntlet riding above the chooser, pointing at a board the player
+    // cannot see. Deferred, never consumed: the keys stay unspent, and the
+    // panel-transition watcher in update() re-runs this the moment the last
+    // panel closes — i.e. once the House's produce has been chosen.
+    if (this.panelUp()) return;
     const candidates = [
       { key: 'twoDragons', recipe: 'ember_dragon:3>4', chain: 'ember_dragon', tier: 3 },
       { key: 'twoHouses', recipe: 'lumber:3>4', chain: 'lumber', tier: 3 }
