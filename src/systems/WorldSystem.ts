@@ -90,8 +90,19 @@ export class WorldSystem {
   private landingCell(world: WorldRuntime, from: string): TilePos | null {
     const board = this.state.itemsIn(world.id);
     const taken = new Set([...(board?.values() ?? [])].map((i) => `${i.col},${i.row}`));
+    // NEVER UNDER THE CLOUDS (owner's report, 2026-08-27): a playable cell
+    // whose region is still fogged is a claim about the FUTURE, and a dragon
+    // seated on one stands inside a cloud the player cannot tap through.
+    // Region status is read off the DESTINATION world's own tile registry —
+    // the active world may be the one the Keeper stayed home on — and a cell
+    // no region names is open ground by construction (fog exists only as
+    // authored cloud regions; the build script asserts it).
+    const open = (col: number, row: number): boolean => {
+      const id = world.tileRegion.get(`${col},${row}`);
+      return id === undefined || this.state.regionStatus.get(id) === 'active';
+    };
     const free = (col: number, row: number): boolean =>
-      world.playable.has(`${col},${row}`) && !taken.has(`${col},${row}`);
+      world.playable.has(`${col},${row}`) && open(col, row) && !taken.has(`${col},${row}`);
 
     // SOMEBODY LIVES HERE FIRST: wherever the far world authors a character —
     // Eleanor keeps Roothold, Selyna her sanctuary — a dragon sent ahead of

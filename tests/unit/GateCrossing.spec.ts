@@ -109,6 +109,25 @@ describe('a dragon crossing a gate', () => {
     expect(roothold.playable.has(`${at.col},${at.row}`)).toBe(true);
   });
 
+  /** NEVER UNDER THE CLOUDS (owner's report, 2026-08-27): a fresh Borealis is
+   *  mostly authored fog — only the shore's region is active — and a landing
+   *  under a cloud puts the dragon on ground the player cannot tap through.
+   *  The landing predicate now requires the cell's region to be ACTIVE. */
+  it('never lands inside a fogged region on the far world', () => {
+    const ctx = createTestContext();
+    const borealis = ctx.state.worlds.get('borealis')!;
+    const itemId = namedDragon(ctx);
+    const crossed = capture(ctx.bus, 'dragon:crossed');
+    ctx.bus.emit('dragon:cross_gate', { itemId, to: 'borealis' });
+    expect(crossed).toHaveLength(1);
+    const at = crossed[0]!.at;
+    expect(borealis.playable.has(`${at.col},${at.row}`)).toBe(true);
+    const region = borealis.tileRegion.get(`${at.col},${at.row}`);
+    if (region !== undefined) {
+      expect(ctx.state.regionStatus.get(region), `landed in ${region}`).toBe('active');
+    }
+  });
+
   it('never lands on top of something already standing there', () => {
     // The far board is live even while unwatched — a crossing must not displace
     // a piece the player left in the hub.

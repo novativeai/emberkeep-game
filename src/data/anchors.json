@@ -4,6 +4,250 @@
     0.85
   ],
   "byKey": {
+    "cliff_corner_e": [
+      0.5,
+      0
+    ],
+    "cliff_corner_s": [
+      0.5,
+      0
+    ],
+    "cliff_corner_w": [
+      0.5,
+      0
+    ],
+    "cliff_rock": [
+      0.5,
+      0
+    ],
+    "cliff_se": [
+      0.5,
+      0
+    ],
+    "cliff_se_b": [
+      0.5,
+      0
+    ],
+    "cliff_sw": [
+      0.5,
+      0
+    ],
+    "cliff_sw_b": [
+      0.5,
+      0
+    ],
+    "decor_brazier": [
+      0.5,
+      0.92
+    ],
+    "decor_dragon": [
+      0.5,
+      0.84
+    ],
+    "decor_far_isle": [
+      0.5,
+      0.5
+    ],
+    "decor_flower_1": [
+      0.5,
+      0
+    ],
+    "decor_hut_houses_transparent_001": [
+      0.84,
+      1
+    ],
+    "decor_nest": [
+      0.5,
+      0.8
+    ],
+    "decor_plant_1": [
+      0.5,
+      0
+    ],
+    "decor_rose_2": [
+      0.5,
+      0
+    ],
+    "decor_space_rose": [
+      0.5,
+      0
+    ],
+    "decor_themcristall": [
+      0.99,
+      0
+    ],
+    "decor_tree_2": [
+      0.18,
+      0
+    ],
+    "decor_warning": [
+      0.5,
+      0
+    ],
+    "fog_puff_1": [
+      0.5,
+      0.64
+    ],
+    "fog_puff_2": [
+      0.5,
+      0.64
+    ],
+    "fx_ember": [
+      0.5,
+      0.5
+    ],
+    "fx_glow": [
+      0.5,
+      0.5
+    ],
+    "fx_shell": [
+      0.5,
+      0.5
+    ],
+    "fx_spark": [
+      0.5,
+      0.5
+    ],
+    "icon_key_bronze": [
+      0.5,
+      0.6
+    ],
+    "item_auroraloom_3": [
+      0.5,
+      0.95
+    ],
+    "item_bigtree_1": [
+      0.5,
+      0.92
+    ],
+    "item_chest_1": [
+      0.5,
+      0.79
+    ],
+    "item_coin_1": [
+      0.5,
+      0.62
+    ],
+    "item_coin_2": [
+      0.5,
+      0.62
+    ],
+    "item_crystal_1": [
+      0.5,
+      0.92
+    ],
+    "item_diamond_1": [
+      0.5,
+      0.66
+    ],
+    "item_ember_dragon_1": [
+      0.5,
+      0.9
+    ],
+    "item_ember_dragon_2": [
+      0.5,
+      1.0
+    ],
+    "item_ember_dragon_3": [
+      0.5,
+      0.88
+    ],
+    "item_ember_dragon_4": [
+      0.5,
+      0.88
+    ],
+    "item_emberbark_1": [
+      0.5,
+      0.94
+    ],
+    "item_emberdram_3": [
+      0.47,
+      0.94
+    ],
+    "item_emerald_1": [
+      0.5,
+      0.66
+    ],
+    "item_emerald_2": [
+      0.5,
+      1.0
+    ],
+    "item_emerald_3": [
+      0.5,
+      0.9
+    ],
+    "item_emerald_4": [
+      0.5,
+      0.88
+    ],
+    "item_frost_1": [
+      0.5,
+      1.0
+    ],
+    "item_frost_2": [
+      0.5,
+      0.88
+    ],
+    "item_frost_3": [
+      0.5,
+      0.88
+    ],
+    "item_glasskiln_3": [
+      0.52,
+      0.95
+    ],
+    "item_golden_egg_1": [
+      0.5,
+      1.0
+    ],
+    "item_golden_egg_2": [
+      0.5,
+      0.88
+    ],
+    "item_keel_3": [
+      0.5,
+      0.9
+    ],
+    "item_keel_4": [
+      0.5,
+      0.9
+    ],
+    "item_lumber_1": [
+      0.5,
+      0.85
+    ],
+    "item_lumber_2": [
+      0.5,
+      0.84
+    ],
+    "item_lumber_3": [
+      0.5,
+      0.9
+    ],
+    "item_lumber_4": [
+      0.5,
+      0.9
+    ],
+    "item_runestone_3": [
+      0.47,
+      0.92
+    ],
+    "item_starbench_3": [
+      0.45,
+      0.875
+    ],
+    "item_storm_1": [
+      0.5,
+      1.0
+    ],
+    "item_storm_2": [
+      0.5,
+      0.88
+    ],
+    "item_storm_3": [
+      0.5,
+      0.88
+    ],
     "item_strawberry_1": [
       0.5,
       0.92
@@ -16,29 +260,73 @@
       0.5,
       0.9
     ],
-    "item_ember_dragon_1": [
-      0.5,
-      0.9
+    "item_tarkiln_3": [
+      0.54,
+      0.92
     ],
-    "item_ember_dragon_2": [
-      0.5,
-      1.0
+    "item_wreckforge_3": [
+      0.48,
+      0.905
     ],
-    "item_golden_egg_1": [
+    "portrait_eleanor": [
       0.5,
-      1.0
+      0.5
     ],
-    "item_golden_egg_2": [
+    "portrait_golden_elder": [
+      0.5,
+      0.5
+    ],
+    "portrait_pip": [
+      0.5,
+      0.5
+    ],
+    "skin_ashglass_3": [
       0.5,
       0.88
     ],
-    "icon_key_bronze": [
+    "skin_ashglass_4": [
       0.5,
-      0.6
+      0.88
     ],
-    "decor_dragon": [
+    "skin_frost_3": [
       0.5,
-      0.84
+      0.88
+    ],
+    "skin_frost_4": [
+      0.5,
+      0.88
+    ],
+    "skin_moonwhisker_3": [
+      0.5,
+      0.9
+    ],
+    "skin_moonwhisker_4": [
+      0.5,
+      0.88
+    ],
+    "skin_porcelain_3": [
+      0.5,
+      0.9
+    ],
+    "skin_porcelain_4": [
+      0.5,
+      0.88
+    ],
+    "skin_storm_3": [
+      0.5,
+      0.88
+    ],
+    "skin_storm_4": [
+      0.5,
+      0.88
+    ],
+    "sleep_ember_dragon_3": [
+      0.5,
+      0.9932
+    ],
+    "sleep_ember_dragon_4": [
+      0.5,
+      0.9942
     ],
     "tile_ash": [
       0.5,
@@ -56,95 +344,11 @@
       0.5,
       0.5
     ],
-    "cliff_sw": [
-      0.5,
-      0
-    ],
-    "cliff_se": [
-      0.5,
-      0
-    ],
-    "cliff_sw_b": [
-      0.5,
-      0
-    ],
-    "cliff_se_b": [
-      0.5,
-      0
-    ],
-    "cliff_corner_s": [
-      0.5,
-      0
-    ],
-    "cliff_corner_e": [
-      0.5,
-      0
-    ],
-    "cliff_corner_w": [
-      0.5,
-      0
-    ],
-    "cliff_rock": [
-      0.5,
-      0
-    ],
-    "fog_puff_1": [
-      0.5,
-      0.64
-    ],
-    "fog_puff_2": [
-      0.5,
-      0.64
-    ],
-    "decor_nest": [
-      0.5,
-      0.8
-    ],
-    "decor_brazier": [
-      0.5,
-      0.92
-    ],
-    "decor_far_isle": [
-      0.5,
-      0.5
-    ],
-    "fx_ember": [
-      0.5,
-      0.5
-    ],
-    "fx_spark": [
-      0.5,
-      0.5
-    ],
-    "fx_glow": [
-      0.5,
-      0.5
-    ],
-    "fx_shell": [
-      0.5,
-      0.5
-    ],
-    "ui_hand": [
-      0.05,
-      0.05
-    ],
     "ui_arrow": [
       0.52,
       0.97
     ],
-    "portrait_eleanor": [
-      0.5,
-      0.5
-    ],
-    "portrait_pip": [
-      0.5,
-      0.5
-    ],
-    "portrait_golden_elder": [
-      0.5,
-      0.5
-    ],
-    "ui_tile_highlight": [
+    "ui_btn_green": [
       0.5,
       0.5
     ],
@@ -152,19 +356,39 @@
       0.5,
       0.5
     ],
-    "ui_btn_green": [
-      0.5,
-      0.5
-    ],
     "ui_btn_round": [
       0.5,
       0.5
     ],
-    "ui_panel": [
+    "ui_card": [
       0.5,
       0.5
     ],
-    "ui_card": [
+    "ui_hand": [
+      0.05,
+      0.05
+    ],
+    "ui_icon_bolt": [
+      0.5,
+      0.5
+    ],
+    "ui_icon_coin": [
+      0.5,
+      0.5
+    ],
+    "ui_icon_gear": [
+      0.5,
+      0.5
+    ],
+    "ui_icon_key": [
+      0.5,
+      0.5
+    ],
+    "ui_icon_scroll": [
+      0.5,
+      0.5
+    ],
+    "ui_panel": [
       0.5,
       0.5
     ],
@@ -176,205 +400,9 @@
       0.5,
       0.5
     ],
-    "ui_icon_bolt": [
+    "ui_tile_highlight": [
       0.5,
       0.5
-    ],
-    "ui_icon_coin": [
-      0.5,
-      0.5
-    ],
-    "ui_icon_key": [
-      0.5,
-      0.5
-    ],
-    "ui_icon_gear": [
-      0.5,
-      0.5
-    ],
-    "ui_icon_scroll": [
-      0.5,
-      0.5
-    ],
-    "item_ember_dragon_3": [
-      0.5,
-      0.88
-    ],
-    "item_ember_dragon_4": [
-      0.5,
-      0.88
-    ],
-    "decor_themcristall": [
-      0.99,
-      0
-    ],
-    "decor_hut_houses_transparent_001": [
-      0.84,
-      1
-    ],
-    "item_lumber_1": [
-      0.5,
-      0.85
-    ],
-    "item_lumber_2": [
-      0.5,
-      0.84
-    ],
-    "item_lumber_3": [
-      0.5,
-      0.9
-    ],
-    "item_chest_1": [
-      0.5,
-      0.79
-    ],
-    "item_bigtree_1": [
-      0.5,
-      0.92
-    ],
-    "decor_tree_2": [
-      0.18,
-      0
-    ],
-    "decor_plant_1": [
-      0.5,
-      0
-    ],
-    "decor_flower_1": [
-      0.5,
-      0
-    ],
-    "decor_rose_2": [
-      0.5,
-      0
-    ],
-    "decor_warning": [
-      0.5,
-      0
-    ],
-    "decor_space_rose": [
-      0.5,
-      0
-    ],
-    "item_crystal_1": [
-      0.5,
-      0.92
-    ],
-    "item_emberbark_1": [
-      0.5,
-      0.94
-    ],
-    "item_coin_1": [
-      0.5,
-      0.62
-    ],
-    "item_coin_2": [
-      0.5,
-      0.62
-    ],
-    "item_diamond_1": [
-      0.5,
-      0.66
-    ],
-    "item_emerald_1": [
-      0.5,
-      0.66
-    ],
-    "item_emerald_2": [
-      0.5,
-      1.0
-    ],
-    "item_emerald_4": [
-      0.5,
-      0.88
-    ],
-    "item_emerald_3": [
-      0.5,
-      0.9
-    ],
-    "item_lumber_4": [
-      0.5,
-      0.9
-    ],
-    "skin_frost_3": [
-      0.5,
-      0.88
-    ],
-    "skin_frost_4": [
-      0.5,
-      0.88
-    ],
-    "skin_storm_3": [
-      0.5,
-      0.88
-    ],
-    "skin_storm_4": [
-      0.5,
-      0.88
-    ],
-    "skin_moonwhisker_3": [
-      0.5,
-      0.9
-    ],
-    "skin_moonwhisker_4": [
-      0.5,
-      0.88
-    ],
-    "skin_ashglass_3": [
-      0.5,
-      0.88
-    ],
-    "skin_ashglass_4": [
-      0.5,
-      0.88
-    ],
-    "skin_porcelain_3": [
-      0.5,
-      0.9
-    ],
-    "skin_porcelain_4": [
-      0.5,
-      0.88
-    ],
-    "sleep_ember_dragon_3": [
-      0.5,
-      0.9932
-    ],
-    "sleep_ember_dragon_4": [
-      0.5,
-      0.9942
-    ],
-    "item_keel_3": [
-      0.5,
-      0.9
-    ],
-    "item_keel_4": [
-      0.5,
-      0.9
-    ],
-    "item_frost_1": [
-      0.5,
-      1.0
-    ],
-    "item_frost_2": [
-      0.5,
-      0.88
-    ],
-    "item_frost_3": [
-      0.5,
-      0.88
-    ],
-    "item_storm_1": [
-      0.5,
-      1.0
-    ],
-    "item_storm_2": [
-      0.5,
-      0.88
-    ],
-    "item_storm_3": [
-      0.5,
-      0.88
     ]
   }
 }

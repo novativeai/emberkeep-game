@@ -11,7 +11,7 @@ import {
   QUEST_TRACKER_RIGHT,
   QUEST_TRACKER_TOP_Y,
   QUEST_VIEW_H,
-  UI_SCALE
+  QUEST_TRACKER_SCALE
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { questGoalPiece } from '../core/recipeTree';
@@ -197,7 +197,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     super(scene, LIVE_GAME_WIDTH - QUEST_TRACKER_RIGHT, QUEST_TRACKER_TOP_Y);
     this.owner = scene;
     this.bus = bus;
-    this.setScale(UI_SCALE); // magnifies down-left from the top-right anchor
+    this.setScale(QUEST_TRACKER_SCALE); // magnifies down-left from the top-right anchor
 
     // ---- Main quest ----
     this.mainGroup = scene.add.container(0, 0);

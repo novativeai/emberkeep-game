@@ -88,6 +88,16 @@ export const IS_LOW_END: boolean =
 export const UI_SCALE: number = IS_MOBILE ? 1.5 : 1;
 
 /**
+ * The quest tracker reads 30% bigger than the other clusters on a phone
+ * (owner's call, 2026-08-27): it is the one instruction most players ever
+ * read, and at the shared UI_SCALE its rows were the smallest live type on
+ * screen. One factor over the whole cluster — text, piece icons and row
+ * pitch grow together, and RecipeHelpPanel's peek seat multiplies by THIS,
+ * not UI_SCALE, so the sheet keeps clearing the row it explains.
+ */
+export const QUEST_TRACKER_SCALE: number = IS_MOBILE ? UI_SCALE * 1.3 : 1;
+
+/**
  * Does Settings offer the Map Editor?
  *
  * OFF — hidden, not removed. The tool is the whole authoring pipeline for the
