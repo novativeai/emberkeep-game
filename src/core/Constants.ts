@@ -1754,8 +1754,13 @@ export const CHEST_INTERVAL_MS = 300_000;
  * then the chest recharges (it never disappears). `coins` is currency; `item`
  * pops that many merge pieces onto free tiles by the chest; `anyItem` rolls a
  * single tier-1 piece from whatever this world actually makes
- * (`chestWildcardChains`). (No wood — lumber appears only when its cloud zone
- * clears.) Designers tune it here, not in code.
+ * (`chestWildcardChains`). Designers tune it here, not in code.
+ *
+ * "No wood — lumber appears only when its cloud zone clears" was written here
+ * as a statement of intent and was FALSE for as long as it stood: nothing
+ * stopped the wildcard rolling `lumber`, and a chest that did put a fourth pile
+ * of Logs beside a lesson whose line promises three. What a comment asserts,
+ * `CHEST_WILDCARD_NEVER` now enforces.
  */
 /** How far (manhattan tiles) a reward drop may land from its source. Beyond
  *  this the drop is BLOCKED (harvest fails / chest pays Gold / passive skips)
@@ -1775,15 +1780,30 @@ export const CHEST_GIFTS: ReadonlyArray<ChestGift> = [
   // rather than by another fixed chain: a named third gift would just be a
   // second Ruby drop with a different sprite, and the chest's job is to be the
   // one place the isle surprises you.
+  // A SECOND PURSE, NOT A SECOND STARTER CHAIN (owner's call, 2026-08-27: the
+  // chest "must not give gifts like Rubies, and wood"). `3 Rubies!` stood here
+  // and it was the dullest thing the box could do: the opening hands the player
+  // Rubies for the whole ruby lesson and the Old Tree sheds Logs for ever, so
+  // the one moment the isle is allowed to surprise you paid out the two piles
+  // already on the floor. Gold at a second, rarer weight keeps the table at
+  // three faces — a chest that only ever paid `+15` or the wildcard would read
+  // as two outcomes, and the third face is what makes opening it feel graded.
   { kind: 'anyItem', label: 'A find!' },
-  { kind: 'item', chain: 'ember_dragon', tier: 1, count: 3, label: '3 Rubies!' }
+  { kind: 'coins', amount: 40, label: '+40' }
 ];
 
 /** Never rolled by the `anyItem` wildcard, whatever world it opens in. */
 export const CHEST_WILDCARD_NEVER = new Set<string>([
   'coin', // currency, and the chest already has a Gold face
   'golden_egg', // the finale's — placed by the altar, brewed at Selyna's Cauldron, and by nothing else
-  'emerald' // the dropped green-dragon chain — the whole point of the change
+  'emerald', // the dropped green-dragon chain — the whole point of the change
+  // The two the player is never short of, barred from the WILDCARD as well —
+  // taking the Ruby gift off the table above and leaving the joker free to roll
+  // it back would have moved the boredom, not removed it. `lumber` also closes
+  // the hole that put a FOURTH pile of Logs on the board during `wood_merge`,
+  // where the lesson's own line promises three.
+  'ember_dragon',
+  'lumber'
 ]);
 
 /**

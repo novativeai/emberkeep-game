@@ -181,7 +181,7 @@ Zone 2 focal is stored in `cameraKeyframes` in `map.json`.
 | `lumber` | 1 Bush → 2 House → 3 Manor | Bush merges 3→1 House; **House pair-merges 2→1 Manor**. House/Manor passively drop coin_1 / coin_2 every 210 s (not tappable) | — |
 | `coin` | 1 Gold Coin → 2 Gold Pouch | Tap to collect (+5 / +10 Gold, `COLLECTIBLE_REWARD`); Pouch grants 60 XP on merge | — |
 | `crystal` | 1 Theme Crystal | startingItem at [8,11] (decor3d position); tappable, **300 s** cooldown → emerald_1; `skipMaxGold: 60` | — |
-| `chest` | 1 Treasure Chest | **Permanent fixture** — recharges every 5 min (`CHEST_INTERVAL_MS`); a gift is 15 Gold / 3 Emeralds / 3 Rubies (`CHEST_GIFTS`). Never consumed, never drops wood | — |
+| `chest` | 1 Treasure Chest | **Permanent fixture** — recharges every 5 min (`CHEST_INTERVAL_MS`); a gift is 15 Gold / 40 Gold / one piece of anything this world makes (`CHEST_GIFTS`). Never consumed; never Rubies and never wood, from either face (`CHEST_WILDCARD_NEVER`) | — |
 | `bigtree` | 1 Ancient Tree | Passive lumber_1 producer (**300 s**); lives in level_2 at [4,4] | — |
 | `strawberry` | 1 Sprout → 2 Bush → 3 Ripe Plant | T3 is the **free** producer (20 s, `energyCost: 0`) — the zero-Warmth floor | — |
 | `golden_egg` | 1 Golden Egg → 2 Golden Elder | Finale MacGuffin; unsellable, awakened by the scripted `FINALE`, never by a player merge | 2 |

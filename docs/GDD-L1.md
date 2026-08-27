@@ -120,11 +120,16 @@ in `chains.json` as the unit tests' generic merge chain but is listed in
 - **Dragon Jobs**: send a dragon to a House and it works `DRAGON_WORK_MS` (3 min)
   advancing every timer at 2× per worker, then rests `DRAGON_REST_MS` (5 min).
 - **Treasure Chest**: a permanent fixture that readies a gift every
-  `CHEST_INTERVAL_MS` (5 min) — 15 Gold, 3 Rubies, or **one piece of anything
+  `CHEST_INTERVAL_MS` (5 min) — 15 Gold, 40 Gold, or **one piece of anything
   this world makes** (the `anyItem` wildcard, rolled at open time from
   `chestWildcardChains`; it replaced the Emeralds when the green chain was
   dropped). Never a legendary egg — the Directive forbids it and the audit
-  checks the roster, not just the written lines.
+  checks the roster, not just the written lines. And never **Rubies or Logs**,
+  from either face (`CHEST_WILDCARD_NEVER`, owner 2026-08-27): the opening
+  hands the player Rubies for the whole ruby lesson and the Old Tree sheds Logs
+  for ever, so the one moment the isle is allowed to surprise you was paying
+  out the two piles already on the floor. Rubies stay renewable without it —
+  a Red Dragon drops one every 10 yields, a Big Red Dragon every 8.
 - **Warmth**: max **30** (+3 per Keeper level), start 28, **+1 / 60 s**,
   offline catch-up on load, banking up to `OFFLINE_BANK_CYCLES` (3) passive
   cycles for the "While you were away" card.
