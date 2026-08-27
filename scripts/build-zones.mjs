@@ -732,6 +732,18 @@ const isFixture = (chain, tier) => GENERATOR_TIERS.has(`${chain}:${tier}`) || ch
  * furthest from everything already placed?" — and that answers correctly for
  * any outline, because it never mentions a direction at all.
  */
+/**
+ * Seeds a region could not hold. A shortfall is CONTENT that did not land;
+ * it must never cost the world its GEOMETRY. It used to throw, and the throw
+ * rode up through the per-world catch — so re-drawing an island smaller than
+ * its plan froze the ENTIRE world at its previous lattice, and every marker
+ * in the game then disagreed with the grid the author was looking at in the
+ * editor. The plan describes yesterday's islands by index; the author is
+ * allowed to draw today's differently and hear about the mismatch, loudly,
+ * without the map refusing to follow.
+ */
+const seedShortfalls = [];
+
 function seedRegion(cells, seeds, taken) {
   if (!seeds?.length || !cells.length) return [];
   const cx = cells.reduce((n, c) => n + c.at.x, 0) / cells.length;
@@ -817,13 +829,22 @@ function seedRegion(cells, seeds, taken) {
     .filter((c) => !used.has(c))
     .sort((a, b) => Math.hypot(a.at.x - cx, a.at.y - cy) - Math.hypot(b.at.x - cx, b.at.y - cy));
   let n = 0;
+  const dropped = [];
   for (const unit of units) {
     if (!unit.at) {
       const cell = mid[n++];
-      if (!cell) throw new Error(`build-zones: ${unit.chain} has no room — island holds ${cells.length}`);
+      if (!cell) {
+        dropped.push(`${unit.chain}:${unit.tier}`);
+        continue;
+      }
       unit.at = [cell.col, cell.row];
     }
     out.push({ chain: unit.chain, tier: unit.tier, at: unit.at });
+  }
+  if (dropped.length) {
+    seedShortfalls.push(
+      `island of ${cells.length} cell(s) had no room for ${dropped.length} seed(s): ${dropped.join(', ')}`
+    );
   }
   return out;
 }
@@ -1611,6 +1632,13 @@ console.log(`wrote ${OUT}`);
 // LOUD, and last, so it is the thing left on screen. A kept world is ground the
 // player still gets; it is also authoring that did not land, and the two must
 // never be confused with a clean run.
+if (seedShortfalls.length) {
+  console.error('');
+  for (const w of seedShortfalls) console.error(`build-zones: SEED SHORTFALL — ${w}`);
+  console.error(
+    'build-zones: the geometry shipped anyway; re-fit BOREALIS_PLAN (or the island) to restore the missing contents.'
+  );
+}
 if (failures.length) {
   console.error('');
   for (const f of failures) {

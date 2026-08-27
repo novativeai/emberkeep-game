@@ -219,6 +219,45 @@ export function worldPointOf(
 }
 
 /**
+ * THE FOUR WORLD-PIXEL CORNERS of a cell, in the zone's own lattice.
+ *
+ * This is the ONE answer for "what shape is this cell on screen", and anything
+ * that draws a cell-shaped thing — the drag reticle, a hint diamond, a tap
+ * area — must ask it rather than build a diamond out of `TILE_W`/`TILE_H`.
+ *
+ * Those constants describe the AUTHORED isle and nothing else. `projectionOf`
+ * pins `halfW` to `TILE_W / 2` whatever the map says and derives `halfH` from
+ * one global aspect, so a shape built from them is right on the authored isle
+ * and wrong on every hand-drawn zone. It cannot be rescued by a scalar either:
+ * a zone is two VECTORS (`u`, `v`) plus a rotation, and one number can only
+ * carry the width. Measured on Borealis, a reticle scaled by `artScale` came
+ * out 13% short on one zone and 13% tall on the next, and never rotated.
+ *
+ * No new maths: `zonePoint` already takes fractional cells, so the corners are
+ * its own projection sampled at the half-steps — rotation, pivot and any shear
+ * come along for free and can never drift from where the piece actually lands.
+ *
+ * Order is the iso reading order — top, right, bottom, left — for an
+ * unrotated 2:1 zone, and stays consistent (it is the winding of the local
+ * square) under rotation.
+ */
+export function cellCorners(
+  world: WorldRuntime,
+  col: number,
+  row: number
+): { x: number; y: number }[] {
+  const z = zoneAt(world, col, row) ?? world.fallback;
+  const i = col - z.block.col;
+  const j = row - z.block.row;
+  return [
+    zonePoint(z, i - 0.5, j - 0.5),
+    zonePoint(z, i + 0.5, j - 0.5),
+    zonePoint(z, i + 0.5, j + 0.5),
+    zonePoint(z, i - 0.5, j + 0.5)
+  ];
+}
+
+/**
  * The cell a point is actually STANDING ON, or null when it is over open sky.
  *
  * THE HONEST HALF of `cellAtWorldPoint`, and the one anything that cares

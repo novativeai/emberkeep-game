@@ -150,7 +150,12 @@ iapBridge.attach(ctx.bus);
  * listener's. The UI Builder document has no board to edit, so it is the one
  * boot that skips the editor entirely.
  */
-if (!uiEditMode) {
+// DEV ONLY, as a build-time constant — the owner's call: the editor must not
+// EXIST online, not merely hide. `import.meta.env.DEV` is false in the
+// production bundle, so Rollup drops this whole block and the editor chunk
+// (250 KB + the 8.9 MB project fetch behind it) is never even emitted;
+// `?mapedit` on the deployed site opens nothing because there is nothing.
+if (import.meta.env.DEV && !uiEditMode) {
   let editorAsked = false;
   ctx.bus.on('editor:open', () => {
     if (editorAsked) return; // constructed already — its own listener has this one

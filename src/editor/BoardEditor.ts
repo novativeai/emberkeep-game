@@ -1122,24 +1122,12 @@ export class BoardEditor {
         g.strokeCircle(mh.x, mh.y, 13);
       }
 
-      if (onTab) {
-        const cc = gridCellCenter(def, (def.cols - 1) / 2, (def.rows - 1) / 2);
-        this.gridLabels.push(
-          this.scene.add
-            .text(cc.x, cc.y, `${def.name}  ·  ${def.cols}×${def.rows}`, {
-              fontFamily: 'sans-serif',
-              fontSize: '28px',
-              fontStyle: 'bold',
-              color: sel ? '#0a2a30' : '#d8f7ff',
-              backgroundColor: sel ? '#8af3ffcc' : '#0a1a1fcc',
-              padding: { x: 8, y: 3 },
-              stroke: '#07333a',
-              strokeThickness: sel ? 0 : 4
-            })
-            .setOrigin(0.5)
-            .setDepth(EDITOR_DEPTH + 6)
-        );
-      }
+      // NO name/size label on the board. It used to print "<name> · C×R" across
+      // each grid's middle on the Grille tab, which is the one thing you cannot
+      // see past while placing cells — and it was redundant: the sidebar list
+      // (EditorDom `renderGridList`) already carries the name and the matrix,
+      // and highlights the row for whichever grid is selected. Which grid is
+      // which stays readable through selection, not through paint.
     }
 
     // The live drag box while creating a grid by hand.

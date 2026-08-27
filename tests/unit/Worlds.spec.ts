@@ -40,7 +40,9 @@ describe('worlds registry — the ingest loses nothing', () => {
     // which is what a lost grid or a half-loaded pager looks like.
     // 367 → 368 on 2026-08-23, the pass that re-levelled both maps so each
     // fog bank lifts on its own Keeper rank; one cell was drawn along the way.
-    expect(sourceCells.length).toBe(368);
+    // 368 → 369 on 2026-08-27, with the Borealis re-cut that split the coast
+    // into per-rank bands (one borealis coast cell moved, two cells drawn).
+    expect(sourceCells.length).toBe(369);
   });
 
   it('keeps each cell at the exact world point the editor placed it', () => {

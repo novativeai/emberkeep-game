@@ -29,12 +29,88 @@ import {
   portalAtWorldPoint,
   worldPointOf,
   ZONES,
-  zoneAt
+  zoneAt,
+  cellCorners
 } from '../../src/core/world';
 
 const MAP = realMap as unknown as MapData;
 const WORLDS = buildWorlds(MAP);
 const EMBERKEEP = WORLDS.get(WORLD_ID)!;
+
+describe('cellCorners — the one answer for a cell\'s shape on screen', () => {
+  const spanOf = (world: ReturnType<typeof buildWorlds> extends Map<string, infer W> ? W : never, col: number, row: number) => {
+    const v = cellCorners(world, col, row);
+    const xs = v.map((p) => p.x);
+    const ys = v.map((p) => p.y);
+    return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+  };
+
+  it('is centred on the cell the piece lands in', () => {
+    for (const [col, row] of [
+      [3, 3],
+      [0, 0],
+      [7, 5]
+    ] as [number, number][]) {
+      const c = worldPointOf(EMBERKEEP, col, row);
+      const v = cellCorners(EMBERKEEP, col, row);
+      const mid = {
+        x: v.reduce((n, p) => n + p.x, 0) / 4,
+        y: v.reduce((n, p) => n + p.y, 0) / 4
+      };
+      expect(mid.x).toBeCloseTo(c.x, 6);
+      expect(mid.y).toBeCloseTo(c.y, 6);
+    }
+  });
+
+  /**
+   * THE BUG THIS EXISTS TO STOP COMING BACK.
+   *
+   * The authored isle's tile is 420x242 (map.json), which `projectionOf` turns
+   * into a 256 x 147.5 cell — NOT 256 x 128. Every marker built out of
+   * `TILE_H` was therefore 13.2% too short even here, on the one lattice those
+   * constants are supposed to describe. Pinned as a number so nobody
+   * "simplifies" the corners back onto the constants.
+   */
+  it('matches the authored isle\'s real cell, which is NOT TILE_W x TILE_H', () => {
+    const { w, h } = spanOf(EMBERKEEP, 4, 4);
+    expect(w).toBeCloseTo(256, 3);
+    expect(h).toBeCloseTo(147.5048, 3);
+  });
+
+  it('gives every hand-drawn zone its own size, not one scaled guess', () => {
+    // A scalar cannot carry two vectors: `artScale` is minted as a WIDTH ratio
+    // (build-zones.mjs), so `256*artScale` tracks the width and `128*artScale`
+    // is only right where the cell happens to be exactly 2:1. Prove the
+    // corners disagree with that guess wherever the aspect does.
+    let checked = 0;
+    for (const world of WORLDS.values()) {
+      for (const z of world.zones) {
+        const first = [...z.cells][0];
+        if (!first) continue;
+        const [i, j] = first.split(',').map(Number) as [number, number];
+        const { w, h } = spanOf(world, z.block.col + i, z.block.row + j);
+        const trueAspect = h / w;
+        if (Math.abs(trueAspect - 0.5) < 0.02) continue; // genuinely 2:1 — no argument to have
+        expect(h).not.toBeCloseTo(128 * z.artScale, 1);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(20); // the roster really is mostly not 2:1
+  });
+
+  it('carries the zone rotation, which a scale never could', () => {
+    const turned = [...WORLDS.values()]
+      .flatMap((w) => w.zones.map((z) => ({ w, z })))
+      .find(({ z }) => z.rotation !== 0 && z.cells.size > 0);
+    expect(turned).toBeDefined();
+    const { w: world, z } = turned!;
+    const [i, j] = [...z.cells][0]!.split(',').map(Number) as [number, number];
+    const v = cellCorners(world, z.block.col + i, z.block.row + j);
+    // An unrotated iso cell has its first corner straight above the centre.
+    const c = worldPointOf(world, z.block.col + i, z.block.row + j);
+    expect(Math.abs(v[0]!.x - c.x)).toBeGreaterThan(0.3);
+  });
+});
 
 /* ------------------------------------------------------------------ */
 /* the guard the whole transition rests on                              */
@@ -253,7 +329,10 @@ describe('zones — new ground beside the isle', () => {
     // pixels through `neighborsOf`, and they agree cell for cell. If this line
     // and the script's report ever disagree, one of them has stopped
     // describing the painting.
-    expect(islands.sort((a, b) => b - a)).toEqual([103, 29, 9]);
+    // 103 → 104 on 2026-08-27: the coast re-cut into per-rank bands moved one
+    // cell and drew two; the mainland grew by one while the total went 140 → 142.
+    // Measured off the rebuilt zones.json, and build-zones' own report agrees.
+    expect(islands.sort((a, b) => b - a)).toEqual([104, 29, 9]);
   });
 
   /**
@@ -345,7 +424,9 @@ describe('zones — new ground beside the isle', () => {
     // 40 → 36 on 2026-08-21, four cells taken back out of the emberkeep draw.
     // 36 → 37 and borealis 140 → 141 on 2026-08-23, the re-level pass that gave
     // every cell its own fog band (one cell drawn on each, and no cell lost).
-    expect(checked).toBe(37 + 141 + 144 + 5);
+    // Borealis 141 → 142 on 2026-08-27, the coast re-cut into per-rank bands
+    // (one cell moved, two drawn — the same pass the island pin above records).
+    expect(checked).toBe(37 + 142 + 144 + 5);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {

@@ -3388,8 +3388,13 @@ export class UIScene extends Phaser.Scene {
     // copy. HIDDEN by default (`MAP_EDITOR_IN_SETTINGS`); `?mapedit` on the
     // URL brings it back for whoever is actually authoring, the same way
     // `?uiedit` opens the UI Builder.
+    // `import.meta.env.DEV` first: online the editor does not ship at all
+    // (main.ts drops its loader from the production bundle), so the button
+    // would emit into silence — and a tool that can repaint the world has no
+    // business being discoverable on the deployed site anyway.
     const showEditor =
-      MAP_EDITOR_IN_SETTINGS || new URLSearchParams(window.location.search).has('mapedit');
+      import.meta.env.DEV &&
+      (MAP_EDITOR_IN_SETTINGS || new URLSearchParams(window.location.search).has('mapedit'));
     const editorButton = showEditor
       ? makeButton(292, 'Map Editor', 'ui_btn_green', 0.68, () => {
           this.closeResetDialog();

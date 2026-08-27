@@ -787,7 +787,9 @@ export class GameState {
     col: number,
     row: number,
     needsIsle: boolean,
-    home: ZoneRuntime
+    home: ZoneRuntime,
+    /** Also demand the cell's region be OPEN — see `evictFromClosedRegions`. */
+    activeOnly = false
   ): TilePos | null {
     for (let r = 1; r <= REGRID_SEARCH_RINGS; r++) {
       for (let dc = -r; dc <= r; dc++) {
@@ -797,6 +799,7 @@ export class GameState {
           const rw = row + dr;
           if (zoneAt(world, c, rw) !== home) continue;
           if (!this.canOccupy(world, board, c, rw)) continue;
+          if (activeOnly && !this.openGroundAt(world, c, rw)) continue;
           if (needsIsle && !world.playable.has(tileKey(c, rw))) continue;
           return { col: c, row: rw };
         }
@@ -815,6 +818,54 @@ export class GameState {
     const at = mapPointToWorld(world.space, { x: place.mx, y: place.my });
     const cell = cellAtWorldPoint(world, at.x, at.y);
     return hasCell(world, cell.col, cell.row) ? tileKey(cell.col, cell.row) : null;
+  }
+
+  /** Ground with no region over it is free land; ground with one is open only
+   *  while that region stands `active`. Region ids are unique across worlds, so
+   *  the Keeper-level `regionStatus` map answers for any world's cell. */
+  private openGroundAt(world: WorldRuntime, col: number, row: number): boolean {
+    const id = world.tileRegion.get(tileKey(col, row));
+    return !id || this.regionStatus.get(id) === 'active';
+  }
+
+  /**
+   * Re-seat every piece standing on ground that is no longer OPEN.
+   *
+   * In ordinary play this finds nothing: a piece only ever lands on active
+   * ground. What makes it real is a RE-CUT — the editor re-exports a world and
+   * a band is renamed or subdivided, so cells that were the save's opened
+   * region now belong to a region the save has never unlocked. The statuses
+   * resolve correctly (a save records progress, not the ladder — see hydrate),
+   * but the save's pieces still stand on those cells, and the board then shows
+   * working items inside a bank of fog the player has not earned through.
+   *
+   * Runs AFTER `settleUnlocks` on purpose, never inside hydrate: at hydrate
+   * time a level the Keeper already holds has not yet been settled into
+   * `regionStatus`, and evicting there would bank pieces off ground that is
+   * about to be open anyway.
+   *
+   * Displaced pieces go to the nearest open cell in their own zone, or into
+   * the satchel — the same two answers a re-grid gives, for the same reason:
+   * never dropped, never left where the player cannot reach them.
+   */
+  evictFromClosedRegions(worldId: string): void {
+    const world = this.worlds.get(worldId);
+    const board = this.boards.get(worldId);
+    if (!world || !board) return;
+    for (const item of [...board.items.values()]) {
+      if (this.openGroundAt(world, item.col, item.row)) continue;
+      const home = zoneAt(world, item.col, item.row) ?? world.fallback;
+      if (board.grid[item.row]?.[item.col] === item.id) board.grid[item.row]![item.col] = null;
+      const seat = this.nearestFree(world, board, item.col, item.row, true, home, true);
+      if (seat) {
+        item.col = seat.col;
+        item.row = seat.row;
+        board.grid[seat.row]![seat.col] = item.id;
+      } else {
+        board.items.delete(item.id);
+        this.stashDisplaced(item);
+      }
+    }
   }
 
   /** Bank a piece that has nowhere to stand. */

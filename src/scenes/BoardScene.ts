@@ -106,7 +106,7 @@ import { editorStore } from '../editor/editorStore';
 import { gridToWorld } from '../core/iso';
 import { guard, recordError } from '../core/crash';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
-import { artScaleAt, groundCellAtWorldPoint, nearestPlayableCell, setActiveWorld, worldPointOf, zoneAt } from '../core/world';
+import { artScaleAt, cellCorners, groundCellAtWorldPoint, nearestPlayableCell, setActiveWorld, worldPointOf, zoneAt } from '../core/world';
 import { POWER_STATE_EVENT, PowerGovernor, PowerState } from '../core/PowerGovernor';
 import { cappedTier } from '../core/graphics';
 import { GRAPHICS_EVENT, graphics, liveCrystalAvailable } from '../core/graphicsState';
@@ -382,7 +382,7 @@ export class BoardScene extends Phaser.Scene {
   /** Badges waiting for their reveal cinematic, played one at a time. */
   private keyRevealQueue: Phaser.GameObjects.Image[] = [];
   private keyRevealPlaying = false;
-  private highlights: Phaser.GameObjects.Image[] = [];
+  private highlights: Phaser.GameObjects.Graphics[] = [];
   private allow: Required<TutorialAllow> = { ...NO_ALLOW };
   private tutorialDone = false;
   /** World-character standees, by character id. Not BoardItems — never pooled,
@@ -448,15 +448,12 @@ export class BoardScene extends Phaser.Scene {
   /** Taps are refused for a beat after a pinch — a finger lifting off a zoom
    *  gesture is not a tap on whatever it happened to be resting on. */
   private pinchTapBlockUntil = 0;
-  /** The reticle currently on screen — always one of `dragCells`. Everything
-   *  that shows or hides "the" reticle goes through this handle, so the verb
-   *  swap in `updateDrag` is the only place that knows there are three. */
+  /** The reticle: ONE Graphics, repainted on the cell's own corners whenever the
+   *  cell or the verb changes. Everything that shows or hides it talks here. */
   private dragCell!: Phaser.GameObjects.Graphics;
-  /** One reticle per drop verb, painted once in `buildDragCell`. Three graphics
-   *  and a visibility swap, rather than a redraw on every verb change: a drag
-   *  crosses a dozen cells a second, and a Graphics redraw is a command-buffer
-   *  rebuild each time, for something that only ever has three looks. */
-  private dragCells!: Record<DropVerb, Phaser.GameObjects.Graphics>;
+  /** `col,row,verb` of what the reticle currently shows, so a drag that stays
+   *  inside one cell repaints nothing. */
+  private dragCellKey = '';
   /**
    * THE LEAN's bookkeeping (see `syncReadyLeans`). `leans` is keyed by item id
    * and holds the tween on that piece's `leanX`/`leanY` — or, once the cluster
@@ -1437,11 +1434,8 @@ export class BoardScene extends Phaser.Scene {
   private markHintTarget(step: MergeStep): void {
     this.clearHintTarget();
     if (this.ctx.state.itemIdAt(step.to.col, step.to.row) !== null) return;
-    const { x, y } = gridToWorld(step.to.col, step.to.row);
-    this.hintTarget = this.add
-      .image(x, y, 'ui_tile_highlight')
-      .setDepth(DEPTHS.tileHighlight)
-      .setAlpha(0.35);
+    this.hintTarget = this.add.graphics().setDepth(DEPTHS.tileHighlight).setAlpha(0.35);
+    this.paintCellMarker(this.hintTarget, step.to.col, step.to.row);
     this.tweens.add({
       targets: this.hintTarget,
       alpha: 0.85,
@@ -1454,6 +1448,48 @@ export class BoardScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * A cell's four corners RELATIVE TO ITS OWN CENTRE, ready to draw into a
+   * Graphics that is then positioned on the cell.
+   *
+   * Local rather than world coordinates so the object can still be tweened —
+   * a pulse that scales a Graphics whose points are absolute world pixels
+   * scales it about the world origin and throws it off screen.
+   */
+  private localCellCorners(col: number, row: number): Phaser.Geom.Point[] {
+    const c = worldPointOf(this.ctx.state.world, col, row);
+    return cellCorners(this.ctx.state.world, col, row).map(
+      (q) => new Phaser.Geom.Point(q.x - c.x, q.y - c.y)
+    );
+  }
+
+  /**
+   * The gold cell marker the hand and the hint both point with — drawn on the
+   * cell's REAL corners.
+   *
+   * Was a `ui_tile_highlight` image dropped at the cell with no scale at all.
+   * That texture is painted at the authored tile (a 256x128 diamond) and every
+   * hand-drawn zone has its own, so on Borealis — cells 162 to 185 wide — the
+   * marker overhung its tile by half again. A per-zone scale could not have
+   * been bolted on either: both call sites tween `scaleX`/`scaleY` to an
+   * ABSOLUTE 1.05/1.06, which would have overwritten it on the tween's first
+   * frame. Drawn geometry has no such argument with itself.
+   */
+  private paintCellMarker(g: Phaser.GameObjects.Graphics, col: number, row: number): void {
+    const v = this.localCellCorners(col, row);
+    const inset = (t: number): Phaser.Geom.Point[] =>
+      v.map((q) => new Phaser.Geom.Point(q.x * t, q.y * t));
+    g.clear();
+    g.fillStyle(num(PALETTE.goldAccent), 0.16);
+    g.fillPoints(v, true);
+    g.lineStyle(4, num(PALETTE.goldAccent), 0.95);
+    g.strokePoints(v, true);
+    g.lineStyle(1.8, 0xffffff, 0.9);
+    g.strokePoints(inset(0.86), true);
+    const c = worldPointOf(this.ctx.state.world, col, row);
+    g.setPosition(c.x, c.y);
+  }
+
   private clearHintTarget(): void {
     if (!this.hintTarget) return;
     this.tweens.killTweensOf(this.hintTarget);
@@ -1461,7 +1497,7 @@ export class BoardScene extends Phaser.Scene {
     this.hintTarget = undefined;
   }
 
-  private hintTarget?: Phaser.GameObjects.Image;
+  private hintTarget?: Phaser.GameObjects.Graphics;
 
   /**
    * Did the player just do what the hand asked?
@@ -6016,16 +6052,19 @@ export class BoardScene extends Phaser.Scene {
     // divided back down by the cap's own scale and shifted back by its own
     // offset: however big or nudged the art gets, the TAP TARGET stays exactly
     // the cell, and a bigger cap never starts stealing its neighbour's taps.
-    const ox = puff.displayOriginX - dx / scale;
-    const oy = puff.displayOriginY - dy / scale;
-    const hw = TILE_W / 2 / scale;
-    const hh = TILE_H / 2 / scale;
-    const diamond = new Phaser.Geom.Polygon([
-      new Phaser.Geom.Point(ox, oy - hh),
-      new Phaser.Geom.Point(ox + hw, oy),
-      new Phaser.Geom.Point(ox, oy + hh),
-      new Phaser.Geom.Point(ox - hw, oy)
-    ]);
+    // The cell's REAL corners, brought into the sprite's frame: world px minus
+    // the cap's own position, divided back down by its scale. Built from the
+    // zone rather than from TILE_W/TILE_H, so the tap area is the tile the
+    // player sees on every hand-drawn grid, not just the authored isle.
+    const diamond = new Phaser.Geom.Polygon(
+      cellCorners(this.ctx.state.world, col, row).map(
+        (q) =>
+          new Phaser.Geom.Point(
+            puff.displayOriginX + (q.x - puff.x) / scale,
+            puff.displayOriginY + (q.y - puff.y) / scale
+          )
+      )
+    );
     puff.setInteractive({
       hitArea: diamond,
       hitAreaCallback: Phaser.Geom.Polygon.Contains,
@@ -6212,49 +6251,59 @@ export class BoardScene extends Phaser.Scene {
    * frame keeps its geometry so only the COLOUR says what changed.
    */
   private buildDragCell(): void {
-    const paint = (color: number, fillAlpha: number): Phaser.GameObjects.Graphics => {
-      const g = this.add.graphics().setDepth(DEPTHS.tileHighlight).setVisible(false);
-      // The diamond's vertices, clockwise from the top.
-      const v = [
-        { x: 0, y: -TILE_H / 2 },
-        { x: TILE_W / 2, y: 0 },
-        { x: 0, y: TILE_H / 2 },
-        { x: -TILE_W / 2, y: 0 }
-      ];
-      g.fillStyle(color, fillAlpha);
-      g.fillPoints(v.map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
-      // Each corner is TWO arms: one reaching along the edge to the previous
-      // vertex, one to the next. Drawn as separate strokes rather than one path so
-      // the round join sits at the vertex and the arms end square.
-      g.lineStyle(DRAG.cellBracketWidth, color, DRAG.cellHighlightAlpha);
-      const t = DRAG.cellBracketSpan;
-      for (let i = 0; i < v.length; i++) {
-        const c = v[i]!;
-        for (const n of [v[(i + 1) % v.length]!, v[(i + 3) % v.length]!]) {
-          g.beginPath();
-          g.moveTo(c.x, c.y);
-          g.lineTo(c.x + (n.x - c.x) * t, c.y + (n.y - c.y) * t);
-          g.strokePath();
-        }
-      }
-      return g;
-    };
-    this.dragCells = {
-      move: paint(DRAG.cellHighlightColor, DRAG.cellFillAlpha),
-      merge: paint(DRAG.mergeColor, DRAG.verbFillAlpha),
-      gather: paint(DRAG.gatherColor, DRAG.verbFillAlpha),
-      refuse: paint(DRAG.refuseColor, DRAG.cellFillAlpha)
-    };
-    this.dragCell = this.dragCells.move;
+    // Empty — every stroke is laid down by `paintDragCell`, in WORLD pixels, so
+    // the object stays at the origin at scale 1 and the frame is the cell.
+    this.dragCell = this.add.graphics().setDepth(DEPTHS.tileHighlight).setVisible(false);
+    this.dragCellKey = '';
   }
 
-  /** Show the reticle that says `verb`, retiring whichever was up. Every other
-   *  reader keeps talking to `this.dragCell`, so the swap is invisible to them. */
-  private setDragVerb(verb: DropVerb): void {
-    const next = this.dragCells[verb];
-    if (next === this.dragCell) return;
-    this.dragCell.setVisible(false);
-    this.dragCell = next;
+  /**
+   * Repaint the reticle on ONE cell's real corners.
+   *
+   * It used to be four Graphics painted once from `TILE_W`/`TILE_H`, swapped by
+   * visibility and stretched by the scalar `artScaleAt`. That is exact on the
+   * authored isle and wrong everywhere else: a hand-drawn zone is two vectors
+   * plus a rotation, and one number carries only the width. Measured on
+   * Borealis the frame came out 13% short on one zone, 13% tall on the next,
+   * and never once rotated — so the marker sat off the tile the player could
+   * see under it.
+   *
+   * The redraw it was avoiding costs nothing at the rate it actually happens:
+   * `dragCellKey` gates it on the cell or the verb CHANGING, which is a handful
+   * of times per drag, not per frame.
+   */
+  private paintDragCell(col: number, row: number, verb: DropVerb): void {
+    const k = `${col},${row},${verb}`;
+    if (k === this.dragCellKey) return;
+    this.dragCellKey = k;
+    const color =
+      verb === 'merge'
+        ? DRAG.mergeColor
+        : verb === 'gather'
+          ? DRAG.gatherColor
+          : verb === 'refuse'
+            ? DRAG.refuseColor
+            : DRAG.cellHighlightColor;
+    const fillAlpha = verb === 'merge' || verb === 'gather' ? DRAG.verbFillAlpha : DRAG.cellFillAlpha;
+    const v = cellCorners(this.ctx.state.world, col, row);
+    const g = this.dragCell;
+    g.clear();
+    g.fillStyle(color, fillAlpha);
+    g.fillPoints(v.map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
+    // Each corner is TWO arms: one reaching along the edge to the previous
+    // vertex, one to the next. Drawn as separate strokes rather than one path so
+    // the round join sits at the vertex and the arms end square.
+    g.lineStyle(DRAG.cellBracketWidth, color, DRAG.cellHighlightAlpha);
+    const t = DRAG.cellBracketSpan;
+    for (let i = 0; i < v.length; i++) {
+      const c = v[i]!;
+      for (const n of [v[(i + 1) % v.length]!, v[(i + 3) % v.length]!]) {
+        g.beginPath();
+        g.moveTo(c.x, c.y);
+        g.lineTo(c.x + (n.x - c.x) * t, c.y + (n.y - c.y) * t);
+        g.strokePath();
+      }
+    }
   }
 
   /* ----------------------------- input ------------------------------ */
@@ -6756,12 +6805,8 @@ export class BoardScene extends Phaser.Scene {
         if (standing && standing.id !== held.id) verb = 'refuse';
       }
     }
-    this.setDragVerb(verb);
-    const { x, y } = worldPointOf(this.ctx.state.world, cell.col, cell.row);
-    this.dragCell
-      .setPosition(x, y)
-      .setScale(artScaleAt(this.ctx.state.world, cell.col, cell.row))
-      .setVisible(true);
+    this.paintDragCell(cell.col, cell.row, verb);
+    this.dragCell.setVisible(true);
   }
 
   /**
@@ -7369,7 +7414,13 @@ export class BoardScene extends Phaser.Scene {
       // A new tap: nothing has claimed it yet. Whoever Phaser dispatches to
       // (see `tapClaimed`) will.
       this.tapClaimed = false;
-      if (onObject) return;
+      // With the editor open, the board's own objects are not the subject. The
+      // editor owns the LEFT button (it returned above); every other button is
+      // the camera's, and a cloud or a piece under the cursor must not swallow
+      // it — otherwise the parts of the map that most need moving, the ones
+      // buried under fog, are exactly the parts you cannot pan from. Fog caps
+      // carry `regionId`, so they match `onObject` on every cell they cover.
+      if (onObject && !editorStore.open) return;
       // A tap that lands on UI must never start a pan: UI lives in UIScene and
       // is invisible to this scene's hit test, so it has to be asked separately.
       // If the popup it opens swallows the pointer-up, the camera would
@@ -9573,11 +9624,8 @@ export class BoardScene extends Phaser.Scene {
     for (const highlight of this.highlights) highlight.destroy();
     this.highlights = [];
     for (const tilePos of tiles) {
-      const { x, y } = gridToWorld(tilePos.col, tilePos.row);
-      const img = this.add
-        .image(x, y, 'ui_tile_highlight')
-        .setDepth(DEPTHS.tileHighlight)
-        .setAlpha(0.5);
+      const img = this.add.graphics().setDepth(DEPTHS.tileHighlight).setAlpha(0.5);
+      this.paintCellMarker(img, tilePos.col, tilePos.row);
       this.tweens.add({
         targets: img,
         alpha: 1,

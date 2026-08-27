@@ -3,6 +3,31 @@ import { ENERGY_REGEN_MS, ENERGY_START, SAVE_KEY } from '../../src/core/Constant
 import { capture, createTestContext, drag, MemoryStorage } from './helpers';
 
 describe('SaveSystem', () => {
+  it('moves a piece standing inside re-locked fog to open ground or the satchel', () => {
+    // The re-cut case: a re-exported map renames a band, so a cell the save's
+    // player had opened now belongs to a region this save never unlocked. The
+    // piece must not stand there working under the clouds.
+    const storage = new MemoryStorage();
+    const ctx1 = createTestContext(storage);
+    ctx1.beginRun();
+    // Force a piece onto fogged ground the way a stale save would put it there.
+    const item = ctx1.state.addItem({ chain: 'sparkweed', tier: 1, col: 0, row: 0, kind: 'item' });
+    expect(ctx1.state.regionStatus.get('north_fog')).toBe('unlockable');
+    ctx1.systems.save.save();
+
+    const ctx2 = createTestContext(storage);
+    expect(ctx2.systems.save.load()).toBe(true);
+    const back = ctx2.state.items.get(item.id);
+    if (back) {
+      // Re-seated: wherever it stands now must be OPEN ground.
+      const region = ctx2.state.regionIdAt(back.col, back.row);
+      expect(!region || ctx2.state.regionStatus.get(region) === 'active').toBe(true);
+    } else {
+      // Or honestly banked — never silently dropped.
+      expect(ctx2.state.bag.some((s) => s.chain === 'sparkweed')).toBe(true);
+    }
+  });
+
   it('round-trips full mid-game state through storage', () => {
     const storage = new MemoryStorage();
     const ctx1 = createTestContext(storage);

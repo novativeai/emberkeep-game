@@ -51,6 +51,9 @@ export class WorldSystem {
       const world = this.state.worlds.get(this.state.worldId);
       if (!world) return;
       this.settleUnlocks(world);
+      // A re-exported map may have re-cut its bands under the save's pieces —
+      // anything now standing inside fog moves to open ground or the satchel.
+      this.state.evictFromClosedRegions(world.id);
       // The bare-board heal, for a reload that lands ON the stranded world
       // (the door-crossing case is handled in `switchTo` — see the note
       // there). Empty makes it safe: nothing to duplicate.
@@ -271,6 +274,7 @@ export class WorldSystem {
     const arriving = !this.state.visited(to);
     this.state.switchWorld(to);
     this.settleUnlocks(world);
+    this.state.evictFromClosedRegions(world.id);
     // Seed on FIRST arrival — and heal a board that stands utterly BARE.
     // The bare case is real (owner's report, 2026-08-27): a save that had
     // "visited" Borealis before a world re-export carried the visit latch but
