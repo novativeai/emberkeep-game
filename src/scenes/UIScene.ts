@@ -94,7 +94,21 @@ const DEPTH_TUTORIAL = 100;
 const DEPTH_DIALOG = 200;
 // On-screen heights (2560-space) for the tutorial pointer/arrow. The real art
 // loads at its native pixel size, so each is scaled to these.
-const HAND_MARKER_H = 172;
+/**
+ * SMALLER THAN THE GROUND IT POINTS AT. Measured at `wood_merge`: a tile is
+ * 155 units across and the hand was 174 — the pointer was WIDER than the cell,
+ * lying flat, in the gauntlet's own leather brown. On the beat whose line reads
+ * "drag the three piles of Logs together" the owner counted FOUR wooden shapes
+ * and could not tell which was his. It was the hand.
+ *
+ * 120 puts it at 0.77 of a tile, so it can never occupy a cell the way a piece
+ * does, and `handShade` lifts it off the floor. The art is untouched: this is a
+ * question of how big a pointer may be, not of what it is a picture of.
+ */
+const HAND_MARKER_H = 120;
+/** The cast shadow's offset (2560-space) and opacity — what makes the hand read
+ *  as hovering OVER the board rather than resting on it. */
+const HAND_SHADE = { dx: 14, dy: 20, alpha: 0.3, grow: 1.04 };
 // +75% on the phone (owner's call): at 148 units the pointer renders ~23 real
 // px on a 390px handset and disappears against the busy board.
 const ARROW_MARKER_H = IS_MOBILE ? 259 : 148;
@@ -246,6 +260,9 @@ export class UIScene extends Phaser.Scene {
   private recipeHint: string | null = null;
   private recipeHintTimer: Phaser.Time.TimerEvent | null = null;
   private hand!: Phaser.GameObjects.Image;
+  /** The hand's cast shadow — its own silhouette, tinted black, one depth under
+   *  it. Mirrors the hand's transform every frame; owns no animation of its own. */
+  private handShade!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
   private dialog: Phaser.GameObjects.Container | null = null;
   /** Real-money purchase dialog (confirm, then the waiting card). */
@@ -636,6 +653,17 @@ export class UIScene extends Phaser.Scene {
     // pointers regardless of source resolution.
     this.handBaseScale = HAND_MARKER_H / this.hand.height;
     this.hand.setScale(this.handBaseScale);
+    // ITS OWN SILHOUETTE, IN SHADOW. A blurred blob would be a smudge under a
+    // hand; the same texture tinted black is the shape the light would actually
+    // cast, and it costs one image. It sits UNDER the hand and takes its whole
+    // transform from it each frame (`syncHandShade`), so no tween has to know it
+    // exists — which is what keeps the press/tilt/travel choreography one place.
+    this.handShade = this.add
+      .image(0, 0, 'ui_hand')
+      .setOrigin(hx, hy)
+      .setTint(0x000000)
+      .setDepth(DEPTH_TUTORIAL + 1)
+      .setVisible(false);
     this.arrow = this.add.image(0, 0, 'ui_arrow').setDepth(DEPTH_TUTORIAL + 1).setVisible(false);
     const [ax, ay] = uiRegistry.replacementAnchor('ui_arrow') ?? this.ctx.data.anchors.byKey['ui_arrow'] ?? [0.5, 1];
     this.arrow.setOrigin(ax, ay);
@@ -754,6 +782,9 @@ export class UIScene extends Phaser.Scene {
         if (p) this.hand.setPosition(p.x, p.y + this.handBob.v);
       }
     }
+    // AFTER the hand has been placed, never before: the shadow is a read of the
+    // hand's final transform for this frame, not a second thing being animated.
+    this.syncHandShade();
     // TWO ARROWS ON ONE BUILDING. `house_skip` aims its beat arrow at the House
     // so the player opens it — and the House's popup then draws its OWN arrow at
     // the ⚡ row (`BoardScene.showSkipButton`). Each is right alone; together
@@ -2669,6 +2700,31 @@ export class UIScene extends Phaser.Scene {
     return (this.lastStep?.done ?? this.ctx.state.tutorialDone) || (this.lastStep?.allow.bag ?? false);
   }
 
+  /**
+   * Put the shadow where the hand ended up this frame.
+   *
+   * A READ, not a second animation. `placeHand` runs a chain of tweens on the
+   * hand — fade, press, tilt, travel, release — and every one of them would
+   * otherwise need a twin. Copying the finished transform once per frame keeps
+   * that choreography in exactly one place and cannot drift from it.
+   */
+  private syncHandShade(): void {
+    if (!this.handShade) return;
+    if (!this.hand.visible) {
+      this.handShade.setVisible(false);
+      return;
+    }
+    this.handShade
+      .setVisible(true)
+      .setPosition(this.hand.x + HAND_SHADE.dx, this.hand.y + HAND_SHADE.dy)
+      .setScale(this.hand.scaleX * HAND_SHADE.grow, this.hand.scaleY * HAND_SHADE.grow)
+      .setAngle(this.hand.angle)
+      // Fades WITH the hand: the gesture's own alpha tween is what makes the
+      // pointer arrive and leave, and a shadow that outlived it would be a
+      // stain left on the board.
+      .setAlpha(this.hand.alpha * HAND_SHADE.alpha);
+  }
+
   private nudgeMarkers(): void {
     if (this.lastStep?.done) return;
     const live = [this.hand, this.arrow].filter((m) => m.visible);
@@ -2698,6 +2754,7 @@ export class UIScene extends Phaser.Scene {
     this.handBob.v = 0;
     this.arrowBob.v = 0;
     this.hand.setVisible(false);
+    this.handShade?.setVisible(false); // taken down WITH the hand, not a frame later
     this.arrow.setVisible(false);
     this.handDrag = null;
     this.handPoint = null;
