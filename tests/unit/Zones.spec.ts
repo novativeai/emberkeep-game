@@ -570,11 +570,21 @@ describe('portals — every world has a way out of it', () => {
    *  paths: settling on arrival, and live the moment the latch flips. The
    *  latch is scoped — `cloudLevelMet` answers false for the southern isle,
    *  so Emberkeep's own level land never rides along. */
+  /** The level slabs BY THE DATA, not by name: a world re-export regroups the
+   *  clouds (it already dissolved `borealis_coast_l4` once), and a test that
+   *  hardcodes slab ids goes stale with it. */
+  const borealisSlabs = (ctx: ReturnType<typeof createTestContext>): string[] =>
+    ctx.state.worlds
+      .get('borealis')!
+      .map.regions.filter((r) => r.unlock?.level !== undefined)
+      .map((r) => r.id);
+
   it('the cauldron latch lifts the main island’s level slabs at level 3', () => {
     const ctx = createTestContext();
     ctx.state.tutorialDone = true;
-    ctx.state.xp = LEVEL_XP[2]!; // Level 3 — nowhere near the slabs' 4/5/6
-    const slabs = ['borealis_coast_l4', 'borealis_coast_l5', 'borealis_coast_l6'];
+    ctx.state.xp = LEVEL_XP[2]!; // Level 3 — below every slab's own rank
+    const slabs = borealisSlabs(ctx);
+    expect(slabs.length).toBeGreaterThan(0);
 
     // Arrive WITHOUT the latch: the slabs stand fogged, offered.
     ctx.state.regionStatus.set('borealis_coast', 'active'); // their `after` door
@@ -594,7 +604,7 @@ describe('portals — every world has a way out of it', () => {
     ctx.state.regionStatus.set('borealis_coast', 'active');
     ctx.state.addStat(CAULDRON_REACHED_STAT, 1);
     ctx.bus.emit('world:switch', { to: 'borealis' });
-    for (const id of ['borealis_coast_l4', 'borealis_coast_l5', 'borealis_coast_l6']) {
+    for (const id of borealisSlabs(ctx)) {
       expect(ctx.state.regionStatus.get(id)).toBe('active');
     }
   });
