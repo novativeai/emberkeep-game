@@ -442,36 +442,36 @@
       "clips": {
         "blinking": {
           "file": "sprites/anims/golden_elder/blinking.webp",
-          "frames": 25,
-          "frameWidth": 353,
-          "frameHeight": 440,
-          "fps": 10,
-          "loop": true,
-          "stage": "portrait",
-          "scale": 1.00583,
-          "dx": 0,
-          "dy": 224.4,
-          "srcFrameWidth": 353,
-          "srcFrameHeight": 440
-        },
-        "talking": {
-          "file": "sprites/anims/golden_elder/talking.webp",
-          "frames": 40,
-          "frameWidth": 353,
-          "frameHeight": 440,
+          "frames": 48,
+          "frameWidth": 296,
+          "frameHeight": 360,
           "fps": 12,
           "loop": true,
           "stage": "portrait",
-          "scale": 1.00583,
-          "dx": 0,
-          "dy": 224.4,
-          "srcFrameWidth": 353,
-          "srcFrameHeight": 440
+          "scale": 0.98328,
+          "dx": 1.47,
+          "dy": 214.01,
+          "srcFrameWidth": 296,
+          "srcFrameHeight": 360
+        },
+        "talking": {
+          "file": "sprites/anims/golden_elder/talking.webp",
+          "frames": 36,
+          "frameWidth": 298,
+          "frameHeight": 360,
+          "fps": 12,
+          "loop": true,
+          "stage": "portrait",
+          "scale": 0.98328,
+          "dx": -1.47,
+          "dy": 215,
+          "srcFrameWidth": 298,
+          "srcFrameHeight": 360
         }
       },
       "portrait": {
-        "height": 372,
-        "dy": -162,
+        "height": 348,
+        "dy": -138,
         "headCrop": 0.58
       }
     },
