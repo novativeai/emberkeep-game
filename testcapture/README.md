@@ -34,3 +34,22 @@ l'image : `pnpm audit:ground`, `node scripts/beats.mjs check`, `pnpm test`.
 
 Les `.png` ne sont pas suivis par git (voir `.gitignore`) — ce sont des
 artefacts de travail, parfois plusieurs Mo pièce.
+
+## Ce que le banc ne sait PAS faire (2026-08-28)
+
+`capture-borealis.mjs` révèle les bandes et se recentre dessus, mais la caméra
+du plateau **cadre un niveau** et n'obéit pas toujours à `centerCell` : sur
+Borealis les cinq vagues sont photographiées depuis le rivage, la nouvelle
+roche entrant par le bord. Les images prouvent donc que le monde se peint, que
+les pièces tiennent sur leurs pierres et qu'aucune erreur runtime ne tombe —
+pas le contenu exact de chaque vague.
+
+Ce contenu-là est prouvé par les nombres que le script imprime à côté de chaque
+image (les pièces par chaîne, le centre et le compte de la bande). Pour la
+vague de la Clé d'or :
+
+    01-borealis_coast   15 cellules, centrée sur (14,2)
+    +starbench +wreckforge +tarkiln +emberdram +chest
+
+C'est la mesure qui porte la preuve ici, l'image qui l'accompagne. Quand
+quelqu'un débridera la caméra, l'inverse deviendra vrai.

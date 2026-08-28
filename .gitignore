@@ -99,7 +99,9 @@ tests/e2e/checkpoints/*.png
 .vercel
 .env*
 
-# visual verification bench — images are working artifacts, the README is not
-testcapture/**
-!testcapture/
-!testcapture/README.md
+# visual verification bench — the images are working artifacts; the scripts and
+# the README that make them reproducible are not
+testcapture/**/*.png
+testcapture/**/*.jpg
+testcapture/**/*.jpeg
+testcapture/**/*.webp
