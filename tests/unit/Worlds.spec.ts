@@ -44,7 +44,9 @@ describe('worlds registry — the ingest loses nothing', () => {
     // bands: cells were drawn and taken back while the editor stayed open, and
     // the export moved mid-day. Pinned at the state the analytic editor→art
     // transform shipped against.
-    expect(sourceCells.length).toBe(367);
+    // 367 → 549 on 2026-08-28: Runevault's whole plaza allocated — all 187
+    // cells of the 33 drawn grids, where only 5 had been marked playable.
+    expect(sourceCells.length).toBe(549);
   });
 
   it('keeps each cell at the exact world point the editor placed it', () => {

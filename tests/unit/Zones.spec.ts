@@ -441,7 +441,12 @@ describe('zones — new ground beside the isle', () => {
     // every cell its own fog band (one cell drawn on each, and no cell lost).
     // Borealis 141 → 142 on 2026-08-27, the coast re-cut into per-rank bands
     // (one cell moved, two drawn — the same pass the island pin above records).
-    expect(checked).toBe(37 + 142 + 144 + 5);
+    // Runevault 5 → 187 on 2026-08-28: the full plaza was allocated (owner's
+    // call — the hub gets its complete floor, every cell of every drawn grid).
+    // Additive, and measured as such: against the previous export those 182 new
+    // cells are the ONLY difference — 367 cells in common, zero coordinates
+    // moved, zero unlock levels changed, none lost.
+    expect(checked).toBe(37 + 142 + 144 + 187);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {

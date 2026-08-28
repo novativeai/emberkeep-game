@@ -475,6 +475,13 @@ export class BoardItem extends Phaser.GameObjects.Container {
     return alpha !== null && alpha > 0;
   }
 
+  /** True while the painted art is hidden behind a live rig — the state in
+   *  which `hitsOpaqueArt` answers with the whole rect instead of pixels, so
+   *  the router knows this claim is a BLANKET and lets real pixels outrank it. */
+  get artAnswersBlanket(): boolean {
+    return this.artHidden;
+  }
+
   /** True when hit-area point (hx,hy) lands on (or within HIT_FORGIVENESS_PX
    *  of) an opaque art pixel. Transparent regions FAIL the hit test, so the
    *  pointer falls through to whatever is visually behind — a tall sprite's

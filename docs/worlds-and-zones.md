@@ -124,10 +124,10 @@ pixels off its island.
 
 | id | level | zones | cells | backdrop | role |
 |---|---|---|---|---|---|
-| `emberkeep` | 1 | 1 dense + 17 | 42 authored + 38 | `emberkeep` (nb2 render) | sanctuary |
+| `emberkeep` | 1 | 1 dense + 17 | 42 authored + 37 | `emberkeep` (nb2 render) | sanctuary |
 | `roothold` | 1 | 21 | 144 | `roothold` | **hub** — Eleanor's home |
-| `borealis` | 3 | 38 | 140 | `borealis` | sanctuary |
-| `runevault` | 3 | 4 | 4 | `runevault` | **hub** — Selyna's home |
+| `borealis` | 3 | 29 | 142 | `borealis` | sanctuary |
+| `runevault` | 3 | 33 | 187 | `runevault` | **hub** — Selyna's home |
 
 They come in pairs: a **sanctuary**, where you do things, and its **hub**, where
 you change something about yourself — buy, decorate, read, talk. Each pair is
