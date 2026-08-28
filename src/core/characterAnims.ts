@@ -64,6 +64,16 @@ export interface PortraitView {
   height: number;
   dy: number;
   headCrop: number;
+  /**
+   * Optional INCLINE on the neck cut, as the height difference between the
+   * cut's two ends in fractions of the frame height — left end LOW at
+   * `headCrop + incline/2`, right end HIGH at `headCrop − incline/2`, so the
+   * cut's height at the frame's centre stays exactly `headCrop`. Authored for
+   * a profile speaker whose open jaw dips below any flat line that clears the
+   * neck: the Golden Elder faces left, so the cut dives under her jaw at its
+   * widest and rises over the static neck behind it. Absent = the flat crop.
+   */
+  headCropIncline?: number;
 }
 
 export interface CharacterAnimEntry {

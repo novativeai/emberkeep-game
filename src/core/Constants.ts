@@ -1494,7 +1494,12 @@ export const WELL_FED_EVOLUTION: Record<string, number> = {
   emerald: 6,
   frost: 6,
   storm: 6,
-  moonwhisker: 6
+  moonwhisker: 6,
+  // The two egg-quest breeds keep the same promise: their adult reveal plates
+  // ship (reveal_ashdrake_adult / reveal_rimewyrm_adult), so the Codex shows
+  // every dragon what it grows into.
+  ashdrake: 6,
+  rimewyrm: 6
 };
 /** Meal value by tier: a snack, a meal, a feast (merge-chains §1.4). */
 export const MEAL_VALUE: Record<number, number> = { 1: 1 / 3, 2: 1, 3: 1 };

@@ -64,13 +64,25 @@
       "title": "Ash Dragon",
       "story": "The old nests never got cold. Three eggs stayed warm under the ash for a hundred years, until a Keeper found them.",
       "personality": "Patient and watchful, like glowing embers. She remembers every hand that fed her.",
-      "ability": "She breathes a slow, warm glow that brings cold things back to life. Cracked Rocks are her favourite snack."
+      "ability": "She breathes a slow, warm glow that brings cold things back to life. Cracked Rocks are her favourite snack.",
+  "evolution": {
+   "wellFedCycles": 6,
+   "into": "Big Ash Dragon",
+   "reveal": "reveal_ashdrake_adult",
+   "condition": "Fully fed for 6 days"
+  }
     },
     "rimewyrm": {
       "title": "Ice Dragon",
       "story": "He waited deep under the ice of Borealis for a very long time. Three eggs, found one by one, finally met their Keeper.",
       "personality": "Quiet and slow to decide. He moves like a glacier: slowly, then all at once.",
-      "ability": "He breathes a frosty mist that freezes a moment in place. Frost that keeps things safe, not frost that hurts."
+      "ability": "He breathes a frosty mist that freezes a moment in place. Frost that keeps things safe, not frost that hurts.",
+  "evolution": {
+   "wellFedCycles": 6,
+   "into": "Big Ice Dragon",
+   "reveal": "reveal_rimewyrm_adult",
+   "condition": "Fully fed for 6 days"
+  }
     }
   }
 }

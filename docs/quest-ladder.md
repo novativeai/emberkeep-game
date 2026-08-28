@@ -113,8 +113,10 @@ finale, never brewed.
 escalating cost makes the march unspendable out of order — at one banked key
 only the coast is affordable. Every generator a quest needs stands on ground
 already open when it asks (the shore's Glass Oven funds the signal fire; the
-coast's five machines — Star Workbench, Shipwreck Forge, Tar Oven, Runestone,
-Juice Barrel — fund the pitch and frames orders that pay for the keep) —
+coast's four machines — Star Workbench, Shipwreck Forge, Tar Oven,
+Juice Barrel — fund the pitch and frames orders that pay for the keep; the
+Runestone is no longer seeded or a generator, 2026-08-28 — the one that counts
+is BREWED in quest 17) —
 `pnpm quests --all` proves it, and Selyna's door is deliberately the arc's
 last and dearest fog. The outer level-slabs past the islands carry the double
 key (rank 5/6 or the cauldron latch, §5).
@@ -358,9 +360,9 @@ are exactly the three the editor's unlock levels named:
 | Region | Opens on | What stands there |
 | --- | --- | --- |
 | `borealis_shore` | active on arrival | Glass Oven · 5 Glass Balls |
-| `borealis_coast` | **1 Gold Key** | Star Workbench · Shipwreck Forge · Tar Oven · Runestone · Juice Barrel · a Chest |
+| `borealis_coast` | **1 Gold Key** | Star Workbench · Shipwreck Forge · Tar Oven · Juice Barrel · a Chest — the SOUTHERN deck: the mainland opens bottom-up, `_l4`/`_l5`/`_l6` lifting band by band northward (2026-08-28) |
 | `borealis_keep` | **2 Gold Keys** | Aurora Loom · Magic Stone Tower · 3 Iron Hats · 3 Magnet Rocks + 2 Compass Needles · 3 Oil Lamps + 2 Big Lanterns · a Chest |
-| `borealis_coast_l5` / `_l6` | **Level 5 / 6 or the cauldron latch** | empty outer land — room, not stock |
+| `borealis_coast_l4` / `_l5` / `_l6` | **Level 4 / 5 / 6 or the cauldron latch** | empty land, south → north — room, not stock; the north band falls as the Rune Way opens |
 
 **A merge cannot cross water**, so each island is seeded to run on its own. That
 is not generosity: an island with no producer is an island where nothing can
@@ -389,11 +391,14 @@ Dragon Rubies onto an island with no dragon and no order that wants them.
 
 *Machine chains, not landmark chains* (`chains.json`, all `world: "borealis"`;
 the original wrackline/frostfont/keel roster was migrated tier for tier by
-`migrate-borealis-farms.py`). The north runs on eight MACHINES — each a
+`migrate-borealis-farms.py`). The north runs on seven MACHINES — each a
 three-tier chain whose tier 3 is the generator: Glass Oven → Glass Balls,
-Star Workbench → Glass Lenses, Shipwreck Forge → Iron Hats, Tar Oven and
-Runestone → Tar Drops, Juice Barrel → Fire Juice, Aurora Loom → Light
-Thread, Magic Stone Tower → Glass Lenses (Magic Pebbles on its bonus). Every
+Star Workbench → Glass Lenses, Shipwreck Forge → Iron Hats, Tar Oven →
+Tar Drops, Juice Barrel → Fire Juice, Aurora Loom → Light
+Thread, Magic Stone Tower → Glass Lenses (Magic Pebbles on its bonus). The
+Runestone stopped being one (2026-08-28): it duplicated the Tar Oven's
+produce, so its generator and its seed are gone — the brewed one is an
+ornament with a story, not a faucet. Every
 machine seeds its own replacement parts on an every-12th bonus yield — except
 the SOLE faucet, Magic Pebbles, which drops every 5th (2026-08-27 flow pass;
 at every-12 the compass and rune brews priced at half a day). The Treasure Compass (`wayfinder:3`) is the
