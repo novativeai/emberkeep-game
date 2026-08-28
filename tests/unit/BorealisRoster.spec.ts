@@ -49,7 +49,12 @@ const FARMS: Array<[fixture: string, product: string]> = [
  * one of the product chains above instead of at itself.
  */
 const COMPASS: Array<[fixture: string, product: string | null]> = [
-  ['runestone', 'emberheart'],
+  // The Runestone LEFT this wave on 2026-08-28: it poured Ember Hearts, and so
+  // does the Tar Oven — two machines making one thing is a roster with a
+  // duplicate in it, not a choice. It keeps its ladder and its cauldron page
+  // (`rune_shard` → Runestone, which is what opens `north_terms`); it simply
+  // stopped being a faucet. Its tier-3 is an ornament now, and unsellable so a
+  // quest that asks for one can never be locked out by a sale.
   // Its own t1: the Juice Barrel pours Fire Juice — the seaglass primary was
   // migrate-borealis-farms.py's mapping leaking through (two Glass Ball makers).
   ['emberdram', 'emberdram'],
@@ -91,6 +96,17 @@ const ICE = { satMax: 0.55, darkMax: 0.52, brightMin: 0.8 };
  * against ice; if it ever reads pale up there, re-cut and take it out.
  */
 const GRANDFATHERED = new Set(['rimewyrm', 'frost', 'storm', 'stormcap']);
+
+/**
+ * Northern ladders that are neither a faucet nor a faucet's product — they are
+ * merged for their own sake and asked for by name.
+ *
+ * The Runestone joined them on 2026-08-28: it used to pour Ember Hearts, which
+ * is the Tar Oven's job, and two machines making one thing is a duplicate in
+ * the roster rather than a choice. It kept its ladder and its cauldron page
+ * (`rune_shard` → Runestone, the brew that opens `north_terms`).
+ */
+const ORNAMENTS = new Set(['runestone']);
 
 /** Mean saturation/value of a webp's opaque pixels, straight off the file. */
 function meanHsv(file: string): { sat: number; val: number } {
@@ -185,6 +201,7 @@ describe('the Borealis roster', () => {
     const accounted = new Set([
       ...FARMS.flat(),
       ...COMPASS.map(([f]) => f),
+      ...ORNAMENTS,
       ...GRANDFATHERED,
     ]);
     for (const id of northern) expect(accounted, `${id} is in neither list`).toContain(id);
@@ -250,7 +267,7 @@ describe('the Borealis roster', () => {
         .toBeGreaterThanOrEqual(1);
     }
     // Self-reseeding compass farms likewise stand ready-built.
-    for (const id of ['runestone', 'emberdram', 'manastone']) {
+    for (const id of ['emberdram', 'manastone']) {
       expect(seeded.get(`${id}:3`) ?? 0, `${id}:3 stands somewhere?`).toBeGreaterThanOrEqual(1);
     }
     // The lamp and the compass never reseed a tier-1, so they arrive as parts:

@@ -2,10 +2,10 @@
   "cols": 13,
   "rows": 12,
   "tile": {
-    "width": 420,
-    "height": 249,
-    "skew": -0.728,
-    "angle": 29.95
+    "width": 409.23,
+    "height": 243.96,
+    "skew": 0,
+    "angle": 30.8
   },
   "regions": [
     {
@@ -948,15 +948,15 @@
       "col": 6,
       "row": 4,
       "z": 0,
-      "dx": 80,
-      "dy": -163
+      "dx": 88.36,
+      "dy": -172.83
     }
   ],
   "backgroundCalibration": {
     "emberkeep": {
-      "offsetX": -5.05,
-      "offsetY": -15.2,
-      "scale": 2.0289,
+      "offsetX": 0,
+      "offsetY": 0,
+      "scale": 2,
       "anchor": {
         "x": 0.5,
         "y": 0.5

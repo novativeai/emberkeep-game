@@ -139,12 +139,9 @@ const artToWorld = (x, y) => ({
   y: artOriginY + (y - ART_H / 2) * unit
 });
 
-/** The game lattice expressed in backdrop px, for the overlap test below.
- *  `tile.skew` shears columns with depth exactly as `iso.ts` projects them —
- *  leave it out and the authored-isle veto reads the wrong cell near the rim. */
-const skewK = authored.tile?.skew ? Math.tan((authored.tile.skew * Math.PI) / 180) : 0;
-const AU = { x: (halfW + skewK * halfH) / unit, y: halfH / unit };
-const AV = { x: (-halfW + skewK * halfH) / unit, y: halfH / unit };
+/** The game lattice expressed in backdrop px, for the overlap test below. */
+const AU = { x: halfW / unit, y: halfH / unit };
+const AV = { x: -halfW / unit, y: halfH / unit };
 const A0 = {
   x: (BOARD_ORIGIN_X - artOriginX) / unit + ART_W / 2,
   y: (BOARD_ORIGIN_Y - artOriginY) / unit + ART_H / 2
@@ -350,8 +347,62 @@ function solve(samples, fit) {
   return { scale: b[0] / M[0][0], offsetX: b[1] / M[1][1], offsetY: b[2] / M[2][2] };
 }
 
+/* ------------------------------------------------------------------ */
+/* 2b. the ANALYTIC editor→art transform — the fit is now a watchdog     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The editor places every imported map image by a FORMULA, not by hand —
+ * `BoardEditor.renderCurrentMap`: the layer is centred on the authored
+ * backdrop's world rect (`backdropRect`, whose centre is exactly `artOrigin`
+ * above) and scaled to COVER it (`cover = max(rect/layer)` per axis). Both
+ * ends of that placement are constants this script already holds, so
+ * editor→art needs no estimation at all.
+ *
+ * The least-squares fit above measured the same relationship from the cells,
+ * and measuring it was the imprecision: the samples' `gameCell`s are ROUNDED
+ * lattice answers, so the solve chases their rounding structure and lands
+ * 0.3–0.8% off scale run over run (1.22453 → 1.22876 across two exports).
+ * Composed with `artToWorld`, a 0.8% scale error is a shear of ±12 world px
+ * across the board — the drawn grid sat visibly beside the painted tiles it
+ * was traced from. The analytic transform composes to identity within ~0.5 px
+ * (the residue is the layer's own 1024×640 downscale of 2610×1632 art).
+ *
+ * The fit still runs, as a WATCHDOG: if someone changes how the editor places
+ * the layer, the measured transform drifts away from this one and the build
+ * says so loudly instead of silently mis-placing every zone.
+ */
+const LAYERS = (source.project?.maps ?? []).map((m) => ({ name: m.name, w: m.w, h: m.h }));
+const LAYER = LAYERS[0] ?? { w: 1024, h: 640 };
+for (const l of LAYERS) {
+  if (l.w !== LAYER.w || l.h !== LAYER.h) {
+    throw new Error(
+      `build-zones: editor map layers disagree on size (${LAYER.w}x${LAYER.h} vs ${l.name} ${l.w}x${l.h}) — ` +
+        'the analytic editor→art assumes one layer geometry; teach it per-map sizes before importing this project.'
+    );
+  }
+}
+const COVER = Math.max((ART_W * unit) / LAYER.w, (ART_H * unit) / LAYER.h);
+const LAYER_TL = { x: artOriginX - (LAYER.w * COVER) / 2, y: artOriginY - (LAYER.h * COVER) / 2 };
+const editorToArt = (p) => ({
+  x: ((p.x - LAYER_TL.x) / COVER) * (ART_W / LAYER.w),
+  y: ((p.y - LAYER_TL.y) / COVER) * (ART_H / LAYER.h)
+});
+
 const FIT = fitEditorToArt();
-const editorToArt = (p) => ({ x: (p.x - FIT.offsetX) / FIT.scale, y: (p.y - FIT.offsetY) / FIT.scale });
+{
+  // The watchdog: express the analytic transform in the fit's own
+  // `editor = scale·art + offset` terms and compare.
+  const aScale = (COVER * LAYER.w) / ART_W;
+  const drift = Math.abs(FIT.scale - aScale) / aScale;
+  if (drift > 0.02) {
+    console.error(
+      `build-zones: the MEASURED editor→art (scale ${FIT.scale.toFixed(5)}) is ${(drift * 100).toFixed(1)}% away ` +
+        `from the ANALYTIC one (${aScale.toFixed(5)}). Either the editor changed how it places the map layer ` +
+        '(update the analytic constants above) or the export is corrupt. The analytic transform was used.'
+    );
+  }
+}
 
 /**
  * How faithfully the fit reproduces the editor's own cell assignment.
@@ -470,121 +521,6 @@ function deckZone(deck, island, index, block) {
     artScale: round2((Math.abs(deck.u[0] - deck.v[0]) * unit) / TILE_W),
     cells: cells.map(([i, j]) => [i - minI, j - minJ])
   };
-}
-
-/**
- * A MEASURED LATTICE over an editor world: the painted flagstones, asked
- * directly (owner's pass, 2026-08-27).
- *
- * The editor grids for Borealis were placed BY HAND, one small grid at a
- * time — 38 origins and pitches, each eyeballed against the painting, drifting
- * up to a third of a tile from the grout and from each other. The painting
- * itself has one coherent lattice per island, and it was measured off the art
- * (autocorrelation for the basis, a grout-valley scan for the phase, a
- * per-stone refit on the runepad) into `assets/map/<backdrop>-lattice.json`.
- *
- * This step SNAPS each editor grid onto that lattice: every kept cell's
- * editor-derived art point rounds to its nearest painted stone, the grid's
- * origin/u/v are rewritten from the island's measured basis, and the editor's
- * numbers survive only as the measurement that says WHICH stone each cell is.
- * Cell indices, blocks, regions and counts do not move — only the pixels do.
- *
- * Two refusals keep it honest: a grid whose cells do not agree on one lattice
- * placement (spread > 1.5 art px) fails, and two cells of the world claiming
- * the SAME painted stone fail — both are authoring errors this step must not
- * paper over.
- */
-function snapZoneToMeasured(zone, keep, measured, claimed) {
-  /** Node at lattice index (a,b) of island `isl`. */
-  const nodeOf = (isl, a, b) => ({
-    a,
-    b,
-    nx: isl.origin[0] + a * isl.u[0] + b * isl.v[0],
-    ny: isl.origin[1] + a * isl.u[1] + b * isl.v[1]
-  });
-  // THE ASSIGNMENT IS DATA, NOT A FIT. The editor transform is calibrated
-  // against the authored lattice, so recalibrating the authored map (emberkeep
-  // 2026-08-27) moves every editor-derived art point a dozen px — and a
-  // nearest-node scan then re-deals borderline grids onto neighbouring stones.
-  // A grid whose stones are already named by the measured file never scans:
-  //   1. an island named exactly after the grid IS that grid's measurement,
-  //      local (0,0) at its origin (emberkeep's per-grille entries);
-  //   2. `grids[name]` pins the grid to its validated island + lattice index
-  //      (borealis, captured from the owner-approved build);
-  //   3. only an unpinned grid — a future export — falls back to the scan.
-  let best = null;
-  const own = measured.islands.find((i) => i.name === zone.name);
-  const pin = measured.grids?.[zone.name];
-  if (own) {
-    best = { isl: own, nodes: keep.map(({ cell }) => nodeOf(own, cell.i, cell.j)) };
-  } else if (pin) {
-    const isl = measured.islands.find((i) => i.name === pin.island);
-    if (!isl) throw new Error(`build-zones: "${zone.name}" is pinned to unknown island "${pin.island}"`);
-    best = { isl, nodes: keep.map(({ cell }) => nodeOf(isl, pin.a0 + cell.i, pin.b0 + cell.j)) };
-  } else {
-    for (const isl of measured.islands) {
-      const det = isl.u[0] * isl.v[1] - isl.v[0] * isl.u[1];
-      let sum = 0;
-      const nodes = [];
-      for (const { art } of keep) {
-        const dx = art.x - isl.origin[0];
-        const dy = art.y - isl.origin[1];
-        const a = Math.round((isl.v[1] * dx - isl.v[0] * dy) / det);
-        const b = Math.round((-isl.u[1] * dx + isl.u[0] * dy) / det);
-        sum += Math.hypot(art.x - nodeOf(isl, a, b).nx, art.y - nodeOf(isl, a, b).ny);
-        nodes.push(nodeOf(isl, a, b));
-      }
-      const mean = sum / keep.length;
-      if (!best || mean < best.mean) best = { isl, nodes, mean };
-    }
-  }
-  const { isl, nodes } = best;
-  // The zone origin every cell implies; they must all imply the same one.
-  let ox = 0;
-  let oy = 0;
-  keep.forEach(({ cell }, k) => {
-    ox += nodes[k].nx - cell.i * isl.u[0] - cell.j * isl.v[0];
-    oy += nodes[k].ny - cell.i * isl.u[1] - cell.j * isl.v[1];
-  });
-  ox /= keep.length;
-  oy /= keep.length;
-  const spread = Math.max(
-    ...keep.map(({ cell }, k) =>
-      Math.hypot(
-        nodes[k].nx - cell.i * isl.u[0] - cell.j * isl.v[0] - ox,
-        nodes[k].ny - cell.i * isl.u[1] - cell.j * isl.v[1] - oy
-      )
-    )
-  );
-  if (spread > 1.5) {
-    throw new Error(
-      `build-zones: grid "${zone.name}" does not sit on the measured ${isl.name} lattice as one piece (spread ${spread.toFixed(1)} art px)`
-    );
-  }
-  keep.forEach(({ cell }, k) => {
-    const key = `${isl.name}:${nodes[k].a},${nodes[k].b}`;
-    const holder = claimed.get(key);
-    if (holder) {
-      throw new Error(
-        `build-zones: "${zone.name}" cell (${cell.i},${cell.j}) and ${holder} claim the same painted stone ${key}`
-      );
-    }
-    claimed.set(key, `"${zone.name}" cell (${cell.i},${cell.j})`);
-  });
-  const origin = artToWorld(ox, oy);
-  const pa = artToWorld(ox, oy);
-  zone.origin = [round2(origin.x), round2(origin.y)];
-  zone.u = [round2(isl.u[0] * unit), round2(isl.u[1] * unit)];
-  zone.v = [round2(isl.v[0] * unit), round2(isl.v[1] * unit)];
-  // Measured off an unrotated painting — any editor rotation was part of the
-  // hand placement this step replaces.
-  zone.rotation = 0;
-  zone.pivot = [round2(pa.x), round2(pa.y)];
-  zone.artScale = round2((Math.abs(isl.u[0] - isl.v[0]) * unit) / TILE_W);
-  // The seeds' world points ride the snapped stones, not the hand placement.
-  keep.forEach((k2, k) => {
-    k2.art = { x: nodes[k].nx, y: nodes[k].ny };
-  });
 }
 
 /** World px centre of an editor cell — the address everything else derives from. */
@@ -850,6 +786,18 @@ const isFixture = (chain, tier) => GENERATOR_TIERS.has(`${chain}:${tier}`) || ch
  * furthest from everything already placed?" — and that answers correctly for
  * any outline, because it never mentions a direction at all.
  */
+/**
+ * Seeds a region could not hold. A shortfall is CONTENT that did not land;
+ * it must never cost the world its GEOMETRY. It used to throw, and the throw
+ * rode up through the per-world catch — so re-drawing an island smaller than
+ * its plan froze the ENTIRE world at its previous lattice, and every marker
+ * in the game then disagreed with the grid the author was looking at in the
+ * editor. The plan describes yesterday's islands by index; the author is
+ * allowed to draw today's differently and hear about the mismatch, loudly,
+ * without the map refusing to follow.
+ */
+const seedShortfalls = [];
+
 function seedRegion(cells, seeds, taken) {
   if (!seeds?.length || !cells.length) return [];
   const cx = cells.reduce((n, c) => n + c.at.x, 0) / cells.length;
@@ -935,13 +883,22 @@ function seedRegion(cells, seeds, taken) {
     .filter((c) => !used.has(c))
     .sort((a, b) => Math.hypot(a.at.x - cx, a.at.y - cy) - Math.hypot(b.at.x - cx, b.at.y - cy));
   let n = 0;
+  const dropped = [];
   for (const unit of units) {
     if (!unit.at) {
       const cell = mid[n++];
-      if (!cell) throw new Error(`build-zones: ${unit.chain} has no room — island holds ${cells.length}`);
+      if (!cell) {
+        dropped.push(`${unit.chain}:${unit.tier}`);
+        continue;
+      }
       unit.at = [cell.col, cell.row];
     }
     out.push({ chain: unit.chain, tier: unit.tier, at: unit.at });
+  }
+  if (dropped.length) {
+    seedShortfalls.push(
+      `island of ${cells.length} cell(s) had no room for ${dropped.length} seed(s): ${dropped.join(', ')}`
+    );
   }
   return out;
 }
@@ -1221,10 +1178,7 @@ const WORLDS = [
      * If the address ever stops resolving the BUILD FAILS — a gift that
      * silently stops being placed is worse than no gift.
      */
-    // Island 4 since the measured re-seat (2026-08-27): the lone slab by the
-    // gate plateau, (35,0), stands its true distance from both neighbours now
-    // and counts as its own island, pushing the north-west group from 3 to 4.
-    gifts: [{ island: 4, level: 4, seeds: [['frost', 1, 1]] }]
+    gifts: [{ island: 3, level: 4, seeds: [['frost', 1, 1]] }]
   },
   {
     id: 'borealis',
@@ -1363,11 +1317,6 @@ for (const spec of WORLDS) {
     nextCol += zone.matrix[0] + BLOCK_GUTTER;
   }
 
-  // A measured flagstone lattice for this backdrop, if one has been taken.
-  const latticePath = `assets/map/${spec.backdrop}-lattice.json`;
-  const measured = existsSync(resolve(ROOT, latticePath)) ? read(latticePath) : null;
-  const claimedStones = new Map();
-
   for (const grid of src?.grids ?? []) {
     if (!(grid.cells ?? []).length) continue;
     const keep = [];
@@ -1385,7 +1334,6 @@ for (const spec of WORLDS) {
     if (!keep.length) continue;
 
     const zone = zoneOf(grid, { col: nextCol, row: 0 });
-    if (measured) snapZoneToMeasured(zone, keep, measured, claimedStones);
     for (const { cell: c, art } of keep) {
       const col = nextCol + c.i;
       const row = c.j;
@@ -1712,10 +1660,12 @@ const doc = {
   /** The measured editor→backdrop transform, kept for provenance: anyone
    *  re-importing from the editor can check these numbers still hold. */
   editorToArt: {
-    scale: Math.round(FIT.scale * 1e5) / 1e5,
-    offsetX: round2(FIT.offsetX),
-    offsetY: round2(FIT.offsetY),
-    samples: FIT.samples,
+    method: 'analytic (layer cover placement); least-squares kept as watchdog',
+    scaleX: Math.round(((COVER * LAYER.w) / ART_W) * 1e5) / 1e5,
+    scaleY: Math.round(((COVER * LAYER.h) / ART_H) * 1e5) / 1e5,
+    offsetX: round2(LAYER_TL.x),
+    offsetY: round2(LAYER_TL.y),
+    fitted: { scale: Math.round(FIT.scale * 1e5) / 1e5, offsetX: round2(FIT.offsetX), offsetY: round2(FIT.offsetY), samples: FIT.samples },
     reproducesEditorCells: `${acc.hit}/${acc.total}`,
     worstErrorArtPx: Math.round(acc.worst)
   },
@@ -1724,7 +1674,7 @@ const doc = {
 
 writeFileSync(resolve(ROOT, OUT), `${JSON.stringify(doc, null, 2)}\n`);
 
-console.log(`editor→art  scale ${doc.editorToArt.scale}  offset (${doc.editorToArt.offsetX}, ${doc.editorToArt.offsetY})`);
+console.log(`editor→art  scale ${doc.editorToArt.scaleX}/${doc.editorToArt.scaleY} (analytic)  offset (${doc.editorToArt.offsetX}, ${doc.editorToArt.offsetY})  [fit watchdog: ${doc.editorToArt.fitted.scale}]`);
 console.log(`            reproduces the editor's own gameCell for ${acc.hit}/${acc.total} cells (worst ${Math.round(acc.worst)} art px)`);
 for (const r of report) {
   console.log(
@@ -1738,6 +1688,13 @@ console.log(`wrote ${OUT}`);
 // LOUD, and last, so it is the thing left on screen. A kept world is ground the
 // player still gets; it is also authoring that did not land, and the two must
 // never be confused with a clean run.
+if (seedShortfalls.length) {
+  console.error('');
+  for (const w of seedShortfalls) console.error(`build-zones: SEED SHORTFALL — ${w}`);
+  console.error(
+    'build-zones: the geometry shipped anyway; re-fit BOREALIS_PLAN (or the island) to restore the missing contents.'
+  );
+}
 if (failures.length) {
   console.error('');
   for (const f of failures) {

@@ -5768,6 +5768,17 @@ export class BoardScene extends Phaser.Scene {
         // out, the named hatchling flies through and stays through. Hooked to
         // the bloom transition, so it happens exactly once per save — a reload
         // finds the door standing open (standIdle) and him already over there.
+        //
+        // ANNOUNCED HERE, NOT WHEN THE ARC STARTS. The Ember Gate blooms on the
+        // tutorial's handover step, and so does chapter 2's catch-up tick: told
+        // at lift-off, UIScene would already have Eleanor mid-monologue about
+        // her moon magic while the door and the dragon were the whole screen.
+        // Said now, the words about the door get the floor and the chapter
+        // waits behind them. Guarded on the same dragon `playGateFlight` needs,
+        // so the lines can never describe a flight that does not happen.
+        if (this.ctx.systems.dragons.firstNamed()) {
+          this.ctx.bus.emit('gate:first_flight', { to: door.to });
+        }
         this.time.delayedCall(GATE_FLIGHT.startDelayMs, () => this.playGateFlight(door));
       } else {
         door.fx.standIdle();
@@ -7906,9 +7917,15 @@ export class BoardScene extends Phaser.Scene {
           // is corrected by its own factor and not the base plate's.
           plateScale(
             textureKey,
-            ITEM_SCALE[`${snap.chain}_${snap.tier}`] ??
+            // AUTHORED DATA WINS. `artScale` in chains.json is what the
+            // worldbuilder's 🪞 Seat page writes, so a size tuned against the
+            // live board has to beat the hand-written constant or the tool
+            // lies. Nothing regresses by putting it first: no tier carried an
+            // `artScale` on the day this flipped, so every piece still takes
+            // its ITEM_SCALE entry until someone deliberately re-seats it.
+            this.tierArtScale(snap.chain, snap.tier) ??
+              ITEM_SCALE[`${snap.chain}_${snap.tier}`] ??
               ITEM_SCALE[snap.chain] ??
-              this.tierArtScale(snap.chain, snap.tier) ??
               1
           );
     sprite.acquire(snap, this.ctx.data.anchors, textureKey, artScale);

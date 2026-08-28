@@ -102,6 +102,11 @@ ACCEPTED = [
     ("borealis", 1994, 424, "lamplight spill on the ice, in front of the magic door"),
     ("borealis", 2063, 461, "lamplight spill on the ice, left of the door"),
     ("borealis", 2125, 501, "lamplight spill on the ice, right of the door"),
+    # Checked on the overlay 2026-08-28, after taking nionja's analytic
+    # calibration: a real flagstone lying in the warm spill from the same
+    # door — the fourth of that family, and the only cell the re-cut coast
+    # added under that light.
+    ("borealis", 2063, 533, "sunlit flagstone below the magic door"),
     # Checked on the overlay 2026-08-27: a real flagstone, tinted pink by the
     # aurora sheet directly above it — the same class of light-on-ground as the
     # three lamplight cells beside the door.

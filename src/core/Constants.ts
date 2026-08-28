@@ -88,14 +88,21 @@ export const IS_LOW_END: boolean =
 export const UI_SCALE: number = IS_MOBILE ? 1.5 : 1;
 
 /**
- * The quest tracker reads 30% bigger than the other clusters on a phone
- * (owner's call, 2026-08-27): it is the one instruction most players ever
- * read, and at the shared UI_SCALE its rows were the smallest live type on
- * screen. One factor over the whole cluster — text, piece icons and row
- * pitch grow together, and RecipeHelpPanel's peek seat multiplies by THIS,
- * not UI_SCALE, so the sheet keeps clearing the row it explains.
+ * The quest tracker reads bigger than the other clusters on a phone (owner's
+ * call, 2026-08-27): it is the one instruction most players ever read, and at
+ * the shared UI_SCALE its rows were the smallest live type on screen. One
+ * factor over the whole cluster — text, piece icons and row pitch grow
+ * together, and RecipeHelpPanel's peek seat multiplies by THIS, not UI_SCALE,
+ * so the sheet keeps clearing the row it explains.
+ *
+ * BOTH LAYOUTS GREW 20% on 2026-08-28 (owner's call): 1.3 → 1.56 on a phone,
+ * and desktop left 1 for the first time. The landscape number is the one with
+ * a ceiling — the tracker magnifies DOWN-LEFT from its top-right anchor, so
+ * its foot travels: `QUEST_TRACKER_BOTTOM` (292 local units) reaches y 546 at
+ * 1.2 against the five-door column's 674.2 top, which `HudColumn.spec`
+ * measures. Past ~1.6 the list would print across the Dragon Codex button.
  */
-export const QUEST_TRACKER_SCALE: number = IS_MOBILE ? UI_SCALE * 1.3 : 1;
+export const QUEST_TRACKER_SCALE: number = IS_MOBILE ? UI_SCALE * 1.56 : 1.2;
 
 /**
  * Does Settings offer the Map Editor?
@@ -2474,6 +2481,31 @@ export const HOLD_TO_PAN = {
   announcePx: 90
 } as const;
 
+/**
+ * THE SOFT GROUND SHADOW every board item casts, as the numbers that decide it.
+ *
+ * These were four magic numbers spread across `BoardItem` — the fit width, its
+ * floor, the squash and the seat — and they are the whole of "does this piece
+ * look like it is standing on the tile". A piece whose art is drawn with its
+ * feet high in the frame, or whose silhouette is much narrower than its plate,
+ * needs its own; that is what `anchors.json`'s `shadowByKey` is for, and these
+ * are the defaults it overrides one key at a time (the worldbuilder's 🪞 Seat
+ * page writes them).
+ */
+export const ITEM_SHADOW = {
+  /** Ellipse width as a fraction of the art's on-board footprint. */
+  ofWidth: 0.92,
+  /** Floor, so a tiny piece still casts something a player can read. */
+  minWidth: 64,
+  /** Height as a fraction of width — the isle's light is near-flat, so the
+   *  contact patch spreads sideways rather than pooling under the piece. */
+  squash: 0.42,
+  /** Where the ellipse sits under the art, in container px. The lean puts it
+   *  back exactly here (`clearLean`), so nothing may write it by hand. */
+  seatX: 0,
+  seatY: 8
+} as const;
+
 export const DRAG = {
   /** Pick-up scale-up and how high the art floats above the finger (px). */
   liftScale: 1.16,
@@ -2815,6 +2847,69 @@ export const TRAVEL_WIPE = {
  * cutting — a jump loses the player's place, which is the whole thing the
  * follow exists to protect.
  */
+/**
+ * THE TUTORIAL HAND — the gauntlet that demonstrates a drag or a tap.
+ *
+ * It is a puppet, not a cursor: it fades in slightly raised, PRESSES down on
+ * the piece, tilts back as it pulls, and pops on release. Every beat of that
+ * used to be a literal inside `UIScene.placeHand`, which is exactly the kind of
+ * number nobody can find when the gesture reads as frantic — the rest between
+ * loops was added for that reason and had to be hunted for. Named here so the
+ * worldbuilder's ⏱ Tuning page can drive them.
+ *
+ * `travelMs` is ONE stroke carried by two tweens (the tilt and the travel); they
+ * must stay equal or the hand finishes leaning before it arrives.
+ */
+export const TUTORIAL_HAND = {
+  /** Drag gesture: fade in from a raised, tilted pose. */
+  fadeInMs: 310,
+  /** How long the hand takes to carry the piece across. */
+  travelMs: 1200,
+  /** The overshoot pop as the item drops. */
+  releaseMs: 200,
+  fadeOutMs: 260,
+  fadeOutDelayMs: 220,
+  /** A beat of rest before the gesture starts over. Without it the hand reads
+   *  as frantic rather than as a demonstration. */
+  restMs: 450,
+  /** Tap gesture: press in, then a springy release. Paired with the bob's own
+   *  chain — equal loop delays, or the tap splits in two. */
+  tapDownMs: 260,
+  tapUpMs: 430,
+  tapLoopDelayMs: 200,
+  /** Pose: the raised start, the press, and the release pop, as scale factors
+   *  of the marker's base size. */
+  startScale: 1.08,
+  pressScale: 0.9,
+  releaseScale: 1.05,
+  /** How far the hand dips on a tap, in live px. */
+  bobPx: 14,
+  /** Tilt as it starts, and as it pulls, in degrees. */
+  startAngle: -5,
+  pullAngle: 4
+} as const;
+
+/**
+ * THE TUTORIAL ARROW — the pointer that names a piece or a control.
+ *
+ * The same puppet law as the hand: rise, drop with weight, land with a squash,
+ * then a settle beat before the next hop. A bob that merely oscillates reads as
+ * a screensaver; the impact is what makes it point.
+ */
+export const TUTORIAL_ARROW = {
+  /** How far it rises before the drop, in live px (negative is up). */
+  riseBy: -22,
+  riseMs: 380,
+  /** Accelerating fall onto the target. */
+  dropMs: 300,
+  /** The landing squash, and how wide/flat it goes. */
+  impactMs: 90,
+  impactScaleX: 1.08,
+  impactScaleY: 0.9,
+  /** Rest before the next hop. */
+  settleMs: 240
+} as const;
+
 export const TUTORIAL_FOLLOW_INSET = 1 / 6;
 export const TUTORIAL_FOLLOW_MS = 880;
 

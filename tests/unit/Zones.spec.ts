@@ -253,7 +253,10 @@ describe('zones — new ground beside the isle', () => {
     // pixels through `neighborsOf`, and they agree cell for cell. If this line
     // and the script's report ever disagree, one of them has stopped
     // describing the painting.
-    expect(islands.sort((a, b) => b - a)).toEqual([103, 29, 9]);
+    // 103 → 104 on 2026-08-27: the coast re-cut into per-rank bands moved one
+    // cell and drew two; the mainland grew by one while the total went 140 → 142.
+    // Measured off the rebuilt zones.json, and build-zones' own report agrees.
+    expect(islands.sort((a, b) => b - a)).toEqual([104, 29, 9]);
   });
 
   /**
@@ -345,7 +348,9 @@ describe('zones — new ground beside the isle', () => {
     // 40 → 36 on 2026-08-21, four cells taken back out of the emberkeep draw.
     // 36 → 37 and borealis 140 → 141 on 2026-08-23, the re-level pass that gave
     // every cell its own fog band (one cell drawn on each, and no cell lost).
-    expect(checked).toBe(37 + 141 + 144 + 5);
+    // The four worlds' shipped cell counts, from build-zones' own report.
+    // Borealis 141 → 142 on 2026-08-27 with the coast re-cut into per-rank bands.
+    expect(checked).toBe(37 + 142 + 144 + 5);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {

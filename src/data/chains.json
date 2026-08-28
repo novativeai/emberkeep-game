@@ -263,7 +263,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "artScale": 0.265
         }
       ]
     },
@@ -1212,7 +1213,8 @@
           "id": "emberheart_3",
           "name": "Ember Heart",
           "sell": 20,
-          "xp": 20
+          "xp": 20,
+          "artScale": 0.199
         }
       ]
     },
@@ -1286,7 +1288,8 @@
           "id": "auroraweave_3",
           "name": "Aurora Cloak",
           "sell": 24,
-          "xp": 22
+          "xp": 22,
+          "artScale": 0.222
         }
       ]
     },
@@ -1315,24 +1318,8 @@
           "name": "Runestone",
           "sell": 16,
           "xp": 17,
-          "generator": {
-            "produces": {
-              "chain": "emberheart",
-              "tier": 1
-            },
-            "cooldownMs": 150000,
-            "energyCost": 1,
-            "passiveMs": 150000,
-            "tappable": true,
-            "bonus": {
-              "every": 12,
-              "produces": {
-                "chain": "runestone",
-                "tier": 1
-              }
-            }
-          },
-          "sellable": false
+          "sellable": false,
+          "artScale": 0.264
         }
       ]
     },

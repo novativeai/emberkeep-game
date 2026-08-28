@@ -350,11 +350,103 @@
     .ipShapeRow .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .ipShapeRow .n { color:var(--gold2); }
     .ipShapeRow button { padding:1px 6px; font-size:11px; }
+    /* ---------------- 🪞 Seat: the merge-item visualiser ---------------- */
+    #seatPage { position:absolute; inset:0; display:none; grid-template-columns:1fr 344px;
+                gap:12px; background:var(--bg,#17121a); padding:12px 14px 14px; z-index:5; overflow:hidden; }
+    #seatPage .skLeft { display:flex; flex-direction:column; min-width:0; gap:8px; }
+    #seatPage .skHead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+    #seatPage .skHead h2 { margin:0; font-size:16px; }
+    #seatPage .skRule { color:var(--dim); font-size:12px; }
+    #seatStageWrap { position:relative; flex:1; min-height:0; border:1px solid var(--line);
+                     border-radius:10px; overflow:hidden; background:#1b141a; }
+    #seatStage { position:absolute; inset:0; width:100%; height:100%; cursor:grab; display:block; }
+    #seatStage.dragging { cursor:grabbing; }
+    #seatHint { position:absolute; left:10px; bottom:8px; font-size:11px; color:var(--dim);
+                background:rgba(20,14,19,.72); border:1px solid var(--line); border-radius:6px; padding:3px 8px; }
+    #seatReadout { position:absolute; right:10px; top:8px; font-size:11px; color:var(--gold2);
+                   background:rgba(20,14,19,.72); border:1px solid var(--line); border-radius:6px;
+                   padding:4px 8px; line-height:1.5; text-align:right; white-space:pre; }
+    #seatPage .skRight { display:flex; flex-direction:column; gap:8px; min-height:0; overflow:auto; padding-right:2px; }
+    .skCard { border:1px solid var(--line); border-radius:9px; background:var(--panel); padding:8px 9px 9px; }
+    .skCard > h3 { margin:0 0 7px; font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:var(--gold); }
+    .skRow { display:grid; grid-template-columns:60px 1fr 58px; align-items:center; gap:7px; margin-bottom:5px; }
+    .skRow:last-child { margin-bottom:0; }
+    .skRow > label { font-size:11px; color:var(--dim); }
+    .skRow input[type=range] { width:100%; accent-color:var(--gold); }
+    .skRow input[type=number] { width:100%; background:var(--panel2); color:var(--cream);
+                                border:1px solid var(--line); border-radius:5px; padding:2px 4px; font-size:11px; }
+    .skRow .u { font-size:10px; color:var(--dim); }
+    .skPick { display:grid; grid-template-columns:1fr; gap:6px; }
+    .skPick select { width:100%; background:var(--panel2); color:var(--cream); border:1px solid var(--line);
+                     border-radius:6px; padding:4px 6px; font-size:12px; }
+    .skFlags { display:flex; flex-wrap:wrap; gap:5px 10px; }
+    .skFlags label { font-size:11px; color:var(--cream); display:flex; align-items:center; gap:4px; cursor:pointer; }
+    .skActions { display:flex; gap:6px; flex-wrap:wrap; }
+    .skActions button { flex:1 1 auto; }
+    #seatApply { background:var(--gold); color:#3A2B38; font-weight:bold; border-color:var(--gold); }
+    .skNote { font-size:11px; color:var(--dim); line-height:1.5; }
+    .skNote b { color:var(--gold2); font-weight:600; }
+    .skDirty { color:var(--lava); font-weight:bold; }
+    .skStrip { display:flex; gap:6px; overflow-x:auto; padding-bottom:3px; }
+    .skStrip .skTierBtn { flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:2px;
+                          padding:4px 6px; border:1px solid var(--line); border-radius:7px; background:var(--panel2);
+                          color:var(--cream); cursor:pointer; font-size:10px; min-width:52px; }
+    .skStrip .skTierBtn.active { border-color:var(--gold); background:var(--panel); }
+    .skStrip .skTierBtn img { width:34px; height:34px; object-fit:contain; }
+    .skStrip .skTierBtn .edited { color:var(--gold2); font-size:9px; }
+    /* ---------------- ⏱ Tuning: every animation, wait and speed ---------------- */
+    #tuningPage { position:absolute; inset:0; display:none; grid-template-columns:250px 1fr 430px;
+                  gap:10px; background:var(--bg,#17121a); padding:12px 14px 14px; z-index:5; overflow:hidden; }
+    #tuningPage .tnCats { display:flex; flex-direction:column; gap:4px; overflow:auto; padding-right:2px; }
+    #tuningPage .tnCats h2 { margin:0 0 6px; font-size:15px; }
+    .tnCat { text-align:left; padding:7px 9px; border:1px solid var(--line); border-radius:8px;
+             background:var(--panel2); color:var(--cream); cursor:pointer; font-size:12px; line-height:1.35; }
+    .tnCat.active { background:var(--gold); color:#3A2B38; font-weight:bold; border-color:var(--gold); }
+    .tnCat .n { display:block; font-size:10px; opacity:.75; }
+    #tuningPage .tnMain { display:flex; flex-direction:column; min-width:0; gap:8px; overflow:hidden; }
+    #tuningPage .tnHead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+    #tuningPage .tnHead h2 { margin:0; font-size:16px; }
+    #tuningPage .tnBlurb { color:var(--dim); font-size:12px; }
+    #tnSearch { width:100%; background:var(--panel2); color:var(--cream); border:1px solid var(--line);
+                border-radius:7px; padding:5px 8px; font-size:12px; }
+    #tnList { flex:1; overflow:auto; padding-right:4px; display:flex; flex-direction:column; gap:2px; }
+    .tnGroup { margin-top:8px; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--gold);
+               border-bottom:1px solid var(--line); padding-bottom:3px; }
+    .tnGroup:first-child { margin-top:0; }
+    .tnRow { display:grid; grid-template-columns:190px 1fr 82px 22px; align-items:center; gap:8px; padding:2px 0; }
+    .tnRow > .k { font-size:11px; color:var(--cream); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .tnRow > .k b { color:var(--gold2); font-weight:600; }
+    .tnRow input[type=range] { width:100%; accent-color:var(--gold); }
+    .tnRow input[type=number] { width:100%; background:var(--panel2); color:var(--cream);
+                                border:1px solid var(--line); border-radius:5px; padding:2px 4px; font-size:11px; }
+    .tnRow .rst { border:none; background:none; color:var(--dim); cursor:pointer; font-size:12px; padding:0; }
+    .tnRow .rst:hover { color:var(--gold2); }
+    .tnRow.dirty > .k b { color:var(--lava); }
+    .tnRow .doc { grid-column:1 / -1; font-size:10px; color:var(--dim); line-height:1.4; margin:0 0 4px; }
+    #tuningPage .tnSide { display:flex; flex-direction:column; gap:8px; min-height:0; }
+    #tnStageWrap { position:relative; height:330px; border:1px solid var(--line); border-radius:10px;
+                   overflow:hidden; background:#170f15; flex:0 0 auto; }
+    #tnStage { position:absolute; inset:0; width:100%; height:100%; display:block; }
+    #tnStageTag { position:absolute; left:9px; top:7px; font-size:11px; color:var(--gold2); }
+    #tnClock { position:absolute; right:9px; top:7px; font-size:11px; color:var(--dim); }
+    .tnActions { display:flex; gap:6px; }
+    .tnActions button { flex:1; }
+    #tnApply { background:var(--gold); color:#3A2B38; font-weight:bold; border-color:var(--gold); }
+    #tnNote { font-size:11px; color:var(--dim); line-height:1.5; }
+    #tnNote b { color:var(--gold2); }
+    #tnDiff { flex:1; overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--panel);
+              padding:7px 8px; font-size:11px; line-height:1.6; min-height:60px; }
+    #tnDiff .d { display:flex; justify-content:space-between; gap:8px; }
+    #tnDiff .d span:first-child { color:var(--cream); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #tnDiff .d span:last-child { color:var(--gold2); white-space:nowrap; }
+    #tnDiff .none { color:var(--dim); }
     #ipResult { width:100%; border-radius:6px; border:1px solid var(--line); display:none; }
     #ipBusy { display:none; font-size:11px; color:var(--gold2); }
   </style>
   <div id="stageWrap"><canvas id="stage"></canvas><canvas id="fxStage" class="hidden"></canvas>
     <div id="mergePage"></div>
+    <div id="seatPage"></div>
+    <div id="tuningPage"></div>
     <div id="tutorialPage"></div>
     <div id="eventsPage"></div>
     <div id="mergeModal"><div class="box"></div></div>
@@ -428,6 +520,8 @@
       <button id="tabCharacters">🧝 Characters <span class="count" id="characterCount">(0)</span></button>
       <button id="tabFx">🔥 FX <span class="count" id="fxCount">(0)</span></button>
       <button id="tabMerge">🔮 Merge <span class="count" id="mergeCount">(0)</span></button>
+      <button id="tabSeat">🪞 Seat</button>
+      <button id="tabTuning">⏱ Tuning</button>
       <button id="tabIsland">🏝 Island <span class="count" id="islandCount">(0)</span></button>
       <button id="tabTutorial">📜 Tutorial <span class="count" id="tutorialCount">(0)</span></button>
       <button id="tabEvents">⚡ Events <span class="count" id="eventsCount">(0)</span></button>
@@ -1420,7 +1514,7 @@ function renderAssets() {
     `(${S.placements.filter((p) => isCharacter(assetById(p.assetId))).length})`;
   document.getElementById('fxCount').textContent = `(${fxPlacements().length})`;
   document.getElementById('mergeCount').textContent = `(${totalElements()})`;
-  if (S.category === 'merge') return; // the Merge page renders in #mergePage, not the sidebar grid
+  if (S.category === 'merge' || S.category === 'seat' || S.category === 'tuning') return; // those pages own the screen, not the sidebar grid
   const list = Object.values(S.assets).filter((a) => a.category === S.category);
   for (const a of list) {
     const card = document.createElement('div');
@@ -2214,9 +2308,1454 @@ function ipRestore(doc) {
   ipShapeList();
 }
 
+/* --------------------------- seat page (🪞) ---------------------------- */
+/**
+ * THE MERGE-ITEM VISUALISER — one piece, on a real painted stone, with the
+ * shadow it casts, and the four numbers that decide all of it.
+ *
+ * The board draws an item as: a sprite whose ANCHOR sits on the cell centre,
+ * scaled by `artScale`, over a soft ellipse whose width follows the art and
+ * whose seat is an offset from that same centre. Every one of those is
+ * reproduced here rather than approximated, so what this page shows is what
+ * BoardItem will draw — including the tile, which is the isle's own projection
+ * over its own backdrop instead of an invented diamond.
+ *
+ * Edits are per TEXTURE KEY and are written to the two files the game already
+ * reads: the anchor and the shadow seat into `anchors.json`, the size into
+ * `chains.json` (`artScale`, which the board now consults first). Nothing is
+ * saved until ⤒ Apply, and a POST only ever touches the keys it names.
+ */
+const SEAT = {
+  data: null,          // the GET payload
+  chainId: null,
+  tier: null,
+  edits: {},           // key -> { anchor:[x,y], artScale:number|null, shadow:{} }
+  lastApply: null,     // the last successful write, so an async re-render keeps it
+  img: null,           // the item art, once loaded
+  imgKey: null,
+  backdrop: null,      // the chosen world's backdrop, once loaded
+  worldId: 'emberkeep', // which world's tile the piece is standing on
+  zoom: 1.15,
+  view: { tile: true, cross: true, backdrop: true, shadow: true, ruler: false },
+  drag: null,
+  loading: false
+};
+
+const seatPage = document.getElementById('seatPage');
+const seatKey = (chainId, tier) => `item_${chainId}_${tier}`;
+const seatArtUrl = (file) => (file ? `../../assets/${file}` : null);
+const seatChain = () => SEAT.data?.chains.chains.find((c) => c.id === SEAT.chainId) ?? null;
+const seatTier = () => seatChain()?.tiers.find((t) => t.tier === SEAT.tier) ?? null;
+const seatRound = (n, dp = 3) => Math.round(n * 10 ** dp) / 10 ** dp;
+
+/** The scale the BOARD would use for a key, before this page's edits: data
+ *  first (chains.json), then the hand-written ITEM_SCALE, then 1. */
+function seatBaseScale(chainId, tier) {
+  const d = SEAT.data;
+  const t = d.chains.chains.find((c) => c.id === chainId)?.tiers.find((x) => x.tier === tier);
+  if (t && typeof t.artScale === 'number') return t.artScale;
+  return d.itemScale[`${chainId}_${tier}`] ?? d.itemScale[chainId] ?? 1;
+}
+
+/** `plateScale`: an authored ratio is against the art AS DRAWN, and 98 plates
+ *  are stored smaller than that (src/data/art-downscale.json). */
+const seatPlateScale = (key, authored) => {
+  const f = SEAT.data.downscale[key];
+  return f ? authored / f : authored;
+};
+
+/** Everything this page can edit for the current element, defaults filled in. */
+function seatState() {
+  const key = seatKey(SEAT.chainId, SEAT.tier);
+  const d = SEAT.data;
+  const base = {
+    anchor: (d.anchors.byKey[key] ?? d.anchors.default).slice(),
+    artScale: seatBaseScale(SEAT.chainId, SEAT.tier),
+    shadow: Object.assign({}, d.anchors.shadowByKey?.[key] ?? {})
+  };
+  const e = SEAT.edits[key];
+  if (!e) return { key, ...base, dirty: false };
+  return {
+    key,
+    anchor: e.anchor ? e.anchor.slice() : base.anchor,
+    artScale: e.artScale != null ? e.artScale : base.artScale,
+    shadow: e.shadow ? Object.assign({}, e.shadow) : base.shadow,
+    dirty: true
+  };
+}
+
+/** Record an edit for the live element (creating its entry on first touch). */
+function seatEdit(patch) {
+  const st = seatState();
+  const e = (SEAT.edits[st.key] ??= { anchor: st.anchor, artScale: st.artScale, shadow: st.shadow });
+  Object.assign(e, patch);
+  SEAT.lastApply = null;
+  seatRenderInspector();
+  seatDraw();
+  seatPersist();
+}
+
+/** Unapplied seats survive a reload: they are edits to the GAME's files, not to
+ *  the world document `scheduleSave` writes, so they get their own key. */
+const SEAT_STORE = 'wb.seat.edits.v1';
+function seatPersist() {
+  try { localStorage.setItem(SEAT_STORE, JSON.stringify(SEAT.edits)); } catch { /* private mode */ }
+}
+function seatRestore() {
+  try {
+    const raw = localStorage.getItem(SEAT_STORE);
+    if (raw) SEAT.edits = JSON.parse(raw) || {};
+  } catch { SEAT.edits = {}; }
+}
+
+/** The four shadow numbers with `ITEM_SHADOW` filled in where unauthored. */
+function seatShadowNumbers(st) {
+  const dflt = SEAT.data.shadowDefaults;
+  return {
+    width: st.shadow.width ?? dflt.ofWidth,
+    squash: st.shadow.squash ?? dflt.squash,
+    dx: st.shadow.dx ?? dflt.seatX,
+    dy: st.shadow.dy ?? dflt.seatY
+  };
+}
+
+async function seatShow() {
+  if (!SEAT.data && !SEAT.loading) await seatLoad();
+  seatRenderPage();
+}
+
+async function seatLoad() {
+  SEAT.loading = true;
+  seatPage.innerHTML = `<div class="skCard" style="margin:auto;max-width:420px">Loading the game's own chains, anchors and projection…</div>`;
+  const out = await devEndpoint('/__worldbuilder/seat', 'GET').catch((e) => ({ ok: false, error: String(e) }));
+  SEAT.loading = false;
+  if (!out || out.ok === false || !out.chains) {
+    SEAT.data = null;
+    seatPage.innerHTML =
+      `<div class="skCard" style="margin:auto;max-width:520px"><h3>🪞 Seat needs the game dev server</h3>` +
+      `<div class="skNote">Start it with <b>pnpm dev</b> and reopen this tab — the page reads the live ` +
+      `<b>chains.json</b>, <b>anchors.json</b> and the isle's projection so what it draws is what the board draws.` +
+      `<br><br>${out?.error ? `<span class="skDirty">${out.error}</span>` : ''}</div></div>`;
+    return;
+  }
+  SEAT.data = out;
+  seatRestore();
+  if (!SEAT.chainId) {
+    // Open on a chain whose art actually ships: `raw/` is the workspace, and a
+    // placeholder key that resolves to nothing would greet the page with an
+    // empty tile and no way to tell a missing file from a bad seat.
+    const shipped = (c) => c.tiers.length && !(out.files[seatKey(c.id, c.tiers[0].tier)] ?? 'raw/').startsWith('raw/');
+    const first = out.chains.chains.find(shipped) ?? out.chains.chains.find((c) => c.tiers.length) ?? out.chains.chains[0];
+    SEAT.chainId = first?.id ?? null;
+    SEAT.tier = first?.tiers[0]?.tier ?? null;
+  }
+  if (!out.worlds?.some((w) => w.id === SEAT.worldId)) SEAT.worldId = out.worlds?.[0]?.id ?? 'emberkeep';
+  seatLoadBackdrop();
+}
+
+/** The world the preview tile belongs to (its backdrop, its stone, its steps). */
+function seatWorld() {
+  const list = SEAT.data?.worlds ?? [];
+  return list.find((w) => w.id === SEAT.worldId) ?? list[0] ?? null;
+}
+
+function seatLoadBackdrop() {
+  const w = seatWorld();
+  const url = w && seatArtUrl(w.backdrop);
+  SEAT.backdrop = null;
+  if (!url) { seatDraw(); return; }
+  const want = SEAT.worldId;
+  const im = new Image();
+  im.onload = () => { if (SEAT.worldId === want) { SEAT.backdrop = im; seatRenderInspector(); } };
+  im.onerror = () => { if (SEAT.worldId === want) { SEAT.backdrop = null; seatDraw(); } };
+  im.src = url;
+}
+
+/**
+ * The preview tile, in the units the canvas draws in.
+ *
+ * `u`/`v` are the cell's own step vectors in WORLD px — the authored isle's
+ * from its projection, a zoned world's from the grid that was measured off its
+ * own backdrop — and `art` is where that stone sits in the backdrop's pixels.
+ * A merge item is NOT scaled per zone (only ground art is), so the piece keeps
+ * its size while the tile under it changes: that is the whole point of being
+ * able to switch.
+ */
+function seatTile() {
+  const p = SEAT.data.projection;
+  const w = seatWorld();
+  const aw = SEAT.backdrop?.naturalWidth ?? 2610;
+  const ah = SEAT.backdrop?.naturalHeight ?? 1632;
+  const ofWorld = (x, y) => [(x - p.artOriginX) / p.unit + aw / 2, (y - p.artOriginY) / p.unit + ah / 2];
+  if (w?.zone) {
+    return { u: w.zone.u, v: w.zone.v, art: ofWorld(w.zone.worldPoint[0], w.zone.worldPoint[1]), cell: w.cell };
+  }
+  // The authored isle: `iso.project`'s own step vectors.
+  const u = [p.halfW + p.skewK * p.halfH, p.halfH];
+  const v = [-p.halfW + p.skewK * p.halfH, p.halfH];
+  const a0 = ofWorld(p.boardOriginX, p.boardOriginY);
+  const [c, r] = w?.cell ?? p.sampleCell;
+  return {
+    u,
+    v,
+    art: [a0[0] + (c * u[0] + r * v[0]) / p.unit, a0[1] + (c * u[1] + r * v[1]) / p.unit],
+    cell: [c, r]
+  };
+}
+
+function seatRenderPage() {
+  if (!SEAT.data) return;
+  seatPage.innerHTML =
+    `<div class="skLeft">` +
+      `<div class="skHead"><h2>🪞 Seat — merge item on its tile</h2>` +
+      `<span class="skRule">the anchor sits on the cell centre · drag the ART to move it, drag the SHADOW to seat it</span></div>` +
+      `<div class="skStrip" id="seatStrip"></div>` +
+      `<div id="seatStageWrap"><canvas id="seatStage"></canvas>` +
+        `<div id="seatReadout"></div><div id="seatHint">drag art = anchor · drag shadow = seat · wheel = zoom · shift-drag = fine</div>` +
+      `</div>` +
+    `</div>` +
+    `<div class="skRight">` +
+      `<div class="skCard"><h3>Element</h3><div class="skPick">` +
+        `<select id="seatChain"></select><select id="seatTier"></select></div>` +
+        `<div class="skNote" id="seatKeyNote" style="margin-top:6px"></div></div>` +
+      `<div class="skCard"><h3>Standing on</h3><div class="skPick"><select id="seatWorld"></select></div>` +
+        `<div class="skNote" id="seatWorldNote" style="margin-top:6px"></div></div>` +
+      `<div class="skCard"><h3>Position on the tile</h3>` +
+        seatRowHtml('seatAX', 'anchor X', 0, 1, 0.001) +
+        seatRowHtml('seatAY', 'anchor Y', 0, 1, 0.001) +
+        `<div class="skNote" style="margin-top:5px">0.5 / 0.85 is the default: centred left-to-right, standing near the art's foot.</div></div>` +
+      `<div class="skCard"><h3>Size</h3>` +
+        seatRowHtml('seatScale', 'art scale', 0.005, 2, 0.001) +
+        `<div class="skNote" id="seatSizeNote" style="margin-top:5px"></div></div>` +
+      `<div class="skCard"><h3>Shadow</h3>` +
+        seatRowHtml('seatSW', 'width', 0, 2, 0.01) +
+        seatRowHtml('seatSQ', 'squash', 0.02, 1.2, 0.01) +
+        seatRowHtml('seatSX', 'seat X', -160, 160, 1) +
+        seatRowHtml('seatSY', 'seat Y', -160, 160, 1) +
+        `<div class="skNote" id="seatShadowNote" style="margin-top:5px"></div></div>` +
+      `<div class="skCard"><h3>View</h3><div class="skFlags">` +
+        `<label><input type="checkbox" id="seatVTile">tile</label>` +
+        `<label><input type="checkbox" id="seatVCross">anchor</label>` +
+        `<label><input type="checkbox" id="seatVBg">backdrop</label>` +
+        `<label><input type="checkbox" id="seatVShadow">shadow</label>` +
+        `<label><input type="checkbox" id="seatVRuler">ruler</label>` +
+        `</div>` + seatRowHtml('seatZoom', 'zoom', 0.35, 3.5, 0.01) + `</div>` +
+      `<div class="skCard"><h3>Apply</h3>` +
+        `<div class="skActions" style="margin-bottom:6px">` +
+          `<button id="seatReset" title="Back to this element's saved values">↺ Revert</button>` +
+          `<button id="seatDefault" title="Clear the shadow override — back to ITEM_SHADOW">⌫ Default shadow</button>` +
+        `</div>` +
+        `<div class="skActions"><button id="seatApply" title="Write anchors.json + chains.json on the dev server">⤒ Apply to game</button></div>` +
+        `<div class="skNote" id="seatDirty" style="margin-top:6px"></div></div>` +
+    `</div>`;
+
+  document.getElementById('seatChain').onchange = (e) => {
+    SEAT.chainId = e.target.value;
+    SEAT.tier = seatChain()?.tiers[0]?.tier ?? null;
+    seatRenderStrip(); seatRenderInspector(); seatLoadArt();
+  };
+  document.getElementById('seatTier').onchange = (e) => {
+    SEAT.tier = Number(e.target.value);
+    seatRenderStrip(); seatRenderInspector(); seatLoadArt();
+  };
+  document.getElementById('seatWorld').onchange = (e) => {
+    SEAT.worldId = e.target.value;
+    seatLoadBackdrop();
+    seatRenderInspector();
+  };
+  seatBindRow('seatAX', (v) => seatEdit({ anchor: [v, seatState().anchor[1]] }));
+  seatBindRow('seatAY', (v) => seatEdit({ anchor: [seatState().anchor[0], v] }));
+  seatBindRow('seatScale', (v) => seatEdit({ artScale: v }));
+  seatBindRow('seatSW', (v) => seatShadowEdit('width', v));
+  seatBindRow('seatSQ', (v) => seatShadowEdit('squash', v));
+  seatBindRow('seatSX', (v) => seatShadowEdit('dx', v));
+  seatBindRow('seatSY', (v) => seatShadowEdit('dy', v));
+  seatBindRow('seatZoom', (v) => { SEAT.zoom = v; seatDraw(); });
+  for (const [id, flag] of [['seatVTile', 'tile'], ['seatVCross', 'cross'], ['seatVBg', 'backdrop'],
+                            ['seatVShadow', 'shadow'], ['seatVRuler', 'ruler']]) {
+    const el = document.getElementById(id);
+    el.checked = SEAT.view[flag];
+    el.onchange = () => { SEAT.view[flag] = el.checked; seatDraw(); };
+  }
+  document.getElementById('seatReset').onclick = () => {
+    delete SEAT.edits[seatState().key];
+    seatRenderStrip(); seatRenderInspector(); seatDraw(); seatPersist();
+    say('Reverted this element to its saved seat.');
+  };
+  document.getElementById('seatDefault').onclick = () => {
+    seatEdit({ shadow: {} });
+    say('Shadow back to the <b>ITEM_SHADOW</b> default (the override is removed on Apply).');
+  };
+  document.getElementById('seatApply').onclick = seatApply;
+
+  seatBindStage();
+  seatRenderStrip();
+  seatRenderInspector();
+  seatLoadArt();
+}
+
+function seatRowHtml(id, label, min, max, step) {
+  return `<div class="skRow"><label for="${id}">${label}</label>` +
+         `<input type="range" id="${id}" min="${min}" max="${max}" step="${step}">` +
+         `<input type="number" id="${id}n" min="${min}" max="${max}" step="${step}"></div>`;
+}
+
+function seatBindRow(id, apply) {
+  const r = document.getElementById(id);
+  const n = document.getElementById(id + 'n');
+  r.oninput = () => { n.value = r.value; apply(Number(r.value)); };
+  n.oninput = () => { r.value = n.value; apply(Number(n.value)); };
+}
+
+function seatShadowEdit(field, value) {
+  const st = seatState();
+  const dflt = SEAT.data.shadowDefaults;
+  const base = { width: dflt.ofWidth, squash: dflt.squash, dx: dflt.seatX, dy: dflt.seatY };
+  const next = Object.assign({}, st.shadow);
+  // A number back at the default is an override worth DROPPING: the file then
+  // says "ordinary" for this key instead of restating the constant.
+  if (Math.abs(value - base[field]) < 1e-9) delete next[field];
+  else next[field] = value;
+  seatEdit({ shadow: next });
+}
+
+function seatSetRow(id, value) {
+  const r = document.getElementById(id);
+  const n = document.getElementById(id + 'n');
+  if (!r) return;
+  r.value = value;
+  n.value = seatRound(value, 4);
+}
+
+function seatRenderStrip() {
+  const chain = seatChain();
+  const strip = document.getElementById('seatStrip');
+  if (!strip || !chain) return;
+  strip.innerHTML = '';
+  for (const t of chain.tiers) {
+    const key = seatKey(chain.id, t.tier);
+    const b = document.createElement('button');
+    b.className = 'skTierBtn' + (t.tier === SEAT.tier ? ' active' : '');
+    b.innerHTML = `<img alt="${t.name}"><span>T${t.tier}</span>` +
+                  (SEAT.edits[key] ? `<span class="edited">● edited</span>` : '');
+    const url = seatArtUrl(SEAT.data.files[key]);
+    if (url) b.querySelector('img').src = url;
+    b.title = t.name;
+    b.onclick = () => { SEAT.tier = t.tier; seatRenderStrip(); seatRenderInspector(); seatLoadArt(); };
+    strip.appendChild(b);
+  }
+}
+
+function seatRenderInspector() {
+  const d = SEAT.data;
+  if (!d) return;
+  const chainSel = document.getElementById('seatChain');
+  const tierSel = document.getElementById('seatTier');
+  if (!chainSel) return;
+  chainSel.innerHTML = d.chains.chains
+    .map((c) => `<option value="${c.id}"${c.id === SEAT.chainId ? ' selected' : ''}>${c.name} — ${c.id}</option>`)
+    .join('');
+  const chain = seatChain();
+  tierSel.innerHTML = (chain?.tiers ?? [])
+    .map((t) => `<option value="${t.tier}"${t.tier === SEAT.tier ? ' selected' : ''}>T${t.tier} · ${t.name}</option>`)
+    .join('');
+
+  const worldSel = document.getElementById('seatWorld');
+  if (worldSel) {
+    worldSel.innerHTML = (d.worlds ?? [])
+      .map((w) => `<option value="${w.id}"${w.id === SEAT.worldId ? ' selected' : ''}>${w.name}</option>`)
+      .join('');
+  }
+
+  const st = seatState();
+  seatSetRow('seatAX', st.anchor[0]);
+  seatSetRow('seatAY', st.anchor[1]);
+  seatSetRow('seatScale', st.artScale);
+  const sh = seatShadowNumbers(st);
+  seatSetRow('seatSW', sh.width);
+  seatSetRow('seatSQ', sh.squash);
+  seatSetRow('seatSX', sh.dx);
+  seatSetRow('seatSY', sh.dy);
+  seatSetRow('seatZoom', SEAT.zoom);
+
+  const file = d.files[st.key];
+  const factor = d.downscale[st.key];
+  document.getElementById('seatKeyNote').innerHTML =
+    `<b>${st.key}</b><br>${file ? file : '<span class="skDirty">no art file in assets.json</span>'}` +
+    (file && file.startsWith('raw/') ? '<br><span class="skDirty">workspace art (raw/) — often a placeholder that never shipped</span>' : '') +
+    (factor ? `<br>plate stored ${factor}× smaller — the scale is divided by it` : '');
+
+  const eff = seatPlateScale(st.key, st.artScale);
+  const tw = SEAT.img?.naturalWidth ?? 0;
+  const th = SEAT.img?.naturalHeight ?? 0;
+  const hasArt = tw > 0;
+  document.getElementById('seatSizeNote').innerHTML = hasArt
+    ? `art ${tw}×${th} → <b>${Math.round(tw * eff)}×${Math.round(th * eff)}</b> board px ` +
+      `(a tile is ${Math.round(d.projection.halfW * 2)} wide)`
+    : 'load the art to see its board size';
+  const sw = Math.max(d.shadowDefaults.minWidth, tw * eff * sh.width);
+  document.getElementById('seatShadowNote').innerHTML = hasArt
+    ? `ellipse <b>${Math.round(sw)}×${Math.round(sw * sh.squash)}</b> board px` +
+      (sw <= d.shadowDefaults.minWidth + 0.001 ? ` — at the ${d.shadowDefaults.minWidth}px floor` : '') +
+      `<br>defaults: ${d.shadowDefaults.ofWidth} · ${d.shadowDefaults.squash} · ${d.shadowDefaults.seatX} · ${d.shadowDefaults.seatY}`
+    : '';
+
+  const tile = seatTile();
+  const tileW = Math.abs(tile.u[0] - tile.v[0]);
+  const home = (d.worlds ?? []).find((w) => w.id === 'emberkeep');
+  const worldNote = document.getElementById('seatWorldNote');
+  if (worldNote) {
+    const homeW = home ? (home.zone ? Math.abs(home.zone.u[0] - home.zone.v[0]) : d.projection.halfW * 2) : d.projection.halfW * 2;
+    const pct = Math.round((tileW / homeW) * 100);
+    worldNote.innerHTML =
+      `tile <b>${Math.round(tileW)} × ${Math.round(Math.abs(tile.u[1] + tile.v[1]))}</b> board px` +
+      ` · cell (${tile.cell[0]},${tile.cell[1]})` +
+      (pct === 100 ? '' : `<br>${pct}% of Emberkeep's stone — a piece keeps its size across worlds, so this is where one starts to overhang`);
+  }
+
+  const n = Object.keys(SEAT.edits).length;
+  // The last Apply's result belongs to the page, not to one render: the art
+  // loads asynchronously and re-renders this panel, which used to wipe the one
+  // line saying the write happened.
+  document.getElementById('seatDirty').innerHTML = n
+    ? `<span class="skDirty">${n} element${n > 1 ? 's' : ''} edited</span> — Apply writes anchors.json + chains.json.`
+    : SEAT.lastApply
+      ? `<b>✓ ${SEAT.lastApply}</b>`
+      : 'Nothing edited yet.';
+  seatDraw();
+}
+
+function seatLoadArt() {
+  const st = seatState();
+  const url = seatArtUrl(SEAT.data.files[st.key]);
+  SEAT.imgKey = st.key;
+  if (!url) { SEAT.img = null; seatRenderInspector(); return; }
+  const im = new Image();
+  im.onload = () => { if (SEAT.imgKey === st.key) { SEAT.img = im; seatRenderInspector(); } };
+  im.onerror = () => { if (SEAT.imgKey === st.key) { SEAT.img = null; seatRenderInspector(); } };
+  im.src = url;
+}
+
+/** Screen point of the preview cell's centre, and the world→screen scale. */
+function seatFrame(cv) {
+  const Z = SEAT.zoom;
+  return { cx: cv.width / 2, cy: cv.height / 2 + cv.height * 0.06, Z };
+}
+
+function seatDraw() {
+  const cv = document.getElementById('seatStage');
+  if (!cv || !SEAT.data) return;
+  const wrap = document.getElementById('seatStageWrap');
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, Math.round(wrap.clientWidth * dpr));
+  cv.height = Math.max(1, Math.round(wrap.clientHeight * dpr));
+  const g = cv.getContext('2d');
+  const p = SEAT.data.projection;
+  const { cx, cy, Z } = seatFrame(cv);
+  const S = Z * dpr; // screen px per board (world) px
+  g.clearRect(0, 0, cv.width, cv.height);
+  g.fillStyle = '#1b141a';
+  g.fillRect(0, 0, cv.width, cv.height);
+
+  // 1. the isle's own backdrop, put so the sample cell's painted stone is here
+  const tile = seatTile();
+  if (SEAT.view.backdrop && SEAT.backdrop) {
+    const aw = SEAT.backdrop.naturalWidth;
+    const ah = SEAT.backdrop.naturalHeight;
+    const scale = p.unit * S; // art px → screen px
+    g.drawImage(SEAT.backdrop, cx - tile.art[0] * scale, cy - tile.art[1] * scale, aw * scale, ah * scale);
+  } else {
+    // A checkerboard reads the alpha of a piece that is being seated blind.
+    const s = 16 * dpr;
+    for (let y = 0; y < cv.height; y += s) {
+      for (let x = 0; x < cv.width; x += s) {
+        g.fillStyle = ((x / s + y / s) | 0) % 2 ? '#241b22' : '#2b2029';
+        g.fillRect(x, y, s, s);
+      }
+    }
+  }
+
+  const st = seatState();
+  const sh = seatShadowNumbers(st);
+  const eff = seatPlateScale(st.key, st.artScale);
+  const tw = SEAT.img?.naturalWidth ?? 0;
+  const th = SEAT.img?.naturalHeight ?? 0;
+
+  // 2. the tile the game projects — the diamond a piece is standing on
+  if (SEAT.view.tile) {
+    const ux = tile.u[0] * S;
+    const uy = tile.u[1] * S;
+    const vx = tile.v[0] * S;
+    const vy = tile.v[1] * S;
+    const pts = [
+      [cx + (ux + vx) / 2, cy + (uy + vy) / 2],
+      [cx + (ux - vx) / 2, cy + (uy - vy) / 2],
+      [cx - (ux + vx) / 2, cy - (uy + vy) / 2],
+      [cx - (ux - vx) / 2, cy - (uy - vy) / 2]
+    ];
+    g.beginPath();
+    pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.closePath();
+    g.strokeStyle = 'rgba(247,164,55,.92)';
+    g.lineWidth = 2 * dpr;
+    g.stroke();
+  }
+
+  // 3. the soft ellipse, exactly as BoardItem sizes and seats it
+  if (SEAT.view.shadow && tw) {
+    const w = Math.max(SEAT.data.shadowDefaults.minWidth, tw * eff * sh.width);
+    const h = w * sh.squash;
+    const ex = cx + sh.dx * S;
+    const ey = cy + sh.dy * S;
+    const grad = g.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, (w / 2) * S));
+    grad.addColorStop(0, 'rgba(24,14,20,.52)');
+    grad.addColorStop(0.55, 'rgba(24,14,20,.30)');
+    grad.addColorStop(1, 'rgba(24,14,20,0)');
+    // Squashed in the transform so the soft falloff squashes with it — the
+    // game's ellipse is one radial texture scaled to w × w·squash, not a
+    // circle with a flattened outline drawn over it.
+    g.save();
+    g.translate(ex, ey);
+    g.scale(1, Math.max(0.02, sh.squash));
+    g.beginPath();
+    g.arc(0, 0, Math.max(1, (w / 2) * S), 0, Math.PI * 2);
+    g.fillStyle = grad;
+    g.fill();
+    g.restore();
+    // its outline, so the seat is readable against a busy stone
+    g.save();
+    g.strokeStyle = 'rgba(63,168,217,.85)';
+    g.lineWidth = 1.5 * dpr;
+    g.beginPath();
+    g.ellipse(ex, ey, Math.max(1, (w / 2) * S), Math.max(1, (h / 2) * S), 0, 0, Math.PI * 2);
+    g.stroke();
+    g.restore();
+    SEAT._shadowHit = { x: ex, y: ey, rx: (w / 2) * S, ry: (h / 2) * S };
+  } else {
+    SEAT._shadowHit = null;
+  }
+
+  // 4. the art, its ANCHOR on the cell centre — the board's own rule
+  if (tw) {
+    const dw = tw * eff * S;
+    const dh = th * eff * S;
+    const x = cx - st.anchor[0] * dw;
+    const y = cy - st.anchor[1] * dh;
+    g.drawImage(SEAT.img, x, y, dw, dh);
+    SEAT._artHit = { x, y, w: dw, h: dh };
+    if (SEAT.view.ruler) {
+      g.strokeStyle = 'rgba(255,216,77,.55)';
+      g.setLineDash([5 * dpr, 4 * dpr]);
+      g.lineWidth = 1 * dpr;
+      g.strokeRect(x, y, dw, dh);
+      g.setLineDash([]);
+    }
+  } else {
+    SEAT._artHit = null;
+    g.fillStyle = 'rgba(232,80,60,.9)';
+    g.font = `${13 * dpr}px system-ui`;
+    g.textAlign = 'center';
+    g.fillText(
+      SEAT.data.files[st.key] ? 'art file did not load — see the key note' : 'no art file for this element',
+      cx,
+      cy
+    );
+  }
+
+  // 5. the cell centre — where the anchor is pinned
+  if (SEAT.view.cross) {
+    g.strokeStyle = 'rgba(255,246,232,.95)';
+    g.lineWidth = 1.5 * dpr;
+    const r = 9 * dpr;
+    g.beginPath();
+    g.moveTo(cx - r, cy); g.lineTo(cx + r, cy);
+    g.moveTo(cx, cy - r); g.lineTo(cx, cy + r);
+    g.stroke();
+  }
+
+  const out = document.getElementById('seatReadout');
+  if (out) {
+    const tw2 = Math.round(Math.abs(tile.u[0] - tile.v[0]));
+    out.textContent =
+      `tile    ${tw2} × ${Math.round(Math.abs(tile.u[1] + tile.v[1]))}  (${seatWorld()?.name ?? '?'})\n` +
+      `anchor  ${seatRound(st.anchor[0])} , ${seatRound(st.anchor[1])}\n` +
+      `scale   ${seatRound(st.artScale, 4)}\n` +
+      `shadow  ${seatRound(sh.width)} × ${seatRound(sh.squash)}\n` +
+      `seat    ${seatRound(sh.dx, 1)} , ${seatRound(sh.dy, 1)}`;
+  }
+}
+
+/** Drag the ART to move it on the tile; drag the SHADOW to seat it. */
+function seatBindStage() {
+  const cv = document.getElementById('seatStage');
+  if (!cv) return;
+  const local = (e) => {
+    const r = cv.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr };
+  };
+  cv.onpointerdown = (e) => {
+    if (!SEAT.data) return;
+    const pt = local(e);
+    const sHit = SEAT._shadowHit;
+    const aHit = SEAT._artHit;
+    const onShadow =
+      sHit && ((pt.x - sHit.x) / Math.max(1, sHit.rx)) ** 2 + ((pt.y - sHit.y) / Math.max(1, sHit.ry)) ** 2 <= 1;
+    const onArt = aHit && pt.x >= aHit.x && pt.x <= aHit.x + aHit.w && pt.y >= aHit.y && pt.y <= aHit.y + aHit.h;
+    // The shadow is UNDER the art and much smaller: test it first, or a piece
+    // whose plate covers its own ellipse could never have its seat dragged.
+    SEAT.drag = onShadow ? { what: 'shadow', pt } : onArt ? { what: 'art', pt } : null;
+    if (!SEAT.drag) return;
+    SEAT.drag.start = seatState();
+    cv.setPointerCapture(e.pointerId);
+    cv.classList.add('dragging');
+  };
+  cv.onpointermove = (e) => {
+    if (!SEAT.drag) return;
+    const pt = local(e);
+    const dpr = window.devicePixelRatio || 1;
+    const S = SEAT.zoom * dpr;
+    const fine = e.shiftKey ? 0.25 : 1;
+    const dx = ((pt.x - SEAT.drag.pt.x) / S) * fine;
+    const dy = ((pt.y - SEAT.drag.pt.y) / S) * fine;
+    const st = SEAT.drag.start;
+    if (SEAT.drag.what === 'shadow') {
+      // Both axes from the drag's OWN start, so a round trip lands exactly
+      // where it began rather than accumulating each move's rounding.
+      const base = seatShadowNumbers(st);
+      seatShadowEdit('dx', seatRound(base.dx + dx, 1));
+      seatShadowEdit('dy', seatRound(base.dy + dy, 1));
+    } else {
+      // Moving the ART on a fixed cell centre IS moving its anchor, the other
+      // way round: pushing the piece right means the anchor sits further left
+      // in its own frame.
+      const eff = seatPlateScale(st.key, st.artScale);
+      const tw = (SEAT.img?.naturalWidth ?? 1) * eff;
+      const th = (SEAT.img?.naturalHeight ?? 1) * eff;
+      seatEdit({
+        anchor: [
+          seatRound(st.anchor[0] - dx / Math.max(1, tw), 4),
+          seatRound(st.anchor[1] - dy / Math.max(1, th), 4)
+        ]
+      });
+    }
+  };
+  const end = (e) => {
+    if (!SEAT.drag) return;
+    SEAT.drag = null;
+    cv.classList.remove('dragging');
+    if (e && e.pointerId !== undefined && cv.hasPointerCapture?.(e.pointerId)) cv.releasePointerCapture(e.pointerId);
+    seatRenderStrip();
+  };
+  cv.onpointerup = end;
+  cv.onpointercancel = end;
+  cv.onwheel = (e) => {
+    e.preventDefault();
+    SEAT.zoom = Math.min(3.5, Math.max(0.35, SEAT.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08)));
+    seatSetRow('seatZoom', SEAT.zoom);
+    seatDraw();
+  };
+}
+
+async function seatApply() {
+  const keys = Object.keys(SEAT.edits);
+  if (!keys.length) { say('Nothing to apply — no element has been re-seated.'); return; }
+  const seats = keys.map((key) => {
+    const [, ...rest] = key.split('_');
+    const tier = Number(rest[rest.length - 1]);
+    const chain = rest.slice(0, -1).join('_');
+    const e = SEAT.edits[key];
+    const base = seatBaseScale(chain, tier);
+    return {
+      key,
+      chain,
+      tier,
+      anchor: e.anchor,
+      // Only write a scale that actually differs from what the board already
+      // uses: an unchanged element must not grow a chains.json field that
+      // silently overrides its Constants entry forever after.
+      artScale: Math.abs((e.artScale ?? base) - base) < 1e-9 ? undefined : e.artScale,
+      shadow: e.shadow ?? {}
+    };
+  });
+  SEAT.lastApply = null;
+  const note = document.getElementById('seatDirty');
+  if (note) note.innerHTML = 'Applying…';
+  const out = await devEndpoint('/__worldbuilder/seat', 'POST', { seats }).catch((err) => ({ ok: false, error: String(err) }));
+  if (!out || out.ok === false) {
+    const msg = `Seat apply failed: ${out?.error ?? 'no dev server'}`;
+    if (note) note.innerHTML = `<span class="skDirty">${msg}</span>`;
+    say(`<span style="color:var(--lava)">${msg}</span>`);
+    return;
+  }
+  SEAT.edits = {};
+  seatPersist();
+  await seatLoad();
+  seatRenderPage();
+  // The result goes in the page's OWN note as well as the status bar: the bar
+  // is shared with the world document's own chatter, which lands after a save
+  // and would wipe the one line saying the write happened.
+  SEAT.lastApply = `Seated ${out.keys.length} element${out.keys.length > 1 ? 's' : ''} — anchors.json + chains.json written. Reload the game to see it.`;
+  seatRenderInspector();
+  say(`Seated <b>${out.keys.length}</b> element${out.keys.length > 1 ? 's' : ''} — anchors.json + chains.json written.`);
+}
+
+/* -------------------------- tuning page (⏱) --------------------------- */
+/**
+ * EVERY ANIMATION, WAIT AND SPEED THE GAME RUNS ON, on one page.
+ *
+ * The catalogue is PARSED out of `src/core/Constants.ts` by the dev server
+ * (`scripts/tuning-catalog.mjs`), so this page cannot list a knob the file does
+ * not have, and cannot miss one it gained yesterday. Categories group what is
+ * worth seeing together; whatever no category claims still appears under
+ * "Everything else", because a tuning page that quietly hides a number is worse
+ * than no tuning page.
+ *
+ * The right-hand pane PLAYS the thing being tuned, in real time, off the live
+ * slider values — the hand gesture with its own durations, the reveal card on
+ * its own timeline, the wait before a hint with a bar that really does take ten
+ * seconds. Moving a slider changes the animation on the next loop, which is the
+ * only honest way to judge "is this too fast".
+ *
+ * ⤒ Apply splices the new literals into Constants.ts — the digits and nothing
+ * else, so every comment and every expression in that file survives.
+ */
+const TUNE = {
+  cats: null,
+  catId: null,
+  edits: {},      // path -> number
+  base: {},       // path -> the value on disk
+  filter: '',
+  playing: true,
+  t0: 0,
+  raf: null,
+  art: {},        // preview art, once loaded
+  lastApply: null
+};
+
+const tuningPage = document.getElementById('tuningPage');
+const TUNE_STORE = 'wb.tuning.edits.v1';
+const tnVal = (p) => (TUNE.edits[p] !== undefined ? TUNE.edits[p] : TUNE.base[p]);
+const tnRound = (n, dp = 3) => Math.round(n * 10 ** dp) / 10 ** dp;
+
+function tnPersist() {
+  try { localStorage.setItem(TUNE_STORE, JSON.stringify(TUNE.edits)); } catch { /* private mode */ }
+}
+function tnRestore() {
+  try { const raw = localStorage.getItem(TUNE_STORE); if (raw) TUNE.edits = JSON.parse(raw) || {}; } catch { TUNE.edits = {}; }
+}
+
+async function tuningShow() {
+  if (!TUNE.cats) await tuningLoad();
+  tuningRenderPage();
+  tnStartLoop();
+}
+
+async function tuningLoad() {
+  tuningPage.innerHTML = `<div class="skCard" style="margin:auto;max-width:420px">Reading every constant out of the game…</div>`;
+  const out = await devEndpoint('/__worldbuilder/tuning', 'GET').catch((e) => ({ ok: false, error: String(e) }));
+  if (!out || out.ok === false || !out.categories) {
+    TUNE.cats = null;
+    tuningPage.innerHTML =
+      `<div class="skCard" style="margin:auto;max-width:520px"><h3>⏱ Tuning needs the game dev server</h3>` +
+      `<div class="skNote">Start it with <b>pnpm dev</b> and reopen this tab — the page reads ` +
+      `<b>src/core/Constants.ts</b> itself, so it always lists exactly what the game has.` +
+      `${out?.error ? `<br><br><span class="skDirty">${out.error}</span>` : ''}</div></div>`;
+    return;
+  }
+  TUNE.cats = out.categories;
+  TUNE.base = {};
+  for (const c of TUNE.cats) for (const p of c.params) TUNE.base[p.path] = p.value;
+  tnRestore();
+  // Drop edits for constants that no longer exist, or that already match disk.
+  for (const k of Object.keys(TUNE.edits)) {
+    if (TUNE.base[k] === undefined || TUNE.base[k] === TUNE.edits[k]) delete TUNE.edits[k];
+  }
+  if (!TUNE.catId || !TUNE.cats.some((c) => c.id === TUNE.catId)) TUNE.catId = TUNE.cats[0]?.id ?? null;
+  tnLoadArt();
+}
+
+function tnLoadArt() {
+  const want = { hand: 'sprites/pointer/gauntlet-pointer.webp', arrow: 'sprites/items/arrow.webp' };
+  for (const [k, file] of Object.entries(want)) {
+    if (TUNE.art[k]) continue;
+    const im = new Image();
+    im.onload = () => { TUNE.art[k] = im; };
+    im.src = `../../assets/${file}`;
+  }
+}
+
+const tnCat = () => TUNE.cats?.find((c) => c.id === TUNE.catId) ?? null;
+
+function tuningRenderPage() {
+  if (!TUNE.cats) return;
+  tuningPage.innerHTML =
+    `<div class="tnCats"><h2>⏱ Tuning</h2><div id="tnCatList"></div></div>` +
+    `<div class="tnMain">` +
+      `<div class="tnHead"><h2 id="tnTitle"></h2></div>` +
+      `<div class="tnBlurb" id="tnBlurb"></div>` +
+      `<input id="tnSearch" placeholder="filter every constant — name, group or path…" />` +
+      `<div id="tnList"></div>` +
+    `</div>` +
+    `<div class="tnSide">` +
+      `<div id="tnStageWrap"><canvas id="tnStage"></canvas>` +
+        `<div id="tnStageTag"></div><div id="tnClock"></div></div>` +
+      `<div class="tnActions">` +
+        `<button id="tnPlay" title="Pause or resume the preview">⏸ Pause</button>` +
+        `<button id="tnRestart" title="Play the animation again from its first frame">↻ Replay</button>` +
+      `</div>` +
+      `<div id="tnDiff"></div>` +
+      `<div class="tnActions">` +
+        `<button id="tnRevertAll" title="Throw away every pending change">↺ Revert all</button>` +
+        `<button id="tnApply" title="Write the new numbers into src/core/Constants.ts">⤒ Apply to game</button>` +
+      `</div>` +
+      `<div id="tnNote"></div>` +
+    `</div>`;
+
+  const search = document.getElementById('tnSearch');
+  search.value = TUNE.filter;
+  search.oninput = () => { TUNE.filter = search.value.trim().toLowerCase(); tnRenderList(); };
+  document.getElementById('tnPlay').onclick = () => {
+    TUNE.playing = !TUNE.playing;
+    document.getElementById('tnPlay').textContent = TUNE.playing ? '⏸ Pause' : '▶ Play';
+    if (TUNE.playing) tnStartLoop();
+  };
+  document.getElementById('tnRestart').onclick = () => { TUNE.t0 = performance.now(); };
+  document.getElementById('tnRevertAll').onclick = () => {
+    TUNE.edits = {}; TUNE.lastApply = null; tnPersist(); tnRenderList(); tnRenderDiff();
+    say('Reverted every pending tuning change.');
+  };
+  document.getElementById('tnApply').onclick = tuningApply;
+
+  tnRenderCats();
+  tnRenderList();
+  tnRenderDiff();
+  tnStartLoop();
+}
+
+function tnRenderCats() {
+  const box = document.getElementById('tnCatList');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const c of TUNE.cats) {
+    const n = c.params.filter((p) => TUNE.edits[p.path] !== undefined).length;
+    const b = document.createElement('button');
+    b.className = 'tnCat' + (c.id === TUNE.catId ? ' active' : '');
+    b.innerHTML = `${c.name}<span class="n">${c.params.length} knobs${n ? ` · ${n} edited` : ''}</span>`;
+    b.onclick = () => { TUNE.catId = c.id; TUNE.t0 = performance.now(); tnRenderCats(); tnRenderList(); };
+    box.appendChild(b);
+  }
+}
+
+function tnRenderList() {
+  const c = tnCat();
+  const list = document.getElementById('tnList');
+  if (!c || !list) return;
+  document.getElementById('tnTitle').textContent = c.name;
+  document.getElementById('tnBlurb').textContent = c.blurb ?? '';
+  const q = TUNE.filter;
+  // A filter searches EVERY category, not just the open one — you should not
+  // have to know which drawer a constant lives in to find it.
+  const pool = q ? TUNE.cats.flatMap((x) => x.params) : c.params;
+  const shown = q ? pool.filter((p) => p.path.toLowerCase().includes(q) || (p.doc ?? '').toLowerCase().includes(q)) : pool;
+  list.innerHTML = '';
+  if (!shown.length) { list.innerHTML = `<div class="skNote">Nothing matches “${q}”.</div>`; return; }
+  let group = null;
+  for (const p of shown) {
+    if (p.group !== group) {
+      group = p.group;
+      const h = document.createElement('div');
+      h.className = 'tnGroup';
+      h.textContent = group;
+      list.appendChild(h);
+    }
+    list.appendChild(tnRow(p));
+  }
+}
+
+function tnRow(p) {
+  const row = document.createElement('div');
+  const dirty = TUNE.edits[p.path] !== undefined;
+  row.className = 'tnRow' + (dirty ? ' dirty' : '');
+  const v = tnVal(p.path);
+  const label = p.key === p.group ? p.group : p.key;
+  row.innerHTML =
+    `<div class="k" title="${p.path}"><b>${label}</b></div>` +
+    `<input type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${v}">` +
+    `<input type="number" step="${p.step}" value="${tnRound(v, 4)}">` +
+    `<button class="rst" title="Back to ${p.value}">↺</button>`;
+  if (p.doc) {
+    const d = document.createElement('div');
+    d.className = 'doc';
+    d.textContent = p.doc.length > 240 ? `${p.doc.slice(0, 240)}…` : p.doc;
+    row.appendChild(d);
+  }
+  const r = row.querySelector('input[type=range]');
+  const n = row.querySelector('input[type=number]');
+  const set = (value) => {
+    if (!Number.isFinite(value)) return;
+    if (value === p.value) delete TUNE.edits[p.path];
+    else TUNE.edits[p.path] = value;
+    TUNE.lastApply = null;
+    row.classList.toggle('dirty', TUNE.edits[p.path] !== undefined);
+    tnPersist(); tnRenderDiff(); tnRenderCats();
+  };
+  r.oninput = () => { n.value = r.value; set(Number(r.value)); };
+  n.oninput = () => { r.value = n.value; set(Number(n.value)); };
+  row.querySelector('.rst').onclick = () => {
+    delete TUNE.edits[p.path];
+    r.value = p.value; n.value = p.value;
+    row.classList.remove('dirty');
+    TUNE.lastApply = null;
+    tnPersist(); tnRenderDiff(); tnRenderCats();
+  };
+  return row;
+}
+
+function tnRenderDiff() {
+  const box = document.getElementById('tnDiff');
+  if (!box) return;
+  const keys = Object.keys(TUNE.edits).sort();
+  if (!keys.length) {
+    box.innerHTML = TUNE.lastApply
+      ? `<div class="none"><b>✓ ${TUNE.lastApply}</b></div>`
+      : '<div class="none">Nothing changed yet. Move a slider and the preview follows it.</div>';
+  } else {
+    box.innerHTML = keys
+      .map((k) => `<div class="d"><span title="${k}">${k}</span><span>${tnRound(TUNE.base[k], 4)} → ${tnRound(TUNE.edits[k], 4)}</span></div>`)
+      .join('');
+  }
+  const note = document.getElementById('tnNote');
+  if (note) {
+    note.innerHTML = keys.length
+      ? `<b>${keys.length}</b> constant${keys.length > 1 ? 's' : ''} pending — Apply rewrites those numbers in <b>src/core/Constants.ts</b>.`
+      : 'Every number here is read live out of Constants.ts; Apply writes back into the same file.';
+  }
+}
+
+async function tuningApply() {
+  const keys = Object.keys(TUNE.edits);
+  if (!keys.length) { say('Nothing to apply — no constant has been changed.'); return; }
+  const out = await devEndpoint('/__worldbuilder/tuning', 'POST', { edits: TUNE.edits })
+    .catch((e) => ({ ok: false, error: String(e) }));
+  if (!out || out.ok === false) {
+    say(`<span style="color:var(--lava)">Tuning apply failed: ${out?.error ?? 'no dev server'}</span>`);
+    const box = document.getElementById('tnDiff');
+    if (box) box.innerHTML = `<div class="none skDirty">${out?.error ?? 'no dev server'}</div>`;
+    return;
+  }
+  const n = out.count;
+  TUNE.edits = {};
+  tnPersist();
+  await tuningLoad();
+  TUNE.lastApply = `${n} constant${n > 1 ? 's' : ''} written to Constants.ts. The game reloads itself.`;
+  tuningRenderPage();
+  say(`Tuned <b>${n}</b> constant${n > 1 ? 's' : ''} — src/core/Constants.ts written.`);
+}
+
+/* ------------------- tuning previews: play what is tuned ------------------- */
+/**
+ * Each scene is a pure function of (ctx, elapsed ms, `v` = a live value lookup).
+ * They read the SLIDERS, not the file, so dragging one changes the animation on
+ * the next frame — which is the only honest way to answer "is this too fast".
+ * Times are real: a ten-second hint wait really does take ten seconds here.
+ */
+const TN_EASE = {
+  linear: (t) => t,
+  sineIn: (t) => 1 - Math.cos((t * Math.PI) / 2),
+  sineOut: (t) => Math.sin((t * Math.PI) / 2),
+  sineInOut: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
+  quadIn: (t) => t * t,
+  quadOut: (t) => 1 - (1 - t) * (1 - t),
+  backOut: (t) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2
+};
+const tnClamp01 = (t) => (t < 0 ? 0 : t > 1 ? 1 : t);
+/** Progress through a phase that starts at `at` and lasts `ms`. */
+const tnPhase = (now, at, ms) => (ms <= 0 ? (now >= at ? 1 : 0) : tnClamp01((now - at) / ms));
+
+function tnStartLoop() {
+  if (TUNE.raf) return;
+  TUNE.t0 = TUNE.t0 || performance.now();
+  const step = () => {
+    TUNE.raf = null;
+    const cv = document.getElementById('tnStage');
+    if (!cv || !document.getElementById('tuningPage') || tuningPage.style.display === 'none') return;
+    tnDrawPreview(cv);
+    if (TUNE.playing) TUNE.raf = requestAnimationFrame(step);
+  };
+  TUNE.raf = requestAnimationFrame(step);
+}
+
+function tnDrawPreview(cv) {
+  const wrap = document.getElementById('tnStageWrap');
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, Math.round(wrap.clientWidth * dpr));
+  cv.height = Math.max(1, Math.round(wrap.clientHeight * dpr));
+  const g = cv.getContext('2d');
+  g.save();
+  g.scale(dpr, dpr);
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = '#170f15';
+  g.fillRect(0, 0, W, H);
+  const cat = tnCat();
+  const now = performance.now() - TUNE.t0;
+  const v = (path, fallback) => {
+    const x = tnVal(path);
+    return x === undefined ? fallback : x;
+  };
+  const scene = TN_SCENES[cat?.preview ?? ''] ?? null;
+  const tag = document.getElementById('tnStageTag');
+  const clock = document.getElementById('tnClock');
+  let loopMs = 0;
+  if (scene) {
+    try { loopMs = scene({ g, W, H, now, v, dpr }) || 0; } catch (e) { loopMs = 0; }
+    if (tag) tag.textContent = cat.name;
+  } else {
+    tnNothingToShow(g, W, H);
+    if (tag) tag.textContent = cat ? cat.name : '';
+  }
+  if (clock) clock.textContent = loopMs ? `${(now % loopMs / 1000).toFixed(1)}s / ${(loopMs / 1000).toFixed(1)}s` : '';
+  g.restore();
+}
+
+function tnNothingToShow(g, W, H) {
+  g.fillStyle = 'rgba(155,141,153,.85)';
+  g.font = '12px system-ui';
+  g.textAlign = 'center';
+  g.fillText('These are numbers with nothing to animate —', W / 2, H / 2 - 9);
+  g.fillText('sizes, counts and depths. Change them and the game reloads.', W / 2, H / 2 + 9);
+  g.textAlign = 'left';
+}
+
+/** A tile diamond, the ground everything in these scenes stands on. */
+function tnTile(g, x, y, w, fill = 'rgba(120,96,116,.55)') {
+  const h = w / 2;
+  g.beginPath();
+  g.moveTo(x, y - h / 2); g.lineTo(x + w / 2, y); g.lineTo(x, y + h / 2); g.lineTo(x - w / 2, y);
+  g.closePath();
+  g.fillStyle = fill;
+  g.fill();
+  g.strokeStyle = 'rgba(247,164,55,.35)';
+  g.stroke();
+}
+function tnPiece(g, x, y, r, hue = '#7ECB4F') {
+  g.beginPath();
+  g.ellipse(x, y + r * 0.62, r * 0.9, r * 0.34, 0, 0, Math.PI * 2);
+  g.fillStyle = 'rgba(18,10,16,.45)';
+  g.fill();
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.fillStyle = hue;
+  g.fill();
+  g.strokeStyle = 'rgba(20,12,18,.8)';
+  g.lineWidth = 2;
+  g.stroke();
+}
+/** A labelled timeline bar — the shape every "how long do I wait" answer takes. */
+function tnBar(g, x, y, w, h, frac, label, colour = '#F7A437') {
+  g.fillStyle = 'rgba(255,255,255,.09)';
+  g.fillRect(x, y, w, h);
+  g.fillStyle = colour;
+  g.fillRect(x, y, w * tnClamp01(frac), h);
+  g.strokeStyle = 'rgba(255,255,255,.16)';
+  g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  if (label) {
+    g.fillStyle = '#FFF6E8';
+    g.font = '11px system-ui';
+    g.fillText(label, x, y - 5);
+  }
+}
+function tnMarks(g, x, y, w, total, marks) {
+  g.font = '10px system-ui';
+  for (const [at, name, colour] of marks) {
+    const mx = x + w * tnClamp01(at / total);
+    g.strokeStyle = colour ?? 'rgba(255,216,77,.7)';
+    g.beginPath(); g.moveTo(mx, y - 4); g.lineTo(mx, y + 14); g.stroke();
+    g.fillStyle = colour ?? 'rgba(255,216,77,.9)';
+    g.fillText(name, mx + 3, y + 25);
+  }
+}
+
+const TN_SCENES = {
+  /* The lift, the carry, the gather and the ready pulse. */
+  merge(c) {
+    const { g, W, H, now, v } = c;
+    const lift = v('DRAG.liftMs', 120), settle = v('DRAG.settleMs', 210);
+    const gather = v('TIMINGS.mergeGather', 170), pop = v('TIMINGS.spawnPop', 310);
+    const ret = v('TIMINGS.dragReturn', 290);
+    const hold = 420;
+    const total = lift + hold + gather + pop + settle + 700;
+    const t = now % total;
+    const y = H * 0.56;
+    const cx = W * 0.5;
+    tnTile(g, cx - 96, y, 118); tnTile(g, cx, y, 118); tnTile(g, cx + 96, y, 118);
+    // the ready pulse the whole cluster breathes on
+    const period = Math.max(60, v('MERGE_READY.periodMs', 1765));
+    const pulse = 1 + 0.06 * Math.sin((now / period) * Math.PI * 2);
+    const bob = Math.sin((now / Math.max(60, v('TIMINGS.bobPeriodMs', 2400))) * Math.PI * 2) * 3;
+    let x = cx - 96, py = y - 16 + bob, r = 22 * pulse;
+    if (t < lift) { const p = TN_EASE.backOut(tnPhase(t, 0, lift)); py -= p * -v('DRAG.liftY', -34); r *= 1 + (v('DRAG.liftScale', 1.16) - 1) * p; }
+    else if (t < lift + hold) { py -= -v('DRAG.liftY', -34); r *= v('DRAG.liftScale', 1.16); x += 96 * TN_EASE.sineInOut(tnPhase(t, lift, hold)); }
+    else if (t < lift + hold + gather) { const p = TN_EASE.quadOut(tnPhase(t, lift + hold, gather)); x = cx - 96 + 96; py -= (-v('DRAG.liftY', -34)) * (1 - p); r *= 1 + (v('DRAG.liftScale', 1.16) - 1) * (1 - p); }
+    else { x = cx; }
+    tnPiece(g, cx + 96, y - 16 + bob, 22 * pulse);
+    if (t > lift + hold + gather) {
+      const p = TN_EASE.backOut(tnPhase(t, lift + hold + gather, pop));
+      tnPiece(g, cx, y - 20 + bob, 6 + 24 * p, '#FFD84D');
+    } else {
+      tnPiece(g, cx, y - 16 + bob, 22 * pulse);
+      tnPiece(g, x, py, r, '#7ECB4F');
+    }
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    g.fillText(`lift ${lift|0}ms · carry · gather ${gather|0}ms · pop ${pop|0}ms · bounce-back ${ret|0}ms`, 12, H - 40);
+    tnBar(g, 12, H - 26, W - 24, 8, (now % total) / total, null);
+    return total;
+  },
+
+  /* The wait before the board suggests a merge — in real seconds. */
+  hint(c) {
+    const { g, W, H, now, v } = c;
+    const idle = Math.max(200, v('MERGE_HINT.idleMs', 10000));
+    const rest = Math.max(0, v('MERGE_HINT.restMs', 10000));
+    const follow = Math.max(0, v('MERGE_HINT.followUpMs', 5000));
+    const total = idle + 2200 + rest + follow;
+    const t = now % total;
+    const y = H * 0.42;
+    tnTile(g, W / 2 - 70, y, 110); tnTile(g, W / 2 + 70, y, 110);
+    tnPiece(g, W / 2 - 70, y - 14, 21); tnPiece(g, W / 2 + 70, y - 14, 21);
+    if (t > idle && t < idle + 2200 && TUNE.art.hand) {
+      const p = TN_EASE.sineInOut(tnPhase(t, idle + 200, 1400));
+      const hx = W / 2 - 70 + 140 * p;
+      const im = TUNE.art.hand;
+      const hw = 54, hh = (im.naturalHeight / im.naturalWidth) * hw;
+      g.globalAlpha = tnPhase(t, idle, 260) * (1 - tnPhase(t, idle + 1800, 400));
+      g.drawImage(im, hx - hw * 0.3, y - 24, hw, hh);
+      g.globalAlpha = 1;
+    }
+    g.fillStyle = '#FFF6E8'; g.font = '12px system-ui';
+    const stage = t < idle ? `board idle — hint in ${((idle - t) / 1000).toFixed(1)}s`
+      : t < idle + 2200 ? 'the hand shows the merge'
+      : `resting ${(((total - t)) / 1000).toFixed(1)}s before it may ask again`;
+    g.fillText(stage, 12, H - 52);
+    tnBar(g, 12, H - 34, W - 24, 10, t / total, null);
+    tnMarks(g, 12, H - 34, W - 24, total, [[idle, 'hint', '#FFD84D'], [idle + 2200, 'rest', '#3FA8D9']]);
+    return total;
+  },
+
+  /* The gauntlet: its drag stroke, and its tap cycle. */
+  pointer(c) {
+    const { g, W, H, now, v } = c;
+    const fadeIn = v('TUTORIAL_HAND.fadeInMs', 310), travel = v('TUTORIAL_HAND.travelMs', 1200);
+    const rel = v('TUTORIAL_HAND.releaseMs', 200), fOut = v('TUTORIAL_HAND.fadeOutMs', 260);
+    const fDelay = v('TUTORIAL_HAND.fadeOutDelayMs', 220), rest = v('TUTORIAL_HAND.restMs', 450);
+    const total = fadeIn + travel + Math.max(rel, fDelay + fOut) + rest;
+    const t = now % total;
+    const y = H * 0.40;
+    const x0 = W * 0.26, x1 = W * 0.74;
+    tnTile(g, x0, y + 26, 104); tnTile(g, x1, y + 26, 104);
+    tnPiece(g, x0, y + 12, 19); tnPiece(g, x1, y + 12, 19, '#3FA8D9');
+    const im = TUNE.art.hand;
+    if (im) {
+      let alpha = 0, scale = v('TUTORIAL_HAND.startScale', 1.08), ang = v('TUTORIAL_HAND.startAngle', -5), p = 0;
+      if (t < fadeIn) { const q = TN_EASE.backOut(tnPhase(t, 0, fadeIn)); alpha = q; scale = v('TUTORIAL_HAND.startScale', 1.08) + (1 - v('TUTORIAL_HAND.startScale', 1.08)) * q; }
+      else if (t < fadeIn + travel) { alpha = 1; scale = 1; p = TN_EASE.sineInOut(tnPhase(t, fadeIn, travel)); ang = v('TUTORIAL_HAND.startAngle', -5) + (v('TUTORIAL_HAND.pullAngle', 4) - v('TUTORIAL_HAND.startAngle', -5)) * p; }
+      else { p = 1; ang = v('TUTORIAL_HAND.pullAngle', 4) * (1 - TN_EASE.backOut(tnPhase(t, fadeIn + travel, rel)));
+             scale = 1 + (v('TUTORIAL_HAND.releaseScale', 1.05) - 1) * TN_EASE.backOut(tnPhase(t, fadeIn + travel, rel));
+             alpha = 1 - tnPhase(t, fadeIn + travel + fDelay, fOut); }
+      const hx = x0 + (x1 - x0) * p;
+      const hw = 62 * scale, hh = (im.naturalHeight / im.naturalWidth) * hw;
+      g.save(); g.globalAlpha = tnClamp01(alpha);
+      g.translate(hx, y + 6); g.rotate((ang * Math.PI) / 180);
+      g.drawImage(im, -hw * 0.28, -hh * 0.06, hw, hh);
+      g.restore(); g.globalAlpha = 1;
+    }
+    // the arrow's own bob, beside it
+    const aRise = v('TUTORIAL_ARROW.riseMs', 380), aDrop = v('TUTORIAL_ARROW.dropMs', 300);
+    const aImp = v('TUTORIAL_ARROW.impactMs', 90), aSet = v('TUTORIAL_ARROW.settleMs', 240);
+    const aTotal = aRise + aDrop + aSet;
+    const at = now % aTotal;
+    const ay = at < aRise ? v('TUTORIAL_ARROW.riseBy', -22) * TN_EASE.quadOut(tnPhase(at, 0, aRise))
+      : at < aRise + aDrop ? v('TUTORIAL_ARROW.riseBy', -22) * (1 - TN_EASE.quadIn(tnPhase(at, aRise, aDrop))) : 0;
+    const squash = at >= aRise + aDrop && at < aRise + aDrop + aImp ? 1 : 0;
+    const ar = TUNE.art.arrow;
+    const ax = W * 0.5;
+    tnTile(g, ax, H * 0.80, 104);
+    if (ar) {
+      const aw = 40 * (squash ? v('TUTORIAL_ARROW.impactScaleX', 1.08) : 1);
+      const ah = (ar.naturalHeight / ar.naturalWidth) * 40 * (squash ? v('TUTORIAL_ARROW.impactScaleY', 0.9) : 1);
+      g.drawImage(ar, ax - aw / 2, H * 0.80 - 74 + ay, aw, ah);
+    }
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    g.fillText(`hand ${((fadeIn + travel) / 1000).toFixed(2)}s stroke · rest ${(rest / 1000).toFixed(2)}s`, 12, H - 34);
+    g.fillText(`arrow hop ${(aTotal / 1000).toFixed(2)}s`, 12, H - 18);
+    tnBar(g, W - 150, H - 26, 138, 8, t / total, null);
+    return total;
+  },
+
+  /* Typing a line, then holding it for as long as the game thinks it takes to read. */
+  dialogue(c) {
+    const { g, W, H, now, v } = c;
+    const line = 'The Mossy Stump can work anywhere. Drag it to the glowing spot.';
+    const perChar = Math.max(1, v('TYPEWRITER.msPerChar', 26));
+    const typeMs = Math.min(v('TYPEWRITER.maxMs', 7000), line.length * perChar);
+    const read = Math.max(v('READING.minMs', 3600), Math.min(v('READING.maxMs', 16000), v('READING.lead', 900) + line.length * v('READING.perChar', 55)));
+    const total = typeMs + read + 600;
+    const t = now % total;
+    const shown = t < typeMs ? line.slice(0, Math.max(0, Math.floor((t / perChar)))) : line;
+    g.fillStyle = 'rgba(255,246,232,.96)';
+    const bx = 14, by = H * 0.30, bw = W - 28, bh = 96;
+    g.beginPath(); g.roundRect(bx, by, bw, bh, 12); g.fill();
+    g.fillStyle = '#3A2B38'; g.font = 'bold 12px system-ui';
+    g.fillText('Eleanor', bx + 12, by + 20);
+    g.fillStyle = '#5a4350'; g.font = '13px system-ui';
+    const words = shown.split(' ');
+    let lineTxt = '', ly = by + 44;
+    for (const w of words) {
+      if (g.measureText(`${lineTxt} ${w}`).width > bw - 24) { g.fillText(lineTxt, bx + 12, ly); lineTxt = w; ly += 18; }
+      else lineTxt = lineTxt ? `${lineTxt} ${w}` : w;
+    }
+    g.fillText(lineTxt, bx + 12, ly);
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    g.fillText(t < typeMs ? `typing at ${perChar|0}ms/char` : `held for reading — ${((total - t) / 1000).toFixed(1)}s left`, 12, H - 40);
+    tnBar(g, 12, H - 26, W - 24, 8, t / total, null);
+    tnMarks(g, 12, H - 26, W - 24, total, [[typeMs, 'read', '#3FA8D9']]);
+    return total;
+  },
+
+  /* A dragon's idle cadence: how often it celebrates, how long it takes. */
+  dragon(c) {
+    const { g, W, H, now, v } = c;
+    const idleMin = v('DRAGON_ANIM.idleMinMs', 9000), idleMax = v('DRAGON_ANIM.idleMaxMs', 15000);
+    const cel = v('DRAGON_ANIM.celebrateMs', 3000);
+    const idle = (idleMin + idleMax) / 2;
+    const total = idle + cel;
+    const t = now % total;
+    const celebrating = t >= idle;
+    const y = H * 0.5;
+    tnTile(g, W / 2, y + 34, 130);
+    const breath = 1 + 0.03 * Math.sin((now / Math.max(200, v('SLEEP_BREATH.periodMs', 3400))) * Math.PI * 2);
+    const hop = celebrating ? Math.abs(Math.sin(((t - idle) / Math.max(80, cel)) * Math.PI * 4)) * 16 : 0;
+    g.save();
+    g.translate(W / 2, y - hop);
+    g.scale(breath, breath / breath);
+    g.beginPath(); g.ellipse(0, 34 + hop, 40, 13, 0, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(18,10,16,.42)'; g.fill();
+    g.beginPath(); g.arc(0, 0, 30, 0, Math.PI * 2);
+    g.fillStyle = celebrating ? '#FFD84D' : '#E8503C'; g.fill();
+    g.strokeStyle = 'rgba(20,12,18,.8)'; g.lineWidth = 2; g.stroke();
+    g.restore();
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    g.fillText(celebrating ? `celebrating ${cel|0}ms` : `idling — celebrate every ${(idleMin/1000)|0}–${(idleMax/1000)|0}s`, 12, H - 40);
+    tnBar(g, 12, H - 26, W - 24, 8, t / total, null);
+    tnMarks(g, 12, H - 26, W - 24, total, [[idle, 'celebrate', '#FFD84D']]);
+    return total;
+  },
+
+  /* Eleanor's breath and blink, on their own clocks. */
+  folk(c) {
+    const { g, W, H, now, v } = c;
+    const period = Math.max(200, v('STANDEE_BREATH.periodMs', 4200));
+    const amount = v('STANDEE_BREATH.amount', 0.008);
+    const blinkMin = v('STANDEE_CLIP_BLINK.minMs', 7000), blinkMax = v('STANDEE_CLIP_BLINK.maxMs', 14000);
+    const blinkEvery = (blinkMin + blinkMax) / 2;
+    const total = blinkEvery;
+    const t = now % total;
+    const blinking = t > total - 160;
+    const s = 1 + amount * Math.sin((now / period) * Math.PI * 2);
+    const y = H * 0.52;
+    tnTile(g, W / 2, y + 78, 130);
+    g.save();
+    g.translate(W / 2, y);
+    g.scale(1 / s, s);
+    g.fillStyle = '#5b3f57';
+    g.beginPath(); g.roundRect(-30, -20, 60, 96, 10); g.fill();
+    g.fillStyle = '#f0c9a8';
+    g.beginPath(); g.arc(0, -42, 26, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#2b1c28';
+    if (blinking) { g.fillRect(-13, -46, 9, 2); g.fillRect(5, -46, 9, 2); }
+    else { g.beginPath(); g.arc(-9, -46, 3.2, 0, Math.PI * 2); g.arc(9, -46, 3.2, 0, Math.PI * 2); g.fill(); }
+    g.restore();
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    g.fillText(`breath ${(period/1000).toFixed(1)}s · blink every ${(blinkMin/1000)|0}–${(blinkMax/1000)|0}s`, 12, H - 40);
+    tnBar(g, 12, H - 26, W - 24, 8, t / total, null);
+    return total;
+  },
+
+  /* The dragon reveal card, on its own timeline. */
+  ceremony(c) {
+    const { g, W, H, now, v } = c;
+    const scrim = v('REVEAL.scrimMs', 260), plateIn = v('REVEAL.plateInMs', 520);
+    const nameAt = v('REVEAL.nameAtMs', 620), nameRise = v('REVEAL.nameRiseMs', 380);
+    const hold = v('REVEAL.holdMs', 2400), out = v('REVEAL.outMs', 420);
+    const total = scrim + plateIn + hold + out + 500;
+    const t = now % total;
+    const sa = tnPhase(t, 0, scrim) * v('REVEAL.scrimAlpha', 0.88) * (1 - tnPhase(t, scrim + plateIn + hold, out));
+    g.fillStyle = `rgba(10,6,10,${sa})`;
+    g.fillRect(0, 0, W, H);
+    const pin = TN_EASE.backOut(tnPhase(t, scrim, plateIn));
+    const pout = 1 - tnPhase(t, scrim + plateIn + hold, out);
+    const fromS = v('REVEAL.plateFromScale', 0.52);
+    const ps = (fromS + (1 - fromS) * pin) * pout;
+    const py = H * 0.46 + v('REVEAL.plateFromY', 190) * 0.24 * (1 - pin);
+    const pw = W * v('REVEAL.plateWidthFrac', 0.86) * ps;
+    const ph = H * v('REVEAL.plateHeightFrac', 0.66) * ps;
+    g.save(); g.globalAlpha = tnClamp01(pout);
+    g.fillStyle = '#3A2B38';
+    g.beginPath(); g.roundRect(W / 2 - pw / 2, py - ph / 2, pw, ph, 14); g.fill();
+    g.strokeStyle = '#F7A437'; g.lineWidth = 2; g.stroke();
+    if (t > scrim + nameAt) {
+      const nr = TN_EASE.backOut(tnPhase(t, scrim + nameAt, nameRise));
+      g.fillStyle = '#FFD84D'; g.font = 'bold 16px system-ui'; g.textAlign = 'center';
+      g.fillText('Cinder', W / 2, py + ph / 2 - 22 + (1 - nr) * 18);
+      g.textAlign = 'left';
+    }
+    g.restore(); g.globalAlpha = 1;
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    g.fillText(`scrim ${scrim|0} · plate ${plateIn|0} · hold ${hold|0} · out ${out|0}`, 12, H - 40);
+    tnBar(g, 12, H - 26, W - 24, 8, t / total, null);
+    tnMarks(g, 12, H - 26, W - 24, total, [[scrim + nameAt, 'name', '#FFD84D'], [scrim + plateIn + hold, 'out', '#3FA8D9']]);
+    return total;
+  },
+
+  /* The veil between worlds: cover, hold, pull back. */
+  travel(c) {
+    const { g, W, H, now, v } = c;
+    const cover = v('TRAVEL_WIPE.coverMs', 780), hold = v('TRAVEL_WIPE.holdMinMs', 480);
+    const delay = v('TRAVEL_WIPE.revealDelayMs', 340), reveal = v('TRAVEL_WIPE.revealMs', 760);
+    const total = cover + hold + delay + reveal + 500;
+    const t = now % total;
+    const cp = TN_EASE.sineInOut(tnPhase(t, 0, cover));
+    const rp = TN_EASE.sineInOut(tnPhase(t, cover + hold + delay, reveal));
+    for (let i = 0; i < 7; i++) {
+      const x = (W / 7) * i;
+      const lag = (i / 7) * v('TRAVEL_WIPE.jitterFrac', 0.14) * cover;
+      const a = tnClamp01((cp * cover - lag) / Math.max(1, cover)) - tnClamp01((rp * reveal - lag) / Math.max(1, reveal));
+      g.fillStyle = 'rgba(58,43,56,.96)';
+      g.fillRect(x, H * 0.16 + (1 - tnClamp01(a)) * H, W / 7 + 1, H);
+    }
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    const stage = t < cover ? 'covering' : t < cover + hold ? 'held (the world swaps here)' : t < cover + hold + delay ? 'waiting to lift' : 'revealing';
+    g.fillText(`${stage} — cover ${cover|0} · hold ${hold|0} · reveal ${reveal|0}`, 12, H - 40);
+    tnBar(g, 12, H - 26, W - 24, 8, t / total, null);
+    tnMarks(g, 12, H - 26, W - 24, total, [[cover, 'swap', '#FFD84D'], [cover + hold + delay, 'lift', '#3FA8D9']]);
+    return total;
+  },
+
+  /* Cloud breath and drifting motes. */
+  weather(c) {
+    const { g, W, H, now, v } = c;
+    const period = Math.max(200, v('TIMINGS.fogPulsePeriodMs', 4200));
+    const total = period;
+    const ph = Math.sin((now / period) * Math.PI * 2);
+    const sx = 1 + (v('FOG_BLANKET.breathScaleX', 1.02) - 1) * ph;
+    const sy = 1 + (v('FOG_BLANKET.breathScaleY', 1.035) - 1) * ph;
+    const al = v('FOG_BLANKET.breathAlpha', 0.905) + 0.06 * ph;
+    g.save();
+    g.translate(W / 2, H * 0.42);
+    g.scale(sx, sy);
+    g.globalAlpha = tnClamp01(al);
+    g.fillStyle = '#e9eef7';
+    for (const [ox, oy, r] of [[-58, 6, 30], [-20, -10, 38], [22, 2, 34], [58, 10, 26]]) {
+      g.beginPath(); g.arc(ox, oy, r, 0, Math.PI * 2); g.fill();
+    }
+    g.restore(); g.globalAlpha = 1;
+    const life = Math.max(200, v('EMBER_MOTES.lifespanMs', 9000));
+    const spd = (v('EMBER_MOTES.minSpeedY', -28) + v('EMBER_MOTES.maxSpeedY', -60)) / 2;
+    const drift = v('EMBER_MOTES.driftX', 24);
+    for (let i = 0; i < 14; i++) {
+      const seed = i * 97.13;
+      const tt = ((now + seed * 137) % life) / life;
+      const x = ((seed * 7.31) % W) + Math.sin(tt * Math.PI * 2 + i) * drift * 0.4;
+      const y = H * 0.92 + spd * (tt * life) / 1000;
+      g.globalAlpha = 0.75 * (1 - tt);
+      g.fillStyle = '#F7A437';
+      g.beginPath(); g.arc(x % W, y, 2.2, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    g.fillText(`cloud breath ${(period / 1000).toFixed(1)}s · mote life ${(life / 1000).toFixed(1)}s`, 12, H - 40);
+    tnBar(g, 12, H - 26, W - 24, 8, (now % total) / total, null);
+    return total;
+  },
+
+  /* What still counts as a tap, and when a hold becomes a pan. */
+  input(c) {
+    const { g, W, H, now, v } = c;
+    const tap = v('TAP_MAX_MS', 350), hold = v('HOLD_TO_PAN.holdMs', 350);
+    const total = Math.max(tap, hold) + 1400;
+    const t = now % total;
+    const cx = W / 2, cy = H * 0.44;
+    g.strokeStyle = 'rgba(247,164,55,.5)'; g.lineWidth = 2;
+    g.beginPath(); g.arc(cx, cy, v('TAP_MAX_DISTANCE_PX', 16) * 1.6, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = 'rgba(63,168,217,.45)';
+    g.beginPath(); g.arc(cx, cy, v('HOLD_TO_PAN.slopPx', 60) * 0.9, 0, Math.PI * 2); g.stroke();
+    const held = Math.min(t, hold);
+    g.strokeStyle = '#FFD84D'; g.lineWidth = 4;
+    g.beginPath(); g.arc(cx, cy, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (held / Math.max(1, hold))); g.stroke();
+    g.fillStyle = t < tap ? '#7ECB4F' : t < hold ? '#F7A437' : '#3FA8D9';
+    g.beginPath(); g.arc(cx, cy, 9, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#FFF6E8'; g.font = '12px system-ui'; g.textAlign = 'center';
+    g.fillText(t < tap ? 'still a tap' : t < hold ? 'past a tap' : 'this is a pan', cx, cy + 62);
+    g.textAlign = 'left';
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    g.fillText(`tap ≤ ${tap|0}ms & ${v('TAP_MAX_DISTANCE_PX', 16)|0}px · pan after ${hold|0}ms`, 12, H - 40);
+    tnBar(g, 12, H - 26, W - 24, 8, t / total, null);
+    return total;
+  },
+
+  /* Every clock the player waits on, side by side, in real time. */
+  waits(c) {
+    const { g, W, H, now, v } = c;
+    const rows = [
+      ['Warmth +' + (v('ENERGY_REGEN_AMOUNT', 1) | 0), v('ENERGY_REGEN_MS', 60000), '#F7A437'],
+      ['Chest ready', v('CHEST_INTERVAL_MS', 300000), '#FFD84D'],
+      ['Passive retry', v('GENERATOR_PASSIVE_RETRY_MS', 8000), '#7ECB4F'],
+      ['Welcome-back gap', v('WELCOME_BACK_MIN_MS', 300000), '#3FA8D9']
+    ];
+    let y = 40;
+    for (const [name, ms, colour] of rows) {
+      const frac = ms > 0 ? (now % ms) / ms : 0;
+      tnBar(g, 14, y, W - 28, 12, frac, `${name} — ${(ms / 1000).toFixed(ms >= 10000 ? 0 : 1)}s`, colour);
+      y += 46;
+    }
+    g.fillStyle = '#9b8d99'; g.font = '11px system-ui';
+    g.fillText('these bars run at the real rate the game uses', 14, H - 18);
+    return Math.max(...rows.map((r) => r[1])) || 1000;
+  },
+
+  /* When the game throttles itself. */
+  power(c) {
+    const { g, W, H, now, v } = c;
+    const idleAfter = v('POWER.idleAfterMs', 10000), dozeAfter = v('POWER.dozeAfterMs', 45000);
+    const total = dozeAfter + 6000;
+    const t = now % total;
+    const fps = t < idleAfter ? 62 : t < dozeAfter ? v('POWER.idleFps', 30) : 15;
+    const state = t < idleAfter ? 'active' : t < dozeAfter ? 'idle' : 'dozing';
+    g.fillStyle = '#FFF6E8'; g.font = 'bold 30px system-ui'; g.textAlign = 'center';
+    g.fillText(`${fps} fps`, W / 2, H * 0.42);
+    g.font = '13px system-ui'; g.fillStyle = '#FFD84D';
+    g.fillText(state, W / 2, H * 0.42 + 24);
+    g.textAlign = 'left';
+    tnBar(g, 14, H - 34, W - 28, 10, t / total, null);
+    tnMarks(g, 14, H - 34, W - 28, total, [[idleAfter, 'idle', '#F7A437'], [dozeAfter, 'doze', '#3FA8D9']]);
+    return total;
+  }
+};
+
 /* --------------------------- tabs / category --------------------------- */
+const TAB_STORE = 'wb.tab.v1';
+/** The tab this session opened on, read ONCE — boot calls `setCategory('tile')`
+ *  itself, so anything reading the store later would only ever see that. */
+const TAB_ON_BOOT = (() => { try { return localStorage.getItem(TAB_STORE); } catch { return null; } })();
 function setCategory(cat) {
   S.category = cat;
+  // Applying a page's work writes into src/data, vite sees it and full-reloads
+  // this tool along with the game. Remembering the tab is what makes that
+  // invisible instead of dumping the author back on the Tiles palette with
+  // their page gone (the Seat page's unapplied edits already survive).
+  try { localStorage.setItem(TAB_STORE, cat); } catch { /* private mode */ }
   document.getElementById('tabZones').classList.toggle('active', cat === 'zones');
   document.getElementById('tabTiles').classList.toggle('active', cat === 'tile');
   document.getElementById('tabGround').classList.toggle('active', cat === 'decotile');
@@ -2227,12 +3766,16 @@ function setCategory(cat) {
   document.getElementById('tabCharacters').classList.toggle('active', cat === 'character');
   document.getElementById('tabFx').classList.toggle('active', cat === 'fx');
   document.getElementById('tabMerge').classList.toggle('active', cat === 'merge');
+  document.getElementById('tabSeat').classList.toggle('active', cat === 'seat');
+  document.getElementById('tabTuning').classList.toggle('active', cat === 'tuning');
   document.getElementById('tabIsland').classList.toggle('active', cat === 'island');
   document.getElementById('tabTutorial').classList.toggle('active', cat === 'tutorial');
   document.getElementById('tabEvents').classList.toggle('active', cat === 'events');
   // The merge page, island page, 3D section + character roster are catalogues,
   // not upload palettes.
   const isMerge = cat === 'merge';
+  const isSeat = cat === 'seat';
+  const isTuning = cat === 'tuning';
   const isIsland = cat === 'island';
   const isZones = cat === 'zones';
   const isTutorial = cat === 'tutorial';
@@ -2240,13 +3783,21 @@ function setCategory(cat) {
   const isBg = cat === 'background';
   const isChar = cat === 'character';
   const isFxTab = cat === 'fx';
-  document.getElementById('uploadRow').style.display = (isMerge || isIsland || isZones || isChar || isFxTab || isTutorial || isEvents || cat === '3d') ? 'none' : '';
+  document.getElementById('uploadRow').style.display = (isMerge || isSeat || isTuning || isIsland || isZones || isChar || isFxTab || isTutorial || isEvents || cat === '3d') ? 'none' : '';
   document.getElementById('fxActions').style.display = isFxTab ? 'flex' : 'none';
   document.getElementById('mergeActions').style.display = isMerge ? 'flex' : 'none';
   document.getElementById('characterActions').style.display = isChar ? 'flex' : 'none';
   document.getElementById('backgroundActions').style.display = isBg ? 'flex' : 'none';
   // Full-page editors over the canvas.
   document.getElementById('mergePage').style.display = isMerge ? 'block' : 'none';
+  document.getElementById('seatPage').style.display = isSeat ? 'grid' : 'none';
+  // The Seat page brings its own inspector, so the asset palette and the
+  // per-asset calibration below it are two panels of noise arguing with it.
+  document.getElementById('assetGrid').style.display = (isSeat || isTuning) ? 'none' : '';
+  document.getElementById('inspector').style.display = (isSeat || isTuning) ? 'none' : '';
+  document.getElementById('tuningPage').style.display = isTuning ? 'grid' : 'none';
+  if (isSeat) void seatShow();
+  if (isTuning) void tuningShow();
   document.getElementById('islandPage').style.display = isIsland ? 'grid' : 'none';
   document.getElementById('tutorialPage').style.display = isTutorial ? 'grid' : 'none';
   if (isTutorial) TUT.show();
@@ -2266,6 +3817,8 @@ function setCategory(cat) {
     decor: 'Decor sits above tiles — stack multiple, default top-centred.',
     blocker: 'Cloud blockers cover cells and carry a Level tag (set it in the toolbar). Each level’s clouds clear when that level unlocks.',
     background: 'Upload your own tile (sized to a grid cell). Backgrounds sit BELOW the world tiles, one per cell, so the floor superposes over them. Paint cells, or hit ⛶ Fill to flood the whole map + a 10-tile border.',
+    tuning: 'Every <b>animation, wait and speed</b> the game runs on, read live out of <code>src/core/Constants.ts</code>. Pick a category, move a slider, and the pane on the right plays the thing you are tuning in real time. ⤒ Apply writes the new numbers back into that same file — the digits only, so every comment and expression survives.',
+    seat: 'The <b>merge item visualiser</b> — one piece on a real painted tile, with the shadow it casts. Drag the ART to move it on the tile (that is its <code>anchors.json</code> anchor), drag the SHADOW to seat it, and set the size and the ellipse beside them. ⤒ Apply writes <code>anchors.json</code> + <code>chains.json</code>; the numbers it does not change are left as the defaults in <code>ITEM_SHADOW</code>.',
     merge: 'The merge DESIGN page — every chain as a combo strip (group× input → output). Upload element art, add combos (＋), configure generators (⚙, like the House), then ⤒ Apply to the game or ⬇ Export for scripts/ingest-merge.mjs.',
     island: 'The ISLAND GENERATOR — trace an island reference, draw the deck outline, and the tile lattice is fitted into it while the rock skirt is hung underneath. Preview the mask, then render it with Seedream v5 Pro. Needs the game dev server (pnpm dev) for both steps.',
     '3d': 'Animated 3D decor (Three.js) — a cell-shaded emerald crystal spinning on itself in the grid’s top-down view. Pick it and paint; every placement spins live. Calibrate scale/anchor like any decor. (Procedural — the export carries a model3d spec.)',
@@ -3029,6 +4582,8 @@ document.getElementById('tab3d').onclick = () => setCategory('3d');
 document.getElementById('tabCharacters').onclick = () => setCategory('character');
 document.getElementById('tabFx').onclick = () => setCategory('fx');
 document.getElementById('tabMerge').onclick = () => setCategory('merge');
+document.getElementById('tabSeat').onclick = () => setCategory('seat');
+document.getElementById('tabTuning').onclick = () => setCategory('tuning');
 document.getElementById('tabIsland').onclick = () => setCategory('island');
 document.getElementById('tabTutorial').onclick = () => setCategory('tutorial');
 document.getElementById('tabEvents').onclick = () => setCategory('events');
@@ -4546,6 +6101,16 @@ function markReady() {
   // the game for this one, so a stale origin can never outlive its project.
   GAME_FRAME = null;
   void resolveGameFrame();
+}
+
+/** Put the author back on the tab they were working in (see `setCategory`).
+ *  Only the full-page editors are worth restoring — a paint palette is where a
+ *  fresh session should start. */
+function restoreTab() {
+  const cat = TAB_ON_BOOT;
+  if (cat && ['seat', 'tuning', 'merge', 'island', 'tutorial', 'events', 'zones'].includes(cat) && cat !== S.category) {
+    setCategory(cat);
+  }
 }
 
 /** Ensure the preloaded background tiles are present after any world loads
@@ -6139,6 +7704,11 @@ const EVT = (() => {
 if (!restoreSession()) {
   loadDefaultWorld(true).then((ok) => { if (!ok) { fitView(); loadStarterTiles(); } });
 }
+// LAST, so whichever loader ran has already had its say about the category.
+// Applying a page's work writes into src/data, vite sees it and full-reloads
+// this tool along with the game; without this the author is dumped back on the
+// Tiles palette with their page gone.
+setTimeout(restoreTab, 0);
 </script>
 </body>
 </html>
