@@ -6969,6 +6969,16 @@ export class BoardScene extends Phaser.Scene {
     return Phaser.Geom.Rectangle.Contains(s.artHitRect(), hx, hy) && s.hitsOpaqueArt(hx, hy);
   }
 
+  /** Does (wx,wy) land on s's own tile diamond? Same world→hit-space inverse
+   *  as `artContainsWorldPoint` — the rig-blanket router asks this to bound a
+   *  blanket claim to the ground the rig actually stands on. */
+  private spriteTileContains(s: BoardItem, wx: number, wy: number): boolean {
+    if (s.scaleX === 0 || s.scaleY === 0) return false;
+    const hx = (wx - s.x) / s.scaleX + s.displayOriginX;
+    const hy = (wy - s.y) / s.scaleY + s.displayOriginY;
+    return s.hitsOwnTile(hx, hy);
+  }
+
   /* ---------------------- the lean (MERGE_READY) --------------------- */
 
   /**
@@ -7956,7 +7966,21 @@ export class BoardScene extends Phaser.Scene {
           obj: BoardItem
         ): boolean => {
           if (!Phaser.Geom.Rectangle.Contains(area, x, y)) return false;
-          if (obj.hitsOpaqueArt(x, y)) return true;
+          if (obj.hitsOpaqueArt(x, y)) {
+            // A rig host's art answer is a BLANKET — its whole rect, see
+            // hitsOpaqueArt — which is right when nothing competes, but real
+            // pixels outrank it: a wing rect's empty corner must not steal
+            // the Moss Pile the tutorial hand is pointing at (the moss_feed
+            // lesson died exactly there, fourteen drags in a row).
+            if (!obj.artAnswersBlanket) return true;
+            const bwx = obj.x + (x - obj.displayOriginX) * obj.scaleX;
+            const bwy = obj.y + (y - obj.displayOriginY) * obj.scaleY;
+            for (const s of this.itemSprites.values()) {
+              if (s === obj || !s.active || s.artAnswersBlanket) continue;
+              if (this.artContainsWorldPoint(s, bwx, bwy)) return false;
+            }
+            return true;
+          }
           // THE TILE IS A TAP ZONE TOO (owner's rule, 2026-08-28): a press on
           // a piece's own tile is a press on the piece — but the SPRITE stays
           // the prioritized zone, so a tile claim yields to any other piece's
@@ -7967,7 +7991,12 @@ export class BoardScene extends Phaser.Scene {
           const wy = obj.y + (y - obj.displayOriginY) * obj.scaleY;
           for (const s of this.itemSprites.values()) {
             if (s === obj || !s.active) continue;
-            if (this.artContainsWorldPoint(s, wx, wy)) return false;
+            if (!this.artContainsWorldPoint(s, wx, wy)) continue;
+            // A rig's blanket reaches well past its body: only where the rig
+            // actually STANDS — its own tile — does it outrank a neighbour's
+            // claim to that neighbour's own ground.
+            if (s.artAnswersBlanket && !this.spriteTileContains(s, wx, wy)) continue;
+            return false;
           }
           return true;
         },

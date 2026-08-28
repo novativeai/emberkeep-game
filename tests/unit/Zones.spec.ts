@@ -350,7 +350,9 @@ describe('zones — new ground beside the isle', () => {
     // every cell its own fog band (one cell drawn on each, and no cell lost).
     // The four worlds' shipped cell counts, from build-zones' own report.
     // Borealis 141 → 142 on 2026-08-27 with the coast re-cut into per-rank bands.
-    expect(checked).toBe(37 + 142 + 144 + 5);
+    // Runevault 5 → 187 on 2026-08-28: the full plaza was allocated (owner's
+    // call — the hub gets its complete floor, every cell of every drawn grid).
+    expect(checked).toBe(37 + 142 + 144 + 187);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {

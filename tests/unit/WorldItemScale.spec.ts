@@ -26,9 +26,12 @@ describe('per-world item scale', () => {
   });
 
   it('the smaller-tiled worlds land where their ground was measured', () => {
-    expect(worlds.get('borealis')?.itemScale).toBe(0.69);
-    expect(worlds.get('roothold')?.itemScale).toBe(0.67);
-    expect(worlds.get('runevault')?.itemScale).toBe(0.66);
+    // Re-measured 2026-08-28: the analytic editor→art transform (nionja's
+    // lattice-on-the-stones fix) grew every zone's tile ~0.45%, and Runevault
+    // went from 5 cells to its full 187-cell plaza.
+    expect(worlds.get('borealis')?.itemScale).toBe(0.7);
+    expect(worlds.get('roothold')?.itemScale).toBe(0.68);
+    expect(worlds.get('runevault')?.itemScale).toBe(0.67);
   });
 
   it('every shipped world scales pieces DOWN or not at all, never up', () => {
