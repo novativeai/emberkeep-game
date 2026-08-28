@@ -4155,9 +4155,12 @@ export class BoardScene extends Phaser.Scene {
       // no longer standing on is how a standee ends up behind the rock in front
       // of her.
       const sprite = this.add.sprite(x, y, key).setDepth(DEPTHS.itemBase + y);
-      // Baked size × the authored trim. Everything downstream (shadow, marker,
-      // pulses, breath) reads this one number or the live sprite scale.
-      const standeeScale = bank ? bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1) : 1;
+      // Baked size × the authored trim × the WORLD's per-piece scale — she
+      // stands among the merge pieces, so she shrinks to the smaller-tiled
+      // worlds exactly as they do (WorldRuntime.itemScale; 1 on the isle).
+      // Her FEET don't move: the origin is her feet and the authored dx/dy
+      // nudge is a position, so scaling the art cannot float her off them.
+      const standeeScale = (bank ? bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1) : 1) * this.worldItemScale;
       if (bank) {
         // Her FEET are the origin, not the frame's bottom-centre. The baked
         // frame box is the tight union of both banks and the cast's ember bolt
@@ -4255,6 +4258,12 @@ export class BoardScene extends Phaser.Scene {
       this.settleSprite(sprite, 120);
       // The atlas idle already breathes — a squash on top would double it.
       if (!clipIdle) this.startBreathing(art, sprite);
+      // Her idle sheet may still be ON THE WIRE: the clip sets are world art
+      // (worldArtKeys), fetched by the preloader on arrival — and a save that
+      // boots straight into a hub can build this board first. Selyna stood
+      // frozen on her Runevault still on exactly that race. Leave a note under
+      // the texture key, and dress her the moment it lands.
+      if (!clipIdle && clipArt) this.dressStandeeWhenIdleLands(clipArt, art, sprite);
       // …and it blinks: rare full-segment blink one-shots over the idle loop.
       // Armed off her BASE set even while she stands dressed: the one-shot
       // resolves the clip set at FIRE time (playStandeeReaction), so while a
@@ -4264,6 +4273,32 @@ export class BoardScene extends Phaser.Scene {
         this.scheduleStandeeBlink(art, sprite);
       }
     }
+  }
+
+  /**
+   * Re-dress a standee whose atlas idle landed AFTER she was built — the
+   * texture-manager ADD event is the "it landed" fact, and `applyStandeeRest`
+   * is the same seat the build itself uses, so the two cannot diverge. The
+   * still's breath is retired first (the atlas idle carries its own), and the
+   * hit box and keyline follow the texture space she now stands in — the
+   * exact trio `setKeeperLook` maintains for the same swap.
+   */
+  private dressStandeeWhenIdleLands(clipArt: string, art: string, sprite: Phaser.GameObjects.Sprite): void {
+    if (clipFor(clipArt, 'idle') === null) return;
+    const event = `${Phaser.Textures.Events.ADD_KEY}${clipKey(clipArt, 'idle')}`;
+    const handler = (): void => {
+      if (!sprite.active || this.characterSprites.get(art) !== sprite) return;
+      // A look or a reaction may have re-dressed her while the sheet was on
+      // the wire; the rest-seat asks the same preference order the build does.
+      if (!this.applyStandeeRest(clipArt, sprite)) return;
+      this.breathing = this.breathing.filter((b) => b.sprite !== sprite);
+      const bank = STANDEE_BANKS[art];
+      if (bank) sprite.setData('bodyBox', this.standeeBodyBox(art, clipArt, bank.body));
+      syncSpriteInk(sprite);
+      this.reshapeStandees();
+    };
+    this.textures.once(event, handler);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.textures.off(event, handler));
   }
 
   /**
@@ -4351,8 +4386,12 @@ export class BoardScene extends Phaser.Scene {
     const origin = originFor(clip);
     sprite.setTexture(clipKey(art, clipId), 0);
     sprite.setOrigin(origin.x, origin.y);
-    sprite.setScale(clip.scale);
-    sprite.setData('baseScale', clip.scale);
+    // The world's per-piece scale rides every clip seat, so an atlas idle
+    // stands at the same size as the bank still it replaces. standeeBodyBox
+    // needs no matching term: it maps bank px → clip TEXTURE px, and texture
+    // space is scale-invariant — the factor cancels out of that ratio.
+    sprite.setScale(clip.scale * this.worldItemScale);
+    sprite.setData('baseScale', clip.scale * this.worldItemScale);
   }
 
   /**
@@ -4397,7 +4436,7 @@ export class BoardScene extends Phaser.Scene {
   private restoreBankStill(art: string, sprite: Phaser.GameObjects.Sprite): void {
     const bank = STANDEE_BANKS[art];
     if (!bank || !this.textures.exists(bank.keys.idle)) return;
-    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1);
+    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1) * this.worldItemScale;
     sprite.setOrigin(bank.anchorX, bank.anchorY);
     sprite.setScale(standeeScale);
     sprite.setData('baseScale', standeeScale);
@@ -4505,7 +4544,7 @@ export class BoardScene extends Phaser.Scene {
     const onClipIdle = clipArt !== null && this.applyStandeeRest(clipArt, sprite);
     if (!onClipIdle) {
       if (dressed) {
-        const standeeScale = bank ? bank.scale * (STANDEE_SCALE_TRIM[keeper] ?? 1) : 1;
+        const standeeScale = (bank ? bank.scale * (STANDEE_SCALE_TRIM[keeper] ?? 1) : 1) * this.worldItemScale;
         sprite.setTexture(dressed);
         if (bank) sprite.setOrigin(bank.anchorX, bank.anchorY);
         sprite.setScale(standeeScale);
@@ -4628,7 +4667,7 @@ export class BoardScene extends Phaser.Scene {
     // The cast sheet shares the BANK's frame box, so restore the bank geometry
     // for the one-shot — the resting look may be the atlas idle, whose frame,
     // origin and scale are its own.
-    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[characterId] ?? 1);
+    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[characterId] ?? 1) * this.worldItemScale;
     sprite.setOrigin(bank.anchorX, bank.anchorY);
     sprite.setScale(standeeScale);
     sprite.setData('baseScale', standeeScale);
