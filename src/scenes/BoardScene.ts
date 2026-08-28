@@ -362,6 +362,10 @@ export class BoardScene extends Phaser.Scene {
   private skipWarmthLabel?: Phaser.GameObjects.Text;
   private skipForId = 0;
   private skipMaxGold?: number; // per-generator gold cap for the live skip price
+  /** Non-null while the pin is a HARVEST offer over a READY generator (the
+   *  warmth price it could not pay). The cooldown tick must not treat that
+   *  pin as a stale skip and hide it — there is no timer behind it. */
+  private skipHarvestCost: number | null = null;
   /** Dragon job menu (Work / Harvest) + the dragon it belongs to. */
   /** Countdown pill floating above a rig-hosted dragon: the BoardItem's own
    *  pill renders UNDER the rig (glued at host.depth + 0.5), so the timer
@@ -556,6 +560,10 @@ export class BoardScene extends Phaser.Scene {
   private altarZone?: Phaser.GameObjects.Zone;
   /** The doors out of this world, each with its lit FX — see `buildPortals`. */
   private portalDoors = new Map<string, { fx: PortalFX; zone: Phaser.GameObjects.Zone; to: string }>();
+  /** WorldRuntime.itemScale for the world on screen — see `buildBoard`. */
+  private worldItemScale = 1;
+  /** One refetch attempt per build — see the missing-backdrop guard in `buildBoard`. */
+  private artRefetchTried = false;
   /** World-position anchors the hub tours point at (the Emporium house, the
    *  cauldron) — registered by whichever builder places the landmark. */
   private tourTargets = new Map<string, { x: number; y: number }>();
@@ -614,6 +622,27 @@ export class BoardScene extends Phaser.Scene {
     // GameState already does this on construction and on each switch; the scene
     // re-asserts it because the scene is what draws the result.
     setActiveWorld(this.ctx.state.world);
+    // The world's per-piece scale, bound once per build (the scene restarts on
+    // every world switch, so nothing built below can ever wear another world's
+    // tile). Items, rigs, clip overlays and the hatch flourish all read this
+    // one field; ground, fog and the drag reticle keep their own per-zone
+    // `artScaleAt` — a floor meets the painting, a piece keeps its size.
+    this.worldItemScale = this.ctx.state.world.itemScale;
+    // TRAVEL IS NOT THE ONLY DOOR INTO A WORLD. The eviction below already
+    // self-corrects from any route; the FETCH half never did — it only ran on
+    // `world:switched`. So Title → Play after a RESET built the isle over open
+    // sky: standing in Borealis had (correctly) handed Emberkeep's backdrop
+    // back, the reset never travels, and the fresh game painted clouds on
+    // black. If the ground this build needs is not resident, fetch it through
+    // the same door travel uses and build on the restart. Once per attempt —
+    // a fetch that cannot land (offline) builds degraded rather than looping.
+    const backdrops = (this.ctx.state.map.backgrounds ?? []).map((b) => `background_${b.name}`);
+    if (!this.artRefetchTried && backdrops.some((k) => !this.textures.exists(k))) {
+      this.artRefetchTried = true;
+      this.fetchWorldArt(() => this.scene.restart());
+      return;
+    }
+    this.artRefetchTried = false;
     this.itemSprites.clear();
     this.itemAuras.clear();
     this.pool = [];
@@ -1116,8 +1145,10 @@ export class BoardScene extends Phaser.Scene {
         if (timer) {
           sprite.setCooldownRemaining(timer.remaining);
           if (this.skipForId === sprite.itemId) this.updateSkipCost(timer.remaining, timer.total);
-        } else if (this.skipForId === sprite.itemId) {
-          this.hideSkipButton(); // became ready
+        } else if (this.skipForId === sprite.itemId && this.skipHarvestCost === null) {
+          // Became ready: the SKIP pin's question is answered. A HARVEST pin
+          // has no timer behind it and stays until answered or dismissed.
+          this.hideSkipButton();
         }
       }
     }
@@ -1773,7 +1804,11 @@ export class BoardScene extends Phaser.Scene {
     this.ensureDragonClips(host.chain, host.tier);
     const scale =
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
-      (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1);
+      (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1) *
+      // The world's tile, folded in at the ONE number RigPlayer is built from:
+      // facing flips, keyline weight and the pose-proxy hit bounds all derive
+      // from it, so nothing downstream needs to know the world shrank.
+      this.worldItemScale;
     // A clip breed has no rig character to look the cadence up by, so the tier
     // decides: the adults are the calm ones — and the Golden Elder, who is an
     // elder at tier 2 (CALM_DRAGONS carried her rig name for the same reason,
@@ -1893,7 +1928,7 @@ export class BoardScene extends Phaser.Scene {
         .setFlipX(flip);
       if (clip) {
         const origin = originFor(clip, flip);
-        ld.clipOverlay.setOrigin(origin.x, origin.y).setScale(clip.scale);
+        ld.clipOverlay.setOrigin(origin.x, origin.y).setScale(clip.scale * this.worldItemScale);
         if (ld.sleepState === 'seated') {
           // The frozen tosleep frame breathes exactly as the sleep painting
           // did (BoardItem.applyBob): ribcage rises, body widens a little
@@ -1902,8 +1937,8 @@ export class BoardScene extends Phaser.Scene {
           const phase = ((((ld.host.itemId * 2654435761) >>> 0) % 1000) / 1000) * Math.PI * 2;
           const k = Math.sin((this.time.now / SLEEP_BREATH.periodMs) * Math.PI * 2 + phase);
           ld.clipOverlay.setScale(
-            clip.scale * (1 - SLEEP_BREATH.amount * 0.45 * k),
-            clip.scale * (1 + SLEEP_BREATH.amount * k)
+            clip.scale * this.worldItemScale * (1 - SLEEP_BREATH.amount * 0.45 * k),
+            clip.scale * this.worldItemScale * (1 + SLEEP_BREATH.amount * k)
           );
         }
       }
@@ -2269,7 +2304,7 @@ export class BoardScene extends Phaser.Scene {
     const size = idle
       ? Math.max(idle.clip.frameWidth, idle.clip.frameHeight) * idle.clip.scale
       : 666 * DRAGON_ANIM.whelpScale;
-    return keylineUnits(size, DRAGON_OUTLINE);
+    return keylineUnits(size * this.worldItemScale, DRAGON_OUTLINE);
   }
 
   /** Mark a sheet most-recently-needed so the LRU takes the coldest first. */
@@ -2435,7 +2470,7 @@ export class BoardScene extends Phaser.Scene {
       .setDepth(ld.host.depth + 0.5)
       .setFlipX(flip)
       .setOrigin(origin.x, origin.y)
-      .setScale(c.clip.scale);
+      .setScale(c.clip.scale * this.worldItemScale);
     // The overlay IS the visible pose now, so it is also the clickable one:
     // taps must land on the curl/wingspan the player SEES, not on the hidden
     // art's silhouette underneath.
@@ -4173,9 +4208,12 @@ export class BoardScene extends Phaser.Scene {
       // no longer standing on is how a standee ends up behind the rock in front
       // of her.
       const sprite = this.add.sprite(x, y, key).setDepth(DEPTHS.itemBase + y);
-      // Baked size × the authored trim. Everything downstream (shadow, marker,
-      // pulses, breath) reads this one number or the live sprite scale.
-      const standeeScale = bank ? bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1) : 1;
+      // Baked size × the authored trim × the WORLD's per-piece scale — she
+      // stands among the merge pieces, so she shrinks to the smaller-tiled
+      // worlds exactly as they do (WorldRuntime.itemScale; 1 on the isle).
+      // Her FEET don't move: the origin is her feet and the authored dx/dy
+      // nudge is a position, so scaling the art cannot float her off them.
+      const standeeScale = (bank ? bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1) : 1) * this.worldItemScale;
       if (bank) {
         // Her FEET are the origin, not the frame's bottom-centre. The baked
         // frame box is the tight union of both banks and the cast's ember bolt
@@ -4273,6 +4311,12 @@ export class BoardScene extends Phaser.Scene {
       this.settleSprite(sprite, 120);
       // The atlas idle already breathes — a squash on top would double it.
       if (!clipIdle) this.startBreathing(art, sprite);
+      // Her idle sheet may still be ON THE WIRE: the clip sets are world art
+      // (worldArtKeys), fetched by the preloader on arrival — and a save that
+      // boots straight into a hub can build this board first. Selyna stood
+      // frozen on her Runevault still on exactly that race. Leave a note under
+      // the texture key, and dress her the moment it lands.
+      if (!clipIdle && clipArt) this.dressStandeeWhenIdleLands(clipArt, art, sprite);
       // …and it blinks: rare full-segment blink one-shots over the idle loop.
       // Armed off her BASE set even while she stands dressed: the one-shot
       // resolves the clip set at FIRE time (playStandeeReaction), so while a
@@ -4282,6 +4326,32 @@ export class BoardScene extends Phaser.Scene {
         this.scheduleStandeeBlink(art, sprite);
       }
     }
+  }
+
+  /**
+   * Re-dress a standee whose atlas idle landed AFTER she was built — the
+   * texture-manager ADD event is the "it landed" fact, and `applyStandeeRest`
+   * is the same seat the build itself uses, so the two cannot diverge. The
+   * still's breath is retired first (the atlas idle carries its own), and the
+   * hit box and keyline follow the texture space she now stands in — the
+   * exact trio `setKeeperLook` maintains for the same swap.
+   */
+  private dressStandeeWhenIdleLands(clipArt: string, art: string, sprite: Phaser.GameObjects.Sprite): void {
+    if (clipFor(clipArt, 'idle') === null) return;
+    const event = `${Phaser.Textures.Events.ADD_KEY}${clipKey(clipArt, 'idle')}`;
+    const handler = (): void => {
+      if (!sprite.active || this.characterSprites.get(art) !== sprite) return;
+      // A look or a reaction may have re-dressed her while the sheet was on
+      // the wire; the rest-seat asks the same preference order the build does.
+      if (!this.applyStandeeRest(clipArt, sprite)) return;
+      this.breathing = this.breathing.filter((b) => b.sprite !== sprite);
+      const bank = STANDEE_BANKS[art];
+      if (bank) sprite.setData('bodyBox', this.standeeBodyBox(art, clipArt, bank.body));
+      syncSpriteInk(sprite);
+      this.reshapeStandees();
+    };
+    this.textures.once(event, handler);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.textures.off(event, handler));
   }
 
   /**
@@ -4369,8 +4439,12 @@ export class BoardScene extends Phaser.Scene {
     const origin = originFor(clip);
     sprite.setTexture(clipKey(art, clipId), 0);
     sprite.setOrigin(origin.x, origin.y);
-    sprite.setScale(clip.scale);
-    sprite.setData('baseScale', clip.scale);
+    // The world's per-piece scale rides every clip seat, so an atlas idle
+    // stands at the same size as the bank still it replaces. standeeBodyBox
+    // needs no matching term: it maps bank px → clip TEXTURE px, and texture
+    // space is scale-invariant — the factor cancels out of that ratio.
+    sprite.setScale(clip.scale * this.worldItemScale);
+    sprite.setData('baseScale', clip.scale * this.worldItemScale);
   }
 
   /**
@@ -4415,7 +4489,7 @@ export class BoardScene extends Phaser.Scene {
   private restoreBankStill(art: string, sprite: Phaser.GameObjects.Sprite): void {
     const bank = STANDEE_BANKS[art];
     if (!bank || !this.textures.exists(bank.keys.idle)) return;
-    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1);
+    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[art] ?? 1) * this.worldItemScale;
     sprite.setOrigin(bank.anchorX, bank.anchorY);
     sprite.setScale(standeeScale);
     sprite.setData('baseScale', standeeScale);
@@ -4523,7 +4597,7 @@ export class BoardScene extends Phaser.Scene {
     const onClipIdle = clipArt !== null && this.applyStandeeRest(clipArt, sprite);
     if (!onClipIdle) {
       if (dressed) {
-        const standeeScale = bank ? bank.scale * (STANDEE_SCALE_TRIM[keeper] ?? 1) : 1;
+        const standeeScale = (bank ? bank.scale * (STANDEE_SCALE_TRIM[keeper] ?? 1) : 1) * this.worldItemScale;
         sprite.setTexture(dressed);
         if (bank) sprite.setOrigin(bank.anchorX, bank.anchorY);
         sprite.setScale(standeeScale);
@@ -4646,7 +4720,7 @@ export class BoardScene extends Phaser.Scene {
     // The cast sheet shares the BANK's frame box, so restore the bank geometry
     // for the one-shot — the resting look may be the atlas idle, whose frame,
     // origin and scale are its own.
-    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[characterId] ?? 1);
+    const standeeScale = bank.scale * (STANDEE_SCALE_TRIM[characterId] ?? 1) * this.worldItemScale;
     sprite.setOrigin(bank.anchorX, bank.anchorY);
     sprite.setScale(standeeScale);
     sprite.setData('baseScale', standeeScale);
@@ -5798,6 +5872,17 @@ export class BoardScene extends Phaser.Scene {
         // out, the named hatchling flies through and stays through. Hooked to
         // the bloom transition, so it happens exactly once per save — a reload
         // finds the door standing open (standIdle) and him already over there.
+        //
+        // ANNOUNCED HERE, NOT WHEN THE ARC STARTS. The Ember Gate blooms on the
+        // tutorial's handover step, and so does chapter 2's catch-up tick: told
+        // at lift-off, UIScene would already have Eleanor mid-monologue about
+        // her moon magic while the door and the dragon were the whole screen.
+        // Said now, the words about the door get the floor and the chapter
+        // waits behind them. Guarded on the same dragon `playGateFlight` needs,
+        // so the lines can never describe a flight that does not happen.
+        if (this.ctx.systems.dragons.firstNamed()) {
+          this.ctx.bus.emit('gate:first_flight', { to: door.to });
+        }
         this.time.delayedCall(GATE_FLIGHT.startDelayMs, () => this.playGateFlight(door));
       } else {
         door.fx.standIdle();
@@ -6848,7 +6933,19 @@ export class BoardScene extends Phaser.Scene {
     // over the Borealis sky was therefore told it was standing on an island
     // 2700px away — which is what kept the piece's shadow lit over open cloud.
     // Null is the honest answer for open sky, and both callers below take it.
-    return groundCellAtWorldPoint(this.ctx.state.world, feet.x, feet.y);
+    //
+    // When the biased feet find only sky, ask again at the carry point itself.
+    // The feet sit up to a grab-offset plus bias below the pointer, and on a
+    // small-pitch zone that is more than the tile's own half-height — measured
+    // truth: an extension slab is ~62 px half-high against the isle's 76, so a
+    // stump dropped dead-centre on the tutorial's far-island cell sampled the
+    // sky past its south edge and bounced (the hand-wobble's inflated tiles
+    // had hidden this). The piece is DRAWN at the carry point; landing where
+    // the player sees it beats refusing a drop made on the cell's centre.
+    return (
+      groundCellAtWorldPoint(this.ctx.state.world, feet.x, feet.y) ??
+      groundCellAtWorldPoint(this.ctx.state.world, this.dragTarget.x, this.dragTarget.y)
+    );
   }
 
   /**
@@ -6897,6 +6994,13 @@ export class BoardScene extends Phaser.Scene {
       }
     }
     return cell ? { cell, target: null } : null;
+  }
+
+  /** The tile diamond's screen half-extents at a cell — the zone's own step
+   *  vectors, so a Borealis stone hands out a Borealis-sized tap zone. */
+  private tileHalfAt(col: number, row: number): { w: number; h: number } {
+    const z = zoneAt(this.ctx.state.world, col, row) ?? this.ctx.state.world.fallback;
+    return { w: Math.abs(z.u.x - z.v.x) / 2, h: Math.abs(z.u.y + z.v.y) / 2 };
   }
 
   /** Does (wx,wy) land on this sprite's OPAQUE art? World point → hit-area
@@ -7901,7 +8005,23 @@ export class BoardScene extends Phaser.Scene {
           x: number,
           y: number,
           obj: BoardItem
-        ): boolean => Phaser.Geom.Rectangle.Contains(area, x, y) && obj.hitsOpaqueArt(x, y),
+        ): boolean => {
+          if (!Phaser.Geom.Rectangle.Contains(area, x, y)) return false;
+          if (obj.hitsOpaqueArt(x, y)) return true;
+          // THE TILE IS A TAP ZONE TOO (owner's rule, 2026-08-28): a press on
+          // a piece's own tile is a press on the piece — but the SPRITE stays
+          // the prioritized zone, so a tile claim yields to any other piece's
+          // opaque art over the same point (a tall neighbour's painted body
+          // reaching across this tile wins the tap the player can SEE).
+          if (!obj.hitsOwnTile(x, y)) return false;
+          const wx = obj.x + (x - obj.displayOriginX) * obj.scaleX;
+          const wy = obj.y + (y - obj.displayOriginY) * obj.scaleY;
+          for (const s of this.itemSprites.values()) {
+            if (s === obj || !s.active) continue;
+            if (this.artContainsWorldPoint(s, wx, wy)) return false;
+          }
+          return true;
+        },
         useHandCursor: true
       });
       sprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
@@ -7939,12 +8059,18 @@ export class BoardScene extends Phaser.Scene {
           // is corrected by its own factor and not the base plate's.
           plateScale(
             textureKey,
-            ITEM_SCALE[`${snap.chain}_${snap.tier}`] ??
+            // AUTHORED DATA WINS. `artScale` in chains.json is what the
+            // worldbuilder's 🪞 Seat page writes, so a size tuned against the
+            // live board has to beat the hand-written constant or the tool
+            // lies. Nothing regresses by putting it first: no tier carried an
+            // `artScale` on the day this flipped, so every piece still takes
+            // its ITEM_SCALE entry until someone deliberately re-seats it.
+            this.tierArtScale(snap.chain, snap.tier) ??
+              ITEM_SCALE[`${snap.chain}_${snap.tier}`] ??
               ITEM_SCALE[snap.chain] ??
-              this.tierArtScale(snap.chain, snap.tier) ??
               1
           );
-    sprite.acquire(snap, this.ctx.data.anchors, textureKey, artScale);
+    sprite.acquire(snap, this.ctx.data.anchors, textureKey, artScale, this.worldItemScale);
     // The emerald turns wherever the LIVE gem is not. On a phone and on the
     // `low` profile `ensureCrystal3D` declines the second WebGL context, and the
     // baked sheet plays the same 90° loop at the same cadence instead — the gem
@@ -7955,7 +8081,10 @@ export class BoardScene extends Phaser.Scene {
     // Phaser 3.90: calling setInteractive() on an already-interactive object
     // silently returns without updating hitArea. Mutate sprite.input.hitArea
     // directly instead. This also handles pool-reuse resets.
-    sprite.input!.hitArea = sprite.artHitRect();
+    // Items answer on their tile too; decor stays art-only (and is inert below
+    // anyway). Filed before the hitArea snapshot so the union is in the copy.
+    sprite.setTileFootprint(snap.kind === 'decor' ? null : this.tileHalfAt(snap.col, snap.row));
+    sprite.input!.hitArea = sprite.hitRect();
     // Decor is inert scenery: with art-bounds hit zones its (often huge, opaque)
     // sprite would eclipse playable items behind it — pointer input passes
     // through entirely. Re-enabled per-acquire since the pool recycles sprites.
@@ -8157,6 +8286,15 @@ export class BoardScene extends Phaser.Scene {
     // Passive-only generators (house, big tree) never tap-harvest — they pay out
     // on their own timer; a ready tap does nothing.
     if (cfg?.tappable === false) return;
+    // A READY generator whose Warmth price cannot be paid still ANSWERS with
+    // the pin (owner's law, 2026-08-27): the ⚡ row carries the harvest price
+    // (and refuses loudly if it is still short), and the gold row buys the
+    // very same harvest for the same number — so an empty warmth gauge never
+    // turns a dragon into a dead object that flashes red at every tap.
+    if (isGenerator && cfg && this.ctx.state.energyCurrent < cfg.energyCost) {
+      this.showSkipButton(sprite, 0, cfg.cooldownMs || 1, cfg.skipMaxGold, cfg.energyCost);
+      return;
+    }
     // Harvest IMMEDIATELY (reliable — never coupled to an animation finishing),
     // then, for a plant, a nearby dragon flies over as a cosmetic "worker"
     // flourish. The harvest already happened, so a dropped frame can't stall it.
@@ -8301,9 +8439,13 @@ export class BoardScene extends Phaser.Scene {
     sprite: BoardItem,
     remaining: number,
     total: number,
-    maxGold?: number
+    maxGold?: number,
+    harvestCost?: number
   ): void {
     this.hideSkipButton();
+    // HARVEST MODE: the same pin over a READY generator, priced at the
+    // authored harvest cost in both currencies instead of the skip curve.
+    this.skipHarvestCost = harvestCost ?? null;
     // A COIN MINT (a House/Manor whose effective produce is the coin chain)
     // takes Warmth only — paying gold to hurry gold is a loop wearing the
     // costume of a choice, so the gold row simply is not there and the pin is
@@ -8427,10 +8569,13 @@ export class BoardScene extends Phaser.Scene {
       btn.add([bg, label]);
       return label;
     };
+    const verb = harvestCost !== undefined ? 'Harvest' : 'Skip';
+    const goldPrice = harvestCost !== undefined ? Math.max(1, harvestCost) : skipEnergyCost(remaining, total, maxGold);
+    const warmthPrice = harvestCost ?? skipWarmthCost(remaining, total, maxGold);
     if (!warmthOnly) {
       // The gold row wears the REAL coin art (the 🪙 emoji read as a generic
       // token); the label carries only the price and sits right of the icon.
-      this.skipGoldLabel = make(0, 'gold', 'Skip with Gold', `${skipEnergyCost(remaining, total, maxGold)}`);
+      this.skipGoldLabel = make(0, 'gold', `${verb} with Gold`, `${goldPrice}`);
       this.skipGoldLabel.setX(SKIP_KEYS.labelDx);
       btn.add(
         this.add
@@ -8438,7 +8583,7 @@ export class BoardScene extends Phaser.Scene {
           .setScale(plateScale('item_coin_1', 0.086))
       );
     }
-    this.skipWarmthLabel = make(rows - 1, 'warmth', 'Skip with Warmth', `⚡ ${skipWarmthCost(remaining, total, maxGold)}`);
+    this.skipWarmthLabel = make(rows - 1, 'warmth', `${verb} with Warmth`, `⚡ ${warmthPrice}`);
     btn.add(caption); // on top of the keys
     // Tutorial: bounce an arrow over the WARMTH (⚡) row so the player learns to
     // pay the House's timer with energy (and watches their Warmth drop). It
@@ -8564,6 +8709,7 @@ export class BoardScene extends Phaser.Scene {
     this.skipGoldLabel = undefined;
     this.skipWarmthLabel = undefined;
     this.skipForId = 0;
+    this.skipHarvestCost = null;
     if (had) this.ctx.bus.emit('ui:skip_dismissed', { itemId: had });
   }
 
@@ -8677,7 +8823,7 @@ export class BoardScene extends Phaser.Scene {
         // Ready again — the sparkle the tinted ready-star would have given.
         this.sparks.explode(6, sprite.x, sprite.y - 110);
       }
-      if (this.skipForId === sprite.itemId) this.hideSkipButton();
+      if (this.skipForId === sprite.itemId && this.skipHarvestCost === null) this.hideSkipButton();
       return;
     }
     let badge = existing;
@@ -9030,6 +9176,9 @@ export class BoardScene extends Phaser.Scene {
         if (sprite) {
           sprite.col = to.col;
           sprite.row = to.row;
+          // The tap-zone diamond follows the piece to its new cell — a move
+          // across a zone seam lands on a different tile size.
+          sprite.setTileFootprint(this.tileHalfAt(to.col, to.row));
           const { x, y } = gridToWorld(to.col, to.row);
           this.settleAfterDrag(sprite, x, y);
         }
@@ -9110,6 +9259,12 @@ export class BoardScene extends Phaser.Scene {
         if (sprite) sprite.flashDenied();
         if (reason === 'no_space' && sprite) {
           this.floatText(sprite.x, sprite.y - 140, 'No room!', PALETTE.cream);
+        }
+        // The ⚡ choice refused for want of warmth says so in words — a red
+        // flash alone reads as a dead object, which is how "the skip menu
+        // stopped showing" was reported (owner, 2026-08-27).
+        if (reason === 'energy' && sprite) {
+          this.floatText(sprite.x, sprite.y - 140, 'No Warmth! ⚡', PALETTE.cream);
         }
       }),
       bus.on('bag:give_armed', ({ chain, tier }) => this.armGive(chain, tier)),
@@ -9352,7 +9507,9 @@ export class BoardScene extends Phaser.Scene {
       .image(x, y, eggKey)
       .setOrigin(ax, ay)
       .setScale(
-        plateScale(eggKey, ITEM_SCALE[`${snap.chain}_${snap.tier - 1}`] ?? ITEM_SCALE[snap.chain] ?? 1)
+        plateScale(eggKey, ITEM_SCALE[`${snap.chain}_${snap.tier - 1}`] ?? ITEM_SCALE[snap.chain] ?? 1) *
+          // The ghost stands where the egg ITEM stood — same world, same tile.
+          this.worldItemScale
       )
       .setDepth(DEPTHS.itemBase + y);
     this.tweens.add({

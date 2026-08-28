@@ -29,6 +29,8 @@ import {
   TOP_UP,
   TRAVEL_VEIL_TIMEOUT_MS,
   TRAVEL_WIPE,
+  TUTORIAL_ARROW,
+  TUTORIAL_HAND,
   UI_SCALE,
   WELCOME_BACK_MIN_MS,
   WORLD_ID
@@ -196,10 +198,16 @@ interface TravelVeil {
   /** Every tween target that may still be animating when the veil dies — the
    *  ember dots repeat forever, so destroy must kill, not just drop. */
   pulse: Array<object>;
+  /** Destination — so the `world:switched` echo of a departure this veil
+   *  already covers does not tear it down and re-raise it. */
+  worldId: string;
   covered: boolean;
   coveredAt: number;
   revealAsked: boolean;
   revealing: boolean;
+  /** Runs ONCE when the cover completes — the departure path emits
+   *  `world:switch` here, so the swap happens under a fully-drawn curtain. */
+  onCovered?: () => void;
 }
 
 export class UIScene extends Phaser.Scene {
@@ -891,6 +899,7 @@ export class UIScene extends Phaser.Scene {
       }),
       bus.on('dragon:revealed', (card) => this.reveal.play(card)),
       bus.on('story:chapter', ({ chapter }) => this.playChapterBeats(chapter)),
+      bus.on('gate:first_flight', ({ to }) => this.playGateFlightBeats(to)),
       // The event system's outputs (docs/event-creator.md). Queued behind a
       // running tutorial script like every other unscripted beat.
       bus.on('event:say', (say) => this.playEventBeat({ say })),
@@ -1204,7 +1213,17 @@ export class UIScene extends Phaser.Scene {
       // new board exists. Between those two the destination's backdrop is coming
       // over the network — without this the player taps a door and the game
       // simply does nothing for a second or two.
+      // A curtained departure: cover FIRST, and only then switch — the swap
+      // and the whole board rebuild happen under the veil.
+      bus.on('ui:travel_departing', ({ to }) =>
+        this.showTravelVeil(to, () => this.ctx.bus.emit('world:switch', { to }))
+      ),
+      // A switch this scene did not curtain (the console, a future script)
+      // still gets its veil — the same-journey guard keeps the curtained path
+      // from re-raising it.
       bus.on('world:switched', ({ to }) => this.showTravelVeil(to)),
+      // A refused switch must lift the curtain it was raised behind.
+      bus.on('world:switch_failed', () => this.hideTravelVeil()),
       bus.on('world:ready', () => {
         this.hideTravelVeil();
         this.sweepFirstContact();
@@ -1300,9 +1319,15 @@ export class UIScene extends Phaser.Scene {
    * scene never restarts, so the curtain is the one thing on screen that spans
    * the whole journey.
    */
-  private showTravelVeil(worldId: string): void {
-    // A veil can only still exist here if a previous journey's reveal is
-    // mid-flight; the new cover replaces it outright.
+  private showTravelVeil(worldId: string, onCovered?: () => void): void {
+    // The departure path raises the veil BEFORE the switch, so the
+    // `world:switched` echo arrives while this same journey's veil is already
+    // covering — keep it, or the curtain would blink mid-journey.
+    if (this.travelVeil && !this.travelVeil.revealAsked && this.travelVeil.worldId === worldId) {
+      return;
+    }
+    // Otherwise a veil can only still exist here if a previous journey's
+    // reveal is mid-flight; the new cover replaces it outright.
     if (this.travelVeil) this.destroyTravelVeil(this.travelVeil);
 
     const name = this.ctx.state.worlds.get(worldId)?.name ?? worldId;
@@ -1321,10 +1346,12 @@ export class UIScene extends Phaser.Scene {
       root,
       chrome,
       pulse: [chrome],
+      worldId,
       covered: false,
       coveredAt: 0,
       revealAsked: false,
-      revealing: false
+      revealing: false,
+      onCovered
     };
 
     if (ensureTravelWipePipeline(this.game)) {
@@ -1467,6 +1494,10 @@ export class UIScene extends Phaser.Scene {
   private travelVeilCovered(veil: TravelVeil): void {
     veil.covered = true;
     veil.coveredAt = this.time.now;
+    // The departure's switch happens HERE — under a fully-drawn curtain.
+    const go = veil.onCovered;
+    veil.onCovered = undefined;
+    go?.();
     if (veil.revealAsked) this.beginTravelReveal(veil);
   }
 
@@ -2384,6 +2415,42 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * A DOOR OPENED, AND SHE SAYS SO.
+   *
+   * The Ember Gate blooms on the tutorial's handover step and the named
+   * hatchling flies through it four seconds later. That is also the tick
+   * chapter 2's gate is re-asked, so the player used to watch the crossing
+   * under a four-line speech about moon magic and Moonwater — words for a
+   * different moment entirely.
+   *
+   * So this beat takes the floor and the chapter queues behind it: same delay,
+   * so it still waits out the tutorial's last line, and the same tap-advanced
+   * sequence, so it cannot scroll past unread while the dragon is in the air.
+   */
+  private playGateFlightBeats(to: string): void {
+    const beats = this.ctx.data.dialogue.gateFlight?.[to];
+    if (!beats?.lines.length) return;
+    this.gateBeatHolds = true;
+    this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      this.speakHere(beats.speaker as SpeakerId, beats.lines, () => this.releaseHeldChapter());
+    });
+  }
+
+  /** True from the moment a gate beat is armed until its last line is tapped
+   *  away. `speakHere` calls the done callback even when it defers the lines to
+   *  another world, so the release can never be stranded by a queued beat. */
+  private gateBeatHolds = false;
+  /** The chapter that arrived while a gate beat had the floor, if any. */
+  private heldChapter: number | null = null;
+
+  private releaseHeldChapter(): void {
+    this.gateBeatHolds = false;
+    const chapter = this.heldChapter;
+    this.heldChapter = null;
+    if (chapter !== null) this.playChapterBeats(chapter);
+  }
+
   /** A chapter turned: play its beats, tap by tap. Fires once per chapter — the
    *  pointer is persisted, so a reload never replays them. */
   private playChapterBeats(chapter: number): void {
@@ -2391,6 +2458,19 @@ export class UIScene extends Phaser.Scene {
     if (!beats) return;
     // Let the order-complete celebration land first; her reaction is TO it.
     this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      // HELD, NOT DROPPED: a chapter's beats play once ever, so one that lands
+      // under a gate crossing waits for it rather than being spoken over it.
+      //
+      // Asked at the END of the wait, not the start, because the two facts
+      // arrive on the SAME tick and in the wrong order: StorySystem is built
+      // before the scenes, so `story:chapter` is handled before BoardScene has
+      // said a word about the door. By the time this fires the flag is set
+      // either way, and the gate's own callback — queued after this one —
+      // speaks into the floor this just gave up.
+      if (this.gateBeatHolds) {
+        this.heldChapter = chapter;
+        return;
+      }
       this.speakHere(beats.speaker as SpeakerId, beats.lines, () => {
         this.ctx.bus.emit('story:beats_finished', { chapter });
       });
@@ -3013,37 +3093,37 @@ export class UIScene extends Phaser.Scene {
         this.hand.setAlpha(0);
         // Puppet-style secondary motion: fade in slightly raised, PRESS down on
         // the item (squash), tilt back while pulling, then a springy settle.
-        this.hand.setScale(base * 1.08).setAngle(-5);
+        this.hand.setScale(base * TUTORIAL_HAND.startScale).setAngle(TUTORIAL_HAND.startAngle);
         this.tweens.add({
           targets: this.hand,
           alpha: 1,
           scale: base,
-          duration: 310,
+          duration: TUTORIAL_HAND.fadeInMs,
           ease: 'Back.easeOut',
           onComplete: () => {
             // ONE STROKE, TWO TWEENS — the tilt and the travel must carry the
             // same duration or the hand finishes leaning before it arrives.
-            this.tweens.add({ targets: this.hand, angle: 4, duration: 1200, ease: 'Sine.easeInOut' });
+            this.tweens.add({ targets: this.hand, angle: TUTORIAL_HAND.pullAngle, duration: TUTORIAL_HAND.travelMs, ease: 'Sine.easeInOut' });
             this.tweens.add({
               targets: this.handProg,
               t: 1,
-              duration: 1200,
+              duration: TUTORIAL_HAND.travelMs,
               ease: 'Sine.easeInOut',
               onComplete: () => {
                 // Release: tiny overshoot pop as the item "drops".
-                this.tweens.add({ targets: this.hand, angle: 0, scale: base * 1.05, duration: 200, ease: 'Back.easeOut' });
+                this.tweens.add({ targets: this.hand, angle: 0, scale: base * TUTORIAL_HAND.releaseScale, duration: TUTORIAL_HAND.releaseMs, ease: 'Back.easeOut' });
                 this.tweens.add({
                   targets: this.hand,
                   alpha: 0,
-                  duration: 260,
-                  delay: 220,
+                  duration: TUTORIAL_HAND.fadeOutMs,
+                  delay: TUTORIAL_HAND.fadeOutDelayMs,
                   // A BEAT OF REST before the gesture starts over — it used to
                   // restart the instant it faded, which is what made the hand
                   // read as frantic rather than as a demonstration.
                   // `completeDelay`, never a `delayedCall`: `clearMarkers`
                   // kills TWEENS, so a timer would resurrect a hand after the
                   // step it belongs to has already gone.
-                  completeDelay: 450,
+                  completeDelay: TUTORIAL_HAND.restMs,
                   onComplete: run
                 });
               }
@@ -3077,19 +3157,19 @@ export class UIScene extends Phaser.Scene {
     this.markerChain({
       targets: this.handBob,
       loop: -1,
-      loopDelay: 200, // PAIRED with the other chain — equal, or the tap splits in two
+      loopDelay: TUTORIAL_HAND.tapLoopDelayMs, // PAIRED with the other chain — equal, or the tap splits in two
       tweens: [
-        { v: 14, duration: 260, ease: 'Quad.easeIn' },
-        { v: 0, duration: 430, ease: 'Back.easeOut' }
+        { v: TUTORIAL_HAND.bobPx, duration: TUTORIAL_HAND.tapDownMs, ease: 'Quad.easeIn' },
+        { v: 0, duration: TUTORIAL_HAND.tapUpMs, ease: 'Back.easeOut' }
       ]
     });
     this.markerChain({
       targets: this.hand,
       loop: -1,
-      loopDelay: 200, // PAIRED with the other chain — equal, or the tap splits in two
+      loopDelay: TUTORIAL_HAND.tapLoopDelayMs, // PAIRED with the other chain — equal, or the tap splits in two
       tweens: [
-        { scale: base * 0.9, duration: 260, ease: 'Quad.easeIn' },
-        { scale: base, duration: 430, ease: 'Back.easeOut' }
+        { scale: base * TUTORIAL_HAND.pressScale, duration: TUTORIAL_HAND.tapDownMs, ease: 'Quad.easeIn' },
+        { scale: base, duration: TUTORIAL_HAND.tapUpMs, ease: 'Back.easeOut' }
       ]
     });
   }
@@ -3168,25 +3248,25 @@ export class UIScene extends Phaser.Scene {
       targets: this.arrowBob,
       loop: -1,
       tweens: [
-        { v: -22, duration: 380, ease: 'Quad.easeOut' }, // rise
+        { v: TUTORIAL_ARROW.riseBy, duration: TUTORIAL_ARROW.riseMs, ease: 'Quad.easeOut' }, // rise
         {
           v: 0,
-          duration: 300,
+          duration: TUTORIAL_ARROW.dropMs,
           ease: 'Quad.easeIn', // accelerate down…
           onComplete: () => {
             // …impact: brief squash, then spring back to shape.
             this.tweens.add({
               targets: this.arrow,
-              scaleX: base * 1.08,
-              scaleY: base * 0.9,
-              duration: 90,
+              scaleX: base * TUTORIAL_ARROW.impactScaleX,
+              scaleY: base * TUTORIAL_ARROW.impactScaleY,
+              duration: TUTORIAL_ARROW.impactMs,
               yoyo: true,
               ease: 'Quad.easeOut',
               onComplete: () => this.arrow.setScale(base)
             });
           }
         },
-        { v: 0, duration: 240 } // settle beat before the next hop
+        { v: 0, duration: TUTORIAL_ARROW.settleMs } // settle beat before the next hop
       ]
     });
   }

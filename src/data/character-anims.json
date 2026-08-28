@@ -472,7 +472,8 @@
       "portrait": {
         "height": 348,
         "dy": -138,
-        "headCrop": 0.58
+        "headCrop": 0.69,
+        "headCropIncline": 0.515
       }
     },
     "moonwhisker_adult": {

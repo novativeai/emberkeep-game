@@ -34,7 +34,7 @@ describe('CauldronSystem (brew out of the Bag, bank back into it)', () => {
 
   it('a shortfall refuses BEFORE anything is spent — no half-eaten brews', () => {
     const ctx = createTestContext();
-    const recipe = data.recipes.find((r) => r.id === 'red_egg')!;
+    const recipe = data.recipes.find((r) => r.id === 'hearth_cake')!;
     // Everything except the last input.
     for (const input of recipe.inputs.slice(0, -1)) {
       ctx.bus.emit('bag:bank', { chain: input.chain, tier: input.tier, count: input.count });
@@ -42,9 +42,9 @@ describe('CauldronSystem (brew out of the Bag, bank back into it)', () => {
     const failed = capture(ctx.bus, 'cauldron:brew_failed');
     const before = JSON.parse(JSON.stringify(ctx.state.bag));
 
-    ctx.bus.emit('cauldron:brew', { recipeId: 'red_egg' });
+    ctx.bus.emit('cauldron:brew', { recipeId: 'hearth_cake' });
 
-    expect(failed.at(-1)).toMatchObject({ recipeId: 'red_egg', reason: 'ingredients' });
+    expect(failed.at(-1)).toMatchObject({ recipeId: 'hearth_cake', reason: 'ingredients' });
     expect(ctx.state.bag).toEqual(before);
   });
 
@@ -84,9 +84,9 @@ describe('CauldronSystem (brew out of the Bag, bank back into it)', () => {
 
   it('canBrew mirrors what brew would decide', () => {
     const ctx = createTestContext();
-    expect(ctx.systems.cauldron.canBrew('golden_egg')).toBe(false);
-    stock(ctx, 'golden_egg');
-    expect(ctx.systems.cauldron.canBrew('golden_egg')).toBe(true);
+    expect(ctx.systems.cauldron.canBrew('ashdrake_egg')).toBe(false);
+    stock(ctx, 'ashdrake_egg');
+    expect(ctx.systems.cauldron.canBrew('ashdrake_egg')).toBe(true);
   });
 });
 
@@ -108,7 +108,7 @@ describe('cauldron.json (the recipe book itself)', () => {
 
   it('every dragon egg in the roster has a recipe', () => {
     const outputs = data.recipes.map((r) => `${r.output.chain}:${r.output.tier}`);
-    for (const egg of ['ember_dragon:2', 'emerald:2', 'ashdrake:1', 'rimewyrm:1', 'golden_egg:1']) {
+    for (const egg of ['frost:1', 'storm:1', 'ashdrake:1', 'rimewyrm:1']) {
       expect(outputs, `missing egg recipe ${egg}`).toContain(egg);
     }
   });
@@ -130,17 +130,41 @@ describe('cauldron.json (the recipe book itself)', () => {
   });
 
   /**
-   * THE TIER LAW (owner, 2026-08-26): the pot never hands back a tier-1 item —
-   * a brew must be worth at least a merge. The one exemption is the eggs: by
-   * the legendary directive tier 1 IS the egg (three merge into the dragon),
-   * and the Cauldron is their sanctioned faucet.
+   * THE TIER LAW (owner, 2026-08-27, superseding the 2026-08-26 tier-2 floor):
+   * the pot ONLY hands back tier-3 items — a brew is a capstone, never a part.
+   * The one exemption is the dragon eggs: by the legendary directive the egg
+   * IS the low tier (three merge into the dragon), and the Cauldron is their
+   * sanctioned faucet.
    */
-  it('no recipe outputs a tier-1 item, eggs excepted', () => {
-    const eggs = new Set(['ashdrake', 'rimewyrm', 'golden_egg']);
+  it('every non-dragon recipe outputs a tier-3 item', () => {
+    const dragons = new Set(['frost', 'storm', 'ashdrake', 'rimewyrm']);
     const leaks = data.recipes
-      .filter((r) => r.output.tier < 2 && !eggs.has(r.output.chain))
+      .filter((r) => r.output.tier !== 3 && !dragons.has(r.output.chain))
       .map((r) => r.id);
     expect(leaks).toEqual([]);
+  });
+
+  /**
+   * THE EGG LAWS (owner, 2026-08-27): every dragon egg is endgame work.
+   * Each egg recipe carries at least TWO tier-3 ingredient lines, and the
+   * frost and storm eggs — the hardest brews in the book — each consume
+   * ANOTHER dragon egg on top of that.
+   */
+  it('every egg recipe is difficult: at least two tier-3 ingredient lines', () => {
+    const dragons = new Set(['frost', 'storm', 'ashdrake', 'rimewyrm']);
+    for (const r of data.recipes.filter((rec) => dragons.has(rec.output.chain))) {
+      const t3Lines = r.inputs.filter((i) => i.tier === 3).length;
+      expect(t3Lines, `${r.id} has ${t3Lines} tier-3 lines`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('the frost and storm eggs each consume another dragon egg', () => {
+    const eggTiers = new Set(['ashdrake:1', 'rimewyrm:1']);
+    for (const id of ['frost_egg', 'storm_egg']) {
+      const r = data.recipes.find((rec) => rec.id === id)!;
+      const eatsEgg = r.inputs.some((i) => eggTiers.has(`${i.chain}:${i.tier}`));
+      expect(eatsEgg, `${id} must consume another dragon egg`).toBe(true);
+    }
   });
 });
 
@@ -151,10 +175,10 @@ describe('Recipe gating (the grimoire is earned page by page)', () => {
   const order = quests.map((q) => q.id);
   const at = (id: string): number => order.indexOf(id);
 
-  it('the ledger opens with exactly the three starter pages', () => {
+  it('the ledger opens with exactly one starter page — everything else is earned', () => {
     const ctx = createTestContext();
     const ids = ctx.systems.cauldron.available().map((r) => r.id);
-    expect(ids).toEqual(['hearth_cake', 'red_egg', 'green_egg']);
+    expect(ids).toEqual(['hearth_cake']);
   });
 
   it('every unlock names a quest that exists', () => {

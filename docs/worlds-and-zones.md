@@ -56,14 +56,20 @@ points at the wrong pixel.
    is the one `buildAdjacency` measures, once, at world build: a neighbour is a
    cell sitting where this cell's own ±u / ±v step lands, whichever grid drew it.
 
-   Two guards keep it honest. **Dense zones are exempt by category**, so the
+   Three guards keep it honest. **Dense zones are exempt by category**, so the
    authored isle's neighbours stay exactly what its map was drawn with — a
    `beyond` slab sits 80 px from an isle cell, a third of the isle's own 242 px
-   step, and a purely geometric rule would have grafted it on. And two grids
+   step, and a purely geometric rule would have grafted it on. Two grids
    whose tile pitches differ by more than 30% are not one island's lattice
    (`ADJACENCY_PITCH_MATCH`) — roothold has exactly one such seam, 96 px against
    145, where bonding would give a cell a "neighbour" two of its own steps away.
-   `Zones.spec.ts` pins both, plus "Borealis is still three islands".
+   And a link may not span more than 1.6 of the SMALLER zone's steps
+   (`ADJACENCY_REACH`) — the probe tolerance is measured against the probing
+   zone's own pitch, so a coarse grid can accept a fine grid's cell that the
+   fine grid, probing back, correctly rejects, and the symmetry pass would then
+   heal a two-way merge across open sky (emberkeep's arm slab and gate outcrop,
+   found by the 2026-08-27 measured re-seat, were exactly that).
+   `Zones.spec.ts` pins all three, plus "Borealis is still three islands".
 
 `dense: true` marks the zone synthesised from a `MapData`'s own `cols`/`rows`: it
 owns every index in its block, art or no art, which is what the authored map has
@@ -259,6 +265,22 @@ The builder and `scripts/build-zones.mjs` are the two producers of this file —
 one authored, one imported — and they agree by construction: both lay index
 blocks out reference-grid-first with a one-cell gutter, and both measure the
 reference grid through `gameOrigin`.
+
+### Two scales, two owners
+
+A zone's `artScale` sizes what is PART OF THE GROUND — floor tiles, fog caps,
+the drag reticle — per zone, so the drawn floor meets the painting under it
+exactly (`artScaleAt`). Board pieces do not use it: a piece is a thing the
+player carries, and one that visibly changed size crossing a zone seam
+mid-drag would read as a glitch. Pieces take `WorldRuntime.itemScale` instead —
+ONE number per world, the playable-cell-weighted median of the zones'
+`artScale`, derived in `buildWorld` so a re-export moves it automatically
+(Emberkeep 1 by construction; Borealis 0.69, Roothold 0.67, Runevault 0.66,
+pinned in `tests/unit/WorldItemScale.spec.ts`). BoardItem folds it into every
+art scale, shadow width and shadow seat; BoardScene folds it into the dragon
+rig scale, the clip overlays and the hatch flourish; the worldbuilder's 🪞 Seat
+page draws and drags with the same number. Generator UI (ready star, timer
+pill, badges) deliberately stays unscaled — legibility over perspective.
 
 ## 5. TOUCH X → CHECK Y
 

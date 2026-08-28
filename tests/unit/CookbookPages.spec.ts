@@ -65,10 +65,16 @@ describe('the Cookbook prints one world per page', () => {
     for (const only of ['ashmoss', 'moonwater', 'resin', 'lumber', 'ember_dragon']) {
       expect(north.has(only), `${only} is southern and must not print in Borealis`).toBe(false);
     }
-    for (const only of ['glasskiln', 'seaglass', 'runestone', 'rimewyrm']) {
+    for (const only of ['glasskiln', 'seaglass', 'rimewyrm']) {
       expect(south.has(only), `${only} is northern and must not print in Emberkeep`).toBe(false);
       expect(north.has(only), `${only} is northern and must print in Borealis`).toBe(true);
     }
+    // The Runestone's merge ladder went dormant with its seeded generator
+    // (owner, 2026-08-28): no faucet drops Rune Chips any more, so the ladder's
+    // rows print NOWHERE — the stone the north actually needs arrives BREWED
+    // (the `rune_shard` cauldron page), which the quests audit still proves.
+    expect(south.has('runestone')).toBe(false);
+    expect(north.has('runestone')).toBe(false);
   });
 
   it('prints only chains a world is allowed to hold, so `n / N` is finishable', () => {

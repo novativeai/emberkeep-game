@@ -4,6 +4,7 @@ import {
   DEPTHS,
   DRAG,
   HIT_FORGIVENESS_PX,
+  ITEM_SHADOW,
   MERGE_READY,
   SLEEP_BREATH,
   TIMINGS,
@@ -11,13 +12,14 @@ import {
   PALETTE
 } from '../core/Constants';
 import { gridToWorld } from '../core/iso';
-import type { AnchorsData, ItemSnapshot, SpinSheet } from '../core/types';
+import type { AnchorsData, ItemSnapshot, ShadowSeat, SpinSheet } from '../core/types';
 
 const COOLING_TINT = 0x9d97a2;
 
 /** Where the soft ground shadow sits under an item at rest, in container
- *  pixels. Named because the lean has to put it back exactly here. */
-const SHADOW_SEAT_Y = 8;
+ *  pixels. Named because the lean has to put it back exactly here — a piece
+ *  with its own `shadowByKey` seat overrides it (`shadowSeatY`). */
+const SHADOW_SEAT_Y = ITEM_SHADOW.seatY;
 
 /**
  * Pooled visual for one board item. The container carries position/depth and
@@ -42,6 +44,9 @@ export class BoardItem extends Phaser.GameObjects.Container {
    *  upright frame's transparent margin and fell straight through. */
   private poseProxy: Phaser.GameObjects.Sprite | null = null;
   private groundShadow: Phaser.GameObjects.Image; // persistent soft shadow, sized to the art
+  /** This texture's `anchors.json` shadow override, if it authored one. Read on
+   *  every acquire/texture swap so a pooled slot never keeps the last piece's. */
+  private shadowSeat: ShadowSeat | null = null;
   private cooldownLabel: Phaser.GameObjects.Text;
   private timePill: Phaser.GameObjects.Image;
   private timeIcon: Phaser.GameObjects.Arc;
@@ -60,6 +65,24 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** The art's own scale, so the breath can modulate it without drifting. */
   private artBaseX = 1;
   private artBaseY = 1;
+  /**
+   * Screen half-extents of the tile diamond under this piece's own cell, in
+   * container units — provided by the scene at acquire (zone geometry lives
+   * there) and refreshed when the piece changes cell. Null = the art alone
+   * answers taps, which is the rule for decor and the pre-rule fallback.
+   */
+  private tileHalf: { w: number; h: number } | null = null;
+
+  /**
+   * The world's per-piece scale (WorldRuntime.itemScale): 1 on the authored
+   * isle, ~0.67 on the smaller-tiled worlds. Folded into `artBaseX/Y` HERE, at
+   * the one seam every art scale passes through, so no caller ever multiplies
+   * it — a `setArtScale` written for the sleep painting or a skin stays a
+   * statement about the ART, and the world's tile is applied underneath it.
+   * The shadow's floor width and its authored seat offsets are Emberkeep-tile
+   * pixels, so they scale by the same number.
+   */
+  private worldScale = 1;
   /** Is this piece curled up in its sleep painting? The lean keeps its hands
    *  off a sleeper: `applyBob` hands the art to the breath and never reaches
    *  the seating code, so a lean started here would move nothing and then snap
@@ -181,13 +204,15 @@ export class BoardItem extends Phaser.GameObjects.Container {
     if (anchors) {
       const [ax, ay] = anchors.byKey[textureKey] ?? anchors.default;
       this.sprite.setOrigin(ax, ay);
+      // The seat belongs to the DRAWING, so it is re-read with the anchor: a
+      // skin with a wider silhouette gets its own ellipse, not the base plate's.
+      this.shadowSeat = anchors.shadowByKey?.[textureKey] ?? null;
     }
     // `shadowFitWidth`, not `displayWidth`: the live scale may be carrying the
     // lean's stretch, and a re-fit taken during one bakes that stretch into the
     // shadow for good — the piece stands still afterwards on an ellipse that is
     // permanently 13% wide.
-    const w = this.shadowFitWidth();
-    this.groundShadow.setDisplaySize(w, w * 0.42);
+    this.fitGroundShadow();
     this.refreshHitArea();
   }
 
@@ -201,11 +226,11 @@ export class BoardItem extends Phaser.GameObjects.Container {
    * shadow is re-fitted here too, because the scale is what decides its width.
    */
   setArtScale(artScale: number): void {
-    this.sprite.setScale(artScale);
-    this.artBaseX = artScale;
-    this.artBaseY = artScale;
-    const w = this.shadowFitWidth();
-    this.groundShadow.setDisplaySize(w, w * 0.42);
+    const s = artScale * this.worldScale;
+    this.sprite.setScale(s);
+    this.artBaseX = s;
+    this.artBaseY = s;
+    this.fitGroundShadow();
     this.refreshHitArea();
   }
 
@@ -229,14 +254,15 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // container a fresh rect is silently ignored and the stale one stays live —
     // and the hit callback closes over the stored object either way.
     const area = this.input?.hitArea as Phaser.Geom.Rectangle | undefined;
-    if (area) Phaser.Geom.Rectangle.CopyFrom(this.artHitRect(), area);
+    if (area) Phaser.Geom.Rectangle.CopyFrom(this.hitRect(), area);
   }
 
   acquire(
     snapshot: ItemSnapshot,
     anchors: AnchorsData,
     textureKey: string,
-    artScale = 1
+    artScale = 1,
+    worldScale = 1
   ): void {
     this.itemId = snapshot.id;
     this.chain = snapshot.chain;
@@ -257,11 +283,18 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.sprite.setTexture(textureKey);
     const [ax, ay] = anchors.byKey[textureKey] ?? anchors.default;
     this.sprite.setOrigin(ax, ay);
+    // A pooled slot must never inherit the last tenant's authored seat.
+    this.shadowSeat = anchors.shadowByKey?.[textureKey] ?? null;
     this.sprite.setPosition(0, 0);
+    // A pooled slot must never keep the last WORLD's tile either — set before
+    // any scale below so the whole acquire speaks one world's size.
+    this.worldScale = worldScale;
+    // …nor the last tenant's tile footprint: the scene re-files it per cell.
+    this.tileHalf = null;
     // File-based decor art can be far larger than a tile; artScale fits it.
-    this.sprite.setScale(artScale);
-    this.artBaseX = artScale;
-    this.artBaseY = artScale;
+    this.sprite.setScale(artScale * worldScale);
+    this.artBaseX = artScale * worldScale;
+    this.artBaseY = artScale * worldScale;
     this.sleepBreath = false;
     this.sleepGroundY = 0;
     // The last tenant's lean died with its tween in `release()`; the offset it
@@ -274,14 +307,13 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // a still one or the next piece in this slot inherits the sheet's frames.
     this.spin = null;
     this.sprite.setVisible(true); // a pooled item may have been a hidden rig host
-    // Soft shadow scaled to the art's footprint (proportional to its size).
-    const w = this.shadowFitWidth();
-    this.groundShadow.setDisplaySize(w, w * 0.42);
+    // Soft shadow scaled to the art's footprint (proportional to its size), and
+    // back on its seat: a slot released mid-lean (release() kills the tween, it
+    // does not undo the frame it left behind) would otherwise hand the next
+    // piece a shadow sitting a lean off centre. The lean fields are zeroed
+    // just above, so this seats it square.
+    this.fitGroundShadow();
     this.groundShadow.setVisible(true);
-    // …and back on its seat: a slot released mid-lean (release() kills the
-    // tween, it does not undo the frame it left behind) would otherwise hand
-    // the next piece a shadow sitting a lean off centre.
-    this.groundShadow.setPosition(0, SHADOW_SEAT_Y);
     // A pooled item may have been released mid-flight over the void.
     this.overGround = true;
     this.poseProxy = null; // pooled reuse must never inherit another dragon's overlay
@@ -371,6 +403,45 @@ export class BoardItem extends Phaser.GameObjects.Container {
       w,
       h
     );
+  }
+
+  /** File the tile diamond under this piece's cell (owner's rule, 2026-08-28:
+   *  a tap on a piece's TILE is a tap on the piece). The scene provides the
+   *  half-extents because zone geometry is its to know. */
+  setTileFootprint(half: { w: number; h: number } | null): void {
+    this.tileHalf = half;
+    this.refreshHitArea();
+  }
+
+  /** Does hit-space (hx,hy) land inside this piece's OWN tile diamond? The
+   *  container stands ON its cell centre, so the diamond is centred on the
+   *  hit-space origin (localPoint + displayOrigin — see acquireSprite). */
+  hitsOwnTile(hx: number, hy: number): boolean {
+    if (!this.tileHalf) return false;
+    return (
+      Math.abs(hx - this.displayOriginX) / this.tileHalf.w +
+        Math.abs(hy - this.displayOriginY) / this.tileHalf.h <=
+      1
+    );
+  }
+
+  /**
+   * The full tappable box: the ART's bounds UNION the tile diamond's. The art
+   * stays the prioritized zone — the per-pixel test still runs first, and a
+   * tile-only claim yields to any other piece's opaque art over the same point
+   * (the scene's hit callback owns that arbitration, because only it can see
+   * the other pieces).
+   */
+  hitRect(): Phaser.Geom.Rectangle {
+    const art = this.artHitRect();
+    if (!this.tileHalf) return art;
+    const tile = new Phaser.Geom.Rectangle(
+      this.displayOriginX - this.tileHalf.w,
+      this.displayOriginY - this.tileHalf.h,
+      this.tileHalf.w * 2,
+      this.tileHalf.h * 2
+    );
+    return Phaser.Geom.Rectangle.Union(art, tile, new Phaser.Geom.Rectangle());
   }
 
   /**
@@ -579,7 +650,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
       this.scene.tweens.add({
         targets: this.groundShadow,
         scaleX: w / Math.max(1, this.groundShadow.width),
-        scaleY: (w * 0.42) / Math.max(1, this.groundShadow.height),
+        scaleY: (w * this.shadowSquash()) / Math.max(1, this.groundShadow.height),
         duration: DRAG.liftMs,
         ease: 'Back.easeOut'
       });
@@ -589,7 +660,33 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** The soft shadow's resting display width for the current art — the same fit
    *  every setDisplaySize site uses, from the UNTWEENED art scale. */
   private shadowFitWidth(): number {
-    return Math.max(64, this.sprite.width * this.artBaseX * 0.92);
+    const ofWidth = this.shadowSeat?.width ?? ITEM_SHADOW.ofWidth;
+    // The floor is a tile-relative promise ("never a sliver"), so it shrinks
+    // with the world's tile like everything else — an un-scaled 64px floor
+    // under a 0.67-world piece would out-shadow the piece itself.
+    return Math.max(ITEM_SHADOW.minWidth * this.worldScale, this.sprite.width * this.artBaseX * ofWidth);
+  }
+
+  /** Ellipse height as a fraction of its width, for THIS art. */
+  private shadowSquash(): number {
+    return this.shadowSeat?.squash ?? ITEM_SHADOW.squash;
+  }
+
+  /** Where the ellipse sits under this art, in container px (before any lean). */
+  private shadowSeatX(): number {
+    return (this.shadowSeat?.dx ?? ITEM_SHADOW.seatX) * this.worldScale;
+  }
+
+  private shadowSeatY(): number {
+    return (this.shadowSeat?.dy ?? SHADOW_SEAT_Y) * this.worldScale;
+  }
+
+  /** Fit the ellipse to the art it belongs to — the ONE place that sizes and
+   *  seats a resting shadow, so an authored seat can never be applied by half. */
+  private fitGroundShadow(): void {
+    const w = this.shadowFitWidth();
+    this.groundShadow.setDisplaySize(w, w * this.shadowSquash());
+    this.groundShadow.setPosition(this.shadowSeatX() + this.leanX, this.shadowSeatY() + this.leanY);
   }
 
   settleFromDrag(): void {
@@ -622,7 +719,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
       this.scene.tweens.add({
         targets: this.groundShadow,
         scaleX: w / Math.max(1, this.groundShadow.width),
-        scaleY: (w * 0.42) / Math.max(1, this.groundShadow.height),
+        scaleY: (w * this.shadowSquash()) / Math.max(1, this.groundShadow.height),
         duration: DRAG.shadowFadeMs,
         ease: 'Sine.easeOut'
       });
@@ -648,11 +745,11 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.spin = spin;
     if (!spin) return;
     this.sprite.setOrigin(spin.anchor[0], spin.anchor[1]);
-    this.sprite.setScale(spin.itemScale);
-    this.artBaseX = spin.itemScale;
-    this.artBaseY = spin.itemScale;
-    const w = Math.max(64, this.sprite.displayWidth * 0.92);
-    this.groundShadow.setDisplaySize(w, w * 0.42);
+    this.sprite.setScale(spin.itemScale * this.worldScale);
+    this.artBaseX = spin.itemScale * this.worldScale;
+    this.artBaseY = spin.itemScale * this.worldScale;
+    const w = Math.max(ITEM_SHADOW.minWidth * this.worldScale, this.sprite.displayWidth * ITEM_SHADOW.ofWidth);
+    this.groundShadow.setDisplaySize(w, w * this.shadowSquash());
   }
 
   /** Items no longer float — they sit flat on the ground (a one-time landing
@@ -696,8 +793,9 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // read as the art coming unstuck from the object. Position only — the
     // shadow's SCALE is the drag lift's (`liftForDrag`) and the art fit's
     // (`setDisplaySize`), and a second writer on it would fight both.
-    const shadowY = SHADOW_SEAT_Y + this.leanY;
-    if (this.groundShadow.x !== this.leanX) this.groundShadow.setX(this.leanX);
+    const shadowX = this.shadowSeatX() + this.leanX;
+    const shadowY = this.shadowSeatY() + this.leanY;
+    if (this.groundShadow.x !== shadowX) this.groundShadow.setX(shadowX);
     if (this.groundShadow.y !== shadowY) this.groundShadow.setY(shadowY);
     // THE STORED RECT IS A COPY, and it is what the input plugin tests.
     // `artHitRect()` follows the art, but `input.hitArea` is a snapshot taken
@@ -766,7 +864,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // The shadow is put back HERE and not left to the next `applyBob`: a
     // pick-up pauses the bob, and the lift then swells a shadow that would
     // otherwise still be sitting a lean off centre for the whole drag.
-    this.groundShadow.setPosition(0, SHADOW_SEAT_Y);
+    this.groundShadow.setPosition(this.shadowSeatX(), this.shadowSeatY());
     // The stretch goes with it, and here rather than on the next `applyBob`:
     // the bob may be paused (a pick-up) or replaced (a sleeper's breath), and
     // a piece left mid-stretch would carry it for the whole drag.

@@ -38,8 +38,12 @@
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.dirname(path.dirname(new URL(import.meta.url).pathname));
+// fileURLToPath, not URL.pathname: the checkout lives under a path with
+// spaces, and the raw pathname keeps them percent-encoded — every readFileSync
+// then ENOENTs on a directory that exists.
+const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const inPath = process.argv[2] ?? 'asset3d/editor-map.json';
 const outPath = process.argv[3] ?? 'assets/map/nionja-worlds.json';
 const read = (rel) => JSON.parse(readFileSync(path.resolve(ROOT, rel), 'utf8'));

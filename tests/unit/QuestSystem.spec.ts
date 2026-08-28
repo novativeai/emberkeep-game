@@ -292,16 +292,14 @@ describe('brew goals — the cauldron as a quest driver', () => {
   it('counts brews, and spending what was brewed cannot un-do the step', () => {
     const ctx = createTestContext();
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
-    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 0, need: 2, done: false });
+    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 0, need: 1, done: false });
 
-    brew(ctx, 'tar_spile', 1);
-    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 1, done: false });
     brew(ctx, 'tar_spile', 1);
     expect(ctx.systems.quests.progressFor(step).done).toBe(true);
 
-    // The output is meant to be SPENT — the buckets merged away is the quest
+    // The output is meant to be SPENT — the oven put to work is the quest
     // working, not the quest coming undone.
-    ctx.bus.emit('bag:consume', { chain: 'tarkiln', tier: 2, count: 2 });
+    ctx.bus.emit('bag:consume', { chain: 'tarkiln', tier: 3, count: 1 });
     expect(ctx.systems.quests.progressFor(step).done).toBe(true);
   });
 
@@ -319,7 +317,7 @@ describe('brew goals — the cauldron as a quest driver', () => {
         id: 'unlabelled',
         goal: { kind: 'brew', recipeId: 'iron_cap', count: 2 }
       }).label
-    ).toBe('Brew 2 × Iron Helmet');
+    ).toBe('Brew 2 × Horned Helmet');
   });
 
   /**
@@ -332,9 +330,9 @@ describe('brew goals — the cauldron as a quest driver', () => {
   it('points a brew peek at the cauldron input, scaled by the brew count', () => {
     const ctx = createTestContext();
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
-    // tar_spile takes 1 Glass Float + 2 Iron Hats per bucket; the step asks
-    // for two, and the hats are the bigger of the two shortfalls.
-    expect(ctx.systems.quests.peekNeedFor(step)).toEqual({ chain: 'warhelm', tier: 1, count: 4 });
+    // tar_spile takes 2 Glass Floats + 3 Iron Hats per oven; the step asks
+    // for one, and the hats are the bigger of the two shortfalls.
+    expect(ctx.systems.quests.peekNeedFor(step)).toEqual({ chain: 'warhelm', tier: 1, count: 3 });
   });
 
   /** THE CAULDRON-REACHED LATCH (owner's law, 2026-08-26): the first brew
@@ -371,17 +369,17 @@ describe('brew goals — the cauldron as a quest driver', () => {
 
   it('picks the ingredient the player is shortest of, not the first line', () => {
     const ctx = createTestContext();
-    // north_pitchpot brews `fire_brick` three times: 3 x Tar Loaf
-    // (emberheart:2) + 6 x Iron Hat (warhelm:1). Stock the hats and the
-    // answer must move to the loaves — the first input is the wrong answer as
-    // often as not to "why can I not brew this yet".
+    // north_pitchpot brews `fire_brick` once: 2 x Tar Loaf (emberheart:2)
+    // + 3 x Iron Hat (warhelm:1). Stock the hats and the answer must move to
+    // the loaves — the first input is the wrong answer as often as not to
+    // "why can I not brew this yet".
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_pitchpot')!.steps[0]!;
     expect(ctx.systems.quests.peekNeedFor(step)).toEqual({
       chain: 'warhelm',
       tier: 1,
-      count: 6
+      count: 3
     });
-    ctx.bus.emit('bag:bank', { chain: 'warhelm', tier: 1, count: 6 });
+    ctx.bus.emit('bag:bank', { chain: 'warhelm', tier: 1, count: 3 });
     expect(ctx.systems.quests.peekNeedFor(step)!.chain).toBe('emberheart');
   });
 

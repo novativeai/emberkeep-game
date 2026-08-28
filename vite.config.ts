@@ -50,6 +50,8 @@ const DEV_API_GUARDS: ReadonlyArray<readonly [route: string, methods: string]> =
   ['/__auroralab/presets', 'GET,POST,OPTIONS'],
   ['/__snowlab/presets', 'GET,POST,OPTIONS'],
   ['/__worldbuilder/merge', 'GET,POST,OPTIONS'],
+  ['/__worldbuilder/seat', 'GET,POST,OPTIONS'],
+  ['/__worldbuilder/tuning', 'GET,POST,OPTIONS'],
   ['/__worldbuilder/emitters', 'GET,POST,OPTIONS'],
   ['/__worldbuilder/characters', 'GET,POST,OPTIONS'],
   ['/__worldbuilder/zones', 'GET,POST,OPTIONS'],
@@ -491,6 +493,332 @@ const worldbuilderMergeEndpoint = (): Plugin => ({
       res.statusCode = 405;
       res.end();
     });
+  }
+});
+
+/**
+ * Dev-only endpoint behind the worldbuilder's 🪞 Seat page (the merge-item
+ * visualiser): how one piece stands on its tile.
+ *
+ *   GET  /__worldbuilder/seat → everything needed to DRAW the piece exactly as
+ *        the board draws it: the chains, `anchors.json`, the art file per
+ *        texture key, the resize factors `plateScale` divides by, the hand
+ *        written `ITEM_SCALE` defaults, and the tile the isle projects.
+ *   POST /__worldbuilder/seat → { seats: [{ chain, tier, anchor, artScale,
+ *        shadow }] } writes the anchor + shadow into `anchors.json` and the
+ *        scale into `chains.json`.
+ *
+ * It writes the same two files the game already reads, so a seat authored here
+ * is live on the next reload with no new runtime path — and only for the keys
+ * the page actually edited: every POST is a MERGE, never a replacement, so a
+ * page open on one chain can never blank another's tuning.
+ */
+const worldbuilderSeatEndpoint = (): Plugin => ({
+  name: 'emberkeep-worldbuilder-seat',
+  configureServer(server: ViteDevServer) {
+    const chainsFile = path.resolve(__dirname, 'src/data/chains.json');
+    const anchorsFile = path.resolve(__dirname, 'src/data/anchors.json');
+    const read = (f: string) => JSON.parse(readFileSync(f, 'utf8'));
+    /** The hand-written defaults, for DISPLAY only — the page writes chains.json,
+     *  which now wins. Parsed rather than imported because this file is plain
+     *  Node: a failed parse costs the tool its "unchanged" labels, nothing more. */
+    const itemScaleDefaults = (): Record<string, number> => {
+      try {
+        const src = readFileSync(path.resolve(__dirname, 'src/core/Constants.ts'), 'utf8');
+        const block = /export const ITEM_SCALE: Record<string, number> = \{([\s\S]*?)\n\};/.exec(src);
+        if (!block) return {};
+        const out: Record<string, number> = {};
+        for (const m of block[1].matchAll(/^\s*([A-Za-z0-9_]+)\s*:\s*([0-9.]+)/gm)) {
+          out[m[1]] = Number(m[2]);
+        }
+        return out;
+      } catch {
+        return {};
+      }
+    };
+    server.middlewares.use('/__worldbuilder/seat', (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === 'GET') {
+        const map = read(path.resolve(__dirname, 'src/data/map.json'));
+        const assets = read(path.resolve(__dirname, 'src/data/assets.json')) as {
+          images: { key: string; file?: string; source?: string }[];
+        };
+        const files: Record<string, string> = {};
+        for (const img of assets.images) if (img.file) files[img.key] = img.file;
+        res.end(
+          JSON.stringify({
+            chains: read(chainsFile),
+            anchors: read(anchorsFile),
+            files,
+            downscale: read(path.resolve(__dirname, 'src/data/art-downscale.json')).factors ?? {},
+            itemScale: itemScaleDefaults(),
+            shadowDefaults: { ofWidth: 0.92, minWidth: 64, squash: 0.42, seatX: 0, seatY: 8 },
+            tile: map.tile ?? { width: 420, height: 242, skew: 0 },
+            // The worlds the Seat page can stand a piece on. Emberkeep's tile is
+            // the authored 256 px one; Borealis paints a SMALLER stone (its
+            // grilles were measured off its own backdrop), and a piece keeps its
+            // size across worlds — only the tile changes — so switching here is
+            // how you see a machine that fits the isle overflow the north.
+            worlds: (() => {
+              const zones = JSON.parse(readFileSync(path.resolve(__dirname, 'src/data/zones.json'), 'utf8')) as {
+                worlds: { id: string; name: string; backdrop: string; zones: { name: string; block: [number, number]; cells: [number, number][]; origin: [number, number]; u: [number, number]; v: [number, number] }[] }[];
+              };
+              // One clean, interior stone per world, chosen with the same
+              // grout-valley measure `audit-ground` uses: a preview tile has to
+              // be a stone whose painted joints really are where the lattice
+              // says, or every piece looks mis-seated.
+              const PICK: Record<string, [number, number]> = { borealis: [16, 2], roothold: [4, 0], runevault: [0, 0] };
+              // The same playable-cell-weighted median world.ts derives for
+              // WorldRuntime.itemScale — the Seat page must draw a piece at the
+              // size the running game gives it, or the tool lies about the fit.
+              const medianItemScale = (zs: { cells: [number, number][]; artScale?: number }[]): number => {
+                const all: number[] = [];
+                for (const z of zs) for (let i = 0; i < z.cells.length; i++) all.push(z.artScale ?? 1);
+                all.sort((a, b) => a - b);
+                return all.length ? Math.round(all[(all.length - 1) >> 1] * 100) / 100 : 1;
+              };
+              const out = [{
+                id: 'emberkeep',
+                name: 'Emberkeep',
+                backdrop: 'sprites/background/emberkeep-nb2.webp',
+                cell: [3, 3] as [number, number],
+                itemScale: 1,
+                zone: null as null | { worldPoint: [number, number]; u: [number, number]; v: [number, number] }
+              }];
+              for (const w of zones.worlds) {
+                if (w.id === 'emberkeep') continue;
+                const want = PICK[w.id];
+                let hit: { zone: (typeof w.zones)[number]; cell: [number, number] } | null = null;
+                for (const z of w.zones) {
+                  for (const [i, j] of z.cells) {
+                    const cell: [number, number] = [z.block[0] + i, z.block[1] + j];
+                    if (want && cell[0] === want[0] && cell[1] === want[1]) hit = { zone: z, cell };
+                    if (!hit && !want) hit = { zone: z, cell };
+                  }
+                }
+                if (!hit) hit = w.zones[0] ? { zone: w.zones[0], cell: [w.zones[0].block[0], w.zones[0].block[1]] } : null;
+                if (!hit) continue;
+                const z = hit.zone;
+                const i = hit.cell[0] - z.block[0];
+                const j = hit.cell[1] - z.block[1];
+                out.push({
+                  id: w.id,
+                  name: w.name,
+                  backdrop: `sprites/background/${w.backdrop === 'emberkeep' ? 'emberkeep-nb2' : w.backdrop}.webp`,
+                  cell: hit.cell,
+                  itemScale: medianItemScale(w.zones as { cells: [number, number][]; artScale?: number }[]),
+                  // The stone's own world point, and the zone's own step vectors:
+                  // a zoned world's tile is whatever ITS grid measured, never the
+                  // authored 256 px one.
+                  zone: {
+                    worldPoint: [z.origin[0] + i * z.u[0] + j * z.v[0], z.origin[1] + i * z.u[1] + j * z.v[1]],
+                    u: z.u,
+                    v: z.v
+                  }
+                });
+              }
+              return out;
+            })(),
+            // The isle's own projection, so the page can put the preview tile
+            // over a REAL painted stone instead of an invented diamond: art px
+            // ↔ world px, exactly as `build-zones` and `audit-ground` derive it.
+            projection: (() => {
+              const tile = map.tile ?? { width: 420, height: 242, skew: 0 };
+              const bg = map.backgrounds?.[0] ?? { name: 'emberkeep', col: 0, row: 0, dx: 0, dy: 0 };
+              const cal = map.backgroundCalibration?.[bg.name] ?? { offsetX: 0, offsetY: 0, scale: 1 };
+              const ratio = 256 / (tile.width || 256);
+              const halfW = 128;
+              const halfH = (256 * ((tile.height || 128) / (tile.width || 256))) / 2;
+              return {
+                backdrop: `sprites/background/${bg.name === 'emberkeep' ? 'emberkeep-nb2' : bg.name}.webp`,
+                halfW,
+                halfH,
+                skewK: Math.tan(((tile.skew ?? 0) * Math.PI) / 180),
+                unit: (cal.scale ?? 1) * ratio,
+                boardOriginX: 1280,
+                boardOriginY: 316,
+                artOriginX: 1280 + bg.col * halfW - bg.row * halfW + ((cal.offsetX ?? 0) + (bg.dx ?? 0)) * ratio,
+                artOriginY: 316 + (bg.col + bg.row) * halfH + ((cal.offsetY ?? 0) + (bg.dy ?? 0)) * ratio,
+                // The best-seated interior stone on the isle, chosen by the same
+                // grout-valley measure `audit-ground` uses (24.0, against 8.5
+                // for a typical plaza cell and less at the wobbling rim): the
+                // preview tile has to be a stone whose painted joints really do
+                // sit where the lattice says, or every piece looks mis-seated.
+                sampleCell: [3, 3]
+              };
+            })()
+          })
+        );
+        return;
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          try {
+            const doc = JSON.parse(body) as {
+              seats?: {
+                key?: string;
+                chain?: string;
+                tier?: number;
+                anchor?: [number, number];
+                artScale?: number | null;
+                shadow?: Record<string, number> | null;
+              }[];
+            };
+            if (!Array.isArray(doc.seats) || !doc.seats.length) throw new Error('seats must be a non-empty array');
+            const anchors = read(anchorsFile) as {
+              default: [number, number];
+              byKey: Record<string, [number, number]>;
+              shadowByKey?: Record<string, Record<string, number>>;
+            };
+            const chains = read(chainsFile) as { chains: { id: string; tiers: { tier: number; artScale?: number }[] }[] };
+            anchors.shadowByKey ??= {};
+            const num = (n: unknown, what: string, lo: number, hi: number): number => {
+              if (typeof n !== 'number' || !Number.isFinite(n)) throw new Error(`${what} must be a number`);
+              if (n < lo || n > hi) throw new Error(`${what} must be between ${lo} and ${hi}`);
+              return Math.round(n * 1e4) / 1e4;
+            };
+            const touched: string[] = [];
+            for (const seat of doc.seats) {
+              const key = seat.key;
+              if (!key || typeof key !== 'string') throw new Error('a seat has no texture key');
+              if (Array.isArray(seat.anchor)) {
+                anchors.byKey[key] = [num(seat.anchor[0], `${key} anchor x`, -2, 3), num(seat.anchor[1], `${key} anchor y`, -2, 3)];
+              }
+              // An empty override is DELETED rather than written as the default:
+              // a key with no entry is the file saying "this one is ordinary".
+              if (seat.shadow && Object.keys(seat.shadow).length) {
+                const out: Record<string, number> = {};
+                if (seat.shadow.width !== undefined) out.width = num(seat.shadow.width, `${key} shadow width`, 0, 4);
+                if (seat.shadow.squash !== undefined) out.squash = num(seat.shadow.squash, `${key} shadow squash`, 0.02, 2);
+                if (seat.shadow.dx !== undefined) out.dx = num(seat.shadow.dx, `${key} shadow dx`, -400, 400);
+                if (seat.shadow.dy !== undefined) out.dy = num(seat.shadow.dy, `${key} shadow dy`, -400, 400);
+                if (Object.keys(out).length) anchors.shadowByKey[key] = out;
+                else delete anchors.shadowByKey[key];
+              } else {
+                delete anchors.shadowByKey[key];
+              }
+              if (seat.chain && typeof seat.tier === 'number') {
+                const chain = chains.chains.find((c) => c.id === seat.chain);
+                const tier = chain?.tiers.find((t) => t.tier === seat.tier);
+                if (!tier) throw new Error(`unknown element ${seat.chain} T${seat.tier}`);
+                if (seat.artScale === null || seat.artScale === undefined) delete tier.artScale;
+                else tier.artScale = num(seat.artScale, `${key} artScale`, 0.001, 40);
+              }
+              touched.push(key);
+            }
+            if (!Object.keys(anchors.shadowByKey).length) delete anchors.shadowByKey;
+            writeFileSync(anchorsFile, JSON.stringify(anchors, null, 2) + '\n');
+            writeFileSync(chainsFile, JSON.stringify(chains, null, 2) + '\n');
+            res.end(JSON.stringify({ ok: true, keys: touched }));
+          } catch (e) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+          }
+        });
+        return;
+      }
+      res.statusCode = 405;
+      res.end();
+    });
+  }
+});
+
+/**
+ * Dev-only endpoint behind the worldbuilder's ⏱ Tuning page: every animation,
+ * wait and speed the game runs on.
+ *
+ *   GET  /__worldbuilder/tuning → the catalog, PARSED out of Constants.ts, so
+ *        the page can never list a knob the file does not have (or miss one it
+ *        gained yesterday).
+ *   POST /__worldbuilder/tuning → { edits: { "DRAG.liftMs": 140, … } } splices
+ *        those literals in place. Comments, ordering and every expression in
+ *        the file survive: a write replaces the digits and nothing else.
+ */
+const worldbuilderTuningEndpoint = (): Plugin => ({
+  name: 'emberkeep-worldbuilder-tuning',
+  configureServer(server: ViteDevServer) {
+    const file = path.resolve(__dirname, 'src/core/Constants.ts');
+    server.middlewares.use('/__worldbuilder/tuning', (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'OPTIONS') {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method === 'GET') {
+        void (async () => {
+          try {
+            const { buildCatalog } = await import('./scripts/tuning-catalog.mjs');
+            res.end(JSON.stringify({ ok: true, categories: buildCatalog(readFileSync(file, 'utf8')) }));
+          } catch (e) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+          }
+        })();
+        return;
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+        req.on('end', () => {
+          void (async () => {
+            try {
+              const { parseConstants, applyTuning } = await import('./scripts/tuning-catalog.mjs');
+              const doc = JSON.parse(body) as { edits?: Record<string, number> };
+              if (!doc.edits || !Object.keys(doc.edits).length) throw new Error('edits must be a non-empty object');
+              const src = readFileSync(file, 'utf8');
+              const { text, count } = applyTuning(src, doc.edits, parseConstants(src));
+              writeFileSync(file, text);
+              res.end(JSON.stringify({ ok: true, count }));
+            } catch (e) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+            }
+          })();
+        });
+        return;
+      }
+      res.statusCode = 405;
+      res.end();
+    });
+  }
+});
+
+/**
+ * THE AUTHORING TOOLS MUST NOT BE RELOADED BY THE WORK THEY DO.
+ *
+ * Every tool under `tools/` is a standalone HTML page that Vite happens to
+ * serve — none of them imports a module from the game, so none of them has
+ * anything to hot-update. But Vite injects its HMR client into any HTML it
+ * serves, and each tool's ⤒ Apply writes into `src/data`, which IS in the
+ * game's module graph. Vite therefore answered a successful save with a
+ * full-reload of the page that made it: the Seat page's element, zoom and
+ * unapplied edits, the Merge page's uploads, the Island page's traced
+ * outline — all gone, on the one action that was supposed to be a success.
+ *
+ * Stripping the client leaves the tool exactly as capable (it talks to the
+ * dev server over `/__worldbuilder/*`, not over HMR) and leaves the GAME's
+ * own reload untouched, which is the one that should happen: the tab showing
+ * the board picks the new data up while the tab doing the authoring keeps its
+ * place. Editing a tool's own HTML now needs a manual refresh — the trade a
+ * tool that holds unsaved work should make.
+ */
+const toolPagesKeepTheirPlace = (): Plugin => ({
+  name: 'emberkeep-tool-pages-no-hmr',
+  apply: 'serve',
+  transformIndexHtml: {
+    order: 'post',
+    handler(html: string, ctx: { path: string }) {
+      if (!ctx.path.startsWith('/tools/')) return html;
+      return html.replace(/[ \t]*<script type="module" src="\/@vite\/client"><\/script>\n?/, '');
+    }
   }
 });
 
@@ -1542,6 +1870,9 @@ export default defineConfig({
     auroraLabEndpoint(),
     snowLabEndpoint(),
     worldbuilderMergeEndpoint(),
+    worldbuilderSeatEndpoint(),
+    worldbuilderTuningEndpoint(),
+    toolPagesKeepTheirPlace(),
     worldbuilderEmittersEndpoint(),
     tutorialEndpoint(),
     eventsEndpoint(),

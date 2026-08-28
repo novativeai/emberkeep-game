@@ -98,3 +98,8 @@ __pycache__/
 tests/e2e/checkpoints/*.png
 .vercel
 .env*
+
+# visual verification bench — images are working artifacts, the README is not
+testcapture/**
+!testcapture/
+!testcapture/README.md

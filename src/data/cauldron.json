@@ -26,18 +26,18 @@
       "id": "iron_cap",
       "output": {
         "chain": "warhelm",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "seaglass",
           "tier": 2,
-          "count": 2
+          "count": 3
         }
       ],
-      "flavor": "Melt two Glass Floats, and the iron from their nets comes out — enough for a whole helmet.",
-      "use": "Iron Helmets are hard to find. This makes them faster.",
+      "flavor": "Melt three Glass Floats, and the iron from their nets comes out. Enough for a horned helmet.",
+      "use": "A whole Horned Helmet, no forge needed.",
       "unlock": {
         "quest": "north_salvage"
       }
@@ -46,18 +46,18 @@
       "id": "light_thread",
       "output": {
         "chain": "auroraweave",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "orrery",
           "tier": 2,
-          "count": 2
+          "count": 3
         }
       ],
-      "flavor": "Break two Spyglasses into lenses, hold them up to the northern lights, and the colour weaves itself.",
-      "use": "Makes Light Cloth without building a whole Star Machine.",
+      "flavor": "Break three Spyglasses into lenses, hold them up to the northern lights, and the colour weaves itself.",
+      "use": "Weaves a whole Aurora Cloak from lens-caught light.",
       "unlock": {
         "quest": "north_strakes"
       }
@@ -66,23 +66,23 @@
       "id": "pitch_loaf",
       "output": {
         "chain": "emberheart",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "emberheart",
-          "tier": 1,
+          "tier": 2,
           "count": 2
         },
         {
           "chain": "seaglass",
-          "tier": 1,
+          "tier": 2,
           "count": 2
         }
       ],
-      "flavor": "Two Tar Drops and two Glass Balls. The glass makes it burn slowly.",
-      "use": "Dragon food in the north. Dragons eat it, and it seals boats too.",
+      "flavor": "Two Tar Loaves and two Glass Floats. The glass makes it burn slowly, and forever.",
+      "use": "A whole Ember Heart. Dragons eat it, and it seals boats too.",
       "unlock": {
         "quest": "north_strakes"
       }
@@ -91,7 +91,7 @@
       "id": "oil_lamp",
       "output": {
         "chain": "hearthlamp",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
@@ -103,11 +103,11 @@
         {
           "chain": "emberdram",
           "tier": 1,
-          "count": 2
+          "count": 3
         }
       ],
       "flavor": "Tar to burn twice over, Fire Juice for the light, and wicks for both.",
-      "use": "3 Big Lanterns make a Warm Lamp. Only a few were ever left on the ice.",
+      "use": "A Warm Lamp, whole. Only a few were ever left on the ice.",
       "unlock": {
         "quest": "north_door"
       }
@@ -116,14 +116,14 @@
       "id": "lodestone",
       "output": {
         "chain": "wayfinder",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "manastone",
           "tier": 2,
-          "count": 1
+          "count": 2
         },
         {
           "chain": "warhelm",
@@ -131,49 +131,24 @@
           "count": 1
         }
       ],
-      "flavor": "A Magic Rock and an Iron Helmet argue until a needle points north.",
-      "use": "3 Compass Needles make a Treasure Compass, which makes Gold forever.",
+      "flavor": "Two Magic Rocks and an Iron Helmet argue until a needle points at gold.",
+      "use": "A Treasure Compass, which makes Gold forever.",
       "unlock": {
         "quest": "north_lamplight"
-      }
-    },
-    {
-      "id": "woven_bolt",
-      "output": {
-        "chain": "auroraweave",
-        "tier": 3,
-        "count": 1
-      },
-      "inputs": [
-        {
-          "chain": "auroraweave",
-          "tier": 2,
-          "count": 2
-        },
-        {
-          "chain": "orrery",
-          "tier": 2,
-          "count": 1
-        }
-      ],
-      "flavor": "Two Light Cloths and a Spyglass to hold them apart while they set.",
-      "use": "Selyna's last order asks for Aurora Cloaks. This weaves one whole.",
-      "unlock": {
-        "quest": "north_lodestones"
       }
     },
     {
       "id": "rune_shard",
       "output": {
         "chain": "runestone",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "manastone",
           "tier": 2,
-          "count": 1
+          "count": 2
         },
         {
           "chain": "emberheart",
@@ -181,33 +156,33 @@
           "count": 1
         }
       ],
-      "flavor": "An Ember Heart burns hot enough to fuse a Magic Rock into one carved rune.",
-      "use": "3 Carved Runes finish a Runestone. A Runestone makes Tar Drops forever.",
+      "flavor": "An Ember Heart burns hot enough to fuse two Magic Rocks into one standing stone.",
+      "use": "A finished Runestone, which makes Tar Drops forever.",
       "unlock": {
-        "quest": "north_pitchworks"
+        "quest": "north_terms"
       }
     },
     {
       "id": "fire_brick",
       "output": {
         "chain": "glasskiln",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "emberheart",
           "tier": 2,
-          "count": 1
+          "count": 2
         },
         {
           "chain": "warhelm",
           "tier": 1,
-          "count": 2
+          "count": 3
         }
       ],
       "flavor": "Clay needs a slow fire under it and iron rings to hold its shape.",
-      "use": "3 Oven Racks build a second Glass Oven.",
+      "use": "A second Glass Oven, straight from the pot.",
       "unlock": {
         "quest": "north_threadwork"
       }
@@ -216,23 +191,23 @@
       "id": "tar_spile",
       "output": {
         "chain": "tarkiln",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "seaglass",
           "tier": 2,
-          "count": 1
+          "count": 2
         },
         {
           "chain": "warhelm",
           "tier": 1,
-          "count": 2
+          "count": 3
         }
       ],
-      "flavor": "A Glass Float's worth of tubes and two iron tips. That is all a Tar Bucket is.",
-      "use": "3 Tar Buckets build a second Tar Oven.",
+      "flavor": "Two Glass Floats' worth of tubes and three iron tips. That is all a Tar Oven is.",
+      "use": "A second Tar Oven, straight from the pot.",
       "unlock": {
         "quest": "north_salvage"
       }
@@ -241,14 +216,14 @@
       "id": "iron_billet",
       "output": {
         "chain": "wreckforge",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "warhelm",
           "tier": 2,
-          "count": 1
+          "count": 2
         },
         {
           "chain": "emberheart",
@@ -256,8 +231,8 @@
           "count": 1
         }
       ],
-      "flavor": "An Iron Helmet melted down, with a loaf of tar to keep the fire honest.",
-      "use": "3 Bellows build a second Shipwreck Forge.",
+      "flavor": "Two Iron Helmets melted down, with a loaf of tar to keep the fire honest.",
+      "use": "A second Shipwreck Forge, straight from the pot.",
       "unlock": {
         "quest": "north_hulls"
       }
@@ -266,7 +241,7 @@
       "id": "brass_cog",
       "output": {
         "chain": "starbench",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
@@ -277,28 +252,28 @@
         },
         {
           "chain": "emberheart",
-          "tier": 1,
+          "tier": 2,
           "count": 2
         }
       ],
-      "flavor": "Iron melted and poured into meshing gear shapes.",
-      "use": "3 Gear Wheels build a second Star Workbench.",
+      "flavor": "Iron melted and poured into meshing gear shapes, all the way up to a bench.",
+      "use": "A second Star Workbench, straight from the pot.",
       "unlock": {
-        "quest": "north_skeins"
+        "quest": "north_pitchworks"
       }
     },
     {
       "id": "silver_spindle",
       "output": {
         "chain": "auroraloom",
-        "tier": 2,
+        "tier": 3,
         "count": 1
       },
       "inputs": [
         {
           "chain": "orrery",
           "tier": 2,
-          "count": 1
+          "count": 2
         },
         {
           "chain": "warhelm",
@@ -307,59 +282,70 @@
         }
       ],
       "flavor": "Iron pulled thin as thread around a ring of lenses, then set spinning.",
-      "use": "3 Spinning Wheels build a second Aurora Loom.",
+      "use": "A second Aurora Loom, straight from the pot.",
       "unlock": {
-        "quest": "north_pitchworks"
+        "quest": "north_longhall"
       }
     },
     {
-      "id": "red_egg",
+      "id": "frost_egg",
       "output": {
-        "chain": "ember_dragon",
-        "tier": 2,
+        "chain": "frost",
+        "tier": 1,
         "count": 1
       },
       "inputs": [
         {
-          "chain": "ember_dragon",
+          "chain": "rimewyrm",
           "tier": 1,
-          "count": 2
-        },
-        {
-          "chain": "flame_gem",
-          "tier": 2,
           "count": 1
         },
-        {
-          "chain": "emberberry",
-          "tier": 3,
-          "count": 1
-        }
-      ],
-      "flavor": "Two Rubies remember being one heart. The jam is for the first thing it asks for.",
-      "use": "3 Red Dragon Eggs make a Red Dragon."
-    },
-    {
-      "id": "green_egg",
-      "output": {
-        "chain": "emerald",
-        "tier": 2,
-        "count": 1
-      },
-      "inputs": [
         {
           "chain": "moonwater",
           "tier": 3,
           "count": 2
         },
         {
-          "chain": "emberberry",
+          "chain": "seaglass",
           "tier": 3,
-          "count": 2
+          "count": 1
         }
       ],
-      "flavor": "Moonwater poured over sweet jam until something green grows a shell.",
-      "use": "3 Green Dragon Eggs make a Green Dragon."
+      "flavor": "An Ice Dragon Egg sunk in Moonwater beside a Ship in a Bottle, until a colder little sister forms.",
+      "use": "The hardest brew there is. 3 Frost Dragon Eggs hatch a Frost Dragon.",
+      "unlock": {
+        "quest": "north_terms"
+      }
+    },
+    {
+      "id": "storm_egg",
+      "output": {
+        "chain": "storm",
+        "tier": 1,
+        "count": 1
+      },
+      "inputs": [
+        {
+          "chain": "ashdrake",
+          "tier": 1,
+          "count": 1
+        },
+        {
+          "chain": "flame_gem",
+          "tier": 3,
+          "count": 1
+        },
+        {
+          "chain": "manastone",
+          "tier": 3,
+          "count": 1
+        }
+      ],
+      "flavor": "An Ash Dragon Egg struck by a Sun Gem inside a Magic Stone Tower. Volcanic lightning, in a shell.",
+      "use": "The hardest brew there is. 3 Storm Dragon Eggs hatch a Storm Dragon.",
+      "unlock": {
+        "quest": "north_longhall"
+      }
     },
     {
       "id": "ashdrake_egg",
@@ -418,42 +404,7 @@
       "flavor": "Roll up the cloth, sink it in Moonwater, and let the frost do the rest.",
       "use": "Legendary! 3 Ice Dragon Eggs hatch the Ice Dragon.",
       "unlock": {
-        "quest": "north_terms"
-      }
-    },
-    {
-      "id": "golden_egg",
-      "output": {
-        "chain": "golden_egg",
-        "tier": 1,
-        "count": 1
-      },
-      "inputs": [
-        {
-          "chain": "flame_gem",
-          "tier": 3,
-          "count": 2
-        },
-        {
-          "chain": "emberheart",
-          "tier": 3,
-          "count": 1
-        },
-        {
-          "chain": "orrery",
-          "tier": 3,
-          "count": 1
-        },
-        {
-          "chain": "moonwater",
-          "tier": 3,
-          "count": 3
-        }
-      ],
-      "flavor": "Fire that lasts, frost that lasts, and enough moonlight to make them agree.",
-      "use": "Mythic! The rarest egg the Cauldron knows.",
-      "unlock": {
-        "quest": "the_rimewyrm_wakes"
+        "quest": "north_hulls"
       }
     }
   ]

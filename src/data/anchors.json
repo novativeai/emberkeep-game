@@ -114,11 +114,11 @@
     ],
     "item_auroraloom_3": [
       0.5,
-      0.95
+      0.75
     ],
     "item_bigtree_1": [
       0.5,
-      0.92
+      0.873
     ],
     "item_chest_1": [
       0.5,
@@ -146,11 +146,11 @@
     ],
     "item_ember_dragon_2": [
       0.5,
-      1.0
+      0.826
     ],
     "item_ember_dragon_3": [
       0.5,
-      0.88
+      0.738
     ],
     "item_ember_dragon_4": [
       0.5,
@@ -170,7 +170,7 @@
     ],
     "item_emerald_2": [
       0.5,
-      1.0
+      1
     ],
     "item_emerald_3": [
       0.5,
@@ -182,7 +182,7 @@
     ],
     "item_frost_1": [
       0.5,
-      1.0
+      1
     ],
     "item_frost_2": [
       0.5,
@@ -193,12 +193,12 @@
       0.88
     ],
     "item_glasskiln_3": [
-      0.52,
-      0.95
+      0.489,
+      0.656
     ],
     "item_golden_egg_1": [
       0.5,
-      1.0
+      1
     ],
     "item_golden_egg_2": [
       0.5,
@@ -230,15 +230,15 @@
     ],
     "item_runestone_3": [
       0.47,
-      0.92
+      0.781
     ],
     "item_starbench_3": [
-      0.45,
-      0.875
+      0.55,
+      0.756
     ],
     "item_storm_1": [
       0.5,
-      1.0
+      1
     ],
     "item_storm_2": [
       0.5,
@@ -249,8 +249,8 @@
       0.88
     ],
     "item_strawberry_1": [
-      0.5,
-      0.92
+      0.611,
+      0.78
     ],
     "item_strawberry_2": [
       0.5,
@@ -261,12 +261,12 @@
       0.9
     ],
     "item_tarkiln_3": [
-      0.54,
-      0.92
+      0.447,
+      0.737
     ],
     "item_wreckforge_3": [
       0.48,
-      0.905
+      0.766
     ],
     "portrait_eleanor": [
       0.5,
@@ -403,6 +403,67 @@
     "ui_tile_highlight": [
       0.5,
       0.5
+    ],
+    "item_resin_3": [
+      0.5,
+      0.558
+    ],
+    "item_seaglass_3": [
+      0.561,
+      0.631
+    ],
+    "item_orrery_1": [
+      0.579,
+      0.755
+    ],
+    "item_emberheart_3": [
+      0.5,
+      0.787
+    ],
+    "item_auroraweave_3": [
+      0.5,
+      0.85
+    ],
+    "item_warhelm_1": [
+      0.5,
+      0.728
     ]
+  },
+  "shadowByKey": {
+    "item_ember_dragon_2": {
+      "width": 1.63
+    },
+    "item_glasskiln_3": {
+      "width": 1.79
+    },
+    "item_orrery_1": {
+      "width": 1.53
+    },
+    "item_strawberry_1": {
+      "width": 1.24,
+      "squash": 0.49
+    },
+    "item_tarkiln_3": {
+      "width": 1.8
+    },
+    "item_auroraloom_3": {
+      "width": 1.68
+    },
+    "item_emberheart_3": {
+      "width": 1.93
+    },
+    "item_starbench_3": {
+      "width": 1.67,
+      "dy": 13
+    },
+    "item_wreckforge_3": {
+      "width": 1.51,
+      "dy": 12
+    },
+    "item_runestone_3": {
+      "width": 2,
+      "dx": 19,
+      "dy": 10
+    }
   }
 }

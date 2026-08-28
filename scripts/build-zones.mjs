@@ -731,11 +731,13 @@ const BOREALIS_PLAN = {
     // Wrack Lines, rimebloom from the Fonts, and the chest's own gift table
     // (which pays Strakes too), so the frames order funds itself without a
     // scatter of freebies undercutting the farms.
-    // The Runestone and the Cordial Cask join the rim WORKING (tier 3): both
-    // reseed their own tier-1 (the rune bonus / the cask's own produce), so a
-    // seeded t3 here strands no Cookbook row — the parts stream starts the
-    // moment the farm does. That is what lets them keep the coast's
-    // generators-only law instead of arriving as a scatter of parts.
+    // The Cordial Cask joins the rim WORKING (tier 3): it reseeds its own
+    // tier-1 (its own produce), so a seeded t3 here strands no Cookbook row —
+    // the parts stream starts the moment the farm does. The Runestone SEED is
+    // gone with its generator (owner, 2026-08-28): an inert monument standing
+    // unearned beside the working machines read as a broken faucet, and the
+    // one the player BREWS (`north_runeshards`) is the one that means
+    // something.
     // ONE OF EACH, ACROSS THE WHOLE NORTH. A second Glass Kiln here (there were
     // two, on top of the shore's) was not a bigger farm, it was the same farm
     // twice: the north GROWS its generators — every twelfth firing drops a Fire
@@ -748,11 +750,41 @@ const BOREALIS_PLAN = {
       ['starbench', 3, 1],
       ['wreckforge', 3, 1],
       ['tarkiln', 3, 1],
-      ['runestone', 3, 1],
       ['emberdram', 3, 1],
       ['chest', 1, 1]
     ]
   }
+};
+
+/**
+ * THE MAINLAND OPENS BOTTOM-UP (owner, 2026-08-28).
+ *
+ * The editor's per-cell levels made the coast's key-door band the NORTH-WEST
+ * corner and its rank waves a scatter: the Gold Key opened the top of the
+ * island, level 4 opened the bottom, and the middle stayed clouded between
+ * them — clouds taken at both ends, left in the centre. The march the game
+ * teaches is south → north (shore → coast → keep), so the ISLAND must open
+ * the same way: the key buys the SOUTHERN deck (and the seeds land there,
+ * which is what puts the machines in the player's hands first), and each rank
+ * lifts the next band up, the northern cloud last — falling exactly when the
+ * Rune Way at the top of the island opens.
+ *
+ * GEOMETRY OVER AUTHORING, for this island only: the band a cell joins is
+ * decided by its measured world Y, not its editor level — the door band keeps
+ * the SIZE the editor priced the key at, the rest split as evenly as the cell
+ * count allows across `waves` (south first, ascending). A re-export moves
+ * every cell and this re-derives; nothing here names an address.
+ */
+const FOG_MARCH = {
+  // doorCells PINS the key-door band's size. It used to inherit the authored
+  // first-wave count, which made the door a hostage of the editor's leveling:
+  // nionja's newer editor project re-levels the mainland (56 unlock edits,
+  // ZERO coordinate edits — verified 2026-08-28) and would have shrunk the
+  // door to 4 cells, too few for the five machines and the chest the plan
+  // seeds there. The march already decides every wave geometrically; now it
+  // decides the door's size too, and the editor's levels on this island are
+  // fully advisory.
+  borealis: { island: 1, waves: [4, 5, 6], doorCells: 15 }
 };
 
 /** Tiers that hold a `generator` — the machines, read off the shipped chain
@@ -1377,6 +1409,38 @@ for (const spec of WORLDS) {
   const islands = islandsOf([...byLevel.values()].flat());
   const islandOf = new Map();
   islands.forEach((cells, idx) => cells.forEach((c) => islandOf.set(`${c.col},${c.row}`, idx)));
+
+  // The south-first fog march (FOG_MARCH above): re-band the named island's
+  // cells by measured world Y before the bands are cut, so everything below —
+  // names, gates, seeds-on-the-first-wave — runs on the corrected schedule
+  // without knowing it exists.
+  const marchSpec = FOG_MARCH[spec.id];
+  if (marchSpec && islands[marchSpec.island]?.length) {
+    const cells = islands[marchSpec.island];
+    const lvlOf = new Map();
+    for (const [lvl, list] of byLevel) for (const c of list) lvlOf.set(c, lvl);
+    const doorLvl = Math.min(...cells.map((c) => lvlOf.get(c)));
+    const doorCount = marchSpec.doorCells ?? cells.filter((c) => lvlOf.get(c) === doorLvl).length;
+    // South first: larger world Y is lower on screen. Ties by address, so a
+    // rebuild is reproducible to the cell.
+    const south = [...cells].sort((a, b) => b.at.y - a.at.y || a.col - b.col || a.row - b.row);
+    south.slice(0, doorCount).forEach((c) => lvlOf.set(c, doorLvl));
+    const rest = south.slice(doorCount);
+    const per = Math.ceil(rest.length / marchSpec.waves.length);
+    rest.forEach((c, i) =>
+      lvlOf.set(c, marchSpec.waves[Math.min(Math.floor(i / per), marchSpec.waves.length - 1)])
+    );
+    const marched = new Set(cells);
+    for (const [lvl, list] of byLevel) {
+      byLevel.set(lvl, list.filter((c) => !marched.has(c)));
+    }
+    for (const c of cells) {
+      const lvl = lvlOf.get(c);
+      const list = byLevel.get(lvl) ?? [];
+      list.push(c);
+      byLevel.set(lvl, list);
+    }
+  }
 
   const bands = new Map(); // `${island}:${level}` → { island, lvl, cells }
   for (const [lvl, cells] of byLevel) {

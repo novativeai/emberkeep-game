@@ -9,6 +9,7 @@ import {
   TIMINGS
 } from '../core/Constants';
 import { FONT, INK, TYPE } from '../art/design';
+import { commissionVerdict } from '../core/commissionRule';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { BagStack, ChainsData } from '../core/types';
@@ -283,17 +284,29 @@ export class CommissionPanel extends Phaser.GameObjects.Container {
     // one output every building starts with, so leaving it out of the roster
     // made the default choice the only unchoosable one.
     const purse = goldPurse(this.gameState.coins, cap);
+    // ONE eligibility answer, shared with GeneratorSystem's refusal
+    // (core/commissionRule.ts): rank, no dragons, home goods only. The panel
+    // locking a slot the system would refuse is the whole point of sharing it.
+    const item = this.gameState.items.get(this.itemId ?? -1);
+    const eligible = (stack: BagStack): boolean =>
+      !!item &&
+      commissionVerdict(
+        this.chains,
+        this.gameState.worldId,
+        item,
+        { chain: stack.chain, tier: stack.tier }
+      ) === 'ok';
     // Eligible first, so if the satchel is full the entry that falls off the
     // end is one this building could never have been commissioned to anyway.
     const entries = [...(purse ? [purse as BagStack] : []), ...stacks].sort(
-      (a, b) => Number(b.tier <= cap) - Number(a.tier <= cap)
+      (a, b) => Number(eligible(b)) - Number(eligible(a))
     );
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i]!;
       slot.removeAll(true);
       slot.setVisible(entries.length > 0);
       const stack = entries[i];
-      if (stack) this.paintFilled(slot, stack, stack.tier <= cap);
+      if (stack) this.paintFilled(slot, stack, eligible(stack));
       else this.paintEmpty(slot);
     }
   }
