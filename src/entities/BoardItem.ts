@@ -65,6 +65,16 @@ export class BoardItem extends Phaser.GameObjects.Container {
   /** The art's own scale, so the breath can modulate it without drifting. */
   private artBaseX = 1;
   private artBaseY = 1;
+  /**
+   * The world's per-piece scale (WorldRuntime.itemScale): 1 on the authored
+   * isle, ~0.67 on the smaller-tiled worlds. Folded into `artBaseX/Y` HERE, at
+   * the one seam every art scale passes through, so no caller ever multiplies
+   * it — a `setArtScale` written for the sleep painting or a skin stays a
+   * statement about the ART, and the world's tile is applied underneath it.
+   * The shadow's floor width and its authored seat offsets are Emberkeep-tile
+   * pixels, so they scale by the same number.
+   */
+  private worldScale = 1;
   /** Is this piece curled up in its sleep painting? The lean keeps its hands
    *  off a sleeper: `applyBob` hands the art to the breath and never reaches
    *  the seating code, so a lean started here would move nothing and then snap
@@ -208,9 +218,10 @@ export class BoardItem extends Phaser.GameObjects.Container {
    * shadow is re-fitted here too, because the scale is what decides its width.
    */
   setArtScale(artScale: number): void {
-    this.sprite.setScale(artScale);
-    this.artBaseX = artScale;
-    this.artBaseY = artScale;
+    const s = artScale * this.worldScale;
+    this.sprite.setScale(s);
+    this.artBaseX = s;
+    this.artBaseY = s;
     this.fitGroundShadow();
     this.refreshHitArea();
   }
@@ -242,7 +253,8 @@ export class BoardItem extends Phaser.GameObjects.Container {
     snapshot: ItemSnapshot,
     anchors: AnchorsData,
     textureKey: string,
-    artScale = 1
+    artScale = 1,
+    worldScale = 1
   ): void {
     this.itemId = snapshot.id;
     this.chain = snapshot.chain;
@@ -266,10 +278,13 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // A pooled slot must never inherit the last tenant's authored seat.
     this.shadowSeat = anchors.shadowByKey?.[textureKey] ?? null;
     this.sprite.setPosition(0, 0);
+    // A pooled slot must never keep the last WORLD's tile either — set before
+    // any scale below so the whole acquire speaks one world's size.
+    this.worldScale = worldScale;
     // File-based decor art can be far larger than a tile; artScale fits it.
-    this.sprite.setScale(artScale);
-    this.artBaseX = artScale;
-    this.artBaseY = artScale;
+    this.sprite.setScale(artScale * worldScale);
+    this.artBaseX = artScale * worldScale;
+    this.artBaseY = artScale * worldScale;
     this.sleepBreath = false;
     this.sleepGroundY = 0;
     // The last tenant's lean died with its tween in `release()`; the offset it
@@ -597,7 +612,10 @@ export class BoardItem extends Phaser.GameObjects.Container {
    *  every setDisplaySize site uses, from the UNTWEENED art scale. */
   private shadowFitWidth(): number {
     const ofWidth = this.shadowSeat?.width ?? ITEM_SHADOW.ofWidth;
-    return Math.max(ITEM_SHADOW.minWidth, this.sprite.width * this.artBaseX * ofWidth);
+    // The floor is a tile-relative promise ("never a sliver"), so it shrinks
+    // with the world's tile like everything else — an un-scaled 64px floor
+    // under a 0.67-world piece would out-shadow the piece itself.
+    return Math.max(ITEM_SHADOW.minWidth * this.worldScale, this.sprite.width * this.artBaseX * ofWidth);
   }
 
   /** Ellipse height as a fraction of its width, for THIS art. */
@@ -607,11 +625,11 @@ export class BoardItem extends Phaser.GameObjects.Container {
 
   /** Where the ellipse sits under this art, in container px (before any lean). */
   private shadowSeatX(): number {
-    return this.shadowSeat?.dx ?? ITEM_SHADOW.seatX;
+    return (this.shadowSeat?.dx ?? ITEM_SHADOW.seatX) * this.worldScale;
   }
 
   private shadowSeatY(): number {
-    return this.shadowSeat?.dy ?? SHADOW_SEAT_Y;
+    return (this.shadowSeat?.dy ?? SHADOW_SEAT_Y) * this.worldScale;
   }
 
   /** Fit the ellipse to the art it belongs to — the ONE place that sizes and
@@ -678,10 +696,10 @@ export class BoardItem extends Phaser.GameObjects.Container {
     this.spin = spin;
     if (!spin) return;
     this.sprite.setOrigin(spin.anchor[0], spin.anchor[1]);
-    this.sprite.setScale(spin.itemScale);
-    this.artBaseX = spin.itemScale;
-    this.artBaseY = spin.itemScale;
-    const w = Math.max(ITEM_SHADOW.minWidth, this.sprite.displayWidth * ITEM_SHADOW.ofWidth);
+    this.sprite.setScale(spin.itemScale * this.worldScale);
+    this.artBaseX = spin.itemScale * this.worldScale;
+    this.artBaseY = spin.itemScale * this.worldScale;
+    const w = Math.max(ITEM_SHADOW.minWidth * this.worldScale, this.sprite.displayWidth * ITEM_SHADOW.ofWidth);
     this.groundShadow.setDisplaySize(w, w * this.shadowSquash());
   }
 

@@ -563,6 +563,8 @@ export class BoardScene extends Phaser.Scene {
   private altarZone?: Phaser.GameObjects.Zone;
   /** The doors out of this world, each with its lit FX — see `buildPortals`. */
   private portalDoors = new Map<string, { fx: PortalFX; zone: Phaser.GameObjects.Zone; to: string }>();
+  /** WorldRuntime.itemScale for the world on screen — see `buildBoard`. */
+  private worldItemScale = 1;
   /** World-position anchors the hub tours point at (the Emporium house, the
    *  cauldron) — registered by whichever builder places the landmark. */
   private tourTargets = new Map<string, { x: number; y: number }>();
@@ -621,6 +623,12 @@ export class BoardScene extends Phaser.Scene {
     // GameState already does this on construction and on each switch; the scene
     // re-asserts it because the scene is what draws the result.
     setActiveWorld(this.ctx.state.world);
+    // The world's per-piece scale, bound once per build (the scene restarts on
+    // every world switch, so nothing built below can ever wear another world's
+    // tile). Items, rigs, clip overlays and the hatch flourish all read this
+    // one field; ground, fog and the drag reticle keep their own per-zone
+    // `artScaleAt` — a floor meets the painting, a piece keeps its size.
+    this.worldItemScale = this.ctx.state.world.itemScale;
     this.itemSprites.clear();
     this.itemAuras.clear();
     this.pool = [];
@@ -1743,7 +1751,11 @@ export class BoardScene extends Phaser.Scene {
     this.ensureDragonClips(host.chain, host.tier);
     const scale =
       (host.tier >= 3 ? DRAGON_ANIM.whelpScale : DRAGON_ANIM.hatchlingScale) *
-      (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1);
+      (DRAGON_RIG_SCALE[`${host.chain}:${host.tier}`] ?? DRAGON_RIG_SCALE[host.chain] ?? 1) *
+      // The world's tile, folded in at the ONE number RigPlayer is built from:
+      // facing flips, keyline weight and the pose-proxy hit bounds all derive
+      // from it, so nothing downstream needs to know the world shrank.
+      this.worldItemScale;
     // A clip breed has no rig character to look the cadence up by, so the tier
     // decides: the adults are the calm ones — and the Golden Elder, who is an
     // elder at tier 2 (CALM_DRAGONS carried her rig name for the same reason,
@@ -1863,7 +1875,7 @@ export class BoardScene extends Phaser.Scene {
         .setFlipX(flip);
       if (clip) {
         const origin = originFor(clip, flip);
-        ld.clipOverlay.setOrigin(origin.x, origin.y).setScale(clip.scale);
+        ld.clipOverlay.setOrigin(origin.x, origin.y).setScale(clip.scale * this.worldItemScale);
         if (ld.sleepState === 'seated') {
           // The frozen tosleep frame breathes exactly as the sleep painting
           // did (BoardItem.applyBob): ribcage rises, body widens a little
@@ -1872,8 +1884,8 @@ export class BoardScene extends Phaser.Scene {
           const phase = ((((ld.host.itemId * 2654435761) >>> 0) % 1000) / 1000) * Math.PI * 2;
           const k = Math.sin((this.time.now / SLEEP_BREATH.periodMs) * Math.PI * 2 + phase);
           ld.clipOverlay.setScale(
-            clip.scale * (1 - SLEEP_BREATH.amount * 0.45 * k),
-            clip.scale * (1 + SLEEP_BREATH.amount * k)
+            clip.scale * this.worldItemScale * (1 - SLEEP_BREATH.amount * 0.45 * k),
+            clip.scale * this.worldItemScale * (1 + SLEEP_BREATH.amount * k)
           );
         }
       }
@@ -2239,7 +2251,7 @@ export class BoardScene extends Phaser.Scene {
     const size = idle
       ? Math.max(idle.clip.frameWidth, idle.clip.frameHeight) * idle.clip.scale
       : 666 * DRAGON_ANIM.whelpScale;
-    return keylineUnits(size, DRAGON_OUTLINE);
+    return keylineUnits(size * this.worldItemScale, DRAGON_OUTLINE);
   }
 
   /** Mark a sheet most-recently-needed so the LRU takes the coldest first. */
@@ -2405,7 +2417,7 @@ export class BoardScene extends Phaser.Scene {
       .setDepth(ld.host.depth + 0.5)
       .setFlipX(flip)
       .setOrigin(origin.x, origin.y)
-      .setScale(c.clip.scale);
+      .setScale(c.clip.scale * this.worldItemScale);
     // The overlay IS the visible pose now, so it is also the clickable one:
     // taps must land on the curl/wingspan the player SEES, not on the hidden
     // art's silhouette underneath.
@@ -7928,7 +7940,7 @@ export class BoardScene extends Phaser.Scene {
               ITEM_SCALE[snap.chain] ??
               1
           );
-    sprite.acquire(snap, this.ctx.data.anchors, textureKey, artScale);
+    sprite.acquire(snap, this.ctx.data.anchors, textureKey, artScale, this.worldItemScale);
     // The emerald turns wherever the LIVE gem is not. On a phone and on the
     // `low` profile `ensureCrystal3D` declines the second WebGL context, and the
     // baked sheet plays the same 90° loop at the same cadence instead — the gem
@@ -9359,7 +9371,9 @@ export class BoardScene extends Phaser.Scene {
       .image(x, y, eggKey)
       .setOrigin(ax, ay)
       .setScale(
-        plateScale(eggKey, ITEM_SCALE[`${snap.chain}_${snap.tier - 1}`] ?? ITEM_SCALE[snap.chain] ?? 1)
+        plateScale(eggKey, ITEM_SCALE[`${snap.chain}_${snap.tier - 1}`] ?? ITEM_SCALE[snap.chain] ?? 1) *
+          // The ghost stands where the egg ITEM stood — same world, same tile.
+          this.worldItemScale
       )
       .setDepth(DEPTHS.itemBase + y);
     this.tweens.add({

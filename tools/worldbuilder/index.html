@@ -2409,6 +2409,13 @@ function seatRestore() {
 }
 
 /** The four shadow numbers with `ITEM_SHADOW` filled in where unauthored. */
+/** WorldRuntime.itemScale for the picked world — the game scales every piece
+ *  (art, shadow width, seat offsets) by this once per world, so the preview
+ *  must too or a fit checked here would overhang there. */
+function seatWorldItemScale() {
+  return seatWorld()?.itemScale ?? 1;
+}
+
 function seatShadowNumbers(st) {
   const dflt = SEAT.data.shadowDefaults;
   return {
@@ -2685,7 +2692,7 @@ function seatRenderInspector() {
     (file && file.startsWith('raw/') ? '<br><span class="skDirty">workspace art (raw/) — often a placeholder that never shipped</span>' : '') +
     (factor ? `<br>plate stored ${factor}× smaller — the scale is divided by it` : '');
 
-  const eff = seatPlateScale(st.key, st.artScale);
+  const eff = seatPlateScale(st.key, st.artScale) * seatWorldItemScale();
   const tw = SEAT.img?.naturalWidth ?? 0;
   const th = SEAT.img?.naturalHeight ?? 0;
   const hasArt = tw > 0;
@@ -2693,7 +2700,7 @@ function seatRenderInspector() {
     ? `art ${tw}×${th} → <b>${Math.round(tw * eff)}×${Math.round(th * eff)}</b> board px ` +
       `(a tile is ${Math.round(d.projection.halfW * 2)} wide)`
     : 'load the art to see its board size';
-  const sw = Math.max(d.shadowDefaults.minWidth, tw * eff * sh.width);
+  const sw = Math.max(d.shadowDefaults.minWidth * seatWorldItemScale(), tw * eff * sh.width);
   document.getElementById('seatShadowNote').innerHTML = hasArt
     ? `ellipse <b>${Math.round(sw)}×${Math.round(sw * sh.squash)}</b> board px` +
       (sw <= d.shadowDefaults.minWidth + 0.001 ? ` — at the ${d.shadowDefaults.minWidth}px floor` : '') +
@@ -2710,7 +2717,7 @@ function seatRenderInspector() {
     worldNote.innerHTML =
       `tile <b>${Math.round(tileW)} × ${Math.round(Math.abs(tile.u[1] + tile.v[1]))}</b> board px` +
       ` · cell (${tile.cell[0]},${tile.cell[1]})` +
-      (pct === 100 ? '' : `<br>${pct}% of Emberkeep's stone — a piece keeps its size across worlds, so this is where one starts to overhang`);
+      (pct === 100 ? '' : `<br>${pct}% of Emberkeep's stone — the game scales every piece here by <b>${seatWorldItemScale()}</b> (the world's itemScale), and so does this preview`);
   }
 
   const n = Object.keys(SEAT.edits).length;
@@ -2777,7 +2784,11 @@ function seatDraw() {
 
   const st = seatState();
   const sh = seatShadowNumbers(st);
-  const eff = seatPlateScale(st.key, st.artScale);
+  const ws = seatWorldItemScale();
+  // The world's per-piece scale rides the effective plate scale, exactly as
+  // BoardItem folds WorldRuntime.itemScale into artBase — so the piece drawn
+  // here IS the piece the game stands on this stone.
+  const eff = seatPlateScale(st.key, st.artScale) * ws;
   const tw = SEAT.img?.naturalWidth ?? 0;
   const th = SEAT.img?.naturalHeight ?? 0;
 
@@ -2803,10 +2814,10 @@ function seatDraw() {
 
   // 3. the soft ellipse, exactly as BoardItem sizes and seats it
   if (SEAT.view.shadow && tw) {
-    const w = Math.max(SEAT.data.shadowDefaults.minWidth, tw * eff * sh.width);
+    const w = Math.max(SEAT.data.shadowDefaults.minWidth * ws, tw * eff * sh.width);
     const h = w * sh.squash;
-    const ex = cx + sh.dx * S;
-    const ey = cy + sh.dy * S;
+    const ex = cx + sh.dx * ws * S;
+    const ey = cy + sh.dy * ws * S;
     const grad = g.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, (w / 2) * S));
     grad.addColorStop(0, 'rgba(24,14,20,.52)');
     grad.addColorStop(0.55, 'rgba(24,14,20,.30)');
@@ -2919,17 +2930,20 @@ function seatBindStage() {
     const dx = ((pt.x - SEAT.drag.pt.x) / S) * fine;
     const dy = ((pt.y - SEAT.drag.pt.y) / S) * fine;
     const st = SEAT.drag.start;
+    const ws = seatWorldItemScale();
     if (SEAT.drag.what === 'shadow') {
       // Both axes from the drag's OWN start, so a round trip lands exactly
-      // where it began rather than accumulating each move's rounding.
+      // where it began rather than accumulating each move's rounding. The
+      // authored seat is in Emberkeep-tile px — the game multiplies it by the
+      // world's itemScale, so a drag on a smaller world divides back.
       const base = seatShadowNumbers(st);
-      seatShadowEdit('dx', seatRound(base.dx + dx, 1));
-      seatShadowEdit('dy', seatRound(base.dy + dy, 1));
+      seatShadowEdit('dx', seatRound(base.dx + dx / ws, 1));
+      seatShadowEdit('dy', seatRound(base.dy + dy / ws, 1));
     } else {
       // Moving the ART on a fixed cell centre IS moving its anchor, the other
       // way round: pushing the piece right means the anchor sits further left
       // in its own frame.
-      const eff = seatPlateScale(st.key, st.artScale);
+      const eff = seatPlateScale(st.key, st.artScale) * ws;
       const tw = (SEAT.img?.naturalWidth ?? 1) * eff;
       const th = (SEAT.img?.naturalHeight ?? 1) * eff;
       seatEdit({

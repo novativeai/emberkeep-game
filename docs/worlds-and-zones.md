@@ -266,6 +266,22 @@ one authored, one imported — and they agree by construction: both lay index
 blocks out reference-grid-first with a one-cell gutter, and both measure the
 reference grid through `gameOrigin`.
 
+### Two scales, two owners
+
+A zone's `artScale` sizes what is PART OF THE GROUND — floor tiles, fog caps,
+the drag reticle — per zone, so the drawn floor meets the painting under it
+exactly (`artScaleAt`). Board pieces do not use it: a piece is a thing the
+player carries, and one that visibly changed size crossing a zone seam
+mid-drag would read as a glitch. Pieces take `WorldRuntime.itemScale` instead —
+ONE number per world, the playable-cell-weighted median of the zones'
+`artScale`, derived in `buildWorld` so a re-export moves it automatically
+(Emberkeep 1 by construction; Borealis 0.69, Roothold 0.67, Runevault 0.66,
+pinned in `tests/unit/WorldItemScale.spec.ts`). BoardItem folds it into every
+art scale, shadow width and shadow seat; BoardScene folds it into the dragon
+rig scale, the clip overlays and the hatch flourish; the worldbuilder's 🪞 Seat
+page draws and drags with the same number. Generator UI (ready star, timer
+pill, badges) deliberately stays unscaled — legibility over perspective.
+
 ## 5. TOUCH X → CHECK Y
 
 - **Re-export `map.json`** → re-run `scripts/build-zones.mjs`, or the

@@ -144,6 +144,26 @@ export interface WorldRuntime {
   adjacency: Map<string, TilePos[]>;
   /** Doors out of this world, in authoring order. */
   portals: PortalRuntime[];
+  /**
+   * How much a BOARD PIECE standing anywhere in this world scales — 1 is the
+   * authored isle's tile, the size every ITEM_SCALE, anchor and shadow seat was
+   * tuned against.
+   *
+   * ONE number per world, not per zone, on purpose. Ground art follows its own
+   * zone (`artScaleAt`) because a floor must meet the painting under it exactly;
+   * a piece is a THING the player carries around, and a dragon that visibly
+   * shrank stepping across a zone seam mid-drag would read as a glitch, not as
+   * perspective. So pieces take the world's typical tile once, at spawn, and
+   * keep it for as long as they stand there.
+   *
+   * DERIVED, NOT LISTED (the deploy rule, applied to numbers): the value is the
+   * playable-cell-weighted median of each cell's owning zone's `artScale`, so a
+   * re-export that repaints a world at a new tile size moves this with it and
+   * nothing has to remember to update a table. The authored isle's dense zone is
+   * definitionally 1, which is why Emberkeep lands at exactly the size every
+   * piece was tuned at.
+   */
+  itemScale: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -712,6 +732,18 @@ export function buildWorld(spec: WorldSpec, authored: MapData): WorldRuntime {
   for (const region of map.regions) {
     for (const [c, r] of region.tiles) tileRegion.set(key(c, r), region.id);
   }
+  // The median tile a piece will actually stand on — see `itemScale` on the
+  // interface. Median rather than mean so one oversized terrace (Emberkeep has
+  // zones from 0.79 to 1.13) cannot drag every piece off the size the bulk of
+  // the ground was tuned at; cell-weighted so a five-cell ledge cannot outvote
+  // the hundred-cell mainland. Empty worlds (fixtures) fall back to 1.
+  const cellScales = (map.playable ?? [])
+    .map(([c, r]) => zones.find((z) => inBlock(z, c, r))?.artScale ?? 1)
+    .sort((a, b) => a - b);
+  const itemScale = cellScales.length
+    ? Math.round(cellScales[(cellScales.length - 1) >> 1]! * 100) / 100
+    : 1;
+
   return {
     id: spec.id,
     name: spec.name,
@@ -727,7 +759,8 @@ export function buildWorld(spec: WorldSpec, authored: MapData): WorldRuntime {
     playable: new Set((map.playable ?? []).map(([c, r]) => key(c, r))),
     tileRegion,
     adjacency: buildAdjacency(zones),
-    portals: (spec.portals ?? []).map(portalFromSpec)
+    portals: (spec.portals ?? []).map(portalFromSpec),
+    itemScale
   };
 }
 

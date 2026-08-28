@@ -573,11 +573,21 @@ const worldbuilderSeatEndpoint = (): Plugin => ({
               // be a stone whose painted joints really are where the lattice
               // says, or every piece looks mis-seated.
               const PICK: Record<string, [number, number]> = { borealis: [16, 2], roothold: [4, 0], runevault: [0, 0] };
+              // The same playable-cell-weighted median world.ts derives for
+              // WorldRuntime.itemScale — the Seat page must draw a piece at the
+              // size the running game gives it, or the tool lies about the fit.
+              const medianItemScale = (zs: { cells: [number, number][]; artScale?: number }[]): number => {
+                const all: number[] = [];
+                for (const z of zs) for (let i = 0; i < z.cells.length; i++) all.push(z.artScale ?? 1);
+                all.sort((a, b) => a - b);
+                return all.length ? Math.round(all[(all.length - 1) >> 1] * 100) / 100 : 1;
+              };
               const out = [{
                 id: 'emberkeep',
                 name: 'Emberkeep',
                 backdrop: 'sprites/background/emberkeep-nb2.webp',
                 cell: [3, 3] as [number, number],
+                itemScale: 1,
                 zone: null as null | { worldPoint: [number, number]; u: [number, number]; v: [number, number] }
               }];
               for (const w of zones.worlds) {
@@ -601,6 +611,7 @@ const worldbuilderSeatEndpoint = (): Plugin => ({
                   name: w.name,
                   backdrop: `sprites/background/${w.backdrop === 'emberkeep' ? 'emberkeep-nb2' : w.backdrop}.webp`,
                   cell: hit.cell,
+                  itemScale: medianItemScale(w.zones as { cells: [number, number][]; artScale?: number }[]),
                   // The stone's own world point, and the zone's own step vectors:
                   // a zoned world's tile is whatever ITS grid measured, never the
                   // authored 256 px one.
