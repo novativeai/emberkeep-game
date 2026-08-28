@@ -3216,14 +3216,6 @@
                 "chain": "wayfinder",
                 "tier": 2,
                 "at": [
-                  76,
-                  0
-                ]
-              },
-              {
-                "chain": "hearthlamp",
-                "tier": 1,
-                "at": [
                   70,
                   0
                 ]
@@ -3246,7 +3238,7 @@
               },
               {
                 "chain": "hearthlamp",
-                "tier": 2,
+                "tier": 1,
                 "at": [
                   64,
                   0
@@ -3261,11 +3253,19 @@
                 ]
               },
               {
+                "chain": "hearthlamp",
+                "tier": 2,
+                "at": [
+                  64,
+                  2
+                ]
+              },
+              {
                 "chain": "chest",
                 "tier": 1,
                 "at": [
-                  65,
-                  2
+                  78,
+                  0
                 ]
               }
             ]

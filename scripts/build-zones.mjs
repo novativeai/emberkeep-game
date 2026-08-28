@@ -776,7 +776,15 @@ const BOREALIS_PLAN = {
  * every cell and this re-derives; nothing here names an address.
  */
 const FOG_MARCH = {
-  borealis: { island: 1, waves: [4, 5, 6] }
+  // doorCells PINS the key-door band's size. It used to inherit the authored
+  // first-wave count, which made the door a hostage of the editor's leveling:
+  // nionja's newer editor project re-levels the mainland (56 unlock edits,
+  // ZERO coordinate edits — verified 2026-08-28) and would have shrunk the
+  // door to 4 cells, too few for the five machines and the chest the plan
+  // seeds there. The march already decides every wave geometrically; now it
+  // decides the door's size too, and the editor's levels on this island are
+  // fully advisory.
+  borealis: { island: 1, waves: [4, 5, 6], doorCells: 15 }
 };
 
 /** Tiers that hold a `generator` — the machines, read off the shipped chain
@@ -1412,7 +1420,7 @@ for (const spec of WORLDS) {
     const lvlOf = new Map();
     for (const [lvl, list] of byLevel) for (const c of list) lvlOf.set(c, lvl);
     const doorLvl = Math.min(...cells.map((c) => lvlOf.get(c)));
-    const doorCount = cells.filter((c) => lvlOf.get(c) === doorLvl).length;
+    const doorCount = marchSpec.doorCells ?? cells.filter((c) => lvlOf.get(c) === doorLvl).length;
     // South first: larger world Y is lower on screen. Ties by address, so a
     // rebuild is reproducible to the cell.
     const south = [...cells].sort((a, b) => b.at.y - a.at.y || a.col - b.col || a.row - b.row);
