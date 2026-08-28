@@ -472,10 +472,37 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
    * `reachableRecipeKeys` caches per (chains, world), so flipping tabs costs
    * a lookup, not a ladder walk.
    */
+  /**
+   * Does the player HOLD either side of a recipe right now — its input or its
+   * output, on the viewed world's board or in the Bag (which travels). This is
+   * what floats a recipe to the top: a row about a piece in the player's hands
+   * belongs above one about things they have never seen. Counting the OUTPUT
+   * matters most on the tutorial's own lesson — three mosses just became a
+   * Moss Bunch, so the freshly discovered 1→2 row is held only on its result.
+   */
+  private holdsPiece(recipe: Recipe): boolean {
+    const held = (tier: number): boolean => {
+      for (const item of this.gameState.itemsIn(this.viewWorld)?.values() ?? []) {
+        if (item.kind === 'item' && item.chain === recipe.chain && item.tier === tier) return true;
+      }
+      return this.gameState.bag.some((b) => b.chain === recipe.chain && b.tier === tier);
+    };
+    return held(recipe.fromTier) || held(recipe.toTier);
+  }
+
   private buildRows(): void {
     this.rowsGroup.removeAll(true);
     this.rows = [];
-    const recipes = this.recipesFor(this.viewWorld);
+    // AVAILABLE FIRST (owner's rule, 2026-08-28): recipes whose input the
+    // player already holds print at the top, the rest keep chains.json order
+    // below them — a stable partition, so the book still reads as one list.
+    // During the tutorial's cookbook lesson this is also what puts the ONE
+    // chain the player has touched on row one.
+    const enumerated = this.recipesFor(this.viewWorld);
+    const recipes = [
+      ...enumerated.filter((r) => this.holdsPiece(r)),
+      ...enumerated.filter((r) => !this.holdsPiece(r))
+    ];
     // Row-major, left then right: scrolling then reveals recipes IN ORDER.
     // Filling column one before column two put recipe 1 beside recipe 13, and
     // a scroll moved both by twelve places at once.
@@ -577,10 +604,10 @@ export class CookbookPanel extends Phaser.GameObjects.Container {
       : ([...this.gameState.worlds.keys()].find(
           (id) => this.gameState.visited(id) && this.recipesFor(id).length > 0
         ) ?? this.gameState.worldId);
-    if (this.viewWorld !== here) {
-      this.viewWorld = here;
-      this.buildRows();
-    }
+    this.viewWorld = here;
+    // Rebuilt on EVERY open, not only on a world change: the available-first
+    // order reads the live board and bag, and both moved since last time.
+    this.buildRows();
     this.buildTabs();
     this.refresh();
     this.setScroll(0);

@@ -6,6 +6,7 @@ import {
   skipWarmthCost,
   goldPurse
 } from '../core/Constants';
+import { commissionVerdict } from '../core/commissionRule';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -121,12 +122,14 @@ export class GeneratorSystem {
       this.bus.emit('generator:produce_refused', { itemId, reason: 'already_set' });
       return;
     }
-    // The rank of the building is the rank of the work: a House takes tier-1
-    // commissions only, a Manor tiers 1–2 (`produceMaxTier`). The chooser
-    // renders over-rank stacks locked, so this refusal is the belt to that
-    // brace — the rule must hold even for a caller that never opened the panel.
-    if (tier > this.produceMaxTierOf(item)) {
-      this.bus.emit('generator:produce_refused', { itemId, reason: 'tier_too_high' });
+    // The eligibility law lives in ONE predicate (core/commissionRule.ts —
+    // rank, no dragons, home goods only); the chooser renders ineligible
+    // stacks locked from the same predicate, so this refusal is the belt to
+    // that brace — the rule holds even for a caller that never opened the
+    // panel.
+    const verdict = commissionVerdict(this.chains, this.state.worldId, item, { chain, tier });
+    if (verdict !== 'ok') {
+      this.bus.emit('generator:produce_refused', { itemId, reason: verdict });
       return;
     }
     // The Bag is the roster, and the purse is part of it: Gold is held as the

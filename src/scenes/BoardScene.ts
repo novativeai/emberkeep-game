@@ -565,6 +565,8 @@ export class BoardScene extends Phaser.Scene {
   private portalDoors = new Map<string, { fx: PortalFX; zone: Phaser.GameObjects.Zone; to: string }>();
   /** WorldRuntime.itemScale for the world on screen — see `buildBoard`. */
   private worldItemScale = 1;
+  /** One refetch attempt per build — see the missing-backdrop guard in `buildBoard`. */
+  private artRefetchTried = false;
   /** World-position anchors the hub tours point at (the Emporium house, the
    *  cauldron) — registered by whichever builder places the landmark. */
   private tourTargets = new Map<string, { x: number; y: number }>();
@@ -629,6 +631,21 @@ export class BoardScene extends Phaser.Scene {
     // one field; ground, fog and the drag reticle keep their own per-zone
     // `artScaleAt` — a floor meets the painting, a piece keeps its size.
     this.worldItemScale = this.ctx.state.world.itemScale;
+    // TRAVEL IS NOT THE ONLY DOOR INTO A WORLD. The eviction below already
+    // self-corrects from any route; the FETCH half never did — it only ran on
+    // `world:switched`. So Title → Play after a RESET built the isle over open
+    // sky: standing in Borealis had (correctly) handed Emberkeep's backdrop
+    // back, the reset never travels, and the fresh game painted clouds on
+    // black. If the ground this build needs is not resident, fetch it through
+    // the same door travel uses and build on the restart. Once per attempt —
+    // a fetch that cannot land (offline) builds degraded rather than looping.
+    const backdrops = (this.ctx.state.map.backgrounds ?? []).map((b) => `background_${b.name}`);
+    if (!this.artRefetchTried && backdrops.some((k) => !this.textures.exists(k))) {
+      this.artRefetchTried = true;
+      this.fetchWorldArt(() => this.scene.restart());
+      return;
+    }
+    this.artRefetchTried = false;
     this.itemSprites.clear();
     this.itemAuras.clear();
     this.pool = [];
@@ -6934,6 +6951,13 @@ export class BoardScene extends Phaser.Scene {
     return cell ? { cell, target: null } : null;
   }
 
+  /** The tile diamond's screen half-extents at a cell — the zone's own step
+   *  vectors, so a Borealis stone hands out a Borealis-sized tap zone. */
+  private tileHalfAt(col: number, row: number): { w: number; h: number } {
+    const z = zoneAt(this.ctx.state.world, col, row) ?? this.ctx.state.world.fallback;
+    return { w: Math.abs(z.u.x - z.v.x) / 2, h: Math.abs(z.u.y + z.v.y) / 2 };
+  }
+
   /** Does (wx,wy) land on this sprite's OPAQUE art? World point → hit-area
    *  space by the same transform the input plugin uses (BoardItems have no
    *  parent container and never rotate, so the inverse is two divides), then
@@ -7930,7 +7954,23 @@ export class BoardScene extends Phaser.Scene {
           x: number,
           y: number,
           obj: BoardItem
-        ): boolean => Phaser.Geom.Rectangle.Contains(area, x, y) && obj.hitsOpaqueArt(x, y),
+        ): boolean => {
+          if (!Phaser.Geom.Rectangle.Contains(area, x, y)) return false;
+          if (obj.hitsOpaqueArt(x, y)) return true;
+          // THE TILE IS A TAP ZONE TOO (owner's rule, 2026-08-28): a press on
+          // a piece's own tile is a press on the piece — but the SPRITE stays
+          // the prioritized zone, so a tile claim yields to any other piece's
+          // opaque art over the same point (a tall neighbour's painted body
+          // reaching across this tile wins the tap the player can SEE).
+          if (!obj.hitsOwnTile(x, y)) return false;
+          const wx = obj.x + (x - obj.displayOriginX) * obj.scaleX;
+          const wy = obj.y + (y - obj.displayOriginY) * obj.scaleY;
+          for (const s of this.itemSprites.values()) {
+            if (s === obj || !s.active) continue;
+            if (this.artContainsWorldPoint(s, wx, wy)) return false;
+          }
+          return true;
+        },
         useHandCursor: true
       });
       sprite.on('pointerup', (pointer: Phaser.Input.Pointer) => {
@@ -7990,7 +8030,10 @@ export class BoardScene extends Phaser.Scene {
     // Phaser 3.90: calling setInteractive() on an already-interactive object
     // silently returns without updating hitArea. Mutate sprite.input.hitArea
     // directly instead. This also handles pool-reuse resets.
-    sprite.input!.hitArea = sprite.artHitRect();
+    // Items answer on their tile too; decor stays art-only (and is inert below
+    // anyway). Filed before the hitArea snapshot so the union is in the copy.
+    sprite.setTileFootprint(snap.kind === 'decor' ? null : this.tileHalfAt(snap.col, snap.row));
+    sprite.input!.hitArea = sprite.hitRect();
     // Decor is inert scenery: with art-bounds hit zones its (often huge, opaque)
     // sprite would eclipse playable items behind it — pointer input passes
     // through entirely. Re-enabled per-acquire since the pool recycles sprites.
@@ -9082,6 +9125,9 @@ export class BoardScene extends Phaser.Scene {
         if (sprite) {
           sprite.col = to.col;
           sprite.row = to.row;
+          // The tap-zone diamond follows the piece to its new cell — a move
+          // across a zone seam lands on a different tile size.
+          sprite.setTileFootprint(this.tileHalfAt(to.col, to.row));
           const { x, y } = gridToWorld(to.col, to.row);
           this.settleAfterDrag(sprite, x, y);
         }

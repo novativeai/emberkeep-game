@@ -66,6 +66,14 @@ export class BoardItem extends Phaser.GameObjects.Container {
   private artBaseX = 1;
   private artBaseY = 1;
   /**
+   * Screen half-extents of the tile diamond under this piece's own cell, in
+   * container units — provided by the scene at acquire (zone geometry lives
+   * there) and refreshed when the piece changes cell. Null = the art alone
+   * answers taps, which is the rule for decor and the pre-rule fallback.
+   */
+  private tileHalf: { w: number; h: number } | null = null;
+
+  /**
    * The world's per-piece scale (WorldRuntime.itemScale): 1 on the authored
    * isle, ~0.67 on the smaller-tiled worlds. Folded into `artBaseX/Y` HERE, at
    * the one seam every art scale passes through, so no caller ever multiplies
@@ -246,7 +254,7 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // container a fresh rect is silently ignored and the stale one stays live —
     // and the hit callback closes over the stored object either way.
     const area = this.input?.hitArea as Phaser.Geom.Rectangle | undefined;
-    if (area) Phaser.Geom.Rectangle.CopyFrom(this.artHitRect(), area);
+    if (area) Phaser.Geom.Rectangle.CopyFrom(this.hitRect(), area);
   }
 
   acquire(
@@ -281,6 +289,8 @@ export class BoardItem extends Phaser.GameObjects.Container {
     // A pooled slot must never keep the last WORLD's tile either — set before
     // any scale below so the whole acquire speaks one world's size.
     this.worldScale = worldScale;
+    // …nor the last tenant's tile footprint: the scene re-files it per cell.
+    this.tileHalf = null;
     // File-based decor art can be far larger than a tile; artScale fits it.
     this.sprite.setScale(artScale * worldScale);
     this.artBaseX = artScale * worldScale;
@@ -393,6 +403,45 @@ export class BoardItem extends Phaser.GameObjects.Container {
       w,
       h
     );
+  }
+
+  /** File the tile diamond under this piece's cell (owner's rule, 2026-08-28:
+   *  a tap on a piece's TILE is a tap on the piece). The scene provides the
+   *  half-extents because zone geometry is its to know. */
+  setTileFootprint(half: { w: number; h: number } | null): void {
+    this.tileHalf = half;
+    this.refreshHitArea();
+  }
+
+  /** Does hit-space (hx,hy) land inside this piece's OWN tile diamond? The
+   *  container stands ON its cell centre, so the diamond is centred on the
+   *  hit-space origin (localPoint + displayOrigin — see acquireSprite). */
+  hitsOwnTile(hx: number, hy: number): boolean {
+    if (!this.tileHalf) return false;
+    return (
+      Math.abs(hx - this.displayOriginX) / this.tileHalf.w +
+        Math.abs(hy - this.displayOriginY) / this.tileHalf.h <=
+      1
+    );
+  }
+
+  /**
+   * The full tappable box: the ART's bounds UNION the tile diamond's. The art
+   * stays the prioritized zone — the per-pixel test still runs first, and a
+   * tile-only claim yields to any other piece's opaque art over the same point
+   * (the scene's hit callback owns that arbitration, because only it can see
+   * the other pieces).
+   */
+  hitRect(): Phaser.Geom.Rectangle {
+    const art = this.artHitRect();
+    if (!this.tileHalf) return art;
+    const tile = new Phaser.Geom.Rectangle(
+      this.displayOriginX - this.tileHalf.w,
+      this.displayOriginY - this.tileHalf.h,
+      this.tileHalf.w * 2,
+      this.tileHalf.h * 2
+    );
+    return Phaser.Geom.Rectangle.Union(art, tile, new Phaser.Geom.Rectangle());
   }
 
   /**

@@ -1591,7 +1591,7 @@ export interface EventMap {
   'generator:produce_set': { itemId: number; chain: string; tier: number };
   'generator:produce_refused': {
     itemId: number;
-    reason: 'already_set' | 'not_commissionable' | 'not_in_bag' | 'tier_too_high';
+    reason: 'already_set' | 'not_commissionable' | 'not_in_bag' | 'tier_too_high' | 'dragon' | 'foreign_world';
   };
   /** Intent: SELL one of this stack for coins. Selling lives in the Bag and
    *  nowhere else — a piece on the board can be dragged, merged or pocketed,
