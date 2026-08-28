@@ -38,7 +38,6 @@ import {
   GOLDEN_ALTAR,
   GOLDEN_CHAIN,
   GOLDEN_ELDER_TIER,
-  GOLDEN_TINT,
   GOLDEN_TREMBLE_PROGRESS,
   ITEM_SCALE,
   LEVEL_XP,
@@ -556,7 +555,9 @@ export class BoardScene extends Phaser.Scene {
    *  wings through the touchdown instead of cutting to a standing frame. */
   private altarElderPhase: 'ground' | 'takeoff' | 'loop' | 'landing' = 'ground';
   private altarElderShadow?: Phaser.GameObjects.Image;
-  private altarElderFallback?: Phaser.GameObjects.Image;
+  /** A `showAltarElder` waiter is queued behind the loader — so the tremble's
+   *  pre-warm and the ceremony's own call cannot arm two of them. */
+  private elderClipsPending = false;
   private altarZone?: Phaser.GameObjects.Zone;
   /** The doors out of this world, each with its lit FX — see `buildPortals`. */
   private portalDoors = new Map<string, { fx: PortalFX; zone: Phaser.GameObjects.Zone; to: string }>();
@@ -685,8 +686,11 @@ export class BoardScene extends Phaser.Scene {
     this.altarElderClip = undefined;
     this.altarElderPhase = 'ground';
     this.altarElderShadow = undefined;
-    this.altarElderFallback = undefined;
     this.altarElderRoll = { mode: 'idle', remainMs: 0 };
+    // With the rest: travel restarts this scene and takes the queued waiter
+    // with it, so a flag left standing would refuse to arm the next one and the
+    // altar would hold an egg for the rest of the session.
+    this.elderClipsPending = false;
     this.altarZone = undefined;
     // Travel restarts this scene, so last world's doors died with it — never
     // carry the refs, or the new board would hold rectangles leading out of a
@@ -3201,6 +3205,21 @@ export class BoardScene extends Phaser.Scene {
       this.ctx.state.level === 2 &&
       gained / span >= GOLDEN_TREMBLE_PROGRESS;
     if (near && !this.goldenTremble && egg) {
+      /**
+       * PRE-WARM HER, on the same signal that tells the PLAYER to look.
+       *
+       * Her body is one 2.2 MB, 114-frame sheet, and it used to be asked for at
+       * the very instant the egg cracked — the one moment in the chapter that
+       * cannot wait for a download. The rig that once covered those seconds is
+       * gone with `DRAGON_RIGS`, so the wait became an empty altar.
+       *
+       * The tremble is the right cue and costs nothing extra: it fires only for
+       * a Keeper already deep into level 2, on a board that is visibly about to
+       * reach the awakening, so nobody downloads her who was not going to see
+       * her. `fetchClips` is idempotent, and the waiter it arms refuses to
+       * dress the altar until the ceremony's latch is set.
+       */
+      this.fetchElderClips();
       this.goldenTremble = this.tweens.add({
         targets: egg,
         angle: { from: -2.4, to: 2.4 },
@@ -3311,7 +3330,7 @@ export class BoardScene extends Phaser.Scene {
    *  (Order 1 just delivered) the camera glides west and the egg FLARES — the
    *  old altar answering the rekindled brazier. */
   private showAltarEgg(ceremony: boolean): void {
-    if (!this.altarEgg && !this.altarElder && !this.altarElderClip && !this.altarElderFallback) {
+    if (!this.altarEgg && !this.altarElder && !this.altarElderClip) {
       const p0 = this.altarPoint();
       const cal = GOLDEN_ALTAR.calibration;
       // Through `plateScale`, like every other draw of a board plate: this
@@ -3394,6 +3413,34 @@ export class BoardScene extends Phaser.Scene {
     if (this.altarElderClip) return; // her own clips are the best she gets
     const p = this.altarPoint();
     const eggBottom = p.y + 1451 * p.scale; // egg art is 1176×1451, anchored top
+    // Her sheets are asked for here as well as at the tremble, because this is
+    // also the path a RELOAD takes into a save where she is already awake —
+    // that boot never trembles. `fetchElderClips` calls back into this method
+    // when they land.
+    this.fetchElderClips();
+    const idle = this.elderClip('idle');
+    const rig = this.dragonRigs.get(GOLDEN_CHAIN);
+    /**
+     * THE EGG OUTLIVES THE CRACK UNTIL SOMEONE CAN TAKE ITS PLACE.
+     *
+     * This used to clear the egg as its first act, on the reasoning that a rig
+     * would be standing there within a second or two. That reasoning died with
+     * the rigs: `DRAGON_RIGS` is `{}` now, dragons are clips, and the only
+     * thing left to cover the gap is the placeholder below — which is
+     * DELIBERATELY INVISIBLE, because the plate it would wear is a red dragon.
+     *
+     * So on the one irreversible beat of the chapter the egg cracked into
+     * nothing, the camera went home at `FINALE.returnAtMs`, and the Golden
+     * Elder faded in later, off-screen, whenever her 2.2 MB / 114-frame idle
+     * sheet finished arriving. Measured on the deployed build: 52 seconds.
+     * The owner reported it as the golden dragon not appearing when it should,
+     * and he was describing exactly this.
+     *
+     * Now nothing is destroyed until there is something to destroy it FOR. A
+     * cracked egg that lingers half a second reads as a beat still in flight;
+     * an empty altar reads as the ending being broken.
+     */
+    if (!idle && !rig && !this.altarElder) return;
     this.altarEgg?.destroy();
     this.altarEgg = undefined;
     this.altarEggShadow?.destroy();
@@ -3401,18 +3448,9 @@ export class BoardScene extends Phaser.Scene {
     this.eggAura?.destroy();
     this.eggAura = undefined;
     this.stopGoldenTremble();
-    // HER SHEETS ARE FETCHED HERE AND NOWHERE ELSE. She costs 74 MB of video
-    // memory and appears once, at the very end of the chapter — on a board
-    // that may never reach it. `fetchElderClips` calls back into this method
-    // when they land, so a rig standing in for the seconds between is upgraded
-    // rather than kept.
-    this.fetchElderClips();
-    const idle = this.elderClip('idle');
     if (idle) {
       this.altarElder?.destroy();
       this.altarElder = undefined;
-      this.altarElderFallback?.destroy();
-      this.altarElderFallback = undefined;
       const sprite = this.add
         .sprite(p.x, eggBottom - DRAGON_ANIM.groundLift, idle.key)
         .setDepth(DEPTHS.itemBase + p.y + 1);
@@ -3430,10 +3468,7 @@ export class BoardScene extends Phaser.Scene {
       return;
     }
     if (this.altarElder) return; // rig already standing — wait for the clips
-    const rig = this.dragonRigs.get(GOLDEN_CHAIN);
     if (rig) {
-      this.altarElderFallback?.destroy();
-      this.altarElderFallback = undefined;
       const player = new RigPlayer(this, rig, (layer) => `rig:${rig.character}:${layer}`, {
         scale: GOLDEN_ALTAR.elderScale,
         speed: DRAGON_ANIM.adultSpeed // the Elder breathes slowly — a calm adult
@@ -3445,36 +3480,6 @@ export class BoardScene extends Phaser.Scene {
       player.container.setDepth(DEPTHS.itemBase + p.y + 1);
       this.altarElder = player;
       this.altarElderRoll = { mode: 'idle', remainMs: this.idleSpanMs(true) };
-    } else if (!this.altarElderFallback) {
-      /**
-       * A PLACEHOLDER, and deliberately an invisible one.
-       *
-       * The Elder's rig loads asynchronously, so for the few seconds before it
-       * arrives this stood in for her — wearing `item_golden_egg_2`, which
-       * assets.json maps to `red-dragon-baked.webp`. That is another creature
-       * entirely: the chapter's one irreversible story beat opened with a RED
-       * dragon on the golden altar, which then turned gold when the real rig
-       * landed. Better to show nothing for those seconds than the wrong dragon.
-       *
-       * The object itself stays, because three other places read it — the
-       * commune tap, its bob, and `showAltarEgg`'s "is anyone already here?"
-       * guard — and they are all still right about her being here. Only the
-       * painting is withheld. (The tap target is `ensureAltarZone`, its own
-       * object, so hiding this costs no interaction.)
-       *
-       * The data gap behind it stands: `item_golden_egg_2` points at the red
-       * dragon, and this build ships no full-body Golden Elder art to point it
-       * at — only her bust (`sprites/golden-elder/rest.webp`) and her rig.
-       */
-      this.altarElderFallback = this.add
-        .image(p.x, eggBottom, `item_${GOLDEN_CHAIN}_${GOLDEN_ELDER_TIER}`)
-        .setOrigin(0.5, 0.88)
-        // A no-op today (this plate shares its file with two other keys, so the
-        // downscale skips it) and correct the day it stops sharing.
-        .setScale(plateScale(`item_${GOLDEN_CHAIN}_${GOLDEN_ELDER_TIER}`, 0.21))
-        .setTint(GOLDEN_TINT)
-        .setVisible(false)
-        .setDepth(DEPTHS.itemBase + p.y + 1);
     }
     this.ensureElderShadow(p.x, eggBottom, DEPTHS.itemBase + p.y);
     this.ensureAltarZone();
@@ -3500,19 +3505,37 @@ export class BoardScene extends Phaser.Scene {
   private fetchElderClips(): void {
     const art = dragonClipCharacter(GOLDEN_CHAIN, GOLDEN_ELDER_TIER, null);
     if (!art) return;
-    const before = this.dragonClipsAsked.size;
     this.fetchClips(art, clipLoadTiers(art, { lean: DRAGON_CLIPS.lean }).eager);
-    if (this.dragonClipsAsked.size === before) return; // nothing new was asked for
+    if (this.elderClipsPending) return; // one waiter is enough
+    if (this.elderClip('idle')) return; // already resident — nothing to wait for
+    /**
+     * THE WAITER IS ARMED ON RESIDENCY, NOT ON NOVELTY.
+     *
+     * This used to arm only when the fetch had added something NEW to
+     * `dragonClipsAsked`, which was true while this method was her one and only
+     * door. The tremble pre-warms her now, so the ceremony's own call finds the
+     * sheets already asked for, added nothing, and returned — with no waiter
+     * armed and the altar holding an egg nobody would ever come to replace.
+     * Residency is the question that actually matters: if she is not drawable
+     * yet, somebody has to come back.
+     */
+    this.elderClipsPending = true;
     // Behind the fetch above rather than beside it: an empty batch completes at
     // once, so this always runs after her sheets have had their turn.
     this.loads.run(
       () => {},
       () => {
+        this.elderClipsPending = false;
+        if (!this.scene.isActive()) return;
+        // The tremble asks for her sheets while she is still ASLEEP, so landing
+        // them is not permission to dress the altar. Only the ceremony's own
+        // latch is.
+        if (this.ctx.state.stat(ELDER_WOKEN_STAT) <= 0 && !this.goldenQuestDone()) return;
         // Fenced: this fires from the LOADER, later than the ceremony and with
-        // nobody left to catch it — the upgrade from rig to clips is exactly
-        // the kind of late beat whose failure used to freeze a board the player
-        // had already been handed back.
-        if (this.scene.isActive()) this.beat('clips', () => this.showAltarElder());
+        // nobody left to catch it — the upgrade to clips is exactly the kind of
+        // late beat whose failure used to freeze a board the player had already
+        // been handed back.
+        this.beat('clips', () => this.showAltarElder());
       }
     );
   }
@@ -3690,7 +3713,7 @@ export class BoardScene extends Phaser.Scene {
       // An input handler runs inside the step too, so a tap on the altar could
       // end the session as surely as the ceremony could.
       this.beat('altar.tap', () => {
-        if (this.altarElder || this.altarElderClip || this.altarElderFallback) {
+        if (this.altarElder || this.altarElderClip) {
           this.communeWithElder();
         } else if (this.altarEgg) this.wobbleGoldenEgg();
       });
@@ -8366,10 +8389,6 @@ export class BoardScene extends Phaser.Scene {
       this.altarElder?.playFace(1);
       this.playElder('hover'); // she answers with a low pass over the altar
       this.altarElderRoll = { mode: 'hover', remainMs: DRAGON_ANIM.adultCelebrateMs };
-    } else if (this.altarElderFallback) {
-      const f = this.altarElderFallback;
-      const y0 = f.y;
-      this.tweens.add({ targets: f, y: y0 - 30, duration: 170, yoyo: true, ease: 'Sine.easeOut', onComplete: () => f.setY(y0) });
     }
     this.ctx.bus.emit('elder:tapped', { itemId: 0 }); // Keeper's Tasks counts communes
   }
