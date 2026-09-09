@@ -147,7 +147,7 @@ claims to measure. `TaskKind` counters, `completedOrderIds`, `countItems`,
 
 | Kind | Finished when | Notes |
 | --- | --- | --- |
-| `have` | that many of a chain+tier are on the board | **Non-monotonic** — delivering consumes them, so a met `have` is LATCHED |
+| `have` | the Keeper HOLDS that many of a chain+tier — on any board **or in the satchel** | **Non-monotonic** — delivering consumes them, so a met `have` is LATCHED. The bag counts because a `have` is a check and never a spend; an `order` is the opposite and stays board-only, since its delivery pays with board pieces |
 | `order` | that order is DELIVERED | Its counters show the goods (`6 / 6 — go and deliver`), but holding them is not finishing |
 | `active_order` | never | The endless tail: a live readout of the Ledger |
 | `stat` | a lifetime counter reaches the target | The same counters TaskSystem owns |

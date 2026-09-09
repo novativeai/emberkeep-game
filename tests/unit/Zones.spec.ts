@@ -914,6 +914,36 @@ describe('world art — visiting a world never leaves the others worse off', () 
     expect([...b.held].sort()).toEqual(['background_borealis', 'background_emberkeep']);
   });
 
+  /**
+   * ONE WARDROBE, TWO HOMES. Eleanor stands on the isle AND in her Roothold
+   * house, and both list the same standee banks — so "which world owns this
+   * texture" has no single answer, and the sweep must ask a different question.
+   *
+   * It asked the wrong one: the exemption above is written per WORLD (never
+   * sweep Emberkeep's list) while the removal is per KEY, so walking Roothold's
+   * list took her banks with it and the home world silently lost art the boot
+   * preload had already paid for. Backdrops hid it — one per world, shared with
+   * nobody — which is why the fixtures above never caught it.
+   *
+   * On screen it was the gear's Reset, taken from Borealis: a reset does not
+   * travel, so nothing re-fetched at the door, and the tutorial restarted with
+   * an Eleanor who was simply not drawn (buildWorldCharacters skips a character
+   * whose art is missing) until the page was reloaded.
+   */
+  it('keeps the home world’s art when another world lists the same texture', () => {
+    const ctx = new GameContext(new MemoryStorage());
+    ctx.state.switchWorld('borealis');
+    const home = new Set(worldArtKeys(ctx, 'emberkeep'));
+    const shared = worldArtKeys(ctx, 'roothold').filter((k) => home.has(k));
+    expect(shared).toContain('eleanor_world_idle');
+    const b = bin([...backdrops, ...shared]);
+    const freed = releaseAwayWorldArt(b, ctx);
+    for (const key of shared) {
+      expect(freed).not.toContain(key);
+      expect(b.held.has(key)).toBe(true);
+    }
+  });
+
   it('never takes a texture out from under a live sprite, whatever the rule says', () => {
     // The rule above is about which WORLD owns a texture, and it is only as
     // good as the list it reads: anything holding world art OUTSIDE that list —

@@ -4217,7 +4217,14 @@ export class BoardScene extends Phaser.Scene {
       // have to re-solve all five.
       const dressed = this.keeperSkinTexture(art);
       const key = dressed ?? (animated ? bank!.keys.idle : `char_${art}`);
-      if (!dressed && !animated && !this.textures.exists(key)) continue;
+      if (!dressed && !animated && !this.textures.exists(key)) {
+        // Degrading is right — art missing must never take the board down — but
+        // degrading SILENTLY is what hid the eviction bug for weeks: a lesson
+        // that says "tap me" has no other way to fail than a person who is not
+        // there, and the beat simply dead-ends. Say it out loud instead.
+        console.warn(`[characters] "${cfg.id}" not drawn — no art resident for "${art}"`);
+        continue;
+      }
       const [col, row] = cfg.anchor;
       const cell = gridToWorld(col, row);
       // Her authored nudge off the cell centre. Builder pixels, rebased onto the
@@ -5073,6 +5080,21 @@ export class BoardScene extends Phaser.Scene {
 
     if (!taken) return; // the refusal already spoke for itself (UIScene)
     this.ctx.bus.emit('bag:consume', { chain, tier, count: 1 });
+    // AND THE PIECE STAYS IN HAND while the satchel still holds another of it.
+    //
+    // Giving was armed for exactly ONE piece: the gesture disarmed the moment
+    // it landed, so handing over six meant six round trips out to the bag,
+    // open the panel, find the stack, tap Give, tap the recipient. The player
+    // read that as "I cannot give more than one" — which, as a gesture, is
+    // true. Nothing about the give was ever single by nature; the arming was.
+    //
+    // `bag:consume` is synchronous (the bus is), so this count is already the
+    // one AFTER the piece left. Held back until the tutorial is done because
+    // its later beats own taps that a still-armed give would swallow.
+    if (this.tutorialDone && this.ctx.systems.bag.countOf(chain, tier) > 0) {
+      this.pulseGiveTargets(true); // the set can have changed — a fed dragon may now refuse
+      return;
+    }
     this.pendingGive = null;
     this.pulseGiveTargets(false);
     this.ctx.bus.emit('bag:give_cancelled', {});

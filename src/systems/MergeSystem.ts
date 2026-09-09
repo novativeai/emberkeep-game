@@ -142,7 +142,7 @@ export class MergeSystem {
       spawnTiles.push(...extra);
     }
 
-    for (const tile of spawnTiles) {
+    for (const [index, tile] of spawnTiles.entries()) {
       const created = this.state.addItem({
         chain: seed.chain,
         tier: nextTier.tier,
@@ -151,7 +151,11 @@ export class MergeSystem {
         kind: 'item',
         ...(generator ? { readyAt: this.clock.now() } : {}),
         ...(inherited ? { care: { ...inherited } } : {}),
-        ...(inheritedName ? { dragonName: inheritedName } : {})
+        // THE NAME GOES TO ONE OF THEM. A five-for-two merge makes a second
+        // animal, not a copy of the first: the name belongs to the dragon that
+        // grew up, and the twin is a stranger who gets asked its own (the
+        // hatch queue in DragonSystem offers the question to anything unnamed).
+        ...(inheritedName && index === 0 ? { dragonName: inheritedName } : {})
       });
       outputs.push(this.state.snapshot(created, this.clock.now()));
     }

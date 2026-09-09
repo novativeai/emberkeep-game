@@ -35,6 +35,7 @@ import {
   WELCOME_BACK_MIN_MS,
   WORLD_ID
 } from '../core/Constants';
+import { LEGAL_DOCS, legalUrl } from '../core/legalLinks';
 import { FONT } from '../art/design';
 import { clipKey, clipsFor } from '../core/characterAnims';
 import { guard } from '../core/crash';
@@ -3463,6 +3464,39 @@ export class UIScene extends Phaser.Scene {
       this.closeResetDialog()
     );
 
+    /**
+     * THE POLICIES, INSIDE THE GAME.
+     *
+     * They live on the hub (`/legal/<slug>`, generated from the owner's .docx)
+     * and this row LINKS to them — the text is never copied here, or the two
+     * copies disagree the first time one is edited. The settings sheet is the
+     * right home: it is the one panel reachable from anywhere on the board,
+     * including mobile fullscreen, where the site's own footer is not.
+     *
+     * `window.open` runs SYNCHRONOUSLY inside the tap, which is what gets it
+     * past a pop-up blocker (the same discipline the payment hand-off keeps).
+     */
+    const legalLinks = LEGAL_DOCS.map((doc) => {
+      const link = this.add
+        .text(0, 0, doc.label, {
+          fontFamily: FONT.ui,
+          fontSize: `${SETTINGS_NOTE_PX + 4}px`,
+          color: PALETTE.night
+        })
+        .setOrigin(0, 0.5)
+        // The thumb target, not the glyph: ~33 CSS px on a 390-wide phone.
+        .setPadding(12, 26, 12, 26)
+        .setInteractive({ useHandCursor: true });
+      link.on('pointerup', () => window.open(legalUrl(doc.slug), '_blank', 'noopener'));
+      // Phaser's Text has no underline, and without one these read as inert
+      // labels rather than links. Drawn like the sheet's own divider.
+      const rule = this.add
+        .rectangle(0, 0, link.width - 24, 3, num(PALETTE.lava), 0.6)
+        .setOrigin(0, 0.5);
+      sheet.add([link, rule]);
+      return { link, rule };
+    });
+
     // Map Editor — the tool that authors the zone registry the engine runs
     // (`src/editor/`). Parked on the title row so it never crowds the reset
     // copy. HIDDEN by default (`MAP_EDITOR_IN_SETTINGS`); `?mapedit` on the
@@ -3507,7 +3541,19 @@ export class UIScene extends Phaser.Scene {
       y = body.y + body.height / 2 + 26;
       resetButton.setY(y + 56);
       keepButton.setY(y + 56);
-      y += 112 + 36;
+      y += 112 + 28; // air ABOVE the links
+      {
+        const gap = 18;
+        const total =
+          legalLinks.reduce((w, l) => w + l.link.width, 0) + gap * (legalLinks.length - 1);
+        let lx = -total / 2;
+        for (const { link, rule } of legalLinks) {
+          link.setPosition(lx, y + link.height / 2);
+          rule.setPosition(lx + 12, link.y + link.height / 2 - 6);
+          lx += link.width + gap;
+        }
+        y += (legalLinks[0]?.link.height ?? 0) + 36; // the bottom air, unchanged
+      }
       const h = y;
       panel.clear();
       panel.fillStyle(num(PALETTE.night), 0.25);

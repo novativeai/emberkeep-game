@@ -47,7 +47,7 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
     expect(ctx.systems.quests.titleFor(quest)).toBe('Light the Fire Bowl');
   });
 
-  it('a `have` goal reads the live board and LATCHES, so delivering cannot un-do it', () => {
+  it('a `have` goal reads what the Keeper HOLDS and LATCHES, so delivering cannot un-do it', () => {
     const ctx = createTestContext();
     const shards = ctx.systems.quests.activeQuest!.steps.find((s) => s.id === 'brazier_shards')!;
 
@@ -59,6 +59,39 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
     for (const item of ctx.state.itemsMatching('flame_gem', 1)) ctx.state.removeItem(item.id);
     ctx.bus.emit('item:removed', { itemId: 0, at: { col: 0, row: 0 }, reason: 'delivered' });
     expect(ctx.systems.quests.progressFor(shards).done).toBe(true);
+  });
+
+  /**
+   * THE SATCHEL IS NOT A HIDING PLACE. A player who tidies the pieces away as
+   * they make them was watching the row count DOWN: `BagSystem.store` pockets
+   * the stack and consumes the board item, so a count that walks boards alone
+   * says the piece stopped existing. Reported from a live game — "the 3 sun
+   * items task, if you put each one as made in the pouch, the task does not
+   * detect them, unless taken out".
+   */
+  it('a `have` goal counts the satchel too — pocketing a piece is not losing it', () => {
+    const ctx = createTestContext();
+    const shards = ctx.systems.quests.activeQuest!.steps.find((s) => s.id === 'brazier_shards')!;
+
+    // ONE AT A TIME, AND AWAY — the reported gesture exactly. The board never
+    // holds six at once, so the step cannot have latched on the way past: this
+    // is the only arrangement that actually tests the count. (Six on the
+    // ground first would latch the step and then pass whatever the counter
+    // said afterwards — a test that proves nothing, which is what the first
+    // draft of this one did.)
+    for (let i = 0; i < 6; i++) {
+      place(ctx, 'flame_gem', 1, 1);
+      const piece = ctx.state.itemsMatching('flame_gem', 1)[0]!;
+      ctx.bus.emit('ui:store_requested', { itemId: piece.id });
+      expect(ctx.state.countItemsAnywhere('flame_gem', 1)).toBe(0);
+    }
+    expect(ctx.systems.bag.countOf('flame_gem', 1)).toBe(6);
+
+    expect(ctx.systems.quests.progressFor(shards)).toMatchObject({
+      have: 6,
+      need: 6,
+      done: true
+    });
   });
 
   it('completes a quest only when every step is, then advances the ladder', () => {

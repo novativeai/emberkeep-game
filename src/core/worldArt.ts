@@ -100,15 +100,28 @@ export function worldArtKeys(ctx: GameContext, worldId: string): string[] {
  * leaves the others worse off than before, not that the game holds nothing.
  */
 export function releaseAwayWorldArt(bin: TextureBin, ctx: GameContext): string[] {
-  // Art the ACTIVE world is showing right now is untouchable no matter which
-  // other worlds also list it. Wardrobes are shared — Eleanor stands in both
-  // Emberkeep and Roothold wearing one bank — and evicting a texture under a
-  // live sprite null-crashes the renderer, which kills Phaser's RAF chain and
-  // freezes the whole game (loader, scene ops, travel — everything).
-  const keep = new Set(worldArtKeys(ctx, ctx.state.worldId));
+  // TWO WORLDS ARE EXEMPT: the one on screen, and the authored isle whose art is
+  // the boot preload's baseline. The exemption is a rule about KEYS, not about
+  // whose list we walk — and that distinction is the whole of it, because
+  // wardrobes are shared: Eleanor stands in both Emberkeep and Roothold wearing
+  // ONE bank, so not sweeping Emberkeep's list never spared her art. Walking
+  // Roothold's took her banks and her clips with it, and Emberkeep — never
+  // swept and so never re-fetched — quietly came home without the standee the
+  // boot preload had already paid for. Backdrops hid it for a long time: one
+  // per world, shared with nobody.
+  //
+  // The route it broke on is the gear's Reset, because a reset does NOT travel:
+  // nothing fetches at the door, so the fresh tutorial opened on an Eleanor who
+  // was simply not drawn, and only a page reload brought her back.
+  //
+  // The active world's half is load-bearing for a second reason: evicting a
+  // texture under a live sprite null-crashes the renderer, which kills Phaser's
+  // RAF chain and freezes the whole game (loader, scene ops, travel).
+  const exempt = new Set([ctx.state.worldId, WORLD_ID]);
+  const keep = new Set([...exempt].flatMap((id) => worldArtKeys(ctx, id)));
   const freed: string[] = [];
   for (const id of ctx.state.worlds.keys()) {
-    if (id === ctx.state.worldId || id === WORLD_ID) continue;
+    if (exempt.has(id)) continue;
     for (const key of worldArtKeys(ctx, id)) {
       if (keep.has(key) || !bin.exists(key)) continue;
       // AND NOTHING IS TAKEN OUT FROM UNDER A LIVE SPRITE. The `keep` set above

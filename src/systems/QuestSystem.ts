@@ -362,7 +362,7 @@ export class QuestSystem {
     let worst = needs[0]!;
     let gap = -Infinity;
     for (const need of needs) {
-      const short = need.count - this.heldForBrew(need.chain, need.tier);
+      const short = need.count - this.held(need.chain, need.tier);
       if (short > gap) {
         gap = short;
         worst = need;
@@ -371,11 +371,21 @@ export class QuestSystem {
     return worst;
   }
 
-  /** Boards AND bag, because a brew is paid out of the BAG and the bag is
-   *  filled from the boards: an ingredient already pocketed is not one the
-   *  player still has to go and find, and pointing them back at the board for
-   *  it is the same wrong answer as naming the wrong ingredient. */
-  private heldForBrew(chain: string, tier: number): number {
+  /**
+   * WHAT THE KEEPER HOLDS — every board she has stood on, AND her satchel.
+   *
+   * The bag is a parallel store: `BagSystem.store` pockets the stack and emits
+   * `board:consume_items`, so the piece leaves every board's `items` map. A
+   * count that walks boards alone therefore says a pocketed piece does not
+   * exist — and that is exactly what a player sees when a step asking for
+   * three Sun Gems stops counting the moment they tidy them away, and starts
+   * again when they tip them back out.
+   *
+   * It began as the brew's own predicate (a brew is paid out of the BAG), and
+   * the reasoning was never about brewing: a piece in the satchel is not one
+   * the player still has to go and find.
+   */
+  private held(chain: string, tier: number): number {
     const pocketed = this.state.bag
       .filter((stack) => stack.chain === chain && stack.tier === tier)
       .reduce((n, stack) => n + stack.count, 0);
@@ -549,8 +559,13 @@ export class QuestSystem {
   private rawProgress(goal: QuestGoal): { have: number; need: number } {
     switch (goal.kind) {
       case 'have':
+        // HOLDS, not "stands on a board". A `have` goal is a CHECK and never a
+        // spend — nothing here consumes — so the satchel counts exactly as the
+        // ground does. (An ORDER is the other case and stays board-only: its
+        // delivery pays with board pieces, so counting a pocketed one there
+        // would promise a hand-over the delivery cannot make.)
         return {
-          have: Math.min(this.state.countItemsAnywhere(goal.chain, goal.tier), goal.count),
+          have: Math.min(this.held(goal.chain, goal.tier), goal.count),
           need: goal.count
         };
       case 'order': {
