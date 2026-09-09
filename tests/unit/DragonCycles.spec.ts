@@ -96,6 +96,10 @@ describe('feed cycles — the 10-minute window behind the Dragon Codex', () => {
       }
       // The Evolution page paints `reveal` as the silhouette; a key that is
       // not in assets.json renders an empty frame over the condition text.
+      // And every breed HAS the page now (owner, 2026-08-28): the adult reveal
+      // plates ship for all seven, so a dex entry without `evolution` is a
+      // dragon the Codex cannot show growing up — a regression, not a choice.
+      expect(entry.evolution, `${breed}.evolution`).toBeDefined();
       if (entry.evolution) {
         expect(registered.has(entry.evolution.reveal), `${breed} reveal '${entry.evolution.reveal}'`).toBe(true);
       }

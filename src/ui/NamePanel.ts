@@ -44,6 +44,29 @@ const NAMES: Record<string, string[]> = {
   emerald: [
     'Fern', 'Moss', 'Thistle', 'Verdant', 'Ivy', 'Sage', 'Bracken', 'Hollow',
     'Willow', 'Nettle', 'Sorrel', 'Juniper', 'Laurel', 'Alder', 'Reed', 'Yarrow'
+  ],
+  // THE BREEDS THAT HATCH ON THE BOARD, now that every hatch is asked and not
+  // only the nest's two (DragonSystem's naming queue). Ember's list was the
+  // fallback for all of them, which offered a Frost Dragon the name "Scorch".
+  ashdrake: [
+    'Soot', 'Cinderfall', 'Pumice', 'Grey', 'Smoulder', 'Basalt', 'Drift', 'Char',
+    'Ashen', 'Ember-Grey', 'Slate', 'Wisp', 'Fume', 'Kiln', 'Dusk', 'Char-Bell'
+  ],
+  frost: [
+    'Rime', 'Hail', 'Glacier', 'Sleet', 'Frost', 'Snowdrift', 'Icicle', 'Blizzard',
+    'Winter', 'Crystal', 'Floe', 'Shiver', 'Hoar', 'Pale', 'Snowcap', 'Chill'
+  ],
+  rimewyrm: [
+    'Glint', 'Shard', 'Quartz', 'Prism', 'Frostbite', 'Aurora', 'Silver', 'Icebound',
+    'Glimmer', 'Crackle', 'Lumen', 'Snowlight', 'Facet', 'Winterbourne', 'Cirrus', 'Veil'
+  ],
+  storm: [
+    'Thunder', 'Gale', 'Squall', 'Tempest', 'Bolt', 'Cloudburst', 'Rumble', 'Zephyr',
+    'Cyclone', 'Static', 'Roar', 'Downpour', 'Windshear', 'Levin', 'Stormcrow', 'Nimbus'
+  ],
+  golden_egg: [
+    'Aurelia', 'Sunmark', 'Gilder', 'Dawnfire', 'Radiant', 'Halo', 'Goldenhorn', 'Solace',
+    'Lumina', 'Sunspire', 'Amber', 'Daybreak', 'Regal', 'Corona', 'Highflame', 'Marigold'
   ]
 };
 

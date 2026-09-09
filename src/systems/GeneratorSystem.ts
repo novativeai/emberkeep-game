@@ -6,6 +6,7 @@ import {
   skipWarmthCost,
   goldPurse
 } from '../core/Constants';
+import { commissionVerdict } from '../core/commissionRule';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
@@ -121,12 +122,14 @@ export class GeneratorSystem {
       this.bus.emit('generator:produce_refused', { itemId, reason: 'already_set' });
       return;
     }
-    // The rank of the building is the rank of the work: a House takes tier-1
-    // commissions only, a Manor tiers 1–2 (`produceMaxTier`). The chooser
-    // renders over-rank stacks locked, so this refusal is the belt to that
-    // brace — the rule must hold even for a caller that never opened the panel.
-    if (tier > this.produceMaxTierOf(item)) {
-      this.bus.emit('generator:produce_refused', { itemId, reason: 'tier_too_high' });
+    // The eligibility law lives in ONE predicate (core/commissionRule.ts —
+    // rank, no dragons, home goods only); the chooser renders ineligible
+    // stacks locked from the same predicate, so this refusal is the belt to
+    // that brace — the rule holds even for a caller that never opened the
+    // panel.
+    const verdict = commissionVerdict(this.chains, this.state.worldId, item, { chain, tier });
+    if (verdict !== 'ok') {
+      this.bus.emit('generator:produce_refused', { itemId, reason: verdict });
       return;
     }
     // The Bag is the roster, and the purse is part of it: Gold is held as the
@@ -239,7 +242,18 @@ export class GeneratorSystem {
     if (!cfg) return;
     const now = this.clock.now();
     const timer = this.activeTimer(item, cfg, now);
-    if (!timer) return; // already ready
+    if (!timer) {
+      // ALREADY READY — the pin over a ready-but-unaffordable generator sends
+      // this same command, and the answer is the HARVEST itself (owner's law,
+      // 2026-08-27: a tap must always reach the menu; only the ⚡ choice may
+      // refuse, and loudly). ⚡ charges the authored harvest price; gold buys
+      // the very same harvest for the same number in the dearer currency, so
+      // an empty warmth gauge never dead-ends the loop. A character's `gift`
+      // hurries a WAIT, and there is none — nothing to do.
+      if (currency === 'gift') return;
+      this.harvestPaid(item, cfg, currency);
+      return;
+    }
 
     // Two ways to skip: GOLD (default) or WARMTH (cheaper). Both expensive at the
     // start, ~1 near the end.
@@ -302,9 +316,41 @@ export class GeneratorSystem {
       this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'cooldown' });
       return;
     }
-    if (this.state.energyCurrent < generator.energyCost) {
-      this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
-      return;
+    this.harvestPaid(item, generator, 'warmth');
+  }
+
+  /**
+   * The harvest, paid in either hand. The ordinary tap pays ⚡ (`energyCost`,
+   * as it always has); the pin over a READY generator whose warmth cannot
+   * cover it offers the SAME harvest for the SAME number in gold (floor 1).
+   * A refusal reports its price through `generator:skip_refused`, exactly as
+   * the skip's own refusals do, so the board can answer it in the piece's
+   * name rather than in silence.
+   */
+  private harvestPaid(
+    item: BoardItemState,
+    generator: GeneratorConfig,
+    currency: 'gold' | 'warmth'
+  ): void {
+    const now = this.clock.now();
+    const itemId = item.id;
+    if (currency === 'warmth') {
+      if (this.state.energyCurrent < generator.energyCost) {
+        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
+        this.bus.emit('generator:skip_refused', {
+          itemId, chain: item.chain, tier: item.tier, currency, cost: generator.energyCost
+        });
+        return;
+      }
+    } else {
+      const cost = Math.max(1, generator.energyCost);
+      if (this.state.coins < cost) {
+        this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'gold' });
+        this.bus.emit('generator:skip_refused', {
+          itemId, chain: item.chain, tier: item.tier, currency, cost
+        });
+        return;
+      }
     }
     const target = this.dropTileFor(item);
     if (!target) {
@@ -312,7 +358,14 @@ export class GeneratorSystem {
       return;
     }
 
-    this.bus.emit('energy:spend', { amount: generator.energyCost, reason: 'harvest' });
+    if (currency === 'warmth') {
+      this.bus.emit('energy:spend', { amount: generator.energyCost, reason: 'harvest' });
+    } else {
+      this.bus.emit('economy:add', {
+        coins: -Math.max(1, generator.energyCost),
+        reason: 'harvest_gold'
+      });
+    }
     item.readyAt = now + generator.cooldownMs;
     const output = this.produceItem(this.producesOf(item, generator)!, target, now);
     this.bus.emit('item:harvested', { generatorId: itemId, output: this.state.snapshot(output, now) });

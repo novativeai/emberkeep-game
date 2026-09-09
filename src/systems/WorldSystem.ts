@@ -4,7 +4,7 @@ import type { WorldRuntime } from '../core/world';
 import { groundCellAtWorldPoint, nearestPlayableCell, worldPointOf, zoneAt } from '../core/world';
 import { GATE_LANDING } from '../core/Constants';
 import type { CharactersData, TilePos } from '../core/types';
-import { storyOpen, worldOpen } from '../core/worldGates';
+import { cloudLevelMet, storyOpen, worldOpen } from '../core/worldGates';
 
 /**
  * WORLD TRAVEL — which world the board is showing.
@@ -49,7 +49,15 @@ export class WorldSystem {
     // regions and asks nothing of the rest of the boot.
     bus.on('state:loaded', () => {
       const world = this.state.worlds.get(this.state.worldId);
-      if (world) this.settleUnlocks(world);
+      if (!world) return;
+      this.settleUnlocks(world);
+      // A re-exported map may have re-cut its bands under the save's pieces —
+      // anything now standing inside fog moves to open ground or the satchel.
+      this.state.evictFromClosedRegions(world.id);
+      // The bare-board heal, for a reload that lands ON the stranded world
+      // (the door-crossing case is handled in `switchTo` — see the note
+      // there). Empty makes it safe: nothing to duplicate.
+      if (this.state.items.size === 0) this.seed(world);
     });
   }
 
@@ -85,8 +93,19 @@ export class WorldSystem {
   private landingCell(world: WorldRuntime, from: string): TilePos | null {
     const board = this.state.itemsIn(world.id);
     const taken = new Set([...(board?.values() ?? [])].map((i) => `${i.col},${i.row}`));
+    // NEVER UNDER THE CLOUDS (owner's report, 2026-08-27): a playable cell
+    // whose region is still fogged is a claim about the FUTURE, and a dragon
+    // seated on one stands inside a cloud the player cannot tap through.
+    // Region status is read off the DESTINATION world's own tile registry —
+    // the active world may be the one the Keeper stayed home on — and a cell
+    // no region names is open ground by construction (fog exists only as
+    // authored cloud regions; the build script asserts it).
+    const open = (col: number, row: number): boolean => {
+      const id = world.tileRegion.get(`${col},${row}`);
+      return id === undefined || this.state.regionStatus.get(id) === 'active';
+    };
     const free = (col: number, row: number): boolean =>
-      world.playable.has(`${col},${row}`) && !taken.has(`${col},${row}`);
+      world.playable.has(`${col},${row}`) && open(col, row) && !taken.has(`${col},${row}`);
 
     // SOMEBODY LIVES HERE FIRST: wherever the far world authors a character —
     // Eleanor keeps Roothold, Selyna her sanctuary — a dragon sent ahead of
@@ -243,7 +262,7 @@ export class WorldSystem {
       this.bus.emit('world:switch_failed', { to, reason: 'tutorial' });
       return;
     }
-    if (this.state.level < world.level) {
+    if (!cloudLevelMet(this.state, to, world.level)) {
       this.bus.emit('world:switch_failed', { to, reason: 'level' });
       return;
     }
@@ -255,7 +274,15 @@ export class WorldSystem {
     const arriving = !this.state.visited(to);
     this.state.switchWorld(to);
     this.settleUnlocks(world);
-    if (arriving) this.seed(world);
+    this.state.evictFromClosedRegions(world.id);
+    // Seed on FIRST arrival — and heal a board that stands utterly BARE.
+    // The bare case is real (owner's report, 2026-08-27): a save that had
+    // "visited" Borealis before a world re-export carried the visit latch but
+    // none of the re-gridded regions' contents, so the shore had no Glass
+    // Oven and nothing to play with — a world where nothing can ever happen.
+    // Empty is the guard that makes re-seeding safe: with zero pieces on the
+    // board there is nothing the reveal could duplicate.
+    if (arriving || this.state.items.size === 0) this.seed(world);
     this.bus.emit('world:switched', { from, to });
   }
 
@@ -293,7 +320,11 @@ export class WorldSystem {
       let opened = 0;
       for (const region of world.map.regions) {
         const level = region.unlock?.level;
-        if (level === undefined || level > this.state.level) continue;
+        // `cloudLevelMet`, not a bare rank compare: Borealis's cloud slabs
+        // carry the double key (rank OR the cauldron latch — owner's law,
+        // 2026-08-26), and arriving must settle them the same way living
+        // there would.
+        if (level === undefined || !cloudLevelMet(this.state, world.id, level)) continue;
         // A PRICE IS NOT A DELAY. This used to settle any region whose level was
         // met, which force-opened every gate that costs Gold Keys as well —
         // `level_2_gate` is `{ keys: 1, level: 2 }`, so a Keeper at level 2 who

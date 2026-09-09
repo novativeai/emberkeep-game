@@ -169,14 +169,17 @@ silently drops `checklist` writes, so everything goes in `notes`.
   cap and opens `level_5`'s land; it FIRES nothing. The array deliberately ends
   at level 3; the XP bar reads "Chapter One complete" at the cap.
 - The FINALE — camera to the Golden Altar, the egg cracks, the Golden Elder
-  wakes and speaks, camera home — is choreographed off the shared `FINALE`
-  timeline in Constants and triggered by `quest:completed` for
-  `GOLDEN_ALTAR.awakenQuestId`, in BOTH BoardScene and UIScene. It is a QUEST
-  beat, never a level: a number the player crosses mid-merge is the wrong
-  trigger for the chapter's one irreversible story beat. It ENDS there: no
-  teaser glimpse, and no card asking the player whether to keep playing; the
-  board is handed straight back. Whether she is standing there after a reload is
-  derived from the `q:done:<questId>` latch in `stats`, not from a save field.
+  wakes and speaks, Eleanor speaks the Gate open, camera home — is
+  choreographed off the shared `FINALE` timeline in Constants and triggered by
+  `story:elder_wakes`, in BOTH BoardScene and UIScene. That fact is emitted
+  ONCE per save by StorySystem when the Keeper's level reaches Borealis's own
+  `level` (owner's call, 2026-08-27 — the awakening rides the rank that opens
+  the door, so the two can never arrive out of order; it replaced the
+  `quest:completed`/`keepers_hoard` trigger, whose latch older saves may still
+  carry). It ENDS there: no teaser glimpse, and no card asking the player
+  whether to keep playing; the board is handed straight back. Whether she is
+  standing there after a reload is derived from `ELDER_WOKEN_STAT` (or the
+  legacy `q:done:keepers_hoard` latch) in `stats`, not from a save field.
 
 ## Phaser gotchas (do not regress)
 - Container hit areas test against `localPoint + displayOrigin` — custom hit rects

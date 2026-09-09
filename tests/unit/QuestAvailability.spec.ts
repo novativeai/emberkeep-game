@@ -14,12 +14,12 @@ import {
 import type { QuestConfig } from '../../src/core/types';
 import {
   chainHiddenIn,
-  RUNEVAULT_QUESTS_NEEDED,
   HIDDEN_CHAINS,
   LEVEL_XP,
   WORLD_ID
 } from '../../src/core/Constants';
 import { ZONES } from '../../src/core/world';
+import zonesJson from '../../src/data/zones.json';
 import cauldron from '../../src/data/cauldron.json';
 import chains from '../../src/data/chains.json';
 import map from '../../src/data/map.json';
@@ -409,13 +409,15 @@ describe('Borealis — merge quests and cauldron quests ping-pong', () => {
   const brews = (q: QuestConfig): boolean => q.steps.some((s) => s.goal.kind === 'brew');
   const firstBrew = asked.findIndex(brews);
 
-  it('hands the cauldron its first quest 15–20% of the way down the ladder', () => {
+  it('hands the cauldron its first quest on the 5th or 6th rung', () => {
+    // The owner's law (2026-08-26): the cauldron may not enter the north's
+    // ladder before the 5th quest — the player earns the islands first, then
+    // the Rune Way opens as a mid-arc reveal. It replaced a 15–20%-of-ladder
+    // rule that put the first brew 3rd.
     expect(firstBrew, 'no Borealis quest brews anything').toBeGreaterThan(-1);
-    const at = (firstBrew + 1) / asked.length;
-    expect(at, `first brew is quest ${firstBrew + 1} of ${asked.length}`).toBeGreaterThanOrEqual(
-      0.15
+    expect([5, 6], `first brew is quest ${firstBrew + 1} of ${asked.length}`).toContain(
+      firstBrew + 1
     );
-    expect(at).toBeLessThanOrEqual(0.2);
   });
 
   it('alternates the two kinds of work from there to the end', () => {
@@ -431,9 +433,21 @@ describe('Borealis — merge quests and cauldron quests ping-pong', () => {
     expect(runs.length, `rhythm: ${beats.join('')}`).toBeLessThanOrEqual(1);
   });
 
-  it('opens the Rune Way before the ladder asks for the first brew', () => {
-    // The gate counts FINISHED quests, so it must clear on the quest before.
-    expect(RUNEVAULT_QUESTS_NEEDED).toBeLessThanOrEqual(firstBrew);
+  it('opens the Rune Way exactly when the last clouds leave the main island', () => {
+    // The owner's law (2026-08-26): the Runevault appears at Level 6 — the
+    // rank whose region slab clears the final clouds off Borealis's coast.
+    // Pinned as an EQUALITY on the data both sides read: the door's level
+    // must be the highest level any Borealis region waits on, so neither can
+    // move without the other. (The rank is one of TWO keys: the cauldron
+    // latch — the ladder reaching its first brew quest — opens the same
+    // doors, so brews never wait on grinding. See worldGates.cloudLevelMet.)
+    const worlds = (zonesJson as unknown as {
+      worlds: Array<{ id: string; level: number; map: { regions: Array<{ unlock?: { level?: number } }> } }>;
+    }).worlds;
+    const byId = (id: string) => worlds.find((w) => w.id === id)!;
+    const lastCloud = Math.max(...byId('borealis').map.regions.map((r) => r.unlock?.level ?? 0));
+    expect(byId('runevault').level).toBe(lastCloud);
+    expect(lastCloud).toBe(LEVEL_XP.length); // the cap — clouds end where XP does
   });
 
   it('brews nothing whose ingredients belong to another world', () => {

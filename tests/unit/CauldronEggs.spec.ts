@@ -23,7 +23,7 @@ const eggs = data.recipes
 describe('brewed eggs → board → dragon (the whole road)', () => {
   it('covers every dragon egg the cauldron can brew', () => {
     expect(eggs.map((e) => e.chain).sort()).toEqual(
-      ['ashdrake', 'ember_dragon', 'emerald', 'golden_egg', 'rimewyrm'].sort()
+      ['ashdrake', 'frost', 'rimewyrm', 'storm'].sort()
     );
   });
 

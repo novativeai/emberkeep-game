@@ -55,13 +55,18 @@ describe('groundCellAtWorldPoint', () => {
   for (const id of [...worlds.keys()]) {
     const world = worlds.get(id)!;
 
-    it(`${id}: every cell centre resolves to its own cell`, () => {
+    it(`${id}: every ground cell centre resolves to its own cell`, () => {
       for (const z of world.zones) {
         for (let i = 0; i < z.matrix.cols; i++) {
           for (let j = 0; j < z.matrix.rows; j++) {
             const col = z.block.col + i;
             const row = z.block.row + j;
             if (!hasCell(world, col, row)) continue;
+            // A dense zone ADDRESSES its whole rectangle but its GROUND is the
+            // authored playable set — the corners are open sky (see
+            // `denseZoneOf`), and sky is exactly what this file says nothing
+            // stands on.
+            if (z.dense && z.cells.size > 0 && !z.cells.has(`${i},${j}`)) continue;
             const p = worldPointOf(world, col, row);
             expect(groundCellAtWorldPoint(world, p.x, p.y)).toEqual({ col, row });
           }
@@ -91,6 +96,26 @@ describe('groundCellAtWorldPoint', () => {
         }
       }
       expect(checked).toBeGreaterThan(100); // the sweep really did cross the isle
+    });
+
+    it(`${id}: a painted extension cell beats the isle rectangle's sky corner it overlaps`, () => {
+      // The regression this file exists for, sharpened by the measured re-seat
+      // (2026-08-27): once the extension slabs stood on their true stones, the
+      // far island's (32,0) centre lay 43 px from the isle's non-playable
+      // (9,0) — and the sky corner, counted as ground, won the drop. The
+      // tutorial's own "carry the stump to the far island" lesson bounced
+      // forever on it.
+      if (id !== 'emberkeep') return;
+      const zone = world.zones.find((z) => z.name === 'Grille 21');
+      if (!zone) throw new Error('emberkeep lost Grille 21');
+      const p = worldPointOf(world, zone.block.col, zone.block.row);
+      expect(groundCellAtWorldPoint(world, p.x, p.y)).toEqual({
+        col: zone.block.col,
+        row: zone.block.row
+      });
+      // And the sky corner itself is not ground at all.
+      const sky = worldPointOf(world, 0, 0);
+      expect(groundCellAtWorldPoint(world, sky.x, sky.y)).not.toEqual({ col: 0, row: 0 });
     });
 
     it(`${id}: a point well outside every isle is null, though the lattice still names a cell`, () => {

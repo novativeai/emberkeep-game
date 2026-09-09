@@ -18,13 +18,13 @@
       "speaker": "selyna",
       "world": "borealis",
       "anchor": [
-        85,
+        76,
         0
       ],
       "action": "give_back",
       "cooldownMs": 900000,
-      "dx": -108,
-      "dy": -152
+      "dx": 84,
+      "dy": -71
     },
     {
       "id": "eleanor_home",

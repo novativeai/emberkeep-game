@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import realMap from '../../src/data/map.json';
 import {
   CAULDRON_DECOR,
+  CAULDRON_REACHED_STAT,
   chainHiddenIn,
   DECOR_SCALE,
   decorClipCharacter,
@@ -10,6 +11,7 @@ import {
   SAVE_VERSION,
   WORLD_ID
 } from '../../src/core/Constants';
+import { cloudLevelMet } from '../../src/core/worldGates';
 import { clipFor } from '../../src/core/characterAnims';
 import { GameContext } from '../../src/core/Context';
 import { GameState } from '../../src/core/GameState';
@@ -27,12 +29,93 @@ import {
   portalAtWorldPoint,
   worldPointOf,
   ZONES,
-  zoneAt
+  zoneAt,
+  cellCorners
 } from '../../src/core/world';
 
 const MAP = realMap as unknown as MapData;
 const WORLDS = buildWorlds(MAP);
 const EMBERKEEP = WORLDS.get(WORLD_ID)!;
+
+describe('cellCorners — the one answer for a cell\'s shape on screen', () => {
+  const spanOf = (world: ReturnType<typeof buildWorlds> extends Map<string, infer W> ? W : never, col: number, row: number) => {
+    const v = cellCorners(world, col, row);
+    const xs = v.map((p) => p.x);
+    const ys = v.map((p) => p.y);
+    return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+  };
+
+  it('is centred on the cell the piece lands in', () => {
+    for (const [col, row] of [
+      [3, 3],
+      [0, 0],
+      [7, 5]
+    ] as [number, number][]) {
+      const c = worldPointOf(EMBERKEEP, col, row);
+      const v = cellCorners(EMBERKEEP, col, row);
+      const mid = {
+        x: v.reduce((n, p) => n + p.x, 0) / 4,
+        y: v.reduce((n, p) => n + p.y, 0) / 4
+      };
+      expect(mid.x).toBeCloseTo(c.x, 6);
+      expect(mid.y).toBeCloseTo(c.y, 6);
+    }
+  });
+
+  /**
+   * THE BUG THIS EXISTS TO STOP COMING BACK.
+   *
+   * The authored isle's tile is 420x242 (map.json), which `projectionOf` turns
+   * into a 256 x 147.5 cell — NOT 256 x 128. Every marker built out of
+   * `TILE_H` was therefore 13.2% too short even here, on the one lattice those
+   * constants are supposed to describe. Pinned as a number so nobody
+   * "simplifies" the corners back onto the constants.
+   */
+  it('matches the authored isle\'s real cell, which is NOT TILE_W x TILE_H', () => {
+    // 147.5048 → 152.6129 on 2026-08-27: the isle recalibration (tile 420x242 →
+    // 409.23x243.96) that seats the lattice ON the painted flagstones — the
+    // stones ran ~249.5 px against a 256 px lattice, drifting to 15 px by the
+    // south rim. Derived from map.json's own tile, pinned so nobody folds the
+    // corners back onto the constants.
+    const { w, h } = spanOf(EMBERKEEP, 4, 4);
+    expect(w).toBeCloseTo(256, 3);
+    expect(h).toBeCloseTo(152.6129, 3);
+  });
+
+  it('gives every hand-drawn zone its own size, not one scaled guess', () => {
+    // A scalar cannot carry two vectors: `artScale` is minted as a WIDTH ratio
+    // (build-zones.mjs), so `256*artScale` tracks the width and `128*artScale`
+    // is only right where the cell happens to be exactly 2:1. Prove the
+    // corners disagree with that guess wherever the aspect does.
+    let checked = 0;
+    for (const world of WORLDS.values()) {
+      for (const z of world.zones) {
+        const first = [...z.cells][0];
+        if (!first) continue;
+        const [i, j] = first.split(',').map(Number) as [number, number];
+        const { w, h } = spanOf(world, z.block.col + i, z.block.row + j);
+        const trueAspect = h / w;
+        if (Math.abs(trueAspect - 0.5) < 0.02) continue; // genuinely 2:1 — no argument to have
+        expect(h).not.toBeCloseTo(128 * z.artScale, 1);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(20); // the roster really is mostly not 2:1
+  });
+
+  it('carries the zone rotation, which a scale never could', () => {
+    const turned = [...WORLDS.values()]
+      .flatMap((w) => w.zones.map((z) => ({ w, z })))
+      .find(({ z }) => z.rotation !== 0 && z.cells.size > 0);
+    expect(turned).toBeDefined();
+    const { w: world, z } = turned!;
+    const [i, j] = [...z.cells][0]!.split(',').map(Number) as [number, number];
+    const v = cellCorners(world, z.block.col + i, z.block.row + j);
+    // An unrotated iso cell has its first corner straight above the centre.
+    const c = worldPointOf(world, z.block.col + i, z.block.row + j);
+    expect(Math.abs(v[0]!.x - c.x)).toBeGreaterThan(0.3);
+  });
+});
 
 /* ------------------------------------------------------------------ */
 /* the guard the whole transition rests on                              */
@@ -204,8 +287,18 @@ describe('zones — new ground beside the isle', () => {
           for (const n of ns) {
             const there = worldPointOf(world, n.col, n.row);
             const d = Math.hypot(there.x - here.x, there.y - here.y);
-            // One step, give or take the pitch mismatch between two editor grids.
-            expect(d).toBeLessThan(step * 1.6);
+            // One step, give or take the pitch mismatch between two editor
+            // grids — measured against the LARGER of the two endpoint zones'
+            // steps, because that is the bound the engine actually promises:
+            // buildAdjacency accepts a link when the PROBING zone lands within
+            // its own tolerance, and pass-2 symmetry then writes it into the
+            // other zone too, whose own step may be the smaller one. Judged
+            // only against the smaller step, a legitimate seam read 1.64 and
+            // failed the day the analytic editor→art transform moved every
+            // zone a few honest pixels (2026-08-27).
+            const zn = zoneAt(world, n.col, n.row);
+            const stepN = zn ? Math.max(Math.hypot(zn.u.x, zn.u.y), Math.hypot(zn.v.x, zn.v.y)) : step;
+            expect(d).toBeLessThan(Math.max(step, stepN) * 1.6);
             if (zoneAt(world, n.col, n.row) !== z) crossZone++;
           }
         }
@@ -251,7 +344,10 @@ describe('zones — new ground beside the isle', () => {
     // pixels through `neighborsOf`, and they agree cell for cell. If this line
     // and the script's report ever disagree, one of them has stopped
     // describing the painting.
-    expect(islands.sort((a, b) => b - a)).toEqual([103, 29, 9]);
+    // 103 → 104 on 2026-08-27: the coast re-cut into per-rank bands moved one
+    // cell and drew two; the mainland grew by one while the total went 140 → 142.
+    // Measured off the rebuilt zones.json, and build-zones' own report agrees.
+    expect(islands.sort((a, b) => b - a)).toEqual([104, 29, 9]);
   });
 
   /**
@@ -343,7 +439,14 @@ describe('zones — new ground beside the isle', () => {
     // 40 → 36 on 2026-08-21, four cells taken back out of the emberkeep draw.
     // 36 → 37 and borealis 140 → 141 on 2026-08-23, the re-level pass that gave
     // every cell its own fog band (one cell drawn on each, and no cell lost).
-    expect(checked).toBe(37 + 141 + 144 + 5);
+    // Borealis 141 → 142 on 2026-08-27, the coast re-cut into per-rank bands
+    // (one cell moved, two drawn — the same pass the island pin above records).
+    // Runevault 5 → 187 on 2026-08-28: the full plaza was allocated (owner's
+    // call — the hub gets its complete floor, every cell of every drawn grid).
+    // Additive, and measured as such: against the previous export those 182 new
+    // cells are the ONLY difference — 367 cells in common, zero coordinates
+    // moved, zero unlock levels changed, none lost.
+    expect(checked).toBe(37 + 142 + 144 + 187);
   });
 
   it('gives every world unique region ids, so status can stay one map', () => {
@@ -492,23 +595,25 @@ describe('portals — every world has a way out of it', () => {
   });
 
   /**
-   * The Gate opens on the STORY, not the cap: Borealis stays shut at Level 3
-   * until the Golden Elder has woken (`q:done:keepers_hoard` — the same latch
-   * the altar derives her presence from). A level the player crosses mid-merge
-   * is the wrong key for the chapter's one crossing.
+   * The Gate opens on the KEEPER'S RANK (owner's call, 2026-08-26: "unlock
+   * the portal to borealis at level"): the world's own `level` in zones.json
+   * is the whole gate. It replaced the `q:done:keepers_hoard` story latch —
+   * the Elder's awakening stays a quest beat, but the door no longer waits
+   * on it.
    */
-  it('holds Borealis shut until the Golden Elder has woken', () => {
+  it('holds Borealis shut below its level, and opens it on rank alone', () => {
     const ctx = createTestContext();
     ctx.state.tutorialDone = true;
-    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
+    expect(ctx.state.level).toBeLessThan(3);
     expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('borealis');
     const failures: string[] = [];
     ctx.bus.on('world:switch_failed', ({ reason }) => failures.push(reason));
     ctx.bus.emit('world:switch', { to: 'borealis' });
     expect(ctx.state.worldId).toBe(WORLD_ID);
-    expect(failures).toEqual(['story']);
+    expect(failures).toEqual(['level']);
 
-    ctx.state.addStat('q:done:keepers_hoard', 1);
+    // No quest, no latch — the rank alone turns the key.
+    ctx.state.xp = LEVEL_XP[2]!;
     expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('borealis');
     ctx.bus.emit('world:switch', { to: 'borealis' });
     expect(ctx.state.worldId).toBe('borealis');
@@ -529,21 +634,116 @@ describe('portals — every world has a way out of it', () => {
     expect(ctx.state.worldId).toBe('roothold');
   });
 
-  /** The Rune Way: Runevault opens on the per-world quest counter QuestSystem
-   *  keeps, never on an id list that could drift. */
-  it('holds Runevault shut until two Selyna quests are done', () => {
+  /** The Rune Way opens at the CAP (owner's call, 2026-08-26): Level 6 is the
+   *  rank that clears the last clouds off Borealis's main island, and the hub
+   *  is what stands beyond them. No quest counter, no latch — rank alone. */
+  it('holds Runevault shut below Level 6, and opens it at the cap', () => {
     const ctx = createTestContext();
     ctx.state.tutorialDone = true;
-    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!;
-    ctx.state.addStat('q:world:borealis:done', 1);
+    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 2]!; // Level 5
+    ctx.state.addStat('q:world:borealis:done', 19); // quests no longer turn this key
     expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('runevault');
     ctx.bus.emit('world:switch', { to: 'runevault' });
     expect(ctx.state.worldId).toBe(WORLD_ID);
 
-    ctx.state.addStat('q:world:borealis:done', 1);
+    ctx.state.xp = LEVEL_XP[LEVEL_XP.length - 1]!; // Level 6, the cap
     expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('runevault');
     ctx.bus.emit('world:switch', { to: 'runevault' });
     expect(ctx.state.worldId).toBe('runevault');
+  });
+
+  /** THE DOUBLE KEY (owner's law, 2026-08-26): the ladder reaching its first
+   *  cauldron quest opens the Rune Way just as the cap would — a quester is
+   *  never handed a brew with the pot's door shut. */
+  it('the cauldron latch is the Rune Way’s second key, below the cap', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[2]!; // Level 3 — Borealis open, Runevault shut
+    expect(ctx.systems.worlds.available().map((w) => w.id)).not.toContain('runevault');
+
+    ctx.state.addStat(CAULDRON_REACHED_STAT, 1);
+    expect(ctx.systems.worlds.available().map((w) => w.id)).toContain('runevault');
+    ctx.bus.emit('world:switch', { to: 'runevault' });
+    expect(ctx.state.worldId).toBe('runevault');
+  });
+
+  /** …and it blows the level clouds off Borealis's main island, on BOTH
+   *  paths: settling on arrival, and live the moment the latch flips. The
+   *  latch is scoped — `cloudLevelMet` answers false for the southern isle,
+   *  so Emberkeep's own level land never rides along. */
+  /** The level slabs BY THE DATA, not by name: a world re-export regroups the
+   *  clouds (it already dissolved `borealis_coast_l4` once), and a test that
+   *  hardcodes slab ids goes stale with it. */
+  const borealisSlabs = (ctx: ReturnType<typeof createTestContext>): string[] =>
+    ctx.state.worlds
+      .get('borealis')!
+      .map.regions.filter((r) => r.unlock?.level !== undefined)
+      .map((r) => r.id);
+
+  it('the cauldron latch lifts the main island’s level slabs at level 3', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[2]!; // Level 3 — below every slab's own rank
+    const slabs = borealisSlabs(ctx);
+    expect(slabs.length).toBeGreaterThan(0);
+
+    // Arrive WITHOUT the latch: the slabs stand fogged, offered.
+    ctx.state.regionStatus.set('borealis_coast', 'active'); // their `after` door
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    for (const id of slabs) expect(ctx.state.regionStatus.get(id)).toBe('unlockable');
+
+    // The latch flips mid-session → the fact sweeps them open where she stands.
+    ctx.state.addStat(CAULDRON_REACHED_STAT, 1);
+    ctx.bus.emit('quest:cauldron_reached', {});
+    for (const id of slabs) expect(ctx.state.regionStatus.get(id)).toBe('active');
+  });
+
+  it('arriving with the latch already earned settles the slabs open', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[2]!;
+    ctx.state.regionStatus.set('borealis_coast', 'active');
+    ctx.state.addStat(CAULDRON_REACHED_STAT, 1);
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    for (const id of borealisSlabs(ctx)) {
+      expect(ctx.state.regionStatus.get(id)).toBe('active');
+    }
+  });
+
+  /** THE BARE-BOARD HEAL (owner's report, 2026-08-27): a save that "visited"
+   *  Borealis before a world re-export kept the visit latch but none of the
+   *  re-gridded regions' contents — an island with no producer. Crossing onto
+   *  a board with ZERO pieces re-seeds its active regions; zero is what makes
+   *  that safe (nothing to duplicate). */
+  it('re-seeds a visited world whose board comes up empty', () => {
+    const ctx = createTestContext();
+    ctx.state.tutorialDone = true;
+    ctx.state.xp = LEVEL_XP[2]!;
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    const seeded = ctx.state.items.size;
+    expect(seeded).toBeGreaterThan(0);
+
+    // The stranded-save shape: visited, but the board holds nothing.
+    for (const id of [...ctx.state.items.keys()]) ctx.state.removeItem(id);
+    ctx.bus.emit('world:switch', { to: WORLD_ID });
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    expect(ctx.state.items.size).toBe(seeded);
+
+    // A board with even one piece is NOT healed — that is a played board.
+    const keep = [...ctx.state.items.keys()][0]!;
+    for (const id of [...ctx.state.items.keys()]) if (id !== keep) ctx.state.removeItem(id);
+    ctx.bus.emit('world:switch', { to: WORLD_ID });
+    ctx.bus.emit('world:switch', { to: 'borealis' });
+    expect(ctx.state.items.size).toBe(1);
+  });
+
+  it('the latch is scoped: it is not rank anywhere south of the clouds', () => {
+    const ctx = createTestContext();
+    ctx.state.addStat(CAULDRON_REACHED_STAT, 1);
+    expect(cloudLevelMet(ctx.state, 'emberkeep', 3)).toBe(false);
+    expect(cloudLevelMet(ctx.state, 'roothold', 3)).toBe(false);
+    expect(cloudLevelMet(ctx.state, 'borealis', 6)).toBe(true);
+    expect(cloudLevelMet(ctx.state, 'runevault', 6)).toBe(true);
   });
 });
 
@@ -712,6 +912,36 @@ describe('world art — visiting a world never leaves the others worse off', () 
     // preload, so it is the baseline every session already pays, and evicting it
     // would only buy a re-fetch on the commonest journey there is — coming home.
     expect([...b.held].sort()).toEqual(['background_borealis', 'background_emberkeep']);
+  });
+
+  /**
+   * ONE WARDROBE, TWO HOMES. Eleanor stands on the isle AND in her Roothold
+   * house, and both list the same standee banks — so "which world owns this
+   * texture" has no single answer, and the sweep must ask a different question.
+   *
+   * It asked the wrong one: the exemption above is written per WORLD (never
+   * sweep Emberkeep's list) while the removal is per KEY, so walking Roothold's
+   * list took her banks with it and the home world silently lost art the boot
+   * preload had already paid for. Backdrops hid it — one per world, shared with
+   * nobody — which is why the fixtures above never caught it.
+   *
+   * On screen it was the gear's Reset, taken from Borealis: a reset does not
+   * travel, so nothing re-fetched at the door, and the tutorial restarted with
+   * an Eleanor who was simply not drawn (buildWorldCharacters skips a character
+   * whose art is missing) until the page was reloaded.
+   */
+  it('keeps the home world’s art when another world lists the same texture', () => {
+    const ctx = new GameContext(new MemoryStorage());
+    ctx.state.switchWorld('borealis');
+    const home = new Set(worldArtKeys(ctx, 'emberkeep'));
+    const shared = worldArtKeys(ctx, 'roothold').filter((k) => home.has(k));
+    expect(shared).toContain('eleanor_world_idle');
+    const b = bin([...backdrops, ...shared]);
+    const freed = releaseAwayWorldArt(b, ctx);
+    for (const key of shared) {
+      expect(freed).not.toContain(key);
+      expect(b.held.has(key)).toBe(true);
+    }
   });
 
   it('never takes a texture out from under a live sprite, whatever the rule says', () => {

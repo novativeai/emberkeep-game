@@ -102,6 +102,15 @@ ACCEPTED = [
     ("borealis", 1994, 424, "lamplight spill on the ice, in front of the magic door"),
     ("borealis", 2063, 461, "lamplight spill on the ice, left of the door"),
     ("borealis", 2125, 501, "lamplight spill on the ice, right of the door"),
+    # Checked on the overlay 2026-08-28, after taking nionja's analytic
+    # calibration: a real flagstone lying in the warm spill from the same
+    # door — the fourth of that family, and the only cell the re-cut coast
+    # added under that light.
+    ("borealis", 2063, 533, "sunlit flagstone below the magic door"),
+    # Checked on the overlay 2026-08-27: a real flagstone, tinted pink by the
+    # aurora sheet directly above it — the same class of light-on-ground as the
+    # three lamplight cells beside the door.
+    ("borealis", 2121, 574, "aurora-tinted flagstone below the door, right of the chain"),
     ("roothold", 829, 621, "the brazier flame stands on this flagstone"),
     ("roothold", 1704, 385, "flagstone in the deep shade under the vine arch"),
     # The one cell in the game that is not stone. Its footprint sits inside the
@@ -172,6 +181,8 @@ class Placement:
         self.unit = cal.get("scale", 1) * ratio
         self.w, self.h = w, h
         self.au = (half_w / self.unit, half_h / self.unit)
+        # tile.skew shears columns with depth, exactly as iso.ts projects them.
+        self.skew_px = math.tan(math.radians(tile.get("skew") or 0)) * self.au[1]
         self.a0 = (
             (BOARD_ORIGIN_X - self.ox) / self.unit + w / 2,
             (BOARD_ORIGIN_Y - self.oy) / self.unit + h / 2,
@@ -182,7 +193,7 @@ class Placement:
 
     def of_authored_cell(self, col, row):
         return (
-            self.a0[0] + (col - row) * self.au[0],
+            self.a0[0] + (col - row) * self.au[0] + (col + row) * self.skew_px,
             self.a0[1] + (col + row) * self.au[1],
         )
 
@@ -277,7 +288,7 @@ def audit(world, authored, overlay_dir, strict):
     if overlay_dir:
         proof = im.copy()
         dr = ImageDraw.Draw(proof, "RGBA")
-        offenders = {(c[0], c[1]) for c, _ in flagged}
+        offenders = {(c[0], c[1]) for c, _why, _note in flagged}
         for col, row, x, y, hw, hh, _ in cells:
             colour = (255, 40, 40) if (col, row) in offenders else (0, 255, 90)
             dr.polygon(

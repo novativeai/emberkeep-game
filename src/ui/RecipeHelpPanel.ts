@@ -8,7 +8,7 @@ import {
   panelMobileScale,
   QUEST_ROW_H,
   TAP_SCALE,
-  UI_SCALE
+  QUEST_TRACKER_SCALE
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
@@ -303,7 +303,7 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
    *
    * Portrait has the one thing landscape does not — HEIGHT — so the sheet goes
    * BELOW the row instead of beside it, centred on the screen: its top edge
-   * clears the row's own foot (`QUEST_ROW_H × UI_SCALE`, the pitch the tracker
+   * clears the row's own foot (`QUEST_ROW_H × QUEST_TRACKER_SCALE`, the pitch the tracker
    * lays its rows out on) by the same `PEEK_GAP`. Nothing is covered, the sheet
    * still points at the line that raised it, and the same clamp keeps it in.
    */
@@ -350,7 +350,7 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
     const halfH = FRAME_HALF_H * this.baseScale;
     // `y` is the ROW'S MIDDLE, so half a row's pitch is what clears its foot.
     const wantX = IS_MOBILE ? LIVE_GAME_WIDTH / 2 : x - PEEK_GAP - halfW;
-    const wantY = IS_MOBILE ? y + (QUEST_ROW_H * UI_SCALE) / 2 + PEEK_GAP + halfH : y;
+    const wantY = IS_MOBILE ? y + (QUEST_ROW_H * QUEST_TRACKER_SCALE) / 2 + PEEK_GAP + halfH : y;
     this.setPosition(
       Phaser.Math.Clamp(wantX, PEEK_MARGIN + halfW, LIVE_GAME_WIDTH - PEEK_MARGIN - halfW),
       Phaser.Math.Clamp(wantY, PEEK_MARGIN + halfH, LIVE_GAME_HEIGHT - PEEK_MARGIN - halfH)

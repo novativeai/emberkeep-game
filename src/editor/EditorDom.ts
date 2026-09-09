@@ -72,6 +72,7 @@ const CSS = `
 .me-legend{display:flex;flex-direction:column;gap:5px;margin-top:6px;padding-top:8px;border-top:1px solid #2c2438;font-size:11px;color:#b9b0c9}
 .me-legend .lg{display:flex;align-items:center;gap:7px}
 .me-legend .sw{width:13px;height:13px;border-radius:4px;flex:0 0 auto;box-shadow:0 0 0 1px #0006}
+.me-nav{padding:8px 12px;border-top:1px solid #2c2438;font-size:11px;line-height:1.5;color:#9a91b8;text-align:center}.me-nav b{color:#ffd84d;font-weight:600}
 .me-coords{padding:10px 12px;border-top:1px solid #2c2438;display:flex;gap:14px;justify-content:center;
   font:700 13px/1 'SFMono-Regular',Consolas,monospace}
 .me-coords .k{color:#7f76a0}.me-coords .v{color:#ffd84d}
@@ -339,6 +340,9 @@ export class EditorDom {
           <button class="me-wide me-clearzones" title="Supprimer toutes les zones"><i class="fa-solid fa-trash"></i> Tout supprimer</button>
           <button class="me-wide me-gridtoggle" title="Afficher / masquer la grille carrée globale"><i class="fa-solid fa-border-none"></i> <span class="gt-label">Grille carrée : afficher</span></button>
         </div>
+      </div>
+      <div class="me-nav" title="Déplacer et zoomer la vue — marche sur tous les onglets">
+        <i class="fa-solid fa-up-down-left-right"></i> <b>clic droit</b> (ou molette enfoncée) glisser = déplacer la vue &nbsp;·&nbsp; <b>molette</b> = zoom
       </div>
       <div class="me-coords">
         <span><span class="k">x</span> <span class="v vx">--</span></span>

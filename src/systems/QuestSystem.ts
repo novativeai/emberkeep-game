@@ -1,5 +1,13 @@
 import { questStepNeeds } from '../core/availability';
-import { brewKey, giftKey, heartsForPoints, regardKey, SPEAKER_NAMES, WORLD_ID } from '../core/Constants';
+import {
+  brewKey,
+  CAULDRON_REACHED_STAT,
+  giftKey,
+  heartsForPoints,
+  regardKey,
+  SPEAKER_NAMES,
+  WORLD_ID
+} from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type {
@@ -354,7 +362,7 @@ export class QuestSystem {
     let worst = needs[0]!;
     let gap = -Infinity;
     for (const need of needs) {
-      const short = need.count - this.heldForBrew(need.chain, need.tier);
+      const short = need.count - this.held(need.chain, need.tier);
       if (short > gap) {
         gap = short;
         worst = need;
@@ -363,11 +371,21 @@ export class QuestSystem {
     return worst;
   }
 
-  /** Boards AND bag, because a brew is paid out of the BAG and the bag is
-   *  filled from the boards: an ingredient already pocketed is not one the
-   *  player still has to go and find, and pointing them back at the board for
-   *  it is the same wrong answer as naming the wrong ingredient. */
-  private heldForBrew(chain: string, tier: number): number {
+  /**
+   * WHAT THE KEEPER HOLDS — every board she has stood on, AND her satchel.
+   *
+   * The bag is a parallel store: `BagSystem.store` pockets the stack and emits
+   * `board:consume_items`, so the piece leaves every board's `items` map. A
+   * count that walks boards alone therefore says a pocketed piece does not
+   * exist — and that is exactly what a player sees when a step asking for
+   * three Sun Gems stops counting the moment they tidy them away, and starts
+   * again when they tip them back out.
+   *
+   * It began as the brew's own predicate (a brew is paid out of the BAG), and
+   * the reasoning was never about brewing: a piece in the satchel is not one
+   * the player still has to go and find.
+   */
+  private held(chain: string, tier: number): number {
     const pocketed = this.state.bag
       .filter((stack) => stack.chain === chain && stack.tier === tier)
       .reduce((n, stack) => n + stack.count, 0);
@@ -439,9 +457,9 @@ export class QuestSystem {
       const doneKey = doneLatchKey(quest.id);
       if (this.isComplete(quest) && this.state.stat(doneKey) === 0) {
         this.state.addStat(doneKey, 1);
-        // The per-world completion counter WorldSystem's Rune Way gate reads
-        // (`q:world:borealis:done` >= RUNEVAULT_QUESTS_NEEDED). A counter, not
-        // an id list, so renaming a quest can never silently re-lock a door.
+        // The per-world completion counter. No gate reads it since the Rune
+        // Way went level-only (2026-08-26), but it stays written: it is save
+        // data a future gate or stat screen can lean on without a migration.
         this.state.addStat(`q:world:${quest.world ?? 'emberkeep'}:done`, 1);
         // Paid on the LATCH flipping, not on `announce`. A save resumed past
         // this quest already carries the latch, so a reload can never pay
@@ -451,6 +469,7 @@ export class QuestSystem {
         if (announce) this.bus.emit('quest:completed', { questId: quest.id });
       }
     }
+    this.latchCauldronReached();
     // Each giver's track announces its own pointer moves — the Elder starting
     // his first quest must not wait for (or interfere with) wherever Eleanor's
     // ladder happens to be.
@@ -465,6 +484,35 @@ export class QuestSystem {
           index: ladder.findIndex((q) => q.id === active.id) + 1,
           total: ladder.length
         });
+      }
+    }
+  }
+
+  /**
+   * THE CAULDRON-REACHED LATCH (owner's law, 2026-08-26; the long note sits on
+   * `CAULDRON_REACHED_STAT`): the moment any world's ladder puts its FIRST
+   * brew quest at the player's track head, the clouds and the Rune Way get
+   * their second key. Derived here — never from a hardcoded quest id, so a
+   * ladder reorder moves the latch with it — and monotonic like every other
+   * quest latch. Out-of-order play is covered by the DONE clause: a brew quest
+   * a player satisfied before it ever headed the track was still reached.
+   *
+   * Emitted on the silent (load-time) evaluate too: the fact is a mechanism
+   * (UnlockSystem sweeps, BoardScene re-syncs its doors), not a banner, and an
+   * old save whose ladder already stands past the threshold must open the same
+   * doors a live session would.
+   */
+  private latchCauldronReached(): void {
+    if (this.state.stat(CAULDRON_REACHED_STAT) > 0) return;
+    const brews = (q: QuestConfig): boolean => q.steps.some((s) => s.goal.kind === 'brew');
+    const worlds = new Set(this.quests.quests.map((q) => q.world ?? WORLD_ID));
+    for (const world of worlds) {
+      const ladder = this.quests.quests.filter((q) => (q.world ?? WORLD_ID) === world);
+      const head = ladder.find((q) => this.isLive(q));
+      if ((head && brews(head)) || ladder.some((q) => brews(q) && this.isComplete(q))) {
+        this.state.addStat(CAULDRON_REACHED_STAT, 1);
+        this.bus.emit('quest:cauldron_reached', {});
+        return;
       }
     }
   }
@@ -511,8 +559,13 @@ export class QuestSystem {
   private rawProgress(goal: QuestGoal): { have: number; need: number } {
     switch (goal.kind) {
       case 'have':
+        // HOLDS, not "stands on a board". A `have` goal is a CHECK and never a
+        // spend — nothing here consumes — so the satchel counts exactly as the
+        // ground does. (An ORDER is the other case and stays board-only: its
+        // delivery pays with board pieces, so counting a pocketed one there
+        // would promise a hand-over the delivery cannot make.)
         return {
-          have: Math.min(this.state.countItemsAnywhere(goal.chain, goal.tier), goal.count),
+          have: Math.min(this.held(goal.chain, goal.tier), goal.count),
           need: goal.count
         };
       case 'order': {

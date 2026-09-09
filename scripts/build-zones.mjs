@@ -347,8 +347,62 @@ function solve(samples, fit) {
   return { scale: b[0] / M[0][0], offsetX: b[1] / M[1][1], offsetY: b[2] / M[2][2] };
 }
 
+/* ------------------------------------------------------------------ */
+/* 2b. the ANALYTIC editor→art transform — the fit is now a watchdog     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The editor places every imported map image by a FORMULA, not by hand —
+ * `BoardEditor.renderCurrentMap`: the layer is centred on the authored
+ * backdrop's world rect (`backdropRect`, whose centre is exactly `artOrigin`
+ * above) and scaled to COVER it (`cover = max(rect/layer)` per axis). Both
+ * ends of that placement are constants this script already holds, so
+ * editor→art needs no estimation at all.
+ *
+ * The least-squares fit above measured the same relationship from the cells,
+ * and measuring it was the imprecision: the samples' `gameCell`s are ROUNDED
+ * lattice answers, so the solve chases their rounding structure and lands
+ * 0.3–0.8% off scale run over run (1.22453 → 1.22876 across two exports).
+ * Composed with `artToWorld`, a 0.8% scale error is a shear of ±12 world px
+ * across the board — the drawn grid sat visibly beside the painted tiles it
+ * was traced from. The analytic transform composes to identity within ~0.5 px
+ * (the residue is the layer's own 1024×640 downscale of 2610×1632 art).
+ *
+ * The fit still runs, as a WATCHDOG: if someone changes how the editor places
+ * the layer, the measured transform drifts away from this one and the build
+ * says so loudly instead of silently mis-placing every zone.
+ */
+const LAYERS = (source.project?.maps ?? []).map((m) => ({ name: m.name, w: m.w, h: m.h }));
+const LAYER = LAYERS[0] ?? { w: 1024, h: 640 };
+for (const l of LAYERS) {
+  if (l.w !== LAYER.w || l.h !== LAYER.h) {
+    throw new Error(
+      `build-zones: editor map layers disagree on size (${LAYER.w}x${LAYER.h} vs ${l.name} ${l.w}x${l.h}) — ` +
+        'the analytic editor→art assumes one layer geometry; teach it per-map sizes before importing this project.'
+    );
+  }
+}
+const COVER = Math.max((ART_W * unit) / LAYER.w, (ART_H * unit) / LAYER.h);
+const LAYER_TL = { x: artOriginX - (LAYER.w * COVER) / 2, y: artOriginY - (LAYER.h * COVER) / 2 };
+const editorToArt = (p) => ({
+  x: ((p.x - LAYER_TL.x) / COVER) * (ART_W / LAYER.w),
+  y: ((p.y - LAYER_TL.y) / COVER) * (ART_H / LAYER.h)
+});
+
 const FIT = fitEditorToArt();
-const editorToArt = (p) => ({ x: (p.x - FIT.offsetX) / FIT.scale, y: (p.y - FIT.offsetY) / FIT.scale });
+{
+  // The watchdog: express the analytic transform in the fit's own
+  // `editor = scale·art + offset` terms and compare.
+  const aScale = (COVER * LAYER.w) / ART_W;
+  const drift = Math.abs(FIT.scale - aScale) / aScale;
+  if (drift > 0.02) {
+    console.error(
+      `build-zones: the MEASURED editor→art (scale ${FIT.scale.toFixed(5)}) is ${(drift * 100).toFixed(1)}% away ` +
+        `from the ANALYTIC one (${aScale.toFixed(5)}). Either the editor changed how it places the map layer ` +
+        '(update the analytic constants above) or the export is corrupt. The analytic transform was used.'
+    );
+  }
+}
 
 /**
  * How faithfully the fit reproduces the editor's own cell assignment.
@@ -677,11 +731,13 @@ const BOREALIS_PLAN = {
     // Wrack Lines, rimebloom from the Fonts, and the chest's own gift table
     // (which pays Strakes too), so the frames order funds itself without a
     // scatter of freebies undercutting the farms.
-    // The Runestone and the Cordial Cask join the rim WORKING (tier 3): both
-    // reseed their own tier-1 (the rune bonus / the cask's own produce), so a
-    // seeded t3 here strands no Cookbook row — the parts stream starts the
-    // moment the farm does. That is what lets them keep the coast's
-    // generators-only law instead of arriving as a scatter of parts.
+    // The Cordial Cask joins the rim WORKING (tier 3): it reseeds its own
+    // tier-1 (its own produce), so a seeded t3 here strands no Cookbook row —
+    // the parts stream starts the moment the farm does. The Runestone SEED is
+    // gone with its generator (owner, 2026-08-28): an inert monument standing
+    // unearned beside the working machines read as a broken faucet, and the
+    // one the player BREWS (`north_runeshards`) is the one that means
+    // something.
     // ONE OF EACH, ACROSS THE WHOLE NORTH. A second Glass Kiln here (there were
     // two, on top of the shore's) was not a bigger farm, it was the same farm
     // twice: the north GROWS its generators — every twelfth firing drops a Fire
@@ -694,11 +750,41 @@ const BOREALIS_PLAN = {
       ['starbench', 3, 1],
       ['wreckforge', 3, 1],
       ['tarkiln', 3, 1],
-      ['runestone', 3, 1],
       ['emberdram', 3, 1],
       ['chest', 1, 1]
     ]
   }
+};
+
+/**
+ * THE MAINLAND OPENS BOTTOM-UP (owner, 2026-08-28).
+ *
+ * The editor's per-cell levels made the coast's key-door band the NORTH-WEST
+ * corner and its rank waves a scatter: the Gold Key opened the top of the
+ * island, level 4 opened the bottom, and the middle stayed clouded between
+ * them — clouds taken at both ends, left in the centre. The march the game
+ * teaches is south → north (shore → coast → keep), so the ISLAND must open
+ * the same way: the key buys the SOUTHERN deck (and the seeds land there,
+ * which is what puts the machines in the player's hands first), and each rank
+ * lifts the next band up, the northern cloud last — falling exactly when the
+ * Rune Way at the top of the island opens.
+ *
+ * GEOMETRY OVER AUTHORING, for this island only: the band a cell joins is
+ * decided by its measured world Y, not its editor level — the door band keeps
+ * the SIZE the editor priced the key at, the rest split as evenly as the cell
+ * count allows across `waves` (south first, ascending). A re-export moves
+ * every cell and this re-derives; nothing here names an address.
+ */
+const FOG_MARCH = {
+  // doorCells PINS the key-door band's size. It used to inherit the authored
+  // first-wave count, which made the door a hostage of the editor's leveling:
+  // nionja's newer editor project re-levels the mainland (56 unlock edits,
+  // ZERO coordinate edits — verified 2026-08-28) and would have shrunk the
+  // door to 4 cells, too few for the five machines and the chest the plan
+  // seeds there. The march already decides every wave geometrically; now it
+  // decides the door's size too, and the editor's levels on this island are
+  // fully advisory.
+  borealis: { island: 1, waves: [4, 5, 6], doorCells: 15 }
 };
 
 /** Tiers that hold a `generator` — the machines, read off the shipped chain
@@ -732,6 +818,18 @@ const isFixture = (chain, tier) => GENERATOR_TIERS.has(`${chain}:${tier}`) || ch
  * furthest from everything already placed?" — and that answers correctly for
  * any outline, because it never mentions a direction at all.
  */
+/**
+ * Seeds a region could not hold. A shortfall is CONTENT that did not land;
+ * it must never cost the world its GEOMETRY. It used to throw, and the throw
+ * rode up through the per-world catch — so re-drawing an island smaller than
+ * its plan froze the ENTIRE world at its previous lattice, and every marker
+ * in the game then disagreed with the grid the author was looking at in the
+ * editor. The plan describes yesterday's islands by index; the author is
+ * allowed to draw today's differently and hear about the mismatch, loudly,
+ * without the map refusing to follow.
+ */
+const seedShortfalls = [];
+
 function seedRegion(cells, seeds, taken) {
   if (!seeds?.length || !cells.length) return [];
   const cx = cells.reduce((n, c) => n + c.at.x, 0) / cells.length;
@@ -817,13 +915,22 @@ function seedRegion(cells, seeds, taken) {
     .filter((c) => !used.has(c))
     .sort((a, b) => Math.hypot(a.at.x - cx, a.at.y - cy) - Math.hypot(b.at.x - cx, b.at.y - cy));
   let n = 0;
+  const dropped = [];
   for (const unit of units) {
     if (!unit.at) {
       const cell = mid[n++];
-      if (!cell) throw new Error(`build-zones: ${unit.chain} has no room — island holds ${cells.length}`);
+      if (!cell) {
+        dropped.push(`${unit.chain}:${unit.tier}`);
+        continue;
+      }
       unit.at = [cell.col, cell.row];
     }
     out.push({ chain: unit.chain, tier: unit.tier, at: unit.at });
+  }
+  if (dropped.length) {
+    seedShortfalls.push(
+      `island of ${cells.length} cell(s) had no room for ${dropped.length} seed(s): ${dropped.join(', ')}`
+    );
   }
   return out;
 }
@@ -1134,9 +1241,11 @@ const WORLDS = [
   {
     id: 'runevault',
     name: 'Runevault',
-    // Borealis's hub, so it opens with Borealis: a hub the player cannot reach
-    // from the sanctuary it serves is a shop with the lights off.
-    level: 3,
+    // The Rune Way opens at the CAP (owner's call, 2026-08-26): level 6 is
+    // the rank that clears the last clouds off Borealis's main island, and
+    // the hub is the reward beyond them. worldGates carries no other latch
+    // for it — the rank alone is the gate.
+    level: 6,
     /**
      * WAS `hatchery`, MEASURED. This world had no editor grid, so its ground was
      * recovered from the painting by scripts/fit-deck-grid.py (`deck:`) — the
@@ -1300,6 +1409,38 @@ for (const spec of WORLDS) {
   const islands = islandsOf([...byLevel.values()].flat());
   const islandOf = new Map();
   islands.forEach((cells, idx) => cells.forEach((c) => islandOf.set(`${c.col},${c.row}`, idx)));
+
+  // The south-first fog march (FOG_MARCH above): re-band the named island's
+  // cells by measured world Y before the bands are cut, so everything below —
+  // names, gates, seeds-on-the-first-wave — runs on the corrected schedule
+  // without knowing it exists.
+  const marchSpec = FOG_MARCH[spec.id];
+  if (marchSpec && islands[marchSpec.island]?.length) {
+    const cells = islands[marchSpec.island];
+    const lvlOf = new Map();
+    for (const [lvl, list] of byLevel) for (const c of list) lvlOf.set(c, lvl);
+    const doorLvl = Math.min(...cells.map((c) => lvlOf.get(c)));
+    const doorCount = marchSpec.doorCells ?? cells.filter((c) => lvlOf.get(c) === doorLvl).length;
+    // South first: larger world Y is lower on screen. Ties by address, so a
+    // rebuild is reproducible to the cell.
+    const south = [...cells].sort((a, b) => b.at.y - a.at.y || a.col - b.col || a.row - b.row);
+    south.slice(0, doorCount).forEach((c) => lvlOf.set(c, doorLvl));
+    const rest = south.slice(doorCount);
+    const per = Math.ceil(rest.length / marchSpec.waves.length);
+    rest.forEach((c, i) =>
+      lvlOf.set(c, marchSpec.waves[Math.min(Math.floor(i / per), marchSpec.waves.length - 1)])
+    );
+    const marched = new Set(cells);
+    for (const [lvl, list] of byLevel) {
+      byLevel.set(lvl, list.filter((c) => !marched.has(c)));
+    }
+    for (const c of cells) {
+      const lvl = lvlOf.get(c);
+      const list = byLevel.get(lvl) ?? [];
+      list.push(c);
+      byLevel.set(lvl, list);
+    }
+  }
 
   const bands = new Map(); // `${island}:${level}` → { island, lvl, cells }
   for (const [lvl, cells] of byLevel) {
@@ -1583,10 +1724,12 @@ const doc = {
   /** The measured editor→backdrop transform, kept for provenance: anyone
    *  re-importing from the editor can check these numbers still hold. */
   editorToArt: {
-    scale: Math.round(FIT.scale * 1e5) / 1e5,
-    offsetX: round2(FIT.offsetX),
-    offsetY: round2(FIT.offsetY),
-    samples: FIT.samples,
+    method: 'analytic (layer cover placement); least-squares kept as watchdog',
+    scaleX: Math.round(((COVER * LAYER.w) / ART_W) * 1e5) / 1e5,
+    scaleY: Math.round(((COVER * LAYER.h) / ART_H) * 1e5) / 1e5,
+    offsetX: round2(LAYER_TL.x),
+    offsetY: round2(LAYER_TL.y),
+    fitted: { scale: Math.round(FIT.scale * 1e5) / 1e5, offsetX: round2(FIT.offsetX), offsetY: round2(FIT.offsetY), samples: FIT.samples },
     reproducesEditorCells: `${acc.hit}/${acc.total}`,
     worstErrorArtPx: Math.round(acc.worst)
   },
@@ -1595,7 +1738,7 @@ const doc = {
 
 writeFileSync(resolve(ROOT, OUT), `${JSON.stringify(doc, null, 2)}\n`);
 
-console.log(`editor→art  scale ${doc.editorToArt.scale}  offset (${doc.editorToArt.offsetX}, ${doc.editorToArt.offsetY})`);
+console.log(`editor→art  scale ${doc.editorToArt.scaleX}/${doc.editorToArt.scaleY} (analytic)  offset (${doc.editorToArt.offsetX}, ${doc.editorToArt.offsetY})  [fit watchdog: ${doc.editorToArt.fitted.scale}]`);
 console.log(`            reproduces the editor's own gameCell for ${acc.hit}/${acc.total} cells (worst ${Math.round(acc.worst)} art px)`);
 for (const r of report) {
   console.log(
@@ -1609,6 +1752,13 @@ console.log(`wrote ${OUT}`);
 // LOUD, and last, so it is the thing left on screen. A kept world is ground the
 // player still gets; it is also authoring that did not land, and the two must
 // never be confused with a clean run.
+if (seedShortfalls.length) {
+  console.error('');
+  for (const w of seedShortfalls) console.error(`build-zones: SEED SHORTFALL — ${w}`);
+  console.error(
+    'build-zones: the geometry shipped anyway; re-fit BOREALIS_PLAN (or the island) to restore the missing contents.'
+  );
+}
 if (failures.length) {
   console.error('');
   for (const f of failures) {

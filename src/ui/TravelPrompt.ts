@@ -276,7 +276,10 @@ export class TravelPrompt extends Phaser.GameObjects.Container {
     this.crossLabel = mkBtn(-BTN_DX, 'Cross', () => {
       const to = this.to;
       this.close();
-      if (to) this.bus.emit('world:switch', { to });
+      // Through the curtain, not straight to the switch: UIScene covers the
+      // screen first and emits `world:switch` only once fully covered, so the
+      // destination never flashes before its loading veil.
+      if (to) this.bus.emit('ui:travel_departing', { to });
     });
     mkBtn(BTN_DX, 'Stay', () => this.close());
 

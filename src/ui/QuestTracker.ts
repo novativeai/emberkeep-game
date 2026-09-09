@@ -11,7 +11,7 @@ import {
   QUEST_TRACKER_RIGHT,
   QUEST_TRACKER_TOP_Y,
   QUEST_VIEW_H,
-  UI_SCALE
+  QUEST_TRACKER_SCALE
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import { questGoalPiece } from '../core/recipeTree';
@@ -100,6 +100,19 @@ const TAP_SLOP_CSS = 10;
  *  fourth row says "there is more below", and explaining a line the player can
  *  barely read is noise. */
 const PEEK_MIN_ALPHA = 0.6;
+
+/**
+ * Headroom above the FIRST row, inside the masked viewport.
+ *
+ * A sub-row's icon rides its dark disc, and the disc's top sits ABOVE the
+ * row's own top edge: the icon is centred on the text line (label.height/2 ≈
+ * 20-23) while the disc reaches ICON_BOX/2 + ICON_CHIP_PAD = 27 above that
+ * centre. Row 0 sat at y 0, the clip at QUEST_LIST_TOP_Y — so the title area
+ * sliced the top off the first row's icon, flat. The pad moves every row down
+ * inside the mask by the overhang plus slack; scroll, fades and the peek all
+ * read `row.root.y`, so they follow without knowing.
+ */
+const LIST_PAD_TOP = 12;
 
 /** Strike-through baseline, measured from a row's top. */
 const STRIKE_Y = 18;
@@ -197,7 +210,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
     super(scene, LIVE_GAME_WIDTH - QUEST_TRACKER_RIGHT, QUEST_TRACKER_TOP_Y);
     this.owner = scene;
     this.bus = bus;
-    this.setScale(UI_SCALE); // magnifies down-left from the top-right anchor
+    this.setScale(QUEST_TRACKER_SCALE); // magnifies down-left from the top-right anchor
 
     // ---- Main quest ----
     this.mainGroup = scene.add.container(0, 0);
@@ -678,7 +691,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
    *  finished row leaves), then re-clamp the scroll and re-run the fade ramp. */
   private layoutRows(): void {
     this.rows.forEach((row, i) => {
-      const y = i * QUEST_ROW_H;
+      const y = LIST_PAD_TOP + i * QUEST_ROW_H;
       if (row.slot === i && row.root.y === y) return;
       row.slot = i;
       // The ramp is a function of the row's position, so it has to be re-run as
@@ -721,7 +734,7 @@ export class QuestTracker extends Phaser.GameObjects.Container {
   }
 
   private maxScroll(): number {
-    return Math.max(0, this.rows.length * QUEST_ROW_H - QUEST_VIEW_H);
+    return Math.max(0, LIST_PAD_TOP + this.rows.length * QUEST_ROW_H - QUEST_VIEW_H);
   }
 
   private scrollBy(delta: number): void {

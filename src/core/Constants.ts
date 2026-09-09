@@ -88,6 +88,23 @@ export const IS_LOW_END: boolean =
 export const UI_SCALE: number = IS_MOBILE ? 1.5 : 1;
 
 /**
+ * The quest tracker reads bigger than the other clusters on a phone (owner's
+ * call, 2026-08-27): it is the one instruction most players ever read, and at
+ * the shared UI_SCALE its rows were the smallest live type on screen. One
+ * factor over the whole cluster — text, piece icons and row pitch grow
+ * together, and RecipeHelpPanel's peek seat multiplies by THIS, not UI_SCALE,
+ * so the sheet keeps clearing the row it explains.
+ *
+ * BOTH LAYOUTS GREW 20% on 2026-08-28 (owner's call): 1.3 → 1.56 on a phone,
+ * and desktop left 1 for the first time. The landscape number is the one with
+ * a ceiling — the tracker magnifies DOWN-LEFT from its top-right anchor, so
+ * its foot travels: `QUEST_TRACKER_BOTTOM` (292 local units) reaches y 546 at
+ * 1.2 against the five-door column's 674.2 top, which `HudColumn.spec`
+ * measures. Past ~1.6 the list would print across the Dragon Codex button.
+ */
+export const QUEST_TRACKER_SCALE: number = IS_MOBILE ? UI_SCALE * 1.56 : 1.2;
+
+/**
  * Does Settings offer the Map Editor?
  *
  * OFF — hidden, not removed. The tool is the whole authoring pipeline for the
@@ -1477,7 +1494,12 @@ export const WELL_FED_EVOLUTION: Record<string, number> = {
   emerald: 6,
   frost: 6,
   storm: 6,
-  moonwhisker: 6
+  moonwhisker: 6,
+  // The two egg-quest breeds keep the same promise: their adult reveal plates
+  // ship (reveal_ashdrake_adult / reveal_rimewyrm_adult), so the Codex shows
+  // every dragon what it grows into.
+  ashdrake: 6,
+  rimewyrm: 6
 };
 /** Meal value by tier: a snack, a meal, a feast (merge-chains §1.4). */
 export const MEAL_VALUE: Record<number, number> = { 1: 1 / 3, 2: 1, 3: 1 };
@@ -1744,8 +1766,13 @@ export const CHEST_INTERVAL_MS = 300_000;
  * then the chest recharges (it never disappears). `coins` is currency; `item`
  * pops that many merge pieces onto free tiles by the chest; `anyItem` rolls a
  * single tier-1 piece from whatever this world actually makes
- * (`chestWildcardChains`). (No wood — lumber appears only when its cloud zone
- * clears.) Designers tune it here, not in code.
+ * (`chestWildcardChains`). Designers tune it here, not in code.
+ *
+ * "No wood — lumber appears only when its cloud zone clears" was written here
+ * as a statement of intent and was FALSE for as long as it stood: nothing
+ * stopped the wildcard rolling `lumber`, and a chest that did put a fourth pile
+ * of Logs beside a lesson whose line promises three. What a comment asserts,
+ * `CHEST_WILDCARD_NEVER` now enforces.
  */
 /** How far (manhattan tiles) a reward drop may land from its source. Beyond
  *  this the drop is BLOCKED (harvest fails / chest pays Gold / passive skips)
@@ -1765,15 +1792,30 @@ export const CHEST_GIFTS: ReadonlyArray<ChestGift> = [
   // rather than by another fixed chain: a named third gift would just be a
   // second Ruby drop with a different sprite, and the chest's job is to be the
   // one place the isle surprises you.
+  // A SECOND PURSE, NOT A SECOND STARTER CHAIN (owner's call, 2026-08-27: the
+  // chest "must not give gifts like Rubies, and wood"). `3 Rubies!` stood here
+  // and it was the dullest thing the box could do: the opening hands the player
+  // Rubies for the whole ruby lesson and the Old Tree sheds Logs for ever, so
+  // the one moment the isle is allowed to surprise you paid out the two piles
+  // already on the floor. Gold at a second, rarer weight keeps the table at
+  // three faces — a chest that only ever paid `+15` or the wildcard would read
+  // as two outcomes, and the third face is what makes opening it feel graded.
   { kind: 'anyItem', label: 'A find!' },
-  { kind: 'item', chain: 'ember_dragon', tier: 1, count: 3, label: '3 Rubies!' }
+  { kind: 'coins', amount: 40, label: '+40' }
 ];
 
 /** Never rolled by the `anyItem` wildcard, whatever world it opens in. */
 export const CHEST_WILDCARD_NEVER = new Set<string>([
   'coin', // currency, and the chest already has a Gold face
   'golden_egg', // the finale's — placed by the altar, brewed at Selyna's Cauldron, and by nothing else
-  'emerald' // the dropped green-dragon chain — the whole point of the change
+  'emerald', // the dropped green-dragon chain — the whole point of the change
+  // The two the player is never short of, barred from the WILDCARD as well —
+  // taking the Ruby gift off the table above and leaving the joker free to roll
+  // it back would have moved the boredom, not removed it. `lumber` also closes
+  // the hole that put a FOURTH pile of Logs on the board during `wood_merge`,
+  // where the lesson's own line promises three.
+  'ember_dragon',
+  'lumber'
 ]);
 
 /**
@@ -1869,7 +1911,12 @@ export const CHEST_GIFTS_BY_WORLD: Readonly<Record<string, ReadonlyArray<ChestGi
     // per-world table.
     { kind: 'item', chain: 'seaglass', tier: 1, count: 3, label: '3 Glass Balls!' },
     { kind: 'item', chain: 'orrery', tier: 1, count: 3, label: '3 Glass Lenses!' },
-    { kind: 'item', chain: 'warhelm', tier: 1, count: 2, label: '2 Iron Hats!' }
+    { kind: 'item', chain: 'warhelm', tier: 1, count: 2, label: '2 Iron Hats!' },
+    // Second faucets for the two slowest tier-1s (2026-08-27): Magic Pebbles
+    // and Fire Juice otherwise trickle ONLY from one seeded machine's every-5th
+    // bonus yield, and the compass/lamp brews would be an hours-long wall.
+    { kind: 'item', chain: 'manastone', tier: 1, count: 2, label: '2 Magic Pebbles!' },
+    { kind: 'item', chain: 'emberdram', tier: 1, count: 2, label: '2 Fire Juices!' }
   ]
 };
 
@@ -1917,8 +1964,12 @@ export const ENERGY_REGEN_AMOUNT = 1;
  * Elder's awakening lives on `GOLDEN_ALTAR.awakenQuestId` — a level the player
  * crosses mid-merge is the wrong trigger for the chapter's one irreversible
  * story beat.
+ *
+ * The steps must ASCEND (each level costs more than the last): the old 1000
+ * made Level 5 cost 580 and Level 6 only 400. 850 keeps the curve monotonic
+ * (60 · 160 · 200 · 430 · 550) and stays out of the finale window above.
  */
-export const LEVEL_XP = [0, 60, 220, 420, 1000, 1400] as const;
+export const LEVEL_XP = [0, 60, 220, 420, 850, 1400] as const;
 
 /** Max Warmth grows by this much per Keeper level (level 1 = ENERGY_MAX). */
 export const ENERGY_PER_LEVEL = 3;
@@ -2193,17 +2244,32 @@ export const PORTAL_TINTS: Record<string, PortalTints> = {
 };
 
 /**
- * Selyna quests that must be DONE before the Rune Way opens — counted off the
- * per-world `q:world:borealis:done` stat, so the gate never keeps a quest-id
- * list that could drift.
+ * THE CAULDRON-REACHED LATCH (owner's law, 2026-08-26): the moment any world's
+ * quest ladder puts its FIRST brew quest at the head — the player is being
+ * ASKED to use the pot — is a story fact with a second key on it. It is the
+ * alternative to rank for everything the Rune Way stands behind: Borealis's
+ * level-gated cloud slabs and the Runevault door itself open on Keeper level
+ * OR on this latch (`worldGates.cloudLevelMet`), so the ladder can never ask
+ * for a brew the player cannot reach, and a max-rank player never waits on
+ * quests either.
  *
- * TWO, and that number is the ladder's, not a feel: the north's third quest is
- * its first CAULDRON quest (`north_strakes`), and the pot stands through this
- * door. One quest later and the ladder would ask for a brew the player cannot
- * reach; much earlier and the door opens onto a hub before the north has taught
- * anything to carry through it. See docs/quest-ladder.md §5.
+ * QuestSystem derives and writes it (once, monotonic — `q:cauldron:reached`
+ * in `stats`, so it ships in the save with no schema change) and announces it
+ * as `quest:cauldron_reached`.
  */
-export const RUNEVAULT_QUESTS_NEEDED = 2;
+export const CAULDRON_REACHED_STAT = 'q:cauldron:reached';
+
+/**
+ * THE ELDER WAKES ON RANK (owner's call, 2026-08-27). Reaching the level that
+ * opens Borealis IS the awakening now: the finale — camera to the altar, the
+ * egg cracking, her first words, Eleanor speaking the Gate open — rides the
+ * `story:elder_wakes` fact, which StorySystem emits exactly once when the
+ * Keeper's level reaches the north's own `level`. This latch records that the
+ * ceremony has PLAYED (monotonic, in `stats`, so it ships in the save): the
+ * altar derives her standing from it (or from the legacy `q:done` latch), and
+ * a reload can never replay the chapter's one irreversible beat.
+ */
+export const ELDER_WOKEN_STAT = 'story:elder_woken';
 
 /** The Roothold house — the Emporium's painted storefront — as a world-px
  *  rect: roothold.webp [755, 205, 330, 340] through the shared art→world
@@ -2438,6 +2504,31 @@ export const HOLD_TO_PAN = {
   holdMs: 350,
   slopPx: 60,
   announcePx: 90
+} as const;
+
+/**
+ * THE SOFT GROUND SHADOW every board item casts, as the numbers that decide it.
+ *
+ * These were four magic numbers spread across `BoardItem` — the fit width, its
+ * floor, the squash and the seat — and they are the whole of "does this piece
+ * look like it is standing on the tile". A piece whose art is drawn with its
+ * feet high in the frame, or whose silhouette is much narrower than its plate,
+ * needs its own; that is what `anchors.json`'s `shadowByKey` is for, and these
+ * are the defaults it overrides one key at a time (the worldbuilder's 🪞 Seat
+ * page writes them).
+ */
+export const ITEM_SHADOW = {
+  /** Ellipse width as a fraction of the art's on-board footprint. */
+  ofWidth: 0.92,
+  /** Floor, so a tiny piece still casts something a player can read. */
+  minWidth: 64,
+  /** Height as a fraction of width — the isle's light is near-flat, so the
+   *  contact patch spreads sideways rather than pooling under the piece. */
+  squash: 0.42,
+  /** Where the ellipse sits under the art, in container px. The lean puts it
+   *  back exactly here (`clearLean`), so nothing may write it by hand. */
+  seatX: 0,
+  seatY: 8
 } as const;
 
 export const DRAG = {
@@ -2781,6 +2872,69 @@ export const TRAVEL_WIPE = {
  * cutting — a jump loses the player's place, which is the whole thing the
  * follow exists to protect.
  */
+/**
+ * THE TUTORIAL HAND — the gauntlet that demonstrates a drag or a tap.
+ *
+ * It is a puppet, not a cursor: it fades in slightly raised, PRESSES down on
+ * the piece, tilts back as it pulls, and pops on release. Every beat of that
+ * used to be a literal inside `UIScene.placeHand`, which is exactly the kind of
+ * number nobody can find when the gesture reads as frantic — the rest between
+ * loops was added for that reason and had to be hunted for. Named here so the
+ * worldbuilder's ⏱ Tuning page can drive them.
+ *
+ * `travelMs` is ONE stroke carried by two tweens (the tilt and the travel); they
+ * must stay equal or the hand finishes leaning before it arrives.
+ */
+export const TUTORIAL_HAND = {
+  /** Drag gesture: fade in from a raised, tilted pose. */
+  fadeInMs: 310,
+  /** How long the hand takes to carry the piece across. */
+  travelMs: 1200,
+  /** The overshoot pop as the item drops. */
+  releaseMs: 200,
+  fadeOutMs: 260,
+  fadeOutDelayMs: 220,
+  /** A beat of rest before the gesture starts over. Without it the hand reads
+   *  as frantic rather than as a demonstration. */
+  restMs: 450,
+  /** Tap gesture: press in, then a springy release. Paired with the bob's own
+   *  chain — equal loop delays, or the tap splits in two. */
+  tapDownMs: 260,
+  tapUpMs: 430,
+  tapLoopDelayMs: 200,
+  /** Pose: the raised start, the press, and the release pop, as scale factors
+   *  of the marker's base size. */
+  startScale: 1.08,
+  pressScale: 0.9,
+  releaseScale: 1.05,
+  /** How far the hand dips on a tap, in live px. */
+  bobPx: 14,
+  /** Tilt as it starts, and as it pulls, in degrees. */
+  startAngle: -5,
+  pullAngle: 4
+} as const;
+
+/**
+ * THE TUTORIAL ARROW — the pointer that names a piece or a control.
+ *
+ * The same puppet law as the hand: rise, drop with weight, land with a squash,
+ * then a settle beat before the next hop. A bob that merely oscillates reads as
+ * a screensaver; the impact is what makes it point.
+ */
+export const TUTORIAL_ARROW = {
+  /** How far it rises before the drop, in live px (negative is up). */
+  riseBy: -22,
+  riseMs: 380,
+  /** Accelerating fall onto the target. */
+  dropMs: 300,
+  /** The landing squash, and how wide/flat it goes. */
+  impactMs: 90,
+  impactScaleX: 1.08,
+  impactScaleY: 0.9,
+  /** Rest before the next hop. */
+  settleMs: 240
+} as const;
+
 export const TUTORIAL_FOLLOW_INSET = 1 / 6;
 export const TUTORIAL_FOLLOW_MS = 880;
 

@@ -125,6 +125,11 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
    *  to the ring's WORLD position every tick (masks live in world space). */
   private portraitMaskG: Phaser.GameObjects.Graphics;
   private portraitMask: Phaser.Display.Masks.GeometryMask;
+  private headCutMaskG: Phaser.GameObjects.Graphics;
+  private headCutMask: Phaser.Display.Masks.GeometryMask;
+  private headCutActive = false;
+  /** Reused by the per-tick seat, so it allocates nothing. */
+  private headCutMatrix = new Phaser.GameObjects.Components.TransformMatrix();
   private ringLocal = { x: 0, y: 0 };
   private nameTag: Phaser.GameObjects.Text;
   private nameTagBg: Phaser.GameObjects.Graphics;
@@ -242,10 +247,16 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     this.portraitMaskG.fillStyle(0xffffff, 1);
     this.portraitMaskG.fillCircle(0, 0, PORTRAIT_MASK_RADIUS);
     this.portraitMask = this.portraitMaskG.createGeometryMask();
+    // The head copy's INCLINED neck cut (see seatHeadCut) — a crop is
+    // rect-only, so a sloped cut is a world-space polygon, re-seated on the
+    // image's own live transform every tick like the circle above.
+    this.headCutMaskG = scene.make.graphics();
+    this.headCutMask = this.headCutMaskG.createGeometryMask();
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.syncPortraitMask, this);
     this.once(Phaser.GameObjects.Events.DESTROY, () => {
       scene.events.off(Phaser.Scenes.Events.UPDATE, this.syncPortraitMask, this);
       this.portraitMaskG.destroy();
+      this.headCutMaskG.destroy();
     });
     this.nameTagBg = scene.add.graphics();
     this.nameTag = scene.add
@@ -520,6 +531,57 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     if (!this.visible) return;
     this.portraitMaskG.setPosition(this.x + this.ringLocal.x * this.scaleX, this.y + this.ringLocal.y * this.scaleY);
     this.portraitMaskG.setScale(this.scaleX, this.scaleY);
+    if (this.headCutActive) {
+      // Seated off the head copy's LIVE world transform, not the container's:
+      // the breathing puppet oscillates portraitTop's own scale, and a mask
+      // seated on anything less would shear the cut line across the jaw by
+      // exactly the breath. The polygon is authored in frame pixels with the
+      // image's top-left at (0,0) — origin is (0.5, 0), so the left edge sits
+      // half a display-width left of the matrix's translation.
+      const m = this.portraitTop.getWorldTransformMatrix(this.headCutMatrix);
+      this.headCutMaskG.setPosition(m.getX(-this.portraitTop.width / 2, 0), m.getY(-this.portraitTop.width / 2, 0));
+      this.headCutMaskG.setScale(m.scaleX, m.scaleY);
+    }
+  }
+
+  /**
+   * Cut the head copy at the neck — flat, or on an authored INCLINE.
+   *
+   * The flat cut is a texture crop. The inclined one exists for a profile
+   * speaker: the Golden Elder's open jaw dips BELOW any horizontal line that
+   * clears her neck, so at her widest the ring band sliced the chin flat.
+   * The incline keeps the cut's height at the frame centre exactly where the
+   * flat line was (`headCrop`) and tilts it — left end low, diving under the
+   * jaw's full motion envelope (measured across every talking frame: the jaw
+   * bottoms at row 265 of 360 by x 80), right end high over the neck, which
+   * is identical pixels in both copies and cannot show a seam.
+   */
+  private seatHeadCut(clip: { frameWidth: number; frameHeight: number }, view: PortraitView): void {
+    const incline = view.headCropIncline ?? 0;
+    if (!incline) {
+      if (this.headCutActive) {
+        this.portraitTop.clearMask();
+        this.headCutActive = false;
+      }
+      this.portraitTop.setCrop(0, 0, clip.frameWidth, Math.round(clip.frameHeight * view.headCrop));
+      return;
+    }
+    this.portraitTop.setCrop(); // the mask is the whole cut
+    const left = (view.headCrop + incline / 2) * clip.frameHeight;
+    const right = (view.headCrop - incline / 2) * clip.frameHeight;
+    this.headCutMaskG.clear();
+    this.headCutMaskG.fillStyle(0xffffff, 1);
+    this.headCutMaskG.fillPoints(
+      [
+        new Phaser.Geom.Point(0, 0),
+        new Phaser.Geom.Point(clip.frameWidth, 0),
+        new Phaser.Geom.Point(clip.frameWidth, right),
+        new Phaser.Geom.Point(0, left)
+      ],
+      true
+    );
+    this.headCutActive = true;
+    this.portraitTop.setMask(this.headCutMask);
   }
 
   /** A speaker's baked disc spritesheet is loaded and sliced into frames. */
@@ -680,9 +742,9 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
     const view = this.atlasView(this.atlasSpeaker);
     this.portrait.setTexture(key, 0);
     this.portraitTop.setTexture(key, 0);
-    // Neck-line crop, in this clip's texture rows (talking and blinking may
-    // differ in frame size, so the crop follows the mounted clip).
-    if (view) this.portraitTop.setCrop(0, 0, clip.frameWidth, Math.round(clip.frameHeight * view.headCrop));
+    // Neck-line cut, in this clip's texture rows (talking and blinking may
+    // differ in frame size, so the cut follows the mounted clip).
+    if (view) this.seatHeadCut(clip, view);
     this.atlasTick?.remove();
     this.atlasTick = this.scene.time.addEvent({
       delay: 1000 / clip.fps,
@@ -698,6 +760,12 @@ export class CharacterBubble extends Phaser.GameObjects.Container {
   }
 
   private stopAtlasPortrait(): void {
+    // The inclined cut belongs to the clip that mounted it — a later disc or
+    // static speaker must not inherit a mask shaped like her neck.
+    if (this.headCutActive) {
+      this.portraitTop.clearMask();
+      this.headCutActive = false;
+    }
     this.atlasTick?.remove();
     this.atlasTick = null;
     this.atlasTalkHold?.remove();

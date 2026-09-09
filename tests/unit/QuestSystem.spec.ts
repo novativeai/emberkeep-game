@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GameContext } from '../../src/core/Context';
-import { LEVEL_XP } from '../../src/core/Constants';
+import { CAULDRON_REACHED_STAT, LEVEL_XP } from '../../src/core/Constants';
 import type { MapData } from '../../src/core/types';
 import realMap from '../../src/data/map.json';
 import { capture, createTestContext, MemoryStorage } from './helpers';
@@ -47,7 +47,7 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
     expect(ctx.systems.quests.titleFor(quest)).toBe('Light the Fire Bowl');
   });
 
-  it('a `have` goal reads the live board and LATCHES, so delivering cannot un-do it', () => {
+  it('a `have` goal reads what the Keeper HOLDS and LATCHES, so delivering cannot un-do it', () => {
     const ctx = createTestContext();
     const shards = ctx.systems.quests.activeQuest!.steps.find((s) => s.id === 'brazier_shards')!;
 
@@ -59,6 +59,39 @@ describe('QuestSystem (the quest ladder behind the on-screen tracker)', () => {
     for (const item of ctx.state.itemsMatching('flame_gem', 1)) ctx.state.removeItem(item.id);
     ctx.bus.emit('item:removed', { itemId: 0, at: { col: 0, row: 0 }, reason: 'delivered' });
     expect(ctx.systems.quests.progressFor(shards).done).toBe(true);
+  });
+
+  /**
+   * THE SATCHEL IS NOT A HIDING PLACE. A player who tidies the pieces away as
+   * they make them was watching the row count DOWN: `BagSystem.store` pockets
+   * the stack and consumes the board item, so a count that walks boards alone
+   * says the piece stopped existing. Reported from a live game — "the 3 sun
+   * items task, if you put each one as made in the pouch, the task does not
+   * detect them, unless taken out".
+   */
+  it('a `have` goal counts the satchel too — pocketing a piece is not losing it', () => {
+    const ctx = createTestContext();
+    const shards = ctx.systems.quests.activeQuest!.steps.find((s) => s.id === 'brazier_shards')!;
+
+    // ONE AT A TIME, AND AWAY — the reported gesture exactly. The board never
+    // holds six at once, so the step cannot have latched on the way past: this
+    // is the only arrangement that actually tests the count. (Six on the
+    // ground first would latch the step and then pass whatever the counter
+    // said afterwards — a test that proves nothing, which is what the first
+    // draft of this one did.)
+    for (let i = 0; i < 6; i++) {
+      place(ctx, 'flame_gem', 1, 1);
+      const piece = ctx.state.itemsMatching('flame_gem', 1)[0]!;
+      ctx.bus.emit('ui:store_requested', { itemId: piece.id });
+      expect(ctx.state.countItemsAnywhere('flame_gem', 1)).toBe(0);
+    }
+    expect(ctx.systems.bag.countOf('flame_gem', 1)).toBe(6);
+
+    expect(ctx.systems.quests.progressFor(shards)).toMatchObject({
+      have: 6,
+      need: 6,
+      done: true
+    });
   });
 
   it('completes a quest only when every step is, then advances the ladder', () => {
@@ -292,16 +325,14 @@ describe('brew goals — the cauldron as a quest driver', () => {
   it('counts brews, and spending what was brewed cannot un-do the step', () => {
     const ctx = createTestContext();
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
-    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 0, need: 4, done: false });
+    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 0, need: 1, done: false });
 
-    brew(ctx, 'iron_cap', 3);
-    expect(ctx.systems.quests.progressFor(step)).toMatchObject({ have: 3, done: false });
-    brew(ctx, 'iron_cap', 1);
+    brew(ctx, 'tar_spile', 1);
     expect(ctx.systems.quests.progressFor(step).done).toBe(true);
 
-    // The output is meant to be SPENT — four strakes merged away is the quest
+    // The output is meant to be SPENT — the oven put to work is the quest
     // working, not the quest coming undone.
-    ctx.bus.emit('bag:consume', { chain: 'warhelm', tier: 1, count: 4 });
+    ctx.bus.emit('bag:consume', { chain: 'tarkiln', tier: 3, count: 1 });
     expect(ctx.systems.quests.progressFor(step).done).toBe(true);
   });
 
@@ -319,7 +350,7 @@ describe('brew goals — the cauldron as a quest driver', () => {
         id: 'unlabelled',
         goal: { kind: 'brew', recipeId: 'iron_cap', count: 2 }
       }).label
-    ).toBe('Brew 2 × Iron Hat');
+    ).toBe('Brew 2 × Horned Helmet');
   });
 
   /**
@@ -332,24 +363,57 @@ describe('brew goals — the cauldron as a quest driver', () => {
   it('points a brew peek at the cauldron input, scaled by the brew count', () => {
     const ctx = createTestContext();
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_strakes')!.steps[0]!;
-    // iron_cap takes 1 Glass Float per hat; the step asks for four.
-    expect(ctx.systems.quests.peekNeedFor(step)).toEqual({ chain: 'seaglass', tier: 2, count: 4 });
+    // tar_spile takes 2 Glass Floats + 3 Iron Hats per oven; the step asks
+    // for one, and the hats are the bigger of the two shortfalls.
+    expect(ctx.systems.quests.peekNeedFor(step)).toEqual({ chain: 'warhelm', tier: 1, count: 3 });
+  });
+
+  /** THE CAULDRON-REACHED LATCH (owner's law, 2026-08-26): the first brew
+   *  quest heading any ladder flips `q:cauldron:reached` — the clouds' and
+   *  the Rune Way's second key. Derived from the ladder's shape, never a
+   *  hardcoded id, so it must move if the ladder is reordered. */
+  it('latches cauldron-reached the moment the first brew quest heads the track', () => {
+    const ctx = createTestContext();
+    const reached = capture(ctx.bus, 'quest:cauldron_reached');
+    for (const id of ['north_landing', 'north_coast', 'north_fuel']) {
+      ctx.state.addStat(`q:done:${id}`, 1);
+    }
+    ctx.bus.emit('bag:changed', { used: 0, capacity: 12 });
+    // north_salvage still heads the northern track — not reached yet.
+    expect(ctx.state.stat(CAULDRON_REACHED_STAT)).toBe(0);
+
+    ctx.state.addStat('q:done:north_salvage', 1);
+    ctx.bus.emit('bag:changed', { used: 0, capacity: 12 });
+    expect(ctx.state.stat(CAULDRON_REACHED_STAT)).toBe(1);
+    expect(reached).toHaveLength(1);
+
+    // Monotonic: a later evaluate neither re-announces nor re-counts.
+    ctx.bus.emit('bag:changed', { used: 0, capacity: 12 });
+    expect(ctx.state.stat(CAULDRON_REACHED_STAT)).toBe(1);
+    expect(reached).toHaveLength(1);
+  });
+
+  it('a brew quest finished out of order still counts as reached', () => {
+    const ctx = createTestContext();
+    ctx.state.addStat('q:done:north_strakes', 1);
+    ctx.bus.emit('bag:changed', { used: 0, capacity: 12 });
+    expect(ctx.state.stat(CAULDRON_REACHED_STAT)).toBe(1);
   });
 
   it('picks the ingredient the player is shortest of, not the first line', () => {
     const ctx = createTestContext();
-    // north_pitchpot brews `fire_brick` three times: 6 x Tar Drop
-    // (emberheart:1) + 3 x Iron Hat (warhelm:1). Stock the Tar Drops and the
-    // answer must move to the hats — the first input is the wrong answer as
-    // often as not to "why can I not brew this yet".
+    // north_pitchpot brews `fire_brick` once: 2 x Tar Loaf (emberheart:2)
+    // + 3 x Iron Hat (warhelm:1). Stock the hats and the answer must move to
+    // the loaves — the first input is the wrong answer as often as not to
+    // "why can I not brew this yet".
     const step = ctx.systems.quests.all.find((q) => q.id === 'north_pitchpot')!.steps[0]!;
     expect(ctx.systems.quests.peekNeedFor(step)).toEqual({
-      chain: 'emberheart',
+      chain: 'warhelm',
       tier: 1,
-      count: 6
+      count: 3
     });
-    ctx.bus.emit('bag:bank', { chain: 'emberheart', tier: 1, count: 6 });
-    expect(ctx.systems.quests.peekNeedFor(step)!.chain).toBe('warhelm');
+    ctx.bus.emit('bag:bank', { chain: 'warhelm', tier: 1, count: 3 });
+    expect(ctx.systems.quests.peekNeedFor(step)!.chain).toBe('emberheart');
   });
 
   it('answers nothing for a goal that is not a brew', () => {

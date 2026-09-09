@@ -60,31 +60,66 @@ and this is the order that asks. Moonwater and quartz are `MAGE_ONLY` — no
 dragon eats any tier of either — so without this sink the chain and the Dew
 Basin that feeds it would be dead stock.
 
-*Borealis (`world: "borealis"`).*
+*Borealis (`world: "borealis"`).* The cauldron enters on the **5th** rung
+(owner's law, 2026-08-26 — never earlier), and from there brew quests and
+merge quests strictly alternate. Every brew row uses the first cauldron
+quest's naming — *"Brew … in the Cauldron"* — never a bare "brew" (owner's
+law, 2026-08-27: the player must always know the pot is the tool, because the
+same chains also grow on the board). And the pot only hands back **tier-3**
+items (same law, superseding the tier-2 floor): each brew quest pays a
+capstone — a whole machine, or a top-tier good.
 
 | # | Quest | Order | Subquests |
 | --- | --- | --- | --- |
-| 1 | **Make Camp on the Ice** | `selyna_signal` | Merge 3 Drift Spars into a Bound Faggot · Deliver 2 Bound Faggots to Selyna |
-| 2 🥚 | **Open the Wrack Coast** | — | Spend 1 Gold Key on the fog along the coast |
-| 3 | **Feed the Northern Dragons** | `selyna_pitch` | Build a Drift Stack from 9 Drift Spars · Make 3 Pitch Cakes · Deliver 3 Pitch Cakes to Selyna |
-| 4 | **Salvage the Wrecks** | `selyna_frames` | Make 2 Lashed Frames · Deliver 2 Lashed Frames to Selyna |
-| 5 | **Open Selyna's Keep** | — | Spend 2 Gold Keys on the fog around the keep |
-| 6 🥚 | **What She Will Take** | — | Give Selyna 2 Bound Faggots · Give Selyna 3 Frost Flowers |
-| 7 | **Raise a Longhall** | — | Merge 2 Lashed Frames into an Upturned Hull · Merge 2 Upturned Hulls into a Longhall |
-| 8 | **Stock the Pitchworks** | — | Make 1 Black Ember |
-| 9 | **Turn Two Hulls** | — | Make 2 Upturned Hulls |
-| 10 🥚 | **Spin the Light-Fast Spindles** | `selyna_spindle` | Earn a place at Selyna's fire · Grow a Rime Bloom · Make 2 Light-Fast Spindles · Deliver 2 to Selyna |
-| 11 | **Wake the Rimewyrm** | — | Merge 3 Rimewyrm Eggs into the Rimewyrm |
-| 12 | *(the live order's title)* | the encore | whatever her Ledger asks |
+| 1 | **Make Camp on the Ice** | `selyna_signal` | Merge 3 Glass Balls into a Glass Float · Deliver 2 Glass Floats to Selyna |
+| 2 | **Open the Shipwreck Coast** | — | Use 1 Gold Key on the clouds by the coast |
+| 3 | **Feed the Northern Dragons** | `selyna_pitch` | Get 3 Tar Drops · Make 3 Tar Loaves · Deliver 3 Tar Loaves to Selyna |
+| 4 | **Search the Shipwrecks** | `selyna_frames` | Make 2 Iron Helmets at the Shipwreck Forge · Deliver 2 Iron Helmets to Selyna |
+| 5 | **Brew a Tar Oven** | — | Brew a Tar Oven in the Cauldron |
+| 6 | **Make an Ember Heart** | — | Make 1 Ember Heart |
+| 7 | **Brew a Star Workbench** | — | Brew a Star Workbench in the Cauldron |
+| 8 🥚 | **Open Selyna's Castle** | — | Use 2 Gold Keys on the clouds around the castle |
+| 9 | **Brew a Glass Oven** | — | Brew a Glass Oven in the Cauldron |
+| 10 | **A Gift for Selyna** | `selyna_buoys` | Make 2 Glass Floats · Deliver 2 Glass Floats · Give Selyna 3 Glass Lenses |
+| 11 | **Brew a Warm Lamp** | — | Brew a Warm Lamp in the Cauldron |
+| 12 🥚 | **Make Two Horned Helmets** | — | Make 2 Horned Helmets |
+| 13 | **Brew a Treasure Compass** | — | Brew a Treasure Compass in the Cauldron |
+| 14 | **Build a Second Forge** | — | Merge 3 Iron Helmets into a Horned Helmet · Build a second Shipwreck Forge from 3 Bellows |
+| 15 | **Brew an Aurora Loom** | — | Brew an Aurora Loom in the Cauldron |
+| 16 | **Weave the Aurora** | `selyna_spindle` | Fill 1 of Selyna's hearts · Build a Star Machine · Make 2 Aurora Cloaks · Deliver 2 to Selyna |
+| 17 🥚 | **Brew a Runestone** | — | Brew a Runestone in the Cauldron |
+| 18 | **Wake the Ice Dragon** | — | Merge 3 Ice Dragon Eggs into the Ice Dragon |
+| 19 | *(the live order's title)* | the encore | whatever her Ledger asks |
 
-**The Borealis fog lifts south → north, on keys alone.** Shore (open, cy≈1509
-world px) → coast (1 key, cy≈884) → keep (2 keys, cy≈652): each cloud is the
-next island up the map, and the escalating cost makes the march unspendable out
-of order — at one banked key only the coast is affordable. Every generator a
-quest needs stands on ground already open when it asks (shore's Wrack Line funds
-the signal fire; the coast's Wrack Lines, Hoarfrost Fonts and six Broken Strakes
-fund the pitch and frames orders that pay for the keep) — `pnpm quests --all`
-proves it, and Selyna's door is deliberately the arc's last and dearest fog.
+A brew quest never brews a piece another quest asks the player to *merge*
+(pinned in `QuestAvailability.spec.ts`) — which is why rung 7 brews the Star
+Workbench, not the Aurora Cloak that rung 16 asks for by hand. Recipe pages
+keep unlocking one or two quests ahead of the rung that needs them
+(`brass_cog` on rung 6 for rung 7, `silver_spindle` on rung 14 for rung 15,
+`rune_shard` on rung 16 for rung 17), so the grimoire grows with the ladder.
+The four **dragon-egg recipes** are spaced two rungs apart down the back half
+of the ladder: `ashdrake_egg` off the Keeper's Tasks, then `rimewyrm_egg` on
+rung 12, `storm_egg` on rung 14 and `frost_egg` on rung 16 — every one priced
+with at least two tier-3 ingredient lines, and the frost and storm eggs (the
+hardest brews in the book) each consume ANOTHER dragon egg: an Ice Dragon Egg
+in the frost (brewable from rung 12), an Ash Dragon Egg in the storm
+(brewable since the Tasks). The **Golden Egg is deliberately NOT in the
+cauldron** (owner's law, 2026-08-27): the Golden Elder is story cast like
+Eleanor and Selyna — her one egg is authored at the altar and cracks in the
+finale, never brewed.
+
+**The Borealis fog lifts south → north, on keys alone.** Shore (open) → coast
+(1 key) → keep (2 keys): each cloud is the next island up the map, and the
+escalating cost makes the march unspendable out of order — at one banked key
+only the coast is affordable. Every generator a quest needs stands on ground
+already open when it asks (the shore's Glass Oven funds the signal fire; the
+coast's four machines — Star Workbench, Shipwreck Forge, Tar Oven,
+Juice Barrel — fund the pitch and frames orders that pay for the keep; the
+Runestone is no longer seeded or a generator, 2026-08-28 — the one that counts
+is BREWED in quest 17) —
+`pnpm quests --all` proves it, and Selyna's door is deliberately the arc's
+last and dearest fog. The outer level-slabs past the islands carry the double
+key (rank 5/6 or the cauldron latch, §5).
 
 **A quest title and its Ledger order carry the SAME name.** `quests.json` and
 `orders.json` are edited together — the player opens the Ledger to act on the
@@ -112,7 +147,7 @@ claims to measure. `TaskKind` counters, `completedOrderIds`, `countItems`,
 
 | Kind | Finished when | Notes |
 | --- | --- | --- |
-| `have` | that many of a chain+tier are on the board | **Non-monotonic** — delivering consumes them, so a met `have` is LATCHED |
+| `have` | the Keeper HOLDS that many of a chain+tier — on any board **or in the satchel** | **Non-monotonic** — delivering consumes them, so a met `have` is LATCHED. The bag counts because a `have` is a check and never a spend; an `order` is the opposite and stays board-only, since its delivery pays with board pieces |
 | `order` | that order is DELIVERED | Its counters show the goods (`6 / 6 — go and deliver`), but holding them is not finishing |
 | `active_order` | never | The endless tail: a live readout of the Ledger |
 | `stat` | a lifetime counter reaches the target | The same counters TaskSystem owns |
@@ -279,9 +314,19 @@ Cookbook and the audit all call it. Selyna's four frozen chains used to sit in
 edit at exactly the moment the player crossed, and would have leaked the roster
 into Emberkeep if anyone forgot to put it back.
 
-**A world may only be opened by a quest step.** The `world` goal kind completes
-when the player has stood there, and latches, so coming home never re-opens the
-crossing.
+**How a world opens** lives in `src/core/worldGates.ts`: Roothold on Eleanor's
+first delivered order, **Borealis on the Keeper's level alone** (the world's
+own `level` in zones.json — owner's call, 2026-08-26; the old
+`q:done:keepers_hoard` latch is gone and the Elder's awakening stays a quest
+beat), **the Runevault on a DOUBLE KEY** — Level 6 (the rank that clears the
+last clouds off Borealis's main island) **or** the ladder reaching its first
+cauldron quest (`q:cauldron:reached`, latched by QuestSystem the moment a brew
+quest heads any track; `worldGates.cloudLevelMet` is the shared predicate).
+Borealis's own level cloud-slabs carry the same double key, so grinder and
+quester both get the north whole — and the Selyna-quest-count latch is gone.
+The `world` goal kind completes
+when the player has stood there, and latches, so coming home never re-opens
+the crossing.
 
 > ⚠️ `worlds.json` carries `teleport: { trigger: "hatch", chain: "flame_gem",
 > tier: 2, … toWorld: "borealis" }`. That is a **map-editor placeholder and must
@@ -312,11 +357,12 @@ as three landmasses and the map editor delivered it as 38 grids. `world.ts`
 measures which cells actually touch, and the three connected components it finds
 are exactly the three the editor's unlock levels named:
 
-| Region | Cells | Opens on | What stands there |
-| --- | --- | --- | --- |
-| `borealis_shore` | 9 | active on arrival | Wrack Line ×1 · Drift Spar ×4 |
-| `borealis_keep` | 29 | **1 Gold Key** | Hoarfrost Font · Wrack Line · 3 Frost Flowers · 3 Drift Spars · 3 Broken Strakes · a Chest |
-| `borealis_coast` | 103 | **2 Gold Keys** | 2 Wrack Lines · 2 Fonts · 5 spars · 5 flowers · 6 strakes · a Chest |
+| Region | Opens on | What stands there |
+| --- | --- | --- |
+| `borealis_shore` | active on arrival | Glass Oven · 5 Glass Balls |
+| `borealis_coast` | **1 Gold Key** | Star Workbench · Shipwreck Forge · Tar Oven · Juice Barrel · a Chest — the SOUTHERN deck: the mainland opens bottom-up, `_l4`/`_l5`/`_l6` lifting band by band northward (2026-08-28) |
+| `borealis_keep` | **2 Gold Keys** | Aurora Loom · Magic Stone Tower · 3 Iron Hats · 3 Magnet Rocks + 2 Compass Needles · 3 Oil Lamps + 2 Big Lanterns · a Chest |
+| `borealis_coast_l4` / `_l5` / `_l6` | **Level 4 / 5 / 6 or the cauldron latch** | empty land, south → north — room, not stock; the north band falls as the Rune Way opens |
 
 **A merge cannot cross water**, so each island is seeded to run on its own. That
 is not generosity: an island with no producer is an island where nothing can
@@ -325,14 +371,15 @@ ever happen, no matter how long the player waits. Seeds are authored in
 orders a region's cells outward from its centre — a re-export moves every cell,
 so a hand-written `[col,row]` would become a hole in the sky.
 
-*Keys, not levels.* As generated the two fogged islands gated on Keeper Level 2
-and 3 — and the north opens at Level 3, the Chapter One cap. A player arriving
-for the first time satisfied both, so all 141 cells unfogged in the frame they
-landed and the world was spent before it started. The alternative fix was to
-extend `LEVEL_XP` past 3, which costs the XP bar its *"Chapter One complete"*
-reading. Keys are the right instrument: the only source of one is Selyna's
-Ledger, so the north opens at the pace the player works it — and it keeps the
-rule the south already follows, **keys gate story, levels gate power**.
+*Keys for the islands, ranks for the outer land.* As generated the two fogged
+islands gated on Keeper Level 2 and 3 — and the north opens at Level 3, so a
+player arriving for the first time satisfied both and the whole world unfogged
+in the frame they landed. The three islands now gate on **Gold Keys** (the
+only source is Selyna's Ledger, so the north opens at the pace the player
+works it), while `LEVEL_XP` has since been extended to six ranks for the
+north's OUTER slabs — `borealis_coast_l5`/`_l6`, which also honour the
+cauldron double key. The rule the south follows still holds: **keys gate
+story, levels gate power** — and the level clouds hold no stock, only room.
 
 *Its own everything.* `OrderConfig.world` gives Selyna her own Ledger (Eleanor's
 would otherwise follow the player north and ask, for ever, for Gem Shards that
@@ -342,21 +389,29 @@ carries a `world`, so `chainHiddenIn` would NOT have stopped a chest dropping
 Dragon Rubies onto an island with no dragon and no order that wants them.
 `chestGiftsIn(worldId)` is the one predicate; `ChestSystem` and the audit share it.
 
-*Three new chains* (`chains.json`, all `world: "borealis"`): `wrackline` — the
-north's Ancient Tree, a passive 300 s drip of `driftwood_1` with a `bonus` of one
-`keel_1` every third haul, so ONE landmark bootstraps two chains and the rare
-drop reads as the sea giving something back rather than as a drip rate;
-`frostfont`, feeding the rime farm; and `keel`, the north's gold loop — Broken
-Strake → Lashed Frame → **Upturned Hull** (2→1, generates `coin_1`) → **Longhall**
-(`coin_2`), mirroring `lumber` beat for beat including the tier-3 override, so the
-loop is learned rather than re-taught. It deliberately does not reuse
-`driftwood`: that chain is already the fuel farm, and one chain feeding both the
-furnace and the housing collapses two decisions into one.
+*Machine chains, not landmark chains* (`chains.json`, all `world: "borealis"`;
+the original wrackline/frostfont/keel roster was migrated tier for tier by
+`migrate-borealis-farms.py`). The north runs on seven MACHINES — each a
+three-tier chain whose tier 3 is the generator: Glass Oven → Glass Balls,
+Star Workbench → Glass Lenses, Shipwreck Forge → Iron Hats, Tar Oven →
+Tar Drops, Juice Barrel → Fire Juice, Aurora Loom → Light
+Thread, Magic Stone Tower → Glass Lenses (Magic Pebbles on its bonus). The
+Runestone stopped being one (2026-08-28): it duplicated the Tar Oven's
+produce, so its generator and its seed are gone — the brewed one is an
+ornament with a story, not a faucet. Every
+machine seeds its own replacement parts on an every-12th bonus yield — except
+the SOLE faucet, Magic Pebbles, which drops every 5th (2026-08-27 flow pass;
+at every-12 the compass and rune brews priced at half a day). The Treasure Compass (`wayfinder:3`) is the
+north's gold loop. The seeded machine of each unique line is `sellable:false`
+down to the data — selling the only Magic Stone Tower once stranded the
+compass and rune brews permanently, because rebuilding it needs the very
+pebbles it makes.
 
-*The ladder* is eight quests, `north_landing` → `north_ledger`, and it walks the
-islands: make camp on the shore, buy the door, feed her dragons, salvage the
-wrecks, buy the coast, raise a Longhall, spin the spindles, then her endless
-Ledger. `pnpm quests --all` proves every step and every key.
+*The ladder* is nineteen quests, `north_landing` → `north_ledger` (the table
+in §2), and it walks the islands: make camp on the shore, buy the coast, feed
+her dragons, salvage the wrecks — and only THEN, on the 5th rung, does the
+Cauldron get its first job, alternating with merge work the rest of the way.
+`pnpm quests --all` proves every step and every key.
 
 > **The one thing still missing is the crossing itself.** `WorldSystem` validates
 > travel and `UIScene` already draws the travelling curtain, but nothing on
@@ -426,10 +481,10 @@ dragon, and the audit says so in those words.
 
 | | Emberkeep — **Ashdrake** | Borealis — **Rimewyrm** |
 | --- | --- | --- |
-| Egg 1 | 2. Warm the Long Hearth | 2. Open Selyna's Keep |
-| Egg 2 | 6. Raise the Roofs | 6. What She Will Take |
-| Egg 3 | 10. Raise the Ember Brood | 10. Spin the Light-Fast Spindles |
-| Hatch | 11. Wake the Ashdrake | 11. Wake the Rimewyrm |
+| Egg 1 | 2. Warm the Long Hearth | 8. Open Selyna's Castle |
+| Egg 2 | 6. Raise the Roofs | 12. Make Two Horned Helmets |
+| Egg 3 | 10. Raise the Ember Brood | 17. Brew a Runestone |
+| Hatch | 11. Wake the Ashdrake | 18. Wake the Ice Dragon |
 
 Both dragons come out **FINITE 1** in the audit, which is the correct and
 intended verdict: exactly one can ever exist per zone. That is also why a quest

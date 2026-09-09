@@ -170,6 +170,62 @@ export class DragonSystem {
       this.feedBoardDragon(itemId, chain, tier)
     );
     bus.on('ui:dragon_named', ({ itemId, name }) => this.nameBoardDragon(itemId, name));
+
+    // EVERY HATCHLING IS ASKED ITS NAME, not just the tutorial's Red Dragon.
+    //
+    // The prompt had exactly one emitter in the whole build — the scripted
+    // `nameDragon` effect on the opening's own beat — so the second dragon a
+    // player ever hatched was never asked anything. The Codex and the status
+    // pane then fall back to the BREED for a dragon with no name, and an Ash
+    // Dragon appearing already called "Ash Dragon" reads as the game having
+    // named it behind your back. It had not; it had simply stopped asking.
+    bus.on('item:hatched', ({ item }) => {
+      this.askQueue.push(item.id);
+      this.drainNames();
+    });
+    // …and the question waits for the screen. A hatch plays its reveal card
+    // first and a scripted beat owns the board outright, so both are held
+    // here rather than in the panel: these are the two facts that already say
+    // "the board is the player's again".
+    bus.on('tutorial:step', ({ done }) => {
+      this.scriptRunning = !done;
+      this.drainNames();
+    });
+    bus.on('ui:reveal_toggled', ({ open }) => {
+      this.revealOpen = open;
+      this.drainNames();
+    });
+    bus.on('dragon:named', () => this.drainNames()); // one at a time
+  }
+
+  /** Hatchlings that have not met the question yet. */
+  private askQueue: number[] = [];
+  /** A scripted beat is holding the board (learned from the bus, not from
+   *  `state.tutorialDone` — a mid-game lesson is a script too). */
+  private scriptRunning = false;
+  /** The hatch's own reveal card is up. */
+  private revealOpen = false;
+
+  /**
+   * Ask about the next unnamed hatchling, once nothing else holds the screen.
+   *
+   * Skips what has already been settled — a dragon the script named, one sold
+   * or merged away since — and stops after one: the next is drained when that
+   * name lands, so two hatches in a breath are two questions in a row rather
+   * than two panels at once.
+   */
+  private drainNames(): void {
+    if (this.scriptRunning || this.revealOpen) return;
+    while (this.askQueue.length > 0) {
+      const itemId = this.askQueue[0]!;
+      const item = this.state.items.get(itemId);
+      if (!item || !this.isBoardDragon(item) || item.dragonName) {
+        this.askQueue.shift();
+        continue;
+      }
+      this.bus.emit('ui:name_dragon_requested', { itemId });
+      return;
+    }
   }
 
   get companions(): Companion[] {

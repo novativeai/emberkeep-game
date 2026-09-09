@@ -29,10 +29,13 @@ import {
   TOP_UP,
   TRAVEL_VEIL_TIMEOUT_MS,
   TRAVEL_WIPE,
+  TUTORIAL_ARROW,
+  TUTORIAL_HAND,
   UI_SCALE,
   WELCOME_BACK_MIN_MS,
   WORLD_ID
 } from '../core/Constants';
+import { LEGAL_DOCS, legalUrl } from '../core/legalLinks';
 import { FONT } from '../art/design';
 import { clipKey, clipsFor } from '../core/characterAnims';
 import { guard } from '../core/crash';
@@ -94,7 +97,21 @@ const DEPTH_TUTORIAL = 100;
 const DEPTH_DIALOG = 200;
 // On-screen heights (2560-space) for the tutorial pointer/arrow. The real art
 // loads at its native pixel size, so each is scaled to these.
-const HAND_MARKER_H = 172;
+/**
+ * SMALLER THAN THE GROUND IT POINTS AT. Measured at `wood_merge`: a tile is
+ * 155 units across and the hand was 174 — the pointer was WIDER than the cell,
+ * lying flat, in the gauntlet's own leather brown. On the beat whose line reads
+ * "drag the three piles of Logs together" the owner counted FOUR wooden shapes
+ * and could not tell which was his. It was the hand.
+ *
+ * 120 puts it at 0.77 of a tile, so it can never occupy a cell the way a piece
+ * does, and `handShade` lifts it off the floor. The art is untouched: this is a
+ * question of how big a pointer may be, not of what it is a picture of.
+ */
+const HAND_MARKER_H = 120;
+/** The cast shadow's offset (2560-space) and opacity — what makes the hand read
+ *  as hovering OVER the board rather than resting on it. */
+const HAND_SHADE = { dx: 14, dy: 20, alpha: 0.3, grow: 1.04 };
 // +75% on the phone (owner's call): at 148 units the pointer renders ~23 real
 // px on a 390px handset and disappears against the busy board.
 const ARROW_MARKER_H = IS_MOBILE ? 259 : 148;
@@ -182,10 +199,16 @@ interface TravelVeil {
   /** Every tween target that may still be animating when the veil dies — the
    *  ember dots repeat forever, so destroy must kill, not just drop. */
   pulse: Array<object>;
+  /** Destination — so the `world:switched` echo of a departure this veil
+   *  already covers does not tear it down and re-raise it. */
+  worldId: string;
   covered: boolean;
   coveredAt: number;
   revealAsked: boolean;
   revealing: boolean;
+  /** Runs ONCE when the cover completes — the departure path emits
+   *  `world:switch` here, so the swap happens under a fully-drawn curtain. */
+  onCovered?: () => void;
 }
 
 export class UIScene extends Phaser.Scene {
@@ -246,6 +269,9 @@ export class UIScene extends Phaser.Scene {
   private recipeHint: string | null = null;
   private recipeHintTimer: Phaser.Time.TimerEvent | null = null;
   private hand!: Phaser.GameObjects.Image;
+  /** The hand's cast shadow — its own silhouette, tinted black, one depth under
+   *  it. Mirrors the hand's transform every frame; owns no animation of its own. */
+  private handShade!: Phaser.GameObjects.Image;
   private arrow!: Phaser.GameObjects.Image;
   private dialog: Phaser.GameObjects.Container | null = null;
   /** Real-money purchase dialog (confirm, then the waiting card). */
@@ -283,6 +309,9 @@ export class UIScene extends Phaser.Scene {
   /** True while the HAND is showing an idle merge hint rather than a tutorial
    *  beat — so the hint only ever takes back what the hint put there. */
   private hintHand = false;
+  /** Last frame's `panelUp()` — the edge detector behind suspending and
+   *  re-arming the recipe demonstration around open panels. */
+  private panelWasUp = false;
   /**
    * WHO IS HOLDING THE HAND — stated, not inferred.
    *
@@ -633,6 +662,17 @@ export class UIScene extends Phaser.Scene {
     // pointers regardless of source resolution.
     this.handBaseScale = HAND_MARKER_H / this.hand.height;
     this.hand.setScale(this.handBaseScale);
+    // ITS OWN SILHOUETTE, IN SHADOW. A blurred blob would be a smudge under a
+    // hand; the same texture tinted black is the shape the light would actually
+    // cast, and it costs one image. It sits UNDER the hand and takes its whole
+    // transform from it each frame (`syncHandShade`), so no tween has to know it
+    // exists — which is what keeps the press/tilt/travel choreography one place.
+    this.handShade = this.add
+      .image(0, 0, 'ui_hand')
+      .setOrigin(hx, hy)
+      .setTint(0x000000)
+      .setDepth(DEPTH_TUTORIAL + 1)
+      .setVisible(false);
     this.arrow = this.add.image(0, 0, 'ui_arrow').setDepth(DEPTH_TUTORIAL + 1).setVisible(false);
     const [ax, ay] = uiRegistry.replacementAnchor('ui_arrow') ?? this.ctx.data.anchors.byKey['ui_arrow'] ?? [0.5, 1];
     this.arrow.setOrigin(ax, ay);
@@ -703,9 +743,24 @@ export class UIScene extends Phaser.Scene {
       this.hintHand = false;
       this.clearMarkers();
     }
+    // PANEL TRANSITIONS steer the recipe demonstration the same way (owner's
+    // report, 2026-08-27: the two-Houses gauntlet rode above the commission
+    // chooser). A panel opening over a live demo takes its hand down — the
+    // beat is suspended, not spent; the last panel closing re-aims a
+    // suspended demo, and gives a deferred one (checkRecipeHints refused
+    // while a panel was up) its chance a beat later.
+    const overBoard = this.panelUp();
+    if (overBoard && !this.panelWasUp && this.recipeHint) {
+      this.clearMarkers();
+    }
+    if (!overBoard && this.panelWasUp) {
+      if (this.recipeHint) this.refreshRecipeHint();
+      else this.time.delayedCall(400, () => this.checkRecipeHints());
+    }
+    this.panelWasUp = overBoard;
     // Same question, same answer, one frame later: the quest tracker stops
     // reaching for the pointer while anything is over the board.
-    this.questTracker.setSuppressed(this.panelUp());
+    this.questTracker.setSuppressed(overBoard);
     // Re-project board-anchored tutorial markers EVERY frame so they stay glued
     // to their cell as the board camera pans/zooms (they live on the UI scene's
     // own fixed camera, so without this they'd appear stuck to the screen).
@@ -735,6 +790,23 @@ export class UIScene extends Phaser.Scene {
         const p = this.handPoint();
         if (p) this.hand.setPosition(p.x, p.y + this.handBob.v);
       }
+    }
+    // AFTER the hand has been placed, never before: the shadow is a read of the
+    // hand's final transform for this frame, not a second thing being animated.
+    this.syncHandShade();
+    // TWO ARROWS ON ONE BUILDING. `house_skip` aims its beat arrow at the House
+    // so the player opens it — and the House's popup then draws its OWN arrow at
+    // the ⚡ row (`BoardScene.showSkipButton`). Each is right alone; together
+    // they are a doubled marker over the same object, the beat arrow's tip
+    // buried under the popup it asked for. So a PIECE arrow stands down while a
+    // skip offer is up: the popup covers the piece anyway, and its pointer is
+    // the one now saying something the player does not already know. It comes
+    // straight back if the offer is dismissed without paying — the arrow is
+    // muted, never cleared, so nothing has to re-arm it.
+    if (this.arrowOnPiece && this.arrowAnchor) {
+      const board = this.scene.get(SCENES.board) as BoardScene | undefined;
+      if (board?.skipKeyWorldPoint?.('warmth')) this.arrow.setVisible(false);
+      else if (!this.arrow.visible && this.arrowAnchor()) this.arrow.setVisible(true);
     }
     if (this.arrow.visible && this.arrowAnchor) {
       const a = this.arrowAnchor();
@@ -828,6 +900,7 @@ export class UIScene extends Phaser.Scene {
       }),
       bus.on('dragon:revealed', (card) => this.reveal.play(card)),
       bus.on('story:chapter', ({ chapter }) => this.playChapterBeats(chapter)),
+      bus.on('gate:first_flight', ({ to }) => this.playGateFlightBeats(to)),
       // The event system's outputs (docs/event-creator.md). Queued behind a
       // running tutorial script like every other unscripted beat.
       bus.on('event:say', (say) => this.playEventBeat({ say })),
@@ -1045,12 +1118,12 @@ export class UIScene extends Phaser.Scene {
         this.celebrateOrder(orderId, rewards);
       }),
       bus.on('keeper:leveled', ({ level }) => this.celebrateLevelUp(level)),
-      bus.on('quest:completed', ({ questId }) => {
-        // The Golden Elder's awakening — UIScene runs her voice, BoardScene the
-        // camera and the egg, both off this one beat.
-        if (questId === GOLDEN_ALTAR.awakenQuestId) {
-          this.time.delayedCall(0, () => this.beat('trigger', () => this.runFinaleUi()));
-        }
+      // The Golden Elder's awakening — UIScene runs her voice, BoardScene the
+      // camera and the egg, both off this one beat. It rides the RANK that
+      // opens Borealis now (owner's call, 2026-08-27): StorySystem latches and
+      // speaks it exactly once per save.
+      bus.on('story:elder_wakes', () => {
+        this.time.delayedCall(0, () => this.beat('trigger', () => this.runFinaleUi()));
       }),
       bus.on('tasks:all_complete', () => this.celebrateTasksComplete()),
       bus.on('energy:changed', ({ current }) => {
@@ -1141,7 +1214,17 @@ export class UIScene extends Phaser.Scene {
       // new board exists. Between those two the destination's backdrop is coming
       // over the network — without this the player taps a door and the game
       // simply does nothing for a second or two.
+      // A curtained departure: cover FIRST, and only then switch — the swap
+      // and the whole board rebuild happen under the veil.
+      bus.on('ui:travel_departing', ({ to }) =>
+        this.showTravelVeil(to, () => this.ctx.bus.emit('world:switch', { to }))
+      ),
+      // A switch this scene did not curtain (the console, a future script)
+      // still gets its veil — the same-journey guard keeps the curtained path
+      // from re-raising it.
       bus.on('world:switched', ({ to }) => this.showTravelVeil(to)),
+      // A refused switch must lift the curtain it was raised behind.
+      bus.on('world:switch_failed', () => this.hideTravelVeil()),
       bus.on('world:ready', () => {
         this.hideTravelVeil();
         this.sweepFirstContact();
@@ -1237,9 +1320,15 @@ export class UIScene extends Phaser.Scene {
    * scene never restarts, so the curtain is the one thing on screen that spans
    * the whole journey.
    */
-  private showTravelVeil(worldId: string): void {
-    // A veil can only still exist here if a previous journey's reveal is
-    // mid-flight; the new cover replaces it outright.
+  private showTravelVeil(worldId: string, onCovered?: () => void): void {
+    // The departure path raises the veil BEFORE the switch, so the
+    // `world:switched` echo arrives while this same journey's veil is already
+    // covering — keep it, or the curtain would blink mid-journey.
+    if (this.travelVeil && !this.travelVeil.revealAsked && this.travelVeil.worldId === worldId) {
+      return;
+    }
+    // Otherwise a veil can only still exist here if a previous journey's
+    // reveal is mid-flight; the new cover replaces it outright.
     if (this.travelVeil) this.destroyTravelVeil(this.travelVeil);
 
     const name = this.ctx.state.worlds.get(worldId)?.name ?? worldId;
@@ -1258,10 +1347,12 @@ export class UIScene extends Phaser.Scene {
       root,
       chrome,
       pulse: [chrome],
+      worldId,
       covered: false,
       coveredAt: 0,
       revealAsked: false,
-      revealing: false
+      revealing: false,
+      onCovered
     };
 
     if (ensureTravelWipePipeline(this.game)) {
@@ -1404,6 +1495,10 @@ export class UIScene extends Phaser.Scene {
   private travelVeilCovered(veil: TravelVeil): void {
     veil.covered = true;
     veil.coveredAt = this.time.now;
+    // The departure's switch happens HERE — under a fully-drawn curtain.
+    const go = veil.onCovered;
+    veil.onCovered = undefined;
+    go?.();
     if (veil.revealAsked) this.beginTravelReveal(veil);
   }
 
@@ -1838,14 +1933,11 @@ export class UIScene extends Phaser.Scene {
     this.cookbook.requestClose();
     this.time.delayedCall(FINALE.elderAtMs, () =>
       this.beat('elder.speaks', () => {
-        // No egg earned (Order 1 skipped)? Her words read as PROPHECY — selling
-        // the promise the player hasn't collected yet, never claiming an
-        // awakening that didn't happen. Read HERE, not hoisted: the variant is a
-        // fact about the moment she opens her mouth.
-        const eggEarned = this.ctx.state.completedOrderIds.includes(GOLDEN_ALTAR.orderId);
-        const lines = eggEarned
-          ? this.ctx.data.dialogue.finaleElder
-          : this.ctx.data.dialogue.finaleElderProphecy;
+        // Always her REAL first words: the awakening is unconditional now
+        // (owner's call, 2026-08-27 — she wakes when the rank opens Borealis),
+        // so the prophecy variant that covered a still-sleeping Elder is
+        // retired with the quest trigger that made it possible.
+        const lines = this.ctx.data.dialogue.finaleElder;
         // TAP-ADVANCED, like every chapter beat: these are her first words in
         // the whole game and must not scroll past unread. `say()` was wrong on
         // both counts — it takes ONE string, and it times out.
@@ -2051,6 +2143,13 @@ export class UIScene extends Phaser.Scene {
    */
   private checkRecipeHints(): void {
     if (!this.ctx.state.tutorialDone || this.finaleActive || this.recipeHint) return;
+    // NOT OVER AN OPEN PANEL (owner's report, 2026-08-27): the second House
+    // opens its commission chooser, and this demo used to fire 700ms later —
+    // the gauntlet riding above the chooser, pointing at a board the player
+    // cannot see. Deferred, never consumed: the keys stay unspent, and the
+    // panel-transition watcher in update() re-runs this the moment the last
+    // panel closes — i.e. once the House's produce has been chosen.
+    if (this.panelUp()) return;
     const candidates = [
       { key: 'twoDragons', recipe: 'ember_dragon:3>4', chain: 'ember_dragon', tier: 3 },
       { key: 'twoHouses', recipe: 'lumber:3>4', chain: 'lumber', tier: 3 }
@@ -2317,6 +2416,42 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * A DOOR OPENED, AND SHE SAYS SO.
+   *
+   * The Ember Gate blooms on the tutorial's handover step and the named
+   * hatchling flies through it four seconds later. That is also the tick
+   * chapter 2's gate is re-asked, so the player used to watch the crossing
+   * under a four-line speech about moon magic and Moonwater — words for a
+   * different moment entirely.
+   *
+   * So this beat takes the floor and the chapter queues behind it: same delay,
+   * so it still waits out the tutorial's last line, and the same tap-advanced
+   * sequence, so it cannot scroll past unread while the dragon is in the air.
+   */
+  private playGateFlightBeats(to: string): void {
+    const beats = this.ctx.data.dialogue.gateFlight?.[to];
+    if (!beats?.lines.length) return;
+    this.gateBeatHolds = true;
+    this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      this.speakHere(beats.speaker as SpeakerId, beats.lines, () => this.releaseHeldChapter());
+    });
+  }
+
+  /** True from the moment a gate beat is armed until its last line is tapped
+   *  away. `speakHere` calls the done callback even when it defers the lines to
+   *  another world, so the release can never be stranded by a queued beat. */
+  private gateBeatHolds = false;
+  /** The chapter that arrived while a gate beat had the floor, if any. */
+  private heldChapter: number | null = null;
+
+  private releaseHeldChapter(): void {
+    this.gateBeatHolds = false;
+    const chapter = this.heldChapter;
+    this.heldChapter = null;
+    if (chapter !== null) this.playChapterBeats(chapter);
+  }
+
   /** A chapter turned: play its beats, tap by tap. Fires once per chapter — the
    *  pointer is persisted, so a reload never replays them. */
   private playChapterBeats(chapter: number): void {
@@ -2324,6 +2459,19 @@ export class UIScene extends Phaser.Scene {
     if (!beats) return;
     // Let the order-complete celebration land first; her reaction is TO it.
     this.time.delayedCall(TIMINGS.chapterBeatDelay, () => {
+      // HELD, NOT DROPPED: a chapter's beats play once ever, so one that lands
+      // under a gate crossing waits for it rather than being spoken over it.
+      //
+      // Asked at the END of the wait, not the start, because the two facts
+      // arrive on the SAME tick and in the wrong order: StorySystem is built
+      // before the scenes, so `story:chapter` is handled before BoardScene has
+      // said a word about the door. By the time this fires the flag is set
+      // either way, and the gate's own callback — queued after this one —
+      // speaks into the floor this just gave up.
+      if (this.gateBeatHolds) {
+        this.heldChapter = chapter;
+        return;
+      }
       this.speakHere(beats.speaker as SpeakerId, beats.lines, () => {
         this.ctx.bus.emit('story:beats_finished', { chapter });
       });
@@ -2633,6 +2781,31 @@ export class UIScene extends Phaser.Scene {
     return (this.lastStep?.done ?? this.ctx.state.tutorialDone) || (this.lastStep?.allow.bag ?? false);
   }
 
+  /**
+   * Put the shadow where the hand ended up this frame.
+   *
+   * A READ, not a second animation. `placeHand` runs a chain of tweens on the
+   * hand — fade, press, tilt, travel, release — and every one of them would
+   * otherwise need a twin. Copying the finished transform once per frame keeps
+   * that choreography in exactly one place and cannot drift from it.
+   */
+  private syncHandShade(): void {
+    if (!this.handShade) return;
+    if (!this.hand.visible) {
+      this.handShade.setVisible(false);
+      return;
+    }
+    this.handShade
+      .setVisible(true)
+      .setPosition(this.hand.x + HAND_SHADE.dx, this.hand.y + HAND_SHADE.dy)
+      .setScale(this.hand.scaleX * HAND_SHADE.grow, this.hand.scaleY * HAND_SHADE.grow)
+      .setAngle(this.hand.angle)
+      // Fades WITH the hand: the gesture's own alpha tween is what makes the
+      // pointer arrive and leave, and a shadow that outlived it would be a
+      // stain left on the board.
+      .setAlpha(this.hand.alpha * HAND_SHADE.alpha);
+  }
+
   private nudgeMarkers(): void {
     if (this.lastStep?.done) return;
     const live = [this.hand, this.arrow].filter((m) => m.visible);
@@ -2662,6 +2835,7 @@ export class UIScene extends Phaser.Scene {
     this.handBob.v = 0;
     this.arrowBob.v = 0;
     this.hand.setVisible(false);
+    this.handShade?.setVisible(false); // taken down WITH the hand, not a frame later
     this.arrow.setVisible(false);
     this.handDrag = null;
     this.handPoint = null;
@@ -2920,37 +3094,37 @@ export class UIScene extends Phaser.Scene {
         this.hand.setAlpha(0);
         // Puppet-style secondary motion: fade in slightly raised, PRESS down on
         // the item (squash), tilt back while pulling, then a springy settle.
-        this.hand.setScale(base * 1.08).setAngle(-5);
+        this.hand.setScale(base * TUTORIAL_HAND.startScale).setAngle(TUTORIAL_HAND.startAngle);
         this.tweens.add({
           targets: this.hand,
           alpha: 1,
           scale: base,
-          duration: 310,
+          duration: TUTORIAL_HAND.fadeInMs,
           ease: 'Back.easeOut',
           onComplete: () => {
             // ONE STROKE, TWO TWEENS — the tilt and the travel must carry the
             // same duration or the hand finishes leaning before it arrives.
-            this.tweens.add({ targets: this.hand, angle: 4, duration: 1200, ease: 'Sine.easeInOut' });
+            this.tweens.add({ targets: this.hand, angle: TUTORIAL_HAND.pullAngle, duration: TUTORIAL_HAND.travelMs, ease: 'Sine.easeInOut' });
             this.tweens.add({
               targets: this.handProg,
               t: 1,
-              duration: 1200,
+              duration: TUTORIAL_HAND.travelMs,
               ease: 'Sine.easeInOut',
               onComplete: () => {
                 // Release: tiny overshoot pop as the item "drops".
-                this.tweens.add({ targets: this.hand, angle: 0, scale: base * 1.05, duration: 200, ease: 'Back.easeOut' });
+                this.tweens.add({ targets: this.hand, angle: 0, scale: base * TUTORIAL_HAND.releaseScale, duration: TUTORIAL_HAND.releaseMs, ease: 'Back.easeOut' });
                 this.tweens.add({
                   targets: this.hand,
                   alpha: 0,
-                  duration: 260,
-                  delay: 220,
+                  duration: TUTORIAL_HAND.fadeOutMs,
+                  delay: TUTORIAL_HAND.fadeOutDelayMs,
                   // A BEAT OF REST before the gesture starts over — it used to
                   // restart the instant it faded, which is what made the hand
                   // read as frantic rather than as a demonstration.
                   // `completeDelay`, never a `delayedCall`: `clearMarkers`
                   // kills TWEENS, so a timer would resurrect a hand after the
                   // step it belongs to has already gone.
-                  completeDelay: 450,
+                  completeDelay: TUTORIAL_HAND.restMs,
                   onComplete: run
                 });
               }
@@ -2984,19 +3158,19 @@ export class UIScene extends Phaser.Scene {
     this.markerChain({
       targets: this.handBob,
       loop: -1,
-      loopDelay: 200, // PAIRED with the other chain — equal, or the tap splits in two
+      loopDelay: TUTORIAL_HAND.tapLoopDelayMs, // PAIRED with the other chain — equal, or the tap splits in two
       tweens: [
-        { v: 14, duration: 260, ease: 'Quad.easeIn' },
-        { v: 0, duration: 430, ease: 'Back.easeOut' }
+        { v: TUTORIAL_HAND.bobPx, duration: TUTORIAL_HAND.tapDownMs, ease: 'Quad.easeIn' },
+        { v: 0, duration: TUTORIAL_HAND.tapUpMs, ease: 'Back.easeOut' }
       ]
     });
     this.markerChain({
       targets: this.hand,
       loop: -1,
-      loopDelay: 200, // PAIRED with the other chain — equal, or the tap splits in two
+      loopDelay: TUTORIAL_HAND.tapLoopDelayMs, // PAIRED with the other chain — equal, or the tap splits in two
       tweens: [
-        { scale: base * 0.9, duration: 260, ease: 'Quad.easeIn' },
-        { scale: base, duration: 430, ease: 'Back.easeOut' }
+        { scale: base * TUTORIAL_HAND.pressScale, duration: TUTORIAL_HAND.tapDownMs, ease: 'Quad.easeIn' },
+        { scale: base, duration: TUTORIAL_HAND.tapUpMs, ease: 'Back.easeOut' }
       ]
     });
   }
@@ -3075,25 +3249,25 @@ export class UIScene extends Phaser.Scene {
       targets: this.arrowBob,
       loop: -1,
       tweens: [
-        { v: -22, duration: 380, ease: 'Quad.easeOut' }, // rise
+        { v: TUTORIAL_ARROW.riseBy, duration: TUTORIAL_ARROW.riseMs, ease: 'Quad.easeOut' }, // rise
         {
           v: 0,
-          duration: 300,
+          duration: TUTORIAL_ARROW.dropMs,
           ease: 'Quad.easeIn', // accelerate down…
           onComplete: () => {
             // …impact: brief squash, then spring back to shape.
             this.tweens.add({
               targets: this.arrow,
-              scaleX: base * 1.08,
-              scaleY: base * 0.9,
-              duration: 90,
+              scaleX: base * TUTORIAL_ARROW.impactScaleX,
+              scaleY: base * TUTORIAL_ARROW.impactScaleY,
+              duration: TUTORIAL_ARROW.impactMs,
               yoyo: true,
               ease: 'Quad.easeOut',
               onComplete: () => this.arrow.setScale(base)
             });
           }
         },
-        { v: 0, duration: 240 } // settle beat before the next hop
+        { v: 0, duration: TUTORIAL_ARROW.settleMs } // settle beat before the next hop
       ]
     });
   }
@@ -3290,13 +3464,51 @@ export class UIScene extends Phaser.Scene {
       this.closeResetDialog()
     );
 
+    /**
+     * THE POLICIES, INSIDE THE GAME.
+     *
+     * They live on the hub (`/legal/<slug>`, generated from the owner's .docx)
+     * and this row LINKS to them — the text is never copied here, or the two
+     * copies disagree the first time one is edited. The settings sheet is the
+     * right home: it is the one panel reachable from anywhere on the board,
+     * including mobile fullscreen, where the site's own footer is not.
+     *
+     * `window.open` runs SYNCHRONOUSLY inside the tap, which is what gets it
+     * past a pop-up blocker (the same discipline the payment hand-off keeps).
+     */
+    const legalLinks = LEGAL_DOCS.map((doc) => {
+      const link = this.add
+        .text(0, 0, doc.label, {
+          fontFamily: FONT.ui,
+          fontSize: `${SETTINGS_NOTE_PX + 4}px`,
+          color: PALETTE.night
+        })
+        .setOrigin(0, 0.5)
+        // The thumb target, not the glyph: ~33 CSS px on a 390-wide phone.
+        .setPadding(12, 26, 12, 26)
+        .setInteractive({ useHandCursor: true });
+      link.on('pointerup', () => window.open(legalUrl(doc.slug), '_blank', 'noopener'));
+      // Phaser's Text has no underline, and without one these read as inert
+      // labels rather than links. Drawn like the sheet's own divider.
+      const rule = this.add
+        .rectangle(0, 0, link.width - 24, 3, num(PALETTE.lava), 0.6)
+        .setOrigin(0, 0.5);
+      sheet.add([link, rule]);
+      return { link, rule };
+    });
+
     // Map Editor — the tool that authors the zone registry the engine runs
     // (`src/editor/`). Parked on the title row so it never crowds the reset
     // copy. HIDDEN by default (`MAP_EDITOR_IN_SETTINGS`); `?mapedit` on the
     // URL brings it back for whoever is actually authoring, the same way
     // `?uiedit` opens the UI Builder.
+    // `import.meta.env.DEV` first: online the editor does not ship at all
+    // (main.ts drops its loader from the production bundle), so the button
+    // would emit into silence — and a tool that can repaint the world has no
+    // business being discoverable on the deployed site anyway.
     const showEditor =
-      MAP_EDITOR_IN_SETTINGS || new URLSearchParams(window.location.search).has('mapedit');
+      import.meta.env.DEV &&
+      (MAP_EDITOR_IN_SETTINGS || new URLSearchParams(window.location.search).has('mapedit'));
     const editorButton = showEditor
       ? makeButton(292, 'Map Editor', 'ui_btn_green', 0.68, () => {
           this.closeResetDialog();
@@ -3329,7 +3541,19 @@ export class UIScene extends Phaser.Scene {
       y = body.y + body.height / 2 + 26;
       resetButton.setY(y + 56);
       keepButton.setY(y + 56);
-      y += 112 + 36;
+      y += 112 + 28; // air ABOVE the links
+      {
+        const gap = 18;
+        const total =
+          legalLinks.reduce((w, l) => w + l.link.width, 0) + gap * (legalLinks.length - 1);
+        let lx = -total / 2;
+        for (const { link, rule } of legalLinks) {
+          link.setPosition(lx, y + link.height / 2);
+          rule.setPosition(lx + 12, link.y + link.height / 2 - 6);
+          lx += link.width + gap;
+        }
+        y += (legalLinks[0]?.link.height ?? 0) + 36; // the bottom air, unchanged
+      }
       const h = y;
       panel.clear();
       panel.fillStyle(num(PALETTE.night), 0.25);

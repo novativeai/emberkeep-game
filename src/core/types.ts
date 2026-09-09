@@ -165,9 +165,10 @@ export interface ChainTierConfig {
    *  `merge` when merging items of THIS tier (e.g. 2 Houses → 1 Manor while
    *  Bushes still merge 3 → 1 House). */
   merge?: ChainMergeOverride;
-  /** Display scale for this tier's board art. Consulted AFTER Constants'
-   *  ITEM_SCALE (which wins for hand-tuned keys) — this is the data-driven
-   *  path the worldbuilder Merge page writes for uploaded art. */
+  /** Display scale for this tier's board art. Consulted BEFORE Constants'
+   *  ITEM_SCALE, so a size authored against the live board (the worldbuilder's
+   *  🪞 Seat page) beats the hand-written default for that key. Absent — which
+   *  is every tier until one is re-seated — falls through to ITEM_SCALE. */
   artScale?: number;
   /**
    * This tier is COMMISSIONED: the player picks what it will make, once, from
@@ -326,6 +327,16 @@ export interface DialogueData {
   eggGift: Record<string, { speaker: string; lines: string[] }>;
   /** Post-tutorial chapter beats, keyed by chapter number. */
   chapters: Record<string, StoryChapterConfig>;
+  /**
+   * What is said as a door opens for the first time and the named hatchling
+   * flies through it, keyed by the DESTINATION world id.
+   *
+   * Its own bank rather than a chapter, because the two collide: the Ember Gate
+   * blooms on the tutorial's own handover step, which is the exact tick chapter
+   * 2's gate is re-asked. Whichever spoke second used to wipe the other, and the
+   * one the player was actually looking at was the door.
+   */
+  gateFlight?: Record<string, StoryChapterConfig>;
   /**
    * What is said the FIRST time the Keeper stands in a world, keyed by world id.
    *
@@ -1311,9 +1322,29 @@ export interface AssetsManifest {
   images: AssetEntry[];
 }
 
+/**
+ * How ONE texture's soft ground shadow is seated, overriding `ITEM_SHADOW`.
+ *
+ * Every field is optional and every absent field falls back to the constant, so
+ * an entry says only what is unusual about this piece. Authored per texture key
+ * rather than per chain/tier because the shadow is a property of the DRAWING —
+ * a re-skin with a wider silhouette needs its own even at the same tier.
+ */
+export interface ShadowSeat {
+  /** Ellipse width as a fraction of the art's footprint (ITEM_SHADOW.ofWidth). */
+  width?: number;
+  /** Ellipse height as a fraction of its width (ITEM_SHADOW.squash). */
+  squash?: number;
+  /** Seat offset from the art's anchor, in container px (ITEM_SHADOW.seatX/Y). */
+  dx?: number;
+  dy?: number;
+}
+
 export interface AnchorsData {
   default: [number, number];
   byKey: Record<string, [number, number]>;
+  /** Per-texture shadow overrides; absent keys use `ITEM_SHADOW`. */
+  shadowByKey?: Record<string, ShadowSeat>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1560,7 +1591,7 @@ export interface EventMap {
   'generator:produce_set': { itemId: number; chain: string; tier: number };
   'generator:produce_refused': {
     itemId: number;
-    reason: 'already_set' | 'not_commissionable' | 'not_in_bag' | 'tier_too_high';
+    reason: 'already_set' | 'not_commissionable' | 'not_in_bag' | 'tier_too_high' | 'dragon' | 'foreign_world';
   };
   /** Intent: SELL one of this stack for coins. Selling lives in the Bag and
    *  nowhere else — a piece on the board can be dragged, merged or pocketed,
@@ -2038,6 +2069,18 @@ export interface EventMap {
   /** Every step of a quest is done — the main line strikes through and the next
    *  quest takes the HUD. */
   'quest:completed': { questId: string };
+  /** The Golden Elder WAKES — the Keeper's rank just reached the level that
+   *  opens Borealis (owner's law, 2026-08-27; the ceremony used to ride
+   *  `quest:completed` for keepers_hoard). Emitted ONCE ever per save by
+   *  StorySystem, which writes ELDER_WOKEN_STAT before speaking so the two
+   *  scenes can never race the latch. BoardScene answers with the camera and
+   *  the egg, UIScene with her voice and Eleanor's Gate ceremony. */
+  'story:elder_wakes': Record<string, never>;
+  /** The first brew quest of some ladder has reached the player's track head
+   *  (or was finished out of order) — the cauldron latch just flipped, ONCE
+   *  ever per save. The clouds' and the Rune Way's second key (worldGates
+   *  `cloudLevelMet`); UnlockSystem sweeps and BoardScene re-lights doors. */
+  'quest:cauldron_reached': Record<string, never>;
   /** The tracked quest changed (advance, or a load landing mid-ladder). */
   'quest:advanced': { questId: string; giver: SpeakerId; index: number; total: number };
   'order:completed': { orderId: string; rewards: { coins: number; keys: number; xp?: number } };
@@ -2109,7 +2152,19 @@ export interface EventMap {
   'dragon:cross_gate': { itemId: number; to: string };
   /** Fact: it went through, and this is where it came out. */
   'dragon:crossed': { itemId: number; from: string; to: string; at: TilePos };
+  /**
+   * Fact: a door has just bloomed for the first time AND the named hatchling is
+   * about to fly through it. The crossing is the most visible thing on screen
+   * for the next few seconds, so the words over it must be about the door —
+   * UIScene speaks `dialogue.gateFlight[to]` here and makes the chapter beat
+   * that shares this tick wait its turn.
+   */
+  'gate:first_flight': { to: string };
   'world:switch': { to: string };
+  /** A travel the UI wants CURTAINED: the veil covers first, and only then is
+   *  `world:switch` emitted — so not one frame of the new world paints before
+   *  the loading curtain is fully down. */
+  'ui:travel_departing': { to: string };
   /** Fact: the active world changed. BoardScene rebuilds on this — which means
    *  fetching art over the network, so this is where the travel veil goes UP. */
   'world:switched': { from: string; to: string };

@@ -286,6 +286,16 @@
       }
     }
   },
+  "gateFlight": {
+    "roothold": {
+      "speaker": "eleanor",
+      "lines": [
+        "Look, Keeper! A shining door just opened. That is the Ember Gate.",
+        "It goes to Roothold. Roothold is my home, and my shop is there too.",
+        "{dragon} is flying through first. You can follow her any time. Just tap the door."
+      ]
+    }
+  },
   "chapters": {
     "2": {
       "speaker": "eleanor",

@@ -124,24 +124,22 @@ const ROSTER = {
     // she has no board key, no rig and no standee, because a bust is never
     // placed on the board at all.
     //
-    // Her banks are pose composites rather than wan footage
-    // (scripts/gen-elder-portrait.py): five `edit` cells off one plate, each
-    // swapped into the rest pose through a feathered ellipse so every frame is
-    // byte-identical outside the eyes or the muzzle. If she is ever re-shot as
-    // video, `ingest golden_elder talking <mp4> --write` replaces the sheets
-    // without touching a line of runtime.
+    // Her banks are PURE wan 2.7 footage now (owner's call, 2026-08-26 —
+    // matching Eleanor's and Selyna's): shot off the green i2v plate
+    // (gen-elder-portrait.py `plate`) and brought in with
+    // `ingest golden_elder talking <mp4> --write`. The edit-composite route
+    // (gen-elder-portrait.py `poses`/`composite`/`bake`) is retired for her.
     portraitOnly: true,
     modes: { talking: 'top', blinking: 'top' },
     clipInfo: {
       blinking: { stage: 'portrait', trigger: 'bubble ring at rest — the loop between her lines', loop: true },
       talking: { stage: 'portrait', trigger: 'bubble ring while her line shows', loop: true }
     },
-    // Measured, not guessed: `headCrop` must fall on a row where her silhouette
-    // fits INSIDE the ring's circular mask, or the horn that the head copy
-    // draws in full steps against the body copy the mask has already trimmed.
-    // At height 420 / dy -190 the feasible band is 0.469..0.708; 0.58 sits in
-    // the middle of it, with her chin on the band and both horns clear of it.
-    portraitView: { height: 420, dy: -190, headCrop: 0.58 }
+    // Measured, not guessed (scripts/frame-portrait.py solve, re-run against
+    // the wan footage 2026-08-26: the video frames her wider than the old
+    // composites, so the composite-era 372/-162 put her head at 104.6% of the
+    // mask radius — sliced again). Re-solve after any re-shoot.
+    portraitView: { height: 348, dy: -138, headCrop: 0.58 }
   },
   redwhelp: {
     label: 'Ember Dragon (red whelp)',

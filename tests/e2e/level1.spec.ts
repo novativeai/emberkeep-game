@@ -155,6 +155,97 @@ async function tapBubble(page: Page): Promise<void> {
   await page.mouse.click(750, 725); // bubble centre (game (GAME_WIDTH/2+220, LIVE-150) ÷ RES)
 }
 
+/** The recorder's bubble tap, with its retry loop: wait until the bubble is
+ *  VISIBLE, then real move/down/up gestures until the step moves on — one tap
+ *  can be spent on the typewriter or a story line before the gate hears it. */
+async function tapBubbleWhenOpen(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const b = (window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+        bubble?: { visible: boolean };
+      }).bubble;
+      return !!(b && b.visible);
+    },
+    null,
+    { timeout: 14_000 }
+  );
+  const from = (await gameText(page)).tutorial.step;
+  for (let i = 0; i < 12; i++) {
+    await page.mouse.move(750, 725);
+    await page.mouse.down();
+    await page.waitForTimeout(60);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    if ((await gameText(page)).tutorial.step !== from) return;
+  }
+}
+
+interface PointerView {
+  hand?: { from?: { x: number; y: number }; to?: { x: number; y: number }; at?: { x: number; y: number } } | null;
+  arrow?: { x: number; y: number } | null;
+}
+
+/** Drive the tutorial the way scripts/beats.mjs does: follow the lesson's own
+ *  pointers (hand drag, hand tap, arrow tap — the bubble for a tap gate) and
+ *  re-read after every gesture, until the named step is current. Used for the
+ *  arcs whose beats each point at what to do, so the spec survives re-authoring
+ *  of the lesson; the assertions live at the anchor steps around the window. */
+async function followPointers(page: Page, until: string): Promise<void> {
+  const gesture = async (a: { x: number; y: number }, b?: { x: number; y: number }): Promise<void> => {
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.waitForTimeout(80);
+    if (b) {
+      const steps = 12;
+      for (let i = 1; i <= steps; i++) {
+        await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps);
+        await page.waitForTimeout(16);
+      }
+      await page.waitForTimeout(80);
+    } else {
+      await page.waitForTimeout(60);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(450);
+  };
+  for (let guard = 0; guard < 160; guard++) {
+    const view = await page.evaluate(() => {
+      const w = window.__emberkeep as unknown as {
+        pointers: () => unknown;
+        game: { registry: { get: (k: string) => { systems: { tutorial: { currentStep: { id: string; gate: { type: string } } | null } } } } };
+      };
+      const step = w.game.registry.get('ctx').systems.tutorial.currentStep;
+      return { step: step?.id ?? 'done', gate: step?.gate.type ?? 'none', ptr: w.pointers() as never };
+    }) as { step: string; gate: string; ptr: PointerView };
+    if (view.step === until) return;
+    const ptr = view.ptr;
+    // A pointer read mid-camera-glide aims at where the target WAS — and a tap
+    // on empty ground is not harmless (it cancels an armed give). Tap only a
+    // pointer that reads the same twice, 250ms apart.
+    const settled = async (p: { x: number; y: number }): Promise<{ x: number; y: number } | null> => {
+      await page.waitForTimeout(250);
+      const again = await page.evaluate(
+        () => (window.__emberkeep as unknown as { pointers: () => unknown }).pointers() as never
+      ) as PointerView;
+      const q = again.hand?.at ?? again.arrow;
+      return q && Math.hypot(q.x - p.x, q.y - p.y) < 8 ? q : null;
+    };
+    if (ptr.hand?.from && ptr.hand.to) await gesture(ptr.hand.from, ptr.hand.to);
+    else if (ptr.hand?.at) {
+      const p = await settled(ptr.hand.at);
+      if (p) await gesture(p);
+    } else if (ptr.arrow) {
+      const p = await settled(ptr.arrow);
+      if (p) await gesture(p);
+    } else if (view.gate === 'tap') await tapBubbleWhenOpen(page);
+    // No pointer and no tap gate: the beat is still settling (a tween, a spawn).
+    // A blind tap here is not neutral — during an armed give it lands on empty
+    // ground and CANCELS the give — so wait for the pointer instead.
+    else await page.waitForTimeout(400);
+  }
+  throw new Error(`followPointers never reached step ${until}`);
+}
+
 async function waitStep(page: Page, stepId: string): Promise<void> {
   await expect
     .poll(async () => (await gameText(page)).tutorial.step, {
@@ -281,55 +372,48 @@ test.describe('Level 1 — Emberkeep tutorial', () => {
     const redEggs = await findCells(page, (c) => c.chain === 'ember_dragon' && c.tier === 2);
     expect(redEggs.length).toBe(3);
     await mergeTrio(page, (c) => c.chain === 'ember_dragon' && c.tier === 2, (st) => count(st, 'ember_dragon', 3) >= 1);
-    await waitStep(page, 'emerald_tap');
+
+    // ---------- Naming: Eleanor introduces her, the player picks a name ----------
+    // Same mechanics as scripts/beats.mjs: wait for the bubble to be VISIBLE
+    // (not just the step to be current), then a real move/down/up tap on it;
+    // the panel is confirmed through its own confirm(), the way a player does.
+    await waitStep(page, 'name_intro');
+    await tapBubbleWhenOpen(page);
+    await waitStep(page, 'name_choose');
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const ui = window.__emberkeep.game.scene.getScene('UIScene') as unknown as {
+            naming?: { isOpen: boolean; nameInput: HTMLInputElement | null; chosen: string; confirm: () => void };
+          };
+          const panel = ui.naming;
+          if (!panel?.isOpen) return false;
+          if (panel.nameInput) panel.nameInput.value = 'Cinder';
+          panel.chosen = 'Cinder';
+          panel.confirm();
+          return true;
+        }),
+        { timeout: 14_000, message: 'waiting for the naming panel' }
+      )
+      .toBe(true);
+    await waitStep(page, 'name_said');
+    await tapBubbleWhenOpen(page);
+
     state = await gameText(page);
     expect(count(state, 'ember_dragon', 2)).toBe(0);
-    expect(count(state, 'ember_dragon', 3)).toBe(1); // Red Dragon
-    expect(count(state, 'emerald', 1)).toBe(2); // 2 Emeralds from step effect
+    expect(count(state, 'ember_dragon', 3)).toBe(1); // Red Dragon, now named
     await page.screenshot({ path: shot('06-red-dragon') });
 
-    // ---------- Emerald tap: tap the permanent crystal fixture at [8,11] ----------
-    await waitStep(page, 'emerald_tap');
-    // The crystal is a permanent startingItem at [8,11] (non-active tile —
-    // invisible in the board grid but present in state.items). Emit item:tapped
-    // directly; same GeneratorSystem + TutorialDirector gate path as a real tap.
-    await page.evaluate(() => {
-      const ctx = window.__emberkeep.game.registry.get('ctx') as {
-        state: { items: Map<number, { chain: string; kind: string }> };
-        bus: { emit: (event: string, payload: unknown) => void };
-      };
-      for (const [id, item] of ctx.state.items.entries()) {
-        if (item.chain === 'crystal' && item.kind === 'item') {
-          ctx.bus.emit('item:tapped', { itemId: id });
-          return;
-        }
-      }
-    });
-    await waitStep(page, 'emerald_egg_merge');
+    // ---------- Moss, quartz, and the first gift ----------
+    // moss_feed → crystal_tap → quartz_merge → quartz_ball → ball_pocket →
+    // ball_give → eleanor_gift → eleanor_hearts: this arc's beats each show
+    // their own hand or arrow, so it is driven the way scripts/beats.mjs
+    // drives the whole lesson — follow the pointers until the chest arrives.
+    await followPointers(page, 'chest');
     state = await gameText(page);
-    expect(count(state, 'emerald', 1)).toBe(3); // 2 spawned + 1 from crystal tap
-    await page.screenshot({ path: shot('07-3emeralds') });
-
-    // ---------- Emerald merge: drag 3 Emeralds → 1 Green Egg ----------
-    const emeralds = await findCells(page, (c) => c.chain === 'emerald' && c.tier === 1);
-    expect(emeralds.length).toBe(3);
-    await mergeTrio(page, (c) => c.chain === 'emerald' && c.tier === 1, (st) => count(st, 'emerald', 1) === 0);
-    await waitStep(page, 'green_dragon_hatch');
-    state = await gameText(page);
-    expect(count(state, 'emerald', 1)).toBe(0);
-    expect(count(state, 'emerald', 2)).toBe(3); // 1 from merge + 2 spawned
-    await page.screenshot({ path: shot('08-3green-eggs') });
-
-    // ---------- Green egg merge: drag 3 Green Eggs → Green Dragon ----------
-    const greenEggs = await findCells(page, (c) => c.chain === 'emerald' && c.tier === 2);
-    expect(greenEggs.length).toBe(3);
-    await mergeTrio(page, (c) => c.chain === 'emerald' && c.tier === 2, (st) => count(st, 'emerald', 3) >= 1);
-    await waitStep(page, 'chest');
-    state = await gameText(page);
-    expect(count(state, 'emerald', 2)).toBe(0);
-    expect(count(state, 'emerald', 3)).toBe(1); // green dragon (tier 3)
+    expect(count(state, 'quartz', 3)).toBe(0); // the Crystal Ball was GIVEN away
     expect(count(state, 'chest', 1)).toBe(1); // chest spawned
-    await page.screenshot({ path: shot('09-green-dragon') });
+    await page.screenshot({ path: shot('09-gift-given') });
 
     // ---------- Chest: tap to open ----------
     const chests = await findCells(page, (c) => c.chain === 'chest' && c.tier === 1);

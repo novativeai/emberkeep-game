@@ -144,6 +144,26 @@ export interface WorldRuntime {
   adjacency: Map<string, TilePos[]>;
   /** Doors out of this world, in authoring order. */
   portals: PortalRuntime[];
+  /**
+   * How much a BOARD PIECE standing anywhere in this world scales — 1 is the
+   * authored isle's tile, the size every ITEM_SCALE, anchor and shadow seat was
+   * tuned against.
+   *
+   * ONE number per world, not per zone, on purpose. Ground art follows its own
+   * zone (`artScaleAt`) because a floor must meet the painting under it exactly;
+   * a piece is a THING the player carries around, and a dragon that visibly
+   * shrank stepping across a zone seam mid-drag would read as a glitch, not as
+   * perspective. So pieces take the world's typical tile once, at spawn, and
+   * keep it for as long as they stand there.
+   *
+   * DERIVED, NOT LISTED (the deploy rule, applied to numbers): the value is the
+   * playable-cell-weighted median of each cell's owning zone's `artScale`, so a
+   * re-export that repaints a world at a new tile size moves this with it and
+   * nothing has to remember to update a table. The authored isle's dense zone is
+   * definitionally 1, which is why Emberkeep lands at exactly the size every
+   * piece was tuned at.
+   */
+  itemScale: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -219,6 +239,45 @@ export function worldPointOf(
 }
 
 /**
+ * THE FOUR WORLD-PIXEL CORNERS of a cell, in the zone's own lattice.
+ *
+ * This is the ONE answer for "what shape is this cell on screen", and anything
+ * that draws a cell-shaped thing — the drag reticle, a hint diamond, a tap
+ * area — must ask it rather than build a diamond out of `TILE_W`/`TILE_H`.
+ *
+ * Those constants describe the AUTHORED isle and nothing else. `projectionOf`
+ * pins `halfW` to `TILE_W / 2` whatever the map says and derives `halfH` from
+ * one global aspect, so a shape built from them is right on the authored isle
+ * and wrong on every hand-drawn zone. It cannot be rescued by a scalar either:
+ * a zone is two VECTORS (`u`, `v`) plus a rotation, and one number can only
+ * carry the width. Measured on Borealis, a reticle scaled by `artScale` came
+ * out 13% short on one zone and 13% tall on the next, and never rotated.
+ *
+ * No new maths: `zonePoint` already takes fractional cells, so the corners are
+ * its own projection sampled at the half-steps — rotation, pivot and any shear
+ * come along for free and can never drift from where the piece actually lands.
+ *
+ * Order is the iso reading order — top, right, bottom, left — for an
+ * unrotated 2:1 zone, and stays consistent (it is the winding of the local
+ * square) under rotation.
+ */
+export function cellCorners(
+  world: WorldRuntime,
+  col: number,
+  row: number
+): { x: number; y: number }[] {
+  const z = zoneAt(world, col, row) ?? world.fallback;
+  const i = col - z.block.col;
+  const j = row - z.block.row;
+  return [
+    zonePoint(z, i - 0.5, j - 0.5),
+    zonePoint(z, i + 0.5, j - 0.5),
+    zonePoint(z, i + 0.5, j + 0.5),
+    zonePoint(z, i - 0.5, j + 0.5)
+  ];
+}
+
+/**
  * The cell a point is actually STANDING ON, or null when it is over open sky.
  *
  * THE HONEST HALF of `cellAtWorldPoint`, and the one anything that cares
@@ -252,7 +311,10 @@ export function groundCellAtWorldPoint(
     const i = Math.round(e.i);
     const j = Math.round(e.j);
     if (i < 0 || j < 0 || i >= z.matrix.cols || j >= z.matrix.rows) continue;
-    if (!z.dense && !z.cells.has(key(i, j))) continue;
+    // Ground only: an explicit zone's listed cells, and a dense zone's authored
+    // playable cells (its rectangle corners are sky — see `denseZoneOf`). A
+    // dense zone with no cell list keeps meaning "every index".
+    if (!z.cells.has(key(i, j)) && !(z.dense && z.cells.size === 0)) continue;
     // Zones do not overlap in the shipped art, but nothing enforces that, so
     // resolve ties by whichever cell centre the point is actually nearest.
     const c = zonePoint(z, i, j);
@@ -431,7 +493,15 @@ export function denseZoneOf(map: MapData, id = 'main', name = 'Main Isle'): Zone
     rotation: 0,
     pivot: origin,
     artScale: 1,
-    cells: new Set(),
+    // A dense zone ADDRESSES its whole rectangle, but only the authored
+    // playable cells are GROUND — the rectangle's corners are open sky the
+    // painting never gave a floor. `groundCellAtWorldPoint` reads this set so
+    // a sky corner cannot outcompete a real painted cell it overlaps (the
+    // isle's (9,0) sat 43 px from the far island's (32,0) once the extension
+    // slabs were seated on their true stones, and won drops aimed at them).
+    // Maps that carry no playable list (the unit-test fixture) leave it empty,
+    // which `groundCellAtWorldPoint` treats as "every index", as before.
+    cells: new Set((map.playable ?? []).map(([c, r]) => key(c, r))),
     dense: true
   };
 }
@@ -566,6 +636,22 @@ const ADJACENCY_TOLERANCE = 0.6;
 const ADJACENCY_PITCH_MATCH = 0.7;
 
 /**
+ * The farthest apart two linked cells may stand, in steps of the SMALLER
+ * zone's longest axis. This is the merge law as the player reads it — "the
+ * tile beside you, not one across the water" — and `Zones.spec.ts` asserts it
+ * from both sides of every link.
+ *
+ * The probe tolerance above cannot enforce it alone: it is measured against
+ * the PROBING zone's pitch, so a coarse grid can accept a fine grid's cell
+ * that the fine grid, probing back, correctly rejects — and pass 2's symmetry
+ * would then heal the wrong thing into a two-way merge across a gap. The
+ * measured re-seat of emberkeep (2026-08-27) surfaced exactly one: the arm's
+ * green slab and the gate outcrop, 1.65 of the slab's steps apart, painted
+ * with open sky between them.
+ */
+const ADJACENCY_REACH = 1.6;
+
+/**
  * Measure which cells actually touch, once, at world build.
  *
  * DENSE ZONES ARE EXEMPT BY CATEGORY, and that is the safety property rather
@@ -624,6 +710,12 @@ function buildAdjacency(zones: ZoneRuntime[]): Map<string, TilePos[]> {
       if (!best || bestD > step * ADJACENCY_TOLERANCE) continue;
       const theirs = pitch(best.zone);
       if (Math.min(step, theirs) / Math.max(step, theirs) < ADJACENCY_PITCH_MATCH) continue;
+      const longest = (z: ZoneRuntime): number => {
+        const s = stepsOf(z);
+        return Math.max(Math.hypot(s.u.x, s.u.y), Math.hypot(s.v.x, s.v.y));
+      };
+      const reach = ADJACENCY_REACH * Math.min(longest(cell.zone), longest(best.zone));
+      if (Math.hypot(best.at.x - cell.at.x, best.at.y - cell.at.y) >= reach) continue;
       link(cell.pos, best.pos);
     }
   }
@@ -679,6 +771,18 @@ export function buildWorld(spec: WorldSpec, authored: MapData): WorldRuntime {
   for (const region of map.regions) {
     for (const [c, r] of region.tiles) tileRegion.set(key(c, r), region.id);
   }
+  // The median tile a piece will actually stand on — see `itemScale` on the
+  // interface. Median rather than mean so one oversized terrace (Emberkeep has
+  // zones from 0.79 to 1.13) cannot drag every piece off the size the bulk of
+  // the ground was tuned at; cell-weighted so a five-cell ledge cannot outvote
+  // the hundred-cell mainland. Empty worlds (fixtures) fall back to 1.
+  const cellScales = (map.playable ?? [])
+    .map(([c, r]) => zones.find((z) => inBlock(z, c, r))?.artScale ?? 1)
+    .sort((a, b) => a - b);
+  const itemScale = cellScales.length
+    ? Math.round(cellScales[(cellScales.length - 1) >> 1]! * 100) / 100
+    : 1;
+
   return {
     id: spec.id,
     name: spec.name,
@@ -694,7 +798,8 @@ export function buildWorld(spec: WorldSpec, authored: MapData): WorldRuntime {
     playable: new Set((map.playable ?? []).map(([c, r]) => key(c, r))),
     tileRegion,
     adjacency: buildAdjacency(zones),
-    portals: (spec.portals ?? []).map(portalFromSpec)
+    portals: (spec.portals ?? []).map(portalFromSpec),
+    itemScale
   };
 }
 

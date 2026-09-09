@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CHEST_INTERVAL_MS, chainHiddenIn, chestWildcardChains } from '../../src/core/Constants';
+import { CHEST_GIFTS, CHEST_INTERVAL_MS, chainHiddenIn, chestWildcardChains } from '../../src/core/Constants';
 import { capture, createTestContext } from './helpers';
 
 describe('ChestSystem (standing gift box)', () => {
@@ -51,32 +51,52 @@ describe('ChestSystem (standing gift box)', () => {
       expect(chain.tiers.length).toBeGreaterThan(1);
       expect(chain.tiers.some((t) => t.tier === 1)).toBe(true);
     }
-    for (const id of ['emerald', 'coin', 'golden_egg']) {
+    for (const id of ['emerald', 'coin', 'golden_egg', 'ember_dragon', 'lumber']) {
       expect(pool.some((c) => c.id === id)).toBe(false);
     }
   });
 
-  it('pops 3 Rubies (random → ember_dragon)', () => {
+  it('grants 40 Gold at the rarer weight (random → the third face)', () => {
     const ctx = createTestContext();
-    vi.spyOn(Math, 'random').mockReturnValue(0.99); // index 2 → ember_dragon (ruby)
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // index 2 → the second purse
     const chest = ctx.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
+    const economy = capture(ctx.bus, 'economy:add');
     const spawned = capture(ctx.bus, 'item:spawned');
 
     ctx.bus.emit('chest:open', { itemId: chest.id });
 
-    const rubies = spawned.filter((s) => s.item.chain === 'ember_dragon' && s.item.tier === 1);
-    expect(rubies).toHaveLength(3);
+    expect(economy.some((e) => e.coins === 40 && e.reason === 'chest')).toBe(true);
+    expect(spawned).toHaveLength(0); // a purse, not a pile
   });
 
-  it('never spawns wood — lumber appears only from cleared cloud zones', () => {
+  /**
+   * NEITHER FACE MAY PAY THE TWO PILES ALREADY ON THE FLOOR (owner, 2026-08-27).
+   *
+   * Asserted over the WHOLE table rather than at one mocked roll: `3 Rubies!`
+   * was a fixed entry and `lumber` was reachable through the wildcard, so a test
+   * that forced a single index would have kept passing while the other door
+   * stayed open. The old wood test did exactly that — it forced the roll that
+   * could not spawn wood in the first place and read as a guard for months.
+   */
+  it('never pays Rubies or Logs, from either the fixed table or the wildcard', () => {
     const ctx = createTestContext();
-    vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    const chest = ctx.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
-    const spawned = capture(ctx.bus, 'item:spawned');
-
-    ctx.bus.emit('chest:open', { itemId: chest.id });
-
-    expect(spawned.some((s) => s.item.chain === 'lumber')).toBe(false);
+    const banned = new Set(['ember_dragon', 'lumber']);
+    for (const gift of CHEST_GIFTS) {
+      if (gift.kind === 'item') expect(banned.has(gift.chain)).toBe(false);
+    }
+    for (const chain of chestWildcardChains(ctx.data.chains.chains, ctx.state.worldId)) {
+      expect(banned.has(chain.id)).toBe(false);
+    }
+    // And end to end, at every roll the table can produce.
+    for (const r of [0, 0.34, 0.5, 0.67, 0.99]) {
+      const fresh = createTestContext();
+      vi.spyOn(Math, 'random').mockReturnValue(r);
+      const chest = fresh.state.addItem({ chain: 'chest', tier: 1, col: 3, row: 3, kind: 'item' });
+      const spawned = capture(fresh.bus, 'item:spawned');
+      fresh.bus.emit('chest:open', { itemId: chest.id });
+      for (const s of spawned) expect(banned.has(s.item.chain)).toBe(false);
+      vi.restoreAllMocks();
+    }
   });
 
   it('ignores a tap while the gift is still cooking (cooldown not elapsed)', () => {
@@ -104,7 +124,12 @@ describe('ChestSystem (standing gift box)', () => {
     const economy = capture(ctx.bus, 'economy:add');
     const spawned = capture(ctx.bus, 'item:spawned');
     const origRandom = Math.random;
-    Math.random = () => 0.99; // force an ITEM gift (last CHEST_GIFTS entry)
+    // The WILDCARD, which is the only face that still resolves to pieces now
+    // that `3 Rubies!` is gone. It used to be 0.99 — the last entry — and that
+    // index has since become a purse, so this test was forcing the one gift
+    // that never needed a tile and asserting Gold came out. It passed, and
+    // proved nothing.
+    Math.random = () => 0.5;
     try {
       ctx.bus.emit('chest:open', { itemId: chest.id });
     } finally {
@@ -113,7 +138,7 @@ describe('ChestSystem (standing gift box)', () => {
 
     expect(spawned).toHaveLength(0); // nothing teleports across the map
     expect(economy).toHaveLength(1); // the Gold gift pays out instead
-    expect(economy[0]!.coins).toBeGreaterThan(0);
+    expect(economy[0]!.coins).toBe(15); // the FIRST coins face is the fallback
   });
 
   it('ignores a chest:open for a non-chest item', () => {

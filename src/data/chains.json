@@ -263,7 +263,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "artScale": 0.265
         }
       ]
     },
@@ -663,14 +664,16 @@
           "id": "dew_basin_1",
           "name": "Hollow Stone",
           "sell": 3,
-          "xp": 4
+          "xp": 4,
+          "sellable": false
         },
         {
           "tier": 2,
           "id": "dew_basin_2",
           "name": "Dew Bowl",
           "sell": 9,
-          "xp": 8
+          "xp": 8,
+          "sellable": false
         },
         {
           "tier": 3,
@@ -686,7 +689,8 @@
             "cooldownMs": 240000,
             "energyCost": 0,
             "passiveMs": 240000
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -958,7 +962,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1031,7 +1036,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1104,7 +1110,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1177,7 +1184,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1205,7 +1213,8 @@
           "id": "emberheart_3",
           "name": "Ember Heart",
           "sell": 20,
-          "xp": 20
+          "xp": 20,
+          "artScale": 0.199
         }
       ]
     },
@@ -1250,7 +1259,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1278,7 +1288,8 @@
           "id": "auroraweave_3",
           "name": "Aurora Cloak",
           "sell": 24,
-          "xp": 22
+          "xp": 22,
+          "artScale": 0.222
         }
       ]
     },
@@ -1307,23 +1318,8 @@
           "name": "Runestone",
           "sell": 16,
           "xp": 17,
-          "generator": {
-            "produces": {
-              "chain": "emberheart",
-              "tier": 1
-            },
-            "cooldownMs": 150000,
-            "energyCost": 1,
-            "passiveMs": 150000,
-            "tappable": true,
-            "bonus": {
-              "every": 12,
-              "produces": {
-                "chain": "runestone",
-                "tier": 1
-              }
-            }
-          }
+          "sellable": false,
+          "artScale": 0.264
         }
       ]
     },
@@ -1354,7 +1350,7 @@
           "xp": 18,
           "generator": {
             "produces": {
-              "chain": "seaglass",
+              "chain": "emberdram",
               "tier": 1
             },
             "cooldownMs": 180000,
@@ -1368,7 +1364,8 @@
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },
@@ -1452,13 +1449,14 @@
             "passiveMs": 300000,
             "tappable": true,
             "bonus": {
-              "every": 12,
+              "every": 5,
               "produces": {
                 "chain": "manastone",
                 "tier": 1
               }
             }
-          }
+          },
+          "sellable": false
         }
       ]
     },

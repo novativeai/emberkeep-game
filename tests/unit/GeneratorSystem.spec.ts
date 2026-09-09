@@ -114,10 +114,13 @@ describe('skip cooldown for Warmth', () => {
 
     ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
 
-    // Nothing was pending to sell: it is tappable RIGHT NOW, so the skip is a
-    // no-op rather than a purchase that hands the goods over.
-    expect(ctx.state.coins).toBe(coinsBefore);
+    // Tappable RIGHT NOW: the skip command resolves as a PAID HARVEST (the
+    // owner's ready-harvest law, 2026-08-27) — the goods land, the purse pays
+    // the harvest price, and the PASSIVE clock is still never touched.
+    expect(ctx.state.coins).toBeLessThan(coinsBefore);
+    expect(gen.readyAt!).toBeGreaterThan(ctx.clock.now()); // the tap cooldown began
     expect(gen.passiveAt).toBe(armedAt); // passive clock untouched
+    gen.readyAt = undefined; // hand the ready state back for the tap half below
 
     // Tap it: now there IS a tap cooldown, and THAT is what a skip clears —
     // back to ready, with the item still owed to a tap.
@@ -392,5 +395,76 @@ describe('energy gain (energy:add)', () => {
     expect(ctx.state.energyCurrent).toBe(5);
     ctx.bus.emit('energy:add', { amount: 999, reason: 'test' });
     expect(ctx.state.energyCurrent).toBe(ENERGY_MAX);
+  });
+});
+
+/**
+ * THE READY HARVEST, PAID IN EITHER HAND (owner's law, 2026-08-27): a tap on
+ * a generator must always reach the menu — a READY one whose warmth price
+ * cannot be paid answers the pin's rows through the SAME `generator:skip`
+ * command, harvesting instead of skipping. Gold buys the identical harvest
+ * for the identical number (floor 1); only the ⚡ choice may refuse, loudly.
+ */
+describe('a ready generator harvests through the pin', () => {
+  const readyDragon = (ctx: ReturnType<typeof createTestContext>) => {
+    const gen = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 2, row: 2, kind: 'item' });
+    return gen;
+  };
+
+  it('the warmth row refuses at 0 warmth — loudly, and nothing is produced', () => {
+    const ctx = createTestContext();
+    const gen = readyDragon(ctx);
+    ctx.state.energyCurrent = 0;
+    const failed = capture(ctx.bus, 'item:harvest_failed');
+    const refused = capture(ctx.bus, 'generator:skip_refused');
+    const harvested = capture(ctx.bus, 'item:harvested');
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'warmth' });
+
+    expect(failed.at(-1)).toMatchObject({ reason: 'energy' });
+    expect(refused.at(-1)).toMatchObject({ currency: 'warmth' });
+    expect(harvested).toHaveLength(0);
+    expect(gen.readyAt).toBeUndefined(); // no cooldown was started
+  });
+
+  it('the gold row harvests: coins fall by the harvest price, produce lands', () => {
+    const ctx = createTestContext();
+    const gen = readyDragon(ctx);
+    ctx.state.energyCurrent = 0;
+    ctx.state.coins = 50;
+    const harvested = capture(ctx.bus, 'item:harvested');
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
+
+    expect(harvested).toHaveLength(1);
+    expect(ctx.state.coins).toBeLessThan(50); // the harvest was PAID
+    expect(gen.readyAt).toBeDefined(); // and the cooldown began
+  });
+
+  it('the gold row refuses an empty purse the same loud way', () => {
+    const ctx = createTestContext();
+    const gen = readyDragon(ctx);
+    ctx.state.energyCurrent = 0;
+    ctx.state.coins = 0;
+    const refused = capture(ctx.bus, 'generator:skip_refused');
+    const harvested = capture(ctx.bus, 'item:harvested');
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'gold' });
+
+    expect(refused.at(-1)).toMatchObject({ currency: 'gold' });
+    expect(harvested).toHaveLength(0);
+  });
+
+  it('a COOLING generator still skips — the ready branch changes nothing there', () => {
+    const ctx = createTestContext();
+    const gen = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 2, row: 2, kind: 'item' });
+    gen.readyAt = ctx.clock.now() + 60_000;
+    ctx.state.energyCurrent = ENERGY_MAX;
+    const skipped = capture(ctx.bus, 'generator:skipped');
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'warmth' });
+
+    expect(skipped).toHaveLength(1);
+    expect(gen.readyAt).toBeLessThanOrEqual(ctx.clock.now());
   });
 });

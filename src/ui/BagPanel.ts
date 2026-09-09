@@ -88,6 +88,8 @@ export class BagPanel extends Phaser.GameObjects.Container {
   /** The Drop/Sell chooser, parented to the slot it belongs to (null = none
    *  open). Only one is ever live: opening another closes this one. */
   private chooser: Phaser.GameObjects.Container | null = null;
+  /** The selected stack's name, shown above the helper line while a chooser is up. */
+  private chosenName!: Phaser.GameObjects.Text;
   /**
    * HOW MANY — the stepper's live answer, and why it exists.
    *
@@ -234,6 +236,21 @@ export class BagPanel extends Phaser.GameObjects.Container {
       .setOrigin(0.5)
       .setAlpha(0.92);
     body.add(helper);
+
+    // The CHOSEN item's name, spoken by the panel itself while its chooser is
+    // up. Centred in the measured band between the grid's bottom edge (241)
+    // and the helper's top edge (~363): a 44px line is ~56 tall, so y −148
+    // from the bottom edge leaves the same ~33 units of air above and below —
+    // nothing moves, nothing wraps, the band was already empty.
+    this.chosenName = scene.add
+      .text(0, FRAME_H / 2 - 148, '', {
+        fontFamily: FONT.display,
+        fontSize: '44px',
+        fontStyle: 'bold',
+        color: PALETTE.goldAccent
+      })
+      .setOrigin(0.5);
+    body.add(this.chosenName);
 
     this.add([this.dim, body]);
 
@@ -439,6 +456,7 @@ export class BagPanel extends Phaser.GameObjects.Container {
     chooser.add(this.plate(-offsetX, openUp));
 
     const name = tier?.name ?? stack.chain;
+    this.chosenName.setText(name);
     chooser.add(
       this.scene.add
         .text(0, -POP_H / 2 + 44, `${name}   ×${stack.count}`, {
@@ -743,6 +761,7 @@ export class BagPanel extends Phaser.GameObjects.Container {
     // leave `paint()` writing into a corpse the next time a slot opens.
     this.qtyLabel = null;
     this.qty = 1;
+    this.chosenName.setText('');
     this.dimOthers(null);
   }
 
