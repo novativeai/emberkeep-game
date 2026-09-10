@@ -20,14 +20,18 @@ EXPECT="${1:-}"
 fail() { echo "  ✗ $*"; exit 1; }
 ok() { echo "  ✓ $*"; }
 
+# `grep -a`, ALWAYS, on the bundle. On this machine `grep` is ugrep, and a 2 MB
+# minified file with a stray non-UTF-8 byte is classed as binary and silently
+# never matched without -a — which is how this gate once blocked a correct
+# ship by reporting the new game's own strings as missing.
 echo "=== 1. bundle du jeu synchronisé dans le hub ==="
 git -C "$HUB" pull --rebase --quiet origin main || fail "git pull --rebase a échoué — le hub a des changements locaux en conflit"
 BUNDLE=$(ls "$HUB"/public/games/emberkeep/assets/index-*.js 2>/dev/null | head -1)
 [ -n "$BUNDLE" ] || fail "aucun index-*.js dans public/games/emberkeep/assets"
 ok "bundle: $(basename "$BUNDLE")"
-grep -q "unlimitedUntil" "$BUNDLE" || fail "le bundle NE CONTIENT PAS unlimitedUntil — la synchro du nouveau jeu n'est pas arrivée"
+grep -aq "unlimitedUntil" "$BUNDLE" || fail "le bundle NE CONTIENT PAS unlimitedUntil — la synchro du nouveau jeu n'est pas arrivée"
 ok "contient unlimitedUntil"
-grep -q "embergames:iap:ready" "$BUNDLE" || fail "le bundle NE CONTIENT PAS embergames:iap:ready"
+grep -aq "embergames:iap:ready" "$BUNDLE" || fail "le bundle NE CONTIENT PAS embergames:iap:ready"
 ok "contient embergames:iap:ready"
 
 echo "=== 2. commit de synchro ==="
