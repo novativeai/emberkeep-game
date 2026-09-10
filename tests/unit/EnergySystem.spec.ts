@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ENERGY_MAX,
-  ENERGY_REGEN_MS
+  ENERGY_REGEN_MS,
+  MS_PER_DAY
 } from '../../src/core/Constants';
 import { computeRegen } from '../../src/systems/EnergySystem';
 import { capture, createTestContext } from './helpers';
@@ -37,6 +38,15 @@ describe('computeRegen (pure math)', () => {
     const result = computeRegen(5, 100_000, 50_000);
     expect(result.current).toBe(5);
     expect(result.recovered).toBe(0);
+  });
+
+  it('never cuts Warmth bought above the bar, and banks no regen over it', () => {
+    // The €100 Hearth Hoard carries 1,250 Warmth. This used to clamp every
+    // catch-up to the max, so the paid reserve melted on the next frame.
+    const result = computeRegen(ENERGY_MAX + 1250, 0, ENERGY_REGEN_MS * 10);
+    expect(result.current).toBe(ENERGY_MAX + 1250);
+    expect(result.recovered).toBe(0);
+    expect(result.lastRegenAt).toBe(ENERGY_REGEN_MS * 10);
   });
 });
 
@@ -86,5 +96,95 @@ describe('EnergySystem (via bus + virtual clock)', () => {
     ctx.clock.advance(1);
     ctx.bus.emit('time:advanced', { ms: 1 });
     expect(ctx.state.energyCurrent).toBe(ENERGY_MAX);
+  });
+});
+
+/**
+ * UNLIMITED WARMTH — purchased calendar time. EnergySystem owns the window
+ * (`energy:unlimited_add`) and announces when it lands, loads and ends. Time is
+ * REAL (`clock.wallNow()`), so these freeze the wall and move it only through
+ * `advance`, exactly as `window.advanceTime` does.
+ */
+describe('EnergySystem — Unlimited Warmth', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const FIVE_DAYS = 5 * MS_PER_DAY;
+
+  it('a grant from nothing runs from now', () => {
+    const ctx = createTestContext();
+    const changed = capture(ctx.bus, 'energy:unlimited_changed');
+    const wall = ctx.clock.wallNow();
+
+    ctx.bus.emit('energy:unlimited_add', { ms: FIVE_DAYS, reason: 'test' });
+
+    expect(ctx.state.energyUnlimitedUntil).toBe(wall + FIVE_DAYS);
+    expect(changed).toEqual([{ until: wall + FIVE_DAYS, active: true, cause: 'granted' }]);
+  });
+
+  it('ignores a non-positive grant', () => {
+    const ctx = createTestContext();
+    const changed = capture(ctx.bus, 'energy:unlimited_changed');
+    ctx.bus.emit('energy:unlimited_add', { ms: 0, reason: 'test' });
+    expect(ctx.state.energyUnlimitedUntil).toBe(0);
+    expect(changed).toHaveLength(0);
+  });
+
+  it('stacking while active extends from the running end', () => {
+    const ctx = createTestContext();
+    const wall = ctx.clock.wallNow();
+    ctx.bus.emit('energy:unlimited_add', { ms: FIVE_DAYS, reason: 'test' });
+    ctx.clock.advance(MS_PER_DAY);
+    ctx.bus.emit('energy:unlimited_add', { ms: FIVE_DAYS, reason: 'test' });
+    expect(ctx.state.energyUnlimitedUntil).toBe(wall + 2 * FIVE_DAYS);
+  });
+
+  it('stacking after expiry extends from now', () => {
+    const ctx = createTestContext();
+    ctx.bus.emit('energy:unlimited_add', { ms: FIVE_DAYS, reason: 'test' });
+    ctx.clock.advance(6 * MS_PER_DAY);
+    const wall = ctx.clock.wallNow();
+    ctx.bus.emit('energy:unlimited_add', { ms: FIVE_DAYS, reason: 'test' });
+    expect(ctx.state.energyUnlimitedUntil).toBe(wall + FIVE_DAYS);
+  });
+
+  it('announces the end exactly once when time runs past it', () => {
+    const ctx = createTestContext();
+    ctx.state.energyCurrent = ctx.state.energyMax; // full, so regen cannot confound the check
+    ctx.state.energyLastRegenAt = ctx.clock.now();
+    ctx.bus.emit('energy:unlimited_add', { ms: FIVE_DAYS, reason: 'test' });
+    const changed = capture(ctx.bus, 'energy:unlimited_changed');
+    const energy = capture(ctx.bus, 'energy:changed');
+
+    ctx.clock.advance(FIVE_DAYS);
+    ctx.bus.emit('time:advanced', { ms: FIVE_DAYS });
+    ctx.bus.emit('time:advanced', { ms: 0 });
+    ctx.clock.advance(1_000);
+    ctx.bus.emit('time:advanced', { ms: 1_000 });
+
+    expect(changed).toEqual([
+      { until: ctx.state.energyUnlimitedUntil, active: false, cause: 'expired' }
+    ]);
+    expect(energy).toHaveLength(0); // the bar was full; the end is not a Warmth change
+  });
+
+  it('state:loaded announces the loaded window', () => {
+    const ctx = createTestContext();
+    ctx.state.energyUnlimitedUntil = ctx.clock.wallNow() + MS_PER_DAY;
+    const changed = capture(ctx.bus, 'energy:unlimited_changed');
+
+    ctx.bus.emit('state:loaded', { offlineMs: 0, energyRecovered: 0 });
+
+    expect(changed).toEqual([{ until: ctx.state.energyUnlimitedUntil, active: true, cause: 'loaded' }]);
+  });
+
+  it('game:reset emits nothing — New Game keeps paid time', () => {
+    const ctx = createTestContext();
+    ctx.bus.emit('energy:unlimited_add', { ms: FIVE_DAYS, reason: 'test' });
+    const changed = capture(ctx.bus, 'energy:unlimited_changed');
+
+    ctx.bus.emit('game:reset', {});
+
+    expect(changed).toHaveLength(0);
   });
 });

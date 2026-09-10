@@ -18,6 +18,7 @@ import {
   LIVE_GAME_HEIGHT,
   LIVE_GAME_WIDTH,
   MAP_EDITOR_IN_SETTINGS,
+  MS_PER_DAY,
   num,
   OPENING_HOLD_MS,
   PALETTE,
@@ -32,9 +33,12 @@ import {
   TUTORIAL_ARROW,
   TUTORIAL_HAND,
   UI_SCALE,
+  UNLIMITED_WARMTH,
   WELCOME_BACK_MIN_MS,
   WORLD_ID
 } from '../core/Constants';
+import { priceOf } from '../core/coinPacks';
+import { formatUntil } from '../core/warmth';
 import { LEGAL_DOCS, legalUrl } from '../core/legalLinks';
 import { FONT } from '../art/design';
 import { clipKey, clipsFor } from '../core/characterAnims';
@@ -425,6 +429,9 @@ export class UIScene extends Phaser.Scene {
         return this.store.isOpen ? this.store.requestClose() : this.store.open();
       }
     });
+    // Seeded now, not half a second from now: the ∞ readout owns the label
+    // under the gauge from the first frame a paid window is running.
+    this.hud.setUnlimitedWarmth(this.ctx.state.energyUnlimitedUntil - this.ctx.clock.wallNow());
     this.hud.ledgerButton.setDepth(DEPTH_HUD);
     this.hud.bagButton.setDepth(DEPTH_HUD);
     this.hud.storeButton.setDepth(DEPTH_HUD);
@@ -459,7 +466,8 @@ export class UIScene extends Phaser.Scene {
       this.ctx.bus,
       this.ctx.state,
       this.ctx.data.chains,
-      this.ctx.data.cauldron
+      this.ctx.data.cauldron,
+      this.ctx.clock
     );
     this.recipeHelp.setDepth(DEPTH_PANEL + 9);
     // The SAME ladder, raised under the cursor on a quest row instead of two
@@ -474,6 +482,7 @@ export class UIScene extends Phaser.Scene {
       this.ctx.state,
       this.ctx.data.chains,
       this.ctx.data.cauldron,
+      this.ctx.clock,
       'peek'
     );
     this.recipePeek.setDepth(DEPTH_PANEL + 8);
@@ -728,6 +737,9 @@ export class UIScene extends Phaser.Scene {
 
     // Everything is wired: load the save (or start fresh) and roll the tutorial.
     this.ctx.beginRun();
+    // The state is the loaded one now, so a purchase that lands stays landed:
+    // the bridge may apply grants, and tells the hub to re-send what it holds.
+    iapBridge.setReady(true);
   }
 
   override update(_time: number, delta: number): void {
@@ -840,6 +852,10 @@ export class UIScene extends Phaser.Scene {
     if (this.regenAccum < 500) return;
     this.regenAccum = 0;
     const state = this.ctx.state;
+    // Unlimited Warmth owns the label while it runs (REAL time — wallNow).
+    const unlimitedLeft = state.energyUnlimitedUntil - this.ctx.clock.wallNow();
+    this.hud.setUnlimitedWarmth(unlimitedLeft);
+    if (unlimitedLeft > 0) return;
     if (state.energyCurrent >= state.energyMax) {
       this.hud.setRegenText('');
       return;
@@ -1102,6 +1118,12 @@ export class UIScene extends Phaser.Scene {
       }),
       bus.on('iap:completed', (grant) => this.celebratePurchase(grant)),
       bus.on('iap:failed', ({ reason }) => this.onIapFailed(reason)),
+      // A production build with no hub: a showcase row has nothing to charge.
+      bus.on('ui:iap_unavailable', () => this.onIapFailed('unavailable')),
+      bus.on('energy:unlimited_changed', ({ until, cause }) => {
+        this.hud.setUnlimitedWarmth(until - this.ctx.clock.wallNow());
+        if (cause === 'expired') this.floatWarning('Unlimited Warmth has ended.');
+      }),
       // A crossing changes the stall's catalogue (local goods are only on the
       // shelf in the world that makes them), so a ticket back to a section of
       // the old world's Store has stopped meaning anything — and a notice about
@@ -1207,6 +1229,8 @@ export class UIScene extends Phaser.Scene {
         });
       }),
       bus.on('game:reset', () => {
+        // Until the next `beginRun` there is no run to land a grant in.
+        iapBridge.setReady(false);
         this.scene.stop(SCENES.board);
         this.scene.start(SCENES.title);
       }),
@@ -2048,7 +2072,21 @@ export class UIScene extends Phaser.Scene {
   private buildCelebrationBanner(title: string, rewardLine: string, quote: string): void {
     const cx = LIVE_GAME_WIDTH / 2;
     const cy = LIVE_GAME_HEIGHT * 0.3;
-    const height = quote ? 236 : 180;
+    // The quote is measured BEFORE the card is drawn: a line that wraps grows
+    // the card by exactly the extra lines, so it never runs off the bottom.
+    let quoteText: Phaser.GameObjects.Text | undefined;
+    let quoteExtra = 0;
+    if (quote) {
+      quoteText = this.add
+        .text(0, 0, quote, {
+          fontFamily: FONT.ui, fontSize: '26px', fontStyle: 'italic', color: '#8A6248',
+          wordWrap: { width: 700 }, align: 'center'
+        })
+        .setOrigin(0.5);
+      const lines = Math.max(1, quoteText.getWrappedText(quote).length);
+      quoteExtra = ((lines - 1) * quoteText.height) / lines;
+    }
+    const height = (quote ? 236 : 180) + quoteExtra;
     const c = this.add.container(cx, cy).setDepth(DEPTH_DIALOG - 5).setAlpha(0);
     const g = this.add.graphics();
     g.fillStyle(num(PALETTE.night), 0.22);
@@ -2068,16 +2106,14 @@ export class UIScene extends Phaser.Scene {
         fontFamily: FONT.ui, fontSize: '30px', fontStyle: 'bold', color: PALETTE.goldShade
       })
       .setOrigin(0.5);
+    // Fit, never grow: a long reward line (Gold AND Unlimited Warmth) must stay
+    // inside the 756-wide inner card.
+    sub.setScale(Math.min(1, UNLIMITED_WARMTH.bannerFitW / sub.width));
     c.add([g, ribbon, sub]);
-    if (quote) {
-      c.add(
-        this.add
-          .text(0, -height / 2 + 182, quote, {
-            fontFamily: FONT.ui, fontSize: '26px', fontStyle: 'italic', color: '#8A6248',
-            wordWrap: { width: 700 }, align: 'center'
-          })
-          .setOrigin(0.5)
-      );
+    if (quoteText) {
+      // First line where a one-line quote always sat; the rest hang below it.
+      quoteText.setY(-height / 2 + 182 + quoteExtra / 2);
+      c.add(quoteText);
     }
     this.add
       .particles(cx, cy, 'fx_spark', {
@@ -3644,12 +3680,32 @@ export class UIScene extends Phaser.Scene {
     return button;
   }
 
-  private static describeGrant(grant: { coins: number; keys: number; energy: number }): string {
+  /**
+   * What a pack gives, in words. `until`/`wallNow` (REAL ms) are passed only by
+   * the confirm dialog: when a window is already running, the Warmth part says
+   * where the new end lands instead of restating the length.
+   */
+  private static describeGrant(
+    grant: { coins: number; keys: number; energy: number; unlimitedWarmthMs?: number },
+    until = 0,
+    wallNow = 0
+  ): string {
     const parts: string[] = [];
-    if (grant.coins > 0) parts.push(`◎ +${grant.coins.toLocaleString()} Gold`);
+    if (grant.coins > 0) parts.push(`◎ +${grant.coins.toLocaleString('en-GB')} Gold`);
     if (grant.keys > 0) parts.push(`🗝 +${grant.keys} Gold Key${grant.keys > 1 ? 's' : ''}`);
-    if (grant.energy > 0) parts.push(`⚡ +${grant.energy} Warmth`);
+    if (grant.energy > 0) parts.push(`⚡ +${grant.energy.toLocaleString('en-GB')} Warmth`);
+    const ms = grant.unlimitedWarmthMs ?? 0;
+    if (ms > 0) parts.push(UIScene.unlimitedPart(ms, until, wallNow));
     return parts.join('    ');
+  }
+
+  /** `⚡ 5 days of Unlimited Warmth`, or — already running — `⚡ +5 days · now until 15 Sep, 14:02`. */
+  private static unlimitedPart(ms: number, until = 0, wallNow = 0): string {
+    const days = Math.round(ms / MS_PER_DAY);
+    const span = `${days} day${days === 1 ? '' : 's'}`;
+    return until > wallNow
+      ? `⚡ +${span} · now until ${formatUntil(Math.max(until, wallNow) + ms)}`
+      : `⚡ ${span} of Unlimited Warmth`;
   }
 
   /**
@@ -3697,6 +3753,84 @@ export class UIScene extends Phaser.Scene {
     const pack = iapBridge.pack(packId);
     if (!pack) return;
 
+    const buy = (): void => {
+      // Synchronous, inside the tap: the checkout window opens now.
+      const started = iapBridge.beginCheckout(pack.id);
+      this.closeIapDialog();
+      if (started) this.openIapWaitingDialog();
+      else this.floatWarning('Purchases are available on the EmberGames page.');
+    };
+
+    // A pack that carries Unlimited Warmth states the time and its terms before
+    // money moves: a taller card, a line per grant, and the disclosure.
+    if (pack.unlimitedWarmthMs > 0) {
+      const card = this.iapCard(UNLIMITED_WARMTH.confirmCardH);
+      card.add(
+        this.add
+          .text(0, -330, 'CONFIRM PURCHASE', {
+            fontFamily: FONT.ui, fontSize: '48px', fontStyle: 'bold', color: PALETTE.night
+          })
+          .setOrigin(0.5)
+      );
+      card.add(
+        this.add
+          .text(0, -246, pack.name, {
+            fontFamily: FONT.ui, fontSize: '54px', fontStyle: 'bold', color: '#8A6248'
+          })
+          .setOrigin(0.5)
+      );
+      card.add(
+        this.add
+          .text(0, -172, UIScene.describeGrant({ ...pack, unlimitedWarmthMs: 0 }), {
+            fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: PALETTE.goldShade
+          })
+          .setOrigin(0.5)
+      );
+      card.add(
+        this.add
+          .text(
+            0,
+            -118,
+            UIScene.unlimitedPart(
+              pack.unlimitedWarmthMs,
+              this.ctx.state.energyUnlimitedUntil,
+              this.ctx.clock.wallNow()
+            ),
+            { fontFamily: FONT.ui, fontSize: '40px', fontStyle: 'bold', color: PALETTE.goldShade }
+          )
+          .setOrigin(0.5)
+      );
+      card.add(
+        this.add
+          .text(0, -36, priceOf(pack.amountEur), {
+            fontFamily: FONT.ui, fontSize: '64px', fontStyle: 'bold', color: PALETTE.night
+          })
+          .setOrigin(0.5)
+      );
+      card.add(
+        this.add
+          .text(
+            0,
+            96,
+            [
+              'Starts the moment it reaches your island and runs',
+              '5 × 24 hours, even while you are away. Nothing renews.',
+              'Taps and timer skips cost no Warmth, except skips on',
+              'Houses, the Mansion, trees and the Treasure Compass.'
+            ].join('\n'),
+            {
+              fontFamily: FONT.ui, fontSize: '26px', color: '#8A6248', align: 'center', lineSpacing: 6,
+              wordWrap: { width: UNLIMITED_WARMTH.disclosureWrap }
+            }
+          )
+          .setOrigin(0.5)
+      );
+      card.add(this.iapButton(-210, 300, 'Cancel', 'ui_btn_play', 0.72, () => this.closeIapDialog()));
+      card.add(this.iapButton(210, 300, `Buy ${priceOf(pack.amountEur)}`, 'ui_btn_green', 0.95, buy));
+      this.iapDialog = card;
+      return;
+    }
+
     const card = this.iapCard(660);
     card.add(
       this.add
@@ -3721,7 +3855,7 @@ export class UIScene extends Phaser.Scene {
     );
     card.add(
       this.add
-        .text(0, -6, `€${pack.amountEur.toFixed(2)}`, {
+        .text(0, -6, priceOf(pack.amountEur), {
           fontFamily: FONT.ui, fontSize: '64px', fontStyle: 'bold', color: PALETTE.night
         })
         .setOrigin(0.5)
@@ -3737,13 +3871,7 @@ export class UIScene extends Phaser.Scene {
       this.iapButton(-210, 240, 'Cancel', 'ui_btn_play', 0.72, () => this.closeIapDialog())
     );
     card.add(
-      this.iapButton(210, 240, `Buy €${pack.amountEur.toFixed(2)}`, 'ui_btn_green', 0.95, () => {
-        // Synchronous, inside the tap: the checkout window opens now.
-        const started = iapBridge.beginCheckout(pack.id);
-        this.closeIapDialog();
-        if (started) this.openIapWaitingDialog();
-        else this.floatWarning('Purchases are available on the EmberGames page.');
-      })
+      this.iapButton(210, 240, `Buy ${priceOf(pack.amountEur)}`, 'ui_btn_green', 0.95, buy)
     );
     this.iapDialog = card;
   }
@@ -3784,7 +3912,9 @@ export class UIScene extends Phaser.Scene {
     this.buildCelebrationBanner(
       'PURCHASE COMPLETE!',
       UIScene.describeGrant(grant),
-      `${grant.name} — thank you, Keeper!`
+      grant.unlimitedWarmthMs > 0
+        ? `${grant.name} — thank you, Keeper! Unlimited Warmth until ${formatUntil(this.ctx.state.energyUnlimitedUntil)}.`
+        : `${grant.name} — thank you, Keeper!`
     );
     this.confettiBurst(LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT * 0.3);
   }

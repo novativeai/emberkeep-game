@@ -15,15 +15,19 @@ import type { CoinOffer, CoinPacksData } from './types';
  *
  *   gateway present   `iapBridge.coinPacks()` — real packs, real EUR prices,
  *                     each carrying a `packId`, so a tap goes to the checkout.
+ *   embedded, no      nothing yet — the hub's catalog is on its way, and a
+ *   catalog yet       showcase row shown there would be a free-Gold button in
+ *                     the one build that has real buyers (`Loading packs…`).
  *   standalone        the authored showcase (`src/data/coin-packs.json`) — no
- *                     `packId` at all, so a tap can only take the mock path.
+ *                     `packId` at all, so a tap can only take `offerTap`'s
+ *                     mock path, and that path exists only on a DEV build.
  *
  * THE TEST IS `isAvailable()`, NOT "the coin list came back empty", and the
  * difference is money. `isAvailable()` asks whether there is a HUB — a live
  * catalog of any shape. `coinPacks()` asks a narrower question, and a real hub
  * that happens to sell only a Warmth pack answers it with `[]`. Keying the
  * fallback on that emptiness would put a REAL-gateway build onto the standalone
- * path and hand out 200/900/2100 Gold for a tap. So a live hub with no coin
+ * path and hand out the showcase's Gold for a tap. So a live hub with no coin
  * packs sells no coin packs — an empty shelf, which the Emporium says out loud
  * — and only a build with no hub at all falls back to the showcase.
  *
@@ -37,11 +41,12 @@ import type { CoinOffer, CoinPacksData } from './types';
 
 const SHOWCASE = (packsJson as CoinPacksData).showcase;
 
-/** The one price format. EUR, two decimals, a dot — `bonusPercent` in the
- *  Emporium parses a price back out of this string, so the decimal separator
- *  is part of the contract, not a style choice. */
+/** The one price format. EUR; whole euros print bare; the dot stays the decimal
+ *  separator — `bonusPercent` in the Emporium parses a price back out of this
+ *  string, so the separator is part of the contract, not a style choice.
+ *  Identical to the hub's `formatEur`. */
 export function priceOf(amountEur: number): string {
-  return `€${amountEur.toFixed(2)}`;
+  return Number.isInteger(amountEur) ? `€${amountEur}` : `€${amountEur.toFixed(2)}`;
 }
 
 /** The authored showcase, as offers. No `packId`: see the note above. */
@@ -50,6 +55,8 @@ export function showcaseOffers(): CoinOffer[] {
     name: pack.name,
     coins: pack.coins,
     price: priceOf(pack.amountEur),
+    ...(pack.unlimitedWarmthMs ? { unlimitedWarmthMs: pack.unlimitedWarmthMs } : {}),
+    ...(pack.energy ? { energy: pack.energy } : {}),
     best: pack.best
   }));
 }
@@ -58,20 +65,28 @@ export function showcaseOffers(): CoinOffer[] {
 export function hubOffers(): CoinOffer[] {
   const packs = iapBridge.coinPacks();
   if (packs.length === 0) return [];
-  // The hub authors no "most popular" flag, so the highlight goes to the
-  // biggest pack — derived, and it moves on its own if the catalog changes.
-  const biggest = Math.max(...packs.map((p) => p.coins));
+  // The hub authors no highlight and none is derived (no nudge toward the
+  // dearest pack): `best` is never set on a real pack.
   return packs.map((pack) => ({
     name: pack.name,
     coins: pack.coins,
     price: priceOf(pack.amountEur),
     packId: pack.id,
-    best: packs.length > 1 && pack.coins === biggest
+    unlimitedWarmthMs: pack.unlimitedWarmthMs,
+    energy: pack.energy
   }));
 }
 
 /** What the gold shelf sells RIGHT NOW. Every surface asks this and nothing
  *  else — and an empty answer is a real answer (see the note above). */
 export function coinOffers(): CoinOffer[] {
-  return iapBridge.isAvailable() ? hubOffers() : showcaseOffers();
+  if (iapBridge.isAvailable()) return hubOffers();
+  return iapBridge.isEmbedded() ? [] : showcaseOffers(); // embedded, catalog not in yet → nothing to tap
+}
+
+export type OfferTap = 'checkout' | 'mock' | 'unavailable';
+
+/** A showcase row hands out Gold ONLY on a dev build; production has nothing to charge. */
+export function offerTap(offer: Pick<CoinOffer, 'packId'>, dev: boolean): OfferTap {
+  return offer.packId ? 'checkout' : dev ? 'mock' : 'unavailable';
 }

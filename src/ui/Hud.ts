@@ -14,6 +14,7 @@ import {
 import { FONT } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
+import { formatUnlimitedLeft } from '../core/warmth';
 import { uiRegistry } from './theme';
 
 interface Pill {
@@ -46,6 +47,8 @@ export class Hud {
   /** The tutorial's `key_unlock` beat is running — see `syncKeyPill`. */
   private keyLesson = false;
   private regenLabel: Phaser.GameObjects.Text;
+  /** Unlimited Warmth owns the label under the gauge while it runs. */
+  private unlimitedActive = false;
   private xpFill: Phaser.GameObjects.Graphics;
   private levelText: Phaser.GameObjects.Text;
   private levelGroup!: Phaser.GameObjects.Container;
@@ -457,7 +460,25 @@ export class Hud {
 
   /** Show the time to the next +1 Warmth (m:ss), or hide it when full. */
   setRegenText(text: string): void {
+    if (this.unlimitedActive) return; // the ∞ readout owns the label
     this.regenLabel.setText(text ? `⏱ ${text}` : '').setVisible(text !== '');
+  }
+
+  /**
+   * Unlimited Warmth's readout, in the regen countdown's place under the gauge.
+   * The pill keeps `current/max` — the bar still fills and still pays for a
+   * building's skip. `leftMs` is REAL time left (until − wallNow).
+   */
+  setUnlimitedWarmth(leftMs: number): void {
+    if (leftMs > 0) {
+      this.unlimitedActive = true;
+      this.regenLabel.setText(`∞ Unlimited · ${formatUnlimitedLeft(leftMs)}`).setVisible(true);
+      return;
+    }
+    if (!this.unlimitedActive) return;
+    // Hand the label back; UIScene's regen path fills it on the next tick.
+    this.unlimitedActive = false;
+    this.regenLabel.setText('').setVisible(false);
   }
 
   private refreshEnergy(current: number): void {

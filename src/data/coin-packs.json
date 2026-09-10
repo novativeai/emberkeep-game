@@ -1,7 +1,8 @@
 {
   "showcase": [
-    { "name": "Coin Purse", "coins": 200, "amountEur": 2.99 },
-    { "name": "Merchant’s Chest", "coins": 900, "amountEur": 9.99, "best": true },
-    { "name": "Dragon’s Hoard", "coins": 2100, "amountEur": 19.99 }
+    { "name": "Pouch of Gold", "coins": 250, "amountEur": 2.5 },
+    { "name": "Chest of Gold", "coins": 1100, "amountEur": 10 },
+    { "name": "Keeper’s Coffer", "coins": 3000, "amountEur": 25 },
+    { "name": "Hearth Hoard", "coins": 13000, "amountEur": 100, "energy": 1250 }
   ]
 }

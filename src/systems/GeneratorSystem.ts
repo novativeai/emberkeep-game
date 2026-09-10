@@ -10,6 +10,7 @@ import { commissionVerdict } from '../core/commissionRule';
 import type { EventBus } from '../core/EventBus';
 import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
+import { warmthPrice } from '../core/warmth';
 import type {
   BoardItemState,
   ChainsData,
@@ -90,6 +91,13 @@ export class GeneratorSystem {
   producesCoin(item: Pick<BoardItemState, 'chain' | 'tier' | 'produces'>): boolean {
     const generator = this.generatorConfig(item.chain, item.tier);
     return (item.produces ?? generator?.produces)?.chain === 'coin';
+  }
+
+  /** Which Unlimited-Warmth rule a Warmth SKIP on this piece falls under: buildings keep their price
+   *  (coin makers — free mint skips are unlimited Gold — and every passive, untappable producer). */
+  skipWarmthUse(item: Pick<BoardItemState, 'chain' | 'tier' | 'produces'>): 'skip' | 'skip_building' {
+    const g = this.generatorConfig(item.chain, item.tier);
+    return this.producesCoin(item) || g?.tappable === false ? 'skip_building' : 'skip';
   }
 
   /** What a generator actually makes: its own commission if it has one, else
@@ -275,7 +283,12 @@ export class GeneratorSystem {
     // no longer has to pretend a Gold shortfall is a Warmth one, which is what
     // made the HUD shake the Warmth gauge when the player ran out of Gold.
     if (currency === 'warmth') {
-      const cost = skipWarmthCost(timer.at - now, timer.total, cfg.skipMaxGold);
+      const cost = warmthPrice(
+        skipWarmthCost(timer.at - now, timer.total, cfg.skipMaxGold),
+        this.skipWarmthUse(item),
+        this.state.energyUnlimitedUntil,
+        this.clock.wallNow()
+      );
       if (this.state.energyCurrent < cost) {
         this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
         this.bus.emit('generator:skip_refused', {
@@ -283,7 +296,7 @@ export class GeneratorSystem {
         });
         return;
       }
-      this.bus.emit('energy:spend', { amount: cost, reason: 'skip_cooldown' });
+      if (cost > 0) this.bus.emit('energy:spend', { amount: cost, reason: 'skip_cooldown' });
     } else {
       // A coin mint takes Warmth only (see producesCoin) — the scene never
       // shows this key for one, so a gold skip arriving here is a bus caller
@@ -334,11 +347,18 @@ export class GeneratorSystem {
   ): void {
     const now = this.clock.now();
     const itemId = item.id;
+    // The Warmth hand's price, decided once: Unlimited Warmth waives a harvest.
+    const warmthCost = warmthPrice(
+      generator.energyCost,
+      'harvest',
+      this.state.energyUnlimitedUntil,
+      this.clock.wallNow()
+    );
     if (currency === 'warmth') {
-      if (this.state.energyCurrent < generator.energyCost) {
+      if (this.state.energyCurrent < warmthCost) {
         this.bus.emit('item:harvest_failed', { generatorId: itemId, reason: 'energy' });
         this.bus.emit('generator:skip_refused', {
-          itemId, chain: item.chain, tier: item.tier, currency, cost: generator.energyCost
+          itemId, chain: item.chain, tier: item.tier, currency, cost: warmthCost
         });
         return;
       }
@@ -359,7 +379,7 @@ export class GeneratorSystem {
     }
 
     if (currency === 'warmth') {
-      this.bus.emit('energy:spend', { amount: generator.energyCost, reason: 'harvest' });
+      if (warmthCost > 0) this.bus.emit('energy:spend', { amount: warmthCost, reason: 'harvest' });
     } else {
       this.bus.emit('economy:add', {
         coins: -Math.max(1, generator.energyCost),

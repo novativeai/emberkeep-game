@@ -5,17 +5,22 @@ import type { CoinPacksData, IapPackInfo, TopUpSource } from '../../src/core/typ
 
 /**
  * The bridge is a singleton whose catalog only arrives over `postMessage`, so
- * the two questions this module routes on are stubbed directly. They are
+ * the three questions this module routes on are stubbed directly. They are
  * DIFFERENT questions and the whole point of these tests is that they stay so:
  *
- *   isAvailable()  is there a hub at all?
+ *   isAvailable()  is there a hub catalog at all?
+ *   isEmbedded()   is there a hub parent (whose catalog may still be coming)?
  *   coinPacks()    does that hub sell coins?
  */
 const bridge = {
   available: false,
+  embedded: false,
   packs: [] as IapPackInfo[],
   isAvailable(): boolean {
     return bridge.available;
+  },
+  isEmbedded(): boolean {
+    return bridge.embedded;
   },
   coinPacks(): IapPackInfo[] {
     return bridge.packs;
@@ -30,40 +35,57 @@ const pack = (id: string, coins: number, amountEur: number): IapPackInfo => ({
   amountEur,
   coins,
   keys: 0,
-  energy: 0
+  energy: 0,
+  unlimitedWarmthMs: 0
 });
 
 // Imported after the mock is registered (vi.mock is hoisted, but the module
 // graph is still resolved lazily here for clarity).
-const { coinOffers, priceOf, showcaseOffers } = await import('../../src/core/coinPacks');
+const { coinOffers, offerTap, priceOf, showcaseOffers } = await import('../../src/core/coinPacks');
 
 describe('coin packs — one source of truth, and the gateway test', () => {
   beforeEach(() => {
     bridge.available = false;
+    bridge.embedded = false;
     bridge.packs = [];
   });
 
   it('standalone: the shelf is the authored showcase, priced in EUR, id-less', () => {
     const offers = coinOffers();
     expect(offers.length).toBeGreaterThan(0);
+    expect(offers).toEqual(showcaseOffers());
     for (const offer of offers) {
       expect(offer.price.startsWith('€')).toBe(true);
-      // No `packId` means a tap CANNOT reach a checkout — which is the only
-      // thing that makes the mock grant safe.
+      // No `packId` means a tap CANNOT reach a checkout — and `offerTap` only
+      // lets it grant on a DEV build.
       expect(offer.packId).toBeUndefined();
     }
   });
 
+  it('embedded with no catalog yet: nothing to tap (never the showcase)', () => {
+    bridge.embedded = true;
+    expect(coinOffers()).toEqual([]);
+  });
+
   it('a live hub replaces the showcase entirely, and every row can be bought', () => {
     bridge.available = true;
-    bridge.packs = [pack('coin_small', 200, 2.99), pack('coin_big', 900, 9.99)];
+    bridge.embedded = true;
+    bridge.packs = [
+      pack('gold_pouch', 250, 2.5),
+      pack('gold_chest', 1100, 10),
+      { ...pack('hearth_hoard', 13000, 100), energy: 1250 }
+    ];
 
     const offers = coinOffers();
-    expect(offers.map((o) => o.packId)).toEqual(['coin_small', 'coin_big']);
-    expect(offers.map((o) => o.price)).toEqual(['€2.99', '€9.99']);
-    // The highlight is DERIVED (the hub authors no "popular" flag) and lands on
-    // the biggest pack.
-    expect(offers.find((o) => o.best)?.packId).toBe('coin_big');
+    expect(offers.map((o) => o.packId)).toEqual(['gold_pouch', 'gold_chest', 'hearth_hoard']);
+    expect(offers.map((o) => o.price)).toEqual(['€2.50', '€10', '€100']);
+    expect(offers.map((o) => o.energy)).toEqual([0, 0, 1250]);
+  });
+
+  it('hub offers never set `best` — no nudge toward the dearest pack', () => {
+    bridge.available = true;
+    bridge.packs = [pack('gold_pouch', 250, 2.5), pack('hearth_hoard', 13000, 100)];
+    for (const offer of coinOffers()) expect(offer.best).toBeFalsy();
   });
 
   /**
@@ -71,11 +93,12 @@ describe('coin packs — one source of truth, and the gateway test', () => {
    *
    * A live hub that happens to sell only a Warmth pack has `isAvailable()` true
    * and `coinPacks()` empty. Routing the fallback on that emptiness would drop
-   * a REAL-gateway build onto the standalone path and hand out 200/900/2100
+   * a REAL-gateway build onto the standalone path and hand out the showcase's
    * Gold for a tap. An empty gold shelf is the correct answer.
    */
   it('a live hub that sells no coin packs sells NO coin packs (never the free showcase)', () => {
     bridge.available = true;
+    bridge.embedded = true;
     bridge.packs = []; // it sells Warmth only
 
     expect(coinOffers()).toEqual([]);
@@ -84,12 +107,34 @@ describe('coin packs — one source of truth, and the gateway test', () => {
     expect(showcaseOffers().length).toBeGreaterThan(0);
   });
 
-  it('both sources print through the same formatter', () => {
+  it('the showcase is the four tiers: ascending prices, never less Gold per euro, the Hoard last', () => {
+    const rows = (packsDoc as CoinPacksData).showcase;
+    expect(rows).toHaveLength(4);
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i]!.amountEur).toBeGreaterThan(rows[i - 1]!.amountEur);
+      expect(rows[i]!.coins / rows[i]!.amountEur).toBeGreaterThanOrEqual(
+        rows[i - 1]!.coins / rows[i - 1]!.amountEur
+      );
+    }
+    expect(rows.at(-1)!.energy).toBe(1250);
+    expect(showcaseOffers().at(-1)!.energy).toBe(1250);
+    for (const row of rows) expect(row.best).toBeUndefined();
+  });
+
+  it('both sources print through the same formatter: whole euros bare, the dot as the decimal', () => {
+    expect(priceOf(10)).toBe('€10');
+    expect(priceOf(2.5)).toBe('€2.50');
     expect(priceOf(2.99)).toBe('€2.99');
-    expect(priceOf(20)).toBe('€20.00');
     // The Emporium's value badge parses the number back OUT of this string, so
     // the dot is contract, not style.
     expect(Number(priceOf(9.99).replace(/[^0-9.]/g, ''))).toBe(9.99);
+    expect(Number(priceOf(10).replace(/[^0-9.]/g, ''))).toBe(10);
+  });
+
+  it('offerTap: a real pack checks out; a showcase row grants only on a dev build', () => {
+    expect(offerTap({ packId: 'x' }, false)).toBe('checkout');
+    expect(offerTap({}, true)).toBe('mock');
+    expect(offerTap({}, false)).toBe('unavailable');
   });
 
   it('the authored showcase is written down in EUR, once, with no ids to route on', () => {

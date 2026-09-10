@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
-import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, num, panelMobileScale } from '../core/Constants';
+import { LIVE_GAME_WIDTH, LIVE_GAME_HEIGHT, MS_PER_DAY, num, panelMobileScale } from '../core/Constants';
 import { FONT, INK } from '../art/design';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
-import { coinOffers, priceOf } from '../core/coinPacks';
+import { coinOffers, offerTap, priceOf } from '../core/coinPacks';
 import { iapBridge } from '../core/iapBridge';
 import { uiRegistry } from './theme';
 
@@ -26,6 +26,11 @@ interface Product {
    *  the routing rule; `shelfItems()` is the only thing that sets it, from
    *  `coinOffers()` on the Gold shelf and `iapBridge.warmthPacks()` on Warmth. */
   packId?: string;
+  /** Unlimited Warmth the pack carries (ms) — the Hoard row's third line, and
+   *  what a DEV showcase tap grants beside the Gold. */
+  unlimitedWarmthMs?: number;
+  /** Warmth a Gold pack carries on top — the Hearth Hoard's third line. */
+  warmth?: number;
 }
 /**
  * The two shelves' CHROME. The WARMTH shelf's GOLD-SINK goods are authored
@@ -50,9 +55,9 @@ const SHOP: Record<Currency, { title: string; tab: string; icon: string; iconSca
       { amount: 20, price: '', gold: 60, best: true, name: 'Warmth Pack' },
       { amount: 50, price: '', gold: 130, name: 'Big Warmth' }
     ]
-    // A hub Warmth pack, when the hub sells one, is APPENDED to these by
-    // `shelfItems()` — real money under the Gold sink, in that order, so the
-    // earned way through is the one the eye reaches first.
+    // A hub Warmth pack — only if the hub ever sells an energy pack again — is
+    // APPENDED to these by `shelfItems()`: real money under the Gold sink, in
+    // that order, so the earned way through is the one the eye reaches first.
   },
   coins: {
     title: 'Gold',
@@ -121,14 +126,15 @@ function fitArt(img: Phaser.GameObjects.Image, slot: number): void {
  * printed on. `SHOP_INK` (TextureFactory) holds the sampled values.
  *
  * Content is still MECHANICS §7: the WARMTH shelf is a real GOLD SINK (after
- * the one-time free Little Warmth, refills cost earned Gold) — and, when the hub
- * sells one, a real-money refill APPENDED under it. Both, in that order: the
- * earned way through is the one the eye reaches first, and the euro row is the
- * impatient way past it, never the only way. The GOLD shelf is the REAL IAP
- * shop when the game runs inside the EmberGames hub — packs and EUR prices
- * arrive over `iapBridge`, and tapping either shelf's pack starts the confirm →
- * secure-checkout flow (`ui:iap_buy_requested`). Standalone builds keep the
- * authored mock tags as the showcase, since there is no gateway to charge.
+ * the one-time free Little Warmth, refills cost earned Gold) — and, only if the
+ * hub ever sells an energy pack again, a real-money refill APPENDED under it.
+ * Both, in that order: the earned way through is the one the eye reaches first,
+ * and the euro row is the impatient way past it, never the only way. The GOLD
+ * shelf is the REAL IAP shop when the game runs inside the EmberGames hub —
+ * packs and EUR prices arrive over `iapBridge`, and tapping a pack starts the
+ * confirm → secure-checkout flow (`ui:iap_buy_requested`). Standalone dev
+ * builds grant the showcase; production standalone shows it and sends buyers
+ * to the site.
  * The two are tabs of one hall, which is what lets a player who came for
  * Warmth see what Gold is for.
  */
@@ -341,7 +347,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
   }
 
   private refreshWallet(): void {
-    this.walletGold.setText(`${this.gameState.coins.toLocaleString()}`);
+    this.walletGold.setText(`${this.gameState.coins.toLocaleString('en-GB')}`);
     this.walletWarmth.setText(`${this.gameState.energyCurrent}/${this.gameState.energyMax}`);
   }
 
@@ -406,10 +412,15 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     // a build with no hub at all — see coinPacks.ts), so the honest shelf here
     // is an empty one that says so. Without this the row loop simply draws
     // nothing and the player reads a blank frame as a broken screen.
+    // An EMBEDDED game whose catalog has not arrived yet is the other empty
+    // shelf, and it is a wait rather than an answer: `iap:catalog_changed`
+    // rebuilds this the moment the hub's packs land.
     if (order.length === 0) {
+      const empty =
+        iapBridge.isEmbedded() && !iapBridge.isAvailable() ? 'Loading packs…' : 'No packs are on sale right now.';
       this.shelf.add(
         this.scene.add
-          .text(0, SHELF_TOP + SHELF_H / 2, 'No packs are on sale right now.', {
+          .text(0, SHELF_TOP + SHELF_H / 2, empty, {
             fontFamily: FONT.ui,
             fontSize: '40px',
             color: INK.onFieldDim,
@@ -420,11 +431,18 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       return;
     }
 
-    const total = order.length * ROW_H + (order.length - 1) * ROW_GAP;
-    const top = SHELF_TOP + (SHELF_H - total) / 2 + ROW_H / 2;
+    // FOUR ROWS DO NOT FIT at full size (986 > 928), so the stack is fit-scaled
+    // to the shelf with equal air above and below. Three rows fit at 1 — the
+    // shelf they always drew — and four land at ~0.86.
+    const SHELF_AIR = 40;
+    const n = order.length;
+    const fit = Math.min(1, (SHELF_H - 2 * SHELF_AIR) / (n * ROW_H + (n - 1) * ROW_GAP));
+    const rowH = ROW_H * fit;
+    const gap = ROW_GAP * fit;
+    const top = SHELF_TOP + (SHELF_H - (n * rowH + (n - 1) * gap)) / 2 + rowH / 2;
     order.forEach(({ item, tier }, i) => {
-      const y = top + i * (ROW_H + ROW_GAP);
-      this.shelf.add(this.makeRow(item, cfg, items, tier, y, freeIndex >= 0 && i === 0));
+      const y = top + i * (rowH + gap);
+      this.shelf.add(this.makeRow(item, cfg, items, tier, y, freeIndex >= 0 && i === 0).setScale(fit));
     });
   }
 
@@ -442,7 +460,9 @@ export class ShopPanel extends Phaser.GameObjects.Container {
         price: offer.price,
         name: offer.name,
         best: offer.best,
-        packId: offer.packId
+        packId: offer.packId,
+        unlimitedWarmthMs: offer.unlimitedWarmthMs,
+        warmth: offer.energy
       }));
     }
     // The Gold sink first, then whatever real-money Warmth the hub sells.
@@ -450,9 +470,10 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     // Read straight off the bridge rather than through a resolver of its own:
     // `coinOffers()` exists because TWO surfaces have to agree about coin packs
     // (the shelf and the shortfall notice, which sends the player to it), and
-    // there is no second surface for Warmth. A standalone build has an empty
-    // catalog, so this adds nothing and the shelf is the authored one it has
-    // always been.
+    // there is no second surface for Warmth. The catalog sells no energy pack
+    // today, so this adds nothing and the shelf is the authored one it has
+    // always been; it is kept only if the hub ever sells an energy pack again
+    // (and so an older hub during a ship window still works).
     return [
       ...(SHOP[this.currency].items ?? []),
       ...iapBridge.warmthPacks().map((pack) => ({
@@ -489,6 +510,10 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       [
         [-0.72, -0.2, 0.78], [-0.24, -0.35, 0.86], [0.24, -0.35, 0.86], [0.72, -0.2, 0.78],
         [-0.46, 0.18, 1.02], [0, 0.27, 1.12], [0.46, 0.18, 1.02]
+      ],
+      [
+        [-0.8, -0.14, 0.74], [-0.4, -0.36, 0.82], [0, -0.44, 0.88], [0.4, -0.36, 0.82], [0.8, -0.14, 0.74],
+        [-0.56, 0.16, 0.98], [-0.19, 0.26, 1.08], [0.19, 0.26, 1.08], [0.56, 0.16, 0.98]
       ]
     ];
     const layout = LAYOUTS[Math.min(tier, LAYOUTS.length - 1)]!;
@@ -531,7 +556,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
    * Gold-priced, or money-priced.
    *
    * The Warmth shelf now carries both, and NOTHING that compares value may
-   * cross that line: 50 Warmth for €1.99 and 5 Warmth for 20 Gold are not two
+   * cross that line: a €2.50 pack and 5 Warmth for 20 Gold are not two
    * rates, they are two currencies. Divided anyway, the euro pack returns
    * "+9940% MORE" and takes BEST VALUE off a shelf whose whole point is that
    * the earned way is a real way.
@@ -563,9 +588,23 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     );
     row.add(this.pile(ROW_ART_X, -8, cfg.icon, tier, 100));
 
+    // A pack that carries Warmth on top of its Gold (or Unlimited Warmth) wears
+    // the bolt over its heap and a THIRD line, so its three lines re-seat
+    // around the row's centre.
+    const unlimitedMs = item.unlimitedWarmthMs ?? 0;
+    const warmth = item.warmth ?? 0;
+    const hasThirdLine = unlimitedMs > 0 || warmth > 0;
+    if (hasThirdLine) {
+      const bolt = this.scene.add.image(ROW_ART_X + 72, -62, 'ui_icon_bolt');
+      fitArt(bolt, 64);
+      row.add(bolt);
+    }
+    const nameY = hasThirdLine ? -62 : -34;
+    const amountY = hasThirdLine ? -2 : 34;
+
     row.add(
       this.scene.add
-        .text(ROW_TEXT_X, -34, item.name.toUpperCase(), {
+        .text(ROW_TEXT_X, nameY, item.name.toUpperCase(), {
           fontFamily: FONT.ui,
           fontSize: '46px',
           fontStyle: 'bold',
@@ -577,7 +616,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     // The sub-line carries the amount and, when there is one, the value bonus —
     // inline, so the shelf never needs a chip pinned to a corner to say it.
     const amount = this.scene.add
-      .text(ROW_TEXT_X + 4, 34, `${cfg.title} ×${item.amount.toLocaleString()}`, {
+      .text(ROW_TEXT_X + 4, amountY, `${cfg.title} ×${item.amount.toLocaleString('en-GB')}`, {
         fontFamily: FONT.ui,
         fontSize: '34px',
         color: INK.onFieldDim
@@ -588,9 +627,26 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     if (!isFree && bonus >= 5) {
       row.add(
         this.scene.add
-          .text(ROW_TEXT_X + 4 + amount.width + 26, 34, `+${bonus}% MORE`, {
+          .text(ROW_TEXT_X + 4 + amount.width + 26, amountY, `+${bonus}% BONUS`, {
             fontFamily: FONT.ui,
             fontSize: '32px',
+            fontStyle: 'bold',
+            color: INK.goldHi
+          })
+          .setOrigin(0, 0.5)
+      );
+    }
+    if (hasThirdLine) {
+      const days = Math.round(unlimitedMs / MS_PER_DAY);
+      const line =
+        unlimitedMs > 0
+          ? `⚡ +${days} day${days === 1 ? '' : 's'} of Unlimited Warmth`
+          : `⚡ +${warmth.toLocaleString('en-GB')} Warmth`;
+      row.add(
+        this.scene.add
+          .text(ROW_TEXT_X + 4, 56, line, {
+            fontFamily: FONT.ui,
+            fontSize: '30px',
             fontStyle: 'bold',
             color: INK.goldHi
           })
@@ -661,24 +717,42 @@ export class ShopPanel extends Phaser.GameObjects.Container {
          * nothing to fix.
          */
         if (this.currency === 'energy' && this.gameState.energyCurrent >= this.gameState.energyMax) {
-          text.setColor('#C4361F');
-          this.scene.time.delayedCall(450, () => text.setColor(INK.onFieldGold));
-          this.scene.tweens.add({ targets: btn, x: btn.x + 10, duration: 45, yoyo: true, repeat: 3 });
+          this.refuse(btn, text);
           return;
         }
         this.bus.emit('ui:iap_buy_requested', { packId: item.packId });
         return;
       }
+      // A SHOWCASE coin row (no packId). It grants only on a DEV build; a
+      // production build has nothing to charge, so it refuses and says where
+      // purchases live (`offerTap` is the one rule, unit-tested).
+      if (this.currency === 'coins' && item.gold === undefined) {
+        if (offerTap(item, import.meta.env.DEV) === 'unavailable') {
+          this.refuse(btn, text);
+          this.bus.emit('ui:iap_unavailable', {});
+          return;
+        }
+        if (item.unlimitedWarmthMs) {
+          this.bus.emit('energy:unlimited_add', { ms: item.unlimitedWarmthMs, reason: 'shop:showcase' });
+        }
+        if (item.warmth) {
+          this.bus.emit('energy:add', { amount: item.warmth, reason: 'shop:showcase', overflow: true });
+        }
+        this.purchase('coins', item.amount);
+        return;
+      }
       // GOLD-priced pack: check the coffer; deny with a shake + red flash when
       // short (the coins never go negative), and offer the way out.
       if (!isFree && item.gold !== undefined) {
+        // A FULL BAR TAKES NO GOLD either (see the pack branch above) — this is
+        // the refusal Unlimited Warmth makes common, since nothing drains the
+        // bar while it runs. Read live, at the tap. The free plate is exempt.
+        if (this.currency === 'energy' && this.gameState.energyCurrent >= this.gameState.energyMax) {
+          this.refuse(btn, text);
+          return;
+        }
         if (this.gameState.coins < item.gold) {
-          text.setColor('#C4361F');
-          // Back to the colour it was BUILT with. This restored `INK.onPlate`,
-          // a dark brown the plate never wore: one refused purchase left the
-          // price near-unreadable on the plum face until the shelf rebuilt.
-          this.scene.time.delayedCall(450, () => text.setColor(INK.onFieldGold));
-          this.scene.tweens.add({ targets: btn, x: btn.x + 10, duration: 45, yoyo: true, repeat: 3 });
+          this.refuse(btn, text);
           // Source `warmth`, because this refusal happened INSIDE the coin
           // shop's own hall: the notice's action switches this panel to its
           // GOLD tab rather than opening a second Emporium over this one.
@@ -709,6 +783,16 @@ export class ShopPanel extends Phaser.GameObjects.Container {
       );
     }
     return btn;
+  }
+
+  /** A refused plate: its price flashes red and the plate shoves four times. */
+  private refuse(btn: Phaser.GameObjects.Container, text: Phaser.GameObjects.Text): void {
+    text.setColor('#C4361F');
+    // Back to the colour it was BUILT with. This used to restore `INK.onPlate`,
+    // a dark brown the plate never wore: one refused purchase left the price
+    // near-unreadable on the plum face until the shelf rebuilt.
+    this.scene.time.delayedCall(450, () => text.setColor(INK.onFieldGold));
+    this.scene.tweens.add({ targets: btn, x: btn.x + 10, duration: 45, yoyo: true, repeat: 3 });
   }
 
   private purchase(currency: Currency, amount: number, isFree = false): void {

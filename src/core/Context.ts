@@ -285,6 +285,9 @@ export class GameContext {
     this.systems.save.clear();
     this.state.reset(this.clock.now());
     this.running = false;
-    this.bus.emit('game:reset', {});
+    // Suspended: autosave is still live here, and a handler emitting a SAVE_ON
+    // fact would write the wiped state back as an EMPTY island before the next
+    // `beginRun` could start a fresh one.
+    this.systems.save.suspend(() => this.bus.emit('game:reset', {}));
   }
 }

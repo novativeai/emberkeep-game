@@ -28,13 +28,23 @@ export class GameClock {
   private offsetMs = 0;
   /** Wall time at which the clock was stopped, or null while it runs. */
   private pausedAt: number | null = null;
+  /** Total of every `advance()` — the only part of the offset `wallNow` honours. */
+  private advancedMs = 0;
 
   now(): number {
     return (this.pausedAt ?? Date.now()) + this.offsetMs;
   }
 
   advance(ms: number): void {
-    this.offsetMs += Math.max(0, ms);
+    const d = Math.max(0, ms);
+    this.offsetMs += d;
+    this.advancedMs += d;
+  }
+
+  /** REAL time for purchased entitlements (Unlimited Warmth). Ignores pause/resume/rebaseTo on
+   *  purpose; honours advance() so window.advanceTime stays deterministic. */
+  wallNow(): number {
+    return Date.now() + this.advancedMs;
   }
 
   /** Stop time. Idempotent — a second `hidden` event must not re-stamp the
@@ -75,5 +85,6 @@ export class GameClock {
   reset(): void {
     this.offsetMs = 0;
     this.pausedAt = null;
+    this.advancedMs = 0;
   }
 }

@@ -1,4 +1,11 @@
-import { ENERGY_START, energyMaxForLevel, LEVEL_XP, REGRID_SEARCH_RINGS, WORLD_ID } from './Constants';
+import {
+  ENERGY_START,
+  energyMaxForLevel,
+  IAP_LATCH_PREFIX,
+  LEVEL_XP,
+  REGRID_SEARCH_RINGS,
+  WORLD_ID
+} from './Constants';
 import type { MapSpace, PersistedPlace } from './mapSpace';
 import { MAIN_ZONE, mapPointToWorld, placeOf, worldToMapPoint } from './mapSpace';
 import type { WorldRuntime, ZoneRuntime } from './world';
@@ -85,6 +92,7 @@ export class GameState {
   nextItemId = 1;
   energyCurrent = ENERGY_START;
   energyLastRegenAt = 0;
+  energyUnlimitedUntil = 0; // REAL epoch ms (GameClock.wallNow), 0 = never
   coins = 0;
   keys = 0;
   xp = 0;
@@ -261,7 +269,12 @@ export class GameState {
     this.tutorialIndex = 0;
     this.tutorialStepId = null;
     this.tutorialDone = false;
-    this.stats = {};
+    // A purchase latch only means "already delivered", which New Game does not
+    // make untrue — dropping it would let a replayed grant land a second time.
+    // `energyUnlimitedUntil` is deliberately left alone too: paid time survives.
+    this.stats = Object.fromEntries(
+      Object.entries(this.stats).filter(([k]) => k.startsWith(IAP_LATCH_PREFIX))
+    );
     this.discoveredRecipes = [];
     this.bag = [];
     this.storyChapter = 1;
@@ -323,6 +336,9 @@ export class GameState {
     }
     this.energyCurrent = save.energy.current;
     this.energyLastRegenAt = save.energy.lastRegenAt;
+    // The save is the truth (a missing or junk field is "never").
+    const u = save.energy.unlimitedUntil;
+    this.energyUnlimitedUntil = typeof u === 'number' && Number.isFinite(u) && u > 0 ? u : 0;
     this.coins = save.coins;
     this.keys = save.keys;
     this.xp = save.xp;
@@ -525,7 +541,13 @@ export class GameState {
       ...(Object.keys(boards).length ? { boards } : {}),
       nextItemId: this.nextItemId,
       regions: Object.fromEntries(this.regionStatus),
-      energy: { current: this.energyCurrent, lastRegenAt: this.energyLastRegenAt },
+      // `unlimitedUntil` ALWAYS written, 0 included: its presence is what tells
+      // the hub this build can hold Unlimited Warmth (the capability marker).
+      energy: {
+        current: this.energyCurrent,
+        lastRegenAt: this.energyLastRegenAt,
+        unlimitedUntil: this.energyUnlimitedUntil
+      },
       coins: this.coins,
       keys: this.keys,
       xp: this.xp,

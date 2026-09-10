@@ -11,7 +11,9 @@ import {
   QUEST_TRACKER_SCALE
 } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
+import type { GameClock } from '../core/GameClock';
 import type { GameState } from '../core/GameState';
+import { warmthPrice } from '../core/warmth';
 import { brewHelp, recipeHelp, type RecipeHelp } from '../core/recipeTree';
 import type { CauldronData, ChainsData } from '../core/types';
 import { uiRegistry } from './theme';
@@ -131,6 +133,8 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
     /** The grimoire, for the one ladder that does not start with a merge —
      *  see `recipeTree.brewHelp`. */
     private cauldron: CauldronData,
+    /** Real time for the Unlimited Warmth price (`wallNow`). */
+    private clock: GameClock,
     private readonly variant: RecipeHelpVariant = 'modal'
   ) {
     super(scene, LIVE_GAME_WIDTH / 2, LIVE_GAME_HEIGHT / 2);
@@ -490,7 +494,13 @@ export class RecipeHelpPanel extends Phaser.GameObjects.Container {
         ROW_ICON_FIT
       );
       const cost: string[] = [];
-      if (help.source.energyCost) cost.push(`${help.source.energyCost} ⚡`);
+      const c = warmthPrice(
+        help.source.energyCost ?? 0,
+        'harvest',
+        this.gameState.energyUnlimitedUntil,
+        this.clock.wallNow()
+      );
+      if (help.source.energyCost) cost.push(c === 0 ? 'Free ⚡' : `${c} ⚡`);
       if (help.source.cooldownMs) cost.push(`${Math.round(help.source.cooldownMs / 1000)}s`);
       row.count.setText('');
       this.wrapBefore(row);

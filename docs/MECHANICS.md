@@ -321,8 +321,8 @@ energy meter + temporary event currency.** Emberkeep themes them:
 
 | Resource | Theme | Earned from | Spent on | Status |
 | --- | --- | --- | --- | --- |
-| **Warmth** (energy) | the lantern's hearthlight | regen (+1/60 s), level-up full refill, one free tutorial Warmth gift, Warmth Shop (bought with **Gold**) | harvesting dragons, premium timer skips (1.5×) | **[L1]** |
-| **Gold** (coins) | the sanctuary's ancient gold | orders, Gold Coins/Pouches from Houses, selling, chests, level-ups | **timer skips** and **Warmth refills** — the two live sinks | **[L1]** |
+| **Warmth** (energy) | the lantern's hearthlight | regen (+1/60 s), level-up full refill, one free tutorial Warmth gift, Warmth Shop (bought with **Gold**), the hub Hearth Hoard (+1,250 Warmth, kept whole ABOVE the bar's max; regen resumes once below it — owner's call 2026-09-10; the Unlimited Warmth mechanism stays built but no pack sells it) | harvesting dragons, premium timer skips (1.5×) | **[L1]** |
+| **Gold** (coins) | the sanctuary's ancient gold | orders, Gold Coins/Pouches from Houses, selling, chests, level-ups, Gold packs (hub, real money) | **timer skips** and **Warmth refills** — the two live sinks | **[L1]** |
 | **Gold Keys** | keys of ancient gold ("Stone Key" in the tutorial) | **one, granted by the tutorial**; [full] orders, chests, merging Silver Keys | unlocking fog regions — one gate in the demo | **[L1 scripted once] — see §12** |
 | **Star Shards** (premium) | shards of fallen stars dragons hoard | sparse: daily, events, milestones (or purchase) | Warmth refills, skip a nap, +board space, pop a bubble early | **[full]** |
 | **Festival Embers** (event) | embers of a seasonal festival | event tasks only | event reward track | **[full]** |

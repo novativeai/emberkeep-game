@@ -26,6 +26,8 @@ interface RenderedGame {
   /** Authored events that have fired, as `id×count`. */
   events: string[];
   energy: { current: number; max: number };
+  /** Unlimited Warmth: `until` is REAL epoch ms; `active` against `clock.wallNow()`. */
+  unlimitedWarmth: { until: number; active: boolean };
   coins: number;
   keys: number;
   xp: number;
@@ -374,6 +376,10 @@ window.render_game_to_text = (): RenderedGame => {
     },
     events: ctx.systems.events.status().filter((e) => e.fired > 0).map((e) => `${e.id}×${e.fired}`),
     energy: { current: state.energyCurrent, max: state.energyMax },
+    unlimitedWarmth: {
+      until: state.energyUnlimitedUntil,
+      active: state.energyUnlimitedUntil > ctx.clock.wallNow()
+    },
     coins: state.coins,
     keys: state.keys,
     xp: state.xp,

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { ENERGY_REGEN_MS, ENERGY_START, SAVE_KEY } from '../../src/core/Constants';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ENERGY_REGEN_MS, ENERGY_START, MS_PER_DAY, SAVE_KEY } from '../../src/core/Constants';
 import { capture, createTestContext, drag, MemoryStorage } from './helpers';
 
 describe('SaveSystem', () => {
@@ -279,5 +279,126 @@ describe('the worn wardrobes are readable BEFORE the run begins', () => {
     expect(fresh.state.keeperSkins).toEqual({});
     expect(fresh.state.dragonSkins).toEqual({});
     expect(fresh.state.manorSkin).toBeNull();
+  });
+});
+
+/**
+ * UNLIMITED WARMTH IN THE SAVE. `energy.unlimitedUntil` is optional (no
+ * SAVE_VERSION bump — a bump discards every save) with a load default of 0,
+ * and this build ALWAYS writes it: its presence is the hub's capability marker.
+ */
+describe('Unlimited Warmth persists', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  type Blob = { savedAt: number; energy: { current: number; lastRegenAt: number; unlimitedUntil?: number } };
+  const blob = (storage: MemoryStorage): Blob => JSON.parse(storage.getItem(SAVE_KEY)!) as Blob;
+
+  it('round-trips energy.unlimitedUntil', () => {
+    const storage = new MemoryStorage();
+    const ctx1 = createTestContext(storage);
+    ctx1.beginRun();
+    ctx1.state.energyUnlimitedUntil = Date.now() + MS_PER_DAY;
+    ctx1.systems.save.save();
+
+    const ctx2 = createTestContext(storage);
+    expect(ctx2.systems.save.load()).toBe(true);
+    expect(ctx2.state.energyUnlimitedUntil).toBe(ctx1.state.energyUnlimitedUntil);
+  });
+
+  it('a fresh game writes unlimitedUntil: 0 (the capability marker)', () => {
+    const storage = new MemoryStorage();
+    const ctx = createTestContext(storage);
+    ctx.beginRun();
+    expect(blob(storage).energy.unlimitedUntil).toBe(0);
+  });
+
+  it('a blob without the field loads 0', () => {
+    const storage = new MemoryStorage();
+    createTestContext(storage).beginRun();
+    const b = blob(storage);
+    delete b.energy.unlimitedUntil;
+    storage.setItem(SAVE_KEY, JSON.stringify(b));
+
+    const ctx = createTestContext(storage);
+    expect(ctx.systems.save.load()).toBe(true);
+    expect(ctx.state.energyUnlimitedUntil).toBe(0);
+  });
+
+  it('a blob mutated the way the hub sweep writes it loads active', () => {
+    const storage = new MemoryStorage();
+    createTestContext(storage).beginRun();
+    const b = blob(storage);
+    b.energy.unlimitedUntil = Date.now() + 5 * MS_PER_DAY;
+    b.savedAt = Date.now();
+    storage.setItem(SAVE_KEY, JSON.stringify(b));
+
+    const ctx = createTestContext(storage);
+    const changed = capture(ctx.bus, 'energy:unlimited_changed');
+    expect(ctx.systems.save.load()).toBe(true);
+    expect(ctx.state.energyUnlimitedUntil).toBe(b.energy.unlimitedUntil);
+    expect(ctx.state.energyUnlimitedUntil).toBeGreaterThan(ctx.clock.wallNow());
+    expect(changed.at(-1)).toMatchObject({ active: true, cause: 'loaded' });
+  });
+
+  it('loading six real days later: the clock rebases, the benefit reads expired', () => {
+    const t0 = Date.now();
+    const storage = new MemoryStorage();
+    const ctx1 = createTestContext(storage);
+    ctx1.beginRun();
+    ctx1.state.energyUnlimitedUntil = t0 + 5 * MS_PER_DAY;
+    ctx1.systems.save.save();
+    const savedAt = blob(storage).savedAt;
+
+    vi.spyOn(Date, 'now').mockReturnValue(t0 + 6 * MS_PER_DAY);
+    const ctx2 = createTestContext(storage);
+    const changed = capture(ctx2.bus, 'energy:unlimited_changed');
+    expect(ctx2.systems.save.load()).toBe(true);
+
+    expect(ctx2.clock.now()).toBe(savedAt); // the gap did not happen for gameplay…
+    expect(ctx2.clock.wallNow()).toBe(t0 + 6 * MS_PER_DAY); // …but paid time ran
+    expect(changed.at(-1)).toMatchObject({ active: false, cause: 'loaded' });
+    expect(ctx2.state.energyUnlimitedUntil > ctx2.clock.wallNow()).toBe(false);
+  });
+
+  it('autosaves after iap:completed and after energy:unlimited_changed', () => {
+    const storage = new MemoryStorage();
+    const ctx = createTestContext(storage);
+    ctx.beginRun();
+
+    storage.removeItem(SAVE_KEY);
+    ctx.bus.emit('iap:completed', {
+      purchaseId: 'p', packId: 'gold_pouch', name: 'Pouch of Gold', coins: 0, keys: 0, energy: 0, unlimitedWarmthMs: 0
+    });
+    expect(storage.getItem(SAVE_KEY)).not.toBeNull();
+
+    storage.removeItem(SAVE_KEY);
+    ctx.bus.emit('energy:unlimited_changed', { until: 1, active: false, cause: 'expired' });
+    expect(storage.getItem(SAVE_KEY)).not.toBeNull();
+  });
+
+  it('New Game keeps paid time and purchase latches, and still starts a real island', () => {
+    const storage = new MemoryStorage();
+    const ctx = createTestContext(storage);
+    ctx.beginRun();
+    const until = Date.now() + 5 * MS_PER_DAY;
+    ctx.state.energyUnlimitedUntil = until;
+    ctx.state.addStat('iap:p1', 1);
+    ctx.systems.save.save();
+
+    ctx.bus.emit('game:reset_requested', {});
+    expect(storage.getItem(SAVE_KEY)).toBeNull(); // nothing wrote the wiped state back
+
+    ctx.beginRun();
+    expect(ctx.state.items.size).toBe(13); // the fixture's starting pieces
+    expect(ctx.state.energyUnlimitedUntil).toBe(until);
+    expect(ctx.state.stat('iap:p1')).toBe(1);
+
+    const coins = ctx.state.coins;
+    const completed = capture(ctx.bus, 'iap:completed');
+    ctx.bus.emit('iap:grant', {
+      purchaseId: 'p1', packId: 'gold_pouch', name: 'Pouch of Gold', coins: 250, keys: 0, energy: 0, unlimitedWarmthMs: 0
+    });
+    expect(ctx.state.coins).toBe(coins);
+    expect(completed).toHaveLength(0);
   });
 });

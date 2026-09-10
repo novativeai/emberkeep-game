@@ -1422,7 +1422,12 @@ export interface SaveDataV1 {
    *  `nests`, so a nest relocates with its cell rather than being orphaned. */
   nestPlaces?: Record<string, PersistedPlace>;
   regions: Record<string, RegionStatus>;
-  energy: { current: number; lastRegenAt: number };
+  energy: {
+    current: number;
+    lastRegenAt: number;
+    /** REAL epoch ms; always written by builds that support Unlimited Warmth (0 = never) — the hub's capability marker */
+    unlimitedUntil?: number;
+  };
   coins: number;
   keys: number;
   xp: number;
@@ -1492,6 +1497,9 @@ export interface IapPackInfo {
   coins: number;
   keys: number;
   energy: number;
+  /** Duration of Unlimited Warmth the pack grants, in ms (0 when none). The
+   *  bridge normalises a missing field to 0. */
+  unlimitedWarmthMs: number;
 }
 
 /**
@@ -1508,6 +1516,10 @@ export interface CoinPackShowcase {
   /** Price in EUR. A NUMBER, formatted at the one place that prints it — the
    *  hub's own packs arrive as `amountEur` too, so both sources print alike. */
   amountEur: number;
+  /** Unlimited Warmth the showcase row stands for, in ms (dev builds grant it). */
+  unlimitedWarmthMs?: number;
+  /** Warmth the pack carries on top of its Gold (the Hearth Hoard: 1,250). */
+  energy?: number;
   /** The authored "MOST POPULAR" row. Presentation only. */
   best?: boolean;
 }
@@ -1529,6 +1541,10 @@ export interface CoinOffer {
    *  tap emits `ui:iap_buy_requested`; without it this row came from the
    *  authored showcase and a tap can only take the mock-grant path. */
   packId?: string;
+  /** Unlimited Warmth the pack carries, in ms — the Hoard row's third line. */
+  unlimitedWarmthMs?: number;
+  /** Warmth the pack carries on top of its Gold (the Hearth Hoard: 1,250). */
+  energy?: number;
   best?: boolean;
 }
 
@@ -1684,6 +1700,9 @@ export interface EventMap {
   /** Intent: a real-money pack's price plate was tapped in the Emporium.
    *  UIScene gates it (post-tutorial only) and opens the confirm dialog. */
   'ui:iap_buy_requested': { packId: string };
+  /** Intent: a showcase coin row was tapped on a build with nothing to charge
+   *  (production standalone). ShopPanel emits; UIScene says where to buy. */
+  'ui:iap_unavailable': Record<string, never>;
   /**
    * Intent: a purchase was just refused for want of GOLD, and the surface that
    * refused would like the shortfall notice raised over itself.
@@ -1742,7 +1761,8 @@ export interface EventMap {
 
   /* -- cross-system commands (systems handle, synchronously) -- */
   'energy:spend': { amount: number; reason: string };
-  'energy:add': { amount: number; reason: string };
+  /** `overflow`: PURCHASED Warmth, kept whole above the bar's max. Anything else stops at the max. */
+  'energy:add': { amount: number; reason: string; overflow?: boolean };
   'energy:set': { value: number; reason: string };
   'economy:add': { coins?: number; keys?: number; xp?: number; reason: string };
   'economy:spend_keys': { keys: number; reason: string };
@@ -1750,7 +1770,10 @@ export interface EventMap {
    *  IapSystem applies it EXACTLY ONCE (`stats['iap:<purchaseId>']` is the
    *  latch), granting via `economy:add` / `energy:add`, then announces
    *  `iap:completed`. Replayed deliveries are silently absorbed. */
-  'iap:grant': { purchaseId: string; packId: string; name: string; coins: number; keys: number; energy: number };
+  'iap:grant': { purchaseId: string; packId: string; name: string; coins: number; keys: number; energy: number; unlimitedWarmthMs: number };
+  /** Command: add `ms` of Unlimited Warmth — `until = max(until, wallNow) + ms`.
+   *  Owned by EnergySystem; emitted by IapSystem (and ShopPanel's DEV showcase). */
+  'energy:unlimited_add': { ms: number; reason: string };
   'board:consume_items': { itemIds: number[]; reason: string };
   /** Scripted spawn of `count` items, into free tiles near an item of `nearChain`. */
   /**
@@ -1789,7 +1812,10 @@ export interface EventMap {
   'iap:checkout_opened': { packId: string };
   /** Fact: the purchase was applied — UIScene throws the confetti, the
    *  AudioManager plays the purchase fanfare. Amounts are what was granted. */
-  'iap:completed': { purchaseId: string; packId: string; name: string; coins: number; keys: number; energy: number };
+  'iap:completed': { purchaseId: string; packId: string; name: string; coins: number; keys: number; energy: number; unlimitedWarmthMs: number };
+  /** Fact: Unlimited Warmth's window changed — a grant landed, it ran out, or a
+   *  save loaded. `until` is REAL epoch ms (GameClock.wallNow). */
+  'energy:unlimited_changed': { until: number; active: boolean; cause: 'granted' | 'expired' | 'loaded' };
   /** Fact: the checkout ended without a delivery, and why. `pending` means the
    *  gateway hasn't confirmed yet — the hub delivers it on a later visit. */
   'iap:failed': { packId: string; reason: 'cancelled' | 'declined' | 'pending' | 'unavailable' };

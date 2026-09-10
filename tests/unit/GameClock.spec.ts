@@ -77,6 +77,44 @@ describe('GameClock', () => {
     expect(clock.now()).toBe(8_000);
   });
 
+  describe('wallNow — real time for purchased entitlements', () => {
+    it('reads the wall on a fresh clock', () => {
+      const clock = new GameClock();
+      wall(5_000);
+      expect(clock.wallNow()).toBe(5_000);
+    });
+
+    it('ignores pause/resume and rebaseTo — paid time runs while nobody watches', () => {
+      const clock = new GameClock();
+      wall(1_000);
+      clock.pause();
+      wall(61_000);
+      clock.resume();
+      expect(clock.wallNow()).toBe(61_000);
+      wall(3_600_000);
+      clock.rebaseTo(1_000);
+      expect(clock.now()).toBe(1_000);
+      expect(clock.wallNow()).toBe(3_600_000);
+    });
+
+    it('includes advance (window.advanceTime stays deterministic)', () => {
+      const clock = new GameClock();
+      wall(1_000);
+      clock.advance(9_000);
+      expect(clock.wallNow()).toBe(10_000);
+      clock.advance(-5); // never backwards
+      expect(clock.wallNow()).toBe(10_000);
+    });
+
+    it('reset clears it', () => {
+      const clock = new GameClock();
+      wall(1_000);
+      clock.advance(9_000);
+      clock.reset();
+      expect(clock.wallNow()).toBe(1_000);
+    });
+  });
+
   it('reset clears the freeze as well as the offset', () => {
     const clock = new GameClock();
     wall(1_000);

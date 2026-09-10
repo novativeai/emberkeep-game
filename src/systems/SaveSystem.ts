@@ -44,6 +44,10 @@ export class SaveSystem {
     // Write-once, and the House cost real play to earn: what it is dedicated to.
     'generator:produce_set',
     'energy:changed',
+    // Paid calendar time (`energy.unlimitedUntil`) and the purchase latch that
+    // guards it: a grant whose save is lost would be re-delivered, or lost.
+    'energy:unlimited_changed',
+    'iap:completed',
     'economy:changed',
     'bag:changed',
     'order:completed',

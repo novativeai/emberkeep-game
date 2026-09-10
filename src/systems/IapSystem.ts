@@ -1,3 +1,4 @@
+import { IAP_LATCH_PREFIX } from '../core/Constants';
 import type { EventBus } from '../core/EventBus';
 import type { GameState } from '../core/GameState';
 import type { EventMap } from '../core/types';
@@ -9,8 +10,11 @@ import type { EventMap } from '../core/types';
  * so the guard holds across every delivery path there is: the live in-game
  * bridge, the hub's page-load grant sweep (grants.ts reads the same stat off
  * the blob), and any replay caused by a lost ack. Grants go through the
- * owning systems' commands (`economy:add` / `energy:add`), never by touching
- * state here beyond the latch itself.
+ * owning systems' commands (`energy:unlimited_add` / `economy:add` /
+ * `energy:add`), never by touching state here beyond the latch itself.
+ *
+ * Unlimited Warmth is added BEFORE the Gold, so the autosave `economy:changed`
+ * triggers already carries the new `unlimitedUntil`.
  */
 export class IapSystem {
   constructor(
@@ -21,9 +25,12 @@ export class IapSystem {
   }
 
   private apply(grant: EventMap['iap:grant']): void {
-    const latch = `iap:${grant.purchaseId}`;
+    const latch = `${IAP_LATCH_PREFIX}${grant.purchaseId}`;
     if (this.state.stat(latch) > 0) return; // already delivered — absorb the replay
     this.state.addStat(latch, 1);
+    if (grant.unlimitedWarmthMs > 0) {
+      this.bus.emit('energy:unlimited_add', { ms: grant.unlimitedWarmthMs, reason: `iap:${grant.packId}` });
+    }
     if (grant.coins > 0 || grant.keys > 0) {
       this.bus.emit('economy:add', {
         coins: grant.coins > 0 ? grant.coins : undefined,
@@ -32,7 +39,7 @@ export class IapSystem {
       });
     }
     if (grant.energy > 0) {
-      this.bus.emit('energy:add', { amount: grant.energy, reason: `iap:${grant.packId}` });
+      this.bus.emit('energy:add', { amount: grant.energy, reason: `iap:${grant.packId}`, overflow: true });
     }
     this.bus.emit('iap:completed', { ...grant });
   }

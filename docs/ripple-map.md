@@ -13,7 +13,7 @@ here was extracted from source, not memory. **Regenerate after structural change
 
 Synchronous bus (`core/EventBus`). A handler runs BEFORE the emitter's next line.
 SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/removed`,
-`energy:changed`, `economy:changed`, `order:completed`, `region:unlocked`, `tutorial:step`
+`energy:changed`, `energy:unlimited_changed`, `iap:completed`, `economy:changed`, `order:completed`, `region:unlocked`, `tutorial:step`
 (list: `SaveSystem.SAVE_ON` — adding a state-mutating fact? add it there or it won't persist).
 
 ### Intents (view → system)
@@ -28,6 +28,8 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | ui:deliver_requested | LedgerPanel (per-card, TWO orders visible) | OrderSystem |
 | ui:sell_requested | Tooltip | EconomySystem (refuses `sellable:false` tiers — golden egg/Elder) |
 | ui:shop_requested | Hud (energy/coins only — keys are never sold) | UIScene |
+| ui:iap_buy_requested | ShopPanel (a row with a `packId`) | UIScene (confirm dialog → `iapBridge.beginCheckout`) |
+| ui:iap_unavailable | ShopPanel (a showcase coin row on a non-DEV build — `offerTap` says `unavailable`) | UIScene (`onIapFailed('unavailable')`) |
 | elder:tapped | BoardScene (communing at the GOLDEN ALTAR — the scenic fixture at GOLDEN_ALTAR.cell (-2,2), NOT a board item; egg appears on order `cindra_brazier`, Elder awakens at L3, all derived from save state) | TaskSystem |
 | ui:ledger_toggled | LedgerPanel | AudioManager, TutorialDirector, UIScene |
 | audio:set_music_muted | UIScene | AudioManager |
@@ -42,6 +44,8 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | energy:add | GeneratorSystem, ShopPanel | EnergySystem |
 | energy:set | TutorialDirector | EnergySystem |
 | energy:refill | RewardSystem | EnergySystem |
+| energy:unlimited_add `{ms, reason}` | IapSystem (a grant with `unlimitedWarmthMs > 0`, BEFORE its `economy:add`), ShopPanel (DEV showcase Hoard tap only) | EnergySystem (`until = max(until, wallNow) + ms`) |
+| iap:grant `{purchaseId, packId, name, coins, keys, energy, unlimitedWarmthMs}` | iapBridge (hub `embergames:iap:result` completed — ignored while not `ready`) | IapSystem (latch `IAP_LATCH_PREFIX + purchaseId`, then `energy:unlimited_add` → `economy:add` → `energy:add` → `iap:completed`) |
 | economy:add | MergeSystem, GeneratorSystem, ChestSystem, OrderSystem, RewardSystem, TutorialDirector, ShopPanel, BoardScene, main.ts grantXp | EconomySystem |
 | economy:spend_keys | UnlockSystem | EconomySystem |
 | board:consume_items | EconomySystem (sell), OrderSystem (deliver), BoardScene | BoardSystem |
@@ -69,6 +73,8 @@ SaveSystem additionally autosaves on: `item:spawned/moved/merged/harvested/remov
 | dragon:working | DragonJobSystem | TutorialDirector (gate) — BoardScene animates in startDragonWork, not via this event |
 | dragon:rest / dragon:rested | DragonJobSystem | BoardScene |
 | energy:changed | EnergySystem, BoardSystem | Hud, Save |
+| energy:unlimited_changed `{until, active, cause: granted/expired/loaded}` | EnergySystem (never on `game:reset`) | UIScene → Hud.setUnlimitedWarmth (+ `Unlimited Warmth has ended.` toast on `expired`), Save |
+| iap:completed `{…iap:grant payload}` | IapSystem (first apply only) | UIScene (banner + confetti), AudioManager, Save |
 | economy:changed | EconomySystem, BoardSystem | Hud, AudioManager, Save |
 | keeper:leveled | EconomySystem | UnlockSystem (level regions lift), RewardSystem, BoardScene (camera fly; **level≥3 runs the FINALE sequence instead**), UIScene (banner; **level≥3 → Cindra line + chapter card on the FINALE timeline**), AudioManager |
 | order:progress | OrderSystem (one per VISIBLE order — payload orderId matters) | Hud (dot = ANY deliverable), LedgerPanel |
@@ -410,9 +416,20 @@ Value-level couplings the type system cannot see. Each broke (or nearly broke) o
   assets.json, which is the same bake's output. STANDEE_BANKS is the WHOLE roster,
   but PreloadScene only fetches banks whose `characters.json` `world` matches
   `WORLD_ID` — adding a character there costs nothing until her world ships.
-- **TOUCH GameState fields → CHECK** `SaveSystem` (`toSave`/load + `SAVE_VERSION` — bump it
-  or old saves half-load), `render_game_to_text()` shape (e2e reads it), `state:loaded`
+- **TOUCH GameState fields → CHECK** `SaveSystem` (`toSave`/load + `SAVE_VERSION` — bump SAVE_VERSION only for a non-optional or renamed field — a bump DISCARDS every save; an optional field with a load default needs none), `render_game_to_text()` shape (e2e reads it), `state:loaded`
   fullResync in BoardScene.
+- **TOUCH IAP grant fields (`coins`/`keys`/`energy`/`unlimitedWarmthMs`) → CHECK** hub `src/lib/iap.ts`
+  (`IapGrant`, `bridgeCatalog`, `grantFits`), `GamePlayer.tsx` (result payloads, zero objects),
+  `grants.ts` (sweep sums and writes `save.energy.unlimitedUntil` only into saves carrying the
+  field), `emberkeepSave.ts`, `api/iap/confirm/route.ts` (returns the stored grant); game
+  `iapBridge` (`HubMessage`, catalog normalisation, `grants` in `catalog_request`), `types.ts`
+  (`IapPackInfo`, `iap:grant`/`iap:completed`), `IapSystem`, and `GameState.reset` (keeps
+  `iap:*` latches and `energyUnlimitedUntil`). The game ALWAYS writes `energy.unlimitedUntil`
+  (0 = never): it is the hub's capability marker.
+- **TOUCH bridge messages → CHECK** the `embergames:iap:ready` handshake on BOTH sides: the game
+  posts it from `iapBridge.setReady(true)` right after `beginRun` (UIScene) and drops to not-ready
+  on `game:reset`; while not ready a completed result is neither applied nor acked, and the
+  hub's `GamePlayer` re-sends outstanding purchases when `ready` arrives.
 - **TOUCH main.ts / scene keys → RULE** keep `window.render_game_to_text`,
   `window.advanceTime`, `window.__emberkeep.{gridToPage,centerCell,grantXp,reset}` stable;
   e2e also taps the Title Play button at its current position.

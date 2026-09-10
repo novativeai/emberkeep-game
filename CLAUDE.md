@@ -122,6 +122,7 @@ silently drops `checklist` writes, so everything goes in `notes`.
   numbers. New chains/orders/tutorial steps are JSON-only edits.
 - Gameplay timers read `GameClock.now()` (never `Date.now()`) so
   `window.advanceTime(ms)` stays deterministic.
+  **EXCEPTION — purchased calendar time** (`energyUnlimitedUntil`) is real epoch ms read ONLY through `GameClock.wallNow()` (Date.now() + advance() total), because a payment happens outside the simulation and the benefit runs while the tab is closed. Never compare it with `now()`.
 - Systems stay Phaser-free — unit tests construct a full `GameContext` in node,
   injecting the 8×8 fixture map (`new GameContext(storage, { map })`).
 - Everything tweens; nothing teleports. BoardItems and particles are pooled.

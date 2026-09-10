@@ -172,24 +172,33 @@ jobs:
             --token "${{ secrets.VERCEL_TOKEN }}" \
             --scope 0njas-projects
 
-      # A deploy nobody checked is a deploy nobody trusts. The same assertion
-      # made by hand after every ship: the bytes the browser gets are the bytes
-      # that were built. Generous retries, because a git-triggered deploy has
-      # to build the Next app before the alias swings.
+      # A deploy nobody checked is a deploy nobody trusts: the bytes the browser
+      # gets must be the bytes that were built. Generous retries, because a
+      # git-triggered deploy has to build the Next app before the alias swings.
+      #
+      # WHY NOT index.html ANY MORE. This step used to fetch the game's
+      # index.html from the embergames-psi alias and read the bundle name out of
+      # it. That alias is retired — the site is keepofthedragon.com — so the step
+      # went red on every run while the ship itself was fine, and a check that is
+      # always red hides the day it is right. On the real domain index.html is
+      # behind the account wall (src/proxy.ts answers 307), so it cannot be read
+      # anonymously at all. The bundle ASSET is not walled: fetch it by its
+      # content-hashed name and compare it byte for byte with the build.
       - name: Verify what production actually serves
         if: steps.commit.outputs.changed == 'true'
+        env:
+          SITE: https://keepofthedragon.com
         run: |
           set -euo pipefail
-          built=$(basename "$(ls hub/public/games/emberkeep/assets/index-*.js)")
+          built_path=$(ls hub/public/games/emberkeep/assets/index-*.js | head -1)
+          built=$(basename "$built_path")
           for i in $(seq 1 20); do
-            live=$(curl -fsS https://embergames-psi.vercel.app/games/emberkeep/index.html \
-              | grep -o 'index-[A-Za-z0-9_-]*\.js' | sort -u | head -1) || live=''
-            if [ "$live" = "$built" ]; then
-              echo "live bundle is $live — matches the build"
+            if curl -fsS "$SITE/games/emberkeep/assets/$built" -o live.js && cmp -s live.js "$built_path"; then
+              echo "production serves $built byte for byte"
               exit 0
             fi
-            echo "live '$live', built '$built' — the alias has not swung yet ($i/20)"
+            echo "production does not serve $built yet — the deploy has not landed ($i/20)"
             sleep 20
           done
-          echo "production is still serving a different bundle after ~7 minutes" >&2
+          echo "production still does not serve the built bundle after ~7 minutes" >&2
           exit 1

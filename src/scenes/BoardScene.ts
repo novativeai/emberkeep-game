@@ -102,6 +102,7 @@ import { plateScale } from '../core/artScale';
 // pull into the main bundle: `editorStore` imports only `./lattice`, has no
 // constructor and does no work at module load.
 import { editorStore } from '../editor/editorStore';
+import { warmthPrice, type WarmthUse } from '../core/warmth';
 import { gridToWorld } from '../core/iso';
 import { guard, recordError } from '../core/crash';
 import { releaseAwayWorldArt, worldArtKeys } from '../core/worldArt';
@@ -361,6 +362,8 @@ export class BoardScene extends Phaser.Scene {
   private skipWarmthLabel?: Phaser.GameObjects.Text;
   private skipForId = 0;
   private skipMaxGold?: number; // per-generator gold cap for the live skip price
+  /** Which Unlimited-Warmth rule the live pin's ⚡ skip falls under (GeneratorSystem.skipWarmthUse). */
+  private skipWarmthUse: WarmthUse = 'skip';
   /** Non-null while the pin is a HARVEST offer over a READY generator (the
    *  warmth price it could not pay). The cooldown tick must not treat that
    *  pin as a stale skip and hide it — there is no timer behind it. */
@@ -8365,7 +8368,12 @@ export class BoardScene extends Phaser.Scene {
     // (and refuses loudly if it is still short), and the gold row buys the
     // very same harvest for the same number — so an empty warmth gauge never
     // turns a dragon into a dead object that flashes red at every tap.
-    if (isGenerator && cfg && this.ctx.state.energyCurrent < cfg.energyCost) {
+    if (
+      isGenerator &&
+      cfg &&
+      this.ctx.state.energyCurrent <
+        warmthPrice(cfg.energyCost, 'harvest', this.ctx.state.energyUnlimitedUntil, this.ctx.clock.wallNow())
+    ) {
       this.showSkipButton(sprite, 0, cfg.cooldownMs || 1, cfg.skipMaxGold, cfg.energyCost);
       return;
     }
@@ -8527,6 +8535,9 @@ export class BoardScene extends Phaser.Scene {
     const skipItem = this.ctx.state.items.get(sprite.itemId);
     const warmthOnly =
       skipItem?.kind === 'item' ? this.ctx.systems.generator.producesCoin(skipItem) : false;
+    // Unlimited Warmth waives a ⚡ skip on a dragon, never on a building.
+    this.skipWarmthUse =
+      skipItem?.kind === 'item' ? this.ctx.systems.generator.skipWarmthUse(skipItem) : 'skip';
     if (!warmthOnly) this.ctx.bus.emit('ui:skip_offered', { itemId: sprite.itemId });
     this.skipMaxGold = maxGold; // per-generator gold cap (Crystal emeralds are dear)
 
@@ -8641,7 +8652,12 @@ export class BoardScene extends Phaser.Scene {
     };
     const verb = harvestCost !== undefined ? 'Harvest' : 'Skip';
     const goldPrice = harvestCost !== undefined ? Math.max(1, harvestCost) : skipEnergyCost(remaining, total, maxGold);
-    const warmthPrice = harvestCost ?? skipWarmthCost(remaining, total, maxGold);
+    const until = this.ctx.state.energyUnlimitedUntil;
+    const wall = this.ctx.clock.wallNow();
+    const warmthCost =
+      harvestCost !== undefined
+        ? warmthPrice(harvestCost, 'harvest', until, wall)
+        : warmthPrice(skipWarmthCost(remaining, total, maxGold), this.skipWarmthUse, until, wall);
     if (!warmthOnly) {
       // The gold row wears the REAL coin art (the 🪙 emoji read as a generic
       // token); the label carries only the price and sits right of the icon.
@@ -8653,7 +8669,7 @@ export class BoardScene extends Phaser.Scene {
           .setScale(plateScale('item_coin_1', 0.086))
       );
     }
-    this.skipWarmthLabel = make(rows - 1, 'warmth', `${verb} with Warmth`, `⚡ ${warmthPrice}`);
+    this.skipWarmthLabel = make(rows - 1, 'warmth', `${verb} with Warmth`, warmthCost === 0 ? '⚡ Free' : `⚡ ${warmthCost}`);
     btn.add(caption); // on top of the keys
     // Tutorial: bounce an arrow over the WARMTH (⚡) row so the player learns to
     // pay the House's timer with energy (and watches their Warmth drop). It
@@ -8765,7 +8781,13 @@ export class BoardScene extends Phaser.Scene {
   /** Keep both skip prices in step as the timer drains. */
   private updateSkipCost(remaining: number, total: number): void {
     this.skipGoldLabel?.setText(`${skipEnergyCost(remaining, total, this.skipMaxGold)}`);
-    this.skipWarmthLabel?.setText(`⚡ ${skipWarmthCost(remaining, total, this.skipMaxGold)}`);
+    const warmthCost = warmthPrice(
+      skipWarmthCost(remaining, total, this.skipMaxGold),
+      this.skipWarmthUse,
+      this.ctx.state.energyUnlimitedUntil,
+      this.ctx.clock.wallNow()
+    );
+    this.skipWarmthLabel?.setText(warmthCost === 0 ? '⚡ Free' : `⚡ ${warmthCost}`);
   }
 
   private hideSkipButton(): void {
@@ -9334,7 +9356,15 @@ export class BoardScene extends Phaser.Scene {
         // flash alone reads as a dead object, which is how "the skip menu
         // stopped showing" was reported (owner, 2026-08-27).
         if (reason === 'energy' && sprite) {
-          this.floatText(sprite.x, sprite.y - 140, 'No Warmth! ⚡', PALETTE.cream);
+          // While Unlimited Warmth runs, only a building's skip can be refused —
+          // say why the "unlimited" bar still asked for something.
+          const unlimited = this.ctx.state.energyUnlimitedUntil > this.ctx.clock.wallNow();
+          this.floatText(
+            sprite.x,
+            sprite.y - 140,
+            unlimited ? 'Still costs Warmth ⚡ — top up with ⚡+' : 'No Warmth! ⚡',
+            PALETTE.cream
+          );
         }
       }),
       bus.on('bag:give_armed', ({ chain, tier }) => this.armGive(chain, tier)),

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ENERGY_MAX, GENERATOR_SKIP_MAX_ENERGY, skipEnergyCost } from '../../src/core/Constants';
+import {
+  ENERGY_MAX,
+  GENERATOR_SKIP_MAX_ENERGY,
+  MS_PER_DAY,
+  skipEnergyCost,
+  skipWarmthCost
+} from '../../src/core/Constants';
 import { capture, createTestContext } from './helpers';
 
 describe('dragon passive generation (the standing advantage)', () => {
@@ -466,5 +472,111 @@ describe('a ready generator harvests through the pin', () => {
 
     expect(skipped).toHaveLength(1);
     expect(gen.readyAt).toBeLessThanOrEqual(ctx.clock.now());
+  });
+});
+
+/**
+ * UNLIMITED WARMTH AT THE SPEND SITES. The price is decided once, before the
+ * spend (`warmthPrice`), and a price of 0 emits no `energy:spend` at all.
+ * Buildings — coin makers and every untappable producer — keep their skip
+ * price (`GeneratorSystem.skipWarmthUse`): free mint skips would be unlimited
+ * Gold, and the `house_skip` lesson keeps its Warmth drop.
+ */
+describe('Unlimited Warmth — what a running window waives', () => {
+  const generatorOf = (ctx: ReturnType<typeof createTestContext>, chain: string, tier: number) =>
+    ctx.data.chains.chains.find((c) => c.id === chain)!.tiers.find((t) => t.tier === tier)!.generator!;
+  const activate = (ctx: ReturnType<typeof createTestContext>) => {
+    ctx.state.energyUnlimitedUntil = ctx.clock.wallNow() + MS_PER_DAY;
+  };
+  const drain = (ctx: ReturnType<typeof createTestContext>) => {
+    ctx.state.energyCurrent = 0;
+    ctx.state.energyLastRegenAt = ctx.clock.now(); // no banked regen
+  };
+
+  it('a dragon harvest at 0 Warmth succeeds: no energy:spend, the bar unchanged', () => {
+    const ctx = createTestContext();
+    expect(generatorOf(ctx, 'ember_dragon', 3).energyCost).toBeGreaterThan(0);
+    const gen = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 2, row: 2, kind: 'item' });
+    drain(ctx);
+    activate(ctx);
+    const spends = capture(ctx.bus, 'energy:spend');
+    const harvested = capture(ctx.bus, 'item:harvested');
+
+    ctx.bus.emit('item:tapped', { itemId: gen.id });
+
+    expect(harvested).toHaveLength(1);
+    expect(spends).toHaveLength(0);
+    expect(ctx.state.energyCurrent).toBe(0);
+  });
+
+  it('a dragon Warmth skip at 0 Warmth succeeds free', () => {
+    const ctx = createTestContext();
+    const cfg = generatorOf(ctx, 'ember_dragon', 3);
+    const gen = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 2, row: 2, kind: 'item' });
+    gen.readyAt = ctx.clock.now() + cfg.cooldownMs;
+    expect(skipWarmthCost(cfg.cooldownMs, cfg.cooldownMs, cfg.skipMaxGold)).toBeGreaterThan(0);
+    drain(ctx);
+    activate(ctx);
+    const spends = capture(ctx.bus, 'energy:spend');
+    const skipped = capture(ctx.bus, 'generator:skipped');
+
+    ctx.bus.emit('generator:skip', { itemId: gen.id, currency: 'warmth' });
+
+    expect(skipped).toHaveLength(1);
+    expect(gen.readyAt).toBeLessThanOrEqual(ctx.clock.now());
+    expect(spends).toHaveLength(0);
+    expect(ctx.state.energyCurrent).toBe(0);
+  });
+
+  it('a House (coin) skip is still charged — and refused when short', () => {
+    const ctx = createTestContext();
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
+    expect(ctx.systems.generator.skipWarmthUse(house)).toBe('skip_building');
+    activate(ctx);
+    house.passiveAt = ctx.clock.now() + 210_000;
+    ctx.state.energyCurrent = ctx.state.energyMax;
+
+    ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'warmth' });
+    expect(ctx.state.energyCurrent).toBeLessThan(ctx.state.energyMax);
+
+    const armedAt = ctx.clock.now() + 210_000;
+    house.passiveAt = armedAt;
+    drain(ctx);
+    const refused = capture(ctx.bus, 'generator:skip_refused');
+    ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'warmth' });
+    expect(refused.at(-1)).toMatchObject({ currency: 'warmth' });
+    expect(refused.at(-1)!.cost).toBeGreaterThan(0);
+    expect(house.passiveAt).toBe(armedAt);
+  });
+
+  it('a House commissioned to a non-coin piece is still a building, and still charged', () => {
+    const ctx = createTestContext();
+    const house = ctx.state.addItem({ chain: 'lumber', tier: 3, col: 2, row: 2, kind: 'item' });
+    house.produces = { chain: 'quartz', tier: 1 };
+    expect(ctx.systems.generator.producesCoin(house)).toBe(false);
+    expect(ctx.systems.generator.skipWarmthUse(house)).toBe('skip_building');
+    activate(ctx);
+    house.passiveAt = ctx.clock.now() + 210_000;
+    ctx.state.energyCurrent = ctx.state.energyMax;
+
+    ctx.bus.emit('generator:skip', { itemId: house.id, currency: 'warmth' });
+
+    expect(house.passiveAt!).toBeLessThanOrEqual(ctx.clock.now());
+    expect(ctx.state.energyCurrent).toBeLessThan(ctx.state.energyMax);
+  });
+
+  it('after it ends, a harvest at 0 Warmth is refused again', () => {
+    const ctx = createTestContext();
+    const gen = ctx.state.addItem({ chain: 'ember_dragon', tier: 3, col: 2, row: 2, kind: 'item' });
+    ctx.state.energyUnlimitedUntil = ctx.clock.wallNow() + 1_000;
+    ctx.clock.advance(2_000);
+    drain(ctx);
+    const failed = capture(ctx.bus, 'item:harvest_failed');
+    const harvested = capture(ctx.bus, 'item:harvested');
+
+    ctx.bus.emit('item:tapped', { itemId: gen.id });
+
+    expect(failed.at(-1)).toMatchObject({ reason: 'energy' });
+    expect(harvested).toHaveLength(0);
   });
 });

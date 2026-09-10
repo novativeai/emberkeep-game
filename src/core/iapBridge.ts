@@ -35,8 +35,13 @@ interface HubMessage {
   coins?: number;
   keys?: number;
   energy?: number;
+  unlimitedWarmthMs?: number;
   packs?: IapPackInfo[];
 }
+
+/** Every grant field this build can apply — sent with `catalog_request`, so the
+ *  hub offers (and delivers) only packs whose grant fits. */
+const SUPPORTED_GRANTS = ['coins', 'keys', 'energy', 'unlimitedWarmthMs'] as const;
 
 interface PendingCheckout {
   requestId: string;
@@ -50,6 +55,16 @@ export class IapBridge {
   private catalog: IapPackInfo[] = [];
   private pending: PendingCheckout | null = null;
   private seq = 0;
+  /**
+   * Is there a run whose state a grant can land in and STAY in?
+   *
+   * False from boot until UIScene's `beginRun`, and again from `game:reset`
+   * until the next one. A completed result that arrives in that window is
+   * ignored — no emit, no ack — because `beginRun` re-hydrates the state from
+   * the save, so a grant applied before it would be lost AND acked. The hub
+   * re-sends everything outstanding when `embergames:iap:ready` arrives.
+   */
+  private ready = false;
 
   /** True when the game is an iframe of a same-origin host page. */
   private get embedded(): boolean {
@@ -61,7 +76,18 @@ export class IapBridge {
     this.bus = bus;
     if (!this.embedded) return;
     window.addEventListener('message', this.onMessage);
-    this.post({ type: 'embergames:iap:catalog_request' });
+    this.post({ type: 'embergames:iap:catalog_request', grants: [...SUPPORTED_GRANTS] });
+  }
+
+  isEmbedded(): boolean {
+    return this.embedded;
+  }
+
+  /** UIScene: true right after `beginRun`, false on `game:reset`. Going ready
+   *  tells the hub to (re-)deliver what it holds. */
+  setReady(ready: boolean): void {
+    this.ready = ready;
+    if (ready && this.embedded) this.post({ type: 'embergames:iap:ready' });
   }
 
   isAvailable(): boolean {
@@ -77,13 +103,14 @@ export class IapBridge {
    * The Warmth packs it sells — the real-money row on the WARMTH shelf, under
    * the authored gold-sink offers.
    *
-   * Filtered on what a pack GRANTS, not on what it is called, so a bundle that
-   * carries both coins and Warmth appears on both shelves. That is the honest
-   * reading of a bundle: a player looking at either shelf should see every way
-   * to get the thing that shelf is about.
+   * Filtered on what a pack GRANTS, and a Gold pack that ALSO carries Warmth
+   * (the Hearth Hoard: 13,000 Gold + 1,250 Warmth) stays on the GOLD shelf
+   * only. Listed here too it would sit among 20-Gold refills as "the €100
+   * Warmth", and this shelf refuses a Warmth pack at a full bar — which is
+   * exactly wrong for purchased Warmth that stacks above the bar.
    */
   warmthPacks(): IapPackInfo[] {
-    return this.catalog.filter((pack) => pack.energy > 0);
+    return this.catalog.filter((pack) => pack.energy > 0 && pack.coins === 0);
   }
 
   pack(packId: string): IapPackInfo | undefined {
@@ -128,7 +155,10 @@ export class IapBridge {
 
     switch (data.type) {
       case 'embergames:iap:catalog': {
-        this.catalog = Array.isArray(data.packs) ? data.packs : [];
+        // An older hub sends no `unlimitedWarmthMs`; every reader expects a number.
+        this.catalog = Array.isArray(data.packs)
+          ? data.packs.map((p) => ({ ...p, unlimitedWarmthMs: p.unlimitedWarmthMs ?? 0 }))
+          : [];
         this.bus.emit('iap:catalog_changed', { packs: this.catalog });
         return;
       }
@@ -155,6 +185,9 @@ export class IapBridge {
           typeof data.purchaseId === 'string' &&
           typeof data.packId === 'string'
         ) {
+          // Not ready (Title, or between New Game and Play): no emit, no ack.
+          // The host re-sends on `embergames:iap:ready` (see `ready`).
+          if (!this.ready) return;
           // Synchronous: IapSystem has applied (or absorbed the replay of)
           // the grant by the time emit returns — THEN tell the hub.
           this.bus.emit('iap:grant', {
@@ -163,7 +196,8 @@ export class IapBridge {
             name: data.name ?? 'Pack',
             coins: data.coins ?? 0,
             keys: data.keys ?? 0,
-            energy: data.energy ?? 0
+            energy: data.energy ?? 0,
+            unlimitedWarmthMs: data.unlimitedWarmthMs ?? 0
           });
           this.post({ type: 'embergames:iap:ack', purchaseId: data.purchaseId });
         } else if (typeof data.packId === 'string' && data.status !== 'completed') {

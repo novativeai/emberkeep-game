@@ -3404,7 +3404,11 @@ export function readMs(text: string, floorMs: number = READING.minMs): number {
 /** Host-page IAP bridge — real-money packs; the EmberGames hub does the
  *  charging, the game only confirms, celebrates and applies the grant.
  *  Real wall-clock, deliberately NOT GameClock: a payment happens in the
- *  world outside the simulation and must not fast-forward with it. */
+ *  world outside the simulation and must not fast-forward with it. The same
+ *  rule covers what a payment BUYS over time: Unlimited Warmth's
+ *  `energyUnlimitedUntil` is real epoch ms, read only through
+ *  `GameClock.wallNow()` (Date.now() + advance() total) and never compared
+ *  with `now()`, because it runs while the tab is closed. */
 /**
  * Empty ON PURPOSE, and kept rather than deleted.
  *
@@ -3421,6 +3425,24 @@ export function readMs(text: string, floorMs: number = READING.minMs): number {
  * somewhere new.
  */
 export const IAP = {} as const;
+
+export const MS_PER_DAY = 86_400_000;
+
+/** The save-carried latch a delivered purchase leaves (`stats['iap:<purchaseId>']`).
+ *  The hub's grants.ts reads the same key off the blob; New Game keeps these. */
+export const IAP_LATCH_PREFIX = 'iap:';
+
+/** Unlimited Warmth (the hub's Hearth Hoard). What it waives: every Warmth harvest tap and every
+ *  Warmth skip EXCEPT on a building (coin makers and passive producers — GeneratorSystem.skipWarmthUse).
+ *  Time is REAL — GameClock.wallNow(), never now(). */
+export const UNLIMITED_WARMTH = {
+  covers: ['harvest', 'skip'] as const,
+  /** Celebration banner reward line is fit-scaled to this width (inner card is 756). */
+  bannerFitW: 700,
+  /** Confirm-dialog card height for a pack that carries Unlimited Warmth. */
+  confirmCardH: 800,
+  disclosureWrap: 780
+};
 
 /**
  * THE SHORTFALL NOTICE — the answer to "you cannot afford this".
