@@ -105,3 +105,6 @@ testcapture/**/*.png
 testcapture/**/*.jpg
 testcapture/**/*.jpeg
 testcapture/**/*.webp
+
+# Separately versioned and deployed private backoffice
+embergames-admin/

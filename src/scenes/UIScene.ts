@@ -1056,6 +1056,7 @@ export class UIScene extends Phaser.Scene {
       // the Emporium, never a checkout — its gate is the free Warmth).
       bus.on('ui:iap_buy_requested', ({ packId }) => {
         if (!this.tutorialOver()) return;
+        if (packId === 'custom_gold') { iapBridge.beginCheckout(packId); return; }
         this.openIapConfirmDialog(packId);
       }),
       /*

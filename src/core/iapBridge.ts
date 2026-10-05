@@ -37,6 +37,7 @@ interface HubMessage {
   energy?: number;
   unlimitedWarmthMs?: number;
   packs?: IapPackInfo[];
+  customGold?: boolean;
 }
 
 /** Every grant field this build can apply — sent with `catalog_request`, so the
@@ -55,6 +56,7 @@ export class IapBridge {
   private catalog: IapPackInfo[] = [];
   private pending: PendingCheckout | null = null;
   private seq = 0;
+  private customGold = false;
   /**
    * Is there a run whose state a grant can land in and STAY in?
    *
@@ -113,6 +115,8 @@ export class IapBridge {
     return this.catalog.filter((pack) => pack.energy > 0 && pack.coins === 0);
   }
 
+  supportsCustomGold(): boolean { return this.customGold; }
+
   pack(packId: string): IapPackInfo | undefined {
     return this.catalog.find((p) => p.id === packId);
   }
@@ -135,7 +139,7 @@ export class IapBridge {
    * to keep its own "opening…" state honest.
    */
   beginCheckout(packId: string): boolean {
-    if (!this.bus || !this.embedded || this.pending || !this.pack(packId)) return false;
+    if (!this.bus || !this.embedded || this.pending || !(this.pack(packId) || (packId === 'custom_gold' && this.customGold))) return false;
     const requestId = `ck_${Date.now().toString(36)}_${this.seq++}`;
     this.pending = { requestId, packId, watch: null };
     // `popup: true` tells the hub the caller is NOT asking for a top-level
@@ -149,12 +153,13 @@ export class IapBridge {
   /* ------------------------------------------------------------------ */
 
   private onMessage = (event: MessageEvent): void => {
-    if (event.origin !== window.location.origin) return;
+    if (event.origin !== window.location.origin || event.source !== window.parent) return;
     const data = event.data as HubMessage | null;
     if (!data || typeof data.type !== 'string' || !this.bus) return;
 
     switch (data.type) {
       case 'embergames:iap:catalog': {
+        this.customGold = data.customGold === true;
         // An older hub sends no `unlimitedWarmthMs`; every reader expects a number.
         this.catalog = Array.isArray(data.packs)
           ? data.packs.map((p) => ({ ...p, unlimitedWarmthMs: p.unlimitedWarmthMs ?? 0 }))

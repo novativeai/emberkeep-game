@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "checks": [
+    "Player view excludes Member since",
+    "Player view excludes Last sign-in",
+    "Player view excludes Cloud save synced",
+    "Player view excludes Reset progress",
+    "Exactly three player stat tiles",
+    "Incomplete profile creates no purchase",
+    "Random customer reference generated",
+    "Gold quantity and exact price agree",
+    "Exact paid cents recorded",
+    "Exact Gold grant recorded",
+    "Gold delivery is saved before acknowledgement",
+    "Customer downloads a PDF",
+    "Invoice requires authentication",
+    "Emporium custom row opens and cancels correctly",
+    "Game runtime has no captured errors",
+    "Mobile account has no horizontal overflow",
+    "Mobile shop has no horizontal overflow",
+    "Out-of-range amount cannot open payment",
+    "Seller matches site legal identity",
+    "No browser runtime errors",
+    "Admin reset creates a generation tombstone",
+    "Admin reset keeps a recovery snapshot",
+    "Admin reset preserves delivered purchase acknowledgement"
+  ],
+  "pageErrors": [],
+  "uid": "iMqO8BpHUc7lfMCNWuwC78wwS1T8"
+}

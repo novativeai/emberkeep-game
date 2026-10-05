@@ -455,7 +455,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
    */
   private shelfItems(): Product[] {
     if (this.currency === 'coins') {
-      return coinOffers().map((offer) => ({
+      const offers = coinOffers().map((offer) => ({
         amount: offer.coins,
         price: offer.price,
         name: offer.name,
@@ -464,6 +464,8 @@ export class ShopPanel extends Phaser.GameObjects.Container {
         unlimitedWarmthMs: offer.unlimitedWarmthMs,
         warmth: offer.energy
       }));
+      if (iapBridge.supportsCustomGold()) offers.push({ amount: 0, price: 'Choose', name: 'Your Gold amount', packId: 'custom_gold', best: undefined, unlimitedWarmthMs: 0, warmth: 0 });
+      return offers;
     }
     // The Gold sink first, then whatever real-money Warmth the hub sells.
     //
@@ -616,7 +618,7 @@ export class ShopPanel extends Phaser.GameObjects.Container {
     // The sub-line carries the amount and, when there is one, the value bonus —
     // inline, so the shelf never needs a chip pinned to a corner to say it.
     const amount = this.scene.add
-      .text(ROW_TEXT_X + 4, amountY, `${cfg.title} ×${item.amount.toLocaleString('en-GB')}`, {
+      .text(ROW_TEXT_X + 4, amountY, item.packId === 'custom_gold' ? '€5–€1,000 · 100 Gold per euro' : `${cfg.title} ×${item.amount.toLocaleString('en-GB')}`, {
         fontFamily: FONT.ui,
         fontSize: '34px',
         color: INK.onFieldDim

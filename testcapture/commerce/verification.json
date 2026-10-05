@@ -1,0 +1,49 @@
+{
+  "verifiedAt": "2026-10-05T08:45:48.912590+00:00",
+  "game": {
+    "tests": 1191,
+    "files": 86,
+    "typecheck": "passed",
+    "build": "passed",
+    "servedBundle": "index-CXkbwEzj.js",
+    "sha256": "66a9133f12655164f6a8a7898668007d82f5ff2be6f0cbfb95b13be3420dd015"
+  },
+  "storefront": {
+    "tests": 65,
+    "typecheck": "passed",
+    "build": "passed",
+    "changedSourceLint": "passed"
+  },
+  "admin": {
+    "typecheck": "passed",
+    "build": "passed",
+    "changedCommerceLint": "passed"
+  },
+  "firestoreRules": {
+    "emulatorTests": 6,
+    "passed": true
+  },
+  "browser": {
+    "checks": 23,
+    "passed": true,
+    "runtimeErrors": 0
+  },
+  "invoicePdf": {
+    "downloadedAndRendered": true,
+    "visuallyInspected": true,
+    "productionFontTraces": {
+      "storefront:.next/server/app/api/account/invoices/[purchaseId]/route.js.nft.json": true,
+      "storefront:.next/server/app/api/cron/invoices/route.js.nft.json": true,
+      "storefront:.next/server/app/api/iap/webhook/route.js.nft.json": true,
+      "admin:.next/server/app/api/invoices/[uid]/[purchaseId]/route.js.nft.json": true,
+      "admin:.next/server/app/(admin)/players/[uid]/invoice/[purchaseId]/page.js.nft.json": true
+    }
+  },
+  "sharedModules": "parity verified",
+  "productionDeployed": false,
+  "remaining": [
+    "Configure Ember Resend API key and verified sender plus CRON_SECRET",
+    "Verify new PayTrust customer/billing field schema against merchant API docs",
+    "Deploy matching Firestore rules, storefront game build and admin"
+  ]
+}
