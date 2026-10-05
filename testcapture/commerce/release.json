@@ -1,0 +1,173 @@
+{
+  "releasedAt": "2026-10-05T12:32:30.681007+00:00",
+  "authorizedBy": "User requested pushing verified changes to GitHub and keepofthedragon.com; Resend deferred",
+  "repositories": {
+    "game": {
+      "url": "https://github.com/novativeai/emberkeep-game",
+      "branch": "nionja",
+      "sourceCommit": "17fb540cfb3a6f113eb4f55d98f37e5487181704"
+    },
+    "storefront": {
+      "url": "https://github.com/novativeai/embergames",
+      "branch": "main",
+      "sourceCommit": "073765013ef9fa704fb8c37464ae9302264c833e"
+    },
+    "admin": {
+      "url": "https://github.com/novativeai/embergames-admin",
+      "branch": "main",
+      "private": true,
+      "sourceCommit": "020c5591f0b62d9dd5a771ffde1b42ebf9bc9867"
+    }
+  },
+  "deployments": {
+    "storefront": {
+      "id": "dpl_DJmRvqoqZCfhEBoA7miiKezYEQex",
+      "readyState": "READY",
+      "target": "production",
+      "url": "https://ember-emj0n5205-ember-7d69.vercel.app",
+      "aliases": [
+        "https://keepofthedragon.com",
+        "https://www.keepofthedragon.com",
+        "https://ember-seven-delta.vercel.app",
+        "https://ember-ember-7d69.vercel.app",
+        "https://ember-git-main-ember-7d69.vercel.app"
+      ],
+      "gitCommitSha": "073765013ef9fa704fb8c37464ae9302264c833e",
+      "nodeVersion": "22.x",
+      "crons": [
+        {
+          "path": "/api/cron/invoices",
+          "schedule": "0 * * * *"
+        }
+      ]
+    },
+    "admin": {
+      "id": "dpl_FyqnhXYKPJiq5zTtcZzjeihwdcGt",
+      "readyState": "READY",
+      "target": "production",
+      "url": "https://embergames-admin-rhpxncckb-novativeais-projects.vercel.app",
+      "aliases": [
+        "https://embergames-admin.vercel.app",
+        "https://embergames-admin-novativeais-projects.vercel.app"
+      ],
+      "gitCommitSha": "020c5591f0b62d9dd5a771ffde1b42ebf9bc9867",
+      "nodeVersion": "22.x",
+      "crons": []
+    }
+  },
+  "firestore": {
+    "project": "embergames-hub",
+    "ruleset": "projects/embergames-hub/rulesets/844b9787-b3fd-4da9-a09d-13a91f08e5f1",
+    "releaseUpdatedAt": "2026-10-05T11:11:19.679881Z",
+    "compiledAndPublished": true
+  },
+  "configuration": {
+    "cronSecretConfigured": true,
+    "cronSchedule": "0 * * * *",
+    "nodeVersion": "22.x",
+    "resendConfigured": false,
+    "existingPaymentAndAuthCredentials": "retained"
+  },
+  "httpChecks": [
+    {
+      "name": "landing",
+      "url": "https://keepofthedragon.com/",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "finalUrl": "https://keepofthedragon.com/",
+      "bytes": 99524,
+      "customGoldVisible": true
+    },
+    {
+      "name": "account-auth",
+      "url": "https://keepofthedragon.com/account",
+      "status": 200,
+      "expected": 200,
+      "passed": true,
+      "finalUrl": "https://keepofthedragon.com/account"
+    },
+    {
+      "name": "profile-auth",
+      "url": "https://keepofthedragon.com/api/account/profile",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "finalUrl": "https://keepofthedragon.com/api/account/profile"
+    },
+    {
+      "name": "invoice-auth",
+      "url": "https://keepofthedragon.com/api/account/invoices/release-check",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "finalUrl": "https://keepofthedragon.com/api/account/invoices/release-check"
+    },
+    {
+      "name": "cron-auth",
+      "url": "https://keepofthedragon.com/api/cron/invoices",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "finalUrl": "https://keepofthedragon.com/api/cron/invoices"
+    },
+    {
+      "name": "checkout-auth",
+      "url": "https://keepofthedragon.com/api/iap/checkout",
+      "status": 401,
+      "expected": 401,
+      "passed": true,
+      "finalUrl": "https://keepofthedragon.com/api/iap/checkout"
+    },
+    {
+      "name": "production-game-bundle",
+      "url": "https://keepofthedragon.com/games/emberkeep/assets/index-CXkbwEzj.js",
+      "status": 200,
+      "sha256": "66a9133f12655164f6a8a7898668007d82f5ff2be6f0cbfb95b13be3420dd015",
+      "expectedSha256": "66a9133f12655164f6a8a7898668007d82f5ff2be6f0cbfb95b13be3420dd015",
+      "passed": true
+    },
+    {
+      "name": "www-domain",
+      "status": 200,
+      "finalUrl": "https://www.keepofthedragon.com/",
+      "passed": true
+    },
+    {
+      "name": "admin-login",
+      "url": "https://embergames-admin.vercel.app/login",
+      "status": 200,
+      "expected": 200,
+      "location": null,
+      "passed": true
+    },
+    {
+      "name": "admin-commerce-auth",
+      "url": "https://embergames-admin.vercel.app/commerce",
+      "status": 307,
+      "expected": 307,
+      "location": "/login",
+      "passed": true
+    },
+    {
+      "name": "admin-invoice-auth",
+      "url": "https://embergames-admin.vercel.app/api/invoices/release-check/release-check",
+      "status": 307,
+      "expected": 307,
+      "location": "/login",
+      "passed": true
+    }
+  ],
+  "livePaymentCreated": false,
+  "invoiceEmailSent": false,
+  "remaining": [
+    "Configure the Ember Resend API key and verified invoice sender (deferred by user)",
+    "Verify the new PayTrust customer/billing field schema against merchant API docs and an authorized sandbox payment"
+  ],
+  "taskBoard": {
+    "url": "https://emberkeep-board.vercel.app",
+    "implementation": "EMB-331",
+    "release": "EMB-333",
+    "remainingConfiguration": "EMB-332"
+  }
+}

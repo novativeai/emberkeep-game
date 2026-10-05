@@ -40,10 +40,10 @@
     }
   },
   "sharedModules": "parity verified",
-  "productionDeployed": false,
+  "productionDeployed": true,
   "remaining": [
-    "Configure Ember Resend API key and verified sender plus CRON_SECRET",
-    "Verify new PayTrust customer/billing field schema against merchant API docs",
-    "Deploy matching Firestore rules, storefront game build and admin"
-  ]
+    "Configure the Ember Resend API key and verified invoice sender (deferred by user)",
+    "Verify the new PayTrust customer/billing field schema against merchant API docs and an authorized sandbox payment"
+  ],
+  "releaseEvidence": "testcapture/commerce/release.json"
 }

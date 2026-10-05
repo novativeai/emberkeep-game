@@ -6,7 +6,7 @@ The game checkout at this document's parent is the Phaser/Vite application from 
 
 https://keepofthedragon.com is attached to the **Ember** Vercel project (`prj_LpX8Ke7mgNechBvyOzXoHwbFL2Hx`, team `ember-7d69`). The production deployment inspected before these edits was `dpl_Cm7Pr32WnPJEV3DQ1Bk4ZPqfWzUV`, https://ember-3t139nfk7-ember-7d69.vercel.app. Its served game JavaScript matched the baseline rebuilt game. The user authorized publishing the verified changes on 5 October 2026. Release deployment results are recorded in `testcapture/commerce/release.json`.
 
-`embergames-admin/` is a separate Next.js application, locally linked to Vercel project `embergames-admin`, in a different team. The admin production deployment inspected was `dpl_6wAabj8BpNHw2uQErzcLD62jKeLL`, https://embergames-admin-bnpl2c8j7-novativeais-projects.vercel.app, with no Git commit metadata in the project response. It was an untracked directory without its own Git repository at assessment. The authorized release versions it in a separate private repository at https://github.com/novativeai/embergames-admin; the parent ignores this nested checkout. All three repositories must be pushed for a full release.
+`embergames-admin/` is a separate Next.js application, locally linked to Vercel project `embergames-admin`, in a different team. The admin production deployment inspected before this release was `dpl_6wAabj8BpNHw2uQErzcLD62jKeLL`, https://embergames-admin-bnpl2c8j7-novativeais-projects.vercel.app, with no Git commit metadata in the project response. It was an untracked directory without its own Git repository at assessment. The authorized release versions it in a separate private repository at https://github.com/novativeai/embergames-admin; the parent ignores this nested checkout. All three repositories must be pushed for a full release.
 
 ## Where each component lives
 
@@ -79,18 +79,22 @@ flowchart TD
 
 Player progress shows only **Level, XP and Gold balance**. Member dates, last sign-in, cloud/save diagnostics and reset controls are in the admin panel. Reset keeps a recovery snapshot, acknowledges already-latched grants, increments the save generation, and reloads an active player's game. Old clients cannot overwrite the reset.
 
+## Published release
+
+All three repositories were pushed. Storefront commit `0737650` is READY on https://keepofthedragon.com (`dpl_DJmRvqoqZCfhEBoA7miiKezYEQex`). Admin commit `020c559` is READY on https://embergames-admin.vercel.app (`dpl_FyqnhXYKPJiq5zTtcZzjeihwdcGt`). The served game bundle hash equals the locally verified build. Live HTTP checks passed for the landing/custom Gold form, both public domains, protected storefront APIs, admin login and protected admin routes. Production Firestore rules compiled and were published before the applications. Node 22 and an authenticated hourly invoice cron are configured. Source commit and deployment details are recorded in `testcapture/commerce/release.json`.
+
 ## Remaining production configuration and verification
 
 The Ember production environment inspected had **no Resend API key or sender configured**. The user explicitly deferred Resend setup and authorized publishing the verified code with invoice delivery queued until configuration is supplied. No working Ember-specific key was found locally. Unrelated applications' credentials were not copied into this project.
 
 Production release configuration:
 
-1. Configure `RESEND_API_KEY`, a sender verified for this business (`RESEND_FROM_EMAIL` or the admin Invoices settings), and a strong `CRON_SECRET` in the **Ember** project. The release generates/configures CRON_SECRET separately; Resend credentials remain deferred. Seller defaults are the existing site's LUNQEST LIMITED legal identity and company number 16823938; optional `INVOICE_SELLER_*` overrides exist.
+1. Configure `RESEND_API_KEY` and a sender verified for this business (`RESEND_FROM_EMAIL` or the admin Invoices settings) in the **Ember** project. A strong encrypted production `CRON_SECRET` was configured during this release; Resend credentials remain deferred. Seller defaults are the existing site's LUNQEST LIMITED legal identity and company number 16823938; optional `INVOICE_SELLER_*` overrides exist.
 2. Confirm PayTrust's actual merchant API contract for the new `customer.dateOfBirth`, `customer.phone`, `customer.referenceId` and `billing.{country,city,addressLine,postalCode}` fields. The feedback specifies the required facts but did not provide the API document. The existing successful payment schema was inspected read-only; the new billing payload has been tested against an isolated simulator, **not verified against a merchant sandbox contract**. No real payment was created.
-3. Publish the validated `embergames/firestore.rules` before exposing the admin reset/restore changes. Deploy matching game, storefront and admin code together; old clients without the new generation protocol will be refused after a reset.
+3. The validated `embergames/firestore.rules` were published before the matching storefront/game and admin deployments. Old clients without the new generation protocol will be refused after a reset.
 4. Set the canonical return/webhook origin to https://keepofthedragon.com with `PUBLIC_BASE_URL`/`NEXT_PUBLIC_SITE_URL`; retain the existing production PayTrust keys and cookie secret.
 5. The team's plan was verified as Pro via Vercel's team API. The configured hourly invoice cron is compatible with that plan. Hobby permits only daily cron and would reject this schedule: https://vercel.com/docs/cron-jobs/usage-and-pricing.
-6. Once credentials and the provider schema are confirmed, verify one authorized sandbox payment and invoice email before the production rollout. Resend attachment API reference: https://resend.com/docs/api-reference/emails/send-email. No invoice email or live purchase was sent during this implementation.
+6. Once credentials and the provider schema are confirmed, verify one authorized sandbox payment and invoice email to complete merchant and mail-delivery validation. Resend attachment API reference: https://resend.com/docs/api-reference/emails/send-email. No invoice email or live purchase was sent during this implementation.
 7. For an invoice in `review`, check Resend delivery logs before requeueing it. This state deliberately stops automatic attempts rather than risk duplicate mail.
 
 ## Local verification
